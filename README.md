@@ -14,7 +14,7 @@
 
 ## Why are we here?
 
-Just a little wrapper for motion. I love their work!
+Just a little wrapper for motion. I love their work! The typical this is a WIP, if you have issues please give me a react example working so that I can work to ensure its running properly 😍
 
 ## External Dependencies
 
@@ -30,9 +30,10 @@ This package carefully selects its dependencies to provide a robust and maintain
 
 ### Examples
 
-| Motion                  | Repl                                                                                          |
-| ----------------------- | --------------------------------------------------------------------------------------------- |
-| React - Enter Animation | [View Example](https://svelte.dev/playground/7f60c347729f4ea48b1a4590c9dedc02?version=5.20.2) |
+| Motion                                                                                                   | Repl                                                                                          |
+| -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [React - Enter Animation](https://examples.motion.dev/react/enter-animation)                             | [View Example](https://svelte.dev/playground/7f60c347729f4ea48b1a4590c9dedc02?version=5.20.2) |
+| [Random - Shiny Button](https://www.youtube.com/watch?v=jcpLprT5F0I) by [@verse\_](https://x.com/verse_) | [View Example](https://svelte.dev/playground/96f9e0bf624f4396adaf06c519147450?version=5.20.2) |
 
 ## License
 
