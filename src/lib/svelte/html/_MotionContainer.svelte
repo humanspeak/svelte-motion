@@ -1,0 +1,106 @@
+<script lang="ts">
+    import { type Snippet } from 'svelte'
+    import type { SvelteHTMLElements } from 'svelte/elements'
+    import type {
+        MotionInitial,
+        MotionAnimate,
+        MotionTransition,
+        MotionWhileTap
+    } from '../types.js'
+    import { animate, press } from 'motion'
+    import { isNotEmpty, getCommonKeys } from '../utils/objects.js'
+
+    type Props = {
+        children?: Snippet
+        tag: keyof SvelteHTMLElements
+        initial?: MotionInitial
+        animate?: MotionAnimate
+        whileTap?: MotionWhileTap
+        transition?: MotionTransition
+        style?: string
+        class?: string
+        [key: string]: unknown
+    }
+
+    let {
+        children,
+        tag = 'div',
+        initial: initialProp,
+        animate: animateProp,
+        transition: transitionProp,
+        style: styleProp,
+        class: classProp,
+        whileTap: whileTapProp,
+        ...rest
+    }: Props = $props()
+    let element: HTMLElement | null = $state(null)
+    let isLoaded = $state(false)
+
+    const runAnimation = () => {
+        if (!element || !animateProp) return
+        const transitionAmimate = {
+            ...(transitionProp ?? {})
+        }
+        animate(element, animateProp, transitionAmimate)
+    }
+
+    const setIsLoaded = () => {
+        setTimeout(() => {
+            isLoaded = true
+        }, 1)
+    }
+
+    $effect(() => {
+        if (element && isLoaded) {
+            if (isNotEmpty(whileTapProp)) {
+                press(element, (element: Element) => {
+                    animate(element, whileTapProp!)
+                    return () => {
+                        if (isNotEmpty(initialProp)) {
+                            const commonProps = getCommonKeys(initialProp!, whileTapProp!)
+                            const resetProps = Object.fromEntries(
+                                commonProps.map((key) => [key, initialProp![key]])
+                            )
+                            animate(element, resetProps)
+                        }
+                    }
+                })
+            }
+        }
+    })
+
+    $effect(() => {
+        if (element) {
+            if (animateProp) {
+                if (isNotEmpty(initialProp)) {
+                    animate(element, initialProp!)
+                        .then(() => {
+                            setIsLoaded()
+                        })
+                        .then(runAnimation)
+                } else {
+                    setIsLoaded()
+                    runAnimation()
+                }
+            } else if (isNotEmpty(initialProp)) {
+                animate(element, initialProp!).then(() => {
+                    setIsLoaded()
+                })
+            } else {
+                setIsLoaded()
+            }
+        }
+    })
+</script>
+
+<svelte:element
+    this={tag}
+    bind:this={element}
+    {...rest}
+    style={isLoaded ? `${styleProp} ${element?.style.cssText}` : ''}
+    class={isLoaded ? `${classProp}` : ''}
+>
+    {#if isLoaded}
+        {@render children?.()}
+    {/if}
+</svelte:element>
