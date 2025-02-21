@@ -1,5 +1,5 @@
 <script lang="ts">
-    import MotionContainer from '$lib/svelte/html/_MotionContainer.svelte'
+    import MotionContainer from './_MotionContainer.svelte'
     import type { Snippet } from 'svelte'
 
     type Props = {
@@ -10,6 +10,6 @@
     let { children, ...rest }: Props = $props()
 </script>
 
-<MotionContainer tag="button" {...rest}>
+<MotionContainer tag="div" {...rest}>
     {@render children?.()}
 </MotionContainer>

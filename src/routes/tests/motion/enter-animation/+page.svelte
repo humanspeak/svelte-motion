@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion } from '$lib/svelte/index.js'
+    import { motion } from '$lib/index.js'
 </script>
 
 <motion.div
