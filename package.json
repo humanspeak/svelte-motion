@@ -1,6 +1,32 @@
 {
     "name": "@humanspeak/svelte-motion",
     "version": "0.0.2",
+    "description": "A lightweight animation library for Svelte 5 that provides smooth, hardware-accelerated animations. Features include spring physics, custom easing, and fluid transitions. Built on top of the motion library, it offers a simple API for creating complex animations with minimal code. Perfect for interactive UIs, micro-interactions, and engaging user experiences.",
+    "keywords": [
+        "svelte",
+        "animation",
+        "motion",
+        "transitions",
+        "spring-physics",
+        "ui-animation",
+        "svelte5",
+        "hardware-accelerated",
+        "micro-interactions",
+        "performance"
+    ],
+    "bugs": {
+        "url": "https://github.com/humanspeak/svelte-motion/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/humanspeak/svelte-motion.git"
+    },
+    "funding": {
+        "type": "github",
+        "url": "https://github.com/sponsors/humanspeak"
+    },
+    "license": "MIT",
+    "author": "Humanspeak, Inc.",
     "sideEffects": [
         "**/*.css"
     ],
@@ -70,5 +96,27 @@
     },
     "peerDependencies": {
         "svelte": "^5.0.0"
-    }
+    },
+    "volta": {
+        "node": "22.13.0"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "overrides": {
+        "@sveltejs/kit": {
+            "cookie": "^0.7.0"
+        }
+    },
+    "tags": [
+        "svelte",
+        "animation",
+        "motion",
+        "transitions",
+        "spring-physics",
+        "performance",
+        "ui-animation",
+        "micro-interactions",
+        "svelte5"
+    ]
 }
