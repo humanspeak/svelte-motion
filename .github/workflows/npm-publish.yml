@@ -1,0 +1,376 @@
+# 1. Workflow metadata
+name: Publish to NPM
+
+permissions:
+    contents: read
+    packages: read
+    pull-requests: read
+
+# 2. Trigger conditions
+on:
+    pull_request:
+        types: [closed]
+        branches:
+            - main
+        paths-ignore:
+            - .github/**
+            - docs/**
+            - PRD.md
+            - README.md
+    workflow_dispatch:
+        inputs:
+            # trunk-ignore(checkov/CKV_GHA_7): We need manual version control for releases
+            version_bump:
+                description: Version bump type (major/minor/patch) or skip
+                required: true
+                type: choice
+                options:
+                    - skip
+                    - patch
+                    - minor
+                    - major
+            custom_message:
+                description: Release message
+                required: false
+                type: string
+
+jobs:
+    # 3. Testing jobs (grouped together)
+    build:
+        runs-on: ubuntu-24.04
+        strategy:
+            matrix:
+                node-version: [20, 22, 23]
+        permissions:
+            contents: read
+            packages: write
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+                  token: ${{ secrets.ACTIONS_KEY }}
+
+            - name: Use Node.js ${{ matrix.node-version }}
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ matrix.node-version }}
+
+            - name: Install
+              run: |
+                  npm ci
+
+            - name: Test
+              run: npm test --coverage
+
+            - name: Upload Vitest Results
+              if: always()
+              uses: trunk-io/analytics-uploader@main
+              with:
+                  junit-paths: junit-vitest.xml
+                  org-slug: ${{ secrets.TRUNK_ORG_SLUG }}
+                  token: ${{ secrets.TRUNK_TOKEN }}
+
+            - name: Upload coverage to Coveralls
+              uses: coverallsapp/github-action@v2
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  flag-name: node-${{ matrix.node-version }}
+                  parallel: true
+              if: matrix.node-version == '22'
+
+            - name: Cache dependencies
+              uses: actions/cache@v4
+              with:
+                  path: ~/.npm
+                  key: ${{ runner.os }}-node-${{ matrix.node-version }}-${{ hashFiles('**/package-lock.json') }}
+                  restore-keys: |
+                      ${{ runner.os }}-node-${{ matrix.node-version }}-
+                      ${{ runner.os }}-node-
+
+    playwright-tests:
+        timeout-minutes: 60
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+                  token: ${{ secrets.ACTIONS_KEY }}
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Install Playwright Browsers
+              run: npx playwright install --with-deps
+
+            - name: Run Playwright tests
+              run: npm run test:e2e
+
+            - name: Upload Playwright Results
+              if: always()
+              uses: trunk-io/analytics-uploader@main
+              with:
+                  junit-paths: junit-playwright.xml
+                  org-slug: ${{ secrets.TRUNK_ORG_SLUG }}
+                  token: ${{ secrets.TRUNK_TOKEN }}
+
+            - uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: playwright-report
+                  path: playwright-report/
+                  retention-days: 10
+
+    # 4. Coverage reporting (depends on tests)
+    coverage-report:
+        needs: [build, playwright-tests]
+        runs-on: ubuntu-24.04
+        if: ${{ always() }}
+        steps:
+            - name: Coveralls Finished
+              uses: coverallsapp/github-action@v2
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  parallel-finished: true
+
+    # 5. Publishing job (main deployment logic)
+    publish-github-packages:
+        needs: [build, playwright-tests, coverage-report]
+        runs-on: ubuntu-24.04
+        permissions:
+            contents: write
+            packages: write
+            issues: write
+            pull-requests: write
+            id-token: write
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  fetch-depth: 0
+
+            - name: Use Node.js - 22
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  registry-url: https://registry.npmjs.org
+                  scope: '@humanspeak'
+
+            - name: Install
+              run: npm ci
+
+            - name: Check Publishing Status
+              id: publish-check
+              env:
+                  EVENT_NAME: ${{ github.event_name }}
+                  IS_MERGED: ${{ github.event.pull_request.merged }}
+                  HAS_SKIP_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'skip-publish') }}
+                  INPUT_VERSION: ${{ github.event.inputs.version_bump }}
+              run: |
+                  # Validate event name first
+                  if [[ "$EVENT_NAME" != "pull_request" && "$EVENT_NAME" != "workflow_dispatch" ]]; then
+                    echo "Invalid event type"
+                    exit 1
+                  fi
+
+                  # Check publishing conditions
+                  if [[ "$EVENT_NAME" == "pull_request" ]]; then
+                    if [[ "$IS_MERGED" != "true" ]]; then
+                      echo "PR not merged, skipping publish"
+                      echo "should_publish=false" >> $GITHUB_OUTPUT
+                    elif [[ "$HAS_SKIP_LABEL" == "true" ]]; then
+                      echo "Publishing skipped due to skip-publish label"
+                      echo "should_publish=false" >> $GITHUB_OUTPUT
+                    else
+                      echo "should_publish=true" >> $GITHUB_OUTPUT
+                    fi
+                  elif [[ "$EVENT_NAME" == "workflow_dispatch" && "$INPUT_VERSION" == "skip" ]]; then
+                    echo "Publishing skipped via manual selection"
+                    echo "should_publish=false" >> $GITHUB_OUTPUT
+                  else
+                    echo "should_publish=true" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Create Comment on Skip
+              if: github.event_name == 'pull_request' && steps.publish-check.outputs.should_publish == 'false'
+              uses: actions/github-script@v7
+              with:
+                  github-token: ${{ secrets.ACTIONS_KEY }}
+                  script: |
+                      github.rest.issues.createComment({
+                          issue_number: context.issue.number,
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          body: '⏭️ NPM publishing was skipped due to the `skip-publish` label.'
+                      })
+
+            - name: Import GPG key
+              if: steps.publish-check.outputs.should_publish == 'true'
+              id: import_gpg
+              uses: crazy-max/ghaction-import-gpg@v6
+              with:
+                  gpg_private_key: ${{ secrets.ACTIONS_GPG_PRIVATE_KEY }}
+                  passphrase: ${{ secrets.ACTIONS_GPG_PASSPHRASE }}
+                  git_user_signingkey: true
+                  git_commit_gpgsign: true
+                  git_tag_gpgsign: true
+                  git_config_global: true
+
+            - name: Determine version bump type
+              if: steps.publish-check.outputs.should_publish == 'true'
+              id: version-type
+              env:
+                  HAS_MAJOR: ${{ contains(github.event.pull_request.labels.*.name, 'major') }}
+                  HAS_MINOR: ${{ contains(github.event.pull_request.labels.*.name, 'minor') }}
+                  INPUT_VERSION: ${{ github.event.inputs.version_bump }}
+              run: |
+                  # Function to validate version bump type
+                  validate_bump_type() {
+                    local bump="$1"
+                    case "$bump" in
+                      "major"|"minor"|"patch"|"skip") echo "$bump" ;;
+                      *) echo "patch" ;;
+                    esac
+                  }
+
+                  # Determine and validate bump type
+                  if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+                    BUMP_TYPE=$(validate_bump_type "$INPUT_VERSION")
+                    if [ "$BUMP_TYPE" = "skip" ]; then
+                      echo "Publishing skipped via manual selection"
+                      echo "should_publish=false" >> $GITHUB_OUTPUT
+                      exit 0
+                    fi
+                  elif [ "$HAS_MAJOR" = "true" ]; then
+                    BUMP_TYPE="major"
+                  elif [ "$HAS_MINOR" = "true" ]; then
+                    BUMP_TYPE="minor"
+                  else
+                    BUMP_TYPE="patch"
+                  fi
+
+                  echo "bump=$BUMP_TYPE" >> $GITHUB_OUTPUT
+
+            - name: Bump version
+              if: steps.publish-check.outputs.should_publish == 'true'
+              id: version
+              env:
+                  PR_TITLE: ${{ github.event.pull_request.title }}
+                  PR_URL: ${{ github.event.pull_request.html_url }}
+                  BUMP_TYPE: ${{ steps.version-type.outputs.bump }}
+                  GITHUB_TOKEN: ${{ secrets.ACTIONS_KEY }}
+                  GPG_KEY_ID: ${{ steps.import_gpg.outputs.keyid }}
+              run: |
+                  # Validate GPG key ID format first
+                  if [[ ! "$GPG_KEY_ID" =~ ^[A-F0-9]{16}$ ]]; then
+                      echo "Invalid GPG key ID format"
+                      exit 1
+                  fi
+
+                  # Configure git with validated credentials
+                  git config --global user.name "GitHub Actions Bot"
+                  git config --global user.email "jason@humanspeak.com"
+                  git config --global commit.gpgsign true
+                  git config --global user.signingkey "$GPG_KEY_ID"
+
+                  # Set up authentication for push
+                  git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+
+                  # Validate bump type for security
+                  case "$BUMP_TYPE" in
+                    "major"|"minor"|"patch") ;;
+                    *)
+                      echo "Invalid version bump type"
+                      exit 1
+                      ;;
+                  esac
+
+                  # Get the new version number
+                  NEW_VERSION=$(npm version "$BUMP_TYPE" --no-git-tag-version)
+                  echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+                  # Escape special characters in PR title and URL
+                  ESCAPED_TITLE=$(echo "$PR_TITLE" | sed 's/[`$"\]/\\&/g')
+                  ESCAPED_URL=$(echo "$PR_URL" | sed 's/[`$"\]/\\&/g')
+
+                  # Commit the version changes
+                  git add package.json package-lock.json
+                  git commit -m "Bump version to ${NEW_VERSION} [skip ci]"
+
+                  # Create an annotated tag with release notes
+                  git tag -a "${NEW_VERSION}" -m "Release ${NEW_VERSION}
+
+                  Changes in this Release:
+                  - ${ESCAPED_TITLE}
+
+                  PR: ${ESCAPED_URL}"
+
+                  # Push changes
+                  git push
+                  git push --tags
+
+            - name: Create Release
+              if: steps.publish-check.outputs.should_publish == 'true'
+              id: create_release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.version.outputs.new_version }}
+                  name: Release ${{ steps.version.outputs.new_version }}
+                  body: |
+                      Changes in this Release
+                      ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.custom_message || github.event.pull_request.title }}
+
+                      ${{ github.event_name == 'pull_request' && format('For more details, see the [Pull Request]({0})', github.event.pull_request.html_url) || '' }}
+                  draft: false
+                  prerelease: false
+                  make_latest: true
+                  generate_release_notes: false
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Publish
+              if: steps.publish-check.outputs.should_publish == 'true'
+              run: |
+                  # Ensure we're publishing to the correct scope
+                  rm -f ./.npmrc
+                  npm config set @humanspeak:registry https://registry.npmjs.org/
+                  npm publish --provenance --access public
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_GITHUB_TOKEN }}
+
+            - name: Cleanup on failure
+              if: failure() && steps.create_release.outcome == 'success'
+              env:
+                  RELEASE_VERSION: ${{ steps.version.outputs.new_version }}
+                  GITHUB_TOKEN: ${{ secrets.ACTIONS_KEY }}
+              run: |
+                  # Validate version format first
+                  if [[ ! "$RELEASE_VERSION" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                    echo "Invalid version format: $RELEASE_VERSION"
+                    exit 1
+                  fi
+
+                  # Proceed with cleanup only if validation passes
+                  gh release delete "$RELEASE_VERSION" --yes
+                  git tag -d "$RELEASE_VERSION"
+                  git push --delete origin "$RELEASE_VERSION"
+
+            - name: Notify on failure
+              if: failure()
+              uses: actions/github-script@v7
+              with:
+                  github-token: ${{ secrets.ACTIONS_KEY }}
+                  script: |
+                      github.rest.issues.createComment({
+                          issue_number: context.issue.number,
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          body: '❌ Release workflow failed. Please check the [workflow logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})'
+                      })
