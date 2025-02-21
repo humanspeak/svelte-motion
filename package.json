@@ -35,10 +35,6 @@
         ".": {
             "types": "./dist/index.d.ts",
             "svelte": "./dist/index.js"
-        },
-        "./svelte": {
-            "types": "./dist/svelte/index.d.ts",
-            "svelte": "./dist/svelte/index.js"
         }
     },
     "svelte": "./dist/index.js",
