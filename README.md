@@ -28,6 +28,12 @@ This package carefully selects its dependencies to provide a robust and maintain
     - Supports spring physics and custom easing
     - Used for creating fluid motion and transitions
 
+### Examples
+
+| Motion                  | Repl                                                                                          |
+| ----------------------- | --------------------------------------------------------------------------------------------- |
+| React - Enter Animation | [View Example](https://svelte.dev/playground/7f60c347729f4ea48b1a4590c9dedc02?version=5.20.2) |
+
 ## License
 
 MIT © [Humanspeak, Inc.](LICENSE)
