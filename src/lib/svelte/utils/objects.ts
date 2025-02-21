@@ -9,3 +9,7 @@ export const isEmpty = (obj: Record<string, unknown> | DOMKeyframesDefinition | 
 export const isNotEmpty = (obj: Record<string, unknown> | DOMKeyframesDefinition | undefined) => {
     return !isEmpty(obj)
 }
+
+export function getCommonKeys<T extends Record<string, unknown>>(obj1: T, obj2: T): (keyof T)[] {
+    return Object.keys(obj1).filter((key) => key in obj2) as (keyof T)[]
+}

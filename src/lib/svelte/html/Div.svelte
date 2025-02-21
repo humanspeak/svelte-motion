@@ -1,5 +1,5 @@
 <script lang="ts">
-    import MotionContainer from '$lib/MotionContainer.svelte'
+    import MotionContainer from '$lib/svelte/html/_MotionContainer.svelte'
     import type { Snippet } from 'svelte'
 
     type Props = {
