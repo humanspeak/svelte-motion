@@ -16,6 +16,75 @@
 
 Just a little wrapper for motion. I love their work! The typical this is a WIP, if you have issues please give me a react example working so that I can work to ensure its running properly 😍
 
+## Supported Elements
+
+### Regular Elements
+
+- `motion.a`
+- `motion.article`
+- `motion.aside`
+- `motion.blockquote`
+- `motion.button`
+- `motion.code`
+- `motion.dd`
+- `motion.div`
+- `motion.dl`
+- `motion.dt`
+- `motion.fieldset`
+- `motion.figcaption`
+- `motion.figure`
+- `motion.footer`
+- `motion.form`
+- `motion.h1`
+- `motion.h2`
+- `motion.h3`
+- `motion.h4`
+- `motion.h5`
+- `motion.h6`
+- `motion.header`
+- `motion.label`
+- `motion.legend`
+- `motion.li`
+- `motion.main`
+- `motion.nav`
+- `motion.ol`
+- `motion.option`
+- `motion.p`
+- `motion.pre`
+- `motion.section`
+- `motion.select`
+- `motion.span`
+- `motion.table`
+- `motion.tbody`
+- `motion.td`
+- `motion.textarea`
+- `motion.tfoot`
+- `motion.th`
+- `motion.thead`
+- `motion.tr`
+- `motion.ul`
+
+### Void Elements
+
+- `motion.area`
+- `motion.base`
+- `motion.br`
+- `motion.col`
+- `motion.embed`
+- `motion.hr`
+- `motion.img`
+- `motion.input`
+- `motion.param`
+- `motion.source`
+- `motion.track`
+- `motion.wbr`
+
+### Regular Elements
+
+- `motion.a`
+- `motion.article`
+- `motion.aside`
+
 ## External Dependencies
 
 This package carefully selects its dependencies to provide a robust and maintainable solution:

@@ -101,3 +101,29 @@ const exports = `export { ${FILTERED_TAGS.map(
 
 const indexContent = `${imports}\n\n${exports}\n`
 fs.writeFileSync(path.join(OUTPUT_DIR, 'index.ts'), indexContent)
+
+// Generate documentation for README.md
+const regularElements = FILTERED_TAGS.filter((tag) => !VOID_ELEMENTS.has(tag)).sort()
+const voidElements = FILTERED_TAGS.filter((tag) => VOID_ELEMENTS.has(tag)).sort()
+
+const elementDocs = `
+## Supported Elements
+
+### Regular Elements
+${regularElements.map((tag) => `- \`motion.${tag}\``).join('\n')}
+
+### Void Elements
+${voidElements.map((tag) => `- \`motion.${tag}\``).join('\n')}
+`
+
+// Read existing README
+const readmePath = 'README.md'
+const readme = fs.readFileSync(readmePath, 'utf-8')
+
+// Replace or insert the elements section
+const elementsSectionRegex = /## Supported Elements[\s\S]*?(?=##|$)/
+const updatedReadme = readme.includes('## Supported Elements')
+    ? readme.replace(elementsSectionRegex, elementDocs)
+    : readme + '\n' + elementDocs
+
+fs.writeFileSync(readmePath, updatedReadme)
