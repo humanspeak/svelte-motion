@@ -1,14 +1,14 @@
-// Reexport your entry components here
-import Button from './html/Button.svelte'
-import Div from './html/Div.svelte'
+import * as html from './html/index.js'
+
+// Create type for all HTML components
 type MotionComponents = {
-    div: typeof Div
-    button: typeof Button
+    [K in Lowercase<keyof typeof html>]: (typeof html)[Capitalize<K>]
 }
 
-export const motion: MotionComponents = {
-    div: Div,
-    button: Button
-}
+// Create the motion object with all components
+export const motion: MotionComponents = Object.fromEntries(
+    Object.entries(html).map(([key, component]) => [key.toLowerCase(), component])
+) as MotionComponents
 
-export type { MotionInitial } from './types.js'
+// Export all types
+export type { MotionAnimate, MotionInitial, MotionTransition, MotionWhileTap } from './types.js'

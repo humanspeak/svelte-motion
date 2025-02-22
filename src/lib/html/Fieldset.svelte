@@ -7,6 +7,6 @@
     let { children, ...rest } = $props<HTMLElementProps>()
 </script>
 
-<MotionContainer tag="button" {...rest}>
+<MotionContainer tag="fieldset" {...rest}>
     {@render children?.()}
 </MotionContainer>
