@@ -2,9 +2,7 @@
     import MotionContainer from './_MotionContainer.svelte'
     import type { HTMLElementProps } from '../types.js'
 
-    type Props = HTMLElementProps
-
-    let { children, ...rest } = $props<HTMLElementProps>()
+    let { children, ...rest }: HTMLElementProps = $props()
 </script>
 
 <MotionContainer tag="form" {...rest}>

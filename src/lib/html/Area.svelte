@@ -2,7 +2,7 @@
     import MotionContainer from './_MotionContainer.svelte'
     import type { HTMLVoidElementProps } from '../types.js'
 
-    let { ...rest } = $props<HTMLVoidElementProps>()
+    let { ...rest }: HTMLVoidElementProps = $props()
 </script>
 
 <MotionContainer tag="area" {...rest} />
