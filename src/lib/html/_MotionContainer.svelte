@@ -86,8 +86,8 @@
     this={tag}
     bind:this={element}
     {...rest}
-    style={isLoaded ? `${styleProp} ${element?.style.cssText}` : ''}
-    class={isLoaded ? `${classProp}` : ''}
+    style={isLoaded ? `${styleProp} ${element?.style.cssText}` : undefined}
+    class={isLoaded ? classProp : undefined}
 >
     {#if isLoaded}
         {@render children?.()}

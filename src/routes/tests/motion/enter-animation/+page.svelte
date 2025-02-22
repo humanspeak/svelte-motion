@@ -10,4 +10,5 @@
         scale: { type: 'spring', visualDuration: 0.4, bounce: 0.5 }
     }}
     style="width: 100px; height: 100px; background-color: red; border-radius: 50%;"
+    data-testid="motion-div"
 />
