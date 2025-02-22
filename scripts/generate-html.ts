@@ -95,35 +95,52 @@ const imports = FILTERED_TAGS.map((tag) => {
     return `import ${componentName} from './${componentName}.svelte'`
 }).join('\n')
 
-const exports = `export { ${FILTERED_TAGS.map(
-    (tag) => `${(tag as string).charAt(0).toUpperCase() + (tag as string).slice(1)}`
-).join(', ')} }`
-
-const indexContent = `${imports}\n\n${exports}\n`
-fs.writeFileSync(path.join(OUTPUT_DIR, 'index.ts'), indexContent)
-
-// Generate documentation for README.md
 const regularElements = FILTERED_TAGS.filter((tag) => !VOID_ELEMENTS.has(tag)).sort()
 const voidElements = FILTERED_TAGS.filter((tag) => VOID_ELEMENTS.has(tag)).sort()
 
-const elementDocs = `
-## Supported Elements
+const typeDefinition = `
+export type MotionComponents = {
+    ${regularElements
+        .map((tag) => {
+            const componentName = `${tag.charAt(0).toUpperCase() + tag.slice(1)}`
+            return `${tag}: typeof ${componentName}`
+        })
+        .join('\n    ')}
+
+    ${voidElements
+        .map((tag) => {
+            const componentName = `${tag.charAt(0).toUpperCase() + tag.slice(1)}`
+            return `${tag}: typeof ${componentName}`
+        })
+        .join('\n    ')}
+}
+`
+
+const indexContent = `${imports}\n\nexport { ${FILTERED_TAGS.map(
+    (tag) => `${(tag as string).charAt(0).toUpperCase() + (tag as string).slice(1)}`
+).join(', ')} }\n\n${typeDefinition}\n`
+
+fs.writeFileSync(path.join(OUTPUT_DIR, 'index.ts'), indexContent)
+
+// Generate documentation for README.md
+const elementDocs = `## Supported Elements
 
 ### Regular Elements
 ${regularElements.map((tag) => `- \`motion.${tag}\``).join('\n')}
 
 ### Void Elements
 ${voidElements.map((tag) => `- \`motion.${tag}\``).join('\n')}
-`
+
+## External Dependencies`
 
 // Read existing README
 const readmePath = 'README.md'
 const readme = fs.readFileSync(readmePath, 'utf-8')
 
 // Replace or insert the elements section
-const elementsSectionRegex = /## Supported Elements[\s\S]*?(?=##|$)/
+const elementsSectionRegex = /## Supported Elements[\s\S]*?## External Dependencies/
 const updatedReadme = readme.includes('## Supported Elements')
     ? readme.replace(elementsSectionRegex, elementDocs)
-    : readme + '\n' + elementDocs
+    : readme.replace(/(## Why are we here\?[\s\S]*?\n\n)/, `$1${elementDocs}\n`)
 
-fs.writeFileSync(readmePath, updatedReadme)
+fs.writeFileSync(readmePath, updatedReadme.trim() + '\n')

@@ -111,3 +111,62 @@ export {
     Ul,
     Wbr
 }
+
+export type MotionComponents = {
+    a: typeof A
+    article: typeof Article
+    aside: typeof Aside
+    blockquote: typeof Blockquote
+    button: typeof Button
+    code: typeof Code
+    dd: typeof Dd
+    div: typeof Div
+    dl: typeof Dl
+    dt: typeof Dt
+    fieldset: typeof Fieldset
+    figcaption: typeof Figcaption
+    figure: typeof Figure
+    footer: typeof Footer
+    form: typeof Form
+    h1: typeof H1
+    h2: typeof H2
+    h3: typeof H3
+    h4: typeof H4
+    h5: typeof H5
+    h6: typeof H6
+    header: typeof Header
+    label: typeof Label
+    legend: typeof Legend
+    li: typeof Li
+    main: typeof Main
+    nav: typeof Nav
+    ol: typeof Ol
+    option: typeof Option
+    p: typeof P
+    pre: typeof Pre
+    section: typeof Section
+    select: typeof Select
+    span: typeof Span
+    table: typeof Table
+    tbody: typeof Tbody
+    td: typeof Td
+    textarea: typeof Textarea
+    tfoot: typeof Tfoot
+    th: typeof Th
+    thead: typeof Thead
+    tr: typeof Tr
+    ul: typeof Ul
+
+    area: typeof Area
+    base: typeof Base
+    br: typeof Br
+    col: typeof Col
+    embed: typeof Embed
+    hr: typeof Hr
+    img: typeof Img
+    input: typeof Input
+    param: typeof Param
+    source: typeof Source
+    track: typeof Track
+    wbr: typeof Wbr
+}
