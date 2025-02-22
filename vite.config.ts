@@ -17,7 +17,8 @@ export default defineConfig({
             'tests/**',
             'playwright.config.ts',
             'tests-results/**',
-            '**/docs/**/*'
+            '**/docs/**/*',
+            'scripts/**'
         ],
         workspace: [
             {
