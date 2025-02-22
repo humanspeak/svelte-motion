@@ -81,6 +81,34 @@ const OUTPUT_DIR = 'src/lib/html'
 const template = fs.readFileSync(TEMPLATE_PATH, 'utf-8')
 const voidTemplate = fs.readFileSync(VOID_TEMPLATE_PATH, 'utf-8')
 
+const generateComponentDocs = (tag: string, isVoid: boolean): string => {
+    const workingProps = ['initial', 'animate', 'transition', 'whileTap']
+    const propsText = workingProps.map((prop) => `* \`${prop}\``).join('\n     * ')
+    const content = isVoid ? '' : 'Content'
+
+    return [
+        '    /**',
+        `     * A motion-enhanced ${tag} element with animation capabilities.`,
+        '     *',
+        '     * [Motion Documentation](https://motion.dev/docs/react-motion-component)',
+        '     *',
+        '     * Currently supported features:',
+        `     * ${propsText}`,
+        '     *',
+        '     * ```svelte',
+        `     * <motion.${tag}`,
+        '     *   initial={{ opacity: 0, scale: 0.8 }}',
+        '     *   animate={{ opacity: 1, scale: 1 }}',
+        '     *   transition={{ duration: 0.3 }}',
+        isVoid ? '     * />' : `     * >\n     *   ${content}\n     * </motion.${tag}>`,
+        '     * ```',
+        '     *',
+        '     * Note: Some motion features are still under development.',
+        '     * Check documentation for latest updates.',
+        '     */'
+    ].join('\n')
+}
+
 // Generate components
 FILTERED_TAGS.forEach((tag) => {
     const isVoid = VOID_ELEMENTS.has(tag)
@@ -103,16 +131,18 @@ export type MotionComponents = {
     ${regularElements
         .map((tag) => {
             const componentName = `${tag.charAt(0).toUpperCase() + tag.slice(1)}`
-            return `${tag}: typeof ${componentName}`
+            return `${generateComponentDocs(tag, false)}
+    ${tag}: typeof ${componentName}`
         })
-        .join('\n    ')}
+        .join('\n\n    ')}
 
     ${voidElements
         .map((tag) => {
             const componentName = `${tag.charAt(0).toUpperCase() + tag.slice(1)}`
-            return `${tag}: typeof ${componentName}`
+            return `${generateComponentDocs(tag, true)}
+    ${tag}: typeof ${componentName}`
         })
-        .join('\n    ')}
+        .join('\n\n    ')}
 }
 `
 
