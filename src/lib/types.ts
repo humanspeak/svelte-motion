@@ -6,12 +6,24 @@ export type MotionAnimate = DOMKeyframesDefinition | undefined
 export type MotionTransition = AnimationOptions | undefined
 export type MotionWhileTap = DOMKeyframesDefinition | undefined
 
-export type HTMLElementProps = {
+// Base motion props that all elements share
+export type MotionProps = {
+    initial?: MotionInitial
+    animate?: MotionAnimate
+    transition?: MotionTransition
+    whileTap?: MotionWhileTap
+    style?: string
+    class?: string
+}
+
+// Props for regular HTML elements
+export type HTMLElementProps = MotionProps & {
     children?: Snippet
     [key: string]: unknown
 }
 
-export type HTMLVoidElementProps = {
+// Props for void elements (no children allowed)
+export type HTMLVoidElementProps = MotionProps & {
     [key: string]: unknown
 } & {
     children?: never

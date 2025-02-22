@@ -1,24 +1,13 @@
 <script lang="ts">
     import { type Snippet } from 'svelte'
     import type { SvelteHTMLElements } from 'svelte/elements'
-    import type {
-        MotionInitial,
-        MotionAnimate,
-        MotionTransition,
-        MotionWhileTap
-    } from '../types.js'
+    import type { MotionProps } from '../types.js'
     import { animate, press } from 'motion'
     import { isNotEmpty, getCommonKeys } from '../utils/objects.js'
 
-    type Props = {
+    type Props = MotionProps & {
         children?: Snippet
         tag: keyof SvelteHTMLElements
-        initial?: MotionInitial
-        animate?: MotionAnimate
-        whileTap?: MotionWhileTap
-        transition?: MotionTransition
-        style?: string
-        class?: string
         [key: string]: unknown
     }
 

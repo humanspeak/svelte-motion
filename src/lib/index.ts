@@ -1,9 +1,5 @@
+import type { MotionComponents } from './html/index.js'
 import * as html from './html/index.js'
-
-// Create type for all HTML components
-type MotionComponents = {
-    [K in Lowercase<keyof typeof html>]: (typeof html)[Capitalize<K>]
-}
 
 // Create the motion object with all components
 export const motion: MotionComponents = Object.fromEntries(
