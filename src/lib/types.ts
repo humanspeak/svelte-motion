@@ -65,6 +65,31 @@ export type MotionProps = {
 }
 
 /**
+ * Configuration properties for motion/animation components.
+ * These props control how animations behave and transition between states.
+ *
+ * @example
+ * ```svelte
+ * <motion.div
+ *   transition={{ duration: 0.3, ease: "easeInOut" }}
+ * >
+ *   Content
+ * </motion.div>
+ * ```
+ *
+ * @property {MotionTransition} [transition] - Defines how the animation transitions between states.
+ *   Can include properties like:
+ *   - duration: Length of the animation in seconds
+ *   - ease: Easing function to use (e.g., "linear", "easeIn", "easeOut")
+ *   - delay: Time to wait before starting the animation
+ *   - repeat: Number of times to repeat the animation
+ */
+export type MotionConfigProps = {
+    /** Animation configuration */
+    transition?: MotionTransition
+}
+
+/**
  * Props for regular HTML elements that can have children
  * @example
  * ```svelte

@@ -39,6 +39,8 @@
 </motion.button>
 
 <style>
+    @reference "tailwindcss";
+
     :global(html, body) {
         @apply bg-neutral-950;
     }
