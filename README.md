@@ -79,6 +79,30 @@ Just a little wrapper for motion. I love their work! The typical this is a WIP, 
 - `motion.track`
 - `motion.wbr`
 
+## Configuration
+
+### MotionConfig
+
+This package includes support for `MotionConfig`, which allows you to set default motion settings for all child components. See the [Reach - Motion Config](https://motion.dev/docs/react-motion-config) for more details.
+
+```svelte
+<MotionConfig transition={{ duration: 0.5 }}>
+    <!-- All motion components inside will inherit these settings -->
+    <motion.div animate={{ scale: 1.2 }}>Inherits 0.5s duration</motion.div>
+</MotionConfig>
+```
+
+#### Current Limitations
+
+Some Motion features are not yet implemented:
+
+- `reducedMotion` settings
+- `features` configuration
+- Performance optimizations like `transformPagePoint`
+- Advanced transition controls
+
+We're actively working on adding these features. Check our GitHub issues for progress updates or to contribute.
+
 ## External Dependencies
 
 This package carefully selects its dependencies to provide a robust and maintainable solution:
@@ -93,7 +117,7 @@ This package carefully selects its dependencies to provide a robust and maintain
 
 ### Examples
 
-| Motion                                                                                                   | Repl                                                                                          |
+| Motion                                                                                                   | REPL                                                                                          |
 | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | [React - Enter Animation](https://examples.motion.dev/react/enter-animation)                             | [View Example](https://svelte.dev/playground/7f60c347729f4ea48b1a4590c9dedc02?version=5.20.2) |
 | [Random - Shiny Button](https://www.youtube.com/watch?v=jcpLprT5F0I) by [@verse\_](https://x.com/verse_) | [View Example](https://svelte.dev/playground/96f9e0bf624f4396adaf06c519147450?version=5.20.2) |

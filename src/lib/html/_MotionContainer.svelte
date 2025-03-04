@@ -4,6 +4,7 @@
     import type { MotionProps } from '../types.js'
     import { animate, press } from 'motion'
     import { isNotEmpty, getCommonKeys } from '../utils/objects.js'
+    import { getMotionConfig } from '$lib/components/motionConfig.context.js'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -24,6 +25,15 @@
     }: Props = $props()
     let element: HTMLElement | null = $state(null)
     let isLoaded = $state(false)
+
+    const motionConfig = getMotionConfig()
+
+    $effect(() => {
+        transitionProp = {
+            ...(motionConfig?.transition ?? {}),
+            ...(transitionProp ?? {})
+        }
+    })
 
     const runAnimation = () => {
         if (!element || !animateProp) return

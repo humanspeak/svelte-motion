@@ -38,10 +38,10 @@ lint:
               - svelte
               - javascript
     enabled:
-        - sort-package-json@2.14.0
+        - sort-package-json@2.15.1
         - actionlint@1.7.7
-        - checkov@3.2.372
-        - eslint@9.20.1:
+        - checkov@3.2.379
+        - eslint@9.21.0:
               config: eslint.config.mjs
               packages:
                   - '@typescript-eslint/eslint-plugin'
@@ -53,7 +53,7 @@ lint:
         - markdownlint@0.44.0
         - osv-scanner@1.9.2
         - oxipng@9.1.4
-        - prettier@3.5.1:
+        - prettier@3.5.3:
               packages:
                   - prettier-plugin-svelte
                   - prettier-plugin-organize-imports
@@ -62,7 +62,7 @@ lint:
         - shfmt@3.6.0
         - svgo@3.3.2
         - taplo@0.9.3
-        - trufflehog@3.88.12
+        - trufflehog@3.88.14
         - yamllint@1.35.1
 actions:
     enabled:
