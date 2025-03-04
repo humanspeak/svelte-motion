@@ -1,10 +1,11 @@
 <script lang="ts">
+    import { getMotionConfig } from '$lib/components/motionConfig.context.js'
+    import type { MotionProps } from '$lib/types.js'
+    import { getCommonKeys, isNotEmpty } from '$lib/utils/objects.js'
+    import { sleep } from '$lib/utils/testing.js'
+    import { animate, press } from 'motion'
     import { type Snippet } from 'svelte'
     import type { SvelteHTMLElements } from 'svelte/elements'
-    import type { MotionProps } from '../types.js'
-    import { animate, press } from 'motion'
-    import { isNotEmpty, getCommonKeys } from '../utils/objects.js'
-    import { getMotionConfig } from '$lib/components/motionConfig.context.js'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -24,9 +25,12 @@
         ...rest
     }: Props = $props()
     let element: HTMLElement | null = $state(null)
-    let isLoaded = $state(false)
-
+    let isLoaded = $state<'mounting' | 'initial' | 'ready' | 'animated'>('mounting')
+    let dataPath = $state<number>(-1)
     const motionConfig = getMotionConfig()
+    const isPlaywright =
+        typeof window !== 'undefined' &&
+        window.location.search.includes('@humanspeak-svelte-motion-isPlaywright=true')
 
     $effect(() => {
         transitionProp = {
@@ -43,14 +47,8 @@
         animate(element, animateProp, transitionAmimate)
     }
 
-    const setIsLoaded = () => {
-        setTimeout(() => {
-            isLoaded = true
-        }, 1)
-    }
-
     $effect(() => {
-        if (element && isLoaded) {
+        if (element && isLoaded === 'ready') {
             if (isNotEmpty(whileTapProp)) {
                 press(element, (element: Element) => {
                     animate(element, whileTapProp!)
@@ -72,21 +70,36 @@
         if (element) {
             if (animateProp) {
                 if (isNotEmpty(initialProp)) {
-                    animate(element, initialProp!)
-                        .then(() => {
-                            setIsLoaded()
-                        })
-                        .then(runAnimation)
+                    // Set initial state immediately
+                    isLoaded = 'initial'
+                    dataPath = 1
+                    // Give time for initial render
+                    setTimeout(async () => {
+                        await animate(element!, initialProp!)
+                        if (isPlaywright) {
+                            await sleep(250)
+                        }
+                        isLoaded = 'ready'
+                        runAnimation()
+                    }, 5)
                 } else {
-                    setIsLoaded()
+                    dataPath = 2
+                    isLoaded = 'ready'
                     runAnimation()
                 }
             } else if (isNotEmpty(initialProp)) {
-                animate(element, initialProp!).then(() => {
-                    setIsLoaded()
-                })
+                dataPath = 3
+                isLoaded = 'initial'
+                setTimeout(async () => {
+                    await animate(element!, initialProp!)
+                    if (isPlaywright) {
+                        await sleep(250)
+                    }
+                    isLoaded = 'ready'
+                }, 5)
             } else {
-                setIsLoaded()
+                dataPath = 4
+                isLoaded = 'ready'
             }
         }
     })
@@ -96,10 +109,13 @@
     this={tag}
     bind:this={element}
     {...rest}
-    style={isLoaded ? `${styleProp} ${element?.style.cssText}` : undefined}
-    class={isLoaded ? classProp : undefined}
+    data-playwright={isPlaywright}
+    data-is-loaded={isPlaywright ? isLoaded : undefined}
+    data-path={isPlaywright ? dataPath : undefined}
+    style={isLoaded === 'ready' ? `${styleProp} ${element?.style.cssText}` : undefined}
+    class={isLoaded === 'ready' ? classProp : undefined}
 >
-    {#if isLoaded}
+    {#if isLoaded === 'ready'}
         {@render children?.()}
     {/if}
 </svelte:element>
