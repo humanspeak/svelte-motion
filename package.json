@@ -95,7 +95,7 @@
         "prettier-plugin-organize-imports": "^4.1.0",
         "prettier-plugin-svelte": "^3.3.3",
         "prettier-plugin-tailwindcss": "^0.6.11",
-        "publint": "^0.3.8",
+        "publint": "^0.3.10",
         "svelte": "^5.21.0",
         "svelte-check": "^4.1.4",
         "tailwind-merge": "^3.0.2",
