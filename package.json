@@ -87,7 +87,7 @@
         "@types/node": "^22.13.9",
         "@vitest/coverage-v8": "^3.0.7",
         "eslint": "^9.21.0",
-        "eslint-config-prettier": "^10.0.2",
+        "eslint-config-prettier": "^10.1.5",
         "eslint-plugin-svelte": "^3.0.2",
         "globals": "^16.0.0",
         "jsdom": "^26.0.0",
