@@ -75,7 +75,7 @@
         "@playwright/test": "^1.50.1",
         "@sveltejs/adapter-auto": "^4.0.0",
         "@sveltejs/kit": "^2.17.3",
-        "@sveltejs/package": "^2.3.10",
+        "@sveltejs/package": "^2.3.12",
         "@sveltejs/vite-plugin-svelte": "^5.0.3",
         "@tailwindcss/aspect-ratio": "^0.4.2",
         "@tailwindcss/container-queries": "^0.1.1",
