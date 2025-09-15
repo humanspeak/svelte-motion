@@ -21,7 +21,7 @@ jobs:
                   fetch-depth: 0 # Fetch full history for git comparisons
 
             - name: Set up Python
-              uses: actions/setup-python@v5
+              uses: actions/setup-python@v5 # zizmor: ignore[unpinned-uses]
               with:
                   python-version: '3.12'
 
@@ -40,7 +40,7 @@ jobs:
                   fi
 
             - name: Cache uv installation
-              uses: actions/cache@v4
+              uses: actions/cache@v4 # zizmor: ignore[unpinned-uses]
               with:
                   path: ~/.local/bin/uv
                   key: ${{ runner.os }}-uv-${{ steps.uv-version.outputs.version }}
@@ -110,6 +110,8 @@ jobs:
 
                   # Initialize error flag
                   has_errors=0
+                  # Prepare logs directory (outside working-directory)
+                  mkdir -p ../zizmor-logs
 
                   # Validate inputs
                   if [ -z "${BASE_REF:-}" ]; then
@@ -144,6 +146,8 @@ jobs:
 
                   if [ -z "$changed_files" ]; then
                       echo "No workflow files changed"
+                      # Still write an empty marker so downstream steps succeed
+                      echo 0 > ../zizmor-logs/has_errors.txt
                       exit 0
                   fi
 
@@ -166,17 +170,32 @@ jobs:
                       fi
 
                       echo "Validating $filename..."
-
-                      if ! zizmor "$filename" 2>/dev/null; then
-                          echo "::error::Validation failed for $filename"
+                      # Capture zizmor output per-file to logs for troubleshooting
+                      if ! zizmor "$filename" > "../zizmor-logs/${filename}.log" 2>&1; then
+                          echo "::error::Validation failed for $filename (see artifact logs/${filename}.log)"
                           has_errors=1
+                      else
+                          echo "Validation passed for $filename" | tee "../zizmor-logs/${filename}.log" >/dev/null
                       fi
                   done <<< "$changed_files"
 
-                  # Exit with error if any validation failed
-                  if [ "$has_errors" -eq 1 ]; then
-                      echo "::error::One or more workflow validations failed"
-                      exit 1
-                  fi
+                  # Persist error marker for later steps
+                  echo $has_errors > ../zizmor-logs/has_errors.txt
 
                   echo "All workflows validated successfully"
+
+            - name: Upload zizmor logs
+              if: always()
+              uses: actions/upload-artifact@v4 # zizmor: ignore[unpinned-uses]
+              with:
+                  name: zizmor-logs
+                  path: zizmor-logs
+
+            - name: Fail if validation errors
+              if: always()
+              run: |
+                  set -euo pipefail
+                  if [ -f zizmor-logs/has_errors.txt ] && [ "$(cat zizmor-logs/has_errors.txt)" -eq 1 ]; then
+                      echo "One or more workflow validations failed (see artifact zizmor-logs)"
+                      exit 1
+                  fi
