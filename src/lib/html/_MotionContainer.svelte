@@ -109,7 +109,7 @@
     this={tag}
     bind:this={element}
     {...rest}
-    data-playwright={isPlaywright}
+    data-playwright={isPlaywright ? isPlaywright : undefined}
     data-is-loaded={isPlaywright ? isLoaded : undefined}
     data-path={isPlaywright ? dataPath : undefined}
     style={isLoaded === 'ready' ? `${styleProp} ${element?.style.cssText}` : undefined}
