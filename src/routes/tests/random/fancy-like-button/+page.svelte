@@ -97,12 +97,15 @@
 
     function likeInteraction(node: HTMLElement) {
         const handlePointerDown = (e: PointerEvent) => {
+            console.log('pointerdown', e)
             onPointerDown()
         }
         const handlePointerUp = (e: PointerEvent) => {
+            console.log('pointerup', e)
             onPointerUp()
         }
         const handleKeyDown = (e: KeyboardEvent) => {
+            console.log('keydown', e)
             onKeyDown(e)
         }
         node.addEventListener('pointerdown', handlePointerDown)
@@ -161,6 +164,9 @@
 
                 {#each hearts as heart (heart.id)}
                     <motion.div
+                        ontap={() => {
+                            console.log('heart')
+                        }}
                         class="pointer-events-none absolute z-20 flex h-11 w-11 items-center justify-center rounded-full bg-[#2C3A47]"
                         initial={{ opacity: 1, x: 0, y: 0, scale: heart.scale }}
                         animate={{ x: heart.xOffset, y: -(heart.xOffset + 100), opacity: 0 }}

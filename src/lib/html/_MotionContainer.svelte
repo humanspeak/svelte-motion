@@ -1,6 +1,6 @@
 <script lang="ts">
     import { getMotionConfig } from '$lib/components/motionConfig.context.js'
-    import type { MotionProps } from '$lib/types.js'
+    import type { MotionProps, MotionTransition } from '$lib/types.js'
     import { isNotEmpty } from '$lib/utils/objects.js'
     import { sleep } from '$lib/utils/testing.js'
     import { animate } from 'motion'
@@ -32,18 +32,15 @@
         typeof window !== 'undefined' &&
         window.location.search.includes('@humanspeak-svelte-motion-isPlaywright=true')
 
-    $effect(() => {
-        transitionProp = {
-            ...(motionConfig?.transition ?? {}),
-            ...(transitionProp ?? {})
-        }
+    // Compute merged transition without mutating props to avoid effect write loops
+    let mergedTransition = $derived<MotionTransition>({
+        ...(motionConfig?.transition ?? {}),
+        ...(transitionProp ?? {})
     })
 
     const runAnimation = () => {
         if (!element || !animateProp) return
-        const transitionAmimate = {
-            ...(transitionProp ?? {})
-        }
+        const transitionAmimate: MotionTransition = mergedTransition ?? {}
         animate(element, animateProp, transitionAmimate)
     }
 
@@ -133,7 +130,7 @@
     data-playwright={isPlaywright ? isPlaywright : undefined}
     data-is-loaded={isPlaywright ? isLoaded : undefined}
     data-path={isPlaywright ? dataPath : undefined}
-    style={isLoaded === 'ready' ? `${styleProp ?? ''} ${element?.style.cssText ?? ''}` : styleProp}
+    style={styleProp}
     class={classProp}
 >
     {#if isLoaded === 'ready'}
