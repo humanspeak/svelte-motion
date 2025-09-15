@@ -79,6 +79,13 @@
         }
     })
 
+    // Re-run animate when animateProp changes while ready
+    $effect(() => {
+        if (element && isLoaded === 'ready' && isNotEmpty(animateProp)) {
+            runAnimation()
+        }
+    })
+
     $effect(() => {
         if (!(element && isLoaded === 'mounting')) return
         if (animateProp) {
