@@ -168,7 +168,7 @@
 
                     {#each circles as circle (circle.id)}
                         <motion.div
-                            class="pointer-events-none absolute z-10 flex size-4 items-center justify-center rounded-full bg-red-500/10"
+                            class="pointer-events-none absolute z-10 flex size-4 items-center justify-center rounded-full bg-red-500/30"
                             initial={{ opacity: 1, x: 0, y: 0, scale: circle.size / 15 }}
                             animate={{ x: circle.xOffset, y: -(circle.xOffset + 100), opacity: 0 }}
                             transition={{
