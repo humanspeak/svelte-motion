@@ -14,8 +14,7 @@ test.describe('Enter Animation', () => {
         await expect(element).toHaveAttribute('data-playwright', 'true')
         await expect(element).toHaveCSS('opacity', '0')
 
-        // Wait and verify final state
-        await page.waitForTimeout(500)
+        // Wait and verify final state (CSS-driven)
         await expect(element).toHaveCSS('opacity', '1')
         await expect(element).toHaveCSS('background-color', 'rgb(255, 0, 0)')
         await expect(element).toHaveCSS('border-radius', '50%')

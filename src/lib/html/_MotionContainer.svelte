@@ -1,9 +1,9 @@
 <script lang="ts">
     import { getMotionConfig } from '$lib/components/motionConfig.context.js'
     import type { MotionProps } from '$lib/types.js'
-    import { getCommonKeys, isNotEmpty } from '$lib/utils/objects.js'
+    import { isNotEmpty } from '$lib/utils/objects.js'
     import { sleep } from '$lib/utils/testing.js'
-    import { animate, press } from 'motion'
+    import { animate } from 'motion'
     import { type Snippet } from 'svelte'
     import type { SvelteHTMLElements } from 'svelte/elements'
 
@@ -47,60 +47,74 @@
         animate(element, animateProp, transitionAmimate)
     }
 
+    // Merge style for before/after ready so styles carry through post-anim
+    // Merge styles directly in markup; keep effect solely for readiness logic
+
+    // whileTap handling without relying on motion.press (fallback compatible)
     $effect(() => {
-        if (element && isLoaded === 'ready') {
-            if (isNotEmpty(whileTapProp)) {
-                press(element, (element: Element) => {
-                    animate(element, whileTapProp!)
-                    return () => {
-                        if (isNotEmpty(initialProp)) {
-                            const commonProps = getCommonKeys(initialProp!, whileTapProp!)
-                            const resetProps = Object.fromEntries(
-                                commonProps.map((key) => [key, initialProp![key]])
-                            )
-                            animate(element, resetProps)
-                        }
-                    }
-                })
+        if (!(element && isLoaded === 'ready' && isNotEmpty(whileTapProp))) return
+
+        const handlePointerDown = () => {
+            animate(element!, whileTapProp!)
+        }
+        const handlePointerUp = () => {
+            if (isNotEmpty(initialProp)) {
+                const initialRecord = (initialProp ?? {}) as Record<string, unknown>
+                const whileTapRecord = (whileTapProp ?? {}) as Record<string, unknown>
+                const commonKeys = Object.keys(initialRecord).filter((k) => k in whileTapRecord)
+                const resetRecord: Record<string, unknown> = {}
+                for (const k of commonKeys) resetRecord[k] = initialRecord[k]
+                animate(element!, resetRecord as unknown as import('motion').DOMKeyframesDefinition)
             }
+        }
+
+        element.addEventListener('pointerdown', handlePointerDown)
+        element.addEventListener('pointerup', handlePointerUp)
+        element.addEventListener('pointercancel', handlePointerUp)
+
+        return () => {
+            element?.removeEventListener('pointerdown', handlePointerDown)
+            element?.removeEventListener('pointerup', handlePointerUp)
+            element?.removeEventListener('pointercancel', handlePointerUp)
         }
     })
 
     $effect(() => {
-        if (element) {
-            if (animateProp) {
-                if (isNotEmpty(initialProp)) {
-                    // Set initial state immediately
-                    isLoaded = 'initial'
-                    dataPath = 1
-                    // Give time for initial render
-                    setTimeout(async () => {
-                        await animate(element!, initialProp!)
-                        if (isPlaywright) {
-                            await sleep(250)
-                        }
-                        isLoaded = 'ready'
-                        runAnimation()
-                    }, 5)
-                } else {
-                    dataPath = 2
-                    isLoaded = 'ready'
-                    runAnimation()
-                }
-            } else if (isNotEmpty(initialProp)) {
-                dataPath = 3
+        if (!(element && isLoaded === 'mounting')) return
+        if (animateProp) {
+            if (isNotEmpty(initialProp)) {
+                // Apply initial instantly BEFORE exposing 'initial' state
+                animate(element!, initialProp!, { duration: 0 })
+                // Mark initial after styles are applied so tests read CSS=0 while state=initial
                 isLoaded = 'initial'
-                setTimeout(async () => {
-                    await animate(element!, initialProp!)
+                dataPath = 1
+                // Then promote to ready and run the enter animation
+                requestAnimationFrame(async () => {
                     if (isPlaywright) {
-                        await sleep(250)
+                        await sleep(10)
                     }
                     isLoaded = 'ready'
-                }, 5)
+                    runAnimation()
+                })
             } else {
-                dataPath = 4
+                dataPath = 2
                 isLoaded = 'ready'
+                runAnimation()
             }
+        } else if (isNotEmpty(initialProp)) {
+            // Apply initial instantly BEFORE exposing 'initial' state
+            animate(element!, initialProp!, { duration: 0 })
+            dataPath = 3
+            isLoaded = 'initial'
+            requestAnimationFrame(async () => {
+                if (isPlaywright) {
+                    await sleep(10)
+                }
+                isLoaded = 'ready'
+            })
+        } else {
+            dataPath = 4
+            isLoaded = 'ready'
         }
     })
 </script>
@@ -112,8 +126,8 @@
     data-playwright={isPlaywright ? isPlaywright : undefined}
     data-is-loaded={isPlaywright ? isLoaded : undefined}
     data-path={isPlaywright ? dataPath : undefined}
-    style={isLoaded === 'ready' ? `${styleProp} ${element?.style.cssText}` : undefined}
-    class={isLoaded === 'ready' ? classProp : undefined}
+    style={isLoaded === 'ready' ? `${styleProp ?? ''} ${element?.style.cssText ?? ''}` : styleProp}
+    class={classProp}
 >
     {#if isLoaded === 'ready'}
         {@render children?.()}
