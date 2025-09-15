@@ -14,10 +14,10 @@
         size: number
     }
 
-    let isLiked = false
+    let isLiked = $state(false)
     let spawnInterval: ReturnType<typeof setInterval> | null = null
-    let hearts: Heart[] = []
-    let circles: Circle[] = []
+    let hearts = $state<Heart[]>([])
+    let circles = $state<Circle[]>([])
 
     function randomX(): number {
         return Math.floor(Math.random() * 150) - 75
@@ -93,7 +93,7 @@
         }
     }
 
-    $: buttonBg = isLiked ? 'bg-red-500' : 'bg-[#2C3A47]'
+    const buttonBg = $derived(isLiked ? 'bg-red-500/50' : 'bg-[#2C3A47]')
 
     function likeInteraction(node: HTMLElement) {
         const handlePointerDown = (e: PointerEvent) => {
@@ -135,7 +135,7 @@
         >
             <div class="relative flex" use:likeInteraction>
                 <motion.button
-                    class={`h-20 w-20 ${buttonBg} z-30 flex items-center justify-center rounded-full select-none`}
+                    class={`size-6 ${buttonBg} z-30 flex items-center justify-center rounded-full select-none`}
                     initial={{ scale: 1.05 }}
                     whileTap={{ scale: 0.92 }}
                     transition={{ type: 'spring', stiffness: 400, duration: 0.3 }}
@@ -143,79 +143,50 @@
                     role="button"
                     tabindex="0"
                 >
-                    <svg
-                        version="1.1"
-                        xmlns="http://www.w3.org/2000/svg"
-                        x="0"
-                        y="-10"
-                        width="40.44"
-                        height="53.71"
-                        viewBox="0 0 122.88 107.41"
-                        class="pt-1"
-                    >
-                        <g>
-                            <path
-                                d="M60.83,17.19C68.84,8.84,74.45,1.62,86.79,0.21c23.17-2.66,44.48,21.06,32.78,44.41 c-3.33,6.65-10.11,14.56-17.61,22.32c-8.23,8.52-17.34,16.87-23.72,23.2l-17.4,17.26L46.46,93.56C29.16,76.9,0.95,55.93,0.02,29.95 C-0.63,11.75,13.73,0.09,30.25,0.3C45.01,0.5,51.22,7.84,60.83,17.19L60.83,17.19L60.83,17.19z"
-                                fill={isLiked ? '#ef4444' : '#A5AAB1'}
-                            />
-                        </g>
-                    </svg>
+                    <i
+                        class={`fa-solid fa-heart fa-sm ${isLiked ? 'text-red-500' : 'text-gray-300'}`}
+                    ></i>
                 </motion.button>
-
-                {#each hearts as heart (heart.id)}
-                    <motion.div
-                        ontap={() => {
-                            console.log('heart')
-                        }}
-                        class="pointer-events-none absolute z-20 flex h-11 w-11 items-center justify-center rounded-full bg-[#2C3A47]"
-                        initial={{ opacity: 1, x: 0, y: 0, scale: heart.scale }}
-                        animate={{ x: heart.xOffset, y: -(heart.xOffset + 100), opacity: 0 }}
-                        transition={{
-                            x: { duration: 0.2, ease: 'easeOut' },
-                            y: { duration: 0.6, ease: 'easeInOut' },
-                            opacity: { delay: 0.85, duration: 0.6 }
-                        }}
-                    >
-                        <svg
-                            version="1.1"
-                            xmlns="http://www.w3.org/2000/svg"
-                            x="0"
-                            y="-10"
-                            width="20.44"
-                            height="53.71"
-                            viewBox="0 0 122.88 107.41"
-                            class="pt-1"
+                <!-- Spawn origin centered on the button -->
+                <div
+                    class="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+                >
+                    {#each hearts as heart (heart.id)}
+                        <motion.div
+                            class="pointer-events-none absolute z-20 flex size-5 items-center justify-center text-red-500/50"
+                            initial={{ opacity: 1, x: 0, y: 0, scale: heart.scale }}
+                            animate={{ x: heart.xOffset, y: -(heart.xOffset + 100), opacity: 0 }}
+                            transition={{
+                                x: { duration: 0.2, ease: 'easeOut' },
+                                y: { duration: 0.6, ease: 'easeInOut' },
+                                opacity: { delay: 0.85, duration: 0.6 }
+                            }}
                         >
-                            <g>
-                                <path
-                                    d="M60.83,17.19C68.84,8.84,74.45,1.62,86.79,0.21c23.17-2.66,44.48,21.06,32.78,44.41 c-3.33,6.65-10.11,14.56-17.61,22.32c-8.23,8.52-17.34,16.87-23.72,23.2l-17.4,17.26L46.46,93.56C29.16,76.9,0.95,55.93,0.02,29.95 C-0.63,11.75,13.73,0.09,30.25,0.3C45.01,0.5,51.22,7.84,60.83,17.19L60.83,17.19L60.83,17.19z"
-                                    fill="#A5AAB1"
-                                />
-                            </g>
-                        </svg>
-                    </motion.div>
-                {/each}
+                            <i class="fa-solid fa-heart fa-xs text-red-500"></i>
+                        </motion.div>
+                    {/each}
 
-                {#each circles as circle (circle.id)}
-                    <motion.div
-                        class="pointer-events-none absolute z-10 flex h-11 w-11 items-center justify-center rounded-full bg-[#2C3A47]"
-                        initial={{ opacity: 1, x: 0, y: 0, scale: circle.size / 15 }}
-                        animate={{ x: circle.xOffset, y: -(circle.xOffset + 100), opacity: 0 }}
-                        transition={{
-                            x: {
-                                duration: 0.2 + circle.delay,
-                                delay: circle.delay,
-                                ease: 'easeOut'
-                            },
-                            y: {
-                                duration: 0.6 + circle.delay,
-                                delay: circle.delay,
-                                ease: 'easeInOut'
-                            },
-                            opacity: { delay: 0.4 + circle.delay, duration: 0.6 }
-                        }}
-                    />
-                {/each}
+                    {#each circles as circle (circle.id)}
+                        <motion.div
+                            class="pointer-events-none absolute z-10 flex size-4 items-center justify-center rounded-full bg-red-500/10"
+                            initial={{ opacity: 1, x: 0, y: 0, scale: circle.size / 15 }}
+                            animate={{ x: circle.xOffset, y: -(circle.xOffset + 100), opacity: 0 }}
+                            transition={{
+                                x: {
+                                    duration: 0.2 + circle.delay,
+                                    delay: circle.delay,
+                                    ease: 'easeOut'
+                                },
+                                y: {
+                                    duration: 0.6 + circle.delay,
+                                    delay: circle.delay,
+                                    ease: 'easeInOut'
+                                },
+                                opacity: { delay: 0.4 + circle.delay, duration: 0.6 }
+                            }}
+                        />
+                    {/each}
+                </div>
             </div>
         </div>
     </div>
