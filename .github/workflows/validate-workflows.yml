@@ -110,8 +110,9 @@ jobs:
 
                   # Initialize error flag
                   has_errors=0
-                  # Prepare logs directory (outside working-directory)
-                  mkdir -p ../zizmor-logs
+                  # Prepare logs directory at repository root
+                  LOG_DIR="${GITHUB_WORKSPACE}/zizmor-logs"
+                  mkdir -p "${LOG_DIR}"
 
                   # Validate inputs
                   if [ -z "${BASE_REF:-}" ]; then
@@ -147,7 +148,7 @@ jobs:
                   if [ -z "$changed_files" ]; then
                       echo "No workflow files changed"
                       # Still write an empty marker so downstream steps succeed
-                      echo 0 > ../zizmor-logs/has_errors.txt
+                      echo 0 > "${LOG_DIR}/has_errors.txt"
                       exit 0
                   fi
 
@@ -171,31 +172,36 @@ jobs:
 
                       echo "Validating $filename..."
                       # Capture zizmor output per-file to logs for troubleshooting
-                      if ! zizmor "$filename" > "../zizmor-logs/${filename}.log" 2>&1; then
-                          echo "::error::Validation failed for $filename (see artifact logs/${filename}.log)"
+                      if ! zizmor "$filename" > "${LOG_DIR}/${filename}.log" 2>&1; then
+                          echo "::error::Validation failed for $filename (see artifact zizmor-logs/${filename}.log)"
                           has_errors=1
                       else
-                          echo "Validation passed for $filename" | tee "../zizmor-logs/${filename}.log" >/dev/null
+                          echo "Validation passed for $filename" | tee -a "${LOG_DIR}/${filename}.log" >/dev/null
                       fi
                   done <<< "$changed_files"
 
                   # Persist error marker for later steps
-                  echo $has_errors > ../zizmor-logs/has_errors.txt
+                  echo $has_errors > "${LOG_DIR}/has_errors.txt"
 
-                  echo "All workflows validated successfully"
+                  if [ "$has_errors" -eq 0 ]; then
+                      echo "All workflows validated successfully"
+                  else
+                      echo "One or more workflow validations failed (logs uploaded)"
+                  fi
 
             - name: Upload zizmor logs
               if: always()
               uses: actions/upload-artifact@v4 # zizmor: ignore[unpinned-uses]
               with:
                   name: zizmor-logs
-                  path: zizmor-logs
+                  path: ${{ github.workspace }}/zizmor-logs
 
             - name: Fail if validation errors
               if: always()
               run: |
                   set -euo pipefail
-                  if [ -f zizmor-logs/has_errors.txt ] && [ "$(cat zizmor-logs/has_errors.txt)" -eq 1 ]; then
+                  LOG_DIR="${GITHUB_WORKSPACE}/zizmor-logs"
+                  if [ -f "${LOG_DIR}/has_errors.txt" ] && [ "$(cat "${LOG_DIR}/has_errors.txt")" -eq 1 ]; then
                       echo "One or more workflow validations failed (see artifact zizmor-logs)"
                       exit 1
                   fi
