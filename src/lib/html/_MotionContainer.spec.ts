@@ -42,6 +42,7 @@ describe('_MotionContainer', () => {
         const onStart = vi.fn()
         const onComplete = vi.fn()
 
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -70,6 +71,7 @@ describe('_MotionContainer', () => {
         const animate = { scale: 1.1, backgroundColor: '#000' }
         const whileTap = { scale: 0.9, backgroundColor: '#f00' }
 
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: { tag: 'div', initial, animate, whileTap }
         })
@@ -93,6 +95,7 @@ describe('_MotionContainer', () => {
     })
 
     it('re-runs animate when animate prop changes', async () => {
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const result = render(MotionContainer as unknown as any, {
             props: { tag: 'div', animate: { opacity: 0.5 } }
         })
