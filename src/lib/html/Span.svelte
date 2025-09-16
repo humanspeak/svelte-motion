@@ -1,6 +1,6 @@
 <script lang="ts">
-    import MotionContainer from './_MotionContainer.svelte'
-    import type { HTMLElementProps } from '../types.js'
+    import MotionContainer from '$lib/html/_MotionContainer.svelte'
+    import type { HTMLElementProps } from '$lib/types.js'
 
     let { children, ...rest }: HTMLElementProps = $props()
 </script>

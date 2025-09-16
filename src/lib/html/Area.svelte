@@ -1,6 +1,6 @@
 <script lang="ts">
-    import MotionContainer from './_MotionContainer.svelte'
-    import type { HTMLVoidElementProps } from '../types.js'
+    import MotionContainer from '$lib/html/_MotionContainer.svelte'
+    import type { HTMLVoidElementProps } from '$lib/types.js'
 
     let { ...rest }: HTMLVoidElementProps = $props()
 </script>

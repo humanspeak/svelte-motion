@@ -8,5 +8,6 @@ export const motion: MotionComponents = Object.fromEntries(
 ) as MotionComponents
 
 // Export all types
+export { animate } from 'motion'
 export type { MotionAnimate, MotionInitial, MotionTransition, MotionWhileTap } from './types.js'
 export { MotionConfig }
