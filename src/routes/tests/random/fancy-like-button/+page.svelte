@@ -169,6 +169,7 @@
                     {#each hearts as heart (heart.id)}
                         <motion.div
                             class="pointer-events-none absolute z-20 flex size-5 items-center justify-center text-red-500/50"
+                            style="translate: -50% -50%"
                             initial={{ opacity: 1, x: 0, y: 0, scale: heart.scale }}
                             animate={{ x: heart.xOffset, y: -(heart.xOffset + 100), opacity: 0 }}
                             transition={{
@@ -184,6 +185,7 @@
                     {#each circles as circle (circle.id)}
                         <motion.div
                             class="pointer-events-none absolute z-10 flex size-6 items-center justify-center rounded-full bg-red-500/30"
+                            style="translate: -50% -50%"
                             initial={{ opacity: 1, x: 0, y: 0, scale: circle.size / 15 }}
                             animate={{ x: circle.xOffset, y: -(circle.xOffset + 100), opacity: 0 }}
                             transition={{
