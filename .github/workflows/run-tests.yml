@@ -126,7 +126,7 @@ jobs:
             - name: Run e2e tests (sharded)
               env:
                   CI: true
-              run: pnpm exec playwright test tests --config=playwright.config.ts --shard=${{ matrix.shard }} --reporter=line
+              run: pnpm exec playwright test --config=playwright.config.ts --shard=${{ matrix.shard }} --reporter=line
 
             - name: Upload Playwright artifacts
               if: always()

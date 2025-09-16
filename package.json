@@ -56,6 +56,7 @@
         "lint": "prettier --check . && eslint .",
         "lint:fix": "npm run format && eslint . --fix",
         "package": "svelte-kit sync && svelte-package && publint",
+        "prepare": "husky",
         "prepublishOnly": "npm run package",
         "preview": "vite preview",
         "test": "vitest run --coverage",

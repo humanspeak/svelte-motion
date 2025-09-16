@@ -55,13 +55,31 @@
             animate(element!, whileTapProp!)
         }
         const handlePointerUp = () => {
-            if (isNotEmpty(initialProp)) {
+            // Build reset record preferring animateProp values, falling back to initialProp
+            if (isNotEmpty(whileTapProp) && (isNotEmpty(initialProp) || isNotEmpty(animateProp))) {
                 const initialRecord = (initialProp ?? {}) as Record<string, unknown>
+                const animateRecord = (animateProp ?? {}) as Record<string, unknown>
                 const whileTapRecord = (whileTapProp ?? {}) as Record<string, unknown>
-                const commonKeys = Object.keys(initialRecord).filter((k) => k in whileTapRecord)
+
+                const keys = new Set<string>([
+                    ...Object.keys(initialRecord),
+                    ...Object.keys(animateRecord)
+                ])
+                const overlappingKeys: string[] = []
+                for (const k of keys) if (k in whileTapRecord) overlappingKeys.push(k)
+
                 const resetRecord: Record<string, unknown> = {}
-                for (const k of commonKeys) resetRecord[k] = initialRecord[k]
-                animate(element!, resetRecord as unknown as import('motion').DOMKeyframesDefinition)
+                for (const k of overlappingKeys) {
+                    resetRecord[k] = Object.prototype.hasOwnProperty.call(animateRecord, k)
+                        ? animateRecord[k]
+                        : initialRecord[k]
+                }
+                if (Object.keys(resetRecord).length > 0) {
+                    animate(
+                        element!,
+                        resetRecord as unknown as import('motion').DOMKeyframesDefinition
+                    )
+                }
             }
         }
 
