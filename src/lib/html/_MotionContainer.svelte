@@ -63,14 +63,15 @@
         if (!element || !animateProp) return
         const transitionAmimate: MotionTransition = mergedTransition ?? {}
         // Fire lifecycle callbacks for main animate transitions
-        onAnimationStartProp?.(animateProp)
-        const controls = animate(element, animateProp, transitionAmimate)
+        const payload = $state.snapshot(animateProp)
+        onAnimationStartProp?.(payload)
+        const controls = animate(element, payload, transitionAmimate)
         // controls may be a promise-like or have a finished promise depending on engine
         if (hasFinishedPromise(controls)) {
-            controls.finished?.then(() => onAnimationCompleteProp?.(animateProp)).catch(() => {})
+            controls.finished?.then(() => onAnimationCompleteProp?.(payload)).catch(() => {})
         } else if (isPromiseLike(controls as unknown)) {
             ;(controls as unknown as Promise<unknown>)
-                .then(() => onAnimationCompleteProp?.(animateProp))
+                .then(() => onAnimationCompleteProp?.(payload))
                 .catch(() => {})
         }
     }

@@ -3,10 +3,14 @@ import { afterEach, beforeEach, vi } from 'vitest'
 
 // Mock requestAnimationFrame and related timing functions
 global.requestAnimationFrame = vi.fn().mockImplementation((cb: FrameRequestCallback): number => {
-    const timeoutId = setTimeout(cb, 0)
-    return Number(timeoutId)
+    const handle = setTimeout(() => cb(0 as unknown as DOMHighResTimeStamp), 0)
+    // Return the actual handle, but type it as a number for the DOM signature
+    return handle as unknown as number
 })
-global.cancelAnimationFrame = vi.fn((id) => clearTimeout(id))
+global.cancelAnimationFrame = vi.fn((id: number) => {
+    const handle = id as unknown as NodeJS.Timeout
+    clearTimeout(handle)
+})
 
 // Reset mocks between tests
 beforeEach(() => {
