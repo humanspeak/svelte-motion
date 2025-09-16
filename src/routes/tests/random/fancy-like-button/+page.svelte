@@ -135,7 +135,7 @@
         >
             <div class="relative flex" use:likeInteraction>
                 <motion.button
-                    class={`size-6 ${buttonBg} z-30 flex items-center justify-center rounded-full select-none`}
+                    class={`size-6 ${buttonBg} z-30 m-1 flex items-center justify-center rounded-full select-none`}
                     initial={{ scale: 1.05 }}
                     whileTap={{ scale: 0.92 }}
                     transition={{ type: 'spring', stiffness: 400, duration: 0.3 }}
@@ -143,9 +143,24 @@
                     role="button"
                     tabindex="0"
                 >
-                    <i
-                        class={`fa-solid fa-heart fa-sm ${isLiked ? 'text-red-500' : 'text-gray-300'}`}
-                    ></i>
+                    <svg
+                        version="1.1"
+                        id="Layer_1"
+                        xmlns="http://www.w3.org/2000/svg"
+                        x="0px"
+                        y="-10px"
+                        viewBox="0 0 122.88 107.41"
+                        style="enableBackground: new 0 0 122.88 107.41"
+                        class="size-4 pt-0.5"
+                    >
+                        <g>
+                            <path
+                                class="st0"
+                                d="M60.83,17.19C68.84,8.84,74.45,1.62,86.79,0.21c23.17-2.66,44.48,21.06,32.78,44.41 c-3.33,6.65-10.11,14.56-17.61,22.32c-8.23,8.52-17.34,16.87-23.72,23.2l-17.4,17.26L46.46,93.56C29.16,76.9,0.95,55.93,0.02,29.95 C-0.63,11.75,13.73,0.09,30.25,0.3C45.01,0.5,51.22,7.84,60.83,17.19L60.83,17.19L60.83,17.19z"
+                                fill={isLiked ? '#fb2c36' : '#A5AAB1'}
+                            />
+                        </g>
+                    </svg>
                 </motion.button>
                 <!-- Spawn origin centered on the button -->
                 <div
@@ -162,13 +177,13 @@
                                 opacity: { delay: 0.85, duration: 0.6 }
                             }}
                         >
-                            <i class="fa-solid fa-heart fa-xs text-red-500"></i>
+                            ❤️
                         </motion.div>
                     {/each}
 
                     {#each circles as circle (circle.id)}
                         <motion.div
-                            class="pointer-events-none absolute z-10 flex size-4 items-center justify-center rounded-full bg-red-500/30"
+                            class="pointer-events-none absolute z-10 flex size-6 items-center justify-center rounded-full bg-red-500/30"
                             initial={{ opacity: 1, x: 0, y: 0, scale: circle.size / 15 }}
                             animate={{ x: circle.xOffset, y: -(circle.xOffset + 100), opacity: 0 }}
                             transition={{
