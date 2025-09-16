@@ -100,7 +100,6 @@ jobs:
                   echo "$HOME/.local/bin" >> $GITHUB_PATH
 
             - name: Validate all workflows
-              working-directory: .github/workflows
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   BASE_REF: ${{ github.base_ref }}
@@ -117,8 +116,8 @@ jobs:
                   # Validate inputs
                   if [ -z "${BASE_REF:-}" ]; then
                       echo "::warning::BASE_REF is not set, validating all workflow files"
-                      # If no base ref (manual trigger), validate all workflows
-                      changed_files=$(find . -name "*.yml" -o -name "*.yaml" | sed 's|^\./||' || true)
+                      # If no base ref (manual trigger), validate all workflows under .github/workflows
+                      changed_files=$(find .github/workflows -type f \( -name "*.yml" -o -name "*.yaml" \) || true)
                   else
                       echo "Comparing against base ref: $BASE_REF"
 
@@ -156,27 +155,25 @@ jobs:
                   while IFS= read -r file; do
                       [ -z "$file" ] && continue
 
-                      # Safely handle filenames
-                      filename=$(basename -- "$file")
-
                       # Skip files that were deleted or do not exist in the checkout
-                      if [ ! -f "$filename" ]; then
-                          echo "Skipping $filename (not present in current checkout — likely deleted or renamed)"
+                      if [ ! -f "$file" ]; then
+                          echo "Skipping $file (not present in current checkout — likely deleted or renamed)"
                           continue
                       fi
 
-                      # Skip non-yaml files
-                      if [[ ! "$filename" =~ \.(ya?ml)$ ]]; then
+                      # Skip non-yaml files (defensive)
+                      if [[ ! "$file" =~ \.(ya?ml)$ ]]; then
                           continue
                       fi
 
-                      echo "Validating $filename..."
+                      echo "Validating $file..."
+                      safe_name=$(basename -- "$file")
                       # Capture zizmor output per-file to logs for troubleshooting
-                      if ! zizmor "$filename" > "${LOG_DIR}/${filename}.log" 2>&1; then
-                          echo "::error::Validation failed for $filename (see artifact zizmor-logs/${filename}.log)"
+                      if ! zizmor "$file" > "${LOG_DIR}/${safe_name}.log" 2>&1; then
+                          echo "::error::Validation failed for $file (see artifact zizmor-logs/${safe_name}.log)"
                           has_errors=1
                       else
-                          echo "Validation passed for $filename" | tee -a "${LOG_DIR}/${filename}.log" >/dev/null
+                          echo "Validation passed for $file" | tee -a "${LOG_DIR}/${safe_name}.log" >/dev/null
                       fi
                   done <<< "$changed_files"
 
