@@ -91,7 +91,11 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                shard: [1/2, 2/2]
+                include:
+                    - shard: '1/2'
+                      shard_name: '1-2'
+                    - shard: '2/2'
+                      shard_name: '2-2'
         steps:
             - name: Checkout
               uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
@@ -134,7 +138,7 @@ jobs:
               if: always()
               uses: actions/upload-artifact@v4 # zizmor: ignore[unpinned-uses]
               with:
-                  name: playwright-artifacts-${{ replace(matrix.shard, '/', '-') }}
+                  name: playwright-artifacts-${{ matrix.shard_name }}
                   path: |
                       playwright-report/**
                       test-results/**
