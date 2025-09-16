@@ -19,6 +19,8 @@
         initial: initialProp,
         animate: animateProp,
         transition: transitionProp,
+        onAnimationStart: onAnimationStartProp,
+        onAnimationComplete: onAnimationCompleteProp,
         style: styleProp,
         class: classProp,
         whileTap: whileTapProp,
@@ -38,10 +40,39 @@
         ...(transitionProp ?? {})
     })
 
+    // Type guards for animate return types
+    function isPromiseLike(value: unknown): value is Promise<unknown> {
+        return (
+            typeof value === 'object' &&
+            value !== null &&
+            'then' in (value as { then?: unknown }) &&
+            typeof (value as { then?: unknown }).then === 'function'
+        )
+    }
+    type WithFinished = { finished?: Promise<unknown> }
+    function hasFinishedPromise(value: unknown): value is WithFinished {
+        return (
+            typeof value === 'object' &&
+            value !== null &&
+            'finished' in (value as { finished?: unknown }) &&
+            isPromiseLike((value as { finished?: unknown }).finished)
+        )
+    }
+
     const runAnimation = () => {
         if (!element || !animateProp) return
         const transitionAmimate: MotionTransition = mergedTransition ?? {}
-        animate(element, animateProp, transitionAmimate)
+        // Fire lifecycle callbacks for main animate transitions
+        onAnimationStartProp?.(animateProp)
+        const controls = animate(element, animateProp, transitionAmimate)
+        // controls may be a promise-like or have a finished promise depending on engine
+        if (hasFinishedPromise(controls)) {
+            controls.finished?.then(() => onAnimationCompleteProp?.(animateProp)).catch(() => {})
+        } else if (isPromiseLike(controls as unknown)) {
+            ;(controls as unknown as Promise<unknown>)
+                .then(() => onAnimationCompleteProp?.(animateProp))
+                .catch(() => {})
+        }
     }
 
     // Merge style for before/after ready so styles carry through post-anim
