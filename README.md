@@ -65,8 +65,8 @@ This package carefully selects its dependencies to provide a robust and maintain
 | -------------------------------------------------------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------- |
 | [React - Enter Animation](https://examples.motion.dev/react/enter-animation)                             | `/tests/motion/enter-animation`   | [View Example](https://svelte.dev/playground/7f60c347729f4ea48b1a4590c9dedc02?version=5.20.2)  |
 | HTML Content (0→100 counter)                                                                             | `/tests/motion/html-content`      | [View Example](https://svelte.dev/playground/31cd72df4a3242b4b4589501a25e774f?version=5.38.10) |
-| [Random - Shiny Button](https://www.youtube.com/watch?v=jcpLprT5F0I) by [@verse\_](https://x.com/verse_) | `/tests/random/shiny-button`      | [View Example](https://svelte.dev/playground/96f9e0bf624f4396adaf06c519147450?version=5.20.2)  |
-| [Fancy Like Button](https://github.com/DRlFTER/fancyLikeButton)                                          | `/tests/random/fancy-like-button` | [View Example](https://svelte.dev/playground/c34b7e53d41c48b0ab1eaf21ca120c6e?version=5.20.2)  |
+| [Random - Shiny Button](https://www.youtube.com/watch?v=jcpLprT5F0I) by [@verse\_](https://x.com/verse_) | `/tests/random/shiny-button`      | [View Example](https://svelte.dev/playground/96f9e0bf624f4396adaf06c519147450?version=5.38.10) |
+| [Fancy Like Button](https://github.com/DRlFTER/fancyLikeButton)                                          | `/tests/random/fancy-like-button` | [View Example](https://svelte.dev/playground/c34b7e53d41c48b0ab1eaf21ca120c6e?version=5.38.10) |
 
 ## License
 
