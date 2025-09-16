@@ -92,10 +92,10 @@ jobs:
             fail-fast: false
             matrix:
                 include:
-                    - shard: '1/2'
-                      shard_name: '1-2'
-                    - shard: '2/2'
-                      shard_name: '2-2'
+                    - shard: 1/2
+                      shard_name: 1-2
+                    - shard: 2/2
+                      shard_name: 2-2
         steps:
             - name: Checkout
               uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
