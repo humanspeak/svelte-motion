@@ -1,20 +1,20 @@
-## Svelte Motion — Product Requirements Document (PRD)
+# Svelte Motion — Product Requirements Document (PRD)
 
-### 1) Vision and Context
+## 1) Vision and Context
 
 Svelte Motion aims to bring a Framer Motion–style developer experience to Svelte by offering ergonomic, declarative animation primitives via `motion.<element>` components, interaction props, and composable configuration.
 
-Reference: Framer Motion for React [`framer-motion` on npm](https://www.npmjs.com/package/framer-motion).
+Reference: Framer Motion for React [`motion` on npm](https://www.npmjs.com/package/motion).
 
-### 2) Current State Assessment (as of this repo)
+## 2) Current State Assessment (as of this repo)
 
 - **Exports**:
     - `motion`: Object map of HTML tag components (e.g., `motion.div`, `motion.button`) in `src/lib/html/`.
     - `MotionConfig` context component.
     - Types: `MotionInitial`, `MotionAnimate`, `MotionTransition`, `MotionWhileTap`.
-- **Implemented props** (types present): `initial`, `animate`, `transition`, `whileTap`, `class`, `style`.
+- **Implemented props**: `initial`, `animate`, `transition`, `whileTap`, `onAnimationStart`, `onAnimationComplete`, `class`, `style`.
 - **Coverage of HTML elements**: Many intrinsic HTML components implemented under `src/lib/html/`.
-- **Tests**: Basic E2E for enter animation.
+- **Tests**: Unit tests for utils and `_MotionContainer` lifecycles/whileTap/reset, E2E for enter animation and HTML content.
 
 Gaps vs Framer Motion core:
 
@@ -28,7 +28,7 @@ Gaps vs Framer Motion core:
 - Event callbacks: `onAnimationStart`, `onAnimationComplete`, per-keyframe lifecycle where applicable.
 - Documentation site, examples, and comprehensive test coverage.
 
-### 3) Product Goals
+## 3) Product Goals
 
 Primary goal: API and behavioral parity for core day-1 Framer Motion features that enable common examples to “copy-paste translate” into Svelte with minimal changes.
 
@@ -37,15 +37,15 @@ Non-goals (initial phases):
 - Visual editor tooling (Studio), premium examples, and non-essential React-specific hooks.
 - Advanced layout/FLIP until core animations are robust.
 
-### 4) Phased Roadmap
+## 4) Phased Roadmap
 
-Phase 0 — Foundations (Current → Short-term)
+Phase 0 — Foundations (status)
 
-- Solidify `motion.<tag>` wrappers and prop pass-through.
-- Ensure SSR-friendly behavior and hydration safety.
-- Add `whileHover`, `whileFocus` to interaction set.
-- Introduce `onAnimationStart`/`onAnimationComplete`.
-- Expand tests: unit for utils, E2E for simple enter/interaction.
+- Solidify `motion.<tag>` wrappers and prop pass-through. [Done]
+- Ensure SSR-friendly behavior and hydration safety (instant `initial`, promote to `ready`, then animate). [Done]
+- Add `whileHover`, `whileFocus` to interaction set. [Planned]
+- Introduce `onAnimationStart`/`onAnimationComplete`. [Done]
+- Expand tests: unit for utils, component tests for container, E2E demos. [Done]
 
 Phase 1 — Variants and Presence
 
@@ -66,15 +66,15 @@ Phase 3 — Ecosystem
 - Gallery of examples ported from Framer Motion samples.
 - Performance profiling and benchmarks.
 
-### 5) API Design Targets (Parity-Oriented)
+## 5) API Design Targets (Parity-Oriented)
 
 - `initial`, `animate`, `transition`, `exit`, `variants` (object map), `whileTap`, `whileHover`, `whileFocus`.
-- Event handlers: `onAnimationStart`, `onAnimationComplete`.
+- Event handlers: `onAnimationStart`, `onAnimationComplete`. [Implemented]
 - Presence manager: `AnimatePresence`-like Svelte component.
 - Gesture props: `drag`, `dragConstraints`, `dragMomentum`, `dragElastic` (Phase 2).
 - Motion values: `motionValue`, `derived`, `stagger` helpers (Phase 2).
 
-### 6) Featured Example Requirement — Fancy Like Button
+## 6) Featured Example Requirement — Fancy Like Button
 
 Target UX: A like button inspired by Fancy Like Button (React, Framer Motion) [`DRlFTER/fancyLikeButton` on GitHub](https://github.com/DRlFTER/fancyLikeButton?utm_source=chatgpt.com).
 
@@ -155,26 +155,32 @@ Acceptance criteria:
 
 Deliverables for this feature:
 
-- `src/routes/tests/random/FancyLikeButton.svelte` example (or similar demo path).
-- Reusable heart/circle subcomponents built with `motion.div`.
-- E2E test: press-and-hold spawns, second press unlikes and stops.
+- `src/routes/tests/random/fancy-like-button/+page.svelte` example. [Done]
+- Aligned spawn origin container; size changes keep alignment. [Done]
+- E2E: Pending (press-and-hold spawns, second press unlikes and stops). [Planned]
 
-### 7) Parity Matrix (Initial cut)
+Status against spec:
 
-| Capability                         | Framer Motion (React) | Svelte Motion (now) | Phase |
-| ---------------------------------- | --------------------- | ------------------- | ----- |
-| `initial`, `animate`, `transition` | Yes                   | Partial (typed)     | 0     |
-| `whileTap`                         | Yes                   | Partial (typed)     | 0     |
-| `whileHover`, `whileFocus`         | Yes                   | No                  | 0     |
-| `variants`                         | Yes                   | No                  | 1     |
-| `exit` + presence                  | Yes                   | No                  | 1     |
-| `drag`/`pan`                       | Yes                   | No                  | 2     |
-| Motion values/transforms           | Yes                   | No                  | 2     |
-| Timelines/stagger                  | Yes                   | No                  | 2     |
-| Layout/Shared layout               | Yes                   | No                  | 3     |
-| Docs/examples parity               | Yes                   | Minimal             | 3     |
+- Toggle like/unlike works (mouse/touch/keyboard). [Done]
+- Hold-to-spawn hearts and circles; release stops; cleanup timers. [Done]
+- Performance acceptable; emitters are pointer-events-none. [Done]
 
-### 8) Technical Approach Notes
+## 7) Parity Matrix (Initial cut)
+
+| Capability                         | Framer Motion (React) | Svelte Motion (now)    | Phase |
+| ---------------------------------- | --------------------- | ---------------------- | ----- |
+| `initial`, `animate`, `transition` | Yes                   | Yes                    | 0     |
+| `whileTap`                         | Yes                   | Yes                    | 0     |
+| `whileHover`, `whileFocus`         | Yes                   | No                     | 0     |
+| `variants`                         | Yes                   | No                     | 1     |
+| `exit` + presence                  | Yes                   | No                     | 1     |
+| `drag`/`pan`                       | Yes                   | No                     | 2     |
+| Motion values/transforms           | Yes                   | No                     | 2     |
+| Timelines/stagger                  | Yes                   | No                     | 2     |
+| Layout/Shared layout               | Yes                   | No (prototype planned) | 3     |
+| Docs/examples parity               | Yes                   | Minimal                | 3     |
+
+## 8) Technical Approach Notes
 
 - Leverage the `motion` JS engine already used for typing to drive keyframes/WAAPI under the hood.
 - Encapsulate prop parsing into a shared container (`_MotionContainer.svelte`) to minimize duplication across elements.
@@ -184,19 +190,19 @@ Deliverables for this feature:
 - Gestures: build on pointer events; compute velocity; apply inertial transitions via the motion engine.
 - Motion values: create Svelte stores for values and derived transforms; connect to style updates efficiently.
 
-### 9) Testing and Quality
+## 9) Testing and Quality
 
-- Unit tests for utils and prop merging.
-- E2E Playwright tests for: enter/exit, whileTap/whileHover, variants, presence, and the Fancy Like Button.
-- Lint/typecheck in CI; visual snapshots for critical demos.
+- Unit tests for utils and `_MotionContainer` lifecycles and whileTap reset. [Done]
+- E2E Playwright: enter animation, HTML content. [Done] Fancy Like Button, presence/variants tests. [Planned]
+- Lint/typecheck in CI; workflow validation with artifact logs. [Done]
 
-### 10) Risks
+## 10) Risks
 
 - Gesture complexity across devices and browser quirks.
 - Performance regressions with many concurrent animated nodes (e.g., heart spawns).
 - API drift from Framer Motion causing migration friction.
 
-### 11) References
+## 11) References
 
 - Framer Motion on npm: [`framer-motion`](https://www.npmjs.com/package/framer-motion)
 - Fancy Like Button inspiration: [`DRlFTER/fancyLikeButton`](https://github.com/DRlFTER/fancyLikeButton?utm_source=chatgpt.com)

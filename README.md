@@ -14,70 +14,13 @@
 
 ## Why are we here?
 
-Just a little wrapper for motion. I love their work! The typical this is a WIP, if you have issues please give me a react example working so that I can work to ensure its running properly 😍
+Motion vibes, Svelte runes. This brings Motion’s declarative animation goodness to Svelte with `motion.<tag>` components, interaction props, and composable config. If you spot a cool React example, drop it in an issue—we’ll port it. 😍
+
+Requests welcome: Have a feature/prop/example you want? Please open an issue (ideally include a working Motion/React snippet or example link) and we’ll prioritize it.
 
 ## Supported Elements
 
-### Regular Elements
-
-- `motion.a`
-- `motion.article`
-- `motion.aside`
-- `motion.blockquote`
-- `motion.button`
-- `motion.code`
-- `motion.dd`
-- `motion.div`
-- `motion.dl`
-- `motion.dt`
-- `motion.fieldset`
-- `motion.figcaption`
-- `motion.figure`
-- `motion.footer`
-- `motion.form`
-- `motion.h1`
-- `motion.h2`
-- `motion.h3`
-- `motion.h4`
-- `motion.h5`
-- `motion.h6`
-- `motion.header`
-- `motion.label`
-- `motion.legend`
-- `motion.li`
-- `motion.main`
-- `motion.nav`
-- `motion.ol`
-- `motion.option`
-- `motion.p`
-- `motion.pre`
-- `motion.section`
-- `motion.select`
-- `motion.span`
-- `motion.table`
-- `motion.tbody`
-- `motion.td`
-- `motion.textarea`
-- `motion.tfoot`
-- `motion.th`
-- `motion.thead`
-- `motion.tr`
-- `motion.ul`
-
-### Void Elements
-
-- `motion.area`
-- `motion.base`
-- `motion.br`
-- `motion.col`
-- `motion.embed`
-- `motion.hr`
-- `motion.img`
-- `motion.input`
-- `motion.param`
-- `motion.source`
-- `motion.track`
-- `motion.wbr`
+All standard HTML elements are supported as motion components (e.g., `motion.div`, `motion.button`). See the full set in `src/lib/html/`.
 
 ## Configuration
 
@@ -100,6 +43,7 @@ Some Motion features are not yet implemented:
 - `features` configuration
 - Performance optimizations like `transformPagePoint`
 - Advanced transition controls
+- `layout`/`layoutId` (FLIP) — prototype planned
 
 We're actively working on adding these features. Check our GitHub issues for progress updates or to contribute.
 
@@ -117,10 +61,11 @@ This package carefully selects its dependencies to provide a robust and maintain
 
 ### Examples
 
-| Motion                                                                                                   | REPL                                                                                          |
-| -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| [React - Enter Animation](https://examples.motion.dev/react/enter-animation)                             | [View Example](https://svelte.dev/playground/7f60c347729f4ea48b1a4590c9dedc02?version=5.20.2) |
-| [Random - Shiny Button](https://www.youtube.com/watch?v=jcpLprT5F0I) by [@verse\_](https://x.com/verse_) | [View Example](https://svelte.dev/playground/96f9e0bf624f4396adaf06c519147450?version=5.20.2) |
+| Motion                                                                       | Demo / Route                      | REPL                                                                                           |
+| ---------------------------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| [React - Enter Animation](https://examples.motion.dev/react/enter-animation) | `/tests/motion/enter-animation`   | [View Example](https://svelte.dev/playground/7f60c347729f4ea48b1a4590c9dedc02?version=5.20.2)  |
+| HTML Content (0→100 counter)                                                 | `/tests/motion/html-content`      | [View Example](https://svelte.dev/playground/31cd72df4a3242b4b4589501a25e774f?version=5.38.10) |
+| Fancy Like Button                                                            | `/tests/random/fancy-like-button` | [View Example](https://svelte.dev/playground/96f9e0bf624f4396adaf06c519147450?version=5.20.2)  |
 
 ## License
 
@@ -128,4 +73,4 @@ MIT © [Humanspeak, Inc.](LICENSE)
 
 ## Credits
 
-Made with ♥ by [Humanspeak](https://humanspeak.com)
+Made with ❤️ by [Humanspeak](https://humanspeak.com)

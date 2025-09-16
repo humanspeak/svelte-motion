@@ -47,6 +47,16 @@ export type MotionTransition = AnimationOptions | undefined
 export type MotionWhileTap = DOMKeyframesDefinition | undefined
 
 /**
+ * Animation lifecycle callbacks for motion components.
+ */
+export type MotionAnimationStart =
+    | ((definition: DOMKeyframesDefinition | undefined) => void)
+    | undefined
+export type MotionAnimationComplete =
+    | ((definition: DOMKeyframesDefinition | undefined) => void)
+    | undefined
+
+/**
  * Base motion props shared by all motion components.
  */
 export type MotionProps = {
@@ -58,6 +68,10 @@ export type MotionProps = {
     transition?: MotionTransition
     /** Tap/click interaction animation */
     whileTap?: MotionWhileTap
+    /** Called right before a main animate transition starts */
+    onAnimationStart?: MotionAnimationStart
+    /** Called after a main animate transition completes */
+    onAnimationComplete?: MotionAnimationComplete
     /** Inline styles */
     style?: string
     /** CSS classes */
