@@ -17,6 +17,13 @@ runtimes:
         - node@22.16.0
 # This is the section where you manage your linters. (https://docs.trunk.io/check/configuration)
 lint:
+    ignore:
+        - linters: [osv-scanner]
+          paths:
+              - '**/pnpm-lock.yaml'
+        - linters: [markdownlint]
+          paths:
+              - .changeset/**
     definitions:
         - name: prettier
           files:

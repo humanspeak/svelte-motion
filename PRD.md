@@ -1,12 +1,12 @@
-## Svelte Motion — Product Requirements Document (PRD)
+# Svelte Motion — Product Requirements Document (PRD)
 
-### 1) Vision and Context
+## 1) Vision and Context
 
 Svelte Motion aims to bring a Framer Motion–style developer experience to Svelte by offering ergonomic, declarative animation primitives via `motion.<element>` components, interaction props, and composable configuration.
 
 Reference: Framer Motion for React [`motion` on npm](https://www.npmjs.com/package/motion).
 
-### 2) Current State Assessment (as of this repo)
+## 2) Current State Assessment (as of this repo)
 
 - **Exports**:
     - `motion`: Object map of HTML tag components (e.g., `motion.div`, `motion.button`) in `src/lib/html/`.
@@ -28,7 +28,7 @@ Gaps vs Framer Motion core:
 - Event callbacks: `onAnimationStart`, `onAnimationComplete`, per-keyframe lifecycle where applicable.
 - Documentation site, examples, and comprehensive test coverage.
 
-### 3) Product Goals
+## 3) Product Goals
 
 Primary goal: API and behavioral parity for core day-1 Framer Motion features that enable common examples to “copy-paste translate” into Svelte with minimal changes.
 
@@ -37,7 +37,7 @@ Non-goals (initial phases):
 - Visual editor tooling (Studio), premium examples, and non-essential React-specific hooks.
 - Advanced layout/FLIP until core animations are robust.
 
-### 4) Phased Roadmap
+## 4) Phased Roadmap
 
 Phase 0 — Foundations (status)
 
@@ -66,7 +66,7 @@ Phase 3 — Ecosystem
 - Gallery of examples ported from Framer Motion samples.
 - Performance profiling and benchmarks.
 
-### 5) API Design Targets (Parity-Oriented)
+## 5) API Design Targets (Parity-Oriented)
 
 - `initial`, `animate`, `transition`, `exit`, `variants` (object map), `whileTap`, `whileHover`, `whileFocus`.
 - Event handlers: `onAnimationStart`, `onAnimationComplete`. [Implemented]
@@ -74,7 +74,7 @@ Phase 3 — Ecosystem
 - Gesture props: `drag`, `dragConstraints`, `dragMomentum`, `dragElastic` (Phase 2).
 - Motion values: `motionValue`, `derived`, `stagger` helpers (Phase 2).
 
-### 6) Featured Example Requirement — Fancy Like Button
+## 6) Featured Example Requirement — Fancy Like Button
 
 Target UX: A like button inspired by Fancy Like Button (React, Framer Motion) [`DRlFTER/fancyLikeButton` on GitHub](https://github.com/DRlFTER/fancyLikeButton?utm_source=chatgpt.com).
 
@@ -165,7 +165,7 @@ Status against spec:
 - Hold-to-spawn hearts and circles; release stops; cleanup timers. [Done]
 - Performance acceptable; emitters are pointer-events-none. [Done]
 
-### 7) Parity Matrix (Initial cut)
+## 7) Parity Matrix (Initial cut)
 
 | Capability                         | Framer Motion (React) | Svelte Motion (now)    | Phase |
 | ---------------------------------- | --------------------- | ---------------------- | ----- |
@@ -180,7 +180,7 @@ Status against spec:
 | Layout/Shared layout               | Yes                   | No (prototype planned) | 3     |
 | Docs/examples parity               | Yes                   | Minimal                | 3     |
 
-### 8) Technical Approach Notes
+## 8) Technical Approach Notes
 
 - Leverage the `motion` JS engine already used for typing to drive keyframes/WAAPI under the hood.
 - Encapsulate prop parsing into a shared container (`_MotionContainer.svelte`) to minimize duplication across elements.
@@ -190,19 +190,19 @@ Status against spec:
 - Gestures: build on pointer events; compute velocity; apply inertial transitions via the motion engine.
 - Motion values: create Svelte stores for values and derived transforms; connect to style updates efficiently.
 
-### 9) Testing and Quality
+## 9) Testing and Quality
 
 - Unit tests for utils and `_MotionContainer` lifecycles and whileTap reset. [Done]
 - E2E Playwright: enter animation, HTML content. [Done] Fancy Like Button, presence/variants tests. [Planned]
 - Lint/typecheck in CI; workflow validation with artifact logs. [Done]
 
-### 10) Risks
+## 10) Risks
 
 - Gesture complexity across devices and browser quirks.
 - Performance regressions with many concurrent animated nodes (e.g., heart spawns).
 - API drift from Framer Motion causing migration friction.
 
-### 11) References
+## 11) References
 
 - Framer Motion on npm: [`framer-motion`](https://www.npmjs.com/package/framer-motion)
 - Fancy Like Button inspiration: [`DRlFTER/fancyLikeButton`](https://github.com/DRlFTER/fancyLikeButton?utm_source=chatgpt.com)

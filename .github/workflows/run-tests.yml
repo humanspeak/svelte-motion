@@ -134,7 +134,7 @@ jobs:
               if: always()
               uses: actions/upload-artifact@v4 # zizmor: ignore[unpinned-uses]
               with:
-                  name: playwright-artifacts-${{ matrix.shard }}
+                  name: playwright-artifacts-${{ replace(matrix.shard, '/', '-') }}
                   path: |
                       playwright-report/**
                       test-results/**

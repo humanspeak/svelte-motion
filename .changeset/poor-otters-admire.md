@@ -1,5 +1,5 @@
 ---
-"@fake-scope/fake-pkg": patch
+'@fake-scope/fake-pkg': patch
 ---
 
-Enhancement: Add animation start / complete 
+Enhancement: Add animation start / complete
