@@ -12,14 +12,25 @@ test.describe('Enter Animation', () => {
         await expect(element).toHaveAttribute('data-path', '1')
         await expect(element).toHaveAttribute('data-playwright', 'true')
 
-        // Some runners may promote to 'ready' very fast; accept both states.
-        const state = await element.getAttribute('data-is-loaded')
+        // Wait until data-is-loaded is a stable non-null value ('initial' or 'ready')
+        const handle = await element.elementHandle()
+        const stateHandle = await page.waitForFunction(
+            (el) => {
+                const v = el.getAttribute('data-is-loaded')
+                return v === 'initial' || v === 'ready' ? v : null
+            },
+            handle,
+            { timeout: 1500 }
+        )
+        const state = (await stateHandle.jsonValue()) as string
+
         if (state === 'initial') {
+            // While in initial, opacity should be 0
             await expect(element).toHaveCSS('opacity', '0')
             // Then it should promote to ready
             await expect(element).toHaveAttribute('data-is-loaded', 'ready')
         } else {
-            expect(state).toBe('ready')
+            await expect(element).toHaveAttribute('data-is-loaded', 'ready')
         }
 
         // Wait and verify final state (CSS-driven)
