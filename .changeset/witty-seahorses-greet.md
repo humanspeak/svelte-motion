@@ -1,5 +1,5 @@
 ---
-"@humanspeak/svelte-motion": patch
+'@humanspeak/svelte-motion': patch
 ---
 
 Enhancement: layout paramater
