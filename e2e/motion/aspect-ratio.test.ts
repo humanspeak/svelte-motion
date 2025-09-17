@@ -17,14 +17,41 @@ test.describe('motion/aspect-ratio', () => {
         expect(Math.abs(initial.width - initial.height)).toBeLessThan(2)
 
         // Increase width to 200 via the Width number input
-        const widthNumber = page
-            .locator('label', { hasText: 'Width' })
-            .locator("input[type='number']")
+        const widthNumber = page.getByTestId('width-input')
         await widthNumber.fill('200')
         await widthNumber.dispatchEvent('input')
 
-        // Debounce is 200ms; wait a bit more
-        await page.waitForTimeout(350)
+        // Wait for layout width to update to 200px (debounced)
+        await expect
+            .poll(
+                async () => await box.evaluate((el) => getComputedStyle(el as HTMLElement).width),
+                { timeout: 2000 }
+            )
+            .toBe('200px')
+
+        // Inverse transform should be applied inline immediately (non-empty style.transform)
+        await expect
+            .poll(
+                async () => await box.evaluate((el) => (el as HTMLElement).style.transform || ''),
+                { timeout: 1000 }
+            )
+            .not.toBe('')
+
+        // Debounce is 200ms; animation duration ~250ms; wait for settle
+        await page.waitForTimeout(450)
+
+        // After animation completes, inline transform should be cleared ('' or 'none')
+        await expect
+            .poll(
+                async () => await box.evaluate((el) => (el as HTMLElement).style.transform || ''),
+                { timeout: 2000 }
+            )
+            .toMatch(/^$|^none$/)
+
+        // Visual width should reach ~200px
+        await expect
+            .poll(async () => (await box.boundingBox())?.width ?? 0, { timeout: 2000 })
+            .toBeGreaterThan(185)
 
         const w200 = await box.boundingBox()
         expect(w200).not.toBeNull()
@@ -33,13 +60,50 @@ test.describe('motion/aspect-ratio', () => {
         expect(w200.width).toBeLessThan(215)
 
         // Set aspect ratio to 2 (width:height = 2:1)
-        const arNumber = page
-            .locator('label', { hasText: 'Aspect ratio' })
-            .locator("input[type='number']")
+        const arNumber = page.getByTestId('aspect-ratio-input')
         await arNumber.fill('2')
         await arNumber.dispatchEvent('input')
 
-        await page.waitForTimeout(350)
+        // Wait for computed height to reflect aspect ratio change (height ~ width/2)
+        await expect
+            .poll(
+                async () =>
+                    await box.evaluate((el) =>
+                        parseFloat(getComputedStyle(el as HTMLElement).height)
+                    ),
+                { timeout: 2000 }
+            )
+            .toBeGreaterThan(90)
+        await expect
+            .poll(
+                async () =>
+                    await box.evaluate((el) =>
+                        parseFloat(getComputedStyle(el as HTMLElement).height)
+                    ),
+                { timeout: 2000 }
+            )
+            .toBeLessThan(110)
+
+        // Inline inverse transform should be present during the animation
+        await expect
+            .poll(
+                async () => await box.evaluate((el) => (el as HTMLElement).style.transform || ''),
+                { timeout: 1000 }
+            )
+            .not.toBe('')
+
+        // After animation completes, inline transform should be cleared ('' or 'none')
+        await expect
+            .poll(
+                async () => await box.evaluate((el) => (el as HTMLElement).style.transform || ''),
+                { timeout: 2000 }
+            )
+            .toMatch(/^$|^none$/)
+
+        // After animation completes, visual height should reach expected ~width/2
+        await expect
+            .poll(async () => (await box.boundingBox())?.height ?? 0, { timeout: 2000 })
+            .toBeGreaterThan(90)
 
         const ar2 = await box.boundingBox()
         expect(ar2).not.toBeNull()

@@ -59,12 +59,26 @@
             <label>
                 <code>Aspect ratio</code>
                 <input type="range" min="0.1" max="5" step="0.1" bind:value={aspectRatio} />
-                <input type="number" min="0.1" max="5" step="0.1" bind:value={aspectRatio} />
+                <input
+                    type="number"
+                    min="0.1"
+                    max="5"
+                    step="0.1"
+                    bind:value={aspectRatio}
+                    data-testid="aspect-ratio-input"
+                />
             </label>
             <label>
                 <code>Width</code>
                 <input type="range" min="10" max="1000" step="5" bind:value={width} />
-                <input type="number" min="10" max="1000" step="5" bind:value={width} />
+                <input
+                    type="number"
+                    min="10"
+                    max="1000"
+                    step="5"
+                    bind:value={width}
+                    data-testid="width-input"
+                />
             </label>
         </div>
     </div>
