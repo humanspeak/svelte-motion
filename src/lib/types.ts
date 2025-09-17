@@ -76,6 +76,8 @@ export type MotionProps = {
     style?: string
     /** CSS classes */
     class?: string
+    /** Enable FLIP layout animations; "position" limits to translation only */
+    layout?: boolean | 'position'
 }
 
 /**
