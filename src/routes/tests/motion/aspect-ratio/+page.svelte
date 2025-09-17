@@ -15,9 +15,11 @@
     let wTimeout: ReturnType<typeof setTimeout> | null = null
 
     $effect(() => {
+        // Track aspectRatio so this effect re-runs when it changes
+        const current = aspectRatio
         if (arTimeout) clearTimeout(arTimeout)
         arTimeout = setTimeout(() => {
-            debouncedAspectRatio = aspectRatio
+            debouncedAspectRatio = current
         }, 200)
         return () => {
             if (arTimeout) {
@@ -28,9 +30,11 @@
     })
 
     $effect(() => {
+        // Track width so this effect re-runs when it changes
+        const current = width
         if (wTimeout) clearTimeout(wTimeout)
         wTimeout = setTimeout(() => {
-            debouncedWidth = width
+            debouncedWidth = current
         }, 200)
         return () => {
             if (wTimeout) {
@@ -44,54 +48,23 @@
 <div id="example">
     <div class="container">
         <motion.div
-            style={`background-color: #8df0cc; aspect-ratio: ${debouncedAspectRatio}; border-radius: 20px;`}
-            initial={{ width: initialWidth }}
-            animate={{ width: debouncedWidth }}
+            style={`width: ${debouncedWidth}px; background-color: #8df0cc; aspect-ratio: ${debouncedAspectRatio} ; border-radius: 20px;`}
             transition={{ duration: 0.25 }}
             data-testid="aspect-box"
+            layout
         />
     </div>
     <div class="inputContainer">
         <div class="inputs">
             <label>
                 <code>Aspect ratio</code>
-                <input
-                    type="range"
-                    min="0.1"
-                    max="5"
-                    step="0.1"
-                    value={aspectRatio}
-                    oninput={(e) =>
-                        (aspectRatio = parseFloat((e.target as HTMLInputElement).value))}
-                />
-                <input
-                    type="number"
-                    min="0.1"
-                    max="5"
-                    step="0.1"
-                    value={aspectRatio}
-                    oninput={(e) =>
-                        (aspectRatio = parseFloat((e.target as HTMLInputElement).value) || 0)}
-                />
+                <input type="range" min="0.1" max="5" step="0.1" bind:value={aspectRatio} />
+                <input type="number" min="0.1" max="5" step="0.1" bind:value={aspectRatio} />
             </label>
             <label>
                 <code>Width</code>
-                <input
-                    type="range"
-                    min="10"
-                    max="1000"
-                    step="5"
-                    value={width}
-                    oninput={(e) => (width = parseFloat((e.target as HTMLInputElement).value))}
-                />
-                <input
-                    type="number"
-                    min="10"
-                    max="1000"
-                    step="5"
-                    value={width}
-                    oninput={(e) => (width = parseFloat((e.target as HTMLInputElement).value) || 0)}
-                />
+                <input type="range" min="10" max="1000" step="5" bind:value={width} />
+                <input type="number" min="10" max="1000" step="5" bind:value={width} />
             </label>
         </div>
     </div>

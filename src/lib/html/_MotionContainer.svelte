@@ -24,6 +24,7 @@
         style: styleProp,
         class: classProp,
         whileTap: whileTapProp,
+        layout: layoutProp,
         ...rest
     }: Props = $props()
     let element: HTMLElement | null = $state(null)
@@ -75,6 +76,84 @@
                 .catch(() => {})
         }
     }
+
+    // Minimal layout animation using FLIP when `layout` is enabled.
+    // When layout === 'position' we only translate.
+    // When layout === true we also scale to smoothly interpolate size changes.
+    let lastRect: DOMRect | null = null
+    let hasBaseline = false
+    $effect(() => {
+        if (!(element && layoutProp && isLoaded === 'ready')) return
+
+        // Initialize last rect on first ready frame
+        const measure = () => {
+            const prev = element!.style.transform
+            element!.style.transform = 'none'
+            const rect = element!.getBoundingClientRect()
+            element!.style.transform = prev
+            return rect
+        }
+        lastRect = measure()
+        hasBaseline = false
+
+        const ro = new ResizeObserver(() => {
+            if (!lastRect) {
+                const prev = element!.style.transform
+                element!.style.transform = 'none'
+                lastRect = element!.getBoundingClientRect()
+                element!.style.transform = prev
+                return
+            }
+            if (!hasBaseline) {
+                // First RO callback provides the baseline; don't animate
+                hasBaseline = true
+                const prev = element!.style.transform
+                element!.style.transform = 'none'
+                lastRect = element!.getBoundingClientRect()
+                element!.style.transform = prev
+                return
+            }
+            const prev = element!.style.transform
+            element!.style.transform = 'none'
+            const next = element!.getBoundingClientRect()
+            element!.style.transform = prev
+            // Use top-left corner for FLIP to match transformOrigin '0 0'
+            const dx = lastRect.left - next.left
+            const dy = lastRect.top - next.top
+            const sx = next.width > 0 ? lastRect.width / next.width : 1
+            const sy = next.height > 0 ? lastRect.height / next.height : 1
+
+            const shouldTranslate = Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5
+            const shouldScale =
+                layoutProp !== 'position' && (Math.abs(1 - sx) > 0.01 || Math.abs(1 - sy) > 0.01)
+
+            if (shouldTranslate || shouldScale) {
+                const keyframes: Record<string, unknown> = {}
+                if (shouldTranslate) {
+                    keyframes.x = [dx, 0]
+                    keyframes.y = [dy, 0]
+                }
+                if (shouldScale) {
+                    keyframes.scaleX = [sx, 1]
+                    keyframes.scaleY = [sy, 1]
+                    ;(keyframes as Record<string, unknown>).transformOrigin = '0 0'
+                }
+                animate(
+                    element!,
+                    keyframes as unknown as import('motion').DOMKeyframesDefinition,
+                    (mergedTransition ?? {}) as import('motion').AnimationOptions
+                )
+            }
+            lastRect = next
+        })
+        ro.observe(element)
+
+        return () => {
+            ro.disconnect()
+            lastRect = null
+            hasBaseline = false
+        }
+    })
 
     // Merge style for before/after ready so styles carry through post-anim
     // Merge styles directly in markup; keep effect solely for readiness logic
