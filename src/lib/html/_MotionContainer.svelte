@@ -97,12 +97,10 @@
         element!.style.willChange = 'transform'
         element!.style.transformOrigin = '0 0'
 
-        const ro = new ResizeObserver(() => {
+        let rafId: number | null = null
+        const runFlip = () => {
             if (!lastRect) {
-                const prev = element!.style.transform
-                element!.style.transform = 'none'
-                lastRect = element!.getBoundingClientRect()
-                element!.style.transform = prev
+                lastRect = measure()
                 return
             }
             const prev = element!.style.transform
@@ -144,20 +142,37 @@
                 )
             }
             lastRect = next
-        })
+        }
+
+        const scheduleFlip = () => {
+            if (rafId) cancelAnimationFrame(rafId)
+            rafId = requestAnimationFrame(() => {
+                rafId = null
+                runFlip()
+            })
+        }
+        const ro = new ResizeObserver(() => scheduleFlip())
         ro.observe(element)
+        // Also observe attribute/class changes and nearby DOM mutations that commonly cause reflow/reposition
+        const mo = new MutationObserver(() => scheduleFlip())
+        mo.observe(element, { attributes: true, attributeFilter: ['class', 'style'] })
+        if (element.parentElement) {
+            mo.observe(element.parentElement, { childList: true, subtree: false, attributes: true })
+        }
 
         return () => {
             ro.disconnect()
+            mo.disconnect()
             lastRect = null
             // Reset compositor hints on teardown
             if (element) {
                 element.style.willChange = ''
                 element.style.transformOrigin = ''
+                element.style.transform = ''
             }
+            if (rafId) cancelAnimationFrame(rafId)
         }
     })
-
     // Merge style for before/after ready so styles carry through post-anim
     // Merge styles directly in markup; keep effect solely for readiness logic
 
