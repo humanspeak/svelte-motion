@@ -12,7 +12,7 @@ Reference: Framer Motion for React [`motion` on npm](https://www.npmjs.com/packa
     - `motion`: Object map of HTML tag components (e.g., `motion.div`, `motion.button`) in `src/lib/html/`.
     - `MotionConfig` context component.
     - Types: `MotionInitial`, `MotionAnimate`, `MotionTransition`, `MotionWhileTap`.
-- **Implemented props**: `initial`, `animate`, `transition`, `whileTap`, `onAnimationStart`, `onAnimationComplete`, `class`, `style`.
+- **Implemented props**: `initial`, `animate`, `transition`, `whileTap`, `onAnimationStart`, `onAnimationComplete`, `class`, `style`, `layout` (FLIP-based).
 - **Coverage of HTML elements**: Many intrinsic HTML components implemented under `src/lib/html/`.
 - **Tests**: Unit tests for utils and `_MotionContainer` lifecycles/whileTap/reset, E2E for enter animation and HTML content.
 
@@ -24,7 +24,7 @@ Gaps vs Framer Motion core:
 - Gesture system: `drag`/`pan` with constraints, momentum, elasticity.
 - Motion values and transforms: motion value store, derived transforms, `stagger`, `delayChildren`.
 - `animate` imperative API for non-components, `useAnimation`-like controls, timelines.
-- Layout animations, shared layout transitions.
+- Layout animations, shared layout transitions. [Layout for single elements: Done]
 - Event callbacks: `onAnimationStart`, `onAnimationComplete`, per-keyframe lifecycle where applicable.
 - Documentation site, examples, and comprehensive test coverage.
 
@@ -35,7 +35,7 @@ Primary goal: API and behavioral parity for core day-1 Framer Motion features th
 Non-goals (initial phases):
 
 - Visual editor tooling (Studio), premium examples, and non-essential React-specific hooks.
-- Advanced layout/FLIP until core animations are robust.
+- Advanced shared layout/FLIP until core animations are robust.
 
 ## 4) Phased Roadmap
 
@@ -177,7 +177,8 @@ Status against spec:
 | `drag`/`pan`                       | Yes                   | No                     | 2     |
 | Motion values/transforms           | Yes                   | No                     | 2     |
 | Timelines/stagger                  | Yes                   | No                     | 2     |
-| Layout/Shared layout               | Yes                   | No (prototype planned) | 3     |
+| Layout (single element)            | Yes                   | Yes (FLIP, no flicker) | 0     |
+| Shared layout                      | Yes                   | No (prototype planned) | 3     |
 | Docs/examples parity               | Yes                   | Minimal                | 3     |
 
 ## 8) Technical Approach Notes
@@ -185,6 +186,7 @@ Status against spec:
 - Leverage the `motion` JS engine already used for typing to drive keyframes/WAAPI under the hood.
 - Encapsulate prop parsing into a shared container (`_MotionContainer.svelte`) to minimize duplication across elements.
 - Implement interaction props as composed keyframe sets, merged with `transition` settings and interactive state.
+- Layout: FLIP implementation using `ResizeObserver`. On size/position change we measure previous and next rects, pre-apply the inverted transform (translate/scale from previous to next) synchronously to avoid flashing, then animate back to identity using Motion's `animate`. `layout="position"` restricts to translation only; `layout` enables translation + scaling.
 - Variants: resolve variant keys contextually, support nested inheritance, and per-prop `transition` overrides.
 - Presence: wrapper component coordinating mount/unmount and exit states with deferred DOM removal.
 - Gestures: build on pointer events; compute velocity; apply inertial transitions via the motion engine.

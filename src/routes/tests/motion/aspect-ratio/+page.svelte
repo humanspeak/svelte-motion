@@ -16,7 +16,7 @@
 
     $effect(() => {
         // Track aspectRatio so this effect re-runs when it changes
-        const current = aspectRatio
+        const current = $state.snapshot(aspectRatio)
         if (arTimeout) clearTimeout(arTimeout)
         arTimeout = setTimeout(() => {
             debouncedAspectRatio = current
@@ -31,7 +31,7 @@
 
     $effect(() => {
         // Track width so this effect re-runs when it changes
-        const current = width
+        const current = $state.snapshot(width)
         if (wTimeout) clearTimeout(wTimeout)
         wTimeout = setTimeout(() => {
             debouncedWidth = current

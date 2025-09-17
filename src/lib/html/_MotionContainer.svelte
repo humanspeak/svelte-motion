@@ -81,7 +81,6 @@
     // When layout === 'position' we only translate.
     // When layout === true we also scale to smoothly interpolate size changes.
     let lastRect: DOMRect | null = null
-    let hasBaseline = false
     $effect(() => {
         if (!(element && layoutProp && isLoaded === 'ready')) return
 
@@ -94,19 +93,12 @@
             return rect
         }
         lastRect = measure()
-        hasBaseline = false
+        // Hint compositor for smoother FLIP transforms
+        element!.style.willChange = 'transform'
+        element!.style.transformOrigin = '0 0'
 
         const ro = new ResizeObserver(() => {
             if (!lastRect) {
-                const prev = element!.style.transform
-                element!.style.transform = 'none'
-                lastRect = element!.getBoundingClientRect()
-                element!.style.transform = prev
-                return
-            }
-            if (!hasBaseline) {
-                // First RO callback provides the baseline; don't animate
-                hasBaseline = true
                 const prev = element!.style.transform
                 element!.style.transform = 'none'
                 lastRect = element!.getBoundingClientRect()
@@ -138,6 +130,13 @@
                     keyframes.scaleY = [sy, 1]
                     ;(keyframes as Record<string, unknown>).transformOrigin = '0 0'
                 }
+                // Apply the inverse transform immediately so we don't flash the new layout
+                // before the animation starts (classic FLIP: First, Last, Invert, Play)
+                const parts: string[] = []
+                if (shouldTranslate) parts.push(`translate(${dx}px, ${dy}px)`)
+                if (shouldScale) parts.push(`scale(${sx}, ${sy})`)
+                element!.style.transformOrigin = '0 0'
+                element!.style.transform = parts.join(' ')
                 animate(
                     element!,
                     keyframes as unknown as import('motion').DOMKeyframesDefinition,
@@ -151,7 +150,11 @@
         return () => {
             ro.disconnect()
             lastRect = null
-            hasBaseline = false
+            // Reset compositor hints on teardown
+            if (element) {
+                element.style.willChange = ''
+                element.style.transformOrigin = ''
+            }
         }
     })
 

@@ -35,6 +35,17 @@ This package includes support for `MotionConfig`, which allows you to set defaul
 </MotionConfig>
 ```
 
+### Layout Animations (FLIP)
+
+Svelte Motion supports minimal layout animations via FLIP using the `layout` prop:
+
+```svelte
+<motion.div layout transition={{ duration: 0.25 }} />
+```
+
+- **`layout`**: smoothly animates translation and scale between layout changes (size and position).
+- **`layout="position"`**: only animates translation (no scale).
+
 #### Current Limitations
 
 Some Motion features are not yet implemented:
@@ -43,9 +54,7 @@ Some Motion features are not yet implemented:
 - `features` configuration
 - Performance optimizations like `transformPagePoint`
 - Advanced transition controls
-- `layout`/`layoutId` (FLIP) — prototype planned
-
-We're actively working on adding these features. Check our GitHub issues for progress updates or to contribute.
+- Shared layout / `layoutId` (planned)
 
 ## External Dependencies
 
@@ -63,8 +72,9 @@ This package carefully selects its dependencies to provide a robust and maintain
 
 | Motion                                                                                                   | Demo / Route                      | REPL                                                                                           |
 | -------------------------------------------------------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------- |
-| [React - Enter Animation](https://examples.motion.dev/react/enter-animation)                             | `/tests/motion/enter-animation`   | [View Example](https://svelte.dev/playground/7f60c347729f4ea48b1a4590c9dedc02?version=5.20.2)  |
-| HTML Content (0→100 counter)                                                                             | `/tests/motion/html-content`      | [View Example](https://svelte.dev/playground/31cd72df4a3242b4b4589501a25e774f?version=5.38.10) |
+| [React - Enter Animation](https://examples.motion.dev/react/enter-animation)                             | `/tests/motion/enter-animation`   | [View Example](https://svelte.dev/playground/7f60c347729f4ea48b1a4590c9dedc02?version=5.38.10) |
+| [HTML Content (0→100 counter)](https://examples.motion.dev/react/html-content)                           | `/tests/motion/html-content`      | [View Example](https://svelte.dev/playground/31cd72df4a3242b4b4589501a25e774f?version=5.38.10) |
+| [Aspect Ratio](https://examples.motion.dev/react/aspect-ratio)                                           | `/tests/motion/aspect-ratio`      | [View Example](https://svelte.dev/playground/1bf60e745fae44f5becb4c830fde9b6e?version=5.38.10) |
 | [Random - Shiny Button](https://www.youtube.com/watch?v=jcpLprT5F0I) by [@verse\_](https://x.com/verse_) | `/tests/random/shiny-button`      | [View Example](https://svelte.dev/playground/96f9e0bf624f4396adaf06c519147450?version=5.38.10) |
 | [Fancy Like Button](https://github.com/DRlFTER/fancyLikeButton)                                          | `/tests/random/fancy-like-button` | [View Example](https://svelte.dev/playground/c34b7e53d41c48b0ab1eaf21ca120c6e?version=5.38.10) |
 
