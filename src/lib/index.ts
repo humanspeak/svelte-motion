@@ -1,6 +1,6 @@
-import MotionConfig from './components/MotionConfig.svelte'
-import type { MotionComponents } from './html/index.js'
-import * as html from './html/index.js'
+import MotionConfig from '$lib/components/MotionConfig.svelte'
+import type { MotionComponents } from '$lib/html/index.js'
+import * as html from '$lib/html/index.js'
 
 // Create the motion object with all components
 export const motion: MotionComponents = Object.fromEntries(
@@ -9,5 +9,6 @@ export const motion: MotionComponents = Object.fromEntries(
 
 // Export all types
 export { animate } from 'motion'
-export type { MotionAnimate, MotionInitial, MotionTransition, MotionWhileTap } from './types.js'
+// Re-export all Motion types so consumers can import types from this package
+export type { MotionAnimate, MotionInitial, MotionTransition, MotionWhileTap } from '$lib/types.js'
 export { MotionConfig }
