@@ -1,5 +1,5 @@
 ---
-'@fake-scope/fake-pkg': patch
+'@humanspeak/svelte-motion': patch
 ---
 
 Enhancement: Documentation cleanup

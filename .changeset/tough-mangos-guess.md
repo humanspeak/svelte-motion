@@ -1,5 +1,5 @@
 ---
-"@fake-scope/fake-pkg": patch
+'@humanspeak/svelte-motion': minor
 ---
 
 Enhancement: Package Update
