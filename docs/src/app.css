@@ -1,0 +1,56 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+@theme {
+    /* Brand color (Svelte orange) generates bg-brand-500, text-brand-500, etc. */
+    --color-brand-100: #ffe6d9;
+    --color-brand-200: #ffccb3;
+    --color-brand-300: #ffb38c;
+    --color-brand-400: #ff995f;
+    --color-brand-500: #ff3e00;
+    --color-brand-600: #e63a00;
+    --color-brand-700: #cc3400;
+    --color-brand-800: #b22d00;
+    --color-brand-900: #8f2400;
+    --color-foreground: @apply text-white/80;
+    /* Default border color tokens */
+    --color-border-weak: #ffffff1a; /* ~10% white */
+    --color-border-mid: #ffffff26; /* ~15% white */
+}
+
+/* Global site styles */
+html,
+body {
+    @apply bg-[#0b1011] text-white;
+}
+
+/* Orb backgrounds using the brand color */
+.orb-a-bg {
+    background: radial-gradient(
+        circle at 30% 30%,
+        color-mix(in oklab, var(--color-brand-500) 40%, transparent),
+        color-mix(in oklab, var(--color-brand-500) 10%, transparent)
+    );
+}
+.orb-b-bg {
+    background: radial-gradient(
+        circle at 70% 50%,
+        color-mix(in oklab, var(--color-brand-500) 30%, transparent),
+        color-mix(in oklab, var(--color-brand-500) 8%, transparent)
+    );
+}
+
+@keyframes sheen {
+    0%,
+    100% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+}
+
+.sheen-gradient {
+    background-size: 200% 100%;
+    animation: sheen 6s ease-in-out infinite;
+}
