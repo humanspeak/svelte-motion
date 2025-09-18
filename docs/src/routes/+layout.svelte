@@ -21,29 +21,42 @@
                 aria-label={m.nav_home()}
                 class="inline-flex items-center justify-center"
             >
-                <img src={favicon} alt="logo" class="h-6 w-6 rounded-md" />
+                <motion.img
+                    src={favicon}
+                    alt="logo"
+                    class="h-6 w-6 rounded-md transition-transform hover:scale-110 active:scale-95"
+                    whileTap={{ scale: 0.9 }}
+                />
             </a>
             <div class="flex items-center gap-4">
-                <motion.a
+                <a
                     href="https://github.com/humanspeak/svelte-motion"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex size-6 items-center justify-center rounded-full border border-border-weak transition-transform hover:scale-110 hover:border-border-mid hover:text-white"
+                    class="inline-flex items-center justify-center hover:text-white"
                     aria-label={m.nav_github()}
-                    whileTap={{ scale: 0.9 }}
                 >
-                    <i class="fa-brands fa-github fa-sm"></i>
-                </motion.a>
-                <motion.a
+                    <motion.div
+                        class="inline-flex size-6 items-center justify-center rounded-full border border-border-weak transition-transform hover:scale-110 hover:border-border-mid active:scale-95"
+                        whileTap={{ scale: 0.9 }}
+                    >
+                        <i class="fa-brands fa-github fa-sm"></i>
+                    </motion.div>
+                </a>
+                <a
                     href="https://www.npmjs.com/package/@humanspeak/svelte-motion"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex size-6 items-center justify-center rounded-full border border-border-weak transition-transform hover:scale-110 hover:border-border-mid hover:text-white"
+                    class="inline-flex items-center justify-center hover:text-white"
                     aria-label={m.nav_npm()}
-                    whileTap={{ scale: 0.9 }}
                 >
-                    <i class="fa-brands fa-npm fa-sm"></i>
-                </motion.a>
+                    <motion.div
+                        class="inline-flex size-6 items-center justify-center rounded-full border border-border-weak transition-transform hover:scale-110 hover:border-border-mid active:scale-95"
+                        whileTap={{ scale: 0.9 }}
+                    >
+                        <i class="fa-brands fa-npm fa-sm"></i>
+                    </motion.div>
+                </a>
             </div>
         </header>
 
@@ -61,7 +74,7 @@
             >
                 Humanspeak
             </a>
-            · {m.footer_inspired_by()}
+            ・ {m.footer_inspired_by()}
             <a
                 href="https://motion.dev/"
                 target="_blank"

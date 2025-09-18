@@ -26,6 +26,7 @@ import H5 from './H5.svelte'
 import H6 from './H6.svelte'
 import Header from './Header.svelte'
 import Hr from './Hr.svelte'
+import I from './I.svelte'
 import Img from './Img.svelte'
 import Input from './Input.svelte'
 import Label from './Label.svelte'
@@ -83,6 +84,7 @@ export {
     H6,
     Header,
     Hr,
+    I,
     Img,
     Input,
     Label,
@@ -684,6 +686,30 @@ export type MotionComponents = {
      * Check documentation for latest updates.
      */
     header: typeof Header
+
+    /**
+     * A motion-enhanced i element with animation capabilities.
+     *
+     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
+     *
+     * Currently supported features:
+     * * `initial`
+     * * `animate`
+     * * `transition`
+     * * `whileTap`
+     *
+     * ```svelte
+     * <motion.i
+     *   initial={{ opacity: 0, scale: 0.8 }}
+     *   animate={{ opacity: 1, scale: 1 }}
+     *   transition={{ duration: 0.3 }}
+     * />
+     * ```
+     *
+     * Note: Some motion features are still under development.
+     * Check documentation for latest updates.
+     */
+    i: typeof I
 
     /**
      * A motion-enhanced label element with animation capabilities.
