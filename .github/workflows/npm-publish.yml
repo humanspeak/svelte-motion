@@ -346,7 +346,7 @@ jobs:
 
             - name: Release with Changesets
               if: steps.publish-check.outputs.should_publish == 'true'
-              uses: changesets/action@v1
+              uses: changesets/action@v1 # zizmor: ignore[unpinned-uses]
               with:
                   version: pnpm cs:version
                   publish: pnpm cs:publish
