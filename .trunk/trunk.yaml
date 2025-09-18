@@ -65,6 +65,7 @@ lint:
                   - prettier-plugin-svelte
                   - prettier-plugin-organize-imports
                   - prettier-plugin-tailwindcss
+                  - prettier-plugin-sort-json
         - shellcheck@0.11.0
         - shfmt@3.6.0
         - svgo@4.0.0

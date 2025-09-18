@@ -10,7 +10,7 @@ importers:
     dependencies:
       '@humanspeak/svelte-motion':
         specifier: file:..
-        version: file:..(svelte@5.39.2)(vite@7.1.6(jiti@2.5.1)(lightningcss@1.30.1))
+        version: file:..(svelte@5.39.2)
       '@inlang/paraglide-js':
         specifier: ^2.0.0
         version: 2.3.2
@@ -63,6 +63,9 @@ importers:
       prettier:
         specifier: ^3.4.2
         version: 3.6.2
+      prettier-plugin-sort-json:
+        specifier: ^4.1.1
+        version: 4.1.1(prettier@3.6.2)
       prettier-plugin-svelte:
         specifier: ^3.3.3
         version: 3.4.0(prettier@3.6.2)(svelte@5.39.2)
@@ -1878,6 +1881,12 @@ packages:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
 
+  prettier-plugin-sort-json@4.1.1:
+    resolution: {integrity: sha512-uJ49wCzwJ/foKKV4tIPxqi4jFFvwUzw4oACMRG2dcmDhBKrxBv0L2wSKkAqHCmxKCvj0xcCZS4jO2kSJO/tRJw==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      prettier: ^3.0.0
+
   prettier-plugin-svelte@3.4.0:
     resolution: {integrity: sha512-pn1ra/0mPObzqoIQn/vUTR3ZZI6UuZ0sHqMK5x2jMLGrs53h0sXhkVuDcrlssHwIMk7FYrMjHBPoUSyyEEDlBQ==}
     peerDependencies:
@@ -2634,16 +2643,14 @@ snapshots:
       '@humanfs/core': 0.19.1
       '@humanwhocodes/retry': 0.4.3
 
-  '@humanspeak/svelte-motion@file:..(svelte@5.39.2)(vite@7.1.6(jiti@2.5.1)(lightningcss@1.30.1))':
+  '@humanspeak/svelte-motion@file:..(svelte@5.39.2)':
     dependencies:
-      '@tailwindcss/vite': 4.1.13(vite@7.1.6(jiti@2.5.1)(lightningcss@1.30.1))
       motion: 12.23.15
       svelte: 5.39.2
     transitivePeerDependencies:
       - '@emotion/is-prop-valid'
       - react
       - react-dom
-      - vite
 
   '@humanwhocodes/module-importer@1.0.1': {}
 
@@ -3900,6 +3907,10 @@ snapshots:
       source-map-js: 1.2.1
 
   prelude-ls@1.2.1: {}
+
+  prettier-plugin-sort-json@4.1.1(prettier@3.6.2):
+    dependencies:
+      prettier: 3.6.2
 
   prettier-plugin-svelte@3.4.0(prettier@3.6.2)(svelte@5.39.2):
     dependencies:
