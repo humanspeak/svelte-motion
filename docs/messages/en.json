@@ -14,5 +14,6 @@
     "footer_humanspeak": "Humanspeak",
     "footer_motion": "Motion.dev",
     "nav_github": "GitHub Repository",
-    "nav_npm": "NPM Package"
+    "nav_npm": "NPM Package",
+    "nav_home": "Home"
 }

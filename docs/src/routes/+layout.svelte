@@ -1,35 +1,50 @@
 <script lang="ts">
     import '../app.css'
     import { MotionConfig, motion } from '@humanspeak/svelte-motion'
+    import favicon from '$lib/assets/logo.svg'
     import * as m from '$lib/paraglide/messages/_index.js'
+    import { resolve } from '$app/paths'
 
     let { children } = $props()
 </script>
 
+<svelte:head>
+    <link rel="icon" href={favicon} />
+</svelte:head>
+
 <MotionConfig transition={{ duration: 0.5 }}>
     <div class="flex min-h-svh flex-col">
         <!-- Header with links -->
-        <header class="flex items-center justify-end gap-4 px-6 py-4 text-foreground">
-            <motion.a
-                href="https://github.com/humanspeak/svelte-motion"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex size-6 items-center justify-center rounded-full border border-border-weak transition-transform hover:scale-110 hover:border-border-mid hover:text-white"
-                aria-label="GitHub Repository"
-                whileTap={{ scale: 0.9 }}
+        <header class="flex items-center justify-between px-6 py-4 text-foreground">
+            <a
+                href={resolve('/')}
+                aria-label={m.nav_home()}
+                class="inline-flex items-center justify-center"
             >
-                <i class="fa-brands fa-github fa-sm"></i>
-            </motion.a>
-            <motion.a
-                href="https://www.npmjs.com/package/@humanspeak/svelte-motion"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex size-6 items-center justify-center rounded-full border border-border-weak transition-transform hover:scale-110 hover:border-border-mid hover:text-white"
-                aria-label="NPM Package"
-                whileTap={{ scale: 0.9 }}
-            >
-                <i class="fa-brands fa-npm fa-sm"></i>
-            </motion.a>
+                <img src={favicon} alt="logo" class="h-6 w-6 rounded-md" />
+            </a>
+            <div class="flex items-center gap-4">
+                <motion.a
+                    href="https://github.com/humanspeak/svelte-motion"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex size-6 items-center justify-center rounded-full border border-border-weak transition-transform hover:scale-110 hover:border-border-mid hover:text-white"
+                    aria-label={m.nav_github()}
+                    whileTap={{ scale: 0.9 }}
+                >
+                    <i class="fa-brands fa-github fa-sm"></i>
+                </motion.a>
+                <motion.a
+                    href="https://www.npmjs.com/package/@humanspeak/svelte-motion"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex size-6 items-center justify-center rounded-full border border-border-weak transition-transform hover:scale-110 hover:border-border-mid hover:text-white"
+                    aria-label={m.nav_npm()}
+                    whileTap={{ scale: 0.9 }}
+                >
+                    <i class="fa-brands fa-npm fa-sm"></i>
+                </motion.a>
+            </div>
         </header>
 
         <div class="flex flex-1 flex-col">
