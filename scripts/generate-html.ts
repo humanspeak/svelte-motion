@@ -1,88 +1,48 @@
 import fs from 'fs'
+import htmlTags from 'html-tags'
+import { htmlVoidElements } from 'html-void-elements'
 import path from 'path'
-import type { SvelteHTMLElements } from 'svelte/elements'
-
-// Get all HTML elements from Svelte's type definitions
-const HTML_TAGS = [
-    'div',
-    'span',
-    'button',
-    'a',
-    'p',
-    'h1',
-    'h2',
-    'h3',
-    'h4',
-    'h5',
-    'h6',
-    'section',
-    'article',
-    'nav',
-    'aside',
-    'main',
-    'header',
-    'footer',
-    'ul',
-    'ol',
-    'li',
-    'dl',
-    'dt',
-    'dd',
-    'table',
-    'tr',
-    'td',
-    'th',
-    'thead',
-    'tbody',
-    'tfoot',
-    'form',
-    'label',
-    'select',
-    'option',
-    'textarea',
-    'fieldset',
-    'legend',
-    'pre',
-    'code',
-    'blockquote',
-    'figure',
-    'figcaption'
-] satisfies (keyof SvelteHTMLElements)[]
+import svgTags from 'svg-tags'
 
 // Elements that should be excluded entirely
 const EXCLUDED_TAGS = new Set(['script', 'style', 'link', 'meta', 'title', 'head', 'html', 'body'])
 
-// Void elements that can't have children
-const VOID_ELEMENTS = new Set([
-    'area',
-    'base',
-    'br',
-    'col',
-    'embed',
-    'hr',
-    'img',
-    'input',
-    'link',
-    'meta',
-    'param',
-    'source',
-    'track',
-    'wbr'
-])
+// Canonical lists
+const HTML_TAGS: string[] = (htmlTags as string[]).map((t) => t.toLowerCase())
+const SVG_TAGS: string[] = (svgTags as string[]).map((t) => t.toLowerCase())
+const VOID_ELEMENTS = new Set((htmlVoidElements as string[]).map((t) => t.toLowerCase()))
 
-const FILTERED_TAGS = [...HTML_TAGS, ...Array.from(VOID_ELEMENTS)]
-    .filter((tag) => !EXCLUDED_TAGS.has(tag))
-    .sort()
+const FILTERED_HTML = HTML_TAGS.filter((tag) => !EXCLUDED_TAGS.has(tag)).sort()
+const FILTERED_SVG = SVG_TAGS.sort()
 
-const TEMPLATE_PATH = 'src/lib/html/_template.template'
-const VOID_TEMPLATE_PATH = 'src/lib/html/_template_void.template'
+const TEMPLATE_PATH = 'scripts/_template.template'
+const VOID_TEMPLATE_PATH = 'scripts/_template_void.template'
 const OUTPUT_DIR = 'src/lib/html'
 
 const template = fs.readFileSync(TEMPLATE_PATH, 'utf-8')
 const voidTemplate = fs.readFileSync(VOID_TEMPLATE_PATH, 'utf-8')
 
+const toComponentName = (tag: string): string =>
+    tag
+        .split('-')
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join('')
+
+const needsQuoting = (tag: string): boolean => tag.includes('-')
+
 const generateComponentDocs = (tag: string, isVoid: boolean): string => {
-    const workingProps = ['initial', 'animate', 'transition', 'whileTap']
+    const workingProps = [
+        'initial',
+        'animate',
+        'transition',
+        'whileTap',
+        'whileHover',
+        'onAnimationStart',
+        'onAnimationComplete',
+        'onHoverStart',
+        'onHoverEnd',
+        'layout'
+    ]
     const propsText = workingProps.map((prop) => `* \`${prop}\``).join('\n     * ')
     const content = isVoid ? '' : 'Content'
 
@@ -100,6 +60,8 @@ const generateComponentDocs = (tag: string, isVoid: boolean): string => {
         '     *   initial={{ opacity: 0, scale: 0.8 }}',
         '     *   animate={{ opacity: 1, scale: 1 }}',
         '     *   transition={{ duration: 0.3 }}',
+        '     *   whileHover={{ scale: 1.05 }}',
+        '     *   whileTap={{ scale: 0.95 }}',
         isVoid ? '     * />' : `     * >\n     *   ${content}\n     * </motion.${tag}>`,
         '     * ```',
         '     *',
@@ -109,68 +71,81 @@ const generateComponentDocs = (tag: string, isVoid: boolean): string => {
     ].join('\n')
 }
 
-// Generate components
-FILTERED_TAGS.forEach((tag) => {
+// Generate HTML components
+FILTERED_HTML.forEach((tag) => {
     const isVoid = VOID_ELEMENTS.has(tag)
     const content = (isVoid ? voidTemplate : template).replace(/{{tag}}/g, tag as string)
-    const fileName = `${(tag as string).charAt(0).toUpperCase() + (tag as string).slice(1)}.svelte`
+    const fileName = `${toComponentName(tag)}.svelte`
+    fs.writeFileSync(path.join(OUTPUT_DIR, fileName), content)
+})
+
+// Generate SVG components (never void)
+FILTERED_SVG.forEach((tag) => {
+    const content = template.replace(/{{tag}}/g, tag as string)
+    const fileName = `${toComponentName(tag)}.svelte`
     fs.writeFileSync(path.join(OUTPUT_DIR, fileName), content)
 })
 
 // Generate index.ts
-const imports = FILTERED_TAGS.map((tag) => {
-    const componentName = `${(tag as string).charAt(0).toUpperCase() + (tag as string).slice(1)}`
-    return `import ${componentName} from './${componentName}.svelte'`
+const ALL_TAGS = [...new Set([...FILTERED_HTML, ...FILTERED_SVG])]
+
+const imports = ALL_TAGS.map((tag) => {
+    const componentName = toComponentName(tag)
+    return `import ${componentName} from '$lib/html/${componentName}.svelte'`
 }).join('\n')
 
-const regularElements = FILTERED_TAGS.filter((tag) => !VOID_ELEMENTS.has(tag)).sort()
-const voidElements = FILTERED_TAGS.filter((tag) => VOID_ELEMENTS.has(tag)).sort()
+const regularElements = [
+    ...new Set([...FILTERED_HTML.filter((t) => !VOID_ELEMENTS.has(t)), ...FILTERED_SVG])
+].sort()
+const voidElements = FILTERED_HTML.filter((tag) => VOID_ELEMENTS.has(tag)).sort()
 
 const typeDefinition = `
 export type MotionComponents = {
     ${regularElements
         .map((tag) => {
-            const componentName = `${tag.charAt(0).toUpperCase() + tag.slice(1)}`
+            const componentName = toComponentName(tag)
+            const key = needsQuoting(tag) ? `'${tag}'` : tag
             return `${generateComponentDocs(tag, false)}
-    ${tag}: typeof ${componentName}`
+    ${key}: typeof ${componentName}`
         })
         .join('\n\n    ')}
 
     ${voidElements
         .map((tag) => {
-            const componentName = `${tag.charAt(0).toUpperCase() + tag.slice(1)}`
+            const componentName = toComponentName(tag)
+            const key = needsQuoting(tag) ? `'${tag}'` : tag
             return `${generateComponentDocs(tag, true)}
-    ${tag}: typeof ${componentName}`
+    ${key}: typeof ${componentName}`
         })
         .join('\n\n    ')}
 }
 `
 
-const indexContent = `${imports}\n\nexport { ${FILTERED_TAGS.map(
-    (tag) => `${(tag as string).charAt(0).toUpperCase() + (tag as string).slice(1)}`
+const indexContent = `${imports}\n\nexport { ${ALL_TAGS.map(
+    (tag) => `${toComponentName(tag)}`
 ).join(', ')} }\n\n${typeDefinition}\n`
 
 fs.writeFileSync(path.join(OUTPUT_DIR, 'index.ts'), indexContent)
 
-// Generate documentation for README.md
-const elementDocs = `## Supported Elements
+// // Generate documentation for README.md
+// const elementDocs = `## Supported Elements
 
-### Regular Elements
-${regularElements.map((tag) => `- \`motion.${tag}\``).join('\n')}
+// ### Regular Elements
+// ${regularElements.map((tag) => `- \`motion.${tag}\``).join('\n')}
 
-### Void Elements
-${voidElements.map((tag) => `- \`motion.${tag}\``).join('\n')}
+// ### Void Elements
+// ${voidElements.map((tag) => `- \`motion.${tag}\``).join('\n')}
 
-## External Dependencies`
+// ## External Dependencies`
 
-// Read existing README
-const readmePath = 'README.md'
-const readme = fs.readFileSync(readmePath, 'utf-8')
+// // Read existing README
+// const readmePath = 'README.md'
+// const readme = fs.readFileSync(readmePath, 'utf-8')
 
-// Replace or insert the elements section
-const elementsSectionRegex = /## Supported Elements[\s\S]*?## External Dependencies/
-const updatedReadme = readme.includes('## Supported Elements')
-    ? readme.replace(elementsSectionRegex, elementDocs)
-    : readme.replace(/(## Why are we here\?[\s\S]*?\n\n)/, `$1${elementDocs}\n`)
+// // Replace or insert the elements section
+// const elementsSectionRegex = /## Supported Elements[\s\S]*?## External Dependencies/
+// const updatedReadme = readme.includes('## Supported Elements')
+//     ? readme.replace(elementsSectionRegex, elementDocs)
+//     : readme.replace(/(## Why are we here\?[\s\S]*?\n\n)/, `$1${elementDocs}\n`)
 
-fs.writeFileSync(readmePath, updatedReadme.trim() + '\n')
+// fs.writeFileSync(readmePath, updatedReadme.trim() + '\n')
