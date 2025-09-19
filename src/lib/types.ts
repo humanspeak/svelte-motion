@@ -47,6 +47,23 @@ export type MotionTransition = AnimationOptions | undefined
 export type MotionWhileTap = DOMKeyframesDefinition | undefined
 
 /**
+ * Animation properties for hover interactions.
+ * @example
+ * ```svelte
+ * <motion.div whileHover={{ scale: 1.05 }} />
+ * ```
+ */
+export type MotionWhileHover =
+    | (Record<string, unknown> & { transition?: AnimationOptions })
+    | DOMKeyframesDefinition
+    | undefined
+
+/**
+ * Animation transition configuration for hover interactions.
+ * Overrides the global transition when provided.
+ */
+
+/**
  * Animation lifecycle callbacks for motion components.
  */
 export type MotionAnimationStart =
@@ -55,6 +72,10 @@ export type MotionAnimationStart =
 export type MotionAnimationComplete =
     | ((definition: DOMKeyframesDefinition | undefined) => void)
     | undefined
+
+/** Hover lifecycle callbacks */
+export type MotionOnHoverStart = (() => void) | undefined
+export type MotionOnHoverEnd = (() => void) | undefined
 
 /**
  * Base motion props shared by all motion components.
@@ -68,10 +89,16 @@ export type MotionProps = {
     transition?: MotionTransition
     /** Tap/click interaction animation */
     whileTap?: MotionWhileTap
+    /** Hover interaction animation */
+    whileHover?: MotionWhileHover
     /** Called right before a main animate transition starts */
     onAnimationStart?: MotionAnimationStart
     /** Called after a main animate transition completes */
     onAnimationComplete?: MotionAnimationComplete
+    /** Called when a true hover gesture starts (not emulated by touch) */
+    onHoverStart?: MotionOnHoverStart
+    /** Called when a true hover gesture ends */
+    onHoverEnd?: MotionOnHoverEnd
     /** Inline styles */
     style?: string
     /** CSS classes */

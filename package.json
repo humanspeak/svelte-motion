@@ -54,6 +54,8 @@
         "cs:publish": "pnpm run build && changeset publish",
         "cs:version": "changeset version && pnpm i --lockfile-only",
         "dev": "vite dev",
+        "dev:all": "pnpm -w -r --parallel --filter @humanspeak/svelte-motion dev:pkg --filter docs dev",
+        "dev:pkg": "svelte-kit sync && svelte-package --watch",
         "format": "prettier --write .",
         "generate": "tsx scripts/generate-html.ts",
         "husky": "husky",
@@ -132,6 +134,11 @@
     },
     "publishConfig": {
         "access": "public"
+    },
+    "pnpm": {
+        "onlyBuiltDependencies": [
+            "esbuild"
+        ]
     },
     "tags": [
         "svelte",

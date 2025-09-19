@@ -8,7 +8,7 @@ export const motion: MotionComponents = Object.fromEntries(
 ) as MotionComponents
 
 // Export all types
-export { animate } from 'motion'
+export { animate, hover } from 'motion'
 // Re-export all Motion types so consumers can import types from this package
 export type { MotionAnimate, MotionInitial, MotionTransition, MotionWhileTap } from '$lib/types.js'
 export { MotionConfig }

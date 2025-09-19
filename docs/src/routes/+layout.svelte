@@ -24,8 +24,9 @@
                 <motion.img
                     src={favicon}
                     alt="logo"
-                    class="h-6 w-6 rounded-md transition-transform hover:scale-110 active:scale-95"
+                    class="h-6 w-6 rounded-md active:scale-95"
                     whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.1 }}
                 />
             </a>
             <div class="flex items-center gap-4">
@@ -37,8 +38,9 @@
                     aria-label={m.nav_github()}
                 >
                     <motion.div
-                        class="inline-flex size-6 items-center justify-center rounded-full border border-border-weak transition-transform hover:scale-110 hover:border-border-mid active:scale-95"
+                        class="inline-flex size-6 items-center justify-center rounded-full border border-border-weak active:scale-95"
                         whileTap={{ scale: 0.9 }}
+                        whileHover={{ scale: 1.1, borderColor: 'var(--color-border-mid)' }}
                     >
                         <i class="fa-brands fa-github fa-sm"></i>
                     </motion.div>
@@ -51,8 +53,9 @@
                     aria-label={m.nav_npm()}
                 >
                     <motion.div
-                        class="inline-flex size-6 items-center justify-center rounded-full border border-border-weak transition-transform hover:scale-110 hover:border-border-mid active:scale-95"
+                        class="inline-flex size-6 items-center justify-center rounded-full border border-border-weak active:scale-95"
                         whileTap={{ scale: 0.9 }}
+                        whileHover={{ scale: 1.1, borderColor: 'var(--color-border-mid)' }}
                     >
                         <i class="fa-brands fa-npm fa-sm"></i>
                     </motion.div>

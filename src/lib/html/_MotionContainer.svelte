@@ -24,6 +24,9 @@
         style: styleProp,
         class: classProp,
         whileTap: whileTapProp,
+        whileHover: whileHoverProp,
+        onHoverStart: onHoverStartProp,
+        onHoverEnd: onHoverEndProp,
         layout: layoutProp,
         ...rest
     }: Props = $props()
@@ -34,6 +37,25 @@
     const isPlaywright =
         typeof window !== 'undefined' &&
         window.location.search.includes('@humanspeak-svelte-motion-isPlaywright=true')
+
+    // Recognized HTML void elements that cannot contain children
+    const voidTags = new Set([
+        'area',
+        'base',
+        'br',
+        'col',
+        'embed',
+        'hr',
+        'img',
+        'input',
+        'link',
+        'meta',
+        'param',
+        'source',
+        'track',
+        'wbr'
+    ])
+    const isVoidTag = $derived(voidTags.has(tag as string))
 
     // Compute merged transition without mutating props to avoid effect write loops
     let mergedTransition = $derived<MotionTransition>({
@@ -223,6 +245,98 @@
         }
     })
 
+    // whileHover handling, gated to true-hover devices to avoid sticky states on touch
+    $effect(() => {
+        if (!(element && isLoaded === 'ready' && isNotEmpty(whileHoverProp))) return
+
+        const isHoverCapable = () => {
+            if (typeof window === 'undefined') return false
+            const mqHover = window.matchMedia('(hover: hover)')
+            const mqPointerFine = window.matchMedia('(pointer: fine)')
+            return mqHover.matches && mqPointerFine.matches
+        }
+
+        // Cache baseline values per hover session so we can restore on leave
+        let hoverBaseline: Record<string, unknown> | null = null
+
+        const computeBaseline = () => {
+            const baseline: Record<string, unknown> = {}
+            const initialRecord = (initialProp ?? {}) as Record<string, unknown>
+            const animateRecord = (animateProp ?? {}) as Record<string, unknown>
+            const whileHoverRecordRaw = (whileHoverProp ?? {}) as Record<string, unknown>
+            const whileHoverRecord = { ...whileHoverRecordRaw }
+            delete (whileHoverRecord as Record<string, unknown>)['transition']
+
+            const neutralTransformDefaults: Record<string, unknown> = {
+                x: 0,
+                y: 0,
+                translateX: 0,
+                translateY: 0,
+                scale: 1,
+                scaleX: 1,
+                scaleY: 1,
+                rotate: 0,
+                rotateX: 0,
+                rotateY: 0,
+                rotateZ: 0,
+                skewX: 0,
+                skewY: 0
+            }
+
+            const cs = getComputedStyle(element!)
+            for (const key of Object.keys(whileHoverRecord)) {
+                if (Object.prototype.hasOwnProperty.call(animateRecord, key)) {
+                    baseline[key] = animateRecord[key]
+                } else if (Object.prototype.hasOwnProperty.call(initialRecord, key)) {
+                    baseline[key] = initialRecord[key]
+                } else if (key in neutralTransformDefaults) {
+                    baseline[key] = neutralTransformDefaults[key]
+                } else if (key in cs) {
+                    baseline[key] = (cs as unknown as Record<string, unknown>)[key] as string
+                }
+            }
+            return baseline
+        }
+
+        const handlePointerEnter = () => {
+            if (!isHoverCapable()) return
+            hoverBaseline = computeBaseline()
+            onHoverStartProp?.()
+            const whileHoverRecordRaw = (whileHoverProp ?? {}) as Record<string, unknown>
+            const { transition: whileHoverTransition, ...whileHoverRecord } =
+                whileHoverRecordRaw as { transition?: import('motion').AnimationOptions }
+            animate(
+                element!,
+                whileHoverRecord as unknown as import('motion').DOMKeyframesDefinition,
+                (whileHoverTransition ??
+                    mergedTransition ??
+                    {}) as import('motion').AnimationOptions
+            )
+        }
+
+        const handlePointerLeave = () => {
+            if (!isHoverCapable()) return
+            // Reset changed keys back to baseline values when hover ends
+            if (hoverBaseline && Object.keys(hoverBaseline).length > 0) {
+                animate(
+                    element!,
+                    hoverBaseline as unknown as import('motion').DOMKeyframesDefinition,
+                    // Exit uses component/root transition (not whileHover's nested transition)
+                    (mergedTransition ?? {}) as import('motion').AnimationOptions
+                )
+            }
+            onHoverEndProp?.()
+        }
+
+        element.addEventListener('pointerenter', handlePointerEnter)
+        element.addEventListener('pointerleave', handlePointerLeave)
+
+        return () => {
+            element?.removeEventListener('pointerenter', handlePointerEnter)
+            element?.removeEventListener('pointerleave', handlePointerLeave)
+        }
+    })
+
     // Re-run animate when animateProp changes while ready
     $effect(() => {
         if (element && isLoaded === 'ready' && isNotEmpty(animateProp)) {
@@ -280,7 +394,7 @@
     style={styleProp}
     class={classProp}
 >
-    {#if isLoaded === 'ready'}
+    {#if isLoaded === 'ready' && !isVoidTag}
         {@render children?.()}
     {/if}
 </svelte:element>
