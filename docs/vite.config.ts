@@ -1,13 +1,12 @@
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
 import { sveltekit } from '@sveltejs/kit/vite'
 import tailwindcss from '@tailwindcss/vite'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+// import path from 'node:path'
+// import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import devtoolsJson from 'vite-plugin-devtools-json'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+// const __filename = fileURLToPath(import.meta.url)
 
 export default defineConfig({
     plugins: [
@@ -21,11 +20,7 @@ export default defineConfig({
             disableAsyncLocalStorage: true
         })
     ],
-    resolve: {
-        alias: {
-            '@humanspeak/svelte-motion': path.resolve(__dirname, '../dist/index.js')
-        }
-    },
+    // With pnpm workspace linking, no manual alias is required
     test: {
         expect: { requireAssertions: true },
         projects: [

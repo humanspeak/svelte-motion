@@ -5,7 +5,19 @@
     import { sleep } from '$lib/utils/testing.js'
     import { animate } from 'motion'
     import { type Snippet } from 'svelte'
+    import { VOID_TAGS } from '$lib/utils/constants.js'
+    import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation.js'
+    import { attachWhileTap } from '$lib/utils/interaction.js'
+    import { attachWhileHover } from '$lib/utils/hover.js'
+    import {
+        measureRect,
+        computeFlipTransforms,
+        runFlipAnimation,
+        setCompositorHints,
+        observeLayoutChanges
+    } from '$lib/utils/layout.js'
     import type { SvelteHTMLElements } from 'svelte/elements'
+    import { mergeInlineStyles } from '$lib/utils/style.js'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -24,10 +36,13 @@
         style: styleProp,
         class: classProp,
         whileTap: whileTapProp,
+        whileHover: whileHoverProp,
+        ref: element = $bindable(null),
+        onHoverStart: onHoverStartProp,
+        onHoverEnd: onHoverEndProp,
         layout: layoutProp,
         ...rest
     }: Props = $props()
-    let element: HTMLElement | null = $state(null)
     let isLoaded = $state<'mounting' | 'initial' | 'ready' | 'animated'>('mounting')
     let dataPath = $state<number>(-1)
     const motionConfig = getMotionConfig()
@@ -35,46 +50,31 @@
         typeof window !== 'undefined' &&
         window.location.search.includes('@humanspeak-svelte-motion-isPlaywright=true')
 
-    // Compute merged transition without mutating props to avoid effect write loops
-    let mergedTransition = $derived<MotionTransition>({
-        ...(motionConfig?.transition ?? {}),
-        ...(transitionProp ?? {})
-    })
+    // Recognized HTML void elements that cannot contain children
+    const isVoidTag = $derived(VOID_TAGS.has(tag as string))
 
-    // Type guards for animate return types
-    function isPromiseLike(value: unknown): value is Promise<unknown> {
-        return (
-            typeof value === 'object' &&
-            value !== null &&
-            'then' in (value as { then?: unknown }) &&
-            typeof (value as { then?: unknown }).then === 'function'
-        )
-    }
-    type WithFinished = { finished?: Promise<unknown> }
-    function hasFinishedPromise(value: unknown): value is WithFinished {
-        return (
-            typeof value === 'object' &&
-            value !== null &&
-            'finished' in (value as { finished?: unknown }) &&
-            isPromiseLike((value as { finished?: unknown }).finished)
-        )
-    }
+    // Compute merged transition without mutating props to avoid effect write loops
+    let mergedTransition = $derived<MotionTransition>(
+        mergeTransitions(motionConfig?.transition, transitionProp)
+    )
 
     const runAnimation = () => {
         if (!element || !animateProp) return
         const transitionAmimate: MotionTransition = mergedTransition ?? {}
-        // Fire lifecycle callbacks for main animate transitions
         const payload = $state.snapshot(animateProp)
-        onAnimationStartProp?.(payload)
-        const controls = animate(element, payload, transitionAmimate)
-        // controls may be a promise-like or have a finished promise depending on engine
-        if (hasFinishedPromise(controls)) {
-            controls.finished?.then(() => onAnimationCompleteProp?.(payload)).catch(() => {})
-        } else if (isPromiseLike(controls as unknown)) {
-            ;(controls as unknown as Promise<unknown>)
-                .then(() => onAnimationCompleteProp?.(payload))
-                .catch(() => {})
-        }
+        animateWithLifecycle(
+            element,
+            payload as unknown as import('motion').DOMKeyframesDefinition,
+            transitionAmimate as unknown as import('motion').AnimationOptions,
+            (def) =>
+                onAnimationStartProp?.(
+                    def as unknown as import('motion').DOMKeyframesDefinition | undefined
+                ),
+            (def) =>
+                onAnimationCompleteProp?.(
+                    def as unknown as import('motion').DOMKeyframesDefinition | undefined
+                )
+        )
     }
 
     // Minimal layout animation using FLIP when `layout` is enabled.
@@ -85,62 +85,23 @@
         if (!(element && layoutProp && isLoaded === 'ready')) return
 
         // Initialize last rect on first ready frame
-        const measure = () => {
-            const prev = element!.style.transform
-            element!.style.transform = 'none'
-            const rect = element!.getBoundingClientRect()
-            element!.style.transform = prev
-            return rect
-        }
-        lastRect = measure()
+        lastRect = measureRect(element!)
         // Hint compositor for smoother FLIP transforms
-        element!.style.willChange = 'transform'
-        element!.style.transformOrigin = '0 0'
+        setCompositorHints(element!, true)
 
         let rafId: number | null = null
         const runFlip = () => {
             if (!lastRect) {
-                lastRect = measure()
+                lastRect = measureRect(element!)
                 return
             }
-            const prev = element!.style.transform
-            element!.style.transform = 'none'
-            const next = element!.getBoundingClientRect()
-            element!.style.transform = prev
-            // Use top-left corner for FLIP to match transformOrigin '0 0'
-            const dx = lastRect.left - next.left
-            const dy = lastRect.top - next.top
-            const sx = next.width > 0 ? lastRect.width / next.width : 1
-            const sy = next.height > 0 ? lastRect.height / next.height : 1
-
-            const shouldTranslate = Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5
-            const shouldScale =
-                layoutProp !== 'position' && (Math.abs(1 - sx) > 0.01 || Math.abs(1 - sy) > 0.01)
-
-            if (shouldTranslate || shouldScale) {
-                const keyframes: Record<string, unknown> = {}
-                if (shouldTranslate) {
-                    keyframes.x = [dx, 0]
-                    keyframes.y = [dy, 0]
-                }
-                if (shouldScale) {
-                    keyframes.scaleX = [sx, 1]
-                    keyframes.scaleY = [sy, 1]
-                    ;(keyframes as Record<string, unknown>).transformOrigin = '0 0'
-                }
-                // Apply the inverse transform immediately so we don't flash the new layout
-                // before the animation starts (classic FLIP: First, Last, Invert, Play)
-                const parts: string[] = []
-                if (shouldTranslate) parts.push(`translate(${dx}px, ${dy}px)`)
-                if (shouldScale) parts.push(`scale(${sx}, ${sy})`)
-                element!.style.transformOrigin = '0 0'
-                element!.style.transform = parts.join(' ')
-                animate(
-                    element!,
-                    keyframes as unknown as import('motion').DOMKeyframesDefinition,
-                    (mergedTransition ?? {}) as import('motion').AnimationOptions
-                )
-            }
+            const next = measureRect(element!)
+            const transforms = computeFlipTransforms(lastRect, next, layoutProp ?? false)
+            runFlipAnimation(
+                element!,
+                transforms,
+                (mergedTransition ?? {}) as import('motion').AnimationOptions
+            )
             lastRect = next
         }
 
@@ -151,24 +112,14 @@
                 runFlip()
             })
         }
-        const ro = new ResizeObserver(() => scheduleFlip())
-        ro.observe(element)
-        // Also observe attribute/class changes and nearby DOM mutations that commonly cause reflow/reposition
-        const mo = new MutationObserver(() => scheduleFlip())
-        mo.observe(element, { attributes: true, attributeFilter: ['class', 'style'] })
-        if (element.parentElement) {
-            mo.observe(element.parentElement, { childList: true, subtree: false, attributes: true })
-        }
+        const disconnectObservers = observeLayoutChanges(element!, () => scheduleFlip())
 
         return () => {
-            ro.disconnect()
-            mo.disconnect()
+            disconnectObservers()
             lastRect = null
             // Reset compositor hints on teardown
             if (element) {
-                element.style.willChange = ''
-                element.style.transformOrigin = ''
-                element.style.transform = ''
+                setCompositorHints(element, false)
             }
             if (rafId) cancelAnimationFrame(rafId)
         }
@@ -179,48 +130,28 @@
     // whileTap handling without relying on motion.press (fallback compatible)
     $effect(() => {
         if (!(element && isLoaded === 'ready' && isNotEmpty(whileTapProp))) return
+        return attachWhileTap(
+            element!,
+            (whileTapProp ?? {}) as Record<string, unknown>,
+            (initialProp ?? {}) as Record<string, unknown>,
+            (animateProp ?? {}) as Record<string, unknown>
+        )
+    })
 
-        const handlePointerDown = () => {
-            animate(element!, whileTapProp!)
-        }
-        const handlePointerUp = () => {
-            // Build reset record preferring animateProp values, falling back to initialProp
-            if (isNotEmpty(whileTapProp) && (isNotEmpty(initialProp) || isNotEmpty(animateProp))) {
-                const initialRecord = (initialProp ?? {}) as Record<string, unknown>
-                const animateRecord = (animateProp ?? {}) as Record<string, unknown>
-                const whileTapRecord = (whileTapProp ?? {}) as Record<string, unknown>
-
-                const keys = new Set<string>([
-                    ...Object.keys(initialRecord),
-                    ...Object.keys(animateRecord)
-                ])
-                const overlappingKeys: string[] = []
-                for (const k of keys) if (k in whileTapRecord) overlappingKeys.push(k)
-
-                const resetRecord: Record<string, unknown> = {}
-                for (const k of overlappingKeys) {
-                    resetRecord[k] = Object.prototype.hasOwnProperty.call(animateRecord, k)
-                        ? animateRecord[k]
-                        : initialRecord[k]
-                }
-                if (Object.keys(resetRecord).length > 0) {
-                    animate(
-                        element!,
-                        resetRecord as unknown as import('motion').DOMKeyframesDefinition
-                    )
-                }
+    // whileHover handling, gated to true-hover devices to avoid sticky states on touch
+    $effect(() => {
+        if (!(element && isLoaded === 'ready' && isNotEmpty(whileHoverProp))) return
+        return attachWhileHover(
+            element!,
+            (whileHoverProp ?? {}) as Record<string, unknown>,
+            (mergedTransition ?? {}) as import('motion').AnimationOptions,
+            { onStart: onHoverStartProp, onEnd: onHoverEndProp },
+            undefined,
+            {
+                initial: (initialProp ?? {}) as Record<string, unknown>,
+                animate: (animateProp ?? {}) as Record<string, unknown>
             }
-        }
-
-        element.addEventListener('pointerdown', handlePointerDown)
-        element.addEventListener('pointerup', handlePointerUp)
-        element.addEventListener('pointercancel', handlePointerUp)
-
-        return () => {
-            element?.removeEventListener('pointerdown', handlePointerDown)
-            element?.removeEventListener('pointerup', handlePointerUp)
-            element?.removeEventListener('pointercancel', handlePointerUp)
-        }
+        )
     })
 
     // Re-run animate when animateProp changes while ready
@@ -270,17 +201,38 @@
     })
 </script>
 
-<svelte:element
-    this={tag}
-    bind:this={element}
-    {...rest}
-    data-playwright={isPlaywright ? isPlaywright : undefined}
-    data-is-loaded={isPlaywright ? isLoaded : undefined}
-    data-path={isPlaywright ? dataPath : undefined}
-    style={styleProp}
-    class={classProp}
->
-    {#if isLoaded === 'ready'}
-        {@render children?.()}
-    {/if}
-</svelte:element>
+{#if isVoidTag}
+    <svelte:element
+        this={tag}
+        bind:this={element}
+        {...rest}
+        data-playwright={isPlaywright ? isPlaywright : undefined}
+        data-is-loaded={isPlaywright ? isLoaded : undefined}
+        data-path={isPlaywright ? dataPath : undefined}
+        style={mergeInlineStyles(
+            styleProp,
+            initialProp as unknown as Record<string, unknown>,
+            animateProp as unknown as Record<string, unknown>
+        )}
+        class={classProp}
+    />
+{:else}
+    <svelte:element
+        this={tag}
+        bind:this={element}
+        {...rest}
+        data-playwright={isPlaywright ? isPlaywright : undefined}
+        data-is-loaded={isPlaywright ? isLoaded : undefined}
+        data-path={isPlaywright ? dataPath : undefined}
+        style={mergeInlineStyles(
+            styleProp,
+            initialProp as unknown as Record<string, unknown>,
+            animateProp as unknown as Record<string, unknown>
+        )}
+        class={classProp}
+    >
+        {#if isLoaded === 'ready'}
+            {@render children?.()}
+        {/if}
+    </svelte:element>
+{/if}

@@ -1,5 +1,5 @@
+import type { MotionConfigProps } from '$lib/types.js'
 import { getContext, setContext } from 'svelte'
-import type { MotionConfigProps } from '../types.js'
 
 const key = 'motionConfig'
 

@@ -18,7 +18,7 @@
         "test:unit": "vitest"
     },
     "dependencies": {
-        "@humanspeak/svelte-motion": "file:..",
+        "@humanspeak/svelte-motion": "workspace:*",
         "@inlang/paraglide-js": "^2.0.0"
     },
     "devDependencies": {
@@ -52,9 +52,5 @@
         "vitest-browser-svelte": "^0.1.0",
         "wrangler": "^4.38.0"
     },
-    "pnpm": {
-        "onlyBuiltDependencies": [
-            "esbuild"
-        ]
-    }
+    "pnpm": {}
 }

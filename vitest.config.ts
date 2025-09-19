@@ -39,6 +39,32 @@ export default defineConfig({
         setupFiles: ['vitest.setup.ts'],
         include: ['src/**/*.{test,spec}.{js,ts}'],
         exclude: [...configDefaults.exclude, 'tests'],
+        coverage: {
+            provider: 'v8',
+            all: true,
+            include: ['src/lib/**/*.{ts,svelte}'],
+            exclude: [
+                '**/*.d.ts',
+                'src/lib/types.ts',
+                'src/**/*.spec.ts',
+                'src/**/*.test.ts',
+                'src/lib/**/__tests__/**',
+                'src/app.html',
+                'src/app.d.ts',
+                'src/app.css',
+                'src/routes/**',
+                'docs/**',
+                'dist/**',
+                'coverage/**',
+                'node_modules/**',
+                'vite.config.ts',
+                'vitest.config.ts',
+                'playwright.config.ts',
+                'tailwind.config.ts',
+                'postcss.config.js',
+                'svelte.config.js'
+            ]
+        },
         poolOptions: {
             threads: {
                 singleThread: false,

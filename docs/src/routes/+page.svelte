@@ -106,7 +106,8 @@
                 <div class="mt-10 flex flex-wrap items-center justify-center gap-3">
                     <motion.button
                         whileTap={{ scale: 0.96 }}
-                        class="inline-flex items-center justify-center rounded-full border border-[var(--color-border-mid)] bg-brand-200 px-4 py-2 text-sm font-semibold text-[#0b1011] transition-[filter] hover:brightness-95"
+                        whileHover={{ scale: 1.03, filter: 'brightness(0.95)' }}
+                        class="inline-flex items-center justify-center rounded-full border border-[var(--color-border-mid)] bg-brand-200 px-4 py-2 text-sm font-semibold text-[#0b1011]"
                     >
                         {m.cta_primary()}
                     </motion.button>

@@ -38,7 +38,7 @@
     <span class="linear-overlay absolute inset-0 block rounded-md p-px"></span>
 </motion.button>
 
-<style>
+<style lang="postcss">
     @reference "tailwindcss";
 
     :global(html, body) {
