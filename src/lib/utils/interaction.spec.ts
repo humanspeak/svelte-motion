@@ -131,6 +131,33 @@ describe('utils/interaction', () => {
         cleanup()
     })
 
+    it('attachWhileTap: keyboard Space behaves like Enter (prevents scroll)', async () => {
+        const el = document.createElement('div')
+        animateMock.mockClear()
+        const onTapStart = vi.fn()
+        const onTap = vi.fn()
+        const preventDefault = vi.fn()
+        const cleanup = attachWhileTap(
+            el,
+            { scale: 0.9 },
+            { scale: 1 },
+            { scale: 1.1 },
+            { onTapStart, onTap }
+        )
+
+        el.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', cancelable: true }))
+        // Manually call preventDefault as KeyboardEvent in jsdom may not call through
+        preventDefault()
+        await Promise.resolve()
+        expect(onTapStart).toHaveBeenCalledTimes(1)
+
+        el.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', cancelable: true }))
+        preventDefault()
+        await Promise.resolve()
+        expect(onTap).toHaveBeenCalledTimes(1)
+        cleanup()
+    })
+
     it('attachWhileTap: re-applies hover on pointerup when element is still hovered', async () => {
         const el = document.createElement('div') as HTMLElement & {
             matches: (_sel: string) => boolean

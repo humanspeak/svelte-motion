@@ -13,7 +13,7 @@ Reference: Framer Motion for React [`motion` on npm](https://www.npmjs.com/packa
     - `MotionConfig` context component.
     - Types: `MotionInitial`, `MotionAnimate`, `MotionTransition`, `MotionWhileTap`.
 - **Implemented props**: `initial`, `animate`, `transition`, `whileTap`, `whileHover`, `onAnimationStart`, `onAnimationComplete`, `class`, `style`, `layout` (FLIP-based).
-- **Tap callbacks & a11y**: `onTapStart`, `onTap`, `onTapCancel` implemented. Tap is keyboard-accessible: Enter down starts tap, Enter up completes, blur cancels; `tabindex` added when needed for focusability.
+- **Tap callbacks & a11y**: `onTapStart`, `onTap`, `onTapCancel` implemented. Tap is keyboard-accessible: Enter and Space start tap on keydown, complete on keyup, and cancel on blur. Space handling prevents default scrolling/activation. `tabindex` is added when needed for focusability on non-native button-like elements.
     - SSR: Initial styles are reflected in server HTML by merging `style` with `initial` or first `animate` keyframe (no flicker).
 - **Coverage of elements**: Full HTML + SVG coverage generated; void elements documented distinctly. Dashed names exported as PascalCase.
 - **Tests**: Extensive unit tests for utils (animation, hover, interaction, layout, promise, style), SSR component tests for `_MotionContainer`, and E2E for enter animation, HTML content, and keyframes (shape + scale).

@@ -108,7 +108,9 @@ export const attachWhileTap = (
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key !== 'Enter') return
+        if (!(e.key === 'Enter' || e.key === ' ' || e.key === 'Space')) return
+        // Prevent page scroll/activation for Space
+        if (e.key === ' ' || e.key === 'Space') e.preventDefault?.()
         if (keyboardActive) return
         keyboardActive = true
         callbacks?.onTapStart?.()
@@ -116,7 +118,9 @@ export const attachWhileTap = (
     }
 
     const handleKeyUp = (e: KeyboardEvent) => {
-        if (e.key !== 'Enter') return
+        if (!(e.key === 'Enter' || e.key === ' ' || e.key === 'Space')) return
+        // Prevent page scroll/activation for Space
+        if (e.key === ' ' || e.key === 'Space') e.preventDefault?.()
         if (!keyboardActive) return
         keyboardActive = false
         callbacks?.onTap?.()
