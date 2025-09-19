@@ -1,6 +1,5 @@
-import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
-import { animate } from 'motion'
-import { hasFinishedPromise, isPromiseLike } from './promise.js'
+import { hasFinishedPromise, isPromiseLike } from '$lib/utils/promise'
+import { type AnimationOptions, type DOMKeyframesDefinition, animate } from 'motion'
 
 /**
  * Merge two Motion `AnimationOptions` objects without mutating the inputs.

@@ -18,6 +18,7 @@ Reference: Framer Motion for React [`motion` on npm](https://www.npmjs.com/packa
     - SSR: Initial styles are reflected in server HTML by merging `style` with `initial` or first `animate` keyframe (no flicker).
 - **Coverage of elements**: Full HTML + SVG coverage generated; void elements documented distinctly. Dashed names exported as PascalCase.
 - **Tests**: Extensive unit tests for utils (animation, hover, interaction, layout, promise, style), SSR component tests for `_MotionContainer`, and E2E for enter animation, HTML content, and keyframes (shape + scale).
+    - Demos/E2E added: Animated Border Gradient (conic-gradient rotation) — demo route `/tests/random/animated-border-gradient`, REPL [Svelte Playground](https://svelte.dev/playground/6983a61b4c35441b8aa72a971de01a23?version=5.38.10), source reference [YouTube](https://www.youtube.com/watch?v=OgQI1-9T6ZA).
 
 Gaps vs Framer Motion core:
 
