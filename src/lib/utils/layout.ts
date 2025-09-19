@@ -83,7 +83,6 @@ export const runFlipAnimation = (
     if (shouldScale) {
         keyframes.scaleX = [sx, 1]
         keyframes.scaleY = [sy, 1]
-        ;(keyframes as Record<string, unknown>).transformOrigin = '0 0'
     }
 
     const parts: string[] = []
@@ -119,7 +118,23 @@ export const setCompositorHints = (el: HTMLElement, enabled: boolean): void => {
  * @return Cleanup function.
  */
 export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (() => void) => {
-    const schedule = () => onChange()
+    let pendingRaf: number | null = null
+    let releaseTimeout: ReturnType<typeof setTimeout> | null = null
+
+    const schedule = () => {
+        if (pendingRaf !== null || releaseTimeout !== null) return
+        // Leading-edge: call immediately, then throttle further calls until next frame (or 50ms)
+        onChange()
+        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+            pendingRaf = window.requestAnimationFrame(() => {
+                pendingRaf = null
+            })
+        } else {
+            releaseTimeout = setTimeout(() => {
+                releaseTimeout = null
+            }, 50)
+        }
+    }
     const ro = new ResizeObserver(() => schedule())
     ro.observe(el)
     const mo = new MutationObserver(() => schedule())
@@ -130,5 +145,13 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
     return () => {
         ro.disconnect()
         mo.disconnect()
+        if (pendingRaf !== null && typeof cancelAnimationFrame === 'function') {
+            cancelAnimationFrame(pendingRaf)
+            pendingRaf = null
+        }
+        if (releaseTimeout !== null) {
+            clearTimeout(releaseTimeout)
+            releaseTimeout = null
+        }
     }
 }

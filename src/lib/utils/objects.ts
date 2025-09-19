@@ -35,22 +35,3 @@ export const isEmpty = (obj: Record<string, unknown> | DOMKeyframesDefinition | 
 export const isNotEmpty = (obj: Record<string, unknown> | DOMKeyframesDefinition | undefined) => {
     return !isEmpty(obj)
 }
-
-/**
- * Returns an array of keys that exist in both objects.
- * Useful for finding properties that need to be reset after animations.
- *
- * @param obj1 - First object to compare
- * @param obj2 - Second object to compare
- * @returns Array of keys that exist in both objects
- *
- * @example
- * ```ts
- * const initial = { scale: 1, opacity: 1 }
- * const whileTap = { scale: 0.9, color: 'red' }
- * getCommonKeys(initial, whileTap) // ['scale']
- * ```
- */
-export function getCommonKeys<T extends Record<string, unknown>>(obj1: T, obj2: T): (keyof T)[] {
-    return Object.keys(obj1).filter((key) => key in obj2) as (keyof T)[]
-}

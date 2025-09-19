@@ -58,8 +58,8 @@ export const computeHoverBaseline = (
     const initialRecord = (opts.initial ?? {}) as Record<string, unknown>
     const animateRecord = (opts.animate ?? {}) as Record<string, unknown>
     const whileHoverRecordRaw = (opts.whileHover ?? {}) as Record<string, unknown>
-    const whileHoverRecord = { ...whileHoverRecordRaw }
-    delete (whileHoverRecord as Record<string, unknown>)['transition']
+    const whileHoverRecord = { ...whileHoverRecordRaw } as Record<string, unknown>
+    delete (whileHoverRecord as Record<string, unknown>).transition
 
     const neutralTransformDefaults: Record<string, unknown> = {
         x: 0,
@@ -118,9 +118,16 @@ export const attachWhileHover = (
     if (!whileHover) return () => {}
 
     let hoverBaseline: Record<string, unknown> | null = null
+    let currentAnimation: { cancel: () => void } | null = null
 
     const handlePointerEnter = () => {
         if (!isCapable()) return
+        if (
+            currentAnimation &&
+            typeof (currentAnimation as { cancel?: () => void }).cancel === 'function'
+        ) {
+            ;(currentAnimation as { cancel: () => void }).cancel()
+        }
         hoverBaseline = computeHoverBaseline(el, {
             initial: baselineSources?.initial,
             animate: baselineSources?.animate,
@@ -128,7 +135,7 @@ export const attachWhileHover = (
         })
         callbacks?.onStart?.()
         const { keyframes, transition } = splitHoverDefinition(whileHover)
-        animate(
+        currentAnimation = animate(
             el,
             keyframes as unknown as DOMKeyframesDefinition,
             (transition ?? mergedTransition) as AnimationOptions
@@ -137,8 +144,18 @@ export const attachWhileHover = (
 
     const handlePointerLeave = () => {
         if (!isCapable()) return
+        if (
+            currentAnimation &&
+            typeof (currentAnimation as { cancel?: () => void }).cancel === 'function'
+        ) {
+            ;(currentAnimation as { cancel: () => void }).cancel()
+        }
         if (hoverBaseline && Object.keys(hoverBaseline).length > 0) {
-            animate(el, hoverBaseline as unknown as DOMKeyframesDefinition, mergedTransition)
+            currentAnimation = animate(
+                el,
+                hoverBaseline as unknown as DOMKeyframesDefinition,
+                mergedTransition
+            )
         }
         callbacks?.onEnd?.()
     }
