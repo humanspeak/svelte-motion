@@ -1,6 +1,6 @@
+import { isHoverCapable, splitHoverDefinition } from '$lib/utils/hover'
 import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
 import { animate } from 'motion'
-import { isHoverCapable, splitHoverDefinition } from './hover.js'
 
 /**
  * Build a reset record for whileTap on pointerup.
