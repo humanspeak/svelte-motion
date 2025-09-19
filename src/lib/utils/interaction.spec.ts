@@ -77,4 +77,36 @@ describe('utils/interaction', () => {
         expect(onTapCancel).toHaveBeenCalledTimes(1)
         cleanup()
     })
+
+    it('attachWhileTap: keyboard Enter press triggers start/up/cancel on blur', async () => {
+        const el = document.createElement('div')
+        animateMock.mockClear()
+        const onTapStart = vi.fn()
+        const onTap = vi.fn()
+        const onTapCancel = vi.fn()
+        const cleanup = attachWhileTap(
+            el,
+            { scale: 0.9 },
+            { scale: 1 },
+            { scale: 1.1 },
+            { onTapStart, onTap, onTapCancel }
+        )
+
+        el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+        await Promise.resolve()
+        expect(onTapStart).toHaveBeenCalledTimes(1)
+        expect(animateMock).toHaveBeenCalled()
+
+        el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter' }))
+        await Promise.resolve()
+        expect(onTap).toHaveBeenCalledTimes(1)
+
+        // Start again and then blur to cancel
+        el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+        await Promise.resolve()
+        el.dispatchEvent(new FocusEvent('blur'))
+        await Promise.resolve()
+        expect(onTapCancel).toHaveBeenCalledTimes(1)
+        cleanup()
+    })
 })

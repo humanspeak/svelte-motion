@@ -53,6 +53,8 @@ export const attachWhileTap = (
 ): (() => void) => {
     if (!whileTap) return () => {}
 
+    let keyboardActive = false
+
     const handlePointerDown = () => {
         callbacks?.onTapStart?.()
         animate(el, whileTap as unknown as DOMKeyframesDefinition)
@@ -78,13 +80,52 @@ export const attachWhileTap = (
         }
     }
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key !== 'Enter') return
+        if (keyboardActive) return
+        keyboardActive = true
+        callbacks?.onTapStart?.()
+        animate(el, whileTap as unknown as DOMKeyframesDefinition)
+    }
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+        if (e.key !== 'Enter') return
+        if (!keyboardActive) return
+        keyboardActive = false
+        callbacks?.onTap?.()
+        if (initial || animateDef) {
+            const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
+            if (Object.keys(resetRecord).length > 0) {
+                animate(el, resetRecord as unknown as DOMKeyframesDefinition)
+            }
+        }
+    }
+
+    const handleBlur = () => {
+        if (!keyboardActive) return
+        keyboardActive = false
+        callbacks?.onTapCancel?.()
+        if (initial || animateDef) {
+            const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
+            if (Object.keys(resetRecord).length > 0) {
+                animate(el, resetRecord as unknown as DOMKeyframesDefinition)
+            }
+        }
+    }
+
     el.addEventListener('pointerdown', handlePointerDown)
     el.addEventListener('pointerup', handlePointerUp)
     el.addEventListener('pointercancel', handlePointerCancel)
+    el.addEventListener('keydown', handleKeyDown)
+    el.addEventListener('keyup', handleKeyUp)
+    el.addEventListener('blur', handleBlur)
 
     return () => {
         el.removeEventListener('pointerdown', handlePointerDown)
         el.removeEventListener('pointerup', handlePointerUp)
         el.removeEventListener('pointercancel', handlePointerCancel)
+        el.removeEventListener('keydown', handleKeyDown)
+        el.removeEventListener('keyup', handleKeyUp)
+        el.removeEventListener('blur', handleBlur)
     }
 }

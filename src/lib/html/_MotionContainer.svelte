@@ -61,6 +61,30 @@
         mergeTransitions(motionConfig?.transition, transitionProp)
     )
 
+    // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
+    const derivedAttrs = $derived<Record<string, unknown>>({
+        ...(rest as Record<string, unknown>),
+        ...(whileTapProp &&
+        ((rest as Record<string, unknown>)?.tabindex ??
+            (rest as Record<string, unknown>)?.tabIndex ??
+            undefined) === undefined
+            ? { tabindex: 0 }
+            : {}),
+        ...(isPlaywright
+            ? {
+                  'data-playwright': isPlaywright,
+                  'data-is-loaded': isLoaded,
+                  'data-path': dataPath
+              }
+            : {}),
+        style: mergeInlineStyles(
+            styleProp,
+            initialProp as unknown as Record<string, unknown>,
+            animateProp as unknown as Record<string, unknown>
+        ),
+        class: classProp
+    })
+
     const runAnimation = () => {
         if (!element || !animateProp) return
         const transitionAmimate: MotionTransition = mergedTransition ?? {}
@@ -206,35 +230,9 @@
 </script>
 
 {#if isVoidTag}
-    <svelte:element
-        this={tag}
-        bind:this={element}
-        {...rest}
-        data-playwright={isPlaywright ? isPlaywright : undefined}
-        data-is-loaded={isPlaywright ? isLoaded : undefined}
-        data-path={isPlaywright ? dataPath : undefined}
-        style={mergeInlineStyles(
-            styleProp,
-            initialProp as unknown as Record<string, unknown>,
-            animateProp as unknown as Record<string, unknown>
-        )}
-        class={classProp}
-    />
+    <svelte:element this={tag} bind:this={element} {...derivedAttrs} />
 {:else}
-    <svelte:element
-        this={tag}
-        bind:this={element}
-        {...rest}
-        data-playwright={isPlaywright ? isPlaywright : undefined}
-        data-is-loaded={isPlaywright ? isLoaded : undefined}
-        data-path={isPlaywright ? dataPath : undefined}
-        style={mergeInlineStyles(
-            styleProp,
-            initialProp as unknown as Record<string, unknown>,
-            animateProp as unknown as Record<string, unknown>
-        )}
-        class={classProp}
-    >
+    <svelte:element this={tag} bind:this={element} {...derivedAttrs}>
         {#if isLoaded === 'ready'}
             {@render children?.()}
         {/if}
