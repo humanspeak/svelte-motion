@@ -67,15 +67,20 @@ export type MotionWhileHover =
  * Animation lifecycle callbacks for motion components.
  */
 export type MotionAnimationStart =
-    | ((definition: DOMKeyframesDefinition | undefined) => void)
+    | ((_definition: DOMKeyframesDefinition | undefined) => void)
     | undefined
 export type MotionAnimationComplete =
-    | ((definition: DOMKeyframesDefinition | undefined) => void)
+    | ((_definition: DOMKeyframesDefinition | undefined) => void)
     | undefined
 
 /** Hover lifecycle callbacks */
 export type MotionOnHoverStart = (() => void) | undefined
 export type MotionOnHoverEnd = (() => void) | undefined
+
+/** Tap lifecycle callbacks */
+export type MotionOnTapStart = (() => void) | undefined
+export type MotionOnTap = (() => void) | undefined
+export type MotionOnTapCancel = (() => void) | undefined
 
 /**
  * Base motion props shared by all motion components.
@@ -99,6 +104,12 @@ export type MotionProps = {
     onHoverStart?: MotionOnHoverStart
     /** Called when a true hover gesture ends */
     onHoverEnd?: MotionOnHoverEnd
+    /** Called when a tap gesture starts (pointerdown recognized) */
+    onTapStart?: MotionOnTapStart
+    /** Called when a tap gesture ends successfully (pointerup) */
+    onTap?: MotionOnTap
+    /** Called when a tap gesture is cancelled (pointercancel) */
+    onTapCancel?: MotionOnTapCancel
     /** Inline styles */
     style?: string
     /** CSS classes */

@@ -13,6 +13,7 @@ Reference: Framer Motion for React [`motion` on npm](https://www.npmjs.com/packa
     - `MotionConfig` context component.
     - Types: `MotionInitial`, `MotionAnimate`, `MotionTransition`, `MotionWhileTap`.
 - **Implemented props**: `initial`, `animate`, `transition`, `whileTap`, `whileHover`, `onAnimationStart`, `onAnimationComplete`, `class`, `style`, `layout` (FLIP-based).
+- **Tap callbacks & a11y**: `onTapStart`, `onTap`, `onTapCancel` implemented. Tap is keyboard-accessible: Enter and Space start tap on keydown, complete on keyup, and cancel on blur. Space handling prevents default scrolling/activation. `tabindex` is added when needed for focusability on non-native button-like elements.
     - SSR: Initial styles are reflected in server HTML by merging `style` with `initial` or first `animate` keyframe (no flicker).
 - **Coverage of elements**: Full HTML + SVG coverage generated; void elements documented distinctly. Dashed names exported as PascalCase.
 - **Tests**: Extensive unit tests for utils (animation, hover, interaction, layout, promise, style), SSR component tests for `_MotionContainer`, and E2E for enter animation, HTML content, and keyframes (shape + scale).
@@ -48,6 +49,7 @@ Phase 0 — Foundations (status)
 - Add `whileHover` to interaction set. [Done]
 - Add `whileFocus` to interaction set. [Planned]
 - Introduce `onAnimationStart`/`onAnimationComplete`. [Done]
+- Add tap callbacks + keyboard accessibility for tap. [Done]
 - Expand tests: unit for utils, component tests for container, E2E demos. [Done]
 
 Phase 1 — Variants and Presence
@@ -68,6 +70,72 @@ Phase 3 — Ecosystem
 - Documentation with parity table and migration guide for React users.
 - Gallery of examples ported from Framer Motion samples.
 - Performance profiling and benchmarks.
+
+### 4.1) Next Focus (next 1–2 weeks)
+
+- Priority 1 — whileFocus interaction
+    - Add `whileFocus` prop with capability parity to `whileHover`/`whileTap`.
+    - Tests: utils where needed and `_MotionContainer` behavior (enter/leave focus, nested transition support).
+    - Docs: brief API reference and example.
+
+- Priority 2 — Shared Layout (Prototype)
+    - Introduce `layoutId` for same-tree shared layout transitions (translate + scale).
+    - Coalesce measurements with RAF; use compositor hints; no overlay/portal in MVP.
+    - Tests: card grid reorder and list item move using `layoutId`.
+
+- Priority 3 — Variants (MVP)
+    - Support `variants` object and `initial`/`animate` by variant key.
+    - Allow per-property `transition` inside variants.
+    - Tests: component-level resolution and overrides; no `exit` yet.
+
+- Priority 4 — Presence (MVP)
+    - Minimal `AnimatePresence`-like wrapper enabling exit animations on unmount for simple lists.
+    - SSR/hydration-safe behavior; component tests verifying exit timing.
+
+- Priority 5 — Testing and docs
+    - E2E: Fancy Like Button press-and-hold spawns + un-like stop.
+    - Docs site skeleton: Quickstart + API for `motion.<tag>`, `MotionConfig`, `while*` props.
+
+- Ongoing — Performance hardening
+    - Coalesce observers via `requestAnimationFrame` across utilities (done for layout observers); audit other hotspots.
+    - Add canary perf test with many animated nodes and frequent layout changes.
+
+### 4.2) Shared Layout Plan (post-Variants/Presence)
+
+- Goal
+    - Seamless position/size morph between elements that share identity across renders, supporting both same-tree moves and exit→enter handoff.
+
+- API
+    - `layoutId={string}` on `motion.*` elements to opt into shared layout transitions.
+    - Optional `layout` mode: `true | 'position' | 'scale' | 'crossfade'` (default `true` → translate + scale; may iterate during prototype).
+
+- Behavior
+    - Same-tree reflow: elements with `layoutId` animate between measured previous and next rects using FLIP.
+    - Handoff on unmount→mount: when an element with `layoutId` unmounts and another mounts with the same id, animate from last snapshot to the new rect; integrates with Presence so exit performs the handoff.
+    - Stacking: during transition, temporarily elevate to an overlay layer to avoid clipping, then restore.
+
+- Implementation outline
+    - Registry in context mapping `layoutId → { el, rect, time, styleSnapshot }`.
+    - On mount/resize/mutation: measure via `measureRect` and coalesced observers (RAF) from `observeLayoutChanges`.
+    - On unmount: store a snapshot for a short TTL (e.g., 120ms) to allow handoff.
+    - When a new element with the same `layoutId` mounts within TTL, run shared FLIP from prior snapshot to next rect; apply compositor hints during the transition.
+    - Overlay layer: create a portal layer (single absolute container) to move animating elements temporarily; restore DOM position afterward.
+
+- Milestones
+    1. Prototype same-tree shared layout with `layoutId` (translate+scale).
+    2. Integrate with `AnimatePresence` for exit→enter handoff across lists/routes.
+    3. Add mode switches: `'position'` (no scale) and optional `'crossfade'`.
+    4. Hardening: scrolling containers, transforms, overflow/clipping, border-radius.
+
+- Testing
+    - Unit: registry lifecycle; measurement/coalescing; overlay attach/detach.
+    - Component: card grid reorder; list item move; exit→enter handoff with `layoutId`.
+    - E2E: reorder animation smoothness; no flicker; correct z-order.
+
+- Risks
+    - Stacking contexts and transformed ancestors may disrupt overlay positioning.
+    - Forced reflow if measurement is not batched; mitigated via RAF batching already in place.
+    - Scroll offset and nested scroll containers affecting rect accuracy.
 
 ## 5) API Design Targets (Parity-Oriented)
 

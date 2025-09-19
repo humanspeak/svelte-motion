@@ -1,4 +1,5 @@
-import type { DOMKeyframesDefinition } from 'motion'
+import { isHoverCapable, splitHoverDefinition } from '$lib/utils/hover'
+import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
 import { animate } from 'motion'
 
 /**
@@ -48,15 +49,137 @@ export const attachWhileTap = (
     el: HTMLElement,
     whileTap: Record<string, unknown> | undefined,
     initial?: Record<string, unknown>,
-    animateDef?: Record<string, unknown>
+    animateDef?: Record<string, unknown>,
+    callbacks?: {
+        onTapStart?: () => void
+        onTap?: () => void
+        onTapCancel?: () => void
+        hoverDef?: Record<string, unknown> | undefined
+        hoverFallbackTransition?: AnimationOptions | undefined
+    }
 ): (() => void) => {
     if (!whileTap) return () => {}
 
-    const handlePointerDown = () => {
+    let keyboardActive = false
+    let activePointerId: number | null = null
+
+    const handlePointerDown = (event: PointerEvent) => {
+        // Capture pointer so we receive up/cancel even if pointer leaves the element
+        if (typeof event.pointerId === 'number') {
+            try {
+                if ('setPointerCapture' in el) {
+                    el.setPointerCapture(event.pointerId)
+                }
+            } catch {
+                // noop if not supported
+            }
+            activePointerId = event.pointerId
+            // Attach global listeners to catch off-element releases (even if capture unsupported)
+            window.addEventListener('pointerup', handlePointerUp as EventListener)
+            window.addEventListener('pointercancel', handlePointerCancel as EventListener)
+            document.addEventListener('pointerup', handlePointerUp as EventListener)
+            document.addEventListener('pointercancel', handlePointerCancel as EventListener)
+        }
+        callbacks?.onTapStart?.()
         animate(el, whileTap as unknown as DOMKeyframesDefinition)
     }
-    const handlePointerUp = () => {
+    const reapplyHoverIfActive = () => {
+        if (!callbacks?.hoverDef) return false
+        if (!isHoverCapable()) return false
+        try {
+            if (!el.matches(':hover')) return false
+        } catch {
+            return false
+        }
+        const { keyframes, transition } = splitHoverDefinition(
+            callbacks.hoverDef as Record<string, unknown>
+        )
+        animate(
+            el,
+            keyframes as unknown as DOMKeyframesDefinition,
+            (transition ?? callbacks.hoverFallbackTransition) as AnimationOptions
+        )
+        return true
+    }
+
+    const handlePointerUp = (event: PointerEvent) => {
+        if (typeof event.pointerId === 'number' && activePointerId !== null) {
+            if (event.pointerId !== activePointerId) return
+            try {
+                if ('releasePointerCapture' in el) el.releasePointerCapture(event.pointerId)
+            } catch {
+                // noop
+            }
+            activePointerId = null
+            window.removeEventListener('pointerup', handlePointerUp as EventListener)
+            window.removeEventListener('pointercancel', handlePointerCancel as EventListener)
+            document.removeEventListener('pointerup', handlePointerUp as EventListener)
+            document.removeEventListener('pointercancel', handlePointerCancel as EventListener)
+        }
+        callbacks?.onTap?.()
         if (!whileTap) return
+        if (reapplyHoverIfActive()) return
+        if (initial || animateDef) {
+            const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
+            if (Object.keys(resetRecord).length > 0) {
+                animate(el, resetRecord as unknown as DOMKeyframesDefinition)
+            }
+        }
+    }
+    const handlePointerCancel = (event: PointerEvent) => {
+        if (typeof event.pointerId === 'number' && activePointerId !== null) {
+            if (event.pointerId !== activePointerId) return
+            try {
+                if ('releasePointerCapture' in el) el.releasePointerCapture(event.pointerId)
+            } catch {
+                // noop
+            }
+            activePointerId = null
+            window.removeEventListener('pointerup', handlePointerUp as EventListener)
+            window.removeEventListener('pointercancel', handlePointerCancel as EventListener)
+            document.removeEventListener('pointerup', handlePointerUp as EventListener)
+            document.removeEventListener('pointercancel', handlePointerCancel as EventListener)
+        }
+        callbacks?.onTapCancel?.()
+        // On cancel, also restore baseline if available
+        if (initial || animateDef) {
+            const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
+            if (Object.keys(resetRecord).length > 0) {
+                animate(el, resetRecord as unknown as DOMKeyframesDefinition)
+            }
+        }
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (!(e.key === 'Enter' || e.key === ' ' || e.key === 'Space')) return
+        // Prevent page scroll/activation for Space
+        if (e.key === ' ' || e.key === 'Space') e.preventDefault?.()
+        if (keyboardActive) return
+        keyboardActive = true
+        callbacks?.onTapStart?.()
+        animate(el, whileTap as unknown as DOMKeyframesDefinition)
+    }
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+        if (!(e.key === 'Enter' || e.key === ' ' || e.key === 'Space')) return
+        // Prevent page scroll/activation for Space
+        if (e.key === ' ' || e.key === 'Space') e.preventDefault?.()
+        if (!keyboardActive) return
+        keyboardActive = false
+        callbacks?.onTap?.()
+        if (reapplyHoverIfActive()) return
+        if (initial || animateDef) {
+            const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
+            if (Object.keys(resetRecord).length > 0) {
+                animate(el, resetRecord as unknown as DOMKeyframesDefinition)
+            }
+        }
+    }
+
+    const handleBlur = () => {
+        if (!keyboardActive) return
+        keyboardActive = false
+        callbacks?.onTapCancel?.()
         if (initial || animateDef) {
             const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
             if (Object.keys(resetRecord).length > 0) {
@@ -67,11 +190,21 @@ export const attachWhileTap = (
 
     el.addEventListener('pointerdown', handlePointerDown)
     el.addEventListener('pointerup', handlePointerUp)
-    el.addEventListener('pointercancel', handlePointerUp)
+    el.addEventListener('pointercancel', handlePointerCancel)
+    el.addEventListener('keydown', handleKeyDown)
+    el.addEventListener('keyup', handleKeyUp)
+    el.addEventListener('blur', handleBlur)
 
     return () => {
         el.removeEventListener('pointerdown', handlePointerDown)
         el.removeEventListener('pointerup', handlePointerUp)
-        el.removeEventListener('pointercancel', handlePointerUp)
+        el.removeEventListener('pointercancel', handlePointerCancel)
+        window.removeEventListener('pointerup', handlePointerUp as EventListener)
+        window.removeEventListener('pointercancel', handlePointerCancel as EventListener)
+        document.removeEventListener('pointerup', handlePointerUp as EventListener)
+        document.removeEventListener('pointercancel', handlePointerCancel as EventListener)
+        el.removeEventListener('keydown', handleKeyDown)
+        el.removeEventListener('keyup', handleKeyUp)
+        el.removeEventListener('blur', handleBlur)
     }
 }

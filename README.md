@@ -79,6 +79,7 @@ This package carefully selects its dependencies to provide a robust and maintain
 | [React - Enter Animation](https://examples.motion.dev/react/enter-animation)                             | `/tests/motion/enter-animation`   | [View Example](https://svelte.dev/playground/7f60c347729f4ea48b1a4590c9dedc02?version=5.38.10) |
 | [HTML Content (0→100 counter)](https://examples.motion.dev/react/html-content)                           | `/tests/motion/html-content`      | [View Example](https://svelte.dev/playground/31cd72df4a3242b4b4589501a25e774f?version=5.38.10) |
 | [Aspect Ratio](https://examples.motion.dev/react/aspect-ratio)                                           | `/tests/motion/aspect-ratio`      | [View Example](https://svelte.dev/playground/1bf60e745fae44f5becb4c830fde9b6e?version=5.38.10) |
+| [Hover + Tap (whileHover + whileTap)](https://motion.dev/docs/react?platform=react#hover-tap-animation)  | `/tests/motion/hover-and-tap`     | [View Example](https://svelte.dev/playground/674c7d58f2c740baa4886b01340a97ea?version=5.38.10) |
 | [Random - Shiny Button](https://www.youtube.com/watch?v=jcpLprT5F0I) by [@verse\_](https://x.com/verse_) | `/tests/random/shiny-button`      | [View Example](https://svelte.dev/playground/96f9e0bf624f4396adaf06c519147450?version=5.38.10) |
 | [Fancy Like Button](https://github.com/DRlFTER/fancyLikeButton)                                          | `/tests/random/fancy-like-button` | [View Example](https://svelte.dev/playground/c34b7e53d41c48b0ab1eaf21ca120c6e?version=5.38.10) |
 | [Keyframes (square → circle → square; scale 1→2→1)](https://motion.dev/docs/react-animation#keyframes)   | `/tests/motion/keyframes`         | [View Example](https://svelte.dev/playground/05595ce0db124c1cbbe4e74fda68d717?version=5.38.10) |
@@ -110,6 +111,13 @@ Svelte Motion now supports hover interactions via the `whileHover` prop, similar
 ```svelte
 <motion.button whileTap={{ scale: 0.95 }} />
 ```
+
+- Callbacks: `onTapStart`, `onTap`, `onTapCancel` are supported.
+- Accessibility: Elements with `whileTap` are keyboard-accessible (Enter and Space).
+    - Enter or Space down → fires `onTapStart` and applies `whileTap` (Space prevents default scrolling)
+    - Enter or Space up → fires `onTap`
+    - Blur while key is held → fires `onTapCancel`
+    - `MotionContainer` sets `tabindex="0"` automatically when `whileTap` is present and no `tabindex`/`tabIndex` is provided.
 
 ### Animation lifecycle
 

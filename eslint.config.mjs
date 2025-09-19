@@ -20,6 +20,44 @@ export default ts.config(
                 ...globals.browser,
                 ...globals.node
             }
+        },
+        rules: {
+            'dot-location': ['warn', 'property'],
+            'guard-for-in': ['warn'],
+            camelcase: ['error'],
+            'no-unneeded-ternary': ['warn'],
+            'no-whitespace-before-property': ['warn'],
+            'no-duplicate-imports': ['error'],
+            'no-var': ['error'],
+            'prefer-const': ['off'],
+            semi: 'off',
+            'object-curly-spacing': 'off',
+            'space-in-parens': 'off',
+            'arrow-spacing': 'off',
+            'keyword-spacing': 'off',
+            'block-spacing': 'off',
+            'comma-style': 'off',
+            'no-trailing-spaces': 'off',
+            'no-multi-spaces': 'off',
+            'space-before-blocks': 'off',
+            yoda: 'off',
+            'comma-dangle': 'off',
+            '@typescript-eslint/no-unused-expressions': [
+                'error',
+                {
+                    allowShortCircuit: true,
+                    allowTernary: true,
+                    allowTaggedTemplates: true
+                }
+            ],
+            'no-unused-vars': 'off',
+            '@typescript-eslint/no-unused-vars': [
+                'warn',
+                {
+                    argsIgnorePattern: '^_',
+                    ignoreRestSiblings: true
+                }
+            ]
         }
     },
     {

@@ -3,7 +3,7 @@
     import type { MotionProps, MotionTransition } from '$lib/types.js'
     import { isNotEmpty } from '$lib/utils/objects.js'
     import { sleep } from '$lib/utils/testing.js'
-    import { animate } from 'motion'
+    import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
     import { type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants.js'
     import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation.js'
@@ -18,6 +18,7 @@
     } from '$lib/utils/layout.js'
     import type { SvelteHTMLElements } from 'svelte/elements'
     import { mergeInlineStyles } from '$lib/utils/style.js'
+    import { isNativelyFocusable } from '$lib/utils/a11y.js'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -37,10 +38,13 @@
         class: classProp,
         whileTap: whileTapProp,
         whileHover: whileHoverProp,
-        ref: element = $bindable(null),
         onHoverStart: onHoverStartProp,
         onHoverEnd: onHoverEndProp,
+        onTapStart: onTapStartProp,
+        onTap: onTapProp,
+        onTapCancel: onTapCancelProp,
         layout: layoutProp,
+        ref: element = $bindable(null),
         ...rest
     }: Props = $props()
     let isLoaded = $state<'mounting' | 'initial' | 'ready' | 'animated'>('mounting')
@@ -54,26 +58,45 @@
     const isVoidTag = $derived(VOID_TAGS.has(tag as string))
 
     // Compute merged transition without mutating props to avoid effect write loops
-    let mergedTransition = $derived<MotionTransition>(
+    const mergedTransition = $derived<MotionTransition>(
         mergeTransitions(motionConfig?.transition, transitionProp)
     )
 
+    // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
+    const derivedAttrs = $derived<Record<string, unknown>>({
+        ...(rest as Record<string, unknown>),
+        ...(whileTapProp &&
+        !isNativelyFocusable(tag, rest as Record<string, unknown>) &&
+        ((rest as Record<string, unknown>)?.tabindex ??
+            (rest as Record<string, unknown>)?.tabIndex ??
+            undefined) === undefined
+            ? { tabindex: 0 }
+            : {}),
+        ...(isPlaywright
+            ? {
+                  'data-playwright': isPlaywright,
+                  'data-is-loaded': isLoaded,
+                  'data-path': dataPath
+              }
+            : {}),
+        style: mergeInlineStyles(
+            styleProp,
+            initialProp as unknown as Record<string, unknown>,
+            animateProp as unknown as Record<string, unknown>
+        ),
+        class: classProp
+    })
+
     const runAnimation = () => {
         if (!element || !animateProp) return
-        const transitionAmimate: MotionTransition = mergedTransition ?? {}
+        const transitionAnimate: MotionTransition = mergedTransition ?? {}
         const payload = $state.snapshot(animateProp)
         animateWithLifecycle(
             element,
-            payload as unknown as import('motion').DOMKeyframesDefinition,
-            transitionAmimate as unknown as import('motion').AnimationOptions,
-            (def) =>
-                onAnimationStartProp?.(
-                    def as unknown as import('motion').DOMKeyframesDefinition | undefined
-                ),
-            (def) =>
-                onAnimationCompleteProp?.(
-                    def as unknown as import('motion').DOMKeyframesDefinition | undefined
-                )
+            payload as unknown as DOMKeyframesDefinition,
+            transitionAnimate as unknown as AnimationOptions,
+            (def) => onAnimationStartProp?.(def as unknown as DOMKeyframesDefinition | undefined),
+            (def) => onAnimationCompleteProp?.(def as unknown as DOMKeyframesDefinition | undefined)
         )
     }
 
@@ -97,11 +120,7 @@
             }
             const next = measureRect(element!)
             const transforms = computeFlipTransforms(lastRect, next, layoutProp ?? false)
-            runFlipAnimation(
-                element!,
-                transforms,
-                (mergedTransition ?? {}) as import('motion').AnimationOptions
-            )
+            runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
             lastRect = next
         }
 
@@ -134,7 +153,14 @@
             element!,
             (whileTapProp ?? {}) as Record<string, unknown>,
             (initialProp ?? {}) as Record<string, unknown>,
-            (animateProp ?? {}) as Record<string, unknown>
+            (animateProp ?? {}) as Record<string, unknown>,
+            {
+                onTapStart: onTapStartProp,
+                onTap: onTapProp,
+                onTapCancel: onTapCancelProp,
+                hoverDef: (whileHoverProp ?? {}) as Record<string, unknown>,
+                hoverFallbackTransition: (mergedTransition ?? {}) as AnimationOptions
+            }
         )
     })
 
@@ -144,7 +170,7 @@
         return attachWhileHover(
             element!,
             (whileHoverProp ?? {}) as Record<string, unknown>,
-            (mergedTransition ?? {}) as import('motion').AnimationOptions,
+            (mergedTransition ?? {}) as AnimationOptions,
             { onStart: onHoverStartProp, onEnd: onHoverEndProp },
             undefined,
             {
@@ -202,35 +228,9 @@
 </script>
 
 {#if isVoidTag}
-    <svelte:element
-        this={tag}
-        bind:this={element}
-        {...rest}
-        data-playwright={isPlaywright ? isPlaywright : undefined}
-        data-is-loaded={isPlaywright ? isLoaded : undefined}
-        data-path={isPlaywright ? dataPath : undefined}
-        style={mergeInlineStyles(
-            styleProp,
-            initialProp as unknown as Record<string, unknown>,
-            animateProp as unknown as Record<string, unknown>
-        )}
-        class={classProp}
-    />
+    <svelte:element this={tag} bind:this={element} {...derivedAttrs} />
 {:else}
-    <svelte:element
-        this={tag}
-        bind:this={element}
-        {...rest}
-        data-playwright={isPlaywright ? isPlaywright : undefined}
-        data-is-loaded={isPlaywright ? isLoaded : undefined}
-        data-path={isPlaywright ? dataPath : undefined}
-        style={mergeInlineStyles(
-            styleProp,
-            initialProp as unknown as Record<string, unknown>,
-            animateProp as unknown as Record<string, unknown>
-        )}
-        class={classProp}
-    >
+    <svelte:element this={tag} bind:this={element} {...derivedAttrs}>
         {#if isLoaded === 'ready'}
             {@render children?.()}
         {/if}
