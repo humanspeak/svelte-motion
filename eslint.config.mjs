@@ -29,7 +29,7 @@ export default ts.config(
             'no-whitespace-before-property': ['warn'],
             'no-duplicate-imports': ['error'],
             'no-var': ['error'],
-            'prefer-const': ['off'],
+            'prefer-const': ['error'],
             semi: 'off',
             'object-curly-spacing': 'off',
             'space-in-parens': 'off',
@@ -62,11 +62,13 @@ export default ts.config(
     },
     {
         files: ['**/*.svelte'],
-
         languageOptions: {
             parserOptions: {
                 parser: ts.parser
             }
+        },
+        rules: {
+            'prefer-const': ['off']
         }
     }
 )
