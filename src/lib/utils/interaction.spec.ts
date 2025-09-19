@@ -23,25 +23,31 @@ describe('utils/interaction', () => {
         expect(Object.keys(reset)).toHaveLength(0)
     })
 
-    it('attachWhileTap: animates on down and restores on up', async () => {
+    it('attachWhileTap: animates on down and restores on up, fires callbacks', async () => {
         const el = document.createElement('div')
         animateMock.mockClear()
+        const onTapStart = vi.fn()
+        const onTap = vi.fn()
+        const onTapCancel = vi.fn()
         const cleanup = attachWhileTap(
             el,
             { scale: 0.9, backgroundColor: '#f00' },
             { scale: 1, backgroundColor: '#111' },
-            { scale: 1.1, backgroundColor: '#000' }
+            { scale: 1.1, backgroundColor: '#000' },
+            { onTapStart, onTap, onTapCancel }
         )
         el.dispatchEvent(new PointerEvent('pointerdown'))
         await Promise.resolve()
         expect(animateMock).toHaveBeenCalled()
         const downCall = animateMock.mock.calls.at(-1)
         expect(downCall?.[1]).toMatchObject({ scale: 0.9, backgroundColor: '#f00' })
+        expect(onTapStart).toHaveBeenCalledTimes(1)
 
         el.dispatchEvent(new PointerEvent('pointerup'))
         await Promise.resolve()
         const upCall = animateMock.mock.calls.at(-1)
         expect(upCall?.[1]).toMatchObject({ scale: 1.1, backgroundColor: '#000' })
+        expect(onTap).toHaveBeenCalledTimes(1)
         cleanup()
     })
 
@@ -57,16 +63,18 @@ describe('utils/interaction', () => {
         cleanup()
     })
 
-    it('attachWhileTap: pointercancel path and no baseline available', async () => {
+    it('attachWhileTap: pointercancel path and no baseline available (fires cancel)', async () => {
         const el = document.createElement('div')
         animateMock.mockClear()
-        const cleanup = attachWhileTap(el, { scale: 0.95 })
+        const onTapCancel = vi.fn()
+        const cleanup = attachWhileTap(el, { scale: 0.95 }, undefined, undefined, { onTapCancel })
         el.dispatchEvent(new PointerEvent('pointerdown'))
         await Promise.resolve()
         expect(animateMock).toHaveBeenCalled()
         el.dispatchEvent(new PointerEvent('pointercancel'))
         await Promise.resolve()
         // No additional animate call because no baseline keys computed
+        expect(onTapCancel).toHaveBeenCalledTimes(1)
         cleanup()
     })
 })

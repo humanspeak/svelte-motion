@@ -40,6 +40,9 @@
         ref: element = $bindable(null),
         onHoverStart: onHoverStartProp,
         onHoverEnd: onHoverEndProp,
+        onTapStart: onTapStartProp,
+        onTap: onTapProp,
+        onTapCancel: onTapCancelProp,
         layout: layoutProp,
         ...rest
     }: Props = $props()
@@ -134,7 +137,8 @@
             element!,
             (whileTapProp ?? {}) as Record<string, unknown>,
             (initialProp ?? {}) as Record<string, unknown>,
-            (animateProp ?? {}) as Record<string, unknown>
+            (animateProp ?? {}) as Record<string, unknown>,
+            { onTapStart: onTapStartProp, onTap: onTapProp, onTapCancel: onTapCancelProp }
         )
     })
 
