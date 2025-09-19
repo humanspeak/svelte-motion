@@ -22,27 +22,26 @@ export default ts.config(
             }
         },
         rules: {
-            semi: ['warn', 'never'],
             'dot-location': ['warn', 'property'],
             'guard-for-in': ['warn'],
-            'no-multi-spaces': ['warn'],
-            yoda: ['warn', 'never'],
             camelcase: ['error'],
-            'comma-style': ['warn'],
-            'comma-dangle': ['off', 'always-multiline'],
-            'block-spacing': ['warn'],
-            'keyword-spacing': ['warn'],
-            'no-trailing-spaces': ['warn'],
             'no-unneeded-ternary': ['warn'],
             'no-whitespace-before-property': ['warn'],
-            'object-curly-spacing': ['warn', 'always'],
-            'space-before-blocks': ['warn'],
-            'space-in-parens': ['warn'],
-            'arrow-spacing': ['warn'],
             'no-duplicate-imports': ['error'],
             'no-var': ['error'],
-            'prefer-const': ['error'],
-
+            'prefer-const': ['off'],
+            semi: 'off',
+            'object-curly-spacing': 'off',
+            'space-in-parens': 'off',
+            'arrow-spacing': 'off',
+            'keyword-spacing': 'off',
+            'block-spacing': 'off',
+            'comma-style': 'off',
+            'no-trailing-spaces': 'off',
+            'no-multi-spaces': 'off',
+            'space-before-blocks': 'off',
+            yoda: 'off',
+            'comma-dangle': 'off',
             '@typescript-eslint/no-unused-expressions': [
                 'error',
                 {
@@ -51,15 +50,7 @@ export default ts.config(
                     allowTaggedTemplates: true
                 }
             ],
-
-            'no-unused-vars': [
-                'warn',
-                {
-                    argsIgnorePattern: '^_',
-                    ignoreRestSiblings: true
-                }
-            ],
-
+            'no-unused-vars': 'off',
             '@typescript-eslint/no-unused-vars': [
                 'warn',
                 {
