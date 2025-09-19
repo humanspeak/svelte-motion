@@ -44,6 +44,7 @@
         "dist",
         "!dist/**/*.test.*",
         "!dist/**/*.spec.*",
+        "!dist/**/__tests__/**",
         "!dist/lib/html/*.template"
     ],
     "scripts": {
