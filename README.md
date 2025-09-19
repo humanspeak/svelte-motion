@@ -20,7 +20,11 @@ Requests welcome: Have a feature/prop/example you want? Please open an issue (id
 
 ## Supported Elements
 
-All standard HTML elements are supported as motion components (e.g., `motion.div`, `motion.button`). See the full set in `src/lib/html/`.
+All standard HTML and SVG elements are supported as motion components (e.g., `motion.div`, `motion.button`, `motion.svg`, `motion.circle`). The full set is generated from canonical lists using `html-tags`, `html-void-elements`, and `svg-tags`, and exported from `src/lib/html/`.
+
+- HTML components respect void elements for documentation and generation purposes.
+- SVG components are treated as non-void.
+- Dashed tag names are exported as PascalCase components (e.g., `color-profile` → `ColorProfile`).
 
 ## Configuration
 
@@ -77,6 +81,7 @@ This package carefully selects its dependencies to provide a robust and maintain
 | [Aspect Ratio](https://examples.motion.dev/react/aspect-ratio)                                           | `/tests/motion/aspect-ratio`      | [View Example](https://svelte.dev/playground/1bf60e745fae44f5becb4c830fde9b6e?version=5.38.10) |
 | [Random - Shiny Button](https://www.youtube.com/watch?v=jcpLprT5F0I) by [@verse\_](https://x.com/verse_) | `/tests/random/shiny-button`      | [View Example](https://svelte.dev/playground/96f9e0bf624f4396adaf06c519147450?version=5.38.10) |
 | [Fancy Like Button](https://github.com/DRlFTER/fancyLikeButton)                                          | `/tests/random/fancy-like-button` | [View Example](https://svelte.dev/playground/c34b7e53d41c48b0ab1eaf21ca120c6e?version=5.38.10) |
+| [Keyframes (square → circle → square; scale 1→2→1)](https://motion.dev/docs/react-animation#keyframes)   | `/tests/motion/keyframes`         | [View Example](https://svelte.dev/playground/05595ce0db124c1cbbe4e74fda68d717?version=5.38.10) |
 
 ## Interactions
 
@@ -99,6 +104,59 @@ Svelte Motion now supports hover interactions via the `whileHover` prop, similar
 
 - Baseline restoration: when the pointer leaves, changed values are restored to their pre-hover baseline. Baseline is computed from `animate` values if present, otherwise `initial`, otherwise sensible defaults (e.g., `scale: 1`, `x/y: 0`) or current computed style where applicable.
 - True-hover gating: hover behavior runs only on devices that support real hover and fine pointers (media queries `(hover: hover)` and `(pointer: fine)`), avoiding sticky hover states on touch devices.
+
+### Tap
+
+```svelte
+<motion.button whileTap={{ scale: 0.95 }} />
+```
+
+### Animation lifecycle
+
+```svelte
+<motion.div
+    onAnimationStart={(def) => {
+        /* ... */
+    }}
+    onAnimationComplete={(def) => {
+        /* ... */
+    }}
+/>
+```
+
+## Server-side rendering
+
+Motion components render their initial state during SSR. The container merges inline `style` with the first values from `initial` (or the first keyframes from `animate` when `initial` is empty) so the server HTML matches the starting appearance. On hydration, components promote to a ready state and animate without flicker.
+
+```svelte
+<motion.div
+    initial={{ opacity: 0, borderRadius: '12px' }}
+    animate={{ opacity: 1 }}
+    style="width: 100px; height: 50px"
+/>
+```
+
+Notes:
+
+- Transform properties like `scale`/`rotate` are composed into a single `transform` style during SSR.
+- When `initial` is empty, the first keyframe from `animate` is used to seed SSR styles.
+
+## Access the underlying element (bind:ref)
+
+You can bind a ref to access the underlying DOM element rendered by a motion component:
+
+```svelte
+<script lang="ts">
+    import { motion } from '$lib'
+    let el: HTMLDivElement | null = null
+</script>
+
+<motion.div bind:ref={el} animate={{ scale: 1.1 }} />
+
+{#if el}
+    <!-- use el for measurements, focus, etc. -->
+{/if}
+```
 
 ## License
 

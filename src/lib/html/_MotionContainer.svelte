@@ -17,6 +17,7 @@
         observeLayoutChanges
     } from '$lib/utils/layout.js'
     import type { SvelteHTMLElements } from 'svelte/elements'
+    import { mergeInlineStyles } from '$lib/utils/style.js'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -36,12 +37,12 @@
         class: classProp,
         whileTap: whileTapProp,
         whileHover: whileHoverProp,
+        ref: element = $bindable(null),
         onHoverStart: onHoverStartProp,
         onHoverEnd: onHoverEndProp,
         layout: layoutProp,
         ...rest
     }: Props = $props()
-    let element: HTMLElement | null = $state(null)
     let isLoaded = $state<'mounting' | 'initial' | 'ready' | 'animated'>('mounting')
     let dataPath = $state<number>(-1)
     const motionConfig = getMotionConfig()
@@ -200,17 +201,38 @@
     })
 </script>
 
-<svelte:element
-    this={tag}
-    bind:this={element}
-    {...rest}
-    data-playwright={isPlaywright ? isPlaywright : undefined}
-    data-is-loaded={isPlaywright ? isLoaded : undefined}
-    data-path={isPlaywright ? dataPath : undefined}
-    style={styleProp}
-    class={classProp}
->
-    {#if isLoaded === 'ready' && !isVoidTag}
-        {@render children?.()}
-    {/if}
-</svelte:element>
+{#if isVoidTag}
+    <svelte:element
+        this={tag}
+        bind:this={element}
+        {...rest}
+        data-playwright={isPlaywright ? isPlaywright : undefined}
+        data-is-loaded={isPlaywright ? isLoaded : undefined}
+        data-path={isPlaywright ? dataPath : undefined}
+        style={mergeInlineStyles(
+            styleProp,
+            initialProp as unknown as Record<string, unknown>,
+            animateProp as unknown as Record<string, unknown>
+        )}
+        class={classProp}
+    />
+{:else}
+    <svelte:element
+        this={tag}
+        bind:this={element}
+        {...rest}
+        data-playwright={isPlaywright ? isPlaywright : undefined}
+        data-is-loaded={isPlaywright ? isLoaded : undefined}
+        data-path={isPlaywright ? dataPath : undefined}
+        style={mergeInlineStyles(
+            styleProp,
+            initialProp as unknown as Record<string, unknown>,
+            animateProp as unknown as Record<string, unknown>
+        )}
+        class={classProp}
+    >
+        {#if isLoaded === 'ready'}
+            {@render children?.()}
+        {/if}
+    </svelte:element>
+{/if}

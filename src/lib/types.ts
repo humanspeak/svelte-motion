@@ -105,6 +105,8 @@ export type MotionProps = {
     class?: string
     /** Enable FLIP layout animations; "position" limits to translation only */
     layout?: boolean | 'position'
+    /** Ref to the element */
+    ref?: HTMLElement | null
 }
 
 /**
