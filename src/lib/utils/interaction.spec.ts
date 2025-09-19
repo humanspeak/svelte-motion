@@ -46,17 +46,23 @@ describe('utils/interaction', () => {
         )
         el.dispatchEvent(new PointerEvent('pointerdown'))
         await Promise.resolve()
-        expect(animateMock).toHaveBeenCalled()
+        expect(animateMock).toHaveBeenCalledTimes(1)
         const downCall = animateMock.mock.calls.at(-1)
         expect(downCall?.[1]).toMatchObject({ scale: 0.9, backgroundColor: '#f00' })
         expect(onTapStart).toHaveBeenCalledTimes(1)
 
         el.dispatchEvent(new PointerEvent('pointerup'))
         await Promise.resolve()
+        expect(animateMock).toHaveBeenCalledTimes(2)
         const upCall = animateMock.mock.calls.at(-1)
         expect(upCall?.[1]).toMatchObject({ scale: 1.1, backgroundColor: '#000' })
         expect(onTap).toHaveBeenCalledTimes(1)
         cleanup()
+        const callsAfterCleanup = animateMock.mock.calls.length
+        el.dispatchEvent(new PointerEvent('pointerdown'))
+        el.dispatchEvent(new PointerEvent('pointerup'))
+        await Promise.resolve()
+        expect(animateMock.mock.calls.length).toBe(callsAfterCleanup)
     })
 
     it('attachWhileTap: negative - no-op when whileTap is undefined', () => {

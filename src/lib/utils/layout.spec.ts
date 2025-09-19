@@ -94,7 +94,16 @@ describe('utils/layout', () => {
             { dx: 0, dy: 0, sx: 1.2, sy: 1.1, shouldTranslate: false, shouldScale: true },
             {}
         )
+        // Inline style should have only scale pre-applied
+        expect(el.style.transform).toBe('scale(1.2, 1.1)')
+        // Animate called with keyframes containing only scale, not translate
         expect(animateMock).toHaveBeenCalled()
+        const call = animateMock.mock.calls[0]
+        expect(call?.[0]).toBe(el)
+        const keyframes = call?.[1] as Record<string, unknown>
+        expect(keyframes).toMatchObject({ scaleX: [1.2, 1], scaleY: [1.1, 1] })
+        expect('x' in (keyframes as Record<string, unknown>)).toBe(false)
+        expect('y' in (keyframes as Record<string, unknown>)).toBe(false)
     })
 
     it('setCompositorHints: toggles styles', () => {
@@ -234,6 +243,7 @@ describe('utils/layout', () => {
         expect(cb).toHaveBeenCalledTimes(1)
 
         // Now cleanup should cancel any pending rAF
+        expect(rafCallbacks.size).toBeGreaterThan(0)
         const scheduledId = [...rafCallbacks.keys()][0]
         expect(typeof scheduledId).toBe('number')
         cleanup()

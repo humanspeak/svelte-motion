@@ -113,11 +113,11 @@ Svelte Motion now supports hover interactions via the `whileHover` prop, similar
 ```
 
 - Callbacks: `onTapStart`, `onTap`, `onTapCancel` are supported.
-- Accessibility: Elements with `whileTap` are keyboard-accessible.
-    - Enter down → fires `onTapStart` and applies `whileTap`
-    - Enter up → fires `onTap`
-    - Blur while Enter is held → fires `onTapCancel`
-    - If `tabindex` isn’t provided, it’s set to `0` to ensure focusability.
+- Accessibility: Elements with `whileTap` are keyboard-accessible (Enter and Space).
+    - Enter or Space down → fires `onTapStart` and applies `whileTap` (Space prevents default scrolling)
+    - Enter or Space up → fires `onTap`
+    - Blur while key is held → fires `onTapCancel`
+    - `MotionContainer` sets `tabindex="0"` automatically when `whileTap` is present and no `tabindex`/`tabIndex` is provided.
 
 ### Animation lifecycle
 
