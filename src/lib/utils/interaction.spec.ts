@@ -44,14 +44,15 @@ describe('utils/interaction', () => {
             { scale: 1.1, backgroundColor: '#000' },
             { onTapStart, onTap, onTapCancel }
         )
-        el.dispatchEvent(new PointerEvent('pointerdown'))
+        el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1 }))
         await Promise.resolve()
         expect(animateMock).toHaveBeenCalledTimes(1)
         const downCall = animateMock.mock.calls.at(-1)
         expect(downCall?.[1]).toMatchObject({ scale: 0.9, backgroundColor: '#f00' })
         expect(onTapStart).toHaveBeenCalledTimes(1)
 
-        el.dispatchEvent(new PointerEvent('pointerup'))
+        // Dispatch pointerup on document with same pointerId to simulate off-element release
+        document.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1 }))
         await Promise.resolve()
         expect(animateMock).toHaveBeenCalledTimes(2)
         const upCall = animateMock.mock.calls.at(-1)
@@ -59,8 +60,8 @@ describe('utils/interaction', () => {
         expect(onTap).toHaveBeenCalledTimes(1)
         cleanup()
         const callsAfterCleanup = animateMock.mock.calls.length
-        el.dispatchEvent(new PointerEvent('pointerdown'))
-        el.dispatchEvent(new PointerEvent('pointerup'))
+        el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 2 }))
+        document.dispatchEvent(new PointerEvent('pointerup', { pointerId: 2 }))
         await Promise.resolve()
         expect(animateMock.mock.calls.length).toBe(callsAfterCleanup)
     })
@@ -320,7 +321,7 @@ describe('utils/interaction', () => {
         el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
         await Promise.resolve()
         // Only one animate on double keydown
-        expect(animateMock.mock.calls.filter((c) => !!c).length).toBe(1)
+        expect(animateMock.mock.calls.length).toBe(1)
         // Releasing with non-Enter key should be ignored
         el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape' }))
         await Promise.resolve()
