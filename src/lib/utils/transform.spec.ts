@@ -1,6 +1,6 @@
 import { get, readable, writable } from 'svelte/store'
 import { describe, expect, it } from 'vitest'
-import { useTransform } from './transform.js'
+import { clampBidirectional, useTransform } from './transform.js'
 
 describe('utils/transform', () => {
     it('maps ranges with default clamp', () => {
@@ -40,13 +40,23 @@ describe('utils/transform', () => {
         expect(get(out)).toBe(1)
     })
 
-    it('supports mixer for non-numeric values', () => {
+    it('invokes mixer with correct t and returns mixer result', () => {
         const src = writable(0)
-        const mix = (a: unknown, b: unknown) => (t: number) => (t < 0.5 ? a : b)
-        const out = useTransform(src, [0, 1], ['red', 'blue'], { mixer: mix })
-        expect(get(out)).toBe('red')
-        src.set(1)
-        expect(get(out)).toBe('blue')
+        const recorded: number[] = []
+        const mixer = (a: unknown, b: unknown) => (t: number) => {
+            recorded.push(t)
+            return t < 0.5 ? a : b
+        }
+        const out = useTransform(src, [0, 1], ['red', 'blue'], { mixer })
+
+        const steps = [0, 0.25, 0.5, 0.75, 1]
+        for (const v of steps) {
+            src.set(v)
+            const result = get(out)
+            const lastT = recorded.at(-1)!
+            expect(lastT).toBeCloseTo(v)
+            expect(result).toBe(v < 0.5 ? 'red' : 'blue')
+        }
     })
 
     it('function form computes from deps', () => {
@@ -68,5 +78,15 @@ describe('utils/transform', () => {
     it('throws when input/output lengths differ', () => {
         const src = readable(0)
         expect(() => useTransform(src, [0, 1], [0])).toThrowError()
+    })
+
+    it('clampBidirectional clamps correctly for normal and reversed bounds', () => {
+        expect(clampBidirectional(5, 0, 10)).toBe(5)
+        expect(clampBidirectional(-1, 0, 10)).toBe(0)
+        expect(clampBidirectional(11, 0, 10)).toBe(10)
+        // Reversed
+        expect(clampBidirectional(5, 10, 0)).toBe(5)
+        expect(clampBidirectional(-1, 10, 0)).toBe(0)
+        expect(clampBidirectional(11, 10, 0)).toBe(10)
     })
 })

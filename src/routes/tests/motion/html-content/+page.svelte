@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion, animate } from '$lib/index.js'
+    import { motion, animate } from '$lib/index'
     import { onMount } from 'svelte'
     import { writable } from 'svelte/store'
 

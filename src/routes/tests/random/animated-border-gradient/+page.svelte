@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion, useSpring, useTime, useTransform } from '$lib/index.js'
+    import { motion, useSpring, useTime, useTransform } from '$lib/index'
 
     const time = useTime()
 
@@ -35,7 +35,7 @@
             data-time-value={$time}
             data-testid="rotating-bg"
             class="absolute -inset-0.5 rounded-md"
-            style={`background: ${$rotatingBg}`}
+            style={`background: ${$rotatingBg}; filter: brightness(0.3)`}
         />
     </div>
     <div class="relative">
@@ -53,7 +53,7 @@
             data-testid="rotating-bg-pulse"
             layout
             class="absolute -inset-0.5 rounded-md"
-            style={`background: conic-gradient(#ff4545, #00ff99, #006aff, #ff0095, #ff4545); filter: ${$pulsingBg}`}
+            style={`background: conic-gradient(#ff4545, #00ff99, #006aff, #ff0095, #ff4545); filter: brightness(0.9) ${$pulsingBg}`}
         />
     </div>
 </div>

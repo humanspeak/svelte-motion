@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion } from '$lib/index.js'
+    import { motion } from '$lib/index'
 
     const initialAspectRatio = 1
     const initialWidth = 100

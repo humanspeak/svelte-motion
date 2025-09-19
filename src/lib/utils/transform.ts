@@ -26,6 +26,20 @@ export type TransformOptions = {
 const linearMix = (from: number, to: number) => (t: number) => from + (to - from) * t
 
 /**
+ * Clamps a numeric value between two bounds, irrespective of their order.
+ *
+ * @param val Current value.
+ * @param a First bound.
+ * @param b Second bound.
+ * @returns Value clamped to [min(a,b), max(a,b)].
+ */
+export const clampBidirectional = (val: number, a: number, b: number): number => {
+    const lower = a < b ? a : b
+    const upper = a < b ? b : a
+    return Math.min(Math.max(val, lower), upper)
+}
+
+/**
  * Finds the segment index i such that x lies between input[i] and input[i+1].
  * Handles both ascending and descending input ranges.
  *
@@ -36,14 +50,22 @@ const linearMix = (from: number, to: number) => (t: number) => from + (to - from
  */
 const findSegment = (input: number[], x: number): number => {
     if (input.length < 2) return 0
-    const ascending = input[1]! > input[0]!
+    const first = input[0]
+    const second = input[1]
+    const ascending = second > first
     if (ascending) {
-        if (x <= input[0]!) return 0
-        for (let i = 1; i < input.length; i++) if (x <= input[i]!) return i - 1
+        if (x <= first) return 0
+        for (let i = 1; i < input.length; i++) {
+            const curr = input[i]
+            if (x <= curr) return i - 1
+        }
         return input.length - 2
     } else {
-        if (x >= input[0]!) return 0
-        for (let i = 1; i < input.length; i++) if (x >= input[i]!) return i - 1
+        if (x >= first) return 0
+        for (let i = 1; i < input.length; i++) {
+            const curr = input[i]
+            if (x >= curr) return i - 1
+        }
         return input.length - 2
     }
 }
@@ -84,7 +106,9 @@ export const useTransform = <T = number>(
     const out = (output ?? []) as T[]
     const { clamp = true, ease, mixer } = options
     if (input.length !== out.length) {
-        throw new Error('useTransform: input and output arrays must be the same length')
+        throw new Error(
+            `useTransform: input and output arrays must be the same length (input: ${input.length}, output: ${out.length})`
+        )
     }
     const easings: Array<(t: number) => number> = Array.isArray(ease)
         ? ease
@@ -95,14 +119,21 @@ export const useTransform = <T = number>(
         if (input.length === 0) return out[0] as T
         if (input.length === 1) return out[0] as T
         const seg = findSegment(input, x)
-        const i0 = input[seg]!
-        const i1 = input[seg + 1]!
-        const o0 = out[seg]!
-        const o1 = out[seg + 1]!
-        const localClamp = clamp
-            ? (val: number, a: number, b: number) =>
-                  a < b ? Math.min(Math.max(val, a), b) : Math.min(Math.max(val, b), a)
-            : (val: number) => val
+        const i0 = input[seg]
+        const i1 = input[seg + 1]
+        const o0 = out[seg]
+        const o1 = out[seg + 1]
+
+        // Runtime validation to avoid non-null assertions
+        if (i0 === undefined || i1 === undefined || o0 === undefined || o1 === undefined) {
+            console.warn('useTransform: Invalid segment bounds', {
+                seg,
+                inputLength: input.length,
+                outputLength: out.length
+            })
+            return out[0] as T
+        }
+        const localClamp = clamp ? clampBidirectional : (val: number) => val
         const progress = i0 === i1 ? 0 : (localClamp(x, i0, i1) - i0) / (i1 - i0)
         const e = easings[seg]
         const p = e ? e(progress) : progress
