@@ -1,7 +1,16 @@
 import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
 import { animate } from 'motion'
 
-export function measureRect(el: HTMLElement): DOMRect {
+/**
+ * Measure an element's bounding client rect without current transform.
+ *
+ * Temporarily clears `transform` to avoid skewing measurements, restoring it
+ * immediately after reading the rect.
+ *
+ * @param el Element to measure.
+ * @return DOMRect snapshot of the element.
+ */
+export const measureRect = (el: HTMLElement): DOMRect => {
     const prev = el.style.transform
     el.style.transform = 'none'
     const rect = el.getBoundingClientRect()
@@ -9,7 +18,15 @@ export function measureRect(el: HTMLElement): DOMRect {
     return rect
 }
 
-export function computeFlipTransforms(
+/**
+ * Compute FLIP transform deltas between two rects.
+ *
+ * @param prev Previous rect.
+ * @param next Next rect.
+ * @param mode `true` for translate+scale, `'position'` for translate only.
+ * @return Deltas and flags indicating which transforms to apply.
+ */
+export const computeFlipTransforms = (
     prev: DOMRect,
     next: DOMRect,
     mode: boolean | 'position'
@@ -20,7 +37,7 @@ export function computeFlipTransforms(
     sy: number
     shouldTranslate: boolean
     shouldScale: boolean
-} {
+} => {
     const dx = prev.left - next.left
     const dy = prev.top - next.top
     const sx = next.width > 0 ? prev.width / next.width : 1
@@ -31,7 +48,17 @@ export function computeFlipTransforms(
     return { dx, dy, sx, sy, shouldTranslate, shouldScale }
 }
 
-export function runFlipAnimation(
+/**
+ * Run a FLIP animation for the provided deltas.
+ *
+ * Pre-applies the inverse transform to avoid layout flashes, then animates back
+ * to identity using the provided transition.
+ *
+ * @param el Target element.
+ * @param transforms Deltas computed by `computeFlipTransforms`.
+ * @param transition Timing/options for the animation.
+ */
+export const runFlipAnimation = (
     el: HTMLElement,
     transforms: {
         dx: number
@@ -42,7 +69,7 @@ export function runFlipAnimation(
         shouldScale: boolean
     },
     transition: AnimationOptions
-): void {
+): void => {
     const { dx, dy, sx, sy, shouldTranslate, shouldScale } = transforms
     if (!(shouldTranslate || shouldScale)) return
 
@@ -66,13 +93,30 @@ export function runFlipAnimation(
     animate(el, keyframes as unknown as DOMKeyframesDefinition, transition)
 }
 
-export function setCompositorHints(el: HTMLElement, enabled: boolean): void {
+/**
+ * Toggle compositor hints for smoother transform animations.
+ *
+ * @param el Target element.
+ * @param enabled Whether to enable compositor hints.
+ */
+export const setCompositorHints = (el: HTMLElement, enabled: boolean): void => {
     el.style.willChange = enabled ? 'transform' : ''
     el.style.transformOrigin = enabled ? '0 0' : ''
     if (!enabled) el.style.transform = ''
 }
 
-export function observeLayoutChanges(el: HTMLElement, onChange: () => void): () => void {
+/**
+ * Observe size/attribute changes that commonly trigger layout changes.
+ *
+ * Returns a cleanup function that disconnects observers. The callback is called
+ * for resize events and attribute/class/style changes on the element and
+ * immediate parent child-list changes.
+ *
+ * @param el Element to observe.
+ * @param onChange Callback invoked when a relevant change is detected.
+ * @return Cleanup function.
+ */
+export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (() => void) => {
     const schedule = () => onChange()
     const ro = new ResizeObserver(() => schedule())
     ro.observe(el)
