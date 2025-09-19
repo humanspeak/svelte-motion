@@ -18,6 +18,7 @@
     } from '$lib/utils/layout.js'
     import type { SvelteHTMLElements } from 'svelte/elements'
     import { mergeInlineStyles } from '$lib/utils/style.js'
+    import { isNativelyFocusable } from '$lib/utils/a11y.js'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -65,6 +66,7 @@
     const derivedAttrs = $derived<Record<string, unknown>>({
         ...(rest as Record<string, unknown>),
         ...(whileTapProp &&
+        !isNativelyFocusable(tag, rest as Record<string, unknown>) &&
         ((rest as Record<string, unknown>)?.tabindex ??
             (rest as Record<string, unknown>)?.tabIndex ??
             undefined) === undefined

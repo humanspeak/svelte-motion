@@ -38,6 +38,29 @@ async function flushTimers() {
 }
 
 describe('_MotionContainer', () => {
+    it('does not add tabindex when element is natively focusable', async () => {
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+        const { container } = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'a',
+                whileTap: { scale: 0.95 },
+                href: 'https://example.com'
+            }
+        })
+        await flushTimers()
+        const el = container.firstElementChild as HTMLElement
+        expect(el.hasAttribute('tabindex')).toBe(false)
+    })
+
+    it('adds tabindex=0 for non-focusable elements with whileTap', async () => {
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+        const { container } = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', whileTap: { scale: 0.95 } }
+        })
+        await flushTimers()
+        const el = container.firstElementChild as HTMLElement
+        expect(el.getAttribute('tabindex')).toBe('0')
+    })
     it('fires lifecycle only for main animate transition (not initial)', async () => {
         const onStart = vi.fn()
         const onComplete = vi.fn()
