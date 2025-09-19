@@ -12,10 +12,12 @@ import { animate } from 'motion'
  */
 export const measureRect = (el: HTMLElement): DOMRect => {
     const prev = el.style.transform
-    el.style.transform = 'none'
-    const rect = el.getBoundingClientRect()
-    el.style.transform = prev
-    return rect
+    try {
+        el.style.transform = 'none'
+        return el.getBoundingClientRect()
+    } finally {
+        el.style.transform = prev
+    }
 }
 
 /**

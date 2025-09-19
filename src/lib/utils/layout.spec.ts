@@ -92,23 +92,27 @@ describe('utils/layout', () => {
         parent.appendChild(el)
         const cb = vi.fn()
 
-        // Minimal shims for ResizeObserver/MutationObserver
+        // Minimal shims for ResizeObserver/MutationObserver that record observe(...) calls
+        const resizeObserveCalls: Array<{ target: Element; options?: unknown }> = []
         class FakeResizeObserver {
             private _cb: ResizeObserverCallback
             constructor(cb2: ResizeObserverCallback) {
                 this._cb = cb2
             }
-            observe() {
+            observe(target: Element, options?: unknown) {
+                resizeObserveCalls.push({ target, options })
                 this._cb([], this as unknown as ResizeObserver)
             }
             disconnect() {}
         }
+        const mutationObserveCalls: Array<{ target: Node; options: MutationObserverInit }> = []
         class FakeMutationObserver {
             private _cb: MutationCallback
             constructor(cb2: MutationCallback) {
                 this._cb = cb2
             }
-            observe() {
+            observe(target: Node, options: MutationObserverInit) {
+                mutationObserveCalls.push({ target, options })
                 this._cb([], this as unknown as MutationObserver)
             }
             disconnect() {}
@@ -121,6 +125,21 @@ describe('utils/layout', () => {
 
         const cleanup = observeLayoutChanges(el, cb)
         expect(cb).toHaveBeenCalled()
+        // Verify observers were configured with correct targets/options
+        expect(resizeObserveCalls).toEqual(
+            expect.arrayContaining([expect.objectContaining({ target: el })])
+        )
+        expect(mutationObserveCalls).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    target: el,
+                    options: expect.objectContaining({
+                        attributes: true,
+                        attributeFilter: ['class', 'style']
+                    })
+                })
+            ])
+        )
         cleanup()
 
         vi.unstubAllGlobals()
