@@ -1,11 +1,7 @@
 import A from '$lib/html/A.svelte'
 import Abbr from '$lib/html/Abbr.svelte'
 import Address from '$lib/html/Address.svelte'
-import Altglyph from '$lib/html/Altglyph.svelte'
-import Altglyphdef from '$lib/html/Altglyphdef.svelte'
-import Altglyphitem from '$lib/html/Altglyphitem.svelte'
 import Animate from '$lib/html/Animate.svelte'
-import Animatecolor from '$lib/html/Animatecolor.svelte'
 import Animatemotion from '$lib/html/Animatemotion.svelte'
 import Animatetransform from '$lib/html/Animatetransform.svelte'
 import Area from '$lib/html/Area.svelte'
@@ -27,7 +23,6 @@ import Clippath from '$lib/html/Clippath.svelte'
 import Code from '$lib/html/Code.svelte'
 import Col from '$lib/html/Col.svelte'
 import Colgroup from '$lib/html/Colgroup.svelte'
-import ColorProfile from '$lib/html/ColorProfile.svelte'
 import Cursor from '$lib/html/Cursor.svelte'
 import Data from '$lib/html/Data.svelte'
 import Datalist from '$lib/html/Datalist.svelte'
@@ -72,18 +67,10 @@ import Fieldset from '$lib/html/Fieldset.svelte'
 import Figcaption from '$lib/html/Figcaption.svelte'
 import Figure from '$lib/html/Figure.svelte'
 import Filter from '$lib/html/Filter.svelte'
-import Font from '$lib/html/Font.svelte'
-import FontFace from '$lib/html/FontFace.svelte'
-import FontFaceFormat from '$lib/html/FontFaceFormat.svelte'
-import FontFaceName from '$lib/html/FontFaceName.svelte'
-import FontFaceSrc from '$lib/html/FontFaceSrc.svelte'
-import FontFaceUri from '$lib/html/FontFaceUri.svelte'
 import Footer from '$lib/html/Footer.svelte'
 import Foreignobject from '$lib/html/Foreignobject.svelte'
 import Form from '$lib/html/Form.svelte'
 import G from '$lib/html/G.svelte'
-import Glyph from '$lib/html/Glyph.svelte'
-import Glyphref from '$lib/html/Glyphref.svelte'
 import H1 from '$lib/html/H1.svelte'
 import H2 from '$lib/html/H2.svelte'
 import H3 from '$lib/html/H3.svelte'
@@ -92,7 +79,6 @@ import H5 from '$lib/html/H5.svelte'
 import H6 from '$lib/html/H6.svelte'
 import Header from '$lib/html/Header.svelte'
 import Hgroup from '$lib/html/Hgroup.svelte'
-import Hkern from '$lib/html/Hkern.svelte'
 import Hr from '$lib/html/Hr.svelte'
 import I from '$lib/html/I.svelte'
 import Iframe from '$lib/html/Iframe.svelte'
@@ -115,7 +101,6 @@ import Math from '$lib/html/Math.svelte'
 import Menu from '$lib/html/Menu.svelte'
 import Metadata from '$lib/html/Metadata.svelte'
 import Meter from '$lib/html/Meter.svelte'
-import MissingGlyph from '$lib/html/MissingGlyph.svelte'
 import Mpath from '$lib/html/Mpath.svelte'
 import Nav from '$lib/html/Nav.svelte'
 import Noscript from '$lib/html/Noscript.svelte'
@@ -181,18 +166,13 @@ import Use from '$lib/html/Use.svelte'
 import Var from '$lib/html/Var.svelte'
 import Video from '$lib/html/Video.svelte'
 import View from '$lib/html/View.svelte'
-import Vkern from '$lib/html/Vkern.svelte'
 import Wbr from '$lib/html/Wbr.svelte'
 
 export {
     A,
     Abbr,
     Address,
-    Altglyph,
-    Altglyphdef,
-    Altglyphitem,
     Animate,
-    Animatecolor,
     Animatemotion,
     Animatetransform,
     Area,
@@ -214,7 +194,6 @@ export {
     Code,
     Col,
     Colgroup,
-    ColorProfile,
     Cursor,
     Data,
     Datalist,
@@ -259,18 +238,10 @@ export {
     Figcaption,
     Figure,
     Filter,
-    Font,
-    FontFace,
-    FontFaceFormat,
-    FontFaceName,
-    FontFaceSrc,
-    FontFaceUri,
     Footer,
     Foreignobject,
     Form,
     G,
-    Glyph,
-    Glyphref,
     H1,
     H2,
     H3,
@@ -279,7 +250,6 @@ export {
     H6,
     Header,
     Hgroup,
-    Hkern,
     Hr,
     I,
     Iframe,
@@ -302,7 +272,6 @@ export {
     Menu,
     Metadata,
     Meter,
-    MissingGlyph,
     Mpath,
     Nav,
     Noscript,
@@ -368,7 +337,6 @@ export {
     Var,
     Video,
     View,
-    Vkern,
     Wbr
 }
 
@@ -476,108 +444,6 @@ export type MotionComponents = {
     address: typeof Address
 
     /**
-     * A motion-enhanced altglyph element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.altglyph
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.altglyph>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    altglyph: typeof Altglyph
-
-    /**
-     * A motion-enhanced altglyphdef element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.altglyphdef
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.altglyphdef>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    altglyphdef: typeof Altglyphdef
-
-    /**
-     * A motion-enhanced altglyphitem element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.altglyphitem
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.altglyphitem>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    altglyphitem: typeof Altglyphitem
-
-    /**
      * A motion-enhanced animate element with animation capabilities.
      *
      * [Motion Documentation](https://motion.dev/docs/react-motion-component)
@@ -610,40 +476,6 @@ export type MotionComponents = {
      * Check documentation for latest updates.
      */
     animate: typeof Animate
-
-    /**
-     * A motion-enhanced animatecolor element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.animatecolor
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.animatecolor>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    animatecolor: typeof Animatecolor
 
     /**
      * A motion-enhanced animatemotion element with animation capabilities.
@@ -1222,40 +1054,6 @@ export type MotionComponents = {
      * Check documentation for latest updates.
      */
     colgroup: typeof Colgroup
-
-    /**
-     * A motion-enhanced color-profile element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.color-profile
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.color-profile>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    'color-profile': typeof ColorProfile
 
     /**
      * A motion-enhanced cursor element with animation capabilities.
@@ -2720,210 +2518,6 @@ export type MotionComponents = {
     filter: typeof Filter
 
     /**
-     * A motion-enhanced font element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.font
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.font>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    font: typeof Font
-
-    /**
-     * A motion-enhanced font-face element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.font-face
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.font-face>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    'font-face': typeof FontFace
-
-    /**
-     * A motion-enhanced font-face-format element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.font-face-format
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.font-face-format>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    'font-face-format': typeof FontFaceFormat
-
-    /**
-     * A motion-enhanced font-face-name element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.font-face-name
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.font-face-name>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    'font-face-name': typeof FontFaceName
-
-    /**
-     * A motion-enhanced font-face-src element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.font-face-src
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.font-face-src>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    'font-face-src': typeof FontFaceSrc
-
-    /**
-     * A motion-enhanced font-face-uri element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.font-face-uri
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.font-face-uri>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    'font-face-uri': typeof FontFaceUri
-
-    /**
      * A motion-enhanced footer element with animation capabilities.
      *
      * [Motion Documentation](https://motion.dev/docs/react-motion-component)
@@ -3058,74 +2652,6 @@ export type MotionComponents = {
      * Check documentation for latest updates.
      */
     g: typeof G
-
-    /**
-     * A motion-enhanced glyph element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.glyph
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.glyph>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    glyph: typeof Glyph
-
-    /**
-     * A motion-enhanced glyphref element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.glyphref
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.glyphref>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    glyphref: typeof Glyphref
 
     /**
      * A motion-enhanced h1 element with animation capabilities.
@@ -3398,40 +2924,6 @@ export type MotionComponents = {
      * Check documentation for latest updates.
      */
     hgroup: typeof Hgroup
-
-    /**
-     * A motion-enhanced hkern element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.hkern
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.hkern>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    hkern: typeof Hkern
 
     /**
      * A motion-enhanced i element with animation capabilities.
@@ -4078,40 +3570,6 @@ export type MotionComponents = {
      * Check documentation for latest updates.
      */
     meter: typeof Meter
-
-    /**
-     * A motion-enhanced missing-glyph element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.missing-glyph
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.missing-glyph>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    'missing-glyph': typeof MissingGlyph
 
     /**
      * A motion-enhanced mpath element with animation capabilities.
@@ -6254,40 +5712,6 @@ export type MotionComponents = {
      * Check documentation for latest updates.
      */
     view: typeof View
-
-    /**
-     * A motion-enhanced vkern element with animation capabilities.
-     *
-     * [Motion Documentation](https://motion.dev/docs/react-motion-component)
-     *
-     * Currently supported features:
-     * * `initial`
-     * * `animate`
-     * * `transition`
-     * * `whileTap`
-     * * `whileHover`
-     * * `onAnimationStart`
-     * * `onAnimationComplete`
-     * * `onHoverStart`
-     * * `onHoverEnd`
-     * * `layout`
-     *
-     * ```svelte
-     * <motion.vkern
-     *   initial={{ opacity: 0, scale: 0.8 }}
-     *   animate={{ opacity: 1, scale: 1 }}
-     *   transition={{ duration: 0.3 }}
-     *   whileHover={{ scale: 1.05 }}
-     *   whileTap={{ scale: 0.95 }}
-     * >
-     *   Content
-     * </motion.vkern>
-     * ```
-     *
-     * Note: Some motion features are still under development.
-     * Check documentation for latest updates.
-     */
-    vkern: typeof Vkern
 
     /**
      * A motion-enhanced area element with animation capabilities.

@@ -13,7 +13,26 @@ const SVG_TAGS: string[] = (svgTags as string[]).map((t) => t.toLowerCase())
 const VOID_ELEMENTS = new Set((htmlVoidElements as string[]).map((t) => t.toLowerCase()))
 
 const FILTERED_HTML = HTML_TAGS.filter((tag) => !EXCLUDED_TAGS.has(tag)).sort()
-const FILTERED_SVG = SVG_TAGS.sort()
+// Deprecated/removed SVG elements (SVG 2) to exclude from generation
+const DEPRECATED_SVG = new Set([
+    'animatecolor',
+    'altglyph',
+    'altglyphdef',
+    'altglyphitem',
+    'glyph',
+    'glyphref',
+    'hkern',
+    'vkern',
+    'missing-glyph',
+    'font',
+    'font-face',
+    'font-face-format',
+    'font-face-name',
+    'font-face-src',
+    'font-face-uri',
+    'color-profile'
+])
+const FILTERED_SVG = SVG_TAGS.filter((tag) => !DEPRECATED_SVG.has(tag)).sort()
 
 const TEMPLATE_PATH = 'scripts/_template.template'
 const VOID_TEMPLATE_PATH = 'scripts/_template_void.template'
