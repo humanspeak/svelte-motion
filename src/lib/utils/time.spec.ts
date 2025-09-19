@@ -1,10 +1,16 @@
 import { get } from 'svelte/store'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTime } from './time.js'
 
 describe('utils/time - useTime', () => {
     beforeEach(() => {
         vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
+        vi.restoreAllMocks()
+        vi.unstubAllGlobals()
     })
 
     it('returns a readable store that increases over time', async () => {
@@ -19,12 +25,12 @@ describe('utils/time - useTime', () => {
         const time = useTime()
         expect(get(time)).toBe(0)
 
-        // Advance first frame
+        // Advance first frame (simulate a frame via mocked rAF callback)
         // @ts-expect-error simulate SSR
         rafCb?.(100)
         expect(get(time)).toBe(100)
 
-        // Next frame
+        // Next frame (simulate another frame)
         // @ts-expect-error simulate SSR
         rafCb?.(500)
         expect(get(time)).toBe(500)
@@ -63,7 +69,6 @@ describe('utils/time - useTime', () => {
         expect(rafSpy).toHaveBeenCalledTimes(2)
 
         rafSpy.mockRestore()
-        vi.unstubAllGlobals()
     })
 
     it('cancels rAF and removes shared store on unsubscribe', () => {

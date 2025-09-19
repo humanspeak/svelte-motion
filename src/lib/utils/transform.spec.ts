@@ -30,6 +30,16 @@ describe('utils/transform', () => {
         expect(get(out)).toBeCloseTo(1 + easeIn(0.5))
     })
 
+    it('handles descending input ranges correctly', () => {
+        const src = writable(100)
+        const out = useTransform(src, [100, 0], [0, 1])
+        expect(get(out)).toBe(0)
+        src.set(50)
+        expect(get(out)).toBeCloseTo(0.5)
+        src.set(0)
+        expect(get(out)).toBe(1)
+    })
+
     it('supports mixer for non-numeric values', () => {
         const src = writable(0)
         const mix = (a: unknown, b: unknown) => (t: number) => (t < 0.5 ? a : b)

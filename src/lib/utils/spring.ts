@@ -35,8 +35,11 @@ type UnitValue = { value: number; unit: string }
 const parseUnit = (v: number | string): UnitValue => {
     if (typeof v === 'number') return { value: v, unit: '' }
     const match = String(v).match(/^(-?\d*\.?\d+)(.*)$/)
-    if (!match) return { value: 0, unit: '' }
-    return { value: parseFloat(match[1]!), unit: match[2] ?? '' }
+    if (!match || !match[1]) return { value: 0, unit: '' }
+    const parsed = Number.parseFloat(match[1])
+    if (!Number.isFinite(parsed)) return { value: 0, unit: '' }
+    const unit = match[2] ?? ''
+    return { value: parsed, unit }
 }
 
 /**
@@ -69,8 +72,22 @@ export const useSpring = (
     jump: (v: number | string) => void
 } => {
     if (typeof window === 'undefined') {
-        const initial =
-            typeof source === 'object' ? (('subscribe' in source ? 0 : 0) as number) : source
+        // Derive best-effort initial value for SSR to avoid hydration mismatch
+        let initial: number | string = 0
+        if (typeof source === 'number' || typeof source === 'string') {
+            initial = source
+        } else if (source && typeof source === 'object') {
+            const anySource = source as unknown as {
+                get?: () => number | string
+                value?: number | string
+            }
+            if (typeof anySource.get === 'function') {
+                const v = anySource.get()
+                if (typeof v === 'number' || typeof v === 'string') initial = v
+            } else if (typeof anySource.value === 'number' || typeof anySource.value === 'string') {
+                initial = anySource.value
+            }
+        }
         const store = readable(initial as number | string, () => {}) as Readable<
             number | string
         > & { set: (v: number | string) => void; jump: (v: number | string) => void }
@@ -98,7 +115,8 @@ export const useSpring = (
 
     const step = (t: number) => {
         if (!lastTime) lastTime = t
-        const dt = Math.max(0.001, (t - lastTime) / 1000)
+        // Clamp dt to a safe range to avoid instability across large time gaps
+        const dt = Math.min(0.1, Math.max(0.001, (t - lastTime) / 1000))
         lastTime = t
 
         const displacement = state.current.value - state.target.value
@@ -145,20 +163,34 @@ export const useSpring = (
 
     // If following another store, subscribe and forward values to set()
     if (typeof source === 'object' && 'subscribe' in source) {
+        let followSource = true
         const unsub = (source as Readable<number | string>).subscribe((v) => api.set(v))
         const wrapped = readable<number | string>(formatUnit(state.current.value, unit), (set) => {
             const sub = store.subscribe(set)
             return () => {
                 sub()
                 unsub()
+                followSource = false
                 if (raf) cancelAnimationFrame(raf)
             }
         }) as Readable<number | string> & {
             set: (v: number | string) => void
             jump: (v: number | string) => void
         }
-        ;(wrapped as unknown as { set: (v: number | string) => void }).set = api.set
-        ;(wrapped as unknown as { jump: (v: number | string) => void }).jump = api.jump
+        ;(wrapped as unknown as { set: (v: number | string) => void }).set = (
+            v: number | string
+        ) => {
+            if (followSource) unsub()
+            followSource = false
+            api.set(v)
+        }
+        ;(wrapped as unknown as { jump: (v: number | string) => void }).jump = (
+            v: number | string
+        ) => {
+            if (followSource) unsub()
+            followSource = false
+            api.jump(v)
+        }
         return wrapped
     }
 
