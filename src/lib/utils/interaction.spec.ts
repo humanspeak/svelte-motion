@@ -133,7 +133,7 @@ describe('utils/interaction', () => {
 
     it('attachWhileTap: re-applies hover on pointerup when element is still hovered', async () => {
         const el = document.createElement('div') as HTMLElement & {
-            matches: (sel: string) => boolean
+            matches: (_sel: string) => boolean
         }
         // Pretend environment is hover-capable
         vi.stubGlobal('matchMedia', ((query: string) => {
@@ -184,7 +184,7 @@ describe('utils/interaction', () => {
 
     it('attachWhileTap: when not hovered on pointerup, restores baseline (not hover)', async () => {
         const el = document.createElement('div') as HTMLElement & {
-            matches: (sel: string) => boolean
+            matches: (_sel: string) => boolean
         }
         // Hover capable, but element not hovered
         vi.stubGlobal('matchMedia', ((query: string) => {
@@ -227,7 +227,7 @@ describe('utils/interaction', () => {
 
     it('attachWhileTap: safe reapply hover catch path when matches throws', async () => {
         const el = document.createElement('div') as HTMLElement & {
-            matches: (sel: string) => boolean
+            matches: (_sel: string) => boolean
         }
         // Hover capable
         vi.stubGlobal('matchMedia', ((query: string) => {

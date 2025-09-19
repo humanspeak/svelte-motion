@@ -67,10 +67,10 @@ export type MotionWhileHover =
  * Animation lifecycle callbacks for motion components.
  */
 export type MotionAnimationStart =
-    | ((definition: DOMKeyframesDefinition | undefined) => void)
+    | ((_definition: DOMKeyframesDefinition | undefined) => void)
     | undefined
 export type MotionAnimationComplete =
-    | ((definition: DOMKeyframesDefinition | undefined) => void)
+    | ((_definition: DOMKeyframesDefinition | undefined) => void)
     | undefined
 
 /** Hover lifecycle callbacks */

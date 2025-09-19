@@ -26,6 +26,7 @@
     }
 
     let {
+        // trunk-ignore-begin(eslint/prefer-const)
         children,
         tag = 'div',
         initial: initialProp,
@@ -37,13 +38,15 @@
         class: classProp,
         whileTap: whileTapProp,
         whileHover: whileHoverProp,
-        ref: element = $bindable(null),
         onHoverStart: onHoverStartProp,
         onHoverEnd: onHoverEndProp,
         onTapStart: onTapStartProp,
         onTap: onTapProp,
         onTapCancel: onTapCancelProp,
         layout: layoutProp,
+        // trunk-ignore-end(eslint/prefer-const)
+        ref: element = $bindable(null),
+        // trunk-ignore(eslint/prefer-const)
         ...rest
     }: Props = $props()
     let isLoaded = $state<'mounting' | 'initial' | 'ready' | 'animated'>('mounting')
@@ -57,7 +60,7 @@
     const isVoidTag = $derived(VOID_TAGS.has(tag as string))
 
     // Compute merged transition without mutating props to avoid effect write loops
-    let mergedTransition = $derived<MotionTransition>(
+    const mergedTransition = $derived<MotionTransition>(
         mergeTransitions(motionConfig?.transition, transitionProp)
     )
 
