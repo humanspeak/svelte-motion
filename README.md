@@ -170,6 +170,71 @@ Notes:
 <motion.div style={`rotate: ${$rotate}deg`} />
 ```
 
+### useSpring
+
+`useSpring` creates a readable store that animates to its latest target with a spring. You can either control it directly with `set`/`jump`, or have it follow another readable (like a time-derived value).
+
+```svelte
+<script lang="ts">
+    import { useTime, useTransform, useSpring } from '$lib'
+
+    // Track another readable
+    const time = useTime()
+    const blurTarget = useTransform(() => {
+        const phase = ($time % 2000) / 2000
+        return 4 * (0.5 + 0.5 * Math.sin(phase * Math.PI * 2)) // 0..4
+    }, [time])
+    const blur = useSpring(blurTarget, { stiffness: 300 })
+
+    // Or direct control
+    const x = useSpring(0, { stiffness: 300 })
+    // x.set(100) // animates to 100
+    // x.jump(0)  // jumps without animation
+</script>
+
+<div style={`filter: blur(${$blur}px)`} />
+```
+
+- Accepts number or unit string (e.g., `"100vh"`) or a readable source.
+- Returns a readable with `{ set, jump }` methods when used in the browser; SSR-safe on the server.
+- Reference: Motion useSpring docs [motion.dev](https://motion.dev/docs/react-use-spring?platform=react).
+
+### useTransform
+
+`useTransform` creates a derived readable. It supports:
+
+- Range mapping: map a numeric source across input/output ranges with optional `{ clamp, ease, mixer }`.
+- Function form: compute from one or more dependencies.
+
+Range mapping example:
+
+```svelte
+<script lang="ts">
+    import { useTime, useTransform } from '$lib'
+    const time = useTime()
+    // Map 0..4000ms to 0..360deg, unclamped to allow wrap-around
+    const rotate = useTransform(time, [0, 4000], [0, 360], { clamp: false })
+</script>
+
+<div style={`rotate: ${$rotate}deg`} />
+```
+
+Function form example:
+
+```svelte
+<script lang="ts">
+    import { useTransform } from '$lib'
+    // Given stores a and b, compute their sum
+    const add = (a: number, b: number) => a + b
+    // deps are stores; body can access them via $ syntax
+    const total = useTransform(() => add($a, $b), [a, b])
+</script>
+
+<span>{$total}</span>
+```
+
+- Reference: Motion useTransform docs [motion.dev](https://motion.dev/docs/react-use-transform?platform=react).
+
 ## Access the underlying element (bind:ref)
 
 You can bind a ref to access the underlying DOM element rendered by a motion component:

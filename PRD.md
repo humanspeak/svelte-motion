@@ -13,6 +13,8 @@ Reference: Framer Motion for React [`motion` on npm](https://www.npmjs.com/packa
     - `MotionConfig` context component.
     - Types: `MotionInitial`, `MotionAnimate`, `MotionTransition`, `MotionWhileTap`.
     - Utilities: `useTime(id?)` — readable store ticking each rAF with elapsed ms. Calls with the same `id` share a single timeline for synchronization. SSR-safe (static 0 when `window` is unavailable).
+    - Utilities: `useSpring` — readable store that springs towards its latest target. Can be directly set/jumped, or follow another readable (number or unit string). SSR-safe.
+    - Utilities: `useTransform` — derived readable with two overloads: range mapping from a numeric source with `{ clamp, ease, mixer }`, and a function form that computes from one or more dependencies. Reference: Motion useTransform docs (React) [motion.dev](https://motion.dev/docs/react-use-transform?platform=react).
 - **Implemented props**: `initial`, `animate`, `transition`, `whileTap`, `whileHover`, `onAnimationStart`, `onAnimationComplete`, `class`, `style`, `layout` (FLIP-based).
 - **Tap callbacks & a11y**: `onTapStart`, `onTap`, `onTapCancel` implemented. Tap is keyboard-accessible: Enter and Space start tap on keydown, complete on keyup, and cancel on blur. Space handling prevents default scrolling/activation. `tabindex` is added when needed for focusability on non-native button-like elements.
     - SSR: Initial styles are reflected in server HTML by merging `style` with `initial` or first `animate` keyframe (no flicker).
