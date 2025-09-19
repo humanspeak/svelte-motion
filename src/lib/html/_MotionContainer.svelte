@@ -26,7 +26,6 @@
     }
 
     let {
-        // trunk-ignore-begin(eslint/prefer-const)
         children,
         tag = 'div',
         initial: initialProp,
@@ -44,9 +43,7 @@
         onTap: onTapProp,
         onTapCancel: onTapCancelProp,
         layout: layoutProp,
-        // trunk-ignore-end(eslint/prefer-const)
         ref: element = $bindable(null),
-        // trunk-ignore(eslint/prefer-const)
         ...rest
     }: Props = $props()
     let isLoaded = $state<'mounting' | 'initial' | 'ready' | 'animated'>('mounting')
@@ -90,12 +87,12 @@
 
     const runAnimation = () => {
         if (!element || !animateProp) return
-        const transitionAmimate: MotionTransition = mergedTransition ?? {}
+        const transitionAnimate: MotionTransition = mergedTransition ?? {}
         const payload = $state.snapshot(animateProp)
         animateWithLifecycle(
             element,
             payload as unknown as DOMKeyframesDefinition,
-            transitionAmimate as unknown as AnimationOptions,
+            transitionAnimate as unknown as AnimationOptions,
             (def) => onAnimationStartProp?.(def as unknown as DOMKeyframesDefinition | undefined),
             (def) => onAnimationCompleteProp?.(def as unknown as DOMKeyframesDefinition | undefined)
         )
