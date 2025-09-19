@@ -12,7 +12,7 @@ Reference: Framer Motion for React [`motion` on npm](https://www.npmjs.com/packa
     - `motion`: Object map of HTML tag components (e.g., `motion.div`, `motion.button`) in `src/lib/html/`.
     - `MotionConfig` context component.
     - Types: `MotionInitial`, `MotionAnimate`, `MotionTransition`, `MotionWhileTap`.
-- **Implemented props**: `initial`, `animate`, `transition`, `whileTap`, `onAnimationStart`, `onAnimationComplete`, `class`, `style`, `layout` (FLIP-based).
+- **Implemented props**: `initial`, `animate`, `transition`, `whileTap`, `whileHover`, `onAnimationStart`, `onAnimationComplete`, `class`, `style`, `layout` (FLIP-based).
 - **Coverage of HTML elements**: Many intrinsic HTML components implemented under `src/lib/html/`.
 - **Tests**: Unit tests for utils and `_MotionContainer` lifecycles/whileTap/reset, E2E for enter animation and HTML content.
 
@@ -43,7 +43,8 @@ Phase 0 — Foundations (status)
 
 - Solidify `motion.<tag>` wrappers and prop pass-through. [Done]
 - Ensure SSR-friendly behavior and hydration safety (instant `initial`, promote to `ready`, then animate). [Done]
-- Add `whileHover`, `whileFocus` to interaction set. [Planned]
+- Add `whileHover` to interaction set. [Done]
+- Add `whileFocus` to interaction set. [Planned]
 - Introduce `onAnimationStart`/`onAnimationComplete`. [Done]
 - Expand tests: unit for utils, component tests for container, E2E demos. [Done]
 
@@ -171,7 +172,8 @@ Status against spec:
 | ---------------------------------- | --------------------- | ---------------------- | ----- |
 | `initial`, `animate`, `transition` | Yes                   | Yes                    | 0     |
 | `whileTap`                         | Yes                   | Yes                    | 0     |
-| `whileHover`, `whileFocus`         | Yes                   | No                     | 0     |
+| `whileHover`                       | Yes                   | Yes                    | 0     |
+| `whileFocus`                       | Yes                   | No                     | 0     |
 | `variants`                         | Yes                   | No                     | 1     |
 | `exit` + presence                  | Yes                   | No                     | 1     |
 | `drag`/`pan`                       | Yes                   | No                     | 2     |

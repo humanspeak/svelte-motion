@@ -228,4 +228,102 @@ describe('_MotionContainer', () => {
         rectSpy.mockRestore()
         vi.unstubAllGlobals()
     })
+
+    it('whileHover animates on enter/leave, uses nested transition, and fires callbacks', async () => {
+        // Enable true-hover environment
+        vi.stubGlobal('matchMedia', ((query: string) => {
+            const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
+            return {
+                matches,
+                media: query,
+                onchange: null,
+                addEventListener() {},
+                removeEventListener() {},
+                addListener() {},
+                removeListener() {},
+                dispatchEvent() {
+                    return false
+                }
+            } as unknown as MediaQueryList
+        }) as unknown as typeof window.matchMedia)
+
+        const onHoverStart = vi.fn()
+        const onHoverEnd = vi.fn()
+
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+        const { container } = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                initial: { scale: 1 },
+                animate: { scale: 1.1 },
+                transition: { duration: 0.25 },
+                whileHover: { scale: 1.2, transition: { duration: 0.12 } },
+                onHoverStart,
+                onHoverEnd
+            }
+        })
+
+        await flushTimers()
+
+        const el = container.firstElementChild as HTMLElement
+        expect(el).toBeTruthy()
+
+        // Enter: should animate to whileHover with its nested transition
+        await fireEvent.pointerEnter(el)
+        await flushTimers()
+        let lastCall = animateMock.mock.calls.at(-1)
+        expect(lastCall?.[1]).toMatchObject({ scale: 1.2 })
+        expect(lastCall?.[2]).toMatchObject({ duration: 0.12 })
+        expect(onHoverStart).toHaveBeenCalledTimes(1)
+
+        // Leave: should animate back to baseline (animate over initial) with component transition
+        await fireEvent.pointerLeave(el)
+        await flushTimers()
+        lastCall = animateMock.mock.calls.at(-1)
+        expect(lastCall?.[1]).toMatchObject({ scale: 1.1 })
+        expect(lastCall?.[2]).toMatchObject({ duration: 0.25 })
+        expect(onHoverEnd).toHaveBeenCalledTimes(1)
+
+        vi.unstubAllGlobals()
+    })
+
+    it('whileHover is gated to hover-capable devices', async () => {
+        // Simulate non-hover environment (e.g., touch-only)
+        vi.stubGlobal('matchMedia', ((query: string) => {
+            const matches = false
+            return {
+                matches,
+                media: query,
+                onchange: null,
+                addEventListener() {},
+                removeEventListener() {},
+                addListener() {},
+                removeListener() {},
+                dispatchEvent() {
+                    return false
+                }
+            } as unknown as MediaQueryList
+        }) as unknown as typeof window.matchMedia)
+
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+        const { container } = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', whileHover: { scale: 1.05 } }
+        })
+
+        await flushTimers()
+
+        const el = container.firstElementChild as HTMLElement
+        expect(el).toBeTruthy()
+
+        // Clear any prior animate calls to isolate hover behavior
+        animateMock.mockClear()
+
+        await fireEvent.pointerEnter(el)
+        await flushTimers()
+
+        // No hover animation should be triggered
+        expect(animateMock).not.toHaveBeenCalled()
+
+        vi.unstubAllGlobals()
+    })
 })

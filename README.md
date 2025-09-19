@@ -78,6 +78,28 @@ This package carefully selects its dependencies to provide a robust and maintain
 | [Random - Shiny Button](https://www.youtube.com/watch?v=jcpLprT5F0I) by [@verse\_](https://x.com/verse_) | `/tests/random/shiny-button`      | [View Example](https://svelte.dev/playground/96f9e0bf624f4396adaf06c519147450?version=5.38.10) |
 | [Fancy Like Button](https://github.com/DRlFTER/fancyLikeButton)                                          | `/tests/random/fancy-like-button` | [View Example](https://svelte.dev/playground/c34b7e53d41c48b0ab1eaf21ca120c6e?version=5.38.10) |
 
+## Interactions
+
+### Hover
+
+Svelte Motion now supports hover interactions via the `whileHover` prop, similar to React Motion/Framer Motion.
+
+```svelte
+<motion.div whileHover={{ scale: 1.05 }} />
+```
+
+- `whileHover` accepts a keyframes object. It also supports a nested `transition` to override the global transition for hover only:
+
+```svelte
+<motion.button
+    whileHover={{ scale: 1.05, transition: { duration: 0.12 } }}
+    transition={{ duration: 0.25 }}
+/>
+```
+
+- Baseline restoration: when the pointer leaves, changed values are restored to their pre-hover baseline. Baseline is computed from `animate` values if present, otherwise `initial`, otherwise sensible defaults (e.g., `scale: 1`, `x/y: 0`) or current computed style where applicable.
+- True-hover gating: hover behavior runs only on devices that support real hover and fine pointers (media queries `(hover: hover)` and `(pointer: fine)`), avoiding sticky hover states on touch devices.
+
 ## License
 
 MIT © [Humanspeak, Inc.](LICENSE)
