@@ -12,6 +12,7 @@ Reference: Framer Motion for React [`motion` on npm](https://www.npmjs.com/packa
     - `motion`: Object map of HTML and SVG tag components (e.g., `motion.div`, `motion.button`, `motion.svg`) generated from canonical lists, exported via `src/lib/html/`.
     - `MotionConfig` context component.
     - Types: `MotionInitial`, `MotionAnimate`, `MotionTransition`, `MotionWhileTap`.
+    - Utilities: `useTime(id?)` — readable store ticking each rAF with elapsed ms. Calls with the same `id` share a single timeline for synchronization. SSR-safe (static 0 when `window` is unavailable).
 - **Implemented props**: `initial`, `animate`, `transition`, `whileTap`, `whileHover`, `onAnimationStart`, `onAnimationComplete`, `class`, `style`, `layout` (FLIP-based).
 - **Tap callbacks & a11y**: `onTapStart`, `onTap`, `onTapCancel` implemented. Tap is keyboard-accessible: Enter and Space start tap on keydown, complete on keyup, and cancel on blur. Space handling prevents default scrolling/activation. `tabindex` is added when needed for focusability on non-native button-like elements.
     - SSR: Initial styles are reflected in server HTML by merging `style` with `initial` or first `animate` keyframe (no flicker).
@@ -25,6 +26,7 @@ Gaps vs Framer Motion core:
 - Interaction props beyond `whileTap`: `whileHover`, `whileFocus`, `whileInView`, `onViewportEnter/Leave`.
 - Gesture system: `drag`/`pan` with constraints, momentum, elasticity.
 - Motion values and transforms: motion value store, derived transforms, `stagger`, `delayChildren`.
+    - Note: A minimal time utility `useTime(id?)` is implemented to provide a shared ticking source similar to Motion’s React `useTime`.
 - `animate` imperative API for non-components, `useAnimation`-like controls, timelines.
 - Layout animations, shared layout transitions. [Layout for single elements: Done]
 - Event callbacks: `onAnimationStart`, `onAnimationComplete`, per-keyframe lifecycle where applicable.

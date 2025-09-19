@@ -149,6 +149,26 @@ Notes:
 - Transform properties like `scale`/`rotate` are composed into a single `transform` style during SSR.
 - When `initial` is empty, the first keyframe from `animate` is used to seed SSR styles.
 
+## Utilities
+
+### useTime(id?)
+
+- Returns a Svelte readable store that updates once per animation frame with elapsed milliseconds since creation.
+- If you pass an `id`, calls with the same id return a shared timeline (kept in sync across components).
+- SSR-safe: Returns a static `0` store when `window` is not available.
+
+```svelte
+<script lang="ts">
+    import { motion, useTime } from '$lib'
+    import { derived } from 'svelte/store'
+
+    const time = useTime('global') // shared
+    const rotate = derived(time, (t) => ((t % 4000) / 4000) * 360)
+</script>
+
+<motion.div style={`rotate: ${$rotate}deg`} />
+```
+
 ## Access the underlying element (bind:ref)
 
 You can bind a ref to access the underlying DOM element rendered by a motion component:

@@ -11,4 +11,5 @@ export const motion: MotionComponents = Object.fromEntries(
 export { animate, hover } from 'motion'
 // Re-export all Motion types so consumers can import types from this package
 export type { MotionAnimate, MotionInitial, MotionTransition, MotionWhileTap } from '$lib/types.js'
+export { useTime } from '$lib/utils/time.js'
 export { MotionConfig }
