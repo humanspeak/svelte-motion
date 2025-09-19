@@ -13,6 +13,7 @@ Reference: Framer Motion for React [`motion` on npm](https://www.npmjs.com/packa
     - `MotionConfig` context component.
     - Types: `MotionInitial`, `MotionAnimate`, `MotionTransition`, `MotionWhileTap`.
 - **Implemented props**: `initial`, `animate`, `transition`, `whileTap`, `whileHover`, `onAnimationStart`, `onAnimationComplete`, `class`, `style`, `layout` (FLIP-based).
+- **Tap callbacks & a11y**: `onTapStart`, `onTap`, `onTapCancel` implemented. Tap is keyboard-accessible: Enter down starts tap, Enter up completes, blur cancels; `tabindex` added when needed for focusability.
     - SSR: Initial styles are reflected in server HTML by merging `style` with `initial` or first `animate` keyframe (no flicker).
 - **Coverage of elements**: Full HTML + SVG coverage generated; void elements documented distinctly. Dashed names exported as PascalCase.
 - **Tests**: Extensive unit tests for utils (animation, hover, interaction, layout, promise, style), SSR component tests for `_MotionContainer`, and E2E for enter animation, HTML content, and keyframes (shape + scale).
@@ -48,6 +49,7 @@ Phase 0 — Foundations (status)
 - Add `whileHover` to interaction set. [Done]
 - Add `whileFocus` to interaction set. [Planned]
 - Introduce `onAnimationStart`/`onAnimationComplete`. [Done]
+- Add tap callbacks + keyboard accessibility for tap. [Done]
 - Expand tests: unit for utils, component tests for container, E2E demos. [Done]
 
 Phase 1 — Variants and Presence
