@@ -56,6 +56,8 @@ lint:
                   - svelte-eslint-parser
                   - '@eslint/js'
                   - eslint-plugin-svelte
+                  - eslint-plugin-import
+                  - eslint-plugin-unused-imports
         - git-diff-check
         - markdownlint@0.45.0
         - osv-scanner@2.2.2

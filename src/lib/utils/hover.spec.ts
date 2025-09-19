@@ -72,6 +72,13 @@ describe('utils/hover', () => {
         expect(transition).toBeUndefined()
     })
 
+    it('splitHoverDefinition: handles undefined input gracefully', () => {
+        // @ts-expect-error testing undefined
+        const { keyframes, transition } = splitHoverDefinition(undefined)
+        expect(keyframes).toMatchObject({})
+        expect(transition).toBeUndefined()
+    })
+
     it('computeHoverBaseline: prefers animate over initial, with defaults', () => {
         const el = document.createElement('div')
         el.style.transform = 'translate(10px, 20px) scale(2)'
@@ -91,6 +98,18 @@ describe('utils/hover', () => {
             whileHover: { c: 3 }
         })
         expect(Object.keys(baseline)).toHaveLength(0)
+    })
+
+    it('computeHoverBaseline: uses computed style fallback when available', () => {
+        const el = document.createElement('div')
+        Object.defineProperty(window, 'getComputedStyle', {
+            value: () => ({ color: 'rgb(0, 0, 0)' }),
+            configurable: true
+        })
+        const baseline = computeHoverBaseline(el, {
+            whileHover: { color: 'red' }
+        })
+        expect(baseline.color).toBe('rgb(0, 0, 0)')
     })
 
     it('attachWhileHover: animates on enter with nested transition, restores on leave', async () => {

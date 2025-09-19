@@ -63,8 +63,10 @@ describe('utils/layout', () => {
         expect(el.style.willChange).toBe('')
     })
 
-    it('observeLayoutChanges: calls callback and cleans up', () => {
+    it('observeLayoutChanges: calls callback and cleans up (with parent branch)', () => {
         const el = document.createElement('div')
+        const parent = document.createElement('div')
+        parent.appendChild(el)
         const cb = vi.fn()
 
         // Minimal shims for ResizeObserver/MutationObserver

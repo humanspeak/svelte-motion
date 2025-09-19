@@ -20,7 +20,7 @@ describe('utils/animation', () => {
         })
     })
 
-    it('animateWithLifecycle: calls onStart and onComplete with payload', async () => {
+    it('animateWithLifecycle: calls onStart and onComplete with payload (finished promise)', async () => {
         const el = document.createElement('div')
         const onStart = vi.fn()
         const onComplete = vi.fn()
@@ -43,5 +43,21 @@ describe('utils/animation', () => {
         expect(onStart).toHaveBeenCalledWith(frames)
         expect(onComplete).toHaveBeenCalledWith(frames)
         expect(animateMock).toHaveBeenCalled()
+    })
+
+    it('animateWithLifecycle: handles thenable control (no finished)', async () => {
+        const el = document.createElement('div')
+        const onComplete = vi.fn()
+        // One call returns a thenable (Promise) to hit the thenable branch
+        animateMock.mockImplementationOnce(() => Promise.resolve())
+        animateWithLifecycle(
+            el,
+            { scale: 1 } as unknown as import('motion').DOMKeyframesDefinition,
+            { duration: 0.05 },
+            undefined,
+            onComplete
+        )
+        await Promise.resolve()
+        expect(onComplete).toHaveBeenCalled()
     })
 })

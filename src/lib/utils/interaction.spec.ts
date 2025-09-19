@@ -56,4 +56,17 @@ describe('utils/interaction', () => {
         expect(animateMock).not.toHaveBeenCalled()
         cleanup()
     })
+
+    it('attachWhileTap: pointercancel path and no baseline available', async () => {
+        const el = document.createElement('div')
+        animateMock.mockClear()
+        const cleanup = attachWhileTap(el, { scale: 0.95 })
+        el.dispatchEvent(new PointerEvent('pointerdown'))
+        await Promise.resolve()
+        expect(animateMock).toHaveBeenCalled()
+        el.dispatchEvent(new PointerEvent('pointercancel'))
+        await Promise.resolve()
+        // No additional animate call because no baseline keys computed
+        cleanup()
+    })
 })
