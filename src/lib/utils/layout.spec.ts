@@ -20,8 +20,11 @@ describe('utils/layout', () => {
         const el = document.createElement('div')
         el.style.transform = 'scale(2)'
         const prev = el.style.transform
+        const setSpy = vi.spyOn(el.style, 'transform', 'set')
         const rect = measureRect(el)
         expect(rect).toBeTruthy()
+        expect(setSpy).toHaveBeenNthCalledWith(1, 'none')
+        expect(setSpy).toHaveBeenNthCalledWith(2, prev)
         expect(el.style.transform).toBe(prev)
     })
 
@@ -35,6 +38,26 @@ describe('utils/layout', () => {
         const posOnly = computeFlipTransforms(prev, next, 'position')
         expect(posOnly.shouldTranslate).toBe(true)
         expect(posOnly.shouldScale).toBe(false)
+    })
+
+    it('computeFlipTransforms: handles zero dimensions safely', () => {
+        const prev = { left: 0, top: 0, width: 100, height: 100 } as unknown as DOMRect
+
+        // Zero width on target
+        const nextZeroWidth = { left: 0, top: 0, width: 0, height: 100 } as unknown as DOMRect
+        const w = computeFlipTransforms(prev, nextZeroWidth, true)
+        expect(w.sx).toBe(1)
+        expect(Number.isFinite(w.sx)).toBe(true)
+        expect(Number.isNaN(w.sx)).toBe(false)
+        expect(w.shouldScale).toBe(false)
+
+        // Zero height on target
+        const nextZeroHeight = { left: 0, top: 0, width: 100, height: 0 } as unknown as DOMRect
+        const h = computeFlipTransforms(prev, nextZeroHeight, true)
+        expect(h.sy).toBe(1)
+        expect(Number.isFinite(h.sy)).toBe(true)
+        expect(Number.isNaN(h.sy)).toBe(false)
+        expect(h.shouldScale).toBe(false)
     })
 
     it('runFlipAnimation: animates only when needed', () => {
