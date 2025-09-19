@@ -53,7 +53,7 @@
             data-testid="rotating-bg-pulse"
             layout
             class="absolute -inset-0.5 rounded-md"
-            style={`background: conic-gradient(#ff4545, #00ff99, #006aff, #ff0095, #ff4545); filter: brightness(0.9) ${$pulsingBg}`}
+            style={`background: conic-gradient(#ff4545, #00ff99, #006aff, #ff0095, #ff4545); filter: brightness(0.3) ${$pulsingBg}`}
         />
     </div>
 </div>
