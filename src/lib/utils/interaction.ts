@@ -1,5 +1,6 @@
-import type { DOMKeyframesDefinition } from 'motion'
+import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
 import { animate } from 'motion'
+import { isHoverCapable, splitHoverDefinition } from './hover.js'
 
 /**
  * Build a reset record for whileTap on pointerup.
@@ -49,7 +50,13 @@ export const attachWhileTap = (
     whileTap: Record<string, unknown> | undefined,
     initial?: Record<string, unknown>,
     animateDef?: Record<string, unknown>,
-    callbacks?: { onTapStart?: () => void; onTap?: () => void; onTapCancel?: () => void }
+    callbacks?: {
+        onTapStart?: () => void
+        onTap?: () => void
+        onTapCancel?: () => void
+        hoverDef?: Record<string, unknown> | undefined
+        hoverFallbackTransition?: AnimationOptions | undefined
+    }
 ): (() => void) => {
     if (!whileTap) return () => {}
 
@@ -59,9 +66,29 @@ export const attachWhileTap = (
         callbacks?.onTapStart?.()
         animate(el, whileTap as unknown as DOMKeyframesDefinition)
     }
+    const reapplyHoverIfActive = () => {
+        if (!callbacks?.hoverDef) return false
+        if (!isHoverCapable()) return false
+        try {
+            if (!el.matches(':hover')) return false
+        } catch {
+            return false
+        }
+        const { keyframes, transition } = splitHoverDefinition(
+            callbacks.hoverDef as Record<string, unknown>
+        )
+        animate(
+            el,
+            keyframes as unknown as DOMKeyframesDefinition,
+            (transition ?? callbacks.hoverFallbackTransition) as AnimationOptions
+        )
+        return true
+    }
+
     const handlePointerUp = () => {
         callbacks?.onTap?.()
         if (!whileTap) return
+        if (reapplyHoverIfActive()) return
         if (initial || animateDef) {
             const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
             if (Object.keys(resetRecord).length > 0) {
@@ -93,6 +120,7 @@ export const attachWhileTap = (
         if (!keyboardActive) return
         keyboardActive = false
         callbacks?.onTap?.()
+        if (reapplyHoverIfActive()) return
         if (initial || animateDef) {
             const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
             if (Object.keys(resetRecord).length > 0) {

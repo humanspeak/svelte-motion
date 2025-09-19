@@ -3,7 +3,7 @@
     import type { MotionProps, MotionTransition } from '$lib/types.js'
     import { isNotEmpty } from '$lib/utils/objects.js'
     import { sleep } from '$lib/utils/testing.js'
-    import { animate } from 'motion'
+    import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
     import { type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants.js'
     import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation.js'
@@ -91,16 +91,10 @@
         const payload = $state.snapshot(animateProp)
         animateWithLifecycle(
             element,
-            payload as unknown as import('motion').DOMKeyframesDefinition,
-            transitionAmimate as unknown as import('motion').AnimationOptions,
-            (def) =>
-                onAnimationStartProp?.(
-                    def as unknown as import('motion').DOMKeyframesDefinition | undefined
-                ),
-            (def) =>
-                onAnimationCompleteProp?.(
-                    def as unknown as import('motion').DOMKeyframesDefinition | undefined
-                )
+            payload as unknown as DOMKeyframesDefinition,
+            transitionAmimate as unknown as AnimationOptions,
+            (def) => onAnimationStartProp?.(def as unknown as DOMKeyframesDefinition | undefined),
+            (def) => onAnimationCompleteProp?.(def as unknown as DOMKeyframesDefinition | undefined)
         )
     }
 
@@ -124,11 +118,7 @@
             }
             const next = measureRect(element!)
             const transforms = computeFlipTransforms(lastRect, next, layoutProp ?? false)
-            runFlipAnimation(
-                element!,
-                transforms,
-                (mergedTransition ?? {}) as import('motion').AnimationOptions
-            )
+            runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
             lastRect = next
         }
 
@@ -162,7 +152,13 @@
             (whileTapProp ?? {}) as Record<string, unknown>,
             (initialProp ?? {}) as Record<string, unknown>,
             (animateProp ?? {}) as Record<string, unknown>,
-            { onTapStart: onTapStartProp, onTap: onTapProp, onTapCancel: onTapCancelProp }
+            {
+                onTapStart: onTapStartProp,
+                onTap: onTapProp,
+                onTapCancel: onTapCancelProp,
+                hoverDef: (whileHoverProp ?? {}) as Record<string, unknown>,
+                hoverFallbackTransition: (mergedTransition ?? {}) as AnimationOptions
+            }
         )
     })
 
@@ -172,7 +168,7 @@
         return attachWhileHover(
             element!,
             (whileHoverProp ?? {}) as Record<string, unknown>,
-            (mergedTransition ?? {}) as import('motion').AnimationOptions,
+            (mergedTransition ?? {}) as AnimationOptions,
             { onStart: onHoverStartProp, onEnd: onHoverEndProp },
             undefined,
             {
