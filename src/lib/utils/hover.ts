@@ -1,5 +1,4 @@
-import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
-import { animate } from 'motion'
+import { type AnimationOptions, type DOMKeyframesDefinition, animate } from 'motion'
 
 /**
  * Determine whether the current environment supports true hover.

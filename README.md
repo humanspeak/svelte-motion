@@ -74,15 +74,16 @@ This package carefully selects its dependencies to provide a robust and maintain
 
 ### Examples
 
-| Motion                                                                                                   | Demo / Route                      | REPL                                                                                           |
-| -------------------------------------------------------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------- |
-| [React - Enter Animation](https://examples.motion.dev/react/enter-animation)                             | `/tests/motion/enter-animation`   | [View Example](https://svelte.dev/playground/7f60c347729f4ea48b1a4590c9dedc02?version=5.38.10) |
-| [HTML Content (0→100 counter)](https://examples.motion.dev/react/html-content)                           | `/tests/motion/html-content`      | [View Example](https://svelte.dev/playground/31cd72df4a3242b4b4589501a25e774f?version=5.38.10) |
-| [Aspect Ratio](https://examples.motion.dev/react/aspect-ratio)                                           | `/tests/motion/aspect-ratio`      | [View Example](https://svelte.dev/playground/1bf60e745fae44f5becb4c830fde9b6e?version=5.38.10) |
-| [Hover + Tap (whileHover + whileTap)](https://motion.dev/docs/react?platform=react#hover-tap-animation)  | `/tests/motion/hover-and-tap`     | [View Example](https://svelte.dev/playground/674c7d58f2c740baa4886b01340a97ea?version=5.38.10) |
-| [Random - Shiny Button](https://www.youtube.com/watch?v=jcpLprT5F0I) by [@verse\_](https://x.com/verse_) | `/tests/random/shiny-button`      | [View Example](https://svelte.dev/playground/96f9e0bf624f4396adaf06c519147450?version=5.38.10) |
-| [Fancy Like Button](https://github.com/DRlFTER/fancyLikeButton)                                          | `/tests/random/fancy-like-button` | [View Example](https://svelte.dev/playground/c34b7e53d41c48b0ab1eaf21ca120c6e?version=5.38.10) |
-| [Keyframes (square → circle → square; scale 1→2→1)](https://motion.dev/docs/react-animation#keyframes)   | `/tests/motion/keyframes`         | [View Example](https://svelte.dev/playground/05595ce0db124c1cbbe4e74fda68d717?version=5.38.10) |
+| Motion                                                                                                   | Demo / Route                             | REPL                                                                                           |
+| -------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| [React - Enter Animation](https://examples.motion.dev/react/enter-animation)                             | `/tests/motion/enter-animation`          | [View Example](https://svelte.dev/playground/7f60c347729f4ea48b1a4590c9dedc02?version=5.38.10) |
+| [HTML Content (0→100 counter)](https://examples.motion.dev/react/html-content)                           | `/tests/motion/html-content`             | [View Example](https://svelte.dev/playground/31cd72df4a3242b4b4589501a25e774f?version=5.38.10) |
+| [Aspect Ratio](https://examples.motion.dev/react/aspect-ratio)                                           | `/tests/motion/aspect-ratio`             | [View Example](https://svelte.dev/playground/1bf60e745fae44f5becb4c830fde9b6e?version=5.38.10) |
+| [Hover + Tap (whileHover + whileTap)](https://motion.dev/docs/react?platform=react#hover-tap-animation)  | `/tests/motion/hover-and-tap`            | [View Example](https://svelte.dev/playground/674c7d58f2c740baa4886b01340a97ea?version=5.38.10) |
+| [Random - Shiny Button](https://www.youtube.com/watch?v=jcpLprT5F0I) by [@verse\_](https://x.com/verse_) | `/tests/random/shiny-button`             | [View Example](https://svelte.dev/playground/96f9e0bf624f4396adaf06c519147450?version=5.38.10) |
+| [Fancy Like Button](https://github.com/DRlFTER/fancyLikeButton)                                          | `/tests/random/fancy-like-button`        | [View Example](https://svelte.dev/playground/c34b7e53d41c48b0ab1eaf21ca120c6e?version=5.38.10) |
+| [Keyframes (square → circle → square; scale 1→2→1)](https://motion.dev/docs/react-animation#keyframes)   | `/tests/motion/keyframes`                | [View Example](https://svelte.dev/playground/05595ce0db124c1cbbe4e74fda68d717?version=5.38.10) |
+| [Animated Border Gradient (conic-gradient rotate)](https://www.youtube.com/watch?v=OgQI1-9T6ZA)          | `/tests/random/animated-border-gradient` | [View Example](https://svelte.dev/playground/6983a61b4c35441b8aa72a971de01a23?version=5.38.10) |
 
 ## Interactions
 
@@ -148,6 +149,91 @@ Notes:
 
 - Transform properties like `scale`/`rotate` are composed into a single `transform` style during SSR.
 - When `initial` is empty, the first keyframe from `animate` is used to seed SSR styles.
+
+## Utilities
+
+### useTime(id?)
+
+- Returns a Svelte readable store that updates once per animation frame with elapsed milliseconds since creation.
+- If you pass an `id`, calls with the same id return a shared timeline (kept in sync across components).
+- SSR-safe: Returns a static `0` store when `window` is not available.
+
+```svelte
+<script lang="ts">
+    import { motion, useTime } from '$lib'
+    import { derived } from 'svelte/store'
+
+    const time = useTime('global') // shared
+    const rotate = derived(time, (t) => ((t % 4000) / 4000) * 360)
+</script>
+
+<motion.div style={`rotate: ${$rotate}deg`} />
+```
+
+### useSpring
+
+`useSpring` creates a readable store that animates to its latest target with a spring. You can either control it directly with `set`/`jump`, or have it follow another readable (like a time-derived value).
+
+```svelte
+<script lang="ts">
+    import { useTime, useTransform, useSpring } from '$lib'
+
+    // Track another readable
+    const time = useTime()
+    const blurTarget = useTransform(() => {
+        const phase = ($time % 2000) / 2000
+        return 4 * (0.5 + 0.5 * Math.sin(phase * Math.PI * 2)) // 0..4
+    }, [time])
+    const blur = useSpring(blurTarget, { stiffness: 300 })
+
+    // Or direct control
+    const x = useSpring(0, { stiffness: 300 })
+    // x.set(100) // animates to 100
+    // x.jump(0)  // jumps without animation
+</script>
+
+<div style={`filter: blur(${$blur}px)`} />
+```
+
+- Accepts number or unit string (e.g., `"100vh"`) or a readable source.
+- Returns a readable with `{ set, jump }` methods when used in the browser; SSR-safe on the server.
+- Reference: Motion useSpring docs [motion.dev](https://motion.dev/docs/react-use-spring?platform=react).
+
+### useTransform
+
+`useTransform` creates a derived readable. It supports:
+
+- Range mapping: map a numeric source across input/output ranges with optional `{ clamp, ease, mixer }`.
+- Function form: compute from one or more dependencies.
+
+Range mapping example:
+
+```svelte
+<script lang="ts">
+    import { useTime, useTransform } from '$lib'
+    const time = useTime()
+    // Map 0..4000ms to 0..360deg, unclamped to allow wrap-around
+    const rotate = useTransform(time, [0, 4000], [0, 360], { clamp: false })
+</script>
+
+<div style={`rotate: ${$rotate}deg`} />
+```
+
+Function form example:
+
+```svelte
+<script lang="ts">
+    import { useTransform } from '$lib'
+    // Given stores a and b, compute their sum
+    const add = (a: number, b: number) => a + b
+    // deps are stores; body can access them via $ syntax
+    const total = useTransform(() => add($a, $b), [a, b])
+</script>
+
+<span>{$total}</span>
+```
+
+- Reference: Motion useTransform docs [motion.dev](https://motion.dev/docs/react-use-transform?platform=react).
 
 ## Access the underlying element (bind:ref)
 
