@@ -33,12 +33,10 @@ describe('utils/time - useTime', () => {
     })
 
     it('is SSR-safe (no window)', () => {
-        const original = globalThis.window
-        ;(globalThis as unknown as { window?: undefined }).window = undefined
+        vi.stubGlobal('window', undefined)
         const time = useTime()
         expect(get(time)).toBe(0)
-        // restore
-        globalThis.window = original
+        vi.unstubAllGlobals()
     })
 
     it('returns the same store for the same id (shared timeline)', () => {
@@ -98,11 +96,9 @@ describe('utils/time - useTime', () => {
     })
 
     it('is SSR-safe for shared id (no window)', () => {
-        const originalWin = globalThis.window
-        ;(globalThis as unknown as { window?: undefined }).window = undefined
+        vi.stubGlobal('window', undefined)
         const t = useTime('any')
         expect(get(t)).toBe(0)
-        // restore
-        globalThis.window = originalWin
+        vi.unstubAllGlobals()
     })
 })

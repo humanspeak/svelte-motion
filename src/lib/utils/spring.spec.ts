@@ -13,7 +13,7 @@ describe('utils/spring - useSpring', () => {
             return 1 as unknown as number
         })
         // @ts-expect-error simulate SSR
-        cafSpy = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => {})
+        cafSpy = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => undefined)
     })
 
     afterEach(() => {
@@ -28,9 +28,16 @@ describe('utils/spring - useSpring', () => {
         // Advance some frames
         rafCb?.(16)
         const a = get(s)
-        expect(typeof a === 'number' && a > 0).toBe(true)
+        expect(typeof a).toBe('number')
+        expect(Number.isNaN(a as number)).toBe(false)
+        expect(a as number).toBeGreaterThan(0)
+        expect(a as number).toBeLessThanOrEqual(100)
         rafCb?.(32)
-        expect(get(s) as number).toBeGreaterThan(a as number)
+        const next = get(s) as number
+        expect(typeof next).toBe('number')
+        expect(Number.isNaN(next)).toBe(false)
+        expect(next).toBeGreaterThan(a as number)
+        expect(next).toBeLessThanOrEqual(100)
     })
 
     it('jump sets immediately without animation', () => {
@@ -44,7 +51,12 @@ describe('utils/spring - useSpring', () => {
         s.set('100px')
         rafCb?.(16)
         const v = get(s)
-        expect(typeof v === 'string' && v.endsWith('px')).toBe(true)
+        expect(typeof v).toBe('string')
+        expect(v as string).toMatch(/^\d+(?:\.\d+)?px$/)
+        const n = Number.parseFloat(v as string)
+        expect(Number.isNaN(n)).toBe(false)
+        expect(n).toBeGreaterThan(0)
+        expect(n).toBeLessThanOrEqual(100)
     })
 
     it('tracks another readable source', () => {
@@ -69,13 +81,10 @@ describe('utils/spring - useSpring', () => {
     })
 
     it('SSR-safe returns static store (no-op setters)', () => {
-        const original = globalThis.window
-        ;(globalThis as unknown as { window?: undefined }).window = undefined
+        vi.stubGlobal('window', undefined)
         const s = useSpring(0)
         expect(get(s)).toBe(0)
         s.set(100)
         expect(get(s)).toBe(0)
-        // restore
-        globalThis.window = original
     })
 })
