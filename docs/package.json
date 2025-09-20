@@ -19,7 +19,8 @@
     },
     "dependencies": {
         "@humanspeak/svelte-motion": "workspace:*",
-        "@inlang/paraglide-js": "^2.3.2"
+        "@inlang/paraglide-js": "^2.3.2",
+        "@sentry/sveltekit": "^10.12.0"
     },
     "devDependencies": {
         "@eslint/compat": "^1.3.2",
@@ -41,7 +42,7 @@
         "prettier-plugin-sort-json": "^4.1.1",
         "prettier-plugin-svelte": "^3.4.0",
         "prettier-plugin-tailwindcss": "^0.6.14",
-        "svelte": "^5.39.2",
+        "svelte": "^5.39.3",
         "svelte-check": "^4.3.1",
         "tailwindcss": "^4.1.13",
         "typescript": "^5.9.2",
