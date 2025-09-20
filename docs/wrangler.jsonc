@@ -10,6 +10,9 @@
     "pages_build_output_dir": ".svelte-kit/cloudflare",
     "observability": {
         "enabled": true
+    },
+    "version_metadata": {
+        "binding": "CF_VERSION_METADATA"
     }
     /**
      * Smart Placement
