@@ -260,8 +260,8 @@
 .orb-a-bg {
     background: radial-gradient(
         circle at 30% 30%,
-        color-mix(in oklab, var(--color-brand-500) 40%, transparent),
-        color-mix(in oklab, var(--color-brand-500) 10%, transparent)
+        color-mix(in oklab, var(--color-brand-100) 40%, transparent),
+        color-mix(in oklab, var(--color-brand-100) 10%, transparent)
     );
 }
 

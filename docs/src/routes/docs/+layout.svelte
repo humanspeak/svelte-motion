@@ -52,7 +52,7 @@
     <div class="flex flex-1">
         <!-- Left sidebar - Navigation -->
         <aside
-            class="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar-background lg:sticky lg:top-0 lg:block lg:h-screen lg:overflow-y-auto"
+            class="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar-background/95 shadow-sm lg:sticky lg:top-0 lg:block lg:h-screen lg:overflow-y-auto"
         >
             <Sidebar currentPath={page.url.pathname} />
         </aside>
@@ -69,7 +69,7 @@
 
                 <!-- Right sidebar - Table of Contents -->
                 <aside
-                    class="hidden w-56 shrink-0 xl:sticky xl:top-0 xl:block xl:h-screen xl:overflow-y-auto"
+                    class="hidden w-56 shrink-0 border-l border-sidebar-border bg-sidebar-background/95 shadow-sm xl:sticky xl:top-0 xl:block xl:h-screen xl:overflow-y-auto"
                 >
                     <TableOfContents {headings} />
                 </aside>

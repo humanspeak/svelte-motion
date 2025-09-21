@@ -10,6 +10,24 @@
         {
             title: 'Get started',
             items: [{ title: 'Get started', href: '/docs', icon: 'fa-solid fa-play' }]
+        },
+        {
+            title: 'Love and Respect',
+            items: [
+                { title: 'Beye.ai', href: 'https://beye.ai', icon: 'fa-solid fa-heart' },
+                { title: 'ShadCN', href: 'https://shadcn-svelte.com', icon: 'fa-solid fa-heart' }
+            ]
+        },
+        {
+            title: 'Other Projects',
+            items: [
+                {
+                    title: 'Markdown',
+                    href: 'https://markdown.svelte.page',
+                    icon: 'fa-solid fa-heart'
+                },
+                { title: 'Table', href: 'https://table.svelte.page', icon: 'fa-solid fa-heart' }
+            ]
         }
         // {
         //     title: 'Get started',
