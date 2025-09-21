@@ -1,37 +1,270 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 
-@theme {
-    /* Brand color (Svelte orange) generates bg-brand-500, text-brand-500, etc. */
-    --color-brand-100: #ffe6d9;
-    --color-brand-200: #ffccb3;
-    --color-brand-300: #ffb38c;
-    --color-brand-400: #ff995f;
+:root {
+    /* Brand colors - Svelte orange */
+    --color-brand-50: #fff7ed;
+    --color-brand-100: #ffedd5;
+    --color-brand-200: #fed7aa;
+    --color-brand-300: #fdba74;
+    --color-brand-400: #fb923c;
     --color-brand-500: #ff3e00;
-    --color-brand-600: #e63a00;
-    --color-brand-700: #cc3400;
-    --color-brand-800: #b22d00;
-    --color-brand-900: #8f2400;
-    --color-foreground: @apply text-white/80;
-    /* Default border color tokens */
-    --color-border-weak: #ffffff1a; /* ~10% white */
-    --color-border-mid: #ffffff26; /* ~15% white */
+    --color-brand-600: #ea580c;
+    --color-brand-700: #c2410c;
+    --color-brand-800: #9a3412;
+    --color-brand-900: #7c2d12;
+
+    /* Light mode colors */
+    --color-background: #ffffff;
+    --color-foreground: #0f172a;
+    --color-muted: #f8fafc;
+    --color-muted-foreground: #64748b;
+
+    /* Card colors */
+    --color-card: #ffffff;
+    --color-card-foreground: #0f172a;
+
+    /* Border colors */
+    --color-border: #e2e8f0;
+    --color-border-muted: #f1f5f9;
+    --color-border-mid: #e2e8f0;
+
+    /* Primary colors (using brand) */
+    --color-primary: var(--color-brand-500);
+    --color-primary-foreground: #ffffff;
+
+    /* Secondary colors */
+    --color-secondary: #f1f5f9;
+    --color-secondary-foreground: #0f172a;
+
+    /* Accent colors (blue for links/active states) */
+    --color-accent: #3b82f6;
+    --color-accent-foreground: #ffffff;
+    --color-accent-muted: #dbeafe;
+
+    /* Text colors for different states */
+    --color-text-primary: #0f172a;
+    --color-text-secondary: #475569;
+    --color-text-muted: #64748b;
+    --color-text-inverse: #ffffff;
+
+    /* Sidebar specific colors */
+    --color-sidebar-background: #ffffff;
+    --color-sidebar-foreground: #0f172a;
+    --color-sidebar-border: #e2e8f0;
+    --color-sidebar-active: #dbeafe;
+    --color-sidebar-active-foreground: #1d4ed8;
+
+    /* Code block colors */
+    --color-code-background: #f1f5f9;
+    --color-code-foreground: #1e293b;
+    --color-code-block-background: #0f172a;
+    --color-code-block-foreground: #f1f5f9;
 }
 
-/* Global site styles */
-html,
-body {
-    @apply bg-[#0b1011] text-white;
+.dark {
+    /* Dark mode colors */
+    --color-background: #0b1011;
+    --color-foreground: #f8fafc;
+    --color-muted: #1e293b;
+    --color-muted-foreground: #a3b2c4; /* slightly brighter for contrast */
+
+    /* Card colors */
+    --color-card: #1e293b;
+    --color-card-foreground: #f8fafc;
+
+    /* Border colors */
+    --color-border: #334155;
+    --color-border-muted: rgba(255, 255, 255, 0.1);
+    --color-border-mid: rgba(255, 255, 255, 0.15);
+
+    /* Primary colors (using brand) */
+    --color-primary: var(--color-brand-500);
+    --color-primary-foreground: #ffffff;
+
+    /* Secondary colors */
+    --color-secondary: #1e293b;
+    --color-secondary-foreground: #f8fafc;
+
+    /* Accent colors */
+    --color-accent: #3b82f6;
+    --color-accent-foreground: #ffffff;
+    --color-accent-muted: #1e3a8a;
+
+    /* Text colors for different states */
+    --color-text-primary: #f8fafc;
+    --color-text-secondary: #e2e8f0; /* brighter secondary for readability */
+    --color-text-muted: #cbd5e1; /* raise contrast of muted */
+    --color-text-inverse: #0f172a;
+
+    /* Sidebar specific colors */
+    --color-sidebar-background: #0b1011;
+    --color-sidebar-foreground: #f8fafc;
+    --color-sidebar-border: #334155;
+    --color-sidebar-active: rgba(59, 130, 246, 0.1);
+    --color-sidebar-active-foreground: #60a5fa;
+
+    /* Code block colors */
+    --color-code-background: #1e293b;
+    --color-code-foreground: #f8fafc;
+    --color-code-block-background: #0f172a;
+    --color-code-block-foreground: #f1f5f9;
+}
+
+@theme {
+    /* Map CSS variables to Tailwind colors */
+    --color-background: var(--color-background);
+    --color-foreground: var(--color-foreground);
+    --color-muted: var(--color-muted);
+    --color-muted-foreground: var(--color-muted-foreground);
+
+    --color-card: var(--color-card);
+    --color-card-foreground: var(--color-card-foreground);
+
+    --color-border: var(--color-border);
+    --color-border-muted: var(--color-border-muted);
+    --color-border-mid: var(--color-border-mid);
+
+    --color-primary: var(--color-primary);
+    --color-primary-foreground: var(--color-primary-foreground);
+
+    --color-secondary: var(--color-secondary);
+    --color-secondary-foreground: var(--color-secondary-foreground);
+
+    --color-accent: var(--color-accent);
+    --color-accent-foreground: var(--color-accent-foreground);
+    --color-accent-muted: var(--color-accent-muted);
+
+    /* Text colors */
+    --color-text-primary: var(--color-text-primary);
+    --color-text-secondary: var(--color-text-secondary);
+    --color-text-muted: var(--color-text-muted);
+    --color-text-inverse: var(--color-text-inverse);
+
+    /* Sidebar colors */
+    --color-sidebar-background: var(--color-sidebar-background);
+    --color-sidebar-foreground: var(--color-sidebar-foreground);
+    --color-sidebar-border: var(--color-sidebar-border);
+    --color-sidebar-active: var(--color-sidebar-active);
+    --color-sidebar-active-foreground: var(--color-sidebar-active-foreground);
+
+    /* Code colors */
+    --color-code-background: var(--color-code-background);
+    --color-code-foreground: var(--color-code-foreground);
+    --color-code-block-background: var(--color-code-block-background);
+    --color-code-block-foreground: var(--color-code-block-foreground);
+
+    /* Brand colors */
+    --color-brand-50: var(--color-brand-50);
+    --color-brand-100: var(--color-brand-100);
+    --color-brand-200: var(--color-brand-200);
+    --color-brand-300: var(--color-brand-300);
+    --color-brand-400: var(--color-brand-400);
+    --color-brand-500: var(--color-brand-500);
+    --color-brand-600: var(--color-brand-600);
+    --color-brand-700: var(--color-brand-700);
+    --color-brand-800: var(--color-brand-800);
+    --color-brand-900: var(--color-brand-900);
+}
+
+/* Global base styles */
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    html {
+        @apply scroll-smooth;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+        font-feature-settings:
+            'rlig' 1,
+            'calt' 1;
+    }
+
+    /* Prose styles for markdown content */
+    .prose {
+        @apply text-text-primary;
+    }
+
+    .prose h1,
+    .prose h2,
+    .prose h3,
+    .prose h4,
+    .prose h5,
+    .prose h6 {
+        @apply font-semibold text-text-primary;
+    }
+
+    /* Ensure heading links inherit heading color/contrast */
+    .prose h1 a,
+    .prose h2 a,
+    .prose h3 a,
+    .prose h4 a,
+    .prose h5 a,
+    .prose h6 a {
+        @apply text-text-primary no-underline hover:text-text-primary;
+    }
+
+    .prose p {
+        @apply text-text-secondary;
+    }
+
+    /* Strong emphasis readability in dark mode */
+    .prose strong,
+    .prose b {
+        @apply font-semibold text-text-primary;
+    }
+
+    /* ensure link color inside paragraphs and lists has adequate contrast */
+    .prose p a,
+    .prose li a {
+        @apply text-accent underline-offset-2 hover:text-accent/80;
+    }
+
+    .prose code {
+        @apply rounded bg-code-background px-1.5 py-0.5 font-mono text-sm text-code-foreground;
+    }
+
+    .prose pre {
+        @apply rounded-lg bg-code-block-background text-code-block-foreground;
+    }
+
+    .prose pre code {
+        @apply bg-transparent p-0 text-code-block-foreground;
+    }
+
+    .prose a {
+        @apply text-accent no-underline hover:text-accent/80;
+    }
+
+    .prose blockquote {
+        @apply border-l-4 border-border pl-4 text-text-muted italic;
+    }
+
+    /* Improve list readability and marker contrast (light/dark) */
+    .prose ul,
+    .prose ol {
+        @apply text-text-secondary;
+    }
+
+    .prose ul > li::marker,
+    .prose ol > li::marker {
+        color: var(--color-accent);
+    }
 }
 
 /* Orb backgrounds using the brand color */
 .orb-a-bg {
     background: radial-gradient(
         circle at 30% 30%,
-        color-mix(in oklab, var(--color-brand-500) 40%, transparent),
-        color-mix(in oklab, var(--color-brand-500) 10%, transparent)
+        color-mix(in oklab, var(--color-brand-100) 40%, transparent),
+        color-mix(in oklab, var(--color-brand-100) 10%, transparent)
     );
 }
+
 .orb-b-bg {
     background: radial-gradient(
         circle at 70% 50%,

@@ -33,3 +33,7 @@ vite.config.ts.timestamp-*
 # Testing
 junit-vitest.xml
 junit-playwright.xml
+
+# Custom
+.notes
+docs/src/lib/sitemap-manifest.json

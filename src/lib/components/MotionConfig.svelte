@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { Snippet } from 'svelte'
-    import type { MotionConfigProps } from '$lib/types.js'
-    import { createMotionConfig } from './motionConfig.context.js'
+    import type { MotionConfigProps } from '$lib/types'
+    import { createMotionConfig } from '$lib/components/motionConfig.context'
 
     let { transition, children }: MotionConfigProps & { children?: Snippet } = $props()
 

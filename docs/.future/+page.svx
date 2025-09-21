@@ -1,0 +1,190 @@
+---
+title: "Get started with Svelte Motion"
+description: "Svelte Motion is a Svelte animation library for building smooth, production-grade UI animations."
+---
+
+<script>
+  import { motion } from '@humanspeak/svelte-motion';
+</script>
+
+# Get started with Svelte Motion
+
+**Svelte Motion** is a Svelte animation library for building smooth, production-grade UI animations. You can start with simple prop-based animations before growing to layout, gesture and scroll animations.
+
+Svelte Motion's unique **hybrid engine** combines the performance of native browser animations with the flexibility of JavaScript. It's designed to feel like a natural extension of Svelte's reactive philosophy.
+
+In this guide, we'll learn **why** and **when** you should use Svelte Motion, how to **install** it, and then take a whirlwind tour of its main features.
+
+## Why Svelte Motion?
+
+Svelte gives you the power to build dynamic user interfaces with excellent performance out of the box. Svelte Motion extends this power to animations, making it simple to create everything from beautiful micro-interactions to complex, gesture-driven animations.
+
+```svelte
+<script>
+  import { motion } from '@humanspeak/svelte-motion';
+</script>
+
+<motion.button animate={{ opacity: 1 }}>
+  Animated Button
+</motion.button>
+```
+
+### Key advantages
+
+Here's when it's the right choice for your project.
+
+- **Built for Svelte.** While other animation libraries can feel foreign, Svelte Motion's API feels like a natural extension of Svelte. Animations can be linked directly to reactive state and props.
+- **Hardware-acceleration.** Svelte Motion leverages the same high-performance browser animations as pure CSS, ensuring your UIs stay smooth and snappy. You get the power of 120fps animations with a much simpler and more expressive API.
+- **Animate anything.** CSS has hard limits. There are values you can't animate, keyframes you can't interrupt, staggers that must be hardcoded. Svelte Motion provides a single, consistent API that handles everything from simple transitions to advanced scroll, layout, and gesture-driven effects.
+- **App-like gestures.** Standard CSS `:hover` events are unreliable on touch devices. Svelte Motion provides robust, cross-device gesture recognizers for tap, drag, and hover, making it easy to build interactions that feel native and intuitive on any device.
+
+### When is CSS a better choice?
+
+For simple, self-contained effects (like a color change on hover) a standard CSS transition is a lightweight solution. The strength of Svelte Motion is that it can do these simple kinds of animations but also scale to anything you can imagine. All with the same easy to write and maintain API.
+
+## Install
+
+Svelte Motion is available via npm:
+
+```bash
+npm install @humanspeak/svelte-motion
+```
+
+Features can now be imported:
+
+```javascript
+import { motion } from '@humanspeak/svelte-motion'
+```
+
+## Your first animation
+
+The `<motion>` component is the core API in Svelte Motion. It's a DOM element, supercharged with animation capabilities.
+
+```svelte
+<script>
+  import { motion } from '@humanspeak/svelte-motion';
+</script>
+
+<motion.ul animate={{ rotate: 360 }}>
+  <li>Item 1</li>
+  <li>Item 2</li>
+  <li>Item 3</li>
+</motion.ul>
+```
+
+When values in `animate` change, the component will animate. Svelte Motion has intuitive defaults, but animations can of course be configured via the `transition` prop.
+
+```svelte
+<motion.div
+  animate={{
+    scale: 2,
+    transition: { duration: 2 }
+  }}
+>
+  Scaling div
+</motion.div>
+```
+
+## Enter animation
+
+When a component enters the page, it will automatically animate to the values defined in the `animate` prop.
+
+You can provide values to animate from via the `initial` prop (otherwise these will be read from the DOM).
+
+```svelte
+<motion.button initial={{ scale: 0 }} animate={{ scale: 1 }}>
+  Scaling button
+</motion.button>
+```
+
+Or disable this initial animation entirely by setting `initial` to `false`.
+
+```svelte
+<motion.button initial={false} animate={{ scale: 1 }}>
+  No initial animation
+</motion.button>
+```
+
+## Hover & tap animation
+
+`<motion>` extends Svelte's event system with powerful gesture animations. It currently supports hover, tap, focus, and drag.
+
+```svelte
+<motion.button
+  whileHover={{ scale: 1.1 }}
+  whileTap={{ scale: 0.95 }}
+  onHoverStart={() => console.log('hover started!')}
+>
+  Interactive button
+</motion.button>
+```
+
+Svelte Motion's gestures are designed to feel better than using CSS or JavaScript events alone.
+
+## Scroll animation
+
+Svelte Motion supports both types of scroll animations: **Scroll-triggered** and **scroll-linked**.
+
+To trigger an animation on scroll, the `whileInView` prop defines a state to animate to/from when an element enters/leaves the viewport:
+
+```svelte
+<motion.div
+  initial={{ backgroundColor: "rgb(0, 255, 0)", opacity: 0 }}
+  whileInView={{ backgroundColor: "rgb(255, 0, 0)", opacity: 1 }}
+>
+  Scroll-triggered animation
+</motion.div>
+```
+
+## Layout animation
+
+Svelte Motion has an industry-leading layout animation engine that supports animating between changes in layout using transforms.
+
+It's as easy as applying the `layout` prop.
+
+```svelte
+<motion.div layout>
+  This div will animate layout changes
+</motion.div>
+```
+
+Or to animate between completely different elements, a `layoutId`:
+
+```svelte
+<motion.div layoutId="underline">
+  Shared layout animation
+</motion.div>
+```
+
+## Exit animations
+
+By wrapping `motion` components with `<AnimatePresence>` we gain access to exit animations. This allows us to animate elements as they're removed from the DOM.
+
+```svelte
+<script>
+  import { motion, AnimatePresence } from '@humanspeak/svelte-motion';
+
+  let show = true;
+</script>
+
+<AnimatePresence>
+  {#if show}
+    <motion.div key="box" exit={{ opacity: 0 }}>
+      This will animate out when removed
+    </motion.div>
+  {/if}
+</AnimatePresence>
+```
+
+## Learn next
+
+That's a very quick overview of Svelte Motion's basic features. But there's a lot more to learn!
+
+Next, we recommend exploring the different types of animations you can build with Svelte Motion through our examples and guides.
+
+## Related topics
+
+- **Animation** - Create smooth animations with motion components. Learn variants, gestures, and keyframes.
+- **Scroll animation** - Create scroll-triggered and scroll-linked effects — parallax, progress and more.
+- **Layout animation** - Smoothly animate layout changes and create shared element animations.
+
