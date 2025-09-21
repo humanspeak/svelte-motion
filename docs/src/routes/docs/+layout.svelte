@@ -52,7 +52,7 @@
     <div class="flex flex-1">
         <!-- Left sidebar - Navigation -->
         <aside
-            class="hidden w-64 shrink-0 overflow-y-auto border-r border-sidebar-border bg-sidebar-background lg:block"
+            class="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar-background lg:sticky lg:top-0 lg:block lg:h-screen lg:overflow-y-auto"
         >
             <Sidebar currentPath={page.url.pathname} />
         </aside>
@@ -62,13 +62,15 @@
             <div class="flex">
                 <!-- Content -->
                 <article bind:this={contentElement} class="flex-1 px-4 py-8 sm:px-6 lg:px-8">
-                    <div class="prose max-w-none prose-headings:scroll-mt-20">
+                    <div class="prose max-w-none dark:prose-invert prose-headings:scroll-mt-20">
                         {@render children()}
                     </div>
                 </article>
 
                 <!-- Right sidebar - Table of Contents -->
-                <aside class="hidden w-56 shrink-0 xl:block">
+                <aside
+                    class="hidden w-56 shrink-0 xl:sticky xl:top-0 xl:block xl:h-screen xl:overflow-y-auto"
+                >
                     <TableOfContents {headings} />
                 </aside>
             </div>

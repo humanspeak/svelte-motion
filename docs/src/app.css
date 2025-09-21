@@ -67,7 +67,7 @@
     --color-background: #0b1011;
     --color-foreground: #f8fafc;
     --color-muted: #1e293b;
-    --color-muted-foreground: #94a3b8;
+    --color-muted-foreground: #a3b2c4; /* slightly brighter for contrast */
 
     /* Card colors */
     --color-card: #1e293b;
@@ -93,8 +93,8 @@
 
     /* Text colors for different states */
     --color-text-primary: #f8fafc;
-    --color-text-secondary: #cbd5e1;
-    --color-text-muted: #94a3b8;
+    --color-text-secondary: #e2e8f0; /* brighter secondary for readability */
+    --color-text-muted: #cbd5e1; /* raise contrast of muted */
     --color-text-inverse: #0f172a;
 
     /* Sidebar specific colors */
@@ -195,11 +195,33 @@
     .prose h4,
     .prose h5,
     .prose h6 {
-        @apply text-text-primary;
+        @apply font-semibold text-text-primary;
+    }
+
+    /* Ensure heading links inherit heading color/contrast */
+    .prose h1 a,
+    .prose h2 a,
+    .prose h3 a,
+    .prose h4 a,
+    .prose h5 a,
+    .prose h6 a {
+        @apply text-text-primary no-underline hover:text-text-primary;
     }
 
     .prose p {
         @apply text-text-secondary;
+    }
+
+    /* Strong emphasis readability in dark mode */
+    .prose strong,
+    .prose b {
+        @apply font-semibold text-text-primary;
+    }
+
+    /* ensure link color inside paragraphs and lists has adequate contrast */
+    .prose p a,
+    .prose li a {
+        @apply text-accent underline-offset-2 hover:text-accent/80;
     }
 
     .prose code {
@@ -220,6 +242,17 @@
 
     .prose blockquote {
         @apply border-l-4 border-border pl-4 text-text-muted italic;
+    }
+
+    /* Improve list readability and marker contrast (light/dark) */
+    .prose ul,
+    .prose ol {
+        @apply text-text-secondary;
+    }
+
+    .prose ul > li::marker,
+    .prose ol > li::marker {
+        color: var(--color-accent);
     }
 }
 
