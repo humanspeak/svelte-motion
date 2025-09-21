@@ -1,6 +1,6 @@
 <script lang="ts">
     import { getMotionConfig } from '$lib/components/motionConfig.context.js'
-    import type { MotionProps, MotionTransition } from '$lib/types.js'
+    import type { MotionProps, MotionTransition } from '$lib/types'
     import { isNotEmpty } from '$lib/utils/objects.js'
     import { sleep } from '$lib/utils/testing.js'
     import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
@@ -49,7 +49,7 @@
     }: Props = $props()
     let isLoaded = $state<'mounting' | 'initial' | 'ready' | 'animated'>('mounting')
     let dataPath = $state<number>(-1)
-    const motionConfig = getMotionConfig()
+    const motionConfig = $derived(getMotionConfig())
     const isPlaywright =
         typeof window !== 'undefined' &&
         window.location.search.includes('@humanspeak-svelte-motion-isPlaywright=true')

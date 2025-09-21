@@ -1,7 +1,7 @@
 import type { MotionConfigProps } from '$lib/types.js'
 import { getContext, setContext } from 'svelte'
 
-const key = 'motionConfig'
+const key = Symbol('motionConfig')
 
 export const getMotionConfig = (): MotionConfigProps | undefined => {
     return getContext<MotionConfigProps | undefined>(key)

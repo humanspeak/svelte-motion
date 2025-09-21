@@ -5,10 +5,22 @@
         type MotionAnimate,
         type MotionTransition
     } from '@humanspeak/svelte-motion'
+    import Header from '$lib/components/general/Header.svelte'
+    import Footer from '$lib/components/general/Footer.svelte'
+    import * as m from '$msgs'
+    import { type BreadcrumbContext } from '$lib/components/contexts/Breadcrumb/type'
+    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
+    import { goto } from '$app/navigation'
 
-    import * as m from '$lib/paraglide/messages/_index.js'
     // mounted no longer needed for CSS enter
     let headingContainer: HTMLDivElement | null = $state(null)
+    const breadcrumbContext = $state<BreadcrumbContext | undefined>(getBreadcrumbContext())
+
+    $effect(() => {
+        if (breadcrumbContext) {
+            breadcrumbContext.breadcrumbs = []
+        }
+    })
 
     function splitHeadingWords(root: HTMLElement) {
         const lines = root.querySelectorAll('h1 span')
@@ -62,67 +74,87 @@
     })
 </script>
 
-<section class="relative flex flex-1 overflow-hidden">
-    <!-- Layer: subtle grid -->
-    <div class="bg-grid pointer-events-none absolute inset-0 -z-20"></div>
-    <!-- Layer: soft radial glow -->
-    <div class="bg-glow pointer-events-none absolute inset-0 -z-10"></div>
-    <!-- Layer: animated orbs via motion -->
-    <motion.div
-        class="orb-a-bg absolute bottom-[-80px] left-[-80px] h-[320px] w-[320px] rounded-full opacity-50 blur-[30px]"
-        style="will-change: transform;"
-        animate={{
-            x: ['0vw', '8vw', '-4vw', '2vw', '0vw'],
-            y: ['0vh', '-10vh', '6vh', '-4vh', '0vh']
-        }}
-        transition={{ duration: 28, repeat: Infinity, ease: 'easeInOut' }}
-    />
-    <motion.div
-        class="orb-b-bg absolute top-[20%] right-[-60px] h-[260px] w-[260px] rounded-full opacity-50 blur-[30px]"
-        style="will-change: transform;"
-        animate={{
-            x: ['0vw', '-6vw', '3vw', '-2vw', '0vw'],
-            y: ['0vh', '-8vh', '4vh', '-6vh', '0vh']
-        }}
-        transition={{ duration: 24, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
-    />
+<div class="flex min-h-svh flex-col">
+    <!-- Header with links -->
+    <Header />
+    <div class="flex flex-1 flex-col">
+        <section class="relative flex flex-1 overflow-hidden">
+            <!-- Layer: subtle grid -->
+            <div class="bg-grid pointer-events-none absolute inset-0 -z-20"></div>
+            <!-- Layer: soft radial glow -->
+            <div class="bg-glow pointer-events-none absolute inset-0 -z-10"></div>
+            <!-- Layer: animated orbs via motion -->
+            <motion.div
+                class="orb-a-bg absolute bottom-[-80px] left-[-80px] h-[320px] w-[320px] rounded-full opacity-50 blur-[30px]"
+                style="will-change: transform;"
+                animate={{
+                    x: ['0vw', '8vw', '-4vw', '2vw', '0vw'],
+                    y: ['0vh', '-10vh', '6vh', '-4vh', '0vh']
+                }}
+                transition={{ duration: 28, repeat: Infinity, ease: 'easeInOut' }}
+            />
+            <motion.div
+                class="orb-b-bg absolute top-[20%] right-[-60px] h-[260px] w-[260px] rounded-full opacity-50 blur-[30px]"
+                style="will-change: transform;"
+                animate={{
+                    x: ['0vw', '-6vw', '3vw', '-2vw', '0vw'],
+                    y: ['0vh', '-8vh', '4vh', '-6vh', '0vh']
+                }}
+                transition={{ duration: 24, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
+            />
 
-    <div
-        class="relative mx-auto flex w-full max-w-7xl items-center justify-center px-6 py-8 md:py-12"
-    >
-        <motion.div class="mx-auto max-w-4xl text-center">
-            <div bind:this={headingContainer} class="mx-auto max-w-4xl text-center">
-                <h1 class="text-5xl leading-tight font-semibold text-balance md:text-7xl">
-                    <span class="block">{m.hero_title_line1()}</span>
-                    <span
-                        class="sheen-gradient block bg-gradient-to-r from-white via-brand-500 to-white bg-clip-text text-transparent"
-                    >
-                        {m.hero_title_line2()}
-                    </span>
-                </h1>
-                <p class="mt-6 text-base leading-7 text-pretty text-white/80 md:text-lg">
-                    {m.hero_subtitle()}
-                </p>
-                <div class="mt-10 flex flex-wrap items-center justify-center gap-3">
-                    <motion.button
-                        whileTap={{ scale: 0.96 }}
-                        whileHover={{ scale: 1.03, filter: 'brightness(0.95)' }}
-                        class="inline-flex items-center justify-center rounded-full border border-[var(--color-border-mid)] bg-brand-200 px-4 py-2 text-sm font-semibold text-[#0b1011]"
-                    >
-                        {m.cta_primary()}
-                    </motion.button>
-                </div>
-                <ul class="mt-10 flex flex-wrap justify-center gap-2 text-xs text-white/70">
-                    <li class="rounded-full border border-white/15 px-3 py-1">
-                        {m.pill_free_oss()}
-                    </li>
-                    <li class="rounded-full border border-white/15 px-3 py-1">{m.pill_easy()}</li>
-                    <li class="rounded-full border border-white/15 px-3 py-1">{m.pill_tiny()}</li>
-                </ul>
+            <div
+                class="relative mx-auto flex w-full max-w-7xl items-center justify-center px-6 py-8 md:py-12"
+            >
+                <motion.div class="mx-auto max-w-4xl text-center">
+                    <div bind:this={headingContainer} class="mx-auto max-w-4xl text-center">
+                        <h1
+                            class="text-5xl leading-tight font-semibold text-balance text-foreground md:text-7xl"
+                        >
+                            <span class="block">{m.hero_title_line1()}</span>
+                            <span
+                                class="sheen-gradient block bg-gradient-to-r from-foreground via-brand-500 to-foreground bg-clip-text text-transparent"
+                            >
+                                {m.hero_title_line2()}
+                            </span>
+                        </h1>
+                        <p
+                            class="mt-6 text-base leading-7 text-pretty text-muted-foreground md:text-lg"
+                        >
+                            {m.hero_subtitle()}
+                        </p>
+                        <div class="mt-10 flex flex-wrap items-center justify-center gap-3">
+                            <motion.button
+                                onclick={() => {
+                                    goto('/docs')
+                                }}
+                                whileTap={{ scale: 0.96 }}
+                                whileHover={{ scale: 1.03, filter: 'brightness(0.95)' }}
+                                class="inline-flex items-center justify-center rounded-full border border-border-mid bg-brand-200 px-4 py-2 text-sm font-semibold text-background"
+                            >
+                                {m.cta_primary()}
+                            </motion.button>
+                        </div>
+                        <ul
+                            class="mt-10 flex flex-wrap justify-center gap-2 text-xs text-muted-foreground"
+                        >
+                            <li class="rounded-full border border-border-muted px-3 py-1">
+                                {m.pill_free_oss()}
+                            </li>
+                            <li class="rounded-full border border-border-muted px-3 py-1">
+                                {m.pill_easy()}
+                            </li>
+                            <li class="rounded-full border border-border-muted px-3 py-1">
+                                {m.pill_tiny()}
+                            </li>
+                        </ul>
+                    </div>
+                </motion.div>
             </div>
-        </motion.div>
+        </section>
     </div>
-</section>
+    <Footer />
+</div>
 
 <style>
     /* Decorative layers */

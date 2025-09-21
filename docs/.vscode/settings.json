@@ -1,4 +1,17 @@
 {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "trunk.io",
+    "editor.codeActionsOnSave": {
+        "source.fixAll": "explicit",
+        "source.fixAll.eslint": "explicit"
+    },
+    "editor.formatOnPaste": true,
+    "[json]": {
+        "editor.defaultFormatter": "trunk.io"
+    },
+    "[svelte]": {
+        "editor.defaultFormatter": "trunk.io"
+    },
     "files.associations": {
         "wrangler.json": "jsonc"
     }
