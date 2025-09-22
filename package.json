@@ -82,7 +82,7 @@
         }
     },
     "dependencies": {
-        "motion": "^12.23.16"
+        "motion": "^12.23.18"
     },
     "devDependencies": {
         "@changesets/cli": "^2.29.7",
