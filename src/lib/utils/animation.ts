@@ -7,15 +7,13 @@ import { type AnimationOptions, type DOMKeyframesDefinition, animate } from 'mot
  * Later values override earlier ones. Use to combine root configuration from
  * `MotionConfig` with local `transition` props.
  *
- * @param root Transition from context/root.
- * @param local Transition from the local component.
+ * @param args Array of `AnimationOptions` to merge.
  * @return A new merged `AnimationOptions` object.
  */
-export const mergeTransitions = (
-    root: AnimationOptions | undefined,
-    local: AnimationOptions | undefined
-): AnimationOptions => {
-    return { ...(root ?? {}), ...(local ?? {}) }
+export const mergeTransitions = (...args: AnimationOptions[]): AnimationOptions => {
+    return args.reduce<AnimationOptions>((acc, next) => {
+        return { ...acc, ...next }
+    }, {})
 }
 
 /**

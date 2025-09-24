@@ -56,10 +56,23 @@
     // Generate unique key for presence tracking
     const presenceKey = `motion-${Math.random().toString(36).slice(2)}`
 
+    // Compute merged transition without mutating props to avoid effect write loops
+    const mergedTransition = $derived<AnimationOptions>(
+        mergeTransitions(
+            (motionConfig?.transition ?? {}) as AnimationOptions,
+            (transitionProp ?? {}) as AnimationOptions
+        )
+    )
+
     // Register with AnimatePresence so onDestroy triggers exit cloning
     $effect(() => {
         if (element) {
-            usePresence(presenceKey, element, exitProp)
+            usePresence(
+                presenceKey,
+                element,
+                exitProp,
+                mergedTransition as unknown as MotionTransition
+            )
         }
     })
 
@@ -118,17 +131,13 @@
             if (rafId) cancelAnimationFrame(rafId)
         }
     })
+
     const isPlaywright =
         typeof window !== 'undefined' &&
         window.location.search.includes('@humanspeak-svelte-motion-isPlaywright=true')
 
     // Recognized HTML void elements that cannot contain children
     const isVoidTag = $derived(VOID_TAGS.has(tag as string))
-
-    // Compute merged transition without mutating props to avoid effect write loops
-    const mergedTransition = $derived<MotionTransition>(
-        mergeTransitions(motionConfig?.transition, transitionProp)
-    )
 
     // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
     const derivedAttrs = $derived<Record<string, unknown>>({
@@ -211,8 +220,6 @@
             if (rafId) cancelAnimationFrame(rafId)
         }
     })
-    // Merge style for before/after ready so styles carry through post-anim
-    // Merge styles directly in markup; keep effect solely for readiness logic
 
     // whileTap handling without relying on motion.press (fallback compatible)
     $effect(() => {

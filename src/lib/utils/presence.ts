@@ -1,4 +1,5 @@
-import type { MotionExit } from '$lib/types'
+import type { MotionExit, MotionTransition } from '$lib/types'
+import { mergeTransitions } from '$lib/utils/animation'
 import { animate, type AnimationOptions } from 'motion'
 import { getContext, onDestroy, setContext } from 'svelte'
 
@@ -12,6 +13,7 @@ const ANIMATE_PRESENCE_CONTEXT = Symbol('animate-presence-context')
 type PresenceChild = {
     element: HTMLElement
     exit?: MotionExit
+    mergedTransition?: MotionTransition
     lastRect: DOMRect
     lastComputedStyle: CSSStyleDeclaration
 }
@@ -25,14 +27,30 @@ export type AnimatePresenceContext = {
     /** Called when all exit animations complete (optional). */
     onExitComplete?: () => void
     /** Register a child element and its exit definition. */
-    // trunk-ignore(eslint/no-unused-vars)
-    registerChild: (key: string, element: HTMLElement, exit?: MotionExit) => void
+    registerChild: (
+        // trunk-ignore(eslint/no-unused-vars)
+        key: string,
+        // trunk-ignore(eslint/no-unused-vars)
+        element: HTMLElement,
+        // trunk-ignore(eslint/no-unused-vars)
+        exit?: MotionExit,
+        // trunk-ignore(eslint/no-unused-vars)
+        mergedTransition?: MotionTransition
+    ) => void
     /** Update the last known rect/style snapshot for a registered child. */
-    // trunk-ignore(eslint/no-unused-vars)
-    updateChildState: (key: string, rect: DOMRect, computedStyle: CSSStyleDeclaration) => void
+    updateChildState: (
+        // trunk-ignore(eslint/no-unused-vars)
+        key: string,
+        // trunk-ignore(eslint/no-unused-vars)
+        rect: DOMRect,
+        // trunk-ignore(eslint/no-unused-vars)
+        computedStyle: CSSStyleDeclaration
+    ) => void
     /** Unregister a child. If it has an exit, clone and animate it out. */
-    // trunk-ignore(eslint/no-unused-vars)
-    unregisterChild: (key: string) => void
+    unregisterChild: (
+        // trunk-ignore(eslint/no-unused-vars)
+        key: string
+    ) => void
 }
 
 /**
@@ -50,12 +68,18 @@ export function createAnimatePresenceContext(context: {
 }): AnimatePresenceContext {
     const children = new Map<string, PresenceChild>()
 
-    const registerChild = (key: string, element: HTMLElement, exit?: MotionExit) => {
+    const registerChild = (
+        key: string,
+        element: HTMLElement,
+        exit?: MotionExit,
+        mergedTransition?: MotionTransition
+    ) => {
         const initialRect = element.getBoundingClientRect()
         const initialStyle = getComputedStyle(element)
         children.set(key, {
             element,
             exit,
+            mergedTransition,
             lastRect: initialRect,
             lastComputedStyle: initialStyle
         })
@@ -118,13 +142,19 @@ export function createAnimatePresenceContext(context: {
 
         parent.appendChild(clone)
 
-        // Animate the clone to exit state with a default duration, then clean up
-        const durationSeconds = 0.35
+        // Merge transitions: default < mergedTransition < exit.transition (last wins)
+        const exitObj = (child.exit ?? {}) as unknown as { transition?: MotionTransition }
+        const finalTransition = mergeTransitions(
+            { duration: 0.35 } as AnimationOptions,
+            (child.mergedTransition ?? {}) as AnimationOptions,
+            (exitObj.transition ?? {}) as AnimationOptions
+        )
+
         requestAnimationFrame(() => {
             animate(
                 clone,
                 child.exit as unknown as HTMLElement,
-                { duration: durationSeconds } as unknown as AnimationOptions
+                finalTransition as unknown as AnimationOptions
             ).finished.finally(() => {
                 clone.remove()
                 children.delete(key)
@@ -168,10 +198,15 @@ export function setAnimatePresenceContext(context: AnimatePresenceContext) {
  * Note: Svelte lifecycle wrapper - ignored for coverage.
  */
 /* c8 ignore start */
-export function usePresence(key: string, element: HTMLElement | null, exit: MotionExit): void {
+export function usePresence(
+    key: string,
+    element: HTMLElement | null,
+    exit: MotionExit,
+    mergedTransition?: MotionTransition
+): void {
     const context = getAnimatePresenceContext()
     if (element && context && exit) {
-        context.registerChild(key, element, exit)
+        context.registerChild(key, element, exit, mergedTransition)
         onDestroy(() => {
             context.unregisterChild(key)
         })
