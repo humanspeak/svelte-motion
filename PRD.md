@@ -57,7 +57,7 @@ Phase 3 — Ecosystem
 
 - Variants MVP.
 - Docs: Add presence/exit examples to homepage and README. [Done]
-- E2E: Presence/exit tests. [Planned]
+- E2E: Presence/exit tests. [Done]
 
 ## 5) API Design Targets (Parity-Oriented)
 
@@ -100,7 +100,7 @@ Phase 3 — Ecosystem
 
 - Unit: presence context (register/update/unregister, clone create/remove, onExitComplete).
 - Component: `_MotionContainer` behaviors.
-- E2E: Exit animation visibility and cleanup. [Planned]
+- E2E: Exit animation visibility and cleanup. [Done]
 - Lint/typecheck in CI; workflow validation with artifact logs. [Done]
 
 ## 9) References
@@ -177,7 +177,7 @@ Deliverables for this feature:
 
 - `src/routes/tests/random/fancy-like-button/+page.svelte` example. [Done]
 - Aligned spawn origin container; size changes keep alignment. [Done]
-- E2E: press-and-hold spawns, second press unlikes and stops. [Planned]
+- E2E: press-and-hold spawns, second press unlikes and stops. [Done]
 
 ## Appendix D — Risks
 

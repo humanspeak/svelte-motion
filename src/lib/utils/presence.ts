@@ -1,6 +1,6 @@
 import type { MotionExit, MotionTransition } from '$lib/types'
 import { mergeTransitions } from '$lib/utils/animation'
-import { animate, type AnimationOptions } from 'motion'
+import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import { getContext, onDestroy, setContext } from 'svelte'
 
 /** Context key for AnimatePresence */
@@ -67,6 +67,8 @@ export function createAnimatePresenceContext(context: {
     onExitComplete?: () => void
 }): AnimatePresenceContext {
     const children = new Map<string, PresenceChild>()
+    // Track number of in-flight exit animations to invoke onExitComplete once
+    let inFlightExits = 0
 
     const registerChild = (
         key: string,
@@ -150,16 +152,24 @@ export function createAnimatePresenceContext(context: {
             (exitObj.transition ?? {}) as AnimationOptions
         )
 
+        // Prepare exit keyframes without any inline transition data
+        const rawExit = (child.exit ?? {}) as unknown as Record<string, unknown>
+        /* trunk-ignore(eslint/@typescript-eslint/no-unused-vars) */
+        const { transition: _ignoredTransition, ...exitKeyframes } = rawExit
+
+        // Start exit and track in-flight count
+        inFlightExits += 1
         requestAnimationFrame(() => {
-            animate(
-                clone,
-                child.exit as unknown as HTMLElement,
-                finalTransition as unknown as AnimationOptions
-            ).finished.finally(() => {
-                clone.remove()
-                children.delete(key)
-                context.onExitComplete?.()
-            })
+            animate(clone, exitKeyframes as unknown as DOMKeyframesDefinition, finalTransition)
+                .finished.catch(() => {})
+                .finally(() => {
+                    clone.remove()
+                    children.delete(key)
+                    inFlightExits -= 1
+                    if (inFlightExits === 0) {
+                        context.onExitComplete?.()
+                    }
+                })
         })
     }
 

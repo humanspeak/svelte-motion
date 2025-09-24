@@ -133,7 +133,7 @@ To link a value directly to scroll position, use utilities like `useTime`/`useTr
   const progress = useTransform(() => ($time % 4000) / 4000, [time])
 </script>
 
-<motion.div style={`scaleX: ${$progress}`}/>
+<motion.div style={`transform: scaleX(${$progress})`}/>
 ```
 
 ## Layout animation

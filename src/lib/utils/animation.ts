@@ -33,7 +33,9 @@ export const animateWithLifecycle = (
     el: HTMLElement,
     keyframes: DOMKeyframesDefinition,
     transition: AnimationOptions,
+    /* trunk-ignore(eslint/no-unused-vars) */
     onStart?: (def: unknown) => void,
+    /* trunk-ignore(eslint/no-unused-vars) */
     onComplete?: (def: unknown) => void
 ): void => {
     const payload = keyframes
