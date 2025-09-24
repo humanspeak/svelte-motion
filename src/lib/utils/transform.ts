@@ -110,7 +110,7 @@ export const useTransform = <T = number>(
             `useTransform: input and output arrays must be the same length (input: ${input.length}, output: ${out.length})`
         )
     }
-    const easings: Array<(t: number) => number> = Array.isArray(ease)
+    const easings: Array<(_t: number) => number> = Array.isArray(ease)
         ? ease
         : ease
           ? new Array(Math.max(0, out.length - 1)).fill(ease)
@@ -141,7 +141,7 @@ export const useTransform = <T = number>(
             ? mixer(o0, o1)
             : typeof o0 === 'number' && typeof o1 === 'number'
               ? linearMix(o0, o1)
-              : (_t: number) => (p < 0.5 ? o0 : o1)
+              : (_t: number) => (p < 0.5 ? o0 : o1) // trunk-ignore(eslint/@typescript-eslint/no-unused-vars)
         return mix(p) as T
     })
 }

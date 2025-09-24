@@ -22,6 +22,19 @@ export type SpringOptions = {
 }
 
 /**
+ * Function type for updating the spring's target with animation.
+ *
+ * @param v New target value to animate towards (number or unit string).
+ */
+type SetType = (v: number | string) => void
+/**
+ * Function type for immediately setting the spring's value without animation.
+ *
+ * @param v New value to set instantly (number or unit string).
+ */
+type JumpType = (v: number | string) => void
+
+/**
  * Parsed numeric value with optional unit suffix (e.g., `px`, `vh`).
  */
 type UnitValue = { value: number; unit: string }
@@ -68,8 +81,8 @@ export const useSpring = (
     source: number | string | Readable<number | string>,
     options: SpringOptions = {}
 ): Readable<number | string> & {
-    set: (v: number | string) => void
-    jump: (v: number | string) => void
+    set: SetType
+    jump: JumpType
 } => {
     if (typeof window === 'undefined') {
         // Derive best-effort initial value for SSR to avoid hydration mismatch
@@ -90,10 +103,10 @@ export const useSpring = (
         }
         const store = readable(initial as number | string, () => {}) as Readable<
             number | string
-        > & { set: (v: number | string) => void; jump: (v: number | string) => void }
+        > & { set: SetType; jump: JumpType }
         // No-op setters on server
-        ;(store as unknown as { set: (v: number | string) => void }).set = () => {}
-        ;(store as unknown as { jump: (v: number | string) => void }).jump = () => {}
+        ;(store as unknown as { set: SetType }).set = () => {}
+        ;(store as unknown as { jump: JumpType }).jump = () => {}
         return store
     }
 
@@ -174,19 +187,15 @@ export const useSpring = (
                 if (raf) cancelAnimationFrame(raf)
             }
         }) as Readable<number | string> & {
-            set: (v: number | string) => void
-            jump: (v: number | string) => void
+            set: SetType
+            jump: JumpType
         }
-        ;(wrapped as unknown as { set: (v: number | string) => void }).set = (
-            v: number | string
-        ) => {
+        ;(wrapped as unknown as { set: SetType }).set = (v: number | string) => {
             if (followSource) unsub()
             followSource = false
             api.set(v)
         }
-        ;(wrapped as unknown as { jump: (v: number | string) => void }).jump = (
-            v: number | string
-        ) => {
+        ;(wrapped as unknown as { jump: JumpType }).jump = (v: number | string) => {
             if (followSource) unsub()
             followSource = false
             api.jump(v)
@@ -202,10 +211,10 @@ export const useSpring = (
             if (raf) cancelAnimationFrame(raf)
         }
     }) as Readable<number | string> & {
-        set: (v: number | string) => void
-        jump: (v: number | string) => void
+        set: SetType
+        jump: JumpType
     }
-    ;(wrapped as unknown as { set: (v: number | string) => void }).set = api.set
-    ;(wrapped as unknown as { jump: (v: number | string) => void }).jump = api.jump
+    ;(wrapped as unknown as { set: SetType }).set = api.set
+    ;(wrapped as unknown as { jump: JumpType }).jump = api.jump
     return wrapped
 }

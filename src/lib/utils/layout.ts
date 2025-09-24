@@ -1,5 +1,4 @@
-import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
-import { animate } from 'motion'
+import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 
 /**
  * Measure an element's bounding client rect without current transform.

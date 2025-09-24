@@ -89,4 +89,27 @@ describe('utils/transform', () => {
         expect(clampBidirectional(-1, 10, 0)).toBe(0)
         expect(clampBidirectional(11, 10, 0)).toBe(10)
     })
+
+    it('fills single ease across segments', () => {
+        const easeIn = (t: number) => t * t
+        const src = writable(0)
+        const out = useTransform(src, [0, 50, 100], [0, 1, 2], { ease: easeIn })
+        src.set(25)
+        // seg 0 midpoint eased
+        expect(get(out)).toBeCloseTo(easeIn(0.5))
+        src.set(75)
+        // seg 1 midpoint eased around base=1
+        expect(get(out)).toBeCloseTo(1 + easeIn(0.5))
+    })
+
+    it('function form without deps returns readable with initial compute', () => {
+        const out = useTransform(() => 42, [])
+        expect(get(out)).toBe(42)
+    })
+
+    it('handles single-length input/output by returning the sole output', () => {
+        const src = writable(0)
+        const out1 = useTransform(src, [0], [456])
+        expect(get(out1)).toBe(456)
+    })
 })
