@@ -12,8 +12,7 @@
         window.location.search.includes('@humanspeak-svelte-motion-isPlaywright=true')
 
     // Use seconds; duration must be in the transition prop, not keyframes
-    // trunk-ignore(eslint/@typescript-eslint/no-unused-vars,eslint/no-unused-vars)
-    const _testTransition = isPlaywright ? { duration: 5 } : undefined
+    const _testTransition = isPlaywright ? { duration: 1 } : undefined
 </script>
 
 <div class="relative flex h-40 w-24 flex-col">
@@ -23,6 +22,7 @@
                 initial={{ opacity: 0, scale: 0 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0 }}
+                transition={_testTransition}
                 class="size-24 rounded-lg bg-cyan-400"
                 data-testid="box"
             />

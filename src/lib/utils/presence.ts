@@ -5,6 +5,10 @@ import { getContext, onDestroy, setContext } from 'svelte'
 /** Context key for AnimatePresence */
 const ANIMATE_PRESENCE_CONTEXT = Symbol('animate-presence-context')
 
+/**
+ * Internal record for a registered presence child.
+ * Tracks its element, last known layout/style snapshot, and exit definition.
+ */
 type PresenceChild = {
     element: HTMLElement
     exit?: MotionExit
@@ -12,23 +16,35 @@ type PresenceChild = {
     lastComputedStyle: CSSStyleDeclaration
 }
 
+/**
+ * Presence context API used by `AnimatePresence` and motion elements.
+ * Consumers register/unregister children and provide size/style snapshots
+ * so we can clone and animate them out after removal.
+ */
 export type AnimatePresenceContext = {
+    /** Called when all exit animations complete (optional). */
     onExitComplete?: () => void
-    registerChild: (
-        // trunk-ignore(eslint/no-unused-vars)
-        key: string,
-        // trunk-ignore(eslint/no-unused-vars)
-        element: HTMLElement,
-        // trunk-ignore(eslint/no-unused-vars)
-        exit?: MotionExit
-    ) => void
-
+    /** Register a child element and its exit definition. */
+    // trunk-ignore(eslint/no-unused-vars)
+    registerChild: (key: string, element: HTMLElement, exit?: MotionExit) => void
+    /** Update the last known rect/style snapshot for a registered child. */
     // trunk-ignore(eslint/no-unused-vars)
     updateChildState: (key: string, rect: DOMRect, computedStyle: CSSStyleDeclaration) => void
+    /** Unregister a child. If it has an exit, clone and animate it out. */
     // trunk-ignore(eslint/no-unused-vars)
     unregisterChild: (key: string) => void
 }
 
+/**
+ * Create a new `AnimatePresence` context instance.
+ *
+ * - Maintains a registry of children keyed by a unique string.
+ * - On unregister, if a child has an `exit` definition, a visual clone is
+ *   created at its last known position and animated using Motion.
+ *
+ * @param context Optional callbacks, e.g. `onExitComplete`.
+ * @returns An object implementing the `AnimatePresenceContext` API.
+ */
 export function createAnimatePresenceContext(context: {
     onExitComplete?: () => void
 }): AnimatePresenceContext {
@@ -125,14 +141,33 @@ export function createAnimatePresenceContext(context: {
     }
 }
 
+/**
+ * Get the current `AnimatePresence` context from Svelte component context.
+ *
+ * Note: Trivial wrapper - ignored for coverage.
+ */
+/* c8 ignore next 3 */
 export function getAnimatePresenceContext(): AnimatePresenceContext | undefined {
     return getContext(ANIMATE_PRESENCE_CONTEXT)
 }
 
+/**
+ * Set the `AnimatePresence` context into Svelte component context.
+ *
+ * Note: Trivial wrapper - ignored for coverage.
+ */
+/* c8 ignore next 3 */
 export function setAnimatePresenceContext(context: AnimatePresenceContext) {
     setContext(ANIMATE_PRESENCE_CONTEXT, context)
 }
 
+/**
+ * Hook used by motion elements to participate in presence.
+ * Registers the element and ensures its exit animation runs on teardown.
+ *
+ * Note: Svelte lifecycle wrapper - ignored for coverage.
+ */
+/* c8 ignore start */
 export function usePresence(key: string, element: HTMLElement | null, exit: MotionExit): void {
     const context = getAnimatePresenceContext()
     if (element && context && exit) {
@@ -142,3 +177,4 @@ export function usePresence(key: string, element: HTMLElement | null, exit: Moti
         })
     }
 }
+/* c8 ignore end */
