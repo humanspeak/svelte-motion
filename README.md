@@ -50,6 +50,37 @@ Svelte Motion supports minimal layout animations via FLIP using the `layout` pro
 - **`layout`**: smoothly animates translation and scale between layout changes (size and position).
 - **`layout="position"`**: only animates translation (no scale).
 
+### Exit Animations (AnimatePresence)
+
+Animate elements as they leave the DOM using `AnimatePresence`. This mirrors Motion’s React API and docs for exit animations ([reference](https://motion.dev/docs/react)).
+
+```svelte
+<script lang="ts">
+    import { motion, AnimatePresence } from '$lib'
+    let show = $state(true)
+</script>
+
+<AnimatePresence>
+    {#if show}
+        <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.5 }}
+            class="size-24 rounded-md bg-cyan-400"
+        />
+    {/if}
+</AnimatePresence>
+
+<motion.button whileTap={{ scale: 0.97 }} onclick={() => (show = !show)}>Toggle</motion.button>
+```
+
+- The exit animation is driven by `exit` and will play when the element unmounts.
+- Transition precedence (merged before running exit):
+    - `exit.transition` (highest precedence)
+    - component `transition` (merged with `MotionConfig`)
+    - fallback default `{ duration: 0.35 }`
+
 #### Current Limitations
 
 Some Motion features are not yet implemented:
@@ -84,6 +115,7 @@ This package carefully selects its dependencies to provide a robust and maintain
 | [Fancy Like Button](https://github.com/DRlFTER/fancyLikeButton)                                          | `/tests/random/fancy-like-button`        | [View Example](https://svelte.dev/playground/c34b7e53d41c48b0ab1eaf21ca120c6e?version=5.38.10) |
 | [Keyframes (square → circle → square; scale 1→2→1)](https://motion.dev/docs/react-animation#keyframes)   | `/tests/motion/keyframes`                | [View Example](https://svelte.dev/playground/05595ce0db124c1cbbe4e74fda68d717?version=5.38.10) |
 | [Animated Border Gradient (conic-gradient rotate)](https://www.youtube.com/watch?v=OgQI1-9T6ZA)          | `/tests/random/animated-border-gradient` | [View Example](https://svelte.dev/playground/6983a61b4c35441b8aa72a971de01a23?version=5.38.10) |
+| [Exit Animation](https://motion.dev/docs/react#exit-animations)                                          | `/tests/motion/animate-presence`         | [View Example](https://svelte.dev/playground/ef277e283d864653ace54e7453801601?version=5.38.10) |
 
 ## Interactions
 
