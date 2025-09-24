@@ -3,12 +3,18 @@ import { mergeTransitions } from '$lib/utils/animation'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import { getContext, onDestroy, setContext } from 'svelte'
 
-/** Context key for AnimatePresence */
+/**
+ * Context key for `AnimatePresence`.
+ *
+ * Used with Svelte's context API to provide/register presence management.
+ */
 const ANIMATE_PRESENCE_CONTEXT = Symbol('animate-presence-context')
 
 /**
  * Internal record for a registered presence child.
- * Tracks its element, last known layout/style snapshot, and exit definition.
+ *
+ * Tracks its element, last known layout/style snapshot, and exit definition
+ * so we can create a visually accurate clone on unmount and animate it out.
  */
 type PresenceChild = {
     element: HTMLElement
@@ -16,6 +22,28 @@ type PresenceChild = {
     mergedTransition?: MotionTransition
     lastRect: DOMRect
     lastComputedStyle: CSSStyleDeclaration
+}
+
+/**
+ * Reset any CSS transforms on the element's inline style.
+ *
+ * Ensures the exiting clone is not additionally offset or scaled by an
+ * inherited transform. Applies to standard and vendor-prefixed properties.
+ *
+ * @param element The element whose inline transform properties should be cleared.
+ */
+const resetTransforms = (element: HTMLElement): void => {
+    const s = element.style
+    /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+    ;(s as any).transform = 'none'
+    /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+    ;(s as any).webkitTransform = 'none'
+    /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+    ;(s as any).msTransform = 'none'
+    /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+    ;(s as any).MozTransform = 'none'
+    /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+    ;(s as any).OTransform = 'none'
 }
 
 /**
@@ -63,6 +91,16 @@ export type AnimatePresenceContext = {
  * @param context Optional callbacks, e.g. `onExitComplete`.
  * @returns An object implementing the `AnimatePresenceContext` API.
  */
+/**
+ * Create a new `AnimatePresence` context instance.
+ *
+ * Manages child registration and on unregistration performs exit animation by
+ * cloning the DOM node, freezing its last known rect/styles, and animating
+ * the clone using Motion. Calls `onExitComplete` once when all exits settle.
+ *
+ * @param context Optional callbacks, for example `onExitComplete`.
+ * @returns A presence context with register/update/unregister APIs.
+ */
 export function createAnimatePresenceContext(context: {
     onExitComplete?: () => void
 }): AnimatePresenceContext {
@@ -70,6 +108,9 @@ export function createAnimatePresenceContext(context: {
     // Track number of in-flight exit animations to invoke onExitComplete once
     let inFlightExits = 0
 
+    /**
+     * Register a child element and snapshot its initial rect/styles.
+     */
     const registerChild = (
         key: string,
         element: HTMLElement,
@@ -87,6 +128,9 @@ export function createAnimatePresenceContext(context: {
         })
     }
 
+    /**
+     * Update the last known rect/style snapshot for a registered child.
+     */
     const updateChildState = (key: string, rect: DOMRect, computedStyle: CSSStyleDeclaration) => {
         const child = children.get(key)
         if (child && rect.width > 0 && rect.height > 0) {
@@ -95,6 +139,10 @@ export function createAnimatePresenceContext(context: {
         }
     }
 
+    /**
+     * Unregister a child. If it has an `exit` definition, create a styled
+     * clone and run the exit animation using Motion. Cleans up after finish.
+     */
     const unregisterChild = (key: string) => {
         const child = children.get(key)
         if (!child || !child.exit) {
@@ -111,10 +159,14 @@ export function createAnimatePresenceContext(context: {
         try {
             for (let i = 0; i < computed.length; i += 1) {
                 const prop = computed[i]
+                // Skip transforms to avoid double offset/scale on the absolutely positioned clone
+                if (/transform/i.test(prop)) continue
                 const value = computed.getPropertyValue(prop)
                 const priority = computed.getPropertyPriority(prop)
                 if (value) clone.style.setProperty(prop, value, priority)
             }
+            // Ensure no transform remains on the clone (including vendor-prefixed)
+            resetTransforms(clone)
         } catch {
             // Ignore
         }
@@ -138,6 +190,22 @@ export function createAnimatePresenceContext(context: {
         clone.style.display = 'block'
         clone.style.margin = '0'
         clone.style.boxSizing = 'border-box'
+        // Redundantly ensure no transforms are applied before positioning/z-index take effect
+        resetTransforms(clone)
+        // Elevate clone above siblings to ensure it renders on top during exit
+        try {
+            const siblings = Array.from(parent.children) as HTMLElement[]
+            let maxZ = 0
+            for (const sib of siblings) {
+                if (sib === clone) continue
+                const z = parseInt(getComputedStyle(sib).zIndex || '0', 10)
+                if (!Number.isNaN(z)) maxZ = Math.max(maxZ, z)
+            }
+            // Ensure positioned so z-index applies; already absolute above
+            clone.style.zIndex = String(maxZ + 1 || 9999)
+        } catch {
+            clone.style.zIndex = '9999'
+        }
 
         clone.setAttribute('data-clone', 'true')
         clone.setAttribute('data-exiting', 'true')
@@ -163,6 +231,12 @@ export function createAnimatePresenceContext(context: {
             animate(clone, exitKeyframes as unknown as DOMKeyframesDefinition, finalTransition)
                 .finished.catch(() => {})
                 .finally(() => {
+                    // Reset elevated styles then remove
+                    try {
+                        clone.style.zIndex = ''
+                    } catch {
+                        // ignore
+                    }
                     clone.remove()
                     children.delete(key)
                     inFlightExits -= 1
@@ -208,6 +282,17 @@ export function setAnimatePresenceContext(context: AnimatePresenceContext) {
  * Note: Svelte lifecycle wrapper - ignored for coverage.
  */
 /* c8 ignore start */
+/**
+ * Hook used by motion elements to participate in presence.
+ *
+ * Registers the element with the presence context and guarantees that the
+ * exit animation is scheduled on teardown.
+ *
+ * @param key Unique identifier for the presence child.
+ * @param element The DOM element to track.
+ * @param exit The exit keyframes definition.
+ * @param mergedTransition The element's merged transition for precedence.
+ */
 export function usePresence(
     key: string,
     element: HTMLElement | null,
