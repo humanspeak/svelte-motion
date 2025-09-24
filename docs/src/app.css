@@ -254,6 +254,11 @@
     .prose ol > li::marker {
         color: var(--color-accent);
     }
+
+    .prose code::before,
+    .prose code::after {
+        content: '' !important;
+    }
 }
 
 /* Orb backgrounds using the brand color */

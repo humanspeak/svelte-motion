@@ -20,6 +20,18 @@ export type MotionInitial = DOMKeyframesDefinition | undefined
 export type MotionAnimate = DOMKeyframesDefinition | undefined
 
 /**
+ * Exit animation properties for a motion component when unmounted.
+ * @example
+ * ```svelte
+ * <motion.div exit={{ opacity: 0, scale: 0 }} />
+ * ```
+ */
+export type MotionExit =
+    | (Record<string, unknown> & { transition?: AnimationOptions })
+    | DOMKeyframesDefinition
+    | undefined
+
+/**
  * Animation transition configuration.
  * @example
  * ```svelte
@@ -90,6 +102,8 @@ export type MotionProps = {
     initial?: MotionInitial
     /** Target state of the animation */
     animate?: MotionAnimate
+    /** Exit animation state when component is removed */
+    exit?: MotionExit
     /** Animation configuration */
     transition?: MotionTransition
     /** Tap/click interaction animation */

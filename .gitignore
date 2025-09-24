@@ -37,3 +37,4 @@ junit-playwright.xml
 # Custom
 .notes
 docs/src/lib/sitemap-manifest.json
+.playwright-mcp/

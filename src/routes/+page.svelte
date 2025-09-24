@@ -19,6 +19,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/animate-presence')}
+                    >
+                        Animate Presence
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/html-content')}
                     >
                         HTML Content (0→100)

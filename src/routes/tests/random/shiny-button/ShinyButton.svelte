@@ -6,7 +6,7 @@
         children: Snippet
     }
 
-    let { children }: Props = $props()
+    const { children }: Props = $props()
 </script>
 
 <motion.button
@@ -40,10 +40,6 @@
 
 <style lang="postcss">
     @reference "tailwindcss";
-
-    :global(html, body) {
-        @apply bg-neutral-950;
-    }
 
     :global(:root) {
         --radial-gradient-background: 250, 250, 250;

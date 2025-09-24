@@ -85,6 +85,9 @@ export default [
             parserOptions: {
                 parser: ts.parser
             }
+        },
+        rules: {
+            'prefer-const': ['off']
         }
     },
     {

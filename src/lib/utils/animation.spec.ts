@@ -11,9 +11,9 @@ const { animate: animateMock } = (await import('motion')) as unknown as {
 
 describe('utils/animation', () => {
     it('mergeTransitions: local overrides root; handles undefined inputs', () => {
-        expect(mergeTransitions(undefined, undefined)).toEqual({})
-        expect(mergeTransitions({ duration: 0.2 }, undefined)).toEqual({ duration: 0.2 })
-        expect(mergeTransitions(undefined, { duration: 0.3 })).toEqual({ duration: 0.3 })
+        expect(mergeTransitions()).toEqual({})
+        expect(mergeTransitions({ duration: 0.2 })).toEqual({ duration: 0.2 })
+        expect(mergeTransitions({ duration: 0.3 })).toEqual({ duration: 0.3 })
         expect(mergeTransitions({ duration: 0.2 }, { duration: 0.3, ease: 'linear' })).toEqual({
             duration: 0.3,
             ease: 'linear'
