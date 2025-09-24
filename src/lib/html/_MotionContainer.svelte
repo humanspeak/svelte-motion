@@ -1,24 +1,25 @@
 <script lang="ts">
-    import { getMotionConfig } from '$lib/components/motionConfig.context.js'
+    import { getMotionConfig } from '$lib/components/motionConfig.context'
     import type { MotionProps, MotionTransition } from '$lib/types'
-    import { isNotEmpty } from '$lib/utils/objects.js'
-    import { sleep } from '$lib/utils/testing.js'
+    import { isNotEmpty } from '$lib/utils/objects'
+    import { sleep } from '$lib/utils/testing'
     import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
     import { type Snippet } from 'svelte'
-    import { VOID_TAGS } from '$lib/utils/constants.js'
-    import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation.js'
-    import { attachWhileTap } from '$lib/utils/interaction.js'
-    import { attachWhileHover } from '$lib/utils/hover.js'
+    import { VOID_TAGS } from '$lib/utils/constants'
+    import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation'
+    import { attachWhileTap } from '$lib/utils/interaction'
+    import { attachWhileHover } from '$lib/utils/hover'
     import {
         measureRect,
         computeFlipTransforms,
         runFlipAnimation,
         setCompositorHints,
         observeLayoutChanges
-    } from '$lib/utils/layout.js'
+    } from '$lib/utils/layout'
     import type { SvelteHTMLElements } from 'svelte/elements'
-    import { mergeInlineStyles } from '$lib/utils/style.js'
-    import { isNativelyFocusable } from '$lib/utils/a11y.js'
+    import { mergeInlineStyles } from '$lib/utils/style'
+    import { isNativelyFocusable } from '$lib/utils/a11y'
+    import { usePresence, getAnimatePresenceContext } from '$lib/utils/presence'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -31,6 +32,7 @@
         tag = 'div',
         initial: initialProp,
         animate: animateProp,
+        exit: exitProp,
         transition: transitionProp,
         onAnimationStart: onAnimationStartProp,
         onAnimationComplete: onAnimationCompleteProp,
@@ -50,6 +52,72 @@
     let isLoaded = $state<'mounting' | 'initial' | 'ready' | 'animated'>('mounting')
     let dataPath = $state<number>(-1)
     const motionConfig = $derived(getMotionConfig())
+
+    // Generate unique key for presence tracking
+    const presenceKey = `motion-${Math.random().toString(36).slice(2)}`
+
+    // Register with AnimatePresence so onDestroy triggers exit cloning
+    $effect(() => {
+        if (element) {
+            usePresence(presenceKey, element, exitProp)
+        }
+    })
+
+    const context = getAnimatePresenceContext()
+    // Update presence context with current state when element is ready and has size
+    $effect(() => {
+        if (!(context && element && isLoaded === 'ready')) return
+
+        let rafId: number | null = null
+        let lastWidth = 0
+        let lastHeight = 0
+        let stopped = false
+
+        const measureAndUpdate = () => {
+            if (stopped || !element || !element.isConnected) return
+            const rect = element.getBoundingClientRect()
+            const style = getComputedStyle(element)
+            if (
+                Math.abs(rect.width - lastWidth) > 0.5 ||
+                Math.abs(rect.height - lastHeight) > 0.5
+            ) {
+                lastWidth = rect.width
+                lastHeight = rect.height
+                context.updateChildState(presenceKey, rect, style)
+            }
+        }
+
+        // Observe size changes
+        const resizeObserver = new ResizeObserver(() => {
+            measureAndUpdate()
+        })
+        try {
+            resizeObserver.observe(element)
+        } catch {
+            // Ignore
+        }
+
+        // Also poll on RAF to catch transform/layout-driven changes
+        const tick = () => {
+            if (stopped) return
+            measureAndUpdate()
+            rafId = requestAnimationFrame(tick)
+        }
+        rafId = requestAnimationFrame(tick)
+
+        // Initial measure once
+        measureAndUpdate()
+
+        return () => {
+            stopped = true
+            try {
+                resizeObserver.disconnect()
+            } catch {
+                // Ignore
+            }
+            if (rafId) cancelAnimationFrame(rafId)
+        }
+    })
     const isPlaywright =
         typeof window !== 'undefined' &&
         window.location.search.includes('@humanspeak-svelte-motion-isPlaywright=true')
@@ -231,8 +299,6 @@
     <svelte:element this={tag} bind:this={element} {...derivedAttrs} />
 {:else}
     <svelte:element this={tag} bind:this={element} {...derivedAttrs}>
-        {#if isLoaded === 'ready'}
-            {@render children?.()}
-        {/if}
+        {@render children?.()}
     </svelte:element>
 {/if}

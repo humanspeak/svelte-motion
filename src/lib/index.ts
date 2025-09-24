@@ -1,3 +1,4 @@
+import AnimatePresence from '$lib/components/AnimatePresence.svelte'
 import MotionConfig from '$lib/components/MotionConfig.svelte'
 import type { MotionComponents } from '$lib/html/index'
 import * as html from '$lib/html/index'
@@ -14,4 +15,4 @@ export type { MotionAnimate, MotionInitial, MotionTransition, MotionWhileTap } f
 export { useSpring } from '$lib/utils/spring'
 export { useTime } from '$lib/utils/time'
 export { useTransform } from '$lib/utils/transform'
-export { MotionConfig }
+export { AnimatePresence, MotionConfig }
