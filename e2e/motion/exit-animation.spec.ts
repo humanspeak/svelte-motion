@@ -40,12 +40,14 @@ test.describe('AnimatePresence exit animation', () => {
                 // Must be fully scaled in (scale = 1)
                 if (transform === 'none') return true
 
+                // scale(s)
                 const scaleMatch = transform.match(/scale\(([^)]+)\)/)
                 if (scaleMatch) {
                     const scale = parseFloat(scaleMatch[1])
                     return scale >= 0.99
                 }
 
+                // 2D matrix(a, b, c, d, tx, ty) → scaleX = a
                 const matrixMatch = transform.match(/matrix\(([^)]+)\)/)
                 if (matrixMatch) {
                     const values = matrixMatch[1].split(',').map((v) => parseFloat(v.trim()))
@@ -55,7 +57,19 @@ test.describe('AnimatePresence exit animation', () => {
                     }
                 }
 
-                return true
+                // 3D matrix3d(m11, m12, ..., m33, tx, ty, tz) → scaleX=m11 (index 0), scaleY=m22 (index 5)
+                const matrix3dMatch = transform.match(/matrix3d\(([^)]+)\)/)
+                if (matrix3dMatch) {
+                    const values = matrix3dMatch[1].split(',').map((v) => parseFloat(v.trim()))
+                    if (values.length >= 16) {
+                        const scaleX = values[0]
+                        const scaleY = values[5]
+                        return scaleX >= 0.99 && scaleY >= 0.99
+                    }
+                }
+
+                // Unknown transform → fail closed
+                return false
             },
             { timeout: 5000 }
         )
