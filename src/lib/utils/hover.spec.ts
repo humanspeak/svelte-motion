@@ -112,6 +112,14 @@ describe('utils/hover', () => {
         expect(baseline.color).toBe('rgb(0, 0, 0)')
     })
 
+    it('computeHoverBaseline: uses opacity default when not in initial/animate', () => {
+        const el = document.createElement('div')
+        const baseline = computeHoverBaseline(el, {
+            whileHover: { opacity: 0 }
+        })
+        expect(baseline.opacity).toBe(1)
+    })
+
     it('attachWhileHover: animates on enter with nested transition, restores on leave', async () => {
         const el = document.createElement('div')
         const cleanup = attachWhileHover(

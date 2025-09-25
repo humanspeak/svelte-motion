@@ -5,6 +5,9 @@ description: "Svelte Motion is a Svelte animation library for building smooth, p
 
 <script>
   import { motion, AnimatePresence } from '@humanspeak/svelte-motion';
+  import Example from '$lib/components/general/Example.svelte'
+  import Rotate from '$lib/examples/Rotate.svelte'
+  import AnimatedButton from '$lib/examples/AnimatedButton.svelte'
 </script>
 
 # Get started with Svelte Motion
@@ -20,21 +23,30 @@ In this guide, we'll learn **why** and **when** you should use Svelte Motion, ho
 Svelte gives you the power to build dynamic user interfaces with excellent performance out of the box. Svelte Motion extends this power to animations, making it simple to create everything from beautiful micro-interactions to complex, gesture-driven animations.
 
 ```svelte
-<script>
-  import { motion } from '@humanspeak/svelte-motion';
+<script lang="ts">
+    import { motion } from '@humanspeak/svelte-motion'
 </script>
 
-<motion.button animate={{ opacity: 1 }}>
-  Animated Button
+<motion.button
+    class="my-4 rounded-md border border-border bg-blue-300 px-4 py-2 text-text-primary"
+    animate={{ opacity: 1 }}
+    initial={{ opacity: 0 }}
+    transition={{ duration: 0.6 }}
+>
+    Animated button
 </motion.button>
+
 ```
+
+<Example isSmall>
+  <AnimatedButton />
+</Example>
 
 ### Key advantages
 
 Here's when it's the right choice for your project.
 
-- **Built for Svelte.** While other animation libraries can feel foreign, Svelte Motion's API feels like a natural extension of Svelte. Animations can be linked directly to reactive state and props.
-- **Hardware-acceleration.** Svelte Motion leverages high-performance browser animations, ensuring your UIs stay smooth and snappy.
+- **Built for Svelte.** Sometimes finding examples for animations with Svelte can be tricky. Svelte Motion is attempting to provided an exact copy of the Motion for React API which there is a lot of examples for out there in the wild.
 - **Animate anything.** CSS has hard limits. There are values you can't animate, keyframes you can't interrupt, staggers that must be hardcoded. Svelte Motion provides a single, consistent API that handles everything from simple transitions to advanced scroll, layout, and gesture-driven effects.
 - **App-like gestures.** Standard CSS `:hover` events can be unreliable on touch devices. Svelte Motion provides robust, cross-device gesture recognizers for tap and hover.
 
@@ -65,12 +77,16 @@ The `<motion>` component is the core API in Svelte Motion. It's a DOM element, s
   import { motion } from '@humanspeak/svelte-motion';
 </script>
 
-<motion.ul animate={{ rotate: 360 }}>
-  <li>Item 1</li>
-  <li>Item 2</li>
-  <li>Item 3</li>
-</motion.ul>
+<motion.ul
+    class="size-24 rounded-md bg-pink-400"
+    animate={{ rotate: 360 }}
+    transition={{ duration: 1 }}
+/>
 ```
+
+<Example isSmall>
+  <Rotate />
+</Example>
 
 When values in `animate` change, the component will animate. Svelte Motion has intuitive defaults, but animations can of course be configured via the `transition` prop.
 
