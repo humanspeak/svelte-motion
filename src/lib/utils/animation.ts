@@ -2,12 +2,19 @@ import { hasFinishedPromise, isPromiseLike } from '$lib/utils/promise'
 import { type AnimationOptions, type DOMKeyframesDefinition, animate } from 'motion'
 
 /**
- * Merge two Motion `AnimationOptions` objects without mutating the inputs.
+ * Animation utilities for Svelte Motion.
+ *
+ * Provides helpers for composing transition objects and ensuring lifecycle
+ * callbacks fire consistently regardless of the underlying Motion control type.
+ */
+
+/**
+ * Merge Motion `AnimationOptions` objects without mutating the inputs.
  *
  * Later values override earlier ones. Use to combine root configuration from
- * `MotionConfig` with local `transition` props.
+ * `MotionConfig` with local `transition` props. Accepts a variadic list.
  *
- * @param args Array of `AnimationOptions` to merge.
+ * @param args List of `AnimationOptions` to merge in left-to-right order.
  * @return A new merged `AnimationOptions` object.
  */
 export const mergeTransitions = (...args: AnimationOptions[]): AnimationOptions => {
@@ -19,9 +26,8 @@ export const mergeTransitions = (...args: AnimationOptions[]): AnimationOptions 
 /**
  * Animate an element and invoke lifecycle callbacks around the main transition.
  *
- * This wraps `motion.animate` to ensure `onStart` and `onComplete` are called
- * whether the returned control exposes a `finished` Promise or is itself
- * then-able.
+ * Wraps `motion.animate` to ensure `onStart` and `onComplete` are called
+ * whether the returned control exposes a `finished` promise or is then-able.
  *
  * @param el Target element.
  * @param keyframes Keyframes to animate to.

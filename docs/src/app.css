@@ -55,11 +55,11 @@
     --color-sidebar-active: #dbeafe;
     --color-sidebar-active-foreground: #1d4ed8;
 
-    /* Code block colors */
-    --color-code-background: #f1f5f9;
-    --color-code-foreground: #1e293b;
-    --color-code-block-background: #0f172a;
-    --color-code-block-foreground: #f1f5f9;
+    /* Code colors (light mode: lighter bg, dark text) */
+    --color-code-background: #f8f9f9; /* inline code bg */
+    --color-code-foreground: #111827; /* near-black text */
+    --color-code-block-background: #f5f6f8; /* very light grey block bg */
+    --color-code-block-foreground: #111827; /* black/muted text */
 }
 
 .dark {
@@ -189,13 +189,9 @@
         @apply text-text-primary;
     }
 
-    .prose h1,
-    .prose h2,
-    .prose h3,
-    .prose h4,
-    .prose h5,
-    .prose h6 {
-        @apply font-semibold text-text-primary;
+    /* Ensure headings override typography plugin defaults in light mode */
+    .prose :where(h1, h2, h3, h4, h5, h6) {
+        @apply font-bold !text-text-primary;
     }
 
     /* Ensure heading links inherit heading color/contrast */
@@ -215,21 +211,21 @@
     /* Strong emphasis readability in dark mode */
     .prose strong,
     .prose b {
-        @apply font-semibold text-text-primary;
+        @apply font-bold text-text-primary!;
     }
 
     /* ensure link color inside paragraphs and lists has adequate contrast */
     .prose p a,
     .prose li a {
-        @apply text-accent underline-offset-2 hover:text-accent/80;
+        @apply text-accent! underline-offset-2 hover:text-accent/80!;
     }
 
     .prose code {
-        @apply rounded bg-code-background px-1.5 py-0.5 font-mono text-sm text-code-foreground;
+        @apply rounded bg-code-background! px-1.5 py-0.5 font-mono text-sm text-code-foreground!;
     }
 
     .prose pre {
-        @apply rounded-lg bg-code-block-background text-code-block-foreground;
+        @apply rounded-lg border border-border bg-code-background! text-code-block-foreground!;
     }
 
     .prose pre code {
@@ -238,6 +234,12 @@
 
     .prose a {
         @apply text-accent no-underline hover:text-accent/80;
+    }
+
+    /* Maintain paragraph/list contrast in dark mode */
+    .dark .prose p,
+    .dark .prose li {
+        @apply text-text-secondary;
     }
 
     .prose blockquote {

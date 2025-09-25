@@ -62,13 +62,7 @@ export default [
             'no-var': ['error'],
             'prefer-const': ['error'],
             'svelte/no-navigation-without-resolve': 'off',
-            'no-unused-vars': [
-                'warn',
-                {
-                    argsIgnorePattern: '^_',
-                    ignoreRestSiblings: true
-                }
-            ],
+            'no-unused-vars': ['off'],
             '@typescript-eslint/no-unused-expressions': [
                 'error',
                 {

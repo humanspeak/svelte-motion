@@ -62,7 +62,9 @@
             <div class="flex">
                 <!-- Content -->
                 <article bind:this={contentElement} class="flex-1 px-4 py-8 sm:px-6 lg:px-8">
-                    <div class="prose max-w-none dark:prose-invert prose-headings:scroll-mt-20">
+                    <div
+                        class="prose max-w-none text-text-primary prose-slate dark:prose-invert prose-headings:scroll-mt-20"
+                    >
                         {@render children()}
                     </div>
                 </article>

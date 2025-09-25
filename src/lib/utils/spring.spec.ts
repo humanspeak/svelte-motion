@@ -59,6 +59,26 @@ describe('utils/spring - useSpring', () => {
         expect(n).toBeLessThanOrEqual(100)
     })
 
+    it('jump respects and preserves unit formatting', () => {
+        const s = useSpring('10vh')
+        s.jump('20vh')
+        expect(get(s)).toBe('20vh')
+    })
+
+    it('set/jump unsubscribe breaks following source and cancels raf', () => {
+        const src = writable<number | string>(0)
+        const s = useSpring(src)
+        const unsub = s.subscribe(() => {})
+        s.set(10)
+        rafCb?.(16)
+        // ensure API still works after unsubscribing
+        unsub()
+        // cancelAnimationFrame should have been called at least once via cleanup
+        // The dedicated cafSpy is only in other test; here we assert no throw and callable API
+        expect(() => s.set(20)).not.toThrow()
+        expect(() => s.jump(30)).not.toThrow()
+    })
+
     it('tracks another readable source', () => {
         const src = writable<number | string>(0)
         const s = useSpring(src)

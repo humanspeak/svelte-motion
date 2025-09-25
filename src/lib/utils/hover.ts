@@ -73,7 +73,8 @@ export const computeHoverBaseline = (
         rotateY: 0,
         rotateZ: 0,
         skewX: 0,
-        skewY: 0
+        skewY: 0,
+        opacity: 1
     }
 
     const cs = getComputedStyle(el)

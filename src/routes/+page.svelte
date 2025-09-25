@@ -80,6 +80,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/random/hover-opacity')}
+                    >
+                        Hover Opacity
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/random/animated-border-gradient')}
                     >
                         Animated Border Gradient
