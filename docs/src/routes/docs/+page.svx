@@ -46,7 +46,7 @@ Svelte gives you the power to build dynamic user interfaces with excellent perfo
 
 Here's when it's the right choice for your project.
 
-- **Built for Svelte.** Sometimes finding examples for animations with Svelte can be tricky. Svelte Motion is attempting to provided an exact copy of the Motion for React API which there is a lot of examples for out there in the wild.
+- **Built for Svelte.** Sometimes finding examples for animations with Svelte can be tricky. Svelte Motion is attempting to provide an exact copy of the Motion for React API which there is a lot of examples for out there in the wild.
 - **Animate anything.** CSS has hard limits. There are values you can't animate, keyframes you can't interrupt, staggers that must be hardcoded. Svelte Motion provides a single, consistent API that handles everything from simple transitions to advanced scroll, layout, and gesture-driven effects.
 - **App-like gestures.** Standard CSS `:hover` events can be unreliable on touch devices. Svelte Motion provides robust, cross-device gesture recognizers for tap and hover.
 

@@ -10,7 +10,7 @@
         if (breadcrumbs) {
             breadcrumbs.breadcrumbs = [
                 { title: 'Examples', href: '/examples' },
-                { title: 'Rotate' }
+                { title: 'Animated Button' }
             ]
         }
     })

@@ -7,6 +7,6 @@
 
 <div class="relative flex min-h-screen flex-col bg-background">
     <Header />
-    {@render children()}
+    {@render children?.()}
     <Footer />
 </div>
