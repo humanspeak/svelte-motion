@@ -134,6 +134,16 @@
                             >
                                 {m.cta_primary()}
                             </motion.button>
+                            <motion.button
+                                onclick={() => {
+                                    goto('/examples')
+                                }}
+                                whileTap={{ scale: 0.96 }}
+                                whileHover={{ scale: 1.03 }}
+                                class="inline-flex items-center justify-center rounded-full border border-border-mid bg-transparent px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
+                            >
+                                {m.cta_secondary()}
+                            </motion.button>
                         </div>
                         <ul
                             class="mt-10 flex flex-wrap justify-center gap-2 text-xs text-muted-foreground"
