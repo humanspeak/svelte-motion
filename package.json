@@ -82,7 +82,7 @@
         }
     },
     "dependencies": {
-        "motion": "^12.23.21"
+        "motion": "^12.23.22"
     },
     "devDependencies": {
         "@changesets/cli": "^2.29.7",
@@ -90,7 +90,7 @@
         "@eslint/js": "^9.36.0",
         "@playwright/test": "^1.55.1",
         "@sveltejs/adapter-auto": "^6.1.0",
-        "@sveltejs/kit": "^2.43.4",
+        "@sveltejs/kit": "^2.43.5",
         "@sveltejs/package": "^2.5.4",
         "@sveltejs/vite-plugin-svelte": "^6.2.1",
         "@tailwindcss/aspect-ratio": "^0.4.2",
@@ -126,7 +126,7 @@
         "tailwind-variants": "^3.1.1",
         "tailwindcss": "^4.1.13",
         "tailwindcss-animate": "^1.0.7",
-        "tsx": "^4.20.5",
+        "tsx": "^4.20.6",
         "typescript": "^5.9.2",
         "typescript-eslint": "^8.44.1",
         "vite": "^7.1.7",

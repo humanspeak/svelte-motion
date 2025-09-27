@@ -8,6 +8,7 @@ description: "Svelte Motion is a Svelte animation library for building smooth, p
   import Example from '$lib/components/general/Example.svelte'
   import Rotate from '$lib/examples/Rotate.svelte'
   import AnimatedButton from '$lib/examples/AnimatedButton.svelte'
+  import HoverAndTap from '$lib/examples/HoverAndTap.svelte'
 </script>
 
 # Get started with Svelte Motion
@@ -127,12 +128,16 @@ Or disable this initial animation entirely by setting `initial` to `false`.
 
 ```svelte
 <motion.button
-  whileHover={{ scale: 1.1 }}
-  whileTap={{ scale: 0.95 }}
+  whileHover={{ scale: 1.2 }}
+  whileTap={{ scale: 0.8 }}
 >
   Interactive button
 </motion.button>
 ```
+
+<Example isSmall>
+    <HoverAndTap />
+</Example>
 
 ## Scroll animation
 
