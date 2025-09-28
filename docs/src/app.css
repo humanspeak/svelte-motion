@@ -232,6 +232,38 @@
         @apply bg-transparent p-0 text-code-block-foreground;
     }
 
+    /* Shiki syntax highlighting support */
+    .prose .shiki-container {
+        @apply overflow-hidden rounded-lg border border-border;
+    }
+
+    .prose .shiki-container pre {
+        @apply m-0 rounded-none border-0;
+    }
+
+    .prose .shiki-container pre.shiki {
+        @apply bg-transparent! p-4 text-inherit!;
+    }
+
+    .prose .shiki-container pre.shiki code {
+        @apply bg-transparent! p-0 text-inherit!;
+    }
+
+    /* Theme switching for Shiki */
+    html:not(.dark) .prose .shiki-dark {
+        display: none;
+    }
+
+    html.dark .prose .shiki-light {
+        display: none;
+    }
+
+    /* Ensure proper display */
+    .prose .shiki-light,
+    .prose .shiki-dark {
+        width: 100%;
+    }
+
     .prose a {
         @apply text-accent no-underline hover:text-accent/80;
     }
