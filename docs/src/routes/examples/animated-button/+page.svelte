@@ -4,7 +4,6 @@
     import AnimatedButton from '$lib/examples/AnimatedButton.svelte'
 
     // Placeholder canvas; hook up live example later.
-
     const breadcrumbs = $derived(getBreadcrumbContext())
     $effect(() => {
         if (breadcrumbs) {

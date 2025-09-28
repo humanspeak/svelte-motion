@@ -4,7 +4,7 @@
     import HoverAndTap from '$lib/examples/HoverAndTap.svelte'
 
     // Placeholder canvas; hook up live example later.
-
+    let { data } = $props()
     const breadcrumbs = $derived(getBreadcrumbContext())
     $effect(() => {
         if (breadcrumbs) {
@@ -16,6 +16,6 @@
     })
 </script>
 
-<Example>
+<Example motionUrl={data.sourceUrl}>
     <HoverAndTap />
 </Example>
