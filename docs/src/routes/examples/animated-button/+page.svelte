@@ -4,7 +4,7 @@
     import AnimatedButton from '$lib/examples/AnimatedButton.svelte'
 
     // Placeholder canvas; hook up live example later.
-
+    let { data } = $props()
     const breadcrumbs = $derived(getBreadcrumbContext())
     $effect(() => {
         if (breadcrumbs) {
@@ -16,6 +16,6 @@
     })
 </script>
 
-<Example>
+<Example motionUrl={data.sourceUrl}>
     <AnimatedButton />
 </Example>

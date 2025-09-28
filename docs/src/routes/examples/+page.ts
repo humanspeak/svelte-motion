@@ -14,6 +14,11 @@ export const load: PageLoad = async () => {
             description: 'Interactive hover and tap animation example using Svelte Motion.',
             sourceUrl: 'https://examples.motion.dev/react/gestures'
         },
+        'html-content': {
+            title: 'HTML Content',
+            description: 'Interactive html content animation example using Svelte Motion.',
+            sourceUrl: 'https://examples.motion.dev/react/html-content'
+        },
         rotate: {
             title: 'Rotate',
             description: 'Interactive rotate animation example using Svelte Motion.',

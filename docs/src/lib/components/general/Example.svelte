@@ -1,8 +1,15 @@
 <script lang="ts">
     import { motion } from '@humanspeak/svelte-motion'
     import { cn } from '$lib/shadcn/utils'
+    import type { Snippet } from 'svelte'
 
-    const { children, isSmall = false } = $props()
+    type ExampleProps = {
+        children: Snippet
+        isSmall?: boolean
+        motionUrl?: string
+    }
+
+    const { children, isSmall = false, motionUrl }: ExampleProps = $props()
 
     let refreshId = $state(0)
     const refreshMotion = () => {
@@ -21,6 +28,16 @@
         <div class="flex flex-1 items-center gap-4"></div>
         <div class="flex flex-1 items-center justify-center gap-4"></div>
         <div class="flex flex-1 items-center justify-end gap-4">
+            {#if motionUrl}
+                <motion.button
+                    onclick={() => window.open(motionUrl, '_blank')}
+                    whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.1 }}
+                    class="inline-flex items-center justify-center rounded-md border border-border-muted px-2 py-1 text-sm text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
+                >
+                    Motion.dev
+                </motion.button>
+            {/if}
             <motion.button
                 onclick={refreshMotion}
                 whileTap={{ scale: 0.9 }}

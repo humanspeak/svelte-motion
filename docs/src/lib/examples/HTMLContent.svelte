@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion, animate } from '$lib/index'
+    import { motion, animate } from '@humanspeak/svelte-motion'
     import { onMount } from 'svelte'
 
     let count = $state(0)

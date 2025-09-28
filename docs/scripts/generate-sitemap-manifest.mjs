@@ -105,8 +105,9 @@ async function updateExamplesPageTs(examples) {
         let content = await readFile(examplesPageTs, 'utf8')
 
         // Find the examples object in the file and replace it
-        const examplesObjectRegex = /const examples = \{[\s\S]*?\n {4}\}/
-        const newExamplesObject = `const examples = ${JSON.stringify(examples, null, 8).replace(/^/gm, '    ')}`
+        // More robust regex that matches the entire examples object declaration
+        const examplesObjectRegex = /const examples\s*=\s*\{[\s\S]*?\n\s*\}(?=\s*\n\s*return)/
+        const newExamplesObject = `const examples = ${JSON.stringify(examples, null, 4).replace(/^/gm, '    ')}`
 
         if (examplesObjectRegex.test(content)) {
             content = content.replace(examplesObjectRegex, newExamplesObject)
