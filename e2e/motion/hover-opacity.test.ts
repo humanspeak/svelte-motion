@@ -88,4 +88,54 @@ test.describe('Hover opacity animation', () => {
         })
         expect(finalExitOpacity).toBeCloseTo(1, 1)
     })
+
+    test('should smoothly continue animation when re-hovering during exit animation', async ({
+        page
+    }) => {
+        await page.goto('/tests/random/hover-opacity')
+
+        const button = page.locator('[data-testid="motion-hover-opacity"]')
+
+        // Step 1: Hover to make it invisible
+        await button.hover()
+        await page.waitForTimeout(1500) // Wait for full fade to 0
+
+        const invisibleOpacity = await button.evaluate((el) =>
+            parseFloat(getComputedStyle(el).opacity)
+        )
+        expect(invisibleOpacity).toBeLessThan(0.1)
+
+        // Step 2: Unhover to start animating back to visible
+        await page.mouse.move(0, 0)
+        await page.waitForTimeout(400) // Wait 400ms of 1000ms transition (40% complete)
+
+        // Check that it's partially visible (animating back)
+        const partiallyVisibleOpacity = await button.evaluate((el) =>
+            parseFloat(getComputedStyle(el).opacity)
+        )
+        expect(partiallyVisibleOpacity).toBeGreaterThan(0.1) // Should have started fading back in
+        expect(partiallyVisibleOpacity).toBeLessThan(0.9) // But not fully visible yet
+
+        // Step 3: Hover again while it's animating back
+        await button.hover()
+
+        // Small wait to let animation start
+        await page.waitForTimeout(100)
+
+        // It should be smoothly animating to invisible from current position
+        // NOT jumping instantly to invisible
+        const reHoverOpacity = await button.evaluate((el) =>
+            parseFloat(getComputedStyle(el).opacity)
+        )
+
+        // Should have started moving toward 0, but not jumped there instantly
+        expect(reHoverOpacity).toBeLessThan(partiallyVisibleOpacity)
+        expect(reHoverOpacity).toBeGreaterThan(0) // Should not be at 0 instantly
+
+        // Wait for animation to complete
+        await page.waitForTimeout(1500)
+
+        const finalOpacity = await button.evaluate((el) => parseFloat(getComputedStyle(el).opacity))
+        expect(finalOpacity).toBeLessThan(0.1) // Should eventually reach 0
+    })
 })
