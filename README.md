@@ -182,6 +182,7 @@ Notes:
 
 - Transform properties like `scale`/`rotate` are composed into a single `transform` style during SSR.
 - When `initial` is empty, the first keyframe from `animate` is used to seed SSR styles.
+- `initial` can be `false` to not run on initial
 
 ## Utilities
 

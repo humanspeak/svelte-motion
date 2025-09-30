@@ -4,7 +4,6 @@
     "hero_title_line2": "The complete animation toolkit for the web.",
     "hero_subtitle": "Create high‑performance web animations with an easy API — from simple transforms to advanced interactive gestures.",
     "cta_primary": "Get Started",
-    "cta_secondary": "View Examples",
     "pill_free_oss": "Free and open‑source",
     "pill_easy": "Easy to use",
     "pill_tiny": "Tiny footprint",
@@ -16,5 +15,6 @@
     "footer_motion": "Motion.dev",
     "nav_github": "GitHub Repository",
     "nav_npm": "NPM Package",
-    "nav_home": "Home"
+    "nav_home": "Home",
+    "cta_secondary": "View Examples"
 }

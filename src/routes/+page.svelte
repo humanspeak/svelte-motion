@@ -56,6 +56,14 @@
                         Keyframes (shape + scale)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/initial-false')}
+                    >
+                        initial={'{false}'}
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
