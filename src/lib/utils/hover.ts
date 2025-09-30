@@ -118,16 +118,10 @@ export const attachWhileHover = (
     if (!whileHover) return () => {}
 
     let hoverBaseline: Record<string, unknown> | null = null
-    let currentAnimation: { cancel: () => void } | null = null
 
     const handlePointerEnter = () => {
         if (!isCapable()) return
-        if (
-            currentAnimation &&
-            typeof (currentAnimation as { cancel?: () => void }).cancel === 'function'
-        ) {
-            ;(currentAnimation as { cancel: () => void }).cancel()
-        }
+        // Don't cancel - let Motion interrupt smoothly from current value
         hoverBaseline = computeHoverBaseline(el, {
             initial: baselineSources?.initial,
             animate: baselineSources?.animate,
@@ -135,7 +129,7 @@ export const attachWhileHover = (
         })
         callbacks?.onStart?.()
         const { keyframes, transition } = splitHoverDefinition(whileHover)
-        currentAnimation = animate(
+        animate(
             el,
             keyframes as unknown as DOMKeyframesDefinition,
             (transition ?? mergedTransition) as AnimationOptions
@@ -144,18 +138,9 @@ export const attachWhileHover = (
 
     const handlePointerLeave = () => {
         if (!isCapable()) return
-        if (
-            currentAnimation &&
-            typeof (currentAnimation as { cancel?: () => void }).cancel === 'function'
-        ) {
-            ;(currentAnimation as { cancel: () => void }).cancel()
-        }
+        // Don't cancel - let Motion interrupt smoothly from current value
         if (hoverBaseline && Object.keys(hoverBaseline).length > 0) {
-            currentAnimation = animate(
-                el,
-                hoverBaseline as unknown as DOMKeyframesDefinition,
-                mergedTransition
-            )
+            animate(el, hoverBaseline as unknown as DOMKeyframesDefinition, mergedTransition)
         }
         callbacks?.onEnd?.()
     }
