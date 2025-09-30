@@ -3,12 +3,20 @@ import type { Snippet } from 'svelte'
 
 /**
  * Initial animation properties for a motion component.
+ *
+ * Set to `false` to skip the initial animation and render directly at the animated state.
+ * Useful for elements that should not animate on mount (e.g., tab indicators).
+ *
  * @example
  * ```svelte
- * <motion.div initial={{ opacity: 0, scale: 0 }} />
+ * <!-- Animate from initial to animate state -->
+ * <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} />
+ *
+ * <!-- Skip initial animation, render at animate state -->
+ * <motion.div initial={false} animate={{ opacity: 1 }} />
  * ```
  */
-export type MotionInitial = DOMKeyframesDefinition | undefined
+export type MotionInitial = DOMKeyframesDefinition | false | undefined
 
 /**
  * Target animation properties for a motion component.

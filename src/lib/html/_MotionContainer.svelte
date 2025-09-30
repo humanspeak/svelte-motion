@@ -20,6 +20,7 @@
     import { mergeInlineStyles } from '$lib/utils/style'
     import { isNativelyFocusable } from '$lib/utils/a11y'
     import { usePresence, getAnimatePresenceContext } from '$lib/utils/presence'
+    import { getInitialKeyframes } from '$lib/utils/initial'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -139,6 +140,9 @@
     // Recognized HTML void elements that cannot contain children
     const isVoidTag = $derived(VOID_TAGS.has(tag as string))
 
+    // Extract keyframes from initialProp, handling initial={false}
+    const initialKeyframes = $derived(getInitialKeyframes(initialProp))
+
     // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
     const derivedAttrs = $derived<Record<string, unknown>>({
         ...(rest as Record<string, unknown>),
@@ -158,7 +162,7 @@
             : {}),
         style: mergeInlineStyles(
             styleProp,
-            initialProp as unknown as Record<string, unknown>,
+            initialKeyframes as unknown as Record<string, unknown>,
             animateProp as unknown as Record<string, unknown>
         ),
         class: classProp
@@ -265,9 +269,9 @@
     $effect(() => {
         if (!(element && isLoaded === 'mounting')) return
         if (animateProp) {
-            if (isNotEmpty(initialProp)) {
+            if (isNotEmpty(initialKeyframes)) {
                 // Apply initial instantly BEFORE exposing 'initial' state
-                animate(element!, initialProp!, { duration: 0 })
+                animate(element!, initialKeyframes!, { duration: 0 })
                 // Mark initial after styles are applied so tests read CSS=0 while state=initial
                 isLoaded = 'initial'
                 dataPath = 1
@@ -284,9 +288,9 @@
                 isLoaded = 'ready'
                 runAnimation()
             }
-        } else if (isNotEmpty(initialProp)) {
+        } else if (isNotEmpty(initialKeyframes)) {
             // Apply initial instantly BEFORE exposing 'initial' state
-            animate(element!, initialProp!, { duration: 0 })
+            animate(element!, initialKeyframes!, { duration: 0 })
             dataPath = 3
             isLoaded = 'initial'
             requestAnimationFrame(async () => {
