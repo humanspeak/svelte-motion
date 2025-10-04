@@ -3,10 +3,26 @@
   Hierarchical structure with FontAwesome icons and proper styling
 -->
 <script lang="ts">
+    import { onMount } from 'svelte'
+
     const { currentPath } = $props()
 
+    type NavItem = {
+        title: string
+        href: string
+        icon: string
+    }
+
+    type OtherProject = {
+        url: string
+        slug: string
+        shortDescription: string
+    }
+
+    let otherProjects: NavItem[] = $state([])
+
     // Navigation structure matching Motion.dev with FontAwesome icons
-    const navigation = [
+    let navigation = $derived([
         {
             title: 'Get started',
             items: [{ title: 'Get started', href: '/docs', icon: 'fa-solid fa-play' }]
@@ -18,6 +34,11 @@
                     title: 'useAnimationFrame',
                     href: '/docs/use-animation-frame',
                     icon: 'fa-solid fa-clock'
+                },
+                {
+                    title: 'useTime',
+                    href: '/docs/use-time',
+                    icon: 'fa-solid fa-stopwatch'
                 }
             ]
         },
@@ -28,73 +49,35 @@
                 { title: 'ShadCN', href: 'https://shadcn-svelte.com', icon: 'fa-solid fa-heart' }
             ]
         },
-        {
-            title: 'Other Projects',
-            items: [
-                {
-                    title: 'Markdown',
-                    href: 'https://markdown.svelte.page',
-                    icon: 'fa-solid fa-heart'
-                },
-                { title: 'Table', href: 'https://table.svelte.page', icon: 'fa-solid fa-heart' }
-            ]
+        ...(otherProjects.length > 0
+            ? [
+                  {
+                      title: 'Other Projects',
+                      items: otherProjects
+                  }
+              ]
+            : [])
+    ])
+
+    onMount(async () => {
+        try {
+            const response = await fetch('/api/other-projects')
+            const projects: OtherProject[] = await response.json()
+
+            // Convert to nav items format
+            otherProjects = projects.map((project) => ({
+                title: formatTitle(project.slug),
+                href: project.url,
+                icon: 'fa-solid fa-heart'
+            }))
+        } catch (error) {
+            console.error('Failed to load other projects:', error)
         }
-        // {
-        //     title: 'Get started',
-        //     items: [
-        //         { title: 'Get started', href: '/docs', icon: 'fa-solid fa-play' },
-        //         { title: 'Examples', href: '/docs/examples', icon: 'fa-solid fa-book-open' },
-        //         { title: 'Tutorials', href: '/docs/tutorials', icon: 'fa-solid fa-graduation-cap' }
-        //     ]
-        // },
-        // {
-        //     title: 'Animation',
-        //     items: [
-        //         { title: 'Overview', href: '/docs/animation', icon: 'fa-solid fa-bolt' },
-        //         { title: 'Layout', href: '/docs/animation/layout' },
-        //         { title: 'Scroll', href: '/docs/animation/scroll' },
-        //         { title: 'SVG', href: '/docs/animation/svg' },
-        //         { title: 'Transitions', href: '/docs/animation/transitions' }
-        //     ]
-        // },
-        // {
-        //     title: 'Gestures',
-        //     items: [
-        //         { title: 'Overview', href: '/docs/gestures', icon: 'fa-solid fa-hand-pointer' },
-        //         { title: 'Hover', href: '/docs/gestures/hover' },
-        //         { title: 'Drag', href: '/docs/gestures/drag' }
-        //     ]
-        // },
-        // {
-        //     title: 'Components',
-        //     items: [
-        //         {
-        //             title: 'Motion component',
-        //             href: '/docs/components/motion',
-        //             icon: 'fa-solid fa-layer-group'
-        //         },
-        //         { title: 'AnimatePresence', href: '/docs/components/animate-presence' },
-        //         { title: 'LayoutGroup', href: '/docs/components/layout-group' },
-        //         { title: 'MotionConfig', href: '/docs/components/motion-config' }
-        //     ]
-        // },
-        // {
-        //     title: 'Guides',
-        //     items: [
-        //         {
-        //             title: 'Installation',
-        //             href: '/docs/guides/installation',
-        //             icon: 'fa-solid fa-gear'
-        //         },
-        //         {
-        //             title: 'Accessibility',
-        //             href: '/docs/guides/accessibility',
-        //             icon: 'fa-solid fa-universal-access'
-        //         },
-        //         { title: 'Styling', href: '/docs/guides/styling', icon: 'fa-solid fa-palette' }
-        //     ]
-        // }
-    ]
+    })
+
+    function formatTitle(slug: string): string {
+        return `/${slug.toLowerCase()}`
+    }
 
     /**
      * @param {string} href
