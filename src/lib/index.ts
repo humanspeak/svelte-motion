@@ -12,6 +12,7 @@ export const motion: MotionComponents = Object.fromEntries(
 export { animate, hover } from 'motion'
 // Re-export all Motion types so consumers can import types from this package
 export type { MotionAnimate, MotionInitial, MotionTransition, MotionWhileTap } from '$lib/types'
+export { useAnimationFrame } from '$lib/utils/animationFrame'
 export { useSpring } from '$lib/utils/spring'
 export { useTime } from '$lib/utils/time'
 export { useTransform } from '$lib/utils/transform'

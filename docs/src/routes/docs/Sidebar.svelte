@@ -12,6 +12,16 @@
             items: [{ title: 'Get started', href: '/docs', icon: 'fa-solid fa-play' }]
         },
         {
+            title: 'Hooks',
+            items: [
+                {
+                    title: 'useAnimationFrame',
+                    href: '/docs/use-animation-frame',
+                    icon: 'fa-solid fa-clock'
+                }
+            ]
+        },
+        {
             title: 'Love and Respect',
             items: [
                 { title: 'Beye.ai', href: 'https://beye.ai', icon: 'fa-solid fa-heart' },

@@ -204,6 +204,36 @@ Notes:
 <motion.div style={`rotate: ${$rotate}deg`} />
 ```
 
+### useAnimationFrame(callback)
+
+- Runs a callback on every animation frame with the current timestamp.
+- The callback receives a `DOMHighResTimeStamp` representing the time elapsed since the time origin.
+- Returns a cleanup function that stops the animation loop.
+- Best used inside a `$effect` to ensure proper cleanup when the component unmounts.
+- SSR-safe: Does nothing and returns a no-op cleanup function when `window` is unavailable.
+
+```svelte
+<script lang="ts">
+    import { useAnimationFrame } from '$lib'
+
+    let cubeRef: HTMLDivElement
+
+    $effect(() => {
+        return useAnimationFrame((t) => {
+            if (!cubeRef) return
+
+            const rotate = Math.sin(t / 10000) * 200
+            const y = (1 + Math.sin(t / 1000)) * -50
+            cubeRef.style.transform = `translateY(${y}px) rotateX(${rotate}deg) rotateY(${rotate}deg)`
+        })
+    })
+</script>
+
+<div bind:this={cubeRef}>Animated content</div>
+```
+
+- Reference: Motion useAnimationFrame docs [motion.dev](https://motion.dev/docs/react-use-animation-frame).
+
 ### useSpring
 
 `useSpring` creates a readable store that animates to its latest target with a spring. You can either control it directly with `set`/`jump`, or have it follow another readable (like a time-derived value).

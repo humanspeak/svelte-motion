@@ -7,7 +7,7 @@ export const load: PageLoad = async () => {
         'animated-button': {
             title: 'Animated Button',
             description: 'Interactive animated button animation example using Svelte Motion.',
-            sourceUrl: 'https://examples.motion.dev/react/animated-button?utm_source=embed'
+            sourceUrl: null
         },
         'hover-and-tap': {
             title: 'Hover and Tap',
@@ -23,6 +23,11 @@ export const load: PageLoad = async () => {
             title: 'Rotate',
             description: 'Interactive rotate animation example using Svelte Motion.',
             sourceUrl: 'https://examples.motion.dev/react/rotate?utm_source=embed'
+        },
+        'use-animation-frame': {
+            title: 'useAnimationFrame',
+            description: 'Interactive useanimationframe animation example using Svelte Motion.',
+            sourceUrl: 'https://motion.dev/docs/react-use-animation-frame'
         }
     }
 
