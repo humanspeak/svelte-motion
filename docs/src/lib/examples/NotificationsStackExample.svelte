@@ -25,14 +25,12 @@
         open: {
             y: 0,
             scale: 1,
-            opacity: 1,
-            pointerEvents: 'auto'
+            opacity: 1
         },
         closed: {
             y: 60,
             scale: 0.8,
-            opacity: 0,
-            pointerEvents: 'none'
+            opacity: 0
         }
     }
 
@@ -146,12 +144,9 @@
             >
                 <motion.h2
                     style={stringifyStyleObject({
-                        fontSize: '18px',
+                        fontSize: 18,
                         lineHeight: 1,
-                        margin: 0,
-                        marginLeft: '8px',
-                        pointerEvents: 'none',
-                        color: 'var(--color-text-primary)'
+                        marginLeft: 8
                     })}
                 >
                     Notifications
