@@ -59,6 +59,12 @@ export const load: PageLoad = async () => {
             title: 'While Focus',
             description: 'Interactive while focus animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/docs/react-motion-component#focus'
+        },
+        reordering: {
+            title: 'Reordering',
+            description:
+                'Interactive reordering animation example with layout transitions using Svelte Motion.',
+            sourceUrl: 'https://examples.motion.dev/react/reordering'
         }
     }
 
