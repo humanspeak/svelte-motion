@@ -25,16 +25,26 @@ reviews:
     auto_assign_reviewers: false
     poem: true
     labeling_instructions:
-        - 'bug: Any code that fixes incorrect behavior or errors'
-        - 'enhancement: New features or improvements to existing features'
-        - 'docs: Documentation updates or improvements'
-        - 'test: Test additions or improvements'
-        - 'refactor: Code restructuring without behavior changes'
-        - 'performance: Performance improvements or optimizations'
-        - 'security: Security fixes or improvements'
-        - 'animation: Changes to animation logic or Motion integration'
-        - 'accessibility: Accessibility improvements (a11y, keyboard, screen readers)'
-        - 'breaking-change: Changes that break backward compatibility'
+        - label: bug
+          instructions: Apply to any code that fixes incorrect behavior or errors
+        - label: enhancement
+          instructions: Apply to new features or improvements to existing features
+        - label: docs
+          instructions: Apply to documentation updates or improvements
+        - label: test
+          instructions: Apply to test additions or improvements
+        - label: refactor
+          instructions: Apply to code restructuring without behavior changes
+        - label: performance
+          instructions: Apply to performance improvements or optimizations
+        - label: security
+          instructions: Apply to security fixes or improvements
+        - label: animation
+          instructions: Apply to changes to animation logic or Motion integration
+        - label: accessibility
+          instructions: Apply to accessibility improvements (a11y, keyboard, screen readers)
+        - label: breaking-change
+          instructions: Apply to changes that break backward compatibility
     path_filters: []
     path_instructions:
         - path: src/lib/utils/**/*.ts
