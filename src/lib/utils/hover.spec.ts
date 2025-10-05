@@ -58,6 +58,13 @@ describe('utils/hover', () => {
         expect(isHoverCapable()).toBe(false)
     })
 
+    it('isHoverCapable: returns false when matchMedia throws', () => {
+        vi.stubGlobal('matchMedia', (() => {
+            throw new Error('matchMedia not supported')
+        }) as unknown as typeof window.matchMedia)
+        expect(isHoverCapable()).toBe(false)
+    })
+
     it('splitHoverDefinition: extracts nested transition when present', () => {
         const def = { scale: 1.2, transition: { duration: 0.12 } }
         const { keyframes, transition } = splitHoverDefinition(def)
