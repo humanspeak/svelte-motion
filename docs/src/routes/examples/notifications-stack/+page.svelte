@@ -15,7 +15,7 @@
 </script>
 
 <svelte:head>
-    <title>Notifications Stack | Examples | Examples | Svelte Motion</title>
+    <title>Notifications Stack | Examples | Svelte Motion</title>
 </svelte:head>
 
 <Example>

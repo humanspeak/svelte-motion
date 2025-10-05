@@ -57,6 +57,8 @@ export const computeFocusBaseline = (
         opacity: 1
     }
 
+    const cs = getComputedStyle(el)
+
     for (const key of Object.keys(whileFocusRecord)) {
         if (Object.prototype.hasOwnProperty.call(animateRecord, key)) {
             baseline[key] = animateRecord[key]
@@ -65,9 +67,11 @@ export const computeFocusBaseline = (
         } else if (key in (neutralTransformDefaults as Record<string, unknown>)) {
             baseline[key] = neutralTransformDefaults[key]
         } else {
-            const cs = getComputedStyle(el)
-            if (key in (cs as unknown as Record<string, unknown>)) {
-                baseline[key] = (cs as unknown as Record<string, unknown>)[key] as string
+            // Convert camelCase to kebab-case for CSS property access
+            const cssProperty = key.replace(/([A-Z])/g, '-$1').toLowerCase()
+            const value = cs.getPropertyValue(cssProperty)
+            if (value) {
+                baseline[key] = value
             }
         }
     }
