@@ -8,8 +8,8 @@ import type { DOMKeyframesDefinition } from 'motion'
  * render directly at its animated state. This function returns `undefined` for
  * `initial={false}`, and the keyframes object otherwise.
  *
- * @param {MotionInitial} initial - The initial prop value
- * @returns {DOMKeyframesDefinition | undefined} Keyframes to apply, or undefined
+ * @param initial - The initial prop value
+ * @returns Keyframes to apply, or undefined
  *
  * @example
  * ```typescript
@@ -18,6 +18,6 @@ import type { DOMKeyframesDefinition } from 'motion'
  * getInitialKeyframes(undefined)        // undefined
  * ```
  */
-export function getInitialKeyframes(initial: MotionInitial): DOMKeyframesDefinition | undefined {
+export const getInitialKeyframes = (initial: MotionInitial): DOMKeyframesDefinition | undefined => {
     return initial === false ? undefined : (initial as DOMKeyframesDefinition | undefined)
 }

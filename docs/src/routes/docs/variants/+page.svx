@@ -1,0 +1,340 @@
+---
+title: Variants
+description: Define reusable animation states and orchestrate complex animations across component trees
+---
+
+<script>
+    import VariantsBasicExample from '$lib/examples/VariantsBasicExample.svelte'
+    import Example from '$lib/components/general/Example.svelte'
+    import VariantsPropagationExample from '$lib/examples/VariantsPropagationExample.svelte'
+    import NotificationsStackExample from '$lib/examples/NotificationsStackExample.svelte'
+</script>
+
+# Variants
+
+Variants allow you to define named animation states that can be referenced throughout your component tree. They're perfect for creating reusable animations and orchestrating complex sequences.
+
+## Basic usage
+
+Instead of defining animation objects inline, you can create a `Variants` object with named states:
+
+```svelte
+<script lang="ts">
+    import { motion, type Variants } from '@humanspeak/svelte-motion'
+
+    let isOpen = $state(false)
+
+    const variants: Variants = {
+        open: {
+            opacity: 1,
+            scale: 1
+        },
+        closed: {
+            opacity: 0,
+            scale: 0.8
+        }
+    }
+</script>
+
+<motion.div
+    variants={variants}
+    initial="closed"
+    animate={isOpen ? 'open' : 'closed'}
+    onclick={() => isOpen = !isOpen}
+>
+    Click me
+</motion.div>
+```
+
+<Example isSmall>
+<VariantsBasicExample />
+</Example>
+
+## Benefits
+
+### 1. Reusable animation definitions
+
+Define your animation states once and reference them by name throughout your components:
+
+```svelte
+<script lang="ts">
+    const fadeVariants: Variants = {
+        visible: { opacity: 1 },
+        hidden: { opacity: 0 }
+    }
+</script>
+
+<motion.div variants={fadeVariants} animate="visible" />
+<motion.p variants={fadeVariants} animate="visible" />
+<motion.span variants={fadeVariants} animate="visible" />
+```
+
+### 2. Clean state management
+
+Variants work beautifully with Svelte's reactive state:
+
+```svelte
+<script lang="ts">
+    let status = $state<'idle' | 'loading' | 'success'>('idle')
+
+    const statusVariants: Variants = {
+        idle: { scale: 1, backgroundColor: 'gray' },
+        loading: { scale: 1.1, backgroundColor: 'royalblue' },
+        success: { scale: 1, backgroundColor: '#22c55e' }
+    }
+</script>
+
+<motion.button variants={statusVariants} animate={status}>
+    {status}
+</motion.button>
+```
+
+### 3. Simplified animation orchestration
+
+Variants make it easy to coordinate animations across multiple elements without prop drilling.
+
+## Variant propagation
+
+One of the most powerful features of variants is **automatic propagation** through component trees. When a parent component changes its animation state, all children with matching variant names will animate automatically.
+
+```svelte
+<script lang="ts">
+    import { motion, type Variants } from '@humanspeak/svelte-motion'
+
+    let isVisible = $state(false)
+
+    const containerVariants: Variants = {
+        visible: { opacity: 1 },
+        hidden: { opacity: 0 }
+    }
+
+    const itemVariants: Variants = {
+        visible: { opacity: 1, x: 0 },
+        hidden: { opacity: 0, x: -20 }
+    }
+</script>
+
+<motion.ul
+    variants={containerVariants}
+    initial="hidden"
+    animate={isVisible ? 'visible' : 'hidden'}
+>
+    <!-- These children automatically inherit the parent's "visible" or "hidden" state -->
+    <motion.li variants={itemVariants}>Item 1</motion.li>
+    <motion.li variants={itemVariants}>Item 2</motion.li>
+    <motion.li variants={itemVariants}>Item 3</motion.li>
+</motion.ul>
+```
+
+<Example isSmall>
+<VariantsPropagationExample />
+</Example>
+
+### How propagation works
+
+1. Parent component sets `animate="visible"`
+2. Children with `variants` defined automatically inherit `"visible"`
+3. Each child resolves its own `visible` variant from its local variants definition
+4. No need to pass `animate` props to children!
+
+## Stagger animations
+
+You can create staggered animations by using the `delay` in individual item transitions:
+
+```svelte
+<script lang="ts">
+    const itemVariants: Variants = {
+        visible: { opacity: 1, y: 0 },
+        hidden: { opacity: 0, y: 20 }
+    }
+</script>
+
+{#each items as item, i}
+    <motion.div
+        variants={itemVariants}
+        transition={{
+            delay: i * 0.1
+        }}
+    >
+        {item}
+    </motion.div>
+{/each}
+```
+
+## Complex example: Notifications Stack
+
+Here's a real-world example showing how variants enable complex orchestration. The parent controls the animation state, and all children respond accordingly.
+
+**Click the stack to see variants in action:**
+
+<Example isSmall>
+<NotificationsStackExample />
+</Example>
+
+### Breaking down the code
+
+The example uses three different variant definitions working together:
+
+```svelte
+<script lang="ts">
+    let isOpen = $state(false)
+
+    // 1. Parent stack variants control the overall scale and position
+    const stackVariants: Variants = {
+        open: { y: 20, scale: 0.9, cursor: 'pointer' },
+        closed: { y: 0, scale: 1, cursor: 'default' }
+    }
+
+    // 2. Header variants control visibility
+    const headerVariants: Variants = {
+        open: { opacity: 1, y: 0, pointerEvents: 'auto' },
+        closed: { opacity: 0, y: 60, pointerEvents: 'none' }
+    }
+
+    // 3. Each notification gets its own stacking behavior
+    function getNotificationVariants(index: number): Variants {
+        return {
+            open: {
+                y: 0,
+                opacity: 1,
+                pointerEvents: 'auto'
+            },
+            closed: {
+                y: -index * 68,
+                opacity: 1 - index * 0.4,
+                pointerEvents: index === 0 ? 'auto' : 'none'
+            }
+        }
+    }
+</script>
+
+<motion.div
+    variants={stackVariants}
+    animate={isOpen ? 'open' : 'closed'}
+>
+    <!-- Header automatically inherits "open" or "closed" state -->
+    <motion.div variants={headerVariants}>
+        <h2>Notifications</h2>
+        <button onclick={() => isOpen = false}>Collapse</button>
+    </motion.div>
+
+    <!-- Each notification inherits and applies its own variant -->
+    {#each notifications as notification, i}
+        <motion.div
+            variants={getNotificationVariants(i)}
+            transition={{ delay: i * 0.04 }}
+            onclick={() => isOpen = !isOpen}
+        >
+            {notification}
+        </motion.div>
+    {/each}
+</motion.div>
+```
+
+**Key points:**
+- Parent sets `animate={isOpen ? 'open' : 'closed'}`
+- Children with `variants` automatically inherit this state
+- Each child resolves its own variant definition
+- No need to pass props to children!
+
+See the [full source code](/examples/notifications-stack) for the complete implementation.
+
+## Type safety
+
+Variants are fully typed in TypeScript. The `Variants` type ensures your animation definitions are valid:
+
+```typescript
+import type { Variants } from '@humanspeak/svelte-motion'
+
+const variants: Variants = {
+    visible: {
+        opacity: 1,
+        x: 0
+    },
+    hidden: {
+        opacity: 0,
+        x: -100
+    }
+}
+```
+
+## Best practices
+
+### 1. Use semantic names
+
+Choose variant names that describe the state, not the animation:
+
+```svelte
+// ✅ Good - describes state
+const variants = {
+    visible: { opacity: 1 },
+    hidden: { opacity: 0 }
+}
+
+// ❌ Avoid - describes animation
+const variants = {
+    fadeIn: { opacity: 1 },
+    fadeOut: { opacity: 0 }
+}
+```
+
+### 2. Keep variants focused
+
+Each variant should represent a complete state:
+
+```svelte
+const buttonVariants: Variants = {
+    idle: { scale: 1, backgroundColor: 'gray' },
+    loading: { scale: 1.05, backgroundColor: 'royalblue' },
+    success: { scale: 1, backgroundColor: '#22c55e' },
+    error: { scale: 0.95, backgroundColor: '#ef4444' }
+}
+```
+
+### 3. Combine with Svelte state
+
+Variants work perfectly with Svelte's reactive state management:
+
+```svelte
+<script lang="ts">
+    let state = $state<'initial' | 'active' | 'complete'>('initial')
+</script>
+
+<motion.div variants={myVariants} animate={state}>
+    <!-- Component updates automatically when state changes -->
+</motion.div>
+```
+
+## API Reference
+
+### Variants type
+
+```typescript
+type Variants = Record<string, DOMKeyframesDefinition | undefined>
+```
+
+A `Variants` object is a dictionary mapping variant names (strings) to animation definitions.
+
+### Using variants
+
+Variants can be passed to any motion component via the `variants` prop:
+
+- `variants`: Object containing named animation states
+- `initial`: Initial variant name (string)
+- `animate`: Target variant name (string)
+- `exit`: Exit variant name (string)
+
+```svelte
+<motion.div
+    variants={myVariants}
+    initial="hidden"
+    animate="visible"
+    exit="hidden"
+/>
+```
+
+## Related
+
+- [Animation Overview](/docs/animation) - Learn about other animation techniques
+- [Motion Component](/docs/motion-component) - Full API reference
+- [Examples](/examples) - See variants in action

@@ -58,6 +58,13 @@ describe('utils/hover', () => {
         expect(isHoverCapable()).toBe(false)
     })
 
+    it('isHoverCapable: returns false when matchMedia throws', () => {
+        vi.stubGlobal('matchMedia', (() => {
+            throw new Error('matchMedia not supported')
+        }) as unknown as typeof window.matchMedia)
+        expect(isHoverCapable()).toBe(false)
+    })
+
     it('splitHoverDefinition: extracts nested transition when present', () => {
         const def = { scale: 1.2, transition: { duration: 0.12 } }
         const { keyframes, transition } = splitHoverDefinition(def)
@@ -159,5 +166,135 @@ describe('utils/hover', () => {
         await Promise.resolve()
         expect(animateMock).not.toHaveBeenCalled()
         cleanup()
+    })
+
+    describe('CSS variable preservation', () => {
+        it('computeHoverBaseline: preserves CSS variables from inline style', () => {
+            const el = document.createElement('div')
+            el.setAttribute(
+                'style',
+                'background-color: var(--color-background); color: var(--color-text)'
+            )
+            Object.defineProperty(window, 'getComputedStyle', {
+                value: () => ({
+                    backgroundColor: 'rgb(255, 255, 255)',
+                    color: 'rgb(0, 0, 0)'
+                }),
+                configurable: true
+            })
+
+            const baseline = computeHoverBaseline(el, {
+                whileHover: { backgroundColor: '#f5f5f5', color: '#333' }
+            })
+
+            // Should preserve the CSS variable, not the computed RGB value
+            expect(baseline.backgroundColor).toBe('var(--color-background)')
+            expect(baseline.color).toBe('var(--color-text)')
+        })
+
+        it('computeHoverBaseline: uses computed style when no CSS variable present', () => {
+            const el = document.createElement('div')
+            el.setAttribute('style', 'background-color: #fff')
+            Object.defineProperty(window, 'getComputedStyle', {
+                value: () => ({ backgroundColor: 'rgb(255, 255, 255)' }),
+                configurable: true
+            })
+
+            const baseline = computeHoverBaseline(el, {
+                whileHover: { backgroundColor: '#000' }
+            })
+
+            // Should use computed style when no var() present
+            expect(baseline.backgroundColor).toBe('rgb(255, 255, 255)')
+        })
+
+        it('computeHoverBaseline: handles mixed CSS vars and static values', () => {
+            const el = document.createElement('div')
+            el.setAttribute('style', 'background-color: var(--bg); border-width: 2px; color: #000')
+            Object.defineProperty(window, 'getComputedStyle', {
+                value: () => ({
+                    backgroundColor: 'rgb(255, 0, 0)',
+                    borderWidth: '2px',
+                    color: 'rgb(0, 0, 0)'
+                }),
+                configurable: true
+            })
+
+            const baseline = computeHoverBaseline(el, {
+                whileHover: { backgroundColor: '#fff', borderWidth: '4px', color: '#fff' }
+            })
+
+            // backgroundColor has var() - should preserve
+            expect(baseline.backgroundColor).toBe('var(--bg)')
+            // borderWidth and color don't have var() - should use computed
+            expect(baseline.borderWidth).toBe('2px')
+            expect(baseline.color).toBe('rgb(0, 0, 0)')
+        })
+
+        it('computeHoverBaseline: handles kebab-case to camelCase conversion', () => {
+            const el = document.createElement('div')
+            el.setAttribute('style', 'background-color: var(--primary-bg)')
+            Object.defineProperty(window, 'getComputedStyle', {
+                value: () => ({ backgroundColor: 'rgb(100, 100, 100)' }),
+                configurable: true
+            })
+
+            const baseline = computeHoverBaseline(el, {
+                whileHover: { backgroundColor: '#000' }
+            })
+
+            expect(baseline.backgroundColor).toBe('var(--primary-bg)')
+        })
+
+        it('computeHoverBaseline: preserves calc() functions', () => {
+            const el = document.createElement('div')
+            el.setAttribute('style', 'width: calc(100% - 20px); height: calc(50vh + 10px)')
+            Object.defineProperty(window, 'getComputedStyle', {
+                value: () => ({ width: '980px', height: '500px' }),
+                configurable: true
+            })
+
+            const baseline = computeHoverBaseline(el, {
+                whileHover: { width: '1000px', height: '600px' }
+            })
+
+            expect(baseline.width).toBe('calc(100% - 20px)')
+            expect(baseline.height).toBe('calc(50vh + 10px)')
+        })
+
+        it('computeHoverBaseline: preserves min/max/clamp functions', () => {
+            const el = document.createElement('div')
+            el.setAttribute('style', 'width: clamp(200px, 50%, 800px); font-size: max(16px, 1rem)')
+            Object.defineProperty(window, 'getComputedStyle', {
+                value: () => ({ width: '400px', fontSize: '16px' }),
+                configurable: true
+            })
+
+            const baseline = computeHoverBaseline(el, {
+                whileHover: { width: '500px', fontSize: '20px' }
+            })
+
+            expect(baseline.width).toBe('clamp(200px, 50%, 800px)')
+            expect(baseline.fontSize).toBe('max(16px, 1rem)')
+        })
+
+        it('computeHoverBaseline: preserves color functions (rgb, hsl)', () => {
+            const el = document.createElement('div')
+            el.setAttribute('style', 'background-color: rgb(255, 0, 0); color: hsl(200, 100%, 50%)')
+            Object.defineProperty(window, 'getComputedStyle', {
+                value: () => ({
+                    backgroundColor: 'rgb(255, 0, 0)',
+                    color: 'rgb(0, 191, 255)'
+                }),
+                configurable: true
+            })
+
+            const baseline = computeHoverBaseline(el, {
+                whileHover: { backgroundColor: '#000', color: '#fff' }
+            })
+
+            expect(baseline.backgroundColor).toBe('rgb(255, 0, 0)')
+            expect(baseline.color).toBe('hsl(200, 100%, 50%)')
+        })
     })
 })

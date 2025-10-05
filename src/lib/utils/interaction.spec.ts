@@ -78,6 +78,59 @@ describe('utils/interaction', () => {
         cleanup()
     })
 
+    it('attachWhileTap: handles setPointerCapture failure gracefully', async () => {
+        const el = document.createElement('div')
+        // Mock setPointerCapture to throw
+        const originalSetPointerCapture = el.setPointerCapture
+        el.setPointerCapture = vi.fn(() => {
+            throw new Error('Pointer capture not supported')
+        })
+
+        animateMock.mockClear()
+        const onTapStart = vi.fn()
+        const cleanup = attachWhileTap(
+            el,
+            { scale: 0.9 },
+            { scale: 1 },
+            { scale: 1.1 },
+            { onTapStart }
+        )
+
+        // Should still work despite setPointerCapture failure
+        el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1 }))
+        await Promise.resolve()
+        expect(onTapStart).toHaveBeenCalledTimes(1)
+        expect(animateMock).toHaveBeenCalled()
+
+        // Restore and cleanup
+        el.setPointerCapture = originalSetPointerCapture
+        cleanup()
+    })
+
+    it('attachWhileTap: handles releasePointerCapture failure gracefully', async () => {
+        const el = document.createElement('div')
+        // Mock releasePointerCapture to throw
+        const originalReleasePointerCapture = el.releasePointerCapture
+        el.releasePointerCapture = vi.fn(() => {
+            throw new Error('Release pointer capture failed')
+        })
+
+        animateMock.mockClear()
+        const onTap = vi.fn()
+        const cleanup = attachWhileTap(el, { scale: 0.9 }, { scale: 1 }, { scale: 1.1 }, { onTap })
+
+        el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1 }))
+        await Promise.resolve()
+        // Should still work on pointer up despite releasePointerCapture failure
+        el.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1 }))
+        await Promise.resolve()
+        expect(onTap).toHaveBeenCalledTimes(1)
+
+        // Restore and cleanup
+        el.releasePointerCapture = originalReleasePointerCapture
+        cleanup()
+    })
+
     it('attachWhileTap: pointercancel path and no baseline available (fires cancel)', async () => {
         const el = document.createElement('div')
         animateMock.mockClear()

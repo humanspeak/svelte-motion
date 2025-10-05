@@ -57,9 +57,24 @@ export const mergeInlineStyles = (
             case 'height':
                 setPx('height', value)
                 break
+            case 'x':
+                addTransform('translateX', value, 'px')
+                break
+            case 'y':
+                addTransform('translateY', value, 'px')
+                break
+            case 'z':
+                addTransform('translateZ', value, 'px')
+                break
             case 'scale':
                 // scale is unitless
                 addTransform('scale', value, '')
+                break
+            case 'scaleX':
+                addTransform('scaleX', value, '')
+                break
+            case 'scaleY':
+                addTransform('scaleY', value, '')
                 break
             case 'rotate':
                 addTransform(
@@ -67,6 +82,42 @@ export const mergeInlineStyles = (
                     value,
                     typeof (Array.isArray(value) ? value[0] : value) === 'number' ? 'deg' : ''
                 )
+                break
+            case 'rotateX':
+                addTransform(
+                    'rotateX',
+                    value,
+                    typeof (Array.isArray(value) ? value[0] : value) === 'number' ? 'deg' : ''
+                )
+                break
+            case 'rotateY':
+                addTransform(
+                    'rotateY',
+                    value,
+                    typeof (Array.isArray(value) ? value[0] : value) === 'number' ? 'deg' : ''
+                )
+                break
+            case 'rotateZ':
+                addTransform(
+                    'rotateZ',
+                    value,
+                    typeof (Array.isArray(value) ? value[0] : value) === 'number' ? 'deg' : ''
+                )
+                break
+            case 'skew':
+            case 'skewX':
+            case 'skewY':
+                addTransform(
+                    key,
+                    value,
+                    typeof (Array.isArray(value) ? value[0] : value) === 'number' ? 'deg' : ''
+                )
+                break
+            case 'pointerEvents':
+                base['pointer-events'] = String(Array.isArray(value) ? value[0] : value)
+                break
+            case 'cursor':
+                setProp('cursor', value)
                 break
             default:
                 // Fallback: write raw as-is for simple CSS props

@@ -1,0 +1,183 @@
+---
+title: "useAnimationFrame"
+description: "Run a callback on every animation frame for smooth, time-based animations."
+---
+
+<script>
+  import { useAnimationFrame } from '@humanspeak/svelte-motion';
+  import Example from '$lib/components/general/Example.svelte';
+  import UseAnimationFrameExample from '$lib/examples/UseAnimationFrameExample.svelte';
+</script>
+
+# useAnimationFrame
+
+`useAnimationFrame` runs a callback once every animation frame, providing direct access to the browser's animation loop.
+
+```svelte
+<script>
+  import { useAnimationFrame } from '@humanspeak/svelte-motion'
+
+  let element: HTMLDivElement
+
+  $effect(() => {
+    return useAnimationFrame((time) => {
+      if (!element) return
+      element.style.transform = `rotateY(${time / 10}deg)`
+    })
+  })
+</script>
+
+<div bind:this={element}>Rotating content</div>
+```
+
+## Usage
+
+The callback receives a `DOMHighResTimeStamp` representing the time elapsed since the time origin, in milliseconds.
+
+```svelte
+<script lang="ts">
+  import { useAnimationFrame } from '@humanspeak/svelte-motion'
+
+  let cubeRef: HTMLDivElement
+
+  $effect(() => {
+    return useAnimationFrame((time) => {
+      if (!cubeRef) return
+
+      const rotate = Math.sin(time / 10000) * 200
+      const y = (1 + Math.sin(time / 1000)) * -50
+
+      cubeRef.style.transform =
+        `translateY(${y}px) rotateX(${rotate}deg) rotateY(${rotate}deg)`
+    })
+  })
+</script>
+
+<div bind:this={cubeRef}>
+  Animated content
+</div>
+```
+
+<Example isSmall>
+  <UseAnimationFrameExample />
+</Example>
+
+## How it works
+
+`useAnimationFrame` provides a simple way to create time-based animations by:
+
+1. Starting a `requestAnimationFrame` loop when called
+2. Calling your callback with the current timestamp on each frame
+3. Returning a cleanup function that stops the animation loop
+
+### With $effect
+
+For Svelte 5, wrap `useAnimationFrame` in a `$effect` and return its cleanup function. This ensures the animation loop is properly stopped when the component unmounts:
+
+```svelte
+<script>
+  let element: HTMLDivElement
+
+  $effect(() => {
+    // Start animation loop
+    return useAnimationFrame((time) => {
+      // Your animation logic
+      if (!element) return
+      element.style.opacity = String(Math.sin(time / 1000))
+    })
+    // Cleanup happens automatically when effect reruns or component unmounts
+  })
+</script>
+```
+
+## Performance
+
+`useAnimationFrame` is optimized for performance:
+
+- **Native timing**: Uses `requestAnimationFrame` which runs at the optimal frame rate (typically 60 FPS)
+- **Automatic cleanup**: Cancels animation frames when the effect is destroyed
+- **SSR-safe**: Returns a no-op function in server-side rendering environments
+
+## Common patterns
+
+### Smooth rotation
+
+```svelte
+<script>
+  let element: HTMLDivElement
+
+  $effect(() => {
+    return useAnimationFrame((time) => {
+      if (!element) return
+      const degrees = (time / 10) % 360
+      element.style.transform = `rotate(${degrees}deg)`
+    })
+  })
+</script>
+```
+
+### Pulsing animation
+
+```svelte
+<script>
+  let element: HTMLDivElement
+
+  $effect(() => {
+    return useAnimationFrame((time) => {
+      if (!element) return
+      const scale = 1 + Math.sin(time / 500) * 0.1
+      element.style.transform = `scale(${scale})`
+    })
+  })
+</script>
+```
+
+### Oscillating movement
+
+```svelte
+<script>
+  let element: HTMLDivElement
+
+  $effect(() => {
+    return useAnimationFrame((time) => {
+      if (!element) return
+      const x = Math.sin(time / 1000) * 100
+      const y = Math.cos(time / 1500) * 50
+      element.style.transform = `translate(${x}px, ${y}px)`
+    })
+  })
+</script>
+```
+
+## API Reference
+
+### Parameters
+
+The callback function receives one argument:
+
+- **time** `number` - The total milliseconds since the animation started (DOMHighResTimeStamp)
+
+### Returns
+
+A cleanup function `() => void` that stops the animation loop when called.
+
+## When to use
+
+Use `useAnimationFrame` when you need:
+
+- Frame-by-frame control over animations
+- Time-based calculations for smooth motion
+- Complex animation logic that depends on elapsed time
+- Direct DOM manipulation for performance-critical animations
+
+For declarative animations, consider using the `motion` component with `animate` props instead.
+
+## See also
+
+- [useTime](/docs/use-time) - For reactive time stores
+- [Motion component](/docs) - For declarative animations
+- [Examples](/examples) - See useAnimationFrame in action
+
+---
+
+Based on [Motion's useAnimationFrame](https://motion.dev/docs/react-use-animation-frame) API.
