@@ -30,7 +30,7 @@ All standard HTML and SVG elements are supported as motion components (e.g., `mo
 
 ### MotionConfig
 
-This package includes support for `MotionConfig`, which allows you to set default motion settings for all child components. See the [Reach - Motion Config](https://motion.dev/docs/react-motion-config) for more details.
+This package includes support for `MotionConfig`, which allows you to set default motion settings for all child components. See the [React - Motion Config](https://motion.dev/docs/react-motion-config) for more details.
 
 ```svelte
 <MotionConfig transition={{ duration: 0.5 }}>
@@ -111,6 +111,7 @@ This package carefully selects its dependencies to provide a robust and maintain
 | [HTML Content (0→100 counter)](https://examples.motion.dev/react/html-content)                           | `/tests/motion/html-content`             | [View Example](https://motion.svelte.page/examples/html-content)                               |
 | [Aspect Ratio](https://examples.motion.dev/react/aspect-ratio)                                           | `/tests/motion/aspect-ratio`             | [View Example](https://svelte.dev/playground/1bf60e745fae44f5becb4c830fde9b6e?version=5.38.10) |
 | [Hover + Tap (whileHover + whileTap)](https://examples.motion.dev/react/gestures)                        | `/tests/motion/hover-and-tap`            | [View Example](https://motion.svelte.page/examples/hover-and-tap)                              |
+| [Focus (whileFocus)](https://motion.dev/docs/react-motion-component#focus)                               | `/tests/motion/while-focus`              | [View Example](https://motion.svelte.page/examples/while-focus)                                |
 | [Rotate](https://examples.motion.dev/react/rotate)                                                       | `/tests/motion/rotate`                   | [View Example](https://motion.svelte.page/examples/rotate)                                     |
 | [Random - Shiny Button](https://www.youtube.com/watch?v=jcpLprT5F0I) by [@verse\_](https://x.com/verse_) | `/tests/random/shiny-button`             | [View Example](https://svelte.dev/playground/96f9e0bf624f4396adaf06c519147450?version=5.38.10) |
 | [Fancy Like Button](https://github.com/DRlFTER/fancyLikeButton)                                          | `/tests/random/fancy-like-button`        | [View Example](https://svelte.dev/playground/c34b7e53d41c48b0ab1eaf21ca120c6e?version=5.38.10) |
@@ -152,6 +153,16 @@ Svelte Motion now supports hover interactions via the `whileHover` prop, similar
     - Enter or Space up → fires `onTap`
     - Blur while key is held → fires `onTapCancel`
     - `MotionContainer` sets `tabindex="0"` automatically when `whileTap` is present and no `tabindex`/`tabIndex` is provided.
+
+### Focus
+
+```svelte
+<motion.button whileFocus={{ scale: 1.05, outline: '2px solid blue' }} />
+```
+
+- Animates when the element receives keyboard focus and restores baseline on blur.
+- Callbacks: `onFocusStart`, `onFocusEnd` are supported.
+- Perfect for keyboard navigation and accessibility enhancements.
 
 ### Animation lifecycle
 

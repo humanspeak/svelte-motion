@@ -51,6 +51,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/while-focus')}
+                    >
+                        While Focus
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/keyframes')}
                     >
                         Keyframes (shape + scale)

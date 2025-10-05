@@ -12,9 +12,9 @@ Reference: Framer Motion for React [`motion` on npm](https://www.npmjs.com/packa
     - `motion`: Object map of HTML and SVG tag components (e.g., `motion.div`, `motion.button`, `motion.svg`) generated from canonical lists, exported via `src/lib/html/`.
     - `MotionConfig` context component.
     - `AnimatePresence` wrapper enabling exit animations on unmount.
-    - Types: `MotionInitial`, `MotionAnimate`, `MotionExit`, `MotionTransition`, `MotionWhileTap`.
-    - Utilities: `useTime(id?)`, `useSpring`, `useTransform`.
-- **Implemented props**: `initial`, `animate`, `transition`, `exit`, `whileTap`, `whileHover`, `onAnimationStart`, `onAnimationComplete`, `class`, `style`, `layout` (FLIP-based).
+    - Types: `MotionInitial`, `MotionAnimate`, `MotionExit`, `MotionTransition`, `MotionWhileTap`, `MotionWhileHover`, `MotionWhileFocus`, `Variants`.
+    - Utilities: `useTime(id?)`, `useSpring`, `useTransform`, `useAnimationFrame`.
+- **Implemented props**: `initial`, `animate`, `transition`, `exit`, `whileTap`, `whileHover`, `whileFocus`, `onAnimationStart`, `onAnimationComplete`, `class`, `style`, `layout` (FLIP-based), `variants`.
 - **Presence / Exit**:
     - Exit animations are supported via `AnimatePresence`.
     - Transition precedence for exits (merged): `{ duration: 0.35 } < component transition (merged with MotionConfig) < exit.transition`.
@@ -85,8 +85,8 @@ Phase 3 — Ecosystem
 | `initial`, `animate`, `transition` | Yes                   | Yes                    | 0     |
 | `whileTap`                         | Yes                   | Yes                    | 0     |
 | `whileHover`                       | Yes                   | Yes                    | 0     |
-| `whileFocus`                       | Yes                   | No                     | 0     |
-| `variants`                         | Yes                   | No                     | 1     |
+| `whileFocus`                       | Yes                   | Yes                    | 0     |
+| `variants`                         | Yes                   | Yes                    | 1     |
 | `exit` + presence                  | Yes                   | Yes                    | 1     |
 | `drag`/`pan`                       | Yes                   | No                     | 2     |
 | Motion values/transforms           | Yes                   | No                     | 2     |
