@@ -30,6 +30,7 @@
         getInitialFalseContext
     } from '$lib/components/variantContext.context'
     import { writable } from 'svelte/store'
+    import { transformSVGPathProperties } from '$lib/utils/svg'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -232,6 +233,8 @@
                   'data-path': dataPath
               }
             : {}),
+        // If we have pathLength in initial, set the pathLength attribute for normalization
+        ...(initialKeyframes && 'pathLength' in initialKeyframes ? { pathLength: '1' } : {}),
         style: mergeInlineStyles(
             styleProp,
             initialKeyframes as unknown as Record<string, unknown>,
@@ -243,7 +246,14 @@
     const runAnimation = () => {
         if (!element || !resolvedAnimate) return
         const transitionAnimate: MotionTransition = mergedTransition ?? {}
-        const payload = $state.snapshot(resolvedAnimate)
+        let payload = $state.snapshot(resolvedAnimate)
+
+        // Transform SVG path properties (pathLength, pathOffset) to their CSS equivalents
+        payload = transformSVGPathProperties(
+            element,
+            payload as Record<string, unknown>
+        ) as typeof payload
+
         animateWithLifecycle(
             element,
             payload as unknown as DOMKeyframesDefinition,
@@ -413,7 +423,8 @@
             if (effectiveInitialProp === false && resolvedAnimate) {
                 // Use Motion's animate() with duration:0 so it takes control of these properties
                 // This prevents inline styles from pinning the properties during future animations
-                const snapshot = $state.snapshot(resolvedAnimate) as Record<string, unknown>
+                let snapshot = $state.snapshot(resolvedAnimate) as Record<string, unknown>
+                snapshot = transformSVGPathProperties(element!, snapshot)
                 animate(element!, snapshot as DOMKeyframesDefinition, { duration: 0 })
                 // Mark that we've already applied this variant to avoid a second animate pass
                 mountedWithInitialFalse = true
@@ -424,7 +435,26 @@
                 isLoaded = 'ready'
             } else if (isNotEmpty(initialKeyframes)) {
                 // Apply initial instantly BEFORE exposing 'initial' state
-                animate(element!, initialKeyframes!, { duration: 0 })
+                const transformedInitial = transformSVGPathProperties(
+                    element!,
+                    initialKeyframes as Record<string, unknown>
+                )
+                // For SVG paths, apply initial state truly synchronously to prevent flash
+                const hasSVGProps =
+                    'strokeDasharray' in transformedInitial ||
+                    'strokeDashoffset' in transformedInitial
+                if (hasSVGProps) {
+                    // Apply immediately using element.style for instant effect
+                    Object.entries(transformedInitial).forEach(([key, value]) => {
+                        if (key === 'strokeDasharray' || key === 'strokeDashoffset') {
+                            element!.style.setProperty(
+                                key,
+                                String(Array.isArray(value) ? value[0] : value)
+                            )
+                        }
+                    })
+                }
+                animate(element!, transformedInitial as DOMKeyframesDefinition, { duration: 0 })
                 // Mark initial after styles are applied so tests read CSS=0 while state=initial
                 isLoaded = 'initial'
                 dataPath = 1
@@ -447,7 +477,8 @@
                     resolvedAnimate
                 ) {
                     // Apply variant styles instantly with duration:0
-                    const snapshot = $state.snapshot(resolvedAnimate) as Record<string, unknown>
+                    let snapshot = $state.snapshot(resolvedAnimate) as Record<string, unknown>
+                    snapshot = transformSVGPathProperties(element!, snapshot)
                     animate(element!, snapshot as DOMKeyframesDefinition, { duration: 0 })
                     lastRanVariantKey = currentAnimateKey
                 } else {
@@ -456,7 +487,11 @@
             }
         } else if (isNotEmpty(initialKeyframes)) {
             // Apply initial instantly BEFORE exposing 'initial' state
-            animate(element!, initialKeyframes!, { duration: 0 })
+            const transformedInitial = transformSVGPathProperties(
+                element!,
+                initialKeyframes as Record<string, unknown>
+            )
+            animate(element!, transformedInitial as DOMKeyframesDefinition, { duration: 0 })
             dataPath = 3
             isLoaded = 'initial'
             requestAnimationFrame(async () => {
