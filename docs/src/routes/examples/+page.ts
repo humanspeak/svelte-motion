@@ -9,6 +9,11 @@ export const load: PageLoad = async () => {
             description: 'Interactive animated button animation example using Svelte Motion.',
             sourceUrl: null
         },
+        'color-interpolation': {
+            title: 'Color Interpolation',
+            description: 'Interactive color interpolation animation example using Svelte Motion.',
+            sourceUrl: 'https://motion.dev/docs/motion-animate#color-interpolation'
+        },
         'hover-and-tap': {
             title: 'Hover and Tap',
             description: 'Interactive hover and tap animation example using Svelte Motion.',

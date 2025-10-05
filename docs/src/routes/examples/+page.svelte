@@ -76,6 +76,10 @@
     }
 </script>
 
+<svelte:head>
+    <title>Examples | Svelte Motion</title>
+</svelte:head>
+
 <div class="container mx-auto px-4 py-12">
     <!-- Hero Section -->
     <motion.div

@@ -3,6 +3,10 @@ title: "useAnimationFrame"
 description: "Run a callback on every animation frame for smooth, time-based animations."
 ---
 
+<svelte:head>
+  <title>useAnimationFrame | Docs | Svelte Motion</title>
+</svelte:head>
+
 <script>
   import { useAnimationFrame } from '@humanspeak/svelte-motion';
   import Example from '$lib/components/general/Example.svelte';

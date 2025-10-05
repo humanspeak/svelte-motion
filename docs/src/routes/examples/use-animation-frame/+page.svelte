@@ -15,6 +15,10 @@
     })
 </script>
 
+<svelte:head>
+    <title>useAnimationFrame | Examples | Svelte Motion</title>
+</svelte:head>
+
 <Example motionUrl={data.sourceUrl}>
     <UseAnimationFrameExample />
 </Example>

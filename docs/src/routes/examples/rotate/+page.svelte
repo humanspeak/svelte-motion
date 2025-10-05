@@ -16,6 +16,10 @@
     })
 </script>
 
+<svelte:head>
+    <title>Rotate | Examples | Svelte Motion</title>
+</svelte:head>
+
 <Example motionUrl={data.sourceUrl}>
     <Rotate />
 </Example>
