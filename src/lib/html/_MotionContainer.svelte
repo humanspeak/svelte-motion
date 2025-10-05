@@ -22,7 +22,12 @@
     import { usePresence, getAnimatePresenceContext } from '$lib/utils/presence'
     import { getInitialKeyframes } from '$lib/utils/initial'
     import { resolveInitial, resolveAnimate, resolveExit } from '$lib/utils/variants'
-    import { setVariantContext, getVariantContext } from '$lib/components/variantContext.context'
+    import {
+        setVariantContext,
+        getVariantContext,
+        setInitialFalseContext,
+        getInitialFalseContext
+    } from '$lib/components/variantContext.context'
     import { writable } from 'svelte/store'
 
     type Props = MotionProps & {
@@ -146,8 +151,21 @@
 
     // Variant inheritance and resolution
     const parentVariantStore = getVariantContext()
-    const localVariantStore = writable<string | undefined>(undefined)
-    let inheritedVariant = $state<string | undefined>(undefined)
+
+    // Get initial inherited variant synchronously
+    let initialInheritedVariant: string | undefined = undefined
+    if (parentVariantStore) {
+        parentVariantStore.subscribe((v) => (initialInheritedVariant = v))()
+    }
+
+    // Create store with initial value so children can inherit immediately
+    const initialVariantValue =
+        typeof animateProp === 'string'
+            ? animateProp
+            : (variantsProp && initialInheritedVariant) || undefined
+    const localVariantStore = writable<string | undefined>(initialVariantValue)
+
+    let inheritedVariant = $state<string | undefined>(initialInheritedVariant)
 
     $effect(() => {
         if (!parentVariantStore) {
@@ -158,7 +176,34 @@
         return () => unsubscribe()
     })
 
-    const effectiveAnimate = $derived(animateProp ?? (variantsProp ? inheritedVariant : undefined))
+    // Use the initial value first, then switch to reactive once mounted
+    const effectiveAnimate = $derived(
+        animateProp ?? (variantsProp ? (inheritedVariant ?? initialInheritedVariant) : undefined)
+    )
+
+    // Propagate initial={false} to children BEFORE setting variant context
+    const parentInitialFalse = getInitialFalseContext()
+    const effectiveInitialProp =
+        initialProp !== undefined
+            ? initialProp
+            : parentInitialFalse && variantsProp
+              ? false
+              : undefined
+
+    console.log('[MotionContainer] Mount:', {
+        tag,
+        hasVariants: !!variantsProp,
+        animateProp,
+        initialProp,
+        parentInitialFalse,
+        effectiveInitialProp,
+        initialInheritedVariant,
+        effectiveAnimate
+    })
+
+    if (initialProp === false) {
+        setInitialFalseContext(true)
+    }
 
     // Provide context immediately during initialization so children can inherit
     setVariantContext(localVariantStore)
@@ -170,7 +215,7 @@
         localVariantStore.set(undefined)
     })
 
-    const resolvedInitial = $derived(resolveInitial(initialProp, variantsProp))
+    const resolvedInitial = $derived(resolveInitial(effectiveInitialProp, variantsProp))
     const resolvedAnimate = $derived(resolveAnimate(effectiveAnimate, variantsProp))
     const resolvedExit = $derived(resolveExit(exitProp, variantsProp))
 
@@ -214,6 +259,17 @@
             (def) => onAnimationCompleteProp?.(def as unknown as DOMKeyframesDefinition | undefined)
         )
     }
+
+    // Track the last variant key we ran to avoid re-running on mount
+    let lastRanVariantKey = $state<string | undefined>(undefined)
+    let mountedWithInitialFalse = $state(false)
+    const currentAnimateKey = $derived(
+        typeof animateProp === 'string'
+            ? animateProp
+            : typeof effectiveAnimate === 'string'
+              ? effectiveAnimate
+              : undefined
+    )
 
     // Minimal layout animation using FLIP when `layout` is enabled.
     // When layout === 'position' we only translate.
@@ -295,7 +351,29 @@
 
     // Re-run animate when animateProp changes while ready
     $effect(() => {
-        if (element && isLoaded === 'ready' && animateProp) {
+        if (!(element && isLoaded === 'ready')) return
+        console.log('[MotionContainer] Ready effect - animateProp:', {
+            tag,
+            animateProp,
+            mountedWithInitialFalse,
+            lastRanVariantKey
+        })
+        // Skip first run if we mounted with initial={false}
+        if (mountedWithInitialFalse) {
+            console.log('[MotionContainer] Skipping first ready run for', tag)
+            mountedWithInitialFalse = false
+            return
+        }
+        if (typeof animateProp === 'string') {
+            if (lastRanVariantKey !== animateProp) {
+                console.log('[MotionContainer] Running animation for variant:', animateProp)
+                lastRanVariantKey = animateProp
+                runAnimation()
+            }
+        } else if (animateProp) {
+            // Object animate props - always run
+            console.log('[MotionContainer] Running animation for object prop')
+            lastRanVariantKey = undefined
             runAnimation()
         }
     })
@@ -303,7 +381,30 @@
     // Also run when inherited/effective variant changes
     $effect(() => {
         void resolvedAnimate
-        if (element && isLoaded === 'ready' && !animateProp && resolvedAnimate) {
+        if (!(element && isLoaded === 'ready' && !animateProp && resolvedAnimate)) return
+        console.log('[MotionContainer] Inherited variant effect:', {
+            tag,
+            currentAnimateKey,
+            mountedWithInitialFalse,
+            lastRanVariantKey
+        })
+        // Skip first run if we mounted with initial={false}
+        if (mountedWithInitialFalse) {
+            console.log('[MotionContainer] Skipping first inherited run for', tag)
+            mountedWithInitialFalse = false
+            return
+        }
+        if (typeof currentAnimateKey === 'string') {
+            if (lastRanVariantKey !== currentAnimateKey) {
+                console.log(
+                    '[MotionContainer] Running inherited variant animation:',
+                    currentAnimateKey
+                )
+                lastRanVariantKey = currentAnimateKey
+                runAnimation()
+            }
+        } else {
+            console.log('[MotionContainer] Running inherited animation (no key)')
             runAnimation()
         }
     })
@@ -311,7 +412,39 @@
     $effect(() => {
         if (!(element && isLoaded === 'mounting')) return
         if (effectiveAnimate) {
-            if (isNotEmpty(initialKeyframes)) {
+            // If initial={false}, render at animate state immediately with no transition
+            if (effectiveInitialProp === false && resolvedAnimate) {
+                console.log('[MotionContainer] Mounting with initial=false:', {
+                    tag,
+                    resolvedAnimate,
+                    currentAnimateKey
+                })
+                // Directly apply styles to avoid any animation queueing
+                // Use mergeInlineStyles to handle transforms properly
+                const snapshot = $state.snapshot(resolvedAnimate) as Record<string, unknown>
+                const existingStyle = styleProp || ''
+                const styleString = mergeInlineStyles(existingStyle, {}, snapshot)
+                console.log('[MotionContainer] Setting styles for', tag, {
+                    existingStyle,
+                    snapshot,
+                    mergedStyle: styleString
+                })
+                element!.setAttribute('style', styleString)
+                // Force browser to apply styles immediately
+                void element!.offsetHeight
+                console.log(
+                    '[MotionContainer] Applied initial=false styles instantly for',
+                    tag,
+                    styleString
+                )
+                // Mark that we've already applied this variant to avoid a second animate pass
+                mountedWithInitialFalse = true
+                if (typeof currentAnimateKey === 'string') {
+                    lastRanVariantKey = currentAnimateKey
+                }
+                dataPath = 5
+                isLoaded = 'ready'
+            } else if (isNotEmpty(initialKeyframes)) {
                 // Apply initial instantly BEFORE exposing 'initial' state
                 animate(element!, initialKeyframes!, { duration: 0 })
                 // Mark initial after styles are applied so tests read CSS=0 while state=initial

@@ -107,7 +107,7 @@ async function updateExamplesPageTs(examples) {
         // Find the examples object in the file and replace it
         // More robust regex that matches the entire examples object declaration
         const examplesObjectRegex = /const examples\s*=\s*\{[\s\S]*?\n\s*\}(?=\s*\n\s*return)/
-        const newExamplesObject = `const examples = ${JSON.stringify(examples, null, 4).replace(/^/gm, '    ')}`
+        const newExamplesObject = `const examples = ${JSON.stringify(examples, null, 4).replace(/^/gm, '    ').trim()}`
 
         if (examplesObjectRegex.test(content)) {
             content = content.replace(examplesObjectRegex, newExamplesObject)
