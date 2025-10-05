@@ -1,6 +1,6 @@
 <script lang="ts">
     import { page } from '$app/state'
-    import { onMount } from 'svelte'
+    import { afterNavigate } from '$app/navigation'
     import Header from '$lib/components/general/Header.svelte'
     import Footer from '$lib/components/general/Footer.svelte'
     import Sidebar from './Sidebar.svelte'
@@ -20,29 +20,46 @@
         }
     })
 
-    onMount(() => {
-        // Extract headings for table of contents
-        const extractHeadings = () => {
-            if (contentElement) {
-                const headingElements = contentElement.querySelectorAll('h1, h2, h3, h4, h5, h6')
-                headings = Array.from(headingElements).map((el, index) => ({
-                    id: el.id || `heading-${index}`,
-                    text: el.textContent || '',
-                    level: parseInt(el.tagName.charAt(1)),
-                    element: el as HTMLElement
-                }))
+    /**
+     * Extract headings from content for table of contents
+     * Runs after navigation and DOM updates
+     */
+    function extractHeadings() {
+        if (!contentElement) return
 
-                // Ensure all headings have IDs
-                headings.forEach((heading) => {
-                    if (!heading.element.id) {
-                        heading.element.id = heading.id
-                    }
-                })
+        const headingElements = contentElement.querySelectorAll('h1, h2, h3, h4, h5, h6')
+        headings = Array.from(headingElements).map((el, index) => ({
+            id: el.id || `heading-${index}`,
+            text: el.textContent || '',
+            level: parseInt(el.tagName.charAt(1)),
+            element: el as HTMLElement
+        }))
+
+        // Ensure all headings have IDs
+        headings.forEach((heading) => {
+            if (!heading.element.id) {
+                heading.element.id = heading.id
             }
-        }
+        })
+    }
 
-        // Extract headings after content loads
-        setTimeout(extractHeadings, 100)
+    // Re-extract headings when navigating between pages
+    afterNavigate(() => {
+        // Wait for DOM to fully render after navigation
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                extractHeadings()
+            })
+        })
+    })
+
+    // Initial extraction when contentElement is first available
+    $effect(() => {
+        if (contentElement) {
+            // Small delay to ensure content is rendered
+            const timeoutId = setTimeout(extractHeadings, 100)
+            return () => clearTimeout(timeoutId)
+        }
     })
 </script>
 
