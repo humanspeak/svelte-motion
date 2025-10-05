@@ -1,24 +1,24 @@
 <script lang="ts">
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import Example from '$lib/components/general/Example.svelte'
-    import AnimatedButton from '$lib/examples/AnimatedButton.svelte'
+    import ToggleSwitchExample from '$lib/examples/ToggleSwitchExample.svelte'
 
-    // Placeholder canvas; hook up live example later.
+    let { data } = $props()
     const breadcrumbs = $derived(getBreadcrumbContext())
     $effect(() => {
         if (breadcrumbs) {
             breadcrumbs.breadcrumbs = [
                 { title: 'Examples', href: '/examples' },
-                { title: 'Animated Button' }
+                { title: 'Toggle Switch' }
             ]
         }
     })
 </script>
 
 <svelte:head>
-    <title>Animated Button | Examples | Svelte Motion</title>
+    <title>Toggle Switch | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example>
-    <AnimatedButton />
+<Example motionUrl={data.sourceUrl ?? undefined}>
+    <ToggleSwitchExample />
 </Example>

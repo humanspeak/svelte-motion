@@ -1,24 +1,24 @@
 <script lang="ts">
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import Example from '$lib/components/general/Example.svelte'
-    import AnimatedButton from '$lib/examples/AnimatedButton.svelte'
+    import WhileFocusExample from '$lib/examples/WhileFocusExample.svelte'
 
-    // Placeholder canvas; hook up live example later.
+    let { data } = $props()
     const breadcrumbs = $derived(getBreadcrumbContext())
     $effect(() => {
         if (breadcrumbs) {
             breadcrumbs.breadcrumbs = [
                 { title: 'Examples', href: '/examples' },
-                { title: 'Animated Button' }
+                { title: 'While Focus' }
             ]
         }
     })
 </script>
 
 <svelte:head>
-    <title>Animated Button | Examples | Svelte Motion</title>
+    <title>While Focus | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example>
-    <AnimatedButton />
+<Example motionUrl={data.sourceUrl ?? undefined}>
+    <WhileFocusExample />
 </Example>

@@ -15,6 +15,8 @@ export type {
     MotionAnimate,
     MotionInitial,
     MotionTransition,
+    MotionWhileFocus,
+    MotionWhileHover,
     MotionWhileTap,
     Variants
 } from '$lib/types'

@@ -15,6 +15,10 @@
     })
 </script>
 
+<svelte:head>
+    <title>useTime | Examples | Svelte Motion</title>
+</svelte:head>
+
 <Example motionUrl={data.sourceUrl}>
     <UseTimeExample />
 </Example>

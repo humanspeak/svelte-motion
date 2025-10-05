@@ -3,6 +3,10 @@ title: "Get started with Svelte Motion"
 description: "Svelte Motion is a Svelte animation library for building smooth, production-grade UI animations."
 ---
 
+<svelte:head>
+  <title>Get Started | Docs | Svelte Motion</title>
+</svelte:head>
+
 <script>
   import { motion, AnimatePresence } from '@humanspeak/svelte-motion';
   import Example from '$lib/components/general/Example.svelte'

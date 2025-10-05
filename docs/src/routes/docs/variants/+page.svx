@@ -3,6 +3,10 @@ title: Variants
 description: Define reusable animation states and orchestrate complex animations across component trees
 ---
 
+<svelte:head>
+  <title>Variants | Docs | Svelte Motion</title>
+</svelte:head>
+
 <script>
     import VariantsBasicExample from '$lib/examples/VariantsBasicExample.svelte'
     import Example from '$lib/components/general/Example.svelte'

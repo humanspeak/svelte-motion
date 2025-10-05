@@ -115,6 +115,18 @@ export type MotionWhileHover =
     | undefined
 
 /**
+ * Animation properties for focus interactions.
+ * @example
+ * ```svelte
+ * <motion.button whileFocus={{ scale: 1.05 }} />
+ * ```
+ */
+export type MotionWhileFocus =
+    | (Record<string, unknown> & { transition?: AnimationOptions })
+    | DOMKeyframesDefinition
+    | undefined
+
+/**
  * Animation transition configuration for hover interactions.
  * Overrides the global transition when provided.
  */
@@ -132,6 +144,10 @@ export type MotionAnimationComplete =
 /** Hover lifecycle callbacks */
 export type MotionOnHoverStart = (() => void) | undefined
 export type MotionOnHoverEnd = (() => void) | undefined
+
+/** Focus lifecycle callbacks */
+export type MotionOnFocusStart = (() => void) | undefined
+export type MotionOnFocusEnd = (() => void) | undefined
 
 /** Tap lifecycle callbacks */
 export type MotionOnTapStart = (() => void) | undefined
@@ -156,6 +172,8 @@ export type MotionProps = {
     whileTap?: MotionWhileTap
     /** Hover interaction animation */
     whileHover?: MotionWhileHover
+    /** Focus interaction animation */
+    whileFocus?: MotionWhileFocus
     /** Called right before a main animate transition starts */
     onAnimationStart?: MotionAnimationStart
     /** Called after a main animate transition completes */
@@ -164,6 +182,10 @@ export type MotionProps = {
     onHoverStart?: MotionOnHoverStart
     /** Called when a true hover gesture ends */
     onHoverEnd?: MotionOnHoverEnd
+    /** Called when element receives keyboard focus */
+    onFocusStart?: MotionOnFocusStart
+    /** Called when element loses keyboard focus */
+    onFocusEnd?: MotionOnFocusEnd
     /** Called when a tap gesture starts (pointerdown recognized) */
     onTapStart?: MotionOnTapStart
     /** Called when a tap gesture ends successfully (pointerup) */

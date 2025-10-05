@@ -17,6 +17,10 @@
     })
 </script>
 
+<svelte:head>
+    <title>HTML Content | Examples | Svelte Motion</title>
+</svelte:head>
+
 <Example motionUrl={data.sourceUrl}>
     <HTMLContent />
 </Example>

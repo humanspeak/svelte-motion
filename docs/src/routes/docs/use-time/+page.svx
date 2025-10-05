@@ -3,6 +3,10 @@ title: "useTime"
 description: "A reactive store that ticks once per animation frame with elapsed milliseconds."
 ---
 
+<svelte:head>
+  <title>useTime | Docs | Svelte Motion</title>
+</svelte:head>
+
 <script>
   import { useTime } from '@humanspeak/svelte-motion';
   import Example from '$lib/components/general/Example.svelte';

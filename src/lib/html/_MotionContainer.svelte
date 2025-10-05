@@ -9,6 +9,7 @@
     import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation'
     import { attachWhileTap } from '$lib/utils/interaction'
     import { attachWhileHover } from '$lib/utils/hover'
+    import { attachWhileFocus } from '$lib/utils/focus'
     import {
         measureRect,
         computeFlipTransforms,
@@ -50,8 +51,11 @@
         class: classProp,
         whileTap: whileTapProp,
         whileHover: whileHoverProp,
+        whileFocus: whileFocusProp,
         onHoverStart: onHoverStartProp,
         onHoverEnd: onHoverEndProp,
+        onFocusStart: onFocusStartProp,
+        onFocusEnd: onFocusEndProp,
         onTapStart: onTapStartProp,
         onTap: onTapProp,
         onTapCancel: onTapCancelProp,
@@ -331,6 +335,21 @@
             (mergedTransition ?? {}) as AnimationOptions,
             { onStart: onHoverStartProp, onEnd: onHoverEndProp },
             undefined,
+            {
+                initial: (resolvedInitial ?? {}) as Record<string, unknown>,
+                animate: (resolvedAnimate ?? {}) as Record<string, unknown>
+            }
+        )
+    })
+
+    // whileFocus handling for keyboard focus interactions
+    $effect(() => {
+        if (!(element && isLoaded === 'ready' && isNotEmpty(whileFocusProp))) return
+        return attachWhileFocus(
+            element!,
+            (whileFocusProp ?? {}) as Record<string, unknown>,
+            (mergedTransition ?? {}) as AnimationOptions,
+            { onStart: onFocusStartProp, onEnd: onFocusEndProp },
             {
                 initial: (resolvedInitial ?? {}) as Record<string, unknown>,
                 animate: (resolvedAnimate ?? {}) as Record<string, unknown>
