@@ -190,17 +190,6 @@
               ? false
               : undefined
 
-    console.log('[MotionContainer] Mount:', {
-        tag,
-        hasVariants: !!variantsProp,
-        animateProp,
-        initialProp,
-        parentInitialFalse,
-        effectiveInitialProp,
-        initialInheritedVariant,
-        effectiveAnimate
-    })
-
     if (initialProp === false) {
         setInitialFalseContext(true)
     }
@@ -352,27 +341,18 @@
     // Re-run animate when animateProp changes while ready
     $effect(() => {
         if (!(element && isLoaded === 'ready')) return
-        console.log('[MotionContainer] Ready effect - animateProp:', {
-            tag,
-            animateProp,
-            mountedWithInitialFalse,
-            lastRanVariantKey
-        })
         // Skip first run if we mounted with initial={false}
         if (mountedWithInitialFalse) {
-            console.log('[MotionContainer] Skipping first ready run for', tag)
             mountedWithInitialFalse = false
             return
         }
         if (typeof animateProp === 'string') {
             if (lastRanVariantKey !== animateProp) {
-                console.log('[MotionContainer] Running animation for variant:', animateProp)
                 lastRanVariantKey = animateProp
                 runAnimation()
             }
         } else if (animateProp) {
             // Object animate props - always run
-            console.log('[MotionContainer] Running animation for object prop')
             lastRanVariantKey = undefined
             runAnimation()
         }
@@ -382,29 +362,17 @@
     $effect(() => {
         void resolvedAnimate
         if (!(element && isLoaded === 'ready' && !animateProp && resolvedAnimate)) return
-        console.log('[MotionContainer] Inherited variant effect:', {
-            tag,
-            currentAnimateKey,
-            mountedWithInitialFalse,
-            lastRanVariantKey
-        })
         // Skip first run if we mounted with initial={false}
         if (mountedWithInitialFalse) {
-            console.log('[MotionContainer] Skipping first inherited run for', tag)
             mountedWithInitialFalse = false
             return
         }
         if (typeof currentAnimateKey === 'string') {
             if (lastRanVariantKey !== currentAnimateKey) {
-                console.log(
-                    '[MotionContainer] Running inherited variant animation:',
-                    currentAnimateKey
-                )
                 lastRanVariantKey = currentAnimateKey
                 runAnimation()
             }
         } else {
-            console.log('[MotionContainer] Running inherited animation (no key)')
             runAnimation()
         }
     })
@@ -414,29 +382,14 @@
         if (effectiveAnimate) {
             // If initial={false}, render at animate state immediately with no transition
             if (effectiveInitialProp === false && resolvedAnimate) {
-                console.log('[MotionContainer] Mounting with initial=false:', {
-                    tag,
-                    resolvedAnimate,
-                    currentAnimateKey
-                })
                 // Directly apply styles to avoid any animation queueing
                 // Use mergeInlineStyles to handle transforms properly
                 const snapshot = $state.snapshot(resolvedAnimate) as Record<string, unknown>
                 const existingStyle = styleProp || ''
                 const styleString = mergeInlineStyles(existingStyle, {}, snapshot)
-                console.log('[MotionContainer] Setting styles for', tag, {
-                    existingStyle,
-                    snapshot,
-                    mergedStyle: styleString
-                })
                 element!.setAttribute('style', styleString)
                 // Force browser to apply styles immediately
                 void element!.offsetHeight
-                console.log(
-                    '[MotionContainer] Applied initial=false styles instantly for',
-                    tag,
-                    styleString
-                )
                 // Mark that we've already applied this variant to avoid a second animate pass
                 mountedWithInitialFalse = true
                 if (typeof currentAnimateKey === 'string') {

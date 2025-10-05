@@ -106,4 +106,112 @@ describe('mergeInlineStyles', () => {
         expect(out).toContain('opacity: 1')
         expect(out).not.toContain('baddecl')
     })
+
+    describe('Transform shorthands', () => {
+        it('converts x, y, z to translateX/Y/Z transforms', () => {
+            const out = mergeInlineStyles('', { x: 100, y: -50, z: 20 }, null)
+            expect(out).toContain('transform: translateX(100px) translateY(-50px) translateZ(20px)')
+        })
+
+        it('converts y to translateY and combines with scale', () => {
+            const out = mergeInlineStyles('', { y: 60, scale: 0.8 }, null)
+            expect(out).toContain('transform: translateY(60px) scale(0.8)')
+        })
+
+        it('handles scaleX and scaleY separately', () => {
+            const out = mergeInlineStyles('', { scaleX: 0.5, scaleY: 1.5 }, null)
+            expect(out).toContain('transform: scaleX(0.5) scaleY(1.5)')
+        })
+
+        it('converts rotateX, rotateY, rotateZ with deg units', () => {
+            const out = mergeInlineStyles('', { rotateX: 45, rotateY: 90, rotateZ: 180 }, null)
+            expect(out).toContain('rotateX(45deg)')
+            expect(out).toContain('rotateY(90deg)')
+            expect(out).toContain('rotateZ(180deg)')
+        })
+
+        it('converts skewX and skewY with deg units', () => {
+            const out = mergeInlineStyles('', { skewX: 10, skewY: 20 }, null)
+            expect(out).toContain('skewX(10deg)')
+            expect(out).toContain('skewY(20deg)')
+        })
+
+        it('preserves string units for transform values', () => {
+            const out = mergeInlineStyles('', { x: '50%', rotate: '1turn' }, null)
+            expect(out).toContain('translateX(50%)')
+            expect(out).toContain('rotate(1turn)')
+        })
+
+        it('combines multiple transforms in correct order', () => {
+            const out = mergeInlineStyles(
+                '',
+                { x: 10, y: 20, scale: 1.5, rotate: 45, skewX: 5 },
+                null
+            )
+            expect(out).toContain('transform:')
+            expect(out).toContain('translateX(10px)')
+            expect(out).toContain('translateY(20px)')
+            expect(out).toContain('scale(1.5)')
+            expect(out).toContain('rotate(45deg)')
+            expect(out).toContain('skewX(5deg)')
+        })
+    })
+
+    describe('Pointer and cursor properties', () => {
+        it('converts pointerEvents to kebab-case', () => {
+            const out = mergeInlineStyles('', { pointerEvents: 'none' }, null)
+            expect(out).toContain('pointer-events: none')
+        })
+
+        it('handles cursor property', () => {
+            const out = mergeInlineStyles('', { cursor: 'pointer' }, null)
+            expect(out).toContain('cursor: pointer')
+        })
+
+        it('combines cursor and transforms together', () => {
+            const out = mergeInlineStyles('', { cursor: 'pointer', y: 10, scale: 0.9 }, null)
+            expect(out).toContain('cursor: pointer')
+            expect(out).toContain('transform: translateY(10px) scale(0.9)')
+        })
+    })
+
+    describe('Variants use case - notifications stack', () => {
+        it('properly handles notification closed variant with y transform', () => {
+            const out = mergeInlineStyles(
+                'height: 60px; width: 280px; background-color: #f5f5f5',
+                {},
+                {
+                    y: -76,
+                    opacity: 0.6,
+                    pointerEvents: 'none',
+                    cursor: 'default',
+                    scale: 0.9
+                }
+            )
+            expect(out).toContain('height: 60px')
+            expect(out).toContain('width: 280px')
+            expect(out).toContain('background-color: #f5f5f5')
+            expect(out).toContain('opacity: 0.6')
+            expect(out).toContain('pointer-events: none')
+            expect(out).toContain('cursor: default')
+            expect(out).toContain('transform: translateY(-76px) scale(0.9)')
+        })
+
+        it('properly handles header closed variant', () => {
+            const out = mergeInlineStyles(
+                'position: absolute',
+                {},
+                {
+                    y: 60,
+                    scale: 0.8,
+                    opacity: 0,
+                    pointerEvents: 'none'
+                }
+            )
+            expect(out).toContain('position: absolute')
+            expect(out).toContain('opacity: 0')
+            expect(out).toContain('pointer-events: none')
+            expect(out).toContain('transform: translateY(60px) scale(0.8)')
+        })
+    })
 })
