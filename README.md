@@ -166,6 +166,77 @@ Svelte Motion now supports hover interactions via the `whileHover` prop, similar
 />
 ```
 
+## Variants
+
+Variants allow you to define named animation states that can be referenced throughout your component tree. They're perfect for creating reusable animations and orchestrating complex sequences.
+
+### Basic usage
+
+Instead of defining animation objects inline, create a `Variants` object with named states:
+
+```svelte
+<script lang="ts">
+    import { motion, type Variants } from '@humanspeak/svelte-motion'
+
+    let isOpen = $state(false)
+
+    const variants: Variants = {
+        open: { opacity: 1, scale: 1 },
+        closed: { opacity: 0, scale: 0.8 }
+    }
+</script>
+
+<motion.div {variants} initial="closed" animate={isOpen ? 'open' : 'closed'}>Click me</motion.div>
+```
+
+### Variant propagation
+
+One of the most powerful features is **automatic propagation** through component trees. When a parent changes its animation state, all children with `variants` defined automatically inherit that state:
+
+```svelte
+<script lang="ts">
+    let isVisible = $state(false)
+
+    const containerVariants: Variants = {
+        visible: { opacity: 1 },
+        hidden: { opacity: 0 }
+    }
+
+    const itemVariants: Variants = {
+        visible: { opacity: 1, x: 0 },
+        hidden: { opacity: 0, x: -20 }
+    }
+</script>
+
+<motion.ul variants={containerVariants} initial="hidden" animate={isVisible ? 'visible' : 'hidden'}>
+    <!-- Children automatically inherit parent's variant state -->
+    <motion.li variants={itemVariants}>Item 1</motion.li>
+    <motion.li variants={itemVariants}>Item 2</motion.li>
+    <motion.li variants={itemVariants}>Item 3</motion.li>
+</motion.ul>
+```
+
+**How it works:**
+
+- Parent sets `animate="visible"`
+- Children with `variants` automatically inherit `"visible"` state
+- Each child resolves its own variant definition
+- No need to pass `animate` props to children!
+
+### Staggered animations
+
+Create staggered animations with transition delays:
+
+```svelte
+{#each items as item, i}
+    <motion.div variants={itemVariants} transition={{ delay: i * 0.1 }}>
+        {item}
+    </motion.div>
+{/each}
+```
+
+See the [Variants documentation](https://motion.svelte.page/docs/variants) for complete details and examples.
+
 ## Server-side rendering
 
 Motion components render their initial state during SSR. The container merges inline `style` with the first values from `initial` (or the first keyframes from `animate` when `initial` is empty) so the server HTML matches the starting appearance. On hydration, components promote to a ready state and animate without flicker.
