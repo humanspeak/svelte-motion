@@ -21,7 +21,7 @@ export const load: PageLoad = async () => {
         },
         'notifications-stack': {
             title: 'Notifications Stack',
-            description: 'Interactive notifications stack animation example using Svelte Motion.',
+            description: 'Interactive Notifications Stack animation example using Svelte Motion.',
             sourceUrl:
                 'https://github.com/humanspeak/svelte-motion/tree/main/docs/src/routes/examples/notifications-stack'
         },
@@ -32,17 +32,17 @@ export const load: PageLoad = async () => {
         },
         'use-animation-frame': {
             title: 'useAnimationFrame',
-            description: 'Interactive useanimationframe animation example using Svelte Motion.',
+            description: 'Interactive useAnimationFrame animation example using Svelte Motion.',
             sourceUrl: 'https://examples.motion.dev/react/use-animation-frame'
         },
         'use-time': {
             title: 'useTime',
-            description: 'Interactive usetime animation example using Svelte Motion.',
+            description: 'Interactive useTime animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/docs/react-use-time'
         },
         'use-time-synced': {
             title: 'useTime (Synced)',
-            description: 'Interactive usetime (synced) animation example using Svelte Motion.',
+            description: 'Interactive useTime (Synced) animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/docs/react-use-time'
         }
     }

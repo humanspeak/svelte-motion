@@ -176,7 +176,9 @@
                     }}
                     style={getNotificationStyle(i)}
                     onclick={() => (isOpen = !isOpen)}
-                ></motion.div>
+                >
+                    Note {i + 1}
+                </motion.div>
             {/each}
         </motion.div>
     </div>

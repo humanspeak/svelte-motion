@@ -58,4 +58,6 @@
     style={notificationStyle}
     data-testid={`notification-${index}`}
     {onclick}
-/>
+>
+    Note {index + 1}
+</motion.div>
