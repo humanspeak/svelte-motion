@@ -22,7 +22,8 @@
     "dependencies": {
         "@humanspeak/svelte-motion": "workspace:*",
         "@inlang/paraglide-js": "^2.4.0",
-        "@sentry/sveltekit": "^10.17.0"
+        "@sentry/sveltekit": "^10.17.0",
+        "github-slugger": "^2.0.0"
     },
     "devDependencies": {
         "@eslint/compat": "^1.4.0",
