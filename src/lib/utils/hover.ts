@@ -78,6 +78,24 @@ export const computeHoverBaseline = (
     }
 
     const cs = getComputedStyle(el)
+    const inlineStyle = el.getAttribute('style') || ''
+
+    // Helper to extract CSS function (var, calc, min, max, etc.) from inline style if present
+    const getInlineStyleValue = (propName: string): string | null => {
+        const kebabCase = propName.replace(/([A-Z])/g, '-$1').toLowerCase()
+        // Use negative lookbehind to ensure we match the property name as a whole word
+        const regex = new RegExp(`(?:^|;)\\s*${kebabCase}\\s*:\\s*([^;]+)`, 'i')
+        const match = inlineStyle.match(regex)
+        if (match) {
+            const value = match[1].trim()
+            // Preserve CSS functions: var(), calc(), min(), max(), clamp(), rgb(), hsl(), url(), etc.
+            if (/\b(var|calc|min|max|clamp|rgb|rgba|hsl|hsla|url)\s*\(/.test(value)) {
+                return value
+            }
+        }
+        return null
+    }
+
     for (const key of Object.keys(whileHoverRecord)) {
         if (Object.prototype.hasOwnProperty.call(animateRecord, key)) {
             baseline[key] = animateRecord[key]
@@ -85,8 +103,14 @@ export const computeHoverBaseline = (
             baseline[key] = initialRecord[key]
         } else if (key in (neutralTransformDefaults as Record<string, unknown>)) {
             baseline[key] = neutralTransformDefaults[key]
-        } else if (key in (cs as unknown as Record<string, unknown>)) {
-            baseline[key] = (cs as unknown as Record<string, unknown>)[key] as string
+        } else {
+            // Check if inline style has a CSS variable for this property
+            const inlineValue = getInlineStyleValue(key)
+            if (inlineValue) {
+                baseline[key] = inlineValue
+            } else if (key in (cs as unknown as Record<string, unknown>)) {
+                baseline[key] = (cs as unknown as Record<string, unknown>)[key] as string
+            }
         }
     }
     return baseline

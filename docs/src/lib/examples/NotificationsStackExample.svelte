@@ -69,6 +69,7 @@
         })
     }
 
+    // Make reactive to mode changes by using $derived
     const headerButtonStyle = stringifyStyleObject({
         fontSize: '14px',
         lineHeight: 1,

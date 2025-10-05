@@ -54,17 +54,16 @@
     </motion.h2>
     <motion.button
         style={stringifyStyleObject({
-            fontSize: '14px',
+            fontSize: 14,
             lineHeight: 1,
-            marginRight: '8px',
-            backgroundColor: '#fff',
-            color: '#1f1f1f',
+            marginRight: 8,
+            backgroundColor: '#1f1f1f',
             padding: '4px 12px',
-            height: '20px',
+            height: 20,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            borderRadius: '16px',
+            borderRadius: 16,
             cursor: 'pointer',
             pointerEvents: 'auto',
             userSelect: 'none'
