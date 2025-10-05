@@ -80,11 +80,17 @@ export const computeHoverBaseline = (
     const cs = getComputedStyle(el)
     const inlineStyle = el.getAttribute('style') || ''
 
+    // Helper to escape regex metacharacters to prevent ReDoS and ensure literal matching
+    const escapeRegExp = (str: string): string => {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    }
+
     // Helper to extract CSS function (var, calc, min, max, etc.) from inline style if present
     const getInlineStyleValue = (propName: string): string | null => {
         const kebabCase = propName.replace(/([A-Z])/g, '-$1').toLowerCase()
+        const escapedKebabCase = escapeRegExp(kebabCase)
         // Use negative lookbehind to ensure we match the property name as a whole word
-        const regex = new RegExp(`(?:^|;)\\s*${kebabCase}\\s*:\\s*([^;]+)`, 'i')
+        const regex = new RegExp(`(?:^|;)\\s*${escapedKebabCase}\\s*:\\s*([^;]+)`, 'i')
         const match = inlineStyle.match(regex)
         if (match) {
             const value = match[1].trim()

@@ -9,8 +9,24 @@ type OtherProject = {
 
 export const GET: RequestHandler = async () => {
     try {
-        const response = await fetch('https://svelte.page/api/v1/others')
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+        const response = await fetch('https://svelte.page/api/v1/others', {
+            signal: controller.signal
+        })
+        clearTimeout(timeoutId)
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`)
+        }
+
         const projects = (await response.json()) as OtherProject[]
+
+        // Validate response structure
+        if (!Array.isArray(projects)) {
+            throw new Error('Invalid response: expected array')
+        }
 
         // Filter out the motion project (this project)
         const otherProjects = projects.filter((project) => project.slug !== 'motion')
