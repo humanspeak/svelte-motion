@@ -21,6 +21,15 @@ const UNITLESS_PROPERTIES = new Set([
     'column-count'
 ])
 
+/**
+ * Serialize a style object into a CSS declaration string.
+ *
+ * Property names are converted from camelCase to kebab-case. Numeric values are suffixed with `px`
+ * unless the property (in either camelCase or kebab-case) is listed in `UNITLESS_PROPERTIES`.
+ *
+ * @param obj - A record of CSS properties (camelCase or kebab-case) to string or number values
+ * @returns A `; `-separated CSS declaration string like `"font-size: 12px; line-height: 1.5"`
+ */
 export function stringifyStyleObject(obj: Record<string, string | number>): string {
     return Object.entries(obj)
         .map(([key, value]) => {

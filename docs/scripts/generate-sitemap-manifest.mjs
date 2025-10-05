@@ -95,8 +95,8 @@ async function generateExamplesMetadata(manifest) {
 }
 
 /**
- * Update the examples +page.ts file with the latest example metadata
- * @param {Object} examples - Examples metadata object
+ * Replace the examples object in src/routes/examples/+page.ts with the provided examples metadata and persist the file.
+ * @param {Object<string, {title: string, description: string, sourceUrl: string|null}>} examples - Mapping of example slugs to metadata objects containing `title`, `description`, and optional `sourceUrl`.
  */
 async function updateExamplesPageTs(examples) {
     const examplesPageTs = resolvePath(process.cwd(), 'src', 'routes', 'examples', '+page.ts')
