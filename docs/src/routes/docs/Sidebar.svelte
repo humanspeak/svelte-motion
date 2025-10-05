@@ -69,6 +69,9 @@
     onMount(async () => {
         try {
             const response = await fetch('/api/other-projects')
+            if (!response.ok) {
+                return
+            }
             const projects: OtherProject[] = await response.json()
 
             // Convert to nav items format

@@ -32,7 +32,7 @@ description: "Run a callback on every animation frame for smooth, time-based ani
 
 ## Usage
 
-The callback receives the timestamp argument representing the time elapsed since the callback was first called, in milliseconds.
+The callback receives a `DOMHighResTimeStamp` representing the time elapsed since the time origin, in milliseconds.
 
 ```svelte
 <script lang="ts">

@@ -32,13 +32,13 @@
  * <div bind:this={ref}>Animated content</div>
  * ```
  */
-export function useAnimationFrame(callback: (time: number) => void): () => void {
+export function useAnimationFrame(callback: (time: DOMHighResTimeStamp) => void): () => void {
     // SSR guard
     if (typeof window === 'undefined') return () => {}
 
     let rafId: number | undefined
 
-    const loop = (time: number) => {
+    const loop = (time: DOMHighResTimeStamp) => {
         callback(time)
         rafId = requestAnimationFrame(loop)
     }
