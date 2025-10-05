@@ -23,6 +23,7 @@
 </script>
 
 <motion.div
+    data-testid="header-container"
     style={stringifyStyleObject({
         position: 'absolute',
         top: '-40px',
@@ -57,7 +58,7 @@
             fontSize: 14,
             lineHeight: 1,
             marginRight: 8,
-            backgroundColor: '#1f1f1f',
+            backgroundColor: '#fff',
             padding: '4px 12px',
             height: 20,
             display: 'flex',

@@ -22,7 +22,7 @@
             cursor: 'pointer'
         },
         closed: {
-            y: -index * (NOTIFICATION_HEIGHT + NOTIFICATION_GAP) - NOTIFICATION_GAP * index,
+            y: -index * (NOTIFICATION_HEIGHT + 2 * NOTIFICATION_GAP),
             scale: 1 - index * 0.1,
             opacity: 1 - index * 0.4,
             pointerEvents: index === 0 ? 'auto' : 'none',
@@ -56,5 +56,6 @@
         delay: index * 0.04
     }}
     style={notificationStyle}
+    data-testid={`notification-${index}`}
     {onclick}
 />

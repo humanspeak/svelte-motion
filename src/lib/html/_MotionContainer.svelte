@@ -341,10 +341,15 @@
     // Re-run animate when animateProp changes while ready
     $effect(() => {
         if (!(element && isLoaded === 'ready')) return
-        // Skip first run if we mounted with initial={false}
+        // Skip first run if we mounted with initial={false} AND the variant hasn't changed
         if (mountedWithInitialFalse) {
+            // Only skip if the variant is the same as what we mounted with
+            if (typeof animateProp === 'string' && lastRanVariantKey === animateProp) {
+                mountedWithInitialFalse = false
+                return
+            }
+            // Variant has changed, so we should animate
             mountedWithInitialFalse = false
-            return
         }
         if (typeof animateProp === 'string') {
             if (lastRanVariantKey !== animateProp) {
@@ -362,10 +367,15 @@
     $effect(() => {
         void resolvedAnimate
         if (!(element && isLoaded === 'ready' && !animateProp && resolvedAnimate)) return
-        // Skip first run if we mounted with initial={false}
+        // Skip first run if we mounted with initial={false} AND the variant hasn't changed
         if (mountedWithInitialFalse) {
+            // Only skip if the variant is the same as what we mounted with
+            if (typeof currentAnimateKey === 'string' && lastRanVariantKey === currentAnimateKey) {
+                mountedWithInitialFalse = false
+                return
+            }
+            // Variant has changed, so we should animate
             mountedWithInitialFalse = false
-            return
         }
         if (typeof currentAnimateKey === 'string') {
             if (lastRanVariantKey !== currentAnimateKey) {
@@ -382,14 +392,10 @@
         if (effectiveAnimate) {
             // If initial={false}, render at animate state immediately with no transition
             if (effectiveInitialProp === false && resolvedAnimate) {
-                // Directly apply styles to avoid any animation queueing
-                // Use mergeInlineStyles to handle transforms properly
+                // Use Motion's animate() with duration:0 so it takes control of these properties
+                // This prevents inline styles from pinning the properties during future animations
                 const snapshot = $state.snapshot(resolvedAnimate) as Record<string, unknown>
-                const existingStyle = styleProp || ''
-                const styleString = mergeInlineStyles(existingStyle, {}, snapshot)
-                element!.setAttribute('style', styleString)
-                // Force browser to apply styles immediately
-                void element!.offsetHeight
+                animate(element!, snapshot as DOMKeyframesDefinition, { duration: 0 })
                 // Mark that we've already applied this variant to avoid a second animate pass
                 mountedWithInitialFalse = true
                 if (typeof currentAnimateKey === 'string') {
@@ -414,7 +420,20 @@
             } else {
                 dataPath = 2
                 isLoaded = 'ready'
-                runAnimation()
+                // If we're inheriting a variant and parent had initial={false}, apply the variant instantly
+                // without animation, then mark it as applied
+                if (
+                    parentInitialFalse &&
+                    typeof currentAnimateKey === 'string' &&
+                    resolvedAnimate
+                ) {
+                    // Apply variant styles instantly with duration:0
+                    const snapshot = $state.snapshot(resolvedAnimate) as Record<string, unknown>
+                    animate(element!, snapshot as DOMKeyframesDefinition, { duration: 0 })
+                    lastRanVariantKey = currentAnimateKey
+                } else {
+                    runAnimation()
+                }
             }
         } else if (isNotEmpty(initialKeyframes)) {
             // Apply initial instantly BEFORE exposing 'initial' state

@@ -41,13 +41,13 @@
 <style lang="postcss">
     @reference "tailwindcss";
 
-    :global(:root) {
+    ::global(:root) {
         --radial-gradient-background: 250, 250, 250;
         --solid-color-background: 15, 15, 15;
         --overlay-color: 255, 255, 255;
     }
 
-    :global(.radial-gradient) {
+    ::global(.radial-gradient) {
         background: radial-gradient(
                 circle at 50% 0%,
                 rgba(var(--radial-gradient-background), 0.05) 0%,

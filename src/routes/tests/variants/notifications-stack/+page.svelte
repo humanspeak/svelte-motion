@@ -31,6 +31,7 @@
         </p>
 
         <motion.div
+            data-testid="stack-container"
             style={stringifyStyleObject({
                 position: 'relative',
                 display: 'flex',
