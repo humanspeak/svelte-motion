@@ -89,7 +89,7 @@ export const computeHoverBaseline = (
     const getInlineStyleValue = (propName: string): string | null => {
         const kebabCase = propName.replace(/([A-Z])/g, '-$1').toLowerCase()
         const escapedKebabCase = escapeRegExp(kebabCase)
-        // Use negative lookbehind to ensure we match the property name as a whole word
+        // Match property name at start of string or after semicolon
         const regex = new RegExp(`(?:^|;)\\s*${escapedKebabCase}\\s*:\\s*([^;]+)`, 'i')
         const match = inlineStyle.match(regex)
         if (match) {

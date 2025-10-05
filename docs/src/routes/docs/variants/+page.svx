@@ -78,9 +78,9 @@ Variants work beautifully with Svelte's reactive state:
     let status = $state<'idle' | 'loading' | 'success'>('idle')
 
     const statusVariants: Variants = {
-        idle: { scale: 1, backgroundColor: '#gray' },
-        loading: { scale: 1.1, backgroundColor: '#blue' },
-        success: { scale: 1, backgroundColor: '#green' }
+        idle: { scale: 1, backgroundColor: 'gray' },
+        loading: { scale: 1.1, backgroundColor: 'royalblue' },
+        success: { scale: 1, backgroundColor: '#22c55e' }
     }
 </script>
 
@@ -284,10 +284,10 @@ Each variant should represent a complete state:
 
 ```svelte
 const buttonVariants: Variants = {
-    idle: { scale: 1, backgroundColor: '#gray' },
-    loading: { scale: 1.05, backgroundColor: '#blue' },
-    success: { scale: 1, backgroundColor: '#green' },
-    error: { scale: 0.95, backgroundColor: '#red' }
+    idle: { scale: 1, backgroundColor: 'gray' },
+    loading: { scale: 1.05, backgroundColor: 'royalblue' },
+    success: { scale: 1, backgroundColor: '#22c55e' },
+    error: { scale: 0.95, backgroundColor: '#ef4444' }
 }
 ```
 

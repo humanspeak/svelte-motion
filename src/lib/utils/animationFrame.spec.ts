@@ -70,7 +70,7 @@ describe('utils/animationFrame - useAnimationFrame', () => {
         expect(cancelMock).toHaveBeenCalledWith(scheduledId)
     })
 
-    it('does not schedule new frames after cleanup', () => {
+    it('allows already-scheduled frames to run after cleanup but does not schedule new frames', () => {
         const callback = vi.fn()
         const cleanup = useAnimationFrame(callback)
 
@@ -88,8 +88,9 @@ describe('utils/animationFrame - useAnimationFrame', () => {
         rafCb?.(200)
 
         // Should still call the callback (since the function is already scheduled)
-        // but should not schedule new frames
         expect(callback).toHaveBeenCalledTimes(2)
+        // but should not schedule new frames
+        expect(rafMock).not.toHaveBeenCalled()
     })
 
     it('is SSR-safe (no window)', () => {

@@ -37,15 +37,19 @@ export function useAnimationFrame(callback: (time: DOMHighResTimeStamp) => void)
     if (typeof window === 'undefined') return () => {}
 
     let rafId: number | undefined
+    let isActive = true
 
     const loop = (time: DOMHighResTimeStamp) => {
         callback(time)
-        rafId = requestAnimationFrame(loop)
+        if (isActive) {
+            rafId = requestAnimationFrame(loop)
+        }
     }
 
     rafId = requestAnimationFrame(loop)
 
     return () => {
+        isActive = false
         if (rafId !== undefined) {
             cancelAnimationFrame(rafId)
         }
