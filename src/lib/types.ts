@@ -2,10 +2,28 @@ import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
 import type { Snippet } from 'svelte'
 
 /**
+ * Variants define named animation states that can be referenced by string keys.
+ *
+ * @example
+ * ```svelte
+ * <script>
+ *   const variants = {
+ *     open: { opacity: 1, scale: 1 },
+ *     closed: { opacity: 0, scale: 0.8 }
+ *   }
+ * </script>
+ *
+ * <motion.div variants={variants} animate="open" />
+ * ```
+ */
+export type Variants = Record<string, DOMKeyframesDefinition | undefined>
+
+/**
  * Initial animation properties for a motion component.
  *
- * Set to `false` to skip the initial animation and render directly at the animated state.
- * Useful for elements that should not animate on mount (e.g., tab indicators).
+ * - Can be an object with animation properties
+ * - Can be a string key referencing a variant
+ * - Set to `false` to skip the initial animation and render directly at the animated state
  *
  * @example
  * ```svelte
@@ -14,29 +32,47 @@ import type { Snippet } from 'svelte'
  *
  * <!-- Skip initial animation, render at animate state -->
  * <motion.div initial={false} animate={{ opacity: 1 }} />
+ *
+ * <!-- Use variant key -->
+ * <motion.div variants={myVariants} initial="hidden" animate="visible" />
  * ```
  */
-export type MotionInitial = DOMKeyframesDefinition | false | undefined
+export type MotionInitial = DOMKeyframesDefinition | string | false | undefined
 
 /**
  * Target animation properties for a motion component.
+ *
+ * - Can be an object with animation properties
+ * - Can be a string key referencing a variant
+ *
  * @example
  * ```svelte
  * <motion.div animate={{ opacity: 1, scale: 1 }} />
+ *
+ * <!-- With variants -->
+ * <motion.div variants={myVariants} animate="visible" />
  * ```
  */
-export type MotionAnimate = DOMKeyframesDefinition | undefined
+export type MotionAnimate = DOMKeyframesDefinition | string | undefined
 
 /**
  * Exit animation properties for a motion component when unmounted.
+ *
+ * - Can be an object with animation properties
+ * - Can be a string key referencing a variant
+ *
  * @example
  * ```svelte
  * <motion.div exit={{ opacity: 0, scale: 0 }} />
+ *
+ * <!-- With variants -->
+ * <motion.div variants={myVariants} exit="hidden" />
  * ```
  */
 export type MotionExit =
     | (Record<string, unknown> & { transition?: AnimationOptions })
     | DOMKeyframesDefinition
+    | string
     | undefined
 
 /**
@@ -106,11 +142,13 @@ export type MotionOnTapCancel = (() => void) | undefined
  * Base motion props shared by all motion components.
  */
 export type MotionProps = {
-    /** Initial state of the animation */
+    /** Variants define named animation states */
+    variants?: Variants
+    /** Initial state of the animation (object or variant key) */
     initial?: MotionInitial
-    /** Target state of the animation */
+    /** Target state of the animation (object or variant key) */
     animate?: MotionAnimate
-    /** Exit animation state when component is removed */
+    /** Exit animation state when component is removed (object or variant key) */
     exit?: MotionExit
     /** Animation configuration */
     transition?: MotionTransition

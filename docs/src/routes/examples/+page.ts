@@ -19,6 +19,12 @@ export const load: PageLoad = async () => {
             description: 'Interactive html content animation example using Svelte Motion.',
             sourceUrl: 'https://examples.motion.dev/react/html-content'
         },
+        'notifications-stack': {
+            title: 'Notifications Stack',
+            description: 'Interactive notifications stack animation example using Svelte Motion.',
+            sourceUrl:
+                'https://github.com/humanspeak/svelte-motion/tree/main/docs/src/routes/examples/notifications-stack'
+        },
         rotate: {
             title: 'Rotate',
             description: 'Interactive rotate animation example using Svelte Motion.',

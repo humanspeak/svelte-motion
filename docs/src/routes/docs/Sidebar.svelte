@@ -28,6 +28,16 @@
             items: [{ title: 'Get started', href: '/docs', icon: 'fa-solid fa-play' }]
         },
         {
+            title: 'Animation',
+            items: [
+                {
+                    title: 'Variants',
+                    href: '/docs/variants',
+                    icon: 'fa-solid fa-layer-group'
+                }
+            ]
+        },
+        {
             title: 'Hooks',
             items: [
                 {
@@ -44,10 +54,7 @@
         },
         {
             title: 'Love and Respect',
-            items: [
-                { title: 'Beye.ai', href: 'https://beye.ai', icon: 'fa-solid fa-heart' },
-                { title: 'ShadCN', href: 'https://shadcn-svelte.com', icon: 'fa-solid fa-heart' }
-            ]
+            items: [{ title: 'Beye.ai', href: 'https://beye.ai', icon: 'fa-solid fa-heart' }]
         },
         ...(otherProjects.length > 0
             ? [

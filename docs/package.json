@@ -15,6 +15,7 @@
         "prepare": "svelte-kit sync || echo ''",
         "preview": "pnpm run build && wrangler pages dev",
         "sitemap:manifest": "node ./scripts/generate-sitemap-manifest.mjs",
+        "sitemap:watch": "chokidar 'src/routes/**/*.svelte' 'src/routes/**/*.svx' 'src/routes/**/*.md' --ignore 'src/routes/examples/+page.ts' -c 'node ./scripts/generate-sitemap-manifest.mjs' --initial --silent",
         "test": "npm run test:unit -- --run",
         "test:unit": "vitest"
     },
@@ -33,6 +34,7 @@
         "@tailwindcss/typography": "^0.5.19",
         "@tailwindcss/vite": "^4.1.14",
         "@vitest/browser": "^3.2.4",
+        "chokidar-cli": "^3.0.0",
         "clsx": "^2.1.1",
         "eslint": "^9.37.0",
         "eslint-config-prettier": "10.1.8",

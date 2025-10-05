@@ -1,10 +1,6 @@
 <script lang="ts">
-    import {
-        motion,
-        animate,
-        type MotionAnimate,
-        type MotionTransition
-    } from '@humanspeak/svelte-motion'
+    import { motion, animate, type MotionTransition } from '@humanspeak/svelte-motion'
+    import type { DOMKeyframesDefinition } from 'motion'
     import Header from '$lib/components/general/Header.svelte'
     import Footer from '$lib/components/general/Footer.svelte'
     import * as m from '$msgs'
@@ -55,16 +51,16 @@
                 const words = splitHeadingWords(headingContainer)
                 headingContainer.style.visibility = 'visible'
                 words.forEach((el, i) => {
-                    const keyframes = {
+                    const keyframes: DOMKeyframesDefinition = {
                         opacity: [0, 1],
                         y: [10, 0]
-                    } as MotionAnimate
+                    }
                     const options = {
                         duration: 0.8,
                         easing: 'ease-out',
                         delay: i * 0.05
                     } as MotionTransition
-                    animate(el, keyframes!, options)
+                    animate(el, keyframes, options)
                 })
             })
             .catch(() => {

@@ -55,7 +55,7 @@
         "cs:publish": "pnpm run build && changeset publish",
         "cs:version": "changeset version && pnpm i --lockfile-only",
         "dev": "vite dev",
-        "dev:all": "concurrently -k -n pkg,docs -c green,cyan \"pnpm -w -r --filter @humanspeak/svelte-motion run dev:pkg\" \"pnpm --filter docs run dev\"",
+        "dev:all": "concurrently -k -n pkg,docs,sitemap -c green,cyan,magenta \"pnpm -w -r --filter @humanspeak/svelte-motion run dev:pkg\" \"pnpm --filter docs run dev\" \"pnpm --filter docs run sitemap:watch\"",
         "dev:pkg": "svelte-kit sync && svelte-package --watch",
         "format": "prettier --write .",
         "generate": "tsx scripts/generate-html.ts",
