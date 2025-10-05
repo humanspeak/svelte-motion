@@ -1,6 +1,7 @@
 <script lang="ts">
     import { page } from '$app/state'
     import { afterNavigate } from '$app/navigation'
+    import GithubSlugger from 'github-slugger'
     import Header from '$lib/components/general/Header.svelte'
     import Footer from '$lib/components/general/Footer.svelte'
     import Sidebar from './Sidebar.svelte'
@@ -22,43 +23,66 @@
 
     /**
      * Extract headings from content for table of contents
-     * Runs after navigation and DOM updates
+     * Generates descriptive, slugified IDs for better URL anchors using github-slugger
      */
     function extractHeadings() {
         if (!contentElement) return
 
         const headingElements = contentElement.querySelectorAll('h1, h2, h3, h4, h5, h6')
-        headings = Array.from(headingElements).map((el, index) => ({
-            id: el.id || `heading-${index}`,
-            text: el.textContent || '',
-            level: parseInt(el.tagName.charAt(1)),
-            element: el as HTMLElement
-        }))
+        const slugger = new GithubSlugger()
 
-        // Ensure all headings have IDs
-        headings.forEach((heading) => {
-            if (!heading.element.id) {
-                heading.element.id = heading.id
+        headings = Array.from(headingElements).map((el, index) => {
+            const text = el.textContent?.trim() || ''
+            const level = parseInt(el.tagName.charAt(1))
+
+            // Use existing ID if present, otherwise generate slug
+            let id = el.id
+            if (!id) {
+                // Generate slug from text using github-slugger (handles uniqueness automatically)
+                id = text ? slugger.slug(text) : `heading-${index}`
+            }
+
+            // Assign ID to the element if it doesn't have one
+            if (!el.id) {
+                el.id = id
+            }
+
+            return {
+                id,
+                text,
+                level,
+                element: el as HTMLElement
             }
         })
     }
 
     // Re-extract headings when navigating between pages
     afterNavigate(() => {
-        // Wait for DOM to fully render after navigation
+        // Single rAF for initial navigation tick
         requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                extractHeadings()
-            })
+            extractHeadings()
         })
     })
 
-    // Initial extraction when contentElement is first available
+    // Setup MutationObserver to watch for DOM changes and initial extraction
     $effect(() => {
-        if (contentElement) {
-            // Small delay to ensure content is rendered
-            const timeoutId = setTimeout(extractHeadings, 100)
-            return () => clearTimeout(timeoutId)
+        if (!contentElement) return
+
+        // Initial extraction
+        extractHeadings()
+
+        // Watch for DOM mutations (new content loaded via navigation)
+        const observer = new MutationObserver(() => {
+            extractHeadings()
+        })
+
+        observer.observe(contentElement, {
+            childList: true,
+            subtree: true
+        })
+
+        return () => {
+            observer.disconnect()
         }
     })
 </script>

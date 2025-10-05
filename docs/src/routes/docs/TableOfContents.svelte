@@ -20,13 +20,22 @@
 
     /**
      * Smoothly scrolls to a heading element by its ID
+     * Accounts for header offset to ensure heading is at top of viewport
      */
     function scrollToHeading(id: string) {
         const element = document.getElementById(id)
         if (element) {
             // Optimistically set active for immediate feedback
             activeHeading = id
-            element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+            // Calculate position accounting for any offset (headers, padding)
+            const elementPosition = element.getBoundingClientRect().top
+            const offsetPosition = elementPosition + window.scrollY - 20 // 20px offset from top
+
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+            })
         }
     }
 
