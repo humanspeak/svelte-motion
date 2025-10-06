@@ -119,6 +119,16 @@ export const mergeInlineStyles = (
             case 'cursor':
                 setProp('cursor', value)
                 break
+            // Skip SVG path animation properties - they'll be set by animate()
+            case 'pathLength':
+            case 'pathOffset':
+            case 'pathSpacing':
+            case 'strokeDasharray':
+            case 'stroke-dasharray':
+            case 'strokeDashoffset':
+            case 'stroke-dashoffset':
+                // Don't add these to inline styles - they interfere with animation
+                break
             default:
                 // Fallback: write raw as-is for simple CSS props
                 if (typeof value === 'string' || typeof value === 'number') {
