@@ -30,7 +30,7 @@
         getInitialFalseContext
     } from '$lib/components/variantContext.context'
     import { writable } from 'svelte/store'
-    import { transformSVGPathProperties } from '$lib/utils/svg'
+    import { transformSVGPathProperties, computeNormalizedSVGInitialAttrs } from '$lib/utils/svg'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -233,10 +233,22 @@
                   'data-path': dataPath
               }
             : {}),
-        // If we have pathLength in initial, set the pathLength attribute for normalization
-        ...(initialKeyframes && 'pathLength' in initialKeyframes ? { pathLength: '1' } : {}),
+        // Apply normalized SVG path attributes synchronously on first render to avoid flash
+        // Compute via svg utils (no dynamic import in SSR/derived expressions)
+        ...(() => {
+            if (!initialKeyframes) return {}
+            const attrs = computeNormalizedSVGInitialAttrs(
+                initialKeyframes as Record<string, unknown>
+            )
+            if (attrs) {
+                return attrs
+            }
+            return {}
+        })(),
         style: mergeInlineStyles(
-            styleProp,
+            initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting'
+                ? `${styleProp || ''};visibility:hidden`
+                : styleProp,
             initialKeyframes as unknown as Record<string, unknown>,
             resolvedAnimate as unknown as Record<string, unknown>
         ),
@@ -253,6 +265,12 @@
             element,
             payload as Record<string, unknown>
         ) as typeof payload
+
+        // Ensure dash properties aren't pinned as inline styles
+        if (element && (element as HTMLElement).style) {
+            ;(element as HTMLElement).style.removeProperty('stroke-dasharray')
+            ;(element as HTMLElement).style.removeProperty('stroke-dashoffset')
+        }
 
         animateWithLifecycle(
             element,
@@ -418,6 +436,7 @@
 
     $effect(() => {
         if (!(element && isLoaded === 'mounting')) return
+
         if (effectiveAnimate) {
             // If initial={false}, render at animate state immediately with no transition
             if (effectiveInitialProp === false && resolvedAnimate) {
@@ -439,31 +458,46 @@
                     element!,
                     initialKeyframes as Record<string, unknown>
                 )
+
                 // For SVG paths, apply initial state truly synchronously to prevent flash
                 const hasSVGProps =
                     'strokeDasharray' in transformedInitial ||
                     'strokeDashoffset' in transformedInitial
                 if (hasSVGProps) {
-                    // Apply immediately using element.style for instant effect
+                    // Apply presentation attributes to avoid pinning CSS properties
                     Object.entries(transformedInitial).forEach(([key, value]) => {
-                        if (key === 'strokeDasharray' || key === 'strokeDashoffset') {
-                            element!.style.setProperty(
-                                key,
-                                String(Array.isArray(value) ? value[0] : value)
-                            )
+                        const v = String(Array.isArray(value) ? value[0] : value)
+                        if (key === 'strokeDasharray' || key === 'stroke-dasharray') {
+                            element!.setAttribute('stroke-dasharray', v)
+                        }
+                        if (key === 'strokeDashoffset' || key === 'stroke-dashoffset') {
+                            element!.setAttribute('stroke-dashoffset', v)
                         }
                     })
+                    // no-op
                 }
-                animate(element!, transformedInitial as DOMKeyframesDefinition, { duration: 0 })
+                // Avoid pinning: strip stroke dash props from the animate(0) payload
+                const initialForAnimate = { ...(transformedInitial as Record<string, unknown>) }
+                delete (initialForAnimate as Record<string, unknown>).strokeDasharray
+                delete (initialForAnimate as Record<string, unknown>)['stroke-dasharray']
+                delete (initialForAnimate as Record<string, unknown>).strokeDashoffset
+                delete (initialForAnimate as Record<string, unknown>)['stroke-dashoffset']
+
+                animate(element!, initialForAnimate as DOMKeyframesDefinition, { duration: 0 })
+                // no-op
+
                 // Mark initial after styles are applied so tests read CSS=0 while state=initial
+                // This also removes visibility:hidden that was hiding SVG paths during mount
                 isLoaded = 'initial'
                 dataPath = 1
+
                 // Then promote to ready and run the enter animation
                 requestAnimationFrame(async () => {
                     if (isPlaywright) {
                         await sleep(10)
                     }
                     isLoaded = 'ready'
+
                     runAnimation()
                 })
             } else {

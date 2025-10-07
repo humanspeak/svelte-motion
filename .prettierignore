@@ -1,4 +1,15 @@
-# Package Managers
-package-lock.json
-pnpm-lock.yaml
-yarn.lock
+# Generated outputs - ignore for Prettier
+node_modules/
+.svelte-kit/
+dist/
+coverage/
+test-results/
+
+# Docs workspace generated files
+/docs/node_modules/
+/docs/.svelte-kit/
+/docs/dist/
+/docs/coverage/
+
+# Generated i18n/paraglide artifacts in docs
+/docs/src/lib/paraglide/

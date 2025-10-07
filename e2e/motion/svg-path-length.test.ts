@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('SVG pathLength Animation', () => {
-    test('should animate pathLength from 0 to 1 using strokeDasharray and strokeDashoffset', async ({
+    test('animates pathLength 0→1 with normalized dash attributes and no flash', async ({
         page
     }) => {
         await page.goto('/tests/motion/svg-path-length')
@@ -9,8 +9,16 @@ test.describe('SVG pathLength Animation', () => {
         const path = page.getByTestId('animated-path')
         await expect(path).toBeVisible()
 
-        // Wait for page to be fully loaded and animation to start
-        await page.waitForTimeout(100)
+        // Immediately verify attributes before animation progresses
+        const initialAttrDash = await path.getAttribute('stroke-dasharray')
+        expect(initialAttrDash, 'initial stroke-dasharray attribute should be emitted').toBeTruthy()
+        if (initialAttrDash) {
+            const initVals = initialAttrDash.split(/[\s,]+/).map((v) => parseFloat(v))
+            expect(initVals[0] < 0.05, 'initial first dash value should be ~0').toBe(true)
+        }
+
+        // Small delay to allow animation to start
+        await page.waitForTimeout(60)
 
         /**
          * pathLength animation should be implemented by Motion library using:
@@ -21,9 +29,21 @@ test.describe('SVG pathLength Animation', () => {
 
         const getStrokeDasharray = async (): Promise<string> =>
             await path.evaluate((el) => {
-                const computed = getComputedStyle(el)
-                return computed.strokeDasharray || el.getAttribute('stroke-dasharray') || 'none'
+                // Prefer attribute for normalized values; fallback to computed
+                return (
+                    el.getAttribute('stroke-dasharray') ||
+                    getComputedStyle(el).strokeDasharray ||
+                    'none'
+                )
             })
+
+        const getStrokeDashoffset = async (): Promise<string> =>
+            await path.evaluate(
+                (el) =>
+                    el.getAttribute('stroke-dashoffset') ||
+                    getComputedStyle(el).strokeDashoffset ||
+                    '0'
+            )
 
         const getPathLengthAttr = async (): Promise<string | null> =>
             await path.evaluate((el) => el.getAttribute('pathLength'))
@@ -36,14 +56,22 @@ test.describe('SVG pathLength Animation', () => {
             })
             .toBe('1')
 
-        // Initially, strokeDasharray should represent 0% drawn (approximately "0 1" or similar)
+        // Attributes should be present from first paint to avoid flash
+        await expect
+            .poll(async () => (await getStrokeDasharray()) !== 'none', {
+                message: 'stroke-dasharray attribute should be present on initial paint',
+                timeout: 1000
+            })
+            .toBe(true)
+
+        // Initially, stroke-dasharray should represent ~0% drawn (approximately "0px 1px")
         await expect
             .poll(
                 async () => {
                     const dasharray = await getStrokeDasharray()
                     if (dasharray === 'none') return false
                     // Parse the dasharray value - should start near 0
-                    const values = dasharray.split(/[\s,]+/).map(parseFloat)
+                    const values = dasharray.split(/[\s,]+/).map((v) => parseFloat(v))
                     return values[0] < 0.1 // First value should be near 0 initially
                 },
                 {
@@ -53,15 +81,23 @@ test.describe('SVG pathLength Animation', () => {
             )
             .toBe(true)
 
-        // After animation progresses, strokeDasharray should increase
-        await page.waitForTimeout(1000) // Wait halfway through the 2s animation
+        // Dashoffset should default to ~0px unless pathOffset is provided
+        await expect
+            .poll(async () => (await getStrokeDashoffset()).includes('0'), {
+                message: 'stroke-dashoffset should default to 0px when pathOffset is not provided',
+                timeout: 1000
+            })
+            .toBe(true)
+
+        // After animation progresses, stroke-dasharray first value should increase
+        await page.waitForTimeout(1000) // roughly halfway through the 2s animation
 
         await expect
             .poll(
                 async () => {
                     const dasharray = await getStrokeDasharray()
                     if (dasharray === 'none') return false
-                    const values = dasharray.split(/[\s,]+/).map(parseFloat)
+                    const values = dasharray.split(/[\s,]+/).map((v) => parseFloat(v))
                     // First value should be significantly larger than 0
                     return values[0] > 0.3
                 },
@@ -73,7 +109,7 @@ test.describe('SVG pathLength Animation', () => {
             )
             .toBe(true)
 
-        // At the end, strokeDasharray should be approximately "1 1" (fully drawn)
+        // At the end, stroke-dasharray should be approximately "1px 0px" (fully drawn)
         await page.waitForTimeout(1500) // Wait for animation to complete
 
         await expect
@@ -81,12 +117,12 @@ test.describe('SVG pathLength Animation', () => {
                 async () => {
                     const dasharray = await getStrokeDasharray()
                     if (dasharray === 'none') return false
-                    const values = dasharray.split(/[\s,]+/).map(parseFloat)
-                    // First value should be close to 1 (fully drawn)
+                    const values = dasharray.split(/[\s,]+/).map((v) => parseFloat(v))
+                    // First value should be close to 1 (fully drawn) in normalized units
                     return values[0] > 0.9
                 },
                 {
-                    message: 'strokeDasharray should end near "1" for fully drawn path',
+                    message: 'stroke-dasharray should end near "1px 0px" for fully drawn path',
                     timeout: 2000
                 }
             )
