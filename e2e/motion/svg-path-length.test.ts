@@ -96,8 +96,6 @@ test.describe('SVG pathLength Animation', () => {
             .toBe(true)
 
         // After animation progresses, stroke-dasharray first value should increase
-        await page.waitForTimeout(1000) // roughly halfway through the 2s animation
-
         await expect
             .poll(
                 async () => {
@@ -110,14 +108,12 @@ test.describe('SVG pathLength Animation', () => {
                 {
                     message:
                         'strokeDasharray first value should increase during animation (line drawing)',
-                    timeout: 2000
+                    timeout: 2500
                 }
             )
             .toBe(true)
 
         // At the end, stroke-dasharray should be approximately "1px 0px" (fully drawn)
-        await page.waitForTimeout(1500) // Wait for animation to complete
-
         await expect
             .poll(
                 async () => {
@@ -129,7 +125,7 @@ test.describe('SVG pathLength Animation', () => {
                 },
                 {
                     message: 'stroke-dasharray should end near "1px 0px" for fully drawn path',
-                    timeout: 2000
+                    timeout: 3000
                 }
             )
             .toBe(true)
