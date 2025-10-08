@@ -70,8 +70,13 @@ export const computeFocusBaseline = (
             // Convert camelCase to kebab-case for CSS property access
             const cssProperty = key.replace(/([A-Z])/g, '-$1').toLowerCase()
             const value = cs.getPropertyValue(cssProperty)
+            // Always assign a baseline entry to ensure a removal keyframe exists.
             if (value) {
                 baseline[key] = value
+            } else {
+                // Fallback to inline style for that property, else explicit empty string
+                const inlineValue = el.style.getPropertyValue(cssProperty)
+                baseline[key] = inlineValue || ''
             }
         }
     }
@@ -119,7 +124,15 @@ export const attachWhileFocus = (
 
     const handleBlur = () => {
         if (focusBaseline && Object.keys(focusBaseline).length > 0) {
-            animate(el, focusBaseline as unknown as DOMKeyframesDefinition, mergedTransition)
+            const baselineForAnimation = { ...focusBaseline } as Record<string, unknown>
+            // For baseline entries that are empty string, proactively clear inline CSS
+            for (const [key, v] of Object.entries(baselineForAnimation)) {
+                if (v === '') {
+                    const cssProperty = key.replace(/([A-Z])/g, '-$1').toLowerCase()
+                    el.style.removeProperty(cssProperty)
+                }
+            }
+            animate(el, baselineForAnimation as unknown as DOMKeyframesDefinition, mergedTransition)
         }
         callbacks?.onEnd?.()
     }

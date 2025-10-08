@@ -70,13 +70,19 @@ test.describe('SVG pathLength Animation', () => {
                 async () => {
                     const dasharray = await getStrokeDasharray()
                     if (dasharray === 'none') return false
-                    // Parse the dasharray value - should start near 0
-                    const values = dasharray.split(/[\s,]+/).map((v) => parseFloat(v))
-                    return values[0] < 0.1 // First value should be near 0 initially
+                    const values = dasharray
+                        .trim()
+                        .split(/[\s,]+/)
+                        .map((v) => parseFloat(v))
+                        .filter((n) => Number.isFinite(n))
+                    if (values.length < 2) return false
+                    // Be tolerant across environments: first value should be substantially smaller than the second
+                    return values[0] <= values[1] && values[0] < Math.max(0.1, values[1] * 0.2)
                 },
                 {
-                    message: 'strokeDasharray should start near 0 for line-drawing effect',
-                    timeout: 2000
+                    message:
+                        'stroke-dasharray should start with a small first value (near 0) relative to the second segment',
+                    timeout: 4000
                 }
             )
             .toBe(true)

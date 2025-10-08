@@ -59,6 +59,10 @@ describe('svg utilities', () => {
             expect(hasSVGPathProperties({ pathOffset: 0.5 })).toBe(true)
         })
 
+        it('should return true if pathSpacing is present', () => {
+            expect(hasSVGPathProperties({ pathSpacing: 2 })).toBe(true)
+        })
+
         it('should return false for regular properties', () => {
             expect(hasSVGPathProperties({ opacity: 1, x: 100 })).toBe(false)
         })

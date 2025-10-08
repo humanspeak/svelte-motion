@@ -7,12 +7,21 @@ export const SVG_PATH_PROPERTIES = new Set(['pathLength', 'pathOffset', 'pathSpa
 /**
  * Check if an element is an SVG path element.
  */
-export function isSVGPathElement(element: Element): element is SVGPathElement {
-    // In browsers, prefer native instanceof check
+/**
+ * Determines whether the provided element is an SVGPathElement.
+ *
+ * @param {Element} element The candidate element to test.
+ * @returns {element is SVGPathElement} True when the element is an SVG path.
+ * @example
+ * const el = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+ * if (isSVGPathElement(el)) {
+ *   // el is now typed as SVGPathElement
+ * }
+ */
+export const isSVGPathElement = (element: Element): element is SVGPathElement => {
     if (typeof SVGPathElement !== 'undefined') {
         return element instanceof SVGPathElement
     }
-    // Fallback for SSR/JSDOM environments: detect by namespace and tag name
     const nsOk = element.namespaceURI === 'http://www.w3.org/2000/svg'
     const tagOk = (element as { tagName?: string }).tagName?.toLowerCase() === 'path'
     return !!(nsOk && tagOk)
@@ -21,8 +30,18 @@ export function isSVGPathElement(element: Element): element is SVGPathElement {
 /**
  * Check if an element is any SVG element.
  */
-export function isSVGElement(element: Element): element is SVGElement {
-    // Check if SVGElement is available (for SSR/test environments)
+/**
+ * Determines whether the provided element is an SVGElement.
+ *
+ * @param {Element} element The candidate element to test.
+ * @returns {element is SVGElement} True when the element is an SVG element.
+ * @example
+ * const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+ * if (isSVGElement(svg)) {
+ *   // svg is now typed as SVGElement
+ * }
+ */
+export const isSVGElement = (element: Element): element is SVGElement => {
     if (typeof SVGElement === 'undefined') {
         return false
     }
@@ -41,10 +60,22 @@ export function isSVGElement(element: Element): element is SVGElement {
  * @param keyframes - The animation keyframes that may contain SVG properties
  * @returns Transformed keyframes with CSS-compatible properties
  */
-export function transformSVGPathProperties(
+/**
+ * Transforms SVG path-specific animation properties into DOM-compatible attributes.
+ *
+ * Normalized behavior (React/Framer Motion parity):
+ * - Ensures `pathLength="1"` is set when any path prop is present
+ * - Maps `pathLength`/`pathSpacing` → `stroke-dasharray` (px)
+ * - Maps `pathOffset` → `stroke-dashoffset` (negative px)
+ *
+ * @param {Element} element The element being animated (must be an SVG path).
+ * @param {Record<string, unknown>} keyframes The input keyframes possibly containing path props.
+ * @returns {Record<string, unknown>} A transformed keyframe object safe for animation.
+ */
+export const transformSVGPathProperties = (
     element: Element,
     keyframes: Record<string, unknown>
-): Record<string, unknown> {
+): Record<string, unknown> => {
     if (!isSVGPathElement(element)) {
         return keyframes
     }
@@ -144,7 +175,13 @@ export function transformSVGPathProperties(
 /**
  * Check if any keyframes contain SVG path properties.
  */
-export function hasSVGPathProperties(keyframes: Record<string, unknown>): boolean {
+/**
+ * Checks if any SVG path-related properties are present in the keyframes object.
+ *
+ * @param {Record<string, unknown>} keyframes The keyframes to inspect.
+ * @returns {boolean} True if any of `pathLength`, `pathSpacing`, or `pathOffset` are present.
+ */
+export const hasSVGPathProperties = (keyframes: Record<string, unknown>): boolean => {
     return Object.keys(keyframes).some((key) => SVG_PATH_PROPERTIES.has(key))
 }
 
@@ -152,10 +189,18 @@ export function hasSVGPathProperties(keyframes: Record<string, unknown>): boolea
  * Transform initial SVG path properties for initial state setup.
  * This ensures that the initial state also has the proper strokeDasharray values.
  */
-export function transformInitialSVGPathProperties(
+/**
+ * Transforms initial keyframes for SVG paths so that the initial state uses
+ * normalized dash attributes.
+ *
+ * @param {Element} element The element being animated (must be an SVG path).
+ * @param {Record<string, unknown> | undefined} initial Initial keyframes, if provided.
+ * @returns {Record<string, unknown> | undefined} Transformed initial keyframes or the original value.
+ */
+export const transformInitialSVGPathProperties = (
     element: Element,
     initial: Record<string, unknown> | undefined
-): Record<string, unknown> | undefined {
+): Record<string, unknown> | undefined => {
     if (!initial || !isSVGPathElement(element)) {
         return initial
     }
