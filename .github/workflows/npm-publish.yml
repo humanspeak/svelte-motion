@@ -40,7 +40,7 @@ on:
 
 jobs:
     check-if-merged:
-        runs-on: blacksmith-2vcpu-blacksmith-2vcpu-ubuntu-2404 # trunk-ignore(actionlint/runner-label)
+        runs-on: blacksmith-2vcpu-ubuntu-2404 # trunk-ignore(actionlint/runner-label)
         outputs:
             should_run: ${{ steps.check.outputs.should_run }}
         steps:
@@ -58,7 +58,7 @@ jobs:
     debug-check:
         needs: check-if-merged
         if: needs.check-if-merged.outputs.should_run == 'true'
-        runs-on: blacksmith-2vcpu-blacksmith-2vcpu-ubuntu-2404 # trunk-ignore(actionlint/runner-label)
+        runs-on: blacksmith-2vcpu-ubuntu-2404 # trunk-ignore(actionlint/runner-label)
         steps:
             - name: Checkout
               uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
@@ -196,7 +196,7 @@ jobs:
     build:
         needs: [check-if-merged, debug-check]
         if: needs.check-if-merged.outputs.should_run == 'true'
-        runs-on: blacksmith-2vcpu-blacksmith-2vcpu-ubuntu-2404 # trunk-ignore(actionlint/runner-label)
+        runs-on: blacksmith-2vcpu-ubuntu-2404 # trunk-ignore(actionlint/runner-label)
         strategy:
             matrix:
                 node-version: [20, 22]
@@ -244,11 +244,13 @@ jobs:
                   parallel: true
               if: matrix.node-version == '22'
 
+            # Removed dependency caching to reduce cache-poisoning risk
+
     playwright-tests:
         needs: [check-if-merged, debug-check]
         if: needs.check-if-merged.outputs.should_run == 'true'
         timeout-minutes: 60
-        runs-on: blacksmith-2vcpu-blacksmith-2vcpu-ubuntu-2404 # trunk-ignore(actionlint/runner-label)
+        runs-on: blacksmith-2vcpu-ubuntu-2404 # trunk-ignore(actionlint/runner-label)
         steps:
             - uses: actions/checkout@v4 # zizmor: ignore[unpinned-uses]
               with:
@@ -291,7 +293,7 @@ jobs:
     coverage-report:
         needs: [check-if-merged, build, playwright-tests]
         if: needs.check-if-merged.outputs.should_run == 'true'
-        runs-on: blacksmith-2vcpu-blacksmith-2vcpu-ubuntu-2404 # trunk-ignore(actionlint/runner-label)
+        runs-on: blacksmith-2vcpu-ubuntu-2404 # trunk-ignore(actionlint/runner-label)
         steps:
             - name: Coveralls Finished
               uses: coverallsapp/github-action@v2 # zizmor: ignore[unpinned-uses]
@@ -303,7 +305,7 @@ jobs:
     publish-github-packages:
         needs: [check-if-merged, build, playwright-tests, coverage-report]
         if: needs.check-if-merged.outputs.should_run == 'true'
-        runs-on: blacksmith-2vcpu-blacksmith-2vcpu-ubuntu-2404 # trunk-ignore(actionlint/runner-label)
+        runs-on: blacksmith-2vcpu-ubuntu-2404 # trunk-ignore(actionlint/runner-label)
         permissions:
             contents: write
             packages: write
