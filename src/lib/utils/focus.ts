@@ -57,6 +57,8 @@ export const computeFocusBaseline = (
         opacity: 1
     }
 
+    const cs = getComputedStyle(el)
+
     for (const key of Object.keys(whileFocusRecord)) {
         if (Object.prototype.hasOwnProperty.call(animateRecord, key)) {
             baseline[key] = animateRecord[key]
@@ -65,9 +67,16 @@ export const computeFocusBaseline = (
         } else if (key in (neutralTransformDefaults as Record<string, unknown>)) {
             baseline[key] = neutralTransformDefaults[key]
         } else {
-            const cs = getComputedStyle(el)
-            if (key in (cs as unknown as Record<string, unknown>)) {
-                baseline[key] = (cs as unknown as Record<string, unknown>)[key] as string
+            // Convert camelCase to kebab-case for CSS property access
+            const cssProperty = key.replace(/([A-Z])/g, '-$1').toLowerCase()
+            const value = cs.getPropertyValue(cssProperty)
+            // Always assign a baseline entry to ensure a removal keyframe exists.
+            if (value) {
+                baseline[key] = value
+            } else {
+                // Fallback to inline style for that property, else explicit empty string
+                const inlineValue = el.style.getPropertyValue(cssProperty)
+                baseline[key] = inlineValue || ''
             }
         }
     }
@@ -115,7 +124,15 @@ export const attachWhileFocus = (
 
     const handleBlur = () => {
         if (focusBaseline && Object.keys(focusBaseline).length > 0) {
-            animate(el, focusBaseline as unknown as DOMKeyframesDefinition, mergedTransition)
+            const baselineForAnimation = { ...focusBaseline } as Record<string, unknown>
+            // For baseline entries that are empty string, proactively clear inline CSS
+            for (const [key, v] of Object.entries(baselineForAnimation)) {
+                if (v === '') {
+                    const cssProperty = key.replace(/([A-Z])/g, '-$1').toLowerCase()
+                    el.style.removeProperty(cssProperty)
+                }
+            }
+            animate(el, baselineForAnimation as unknown as DOMKeyframesDefinition, mergedTransition)
         }
         callbacks?.onEnd?.()
     }

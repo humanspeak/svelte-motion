@@ -72,6 +72,14 @@
                         initial={'{false}'}
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/svg-path-length')}
+                    >
+                        SVG Path Length
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

@@ -30,6 +30,7 @@
         getInitialFalseContext
     } from '$lib/components/variantContext.context'
     import { writable } from 'svelte/store'
+    import { transformSVGPathProperties, computeNormalizedSVGInitialAttrs } from '$lib/utils/svg'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -232,8 +233,22 @@
                   'data-path': dataPath
               }
             : {}),
+        // Apply normalized SVG path attributes synchronously on first render to avoid flash
+        // Compute via svg utils (no dynamic import in SSR/derived expressions)
+        ...(() => {
+            if (!initialKeyframes) return {}
+            const attrs = computeNormalizedSVGInitialAttrs(
+                initialKeyframes as Record<string, unknown>
+            )
+            if (attrs) {
+                return attrs
+            }
+            return {}
+        })(),
         style: mergeInlineStyles(
-            styleProp,
+            initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting'
+                ? `${styleProp || ''};visibility:hidden`
+                : styleProp,
             initialKeyframes as unknown as Record<string, unknown>,
             resolvedAnimate as unknown as Record<string, unknown>
         ),
@@ -243,7 +258,20 @@
     const runAnimation = () => {
         if (!element || !resolvedAnimate) return
         const transitionAnimate: MotionTransition = mergedTransition ?? {}
-        const payload = $state.snapshot(resolvedAnimate)
+        let payload = $state.snapshot(resolvedAnimate)
+
+        // Transform SVG path properties (pathLength, pathOffset) to their CSS equivalents
+        payload = transformSVGPathProperties(
+            element,
+            payload as Record<string, unknown>
+        ) as typeof payload
+
+        // Ensure dash properties aren't pinned as inline styles
+        if (element && (element as HTMLElement).style) {
+            ;(element as HTMLElement).style.removeProperty('stroke-dasharray')
+            ;(element as HTMLElement).style.removeProperty('stroke-dashoffset')
+        }
+
         animateWithLifecycle(
             element,
             payload as unknown as DOMKeyframesDefinition,
@@ -408,12 +436,14 @@
 
     $effect(() => {
         if (!(element && isLoaded === 'mounting')) return
+
         if (effectiveAnimate) {
             // If initial={false}, render at animate state immediately with no transition
             if (effectiveInitialProp === false && resolvedAnimate) {
                 // Use Motion's animate() with duration:0 so it takes control of these properties
                 // This prevents inline styles from pinning the properties during future animations
-                const snapshot = $state.snapshot(resolvedAnimate) as Record<string, unknown>
+                let snapshot = $state.snapshot(resolvedAnimate) as Record<string, unknown>
+                snapshot = transformSVGPathProperties(element!, snapshot)
                 animate(element!, snapshot as DOMKeyframesDefinition, { duration: 0 })
                 // Mark that we've already applied this variant to avoid a second animate pass
                 mountedWithInitialFalse = true
@@ -424,16 +454,50 @@
                 isLoaded = 'ready'
             } else if (isNotEmpty(initialKeyframes)) {
                 // Apply initial instantly BEFORE exposing 'initial' state
-                animate(element!, initialKeyframes!, { duration: 0 })
+                const transformedInitial = transformSVGPathProperties(
+                    element!,
+                    initialKeyframes as Record<string, unknown>
+                )
+
+                // For SVG paths, apply initial state truly synchronously to prevent flash
+                const hasSVGProps =
+                    'strokeDasharray' in transformedInitial ||
+                    'strokeDashoffset' in transformedInitial
+                if (hasSVGProps) {
+                    // Apply presentation attributes to avoid pinning CSS properties
+                    Object.entries(transformedInitial).forEach(([key, value]) => {
+                        const v = String(Array.isArray(value) ? value[0] : value)
+                        if (key === 'strokeDasharray' || key === 'stroke-dasharray') {
+                            element!.setAttribute('stroke-dasharray', v)
+                        }
+                        if (key === 'strokeDashoffset' || key === 'stroke-dashoffset') {
+                            element!.setAttribute('stroke-dashoffset', v)
+                        }
+                    })
+                    // no-op
+                }
+                // Avoid pinning: strip stroke dash props from the animate(0) payload
+                const initialForAnimate = { ...(transformedInitial as Record<string, unknown>) }
+                delete (initialForAnimate as Record<string, unknown>).strokeDasharray
+                delete (initialForAnimate as Record<string, unknown>)['stroke-dasharray']
+                delete (initialForAnimate as Record<string, unknown>).strokeDashoffset
+                delete (initialForAnimate as Record<string, unknown>)['stroke-dashoffset']
+
+                animate(element!, initialForAnimate as DOMKeyframesDefinition, { duration: 0 })
+                // no-op
+
                 // Mark initial after styles are applied so tests read CSS=0 while state=initial
+                // This also removes visibility:hidden that was hiding SVG paths during mount
                 isLoaded = 'initial'
                 dataPath = 1
+
                 // Then promote to ready and run the enter animation
                 requestAnimationFrame(async () => {
                     if (isPlaywright) {
                         await sleep(10)
                     }
                     isLoaded = 'ready'
+
                     runAnimation()
                 })
             } else {
@@ -447,7 +511,8 @@
                     resolvedAnimate
                 ) {
                     // Apply variant styles instantly with duration:0
-                    const snapshot = $state.snapshot(resolvedAnimate) as Record<string, unknown>
+                    let snapshot = $state.snapshot(resolvedAnimate) as Record<string, unknown>
+                    snapshot = transformSVGPathProperties(element!, snapshot)
                     animate(element!, snapshot as DOMKeyframesDefinition, { duration: 0 })
                     lastRanVariantKey = currentAnimateKey
                 } else {
@@ -456,7 +521,11 @@
             }
         } else if (isNotEmpty(initialKeyframes)) {
             // Apply initial instantly BEFORE exposing 'initial' state
-            animate(element!, initialKeyframes!, { duration: 0 })
+            const transformedInitial = transformSVGPathProperties(
+                element!,
+                initialKeyframes as Record<string, unknown>
+            )
+            animate(element!, transformedInitial as DOMKeyframesDefinition, { duration: 0 })
             dataPath = 3
             isLoaded = 'initial'
             requestAnimationFrame(async () => {

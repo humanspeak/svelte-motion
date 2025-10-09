@@ -1,23 +1,25 @@
 <script lang="ts">
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import Example from '$lib/components/general/Example.svelte'
-    import NotificationsStackExample from '$lib/examples/NotificationsStackExample.svelte'
+    import Reordering from '$lib/examples/Reordering.svelte'
+
+    let { data } = $props()
 
     const breadcrumbs = $derived(getBreadcrumbContext())
     $effect(() => {
         if (breadcrumbs) {
             breadcrumbs.breadcrumbs = [
                 { title: 'Examples', href: '/examples' },
-                { title: 'Notifications Stack' }
+                { title: 'Reordering' }
             ]
         }
     })
 </script>
 
 <svelte:head>
-    <title>Notifications Stack | Examples | Svelte Motion</title>
+    <title>Reordering | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example>
-    <NotificationsStackExample />
+<Example motionUrl={data.sourceUrl}>
+    <Reordering />
 </Example>
