@@ -62,5 +62,8 @@
         "vitest-browser-svelte": "^1.1.0",
         "wrangler": "^4.42.2"
     },
+    "volta": {
+        "node": "22.20.0"
+    },
     "pnpm": {}
 }

@@ -9,6 +9,3 @@
         style="width:100px;height:100px;background:#60a5fa;border-radius:8px;"
     />
 </div>
-
-
-

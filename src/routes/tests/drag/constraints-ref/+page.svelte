@@ -17,6 +17,3 @@
     </div>
     <p style="font:12px system-ui;color:#666">Drag is constrained to dashed box</p>
 </div>
-
-
-

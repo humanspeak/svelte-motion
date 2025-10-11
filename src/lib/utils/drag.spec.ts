@@ -57,6 +57,3 @@ describe('utils/drag', () => {
         cleanup()
     })
 })
-
-
-

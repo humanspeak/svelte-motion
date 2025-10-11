@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { animate, hover, motion, MotionConfig } from './index.js'
+import {
+    animate,
+    AnimatePresence,
+    createDragControls,
+    hover,
+    motion,
+    MotionConfig,
+    stringifyStyleObject,
+    useAnimationFrame,
+    useSpring,
+    useTime,
+    useTransform
+} from './index.js'
 
 describe('public API: index.ts', () => {
     it('exports motion object with lowercased HTML keys', () => {
@@ -20,5 +32,27 @@ describe('public API: index.ts', () => {
 
     it('exports MotionConfig component', () => {
         expect(typeof MotionConfig).toBe('function')
+    })
+
+    it('exports AnimatePresence component', () => {
+        expect(typeof AnimatePresence).toBe('function')
+    })
+
+    it('exports createDragControls factory', () => {
+        expect(typeof createDragControls).toBe('function')
+        const controls = createDragControls()
+        expect(controls).toBeTruthy()
+        expect(typeof controls.start).toBe('function')
+        expect(typeof controls.cancel).toBe('function')
+        expect(typeof controls.stop).toBe('function')
+        expect(typeof controls.subscribe).toBe('function')
+    })
+
+    it('exports utility helpers', () => {
+        expect(typeof useAnimationFrame).toBe('function')
+        expect(typeof useSpring).toBe('function')
+        expect(typeof stringifyStyleObject).toBe('function')
+        expect(typeof useTime).toBe('function')
+        expect(typeof useTransform).toBe('function')
     })
 })

@@ -124,7 +124,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
     // Origin transform at the start of current drag
     let origin = { x: 0, y: 0 }
     let velocity = { x: 0, y: 0 }
-    let lastT = 0
     // History for velocity smoothing (last N samples)
     let history: Array<{ x: number; y: number; t: number }> = []
 

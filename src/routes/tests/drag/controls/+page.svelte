@@ -16,6 +16,3 @@
         style="width:100px;height:100px;background:#ef4444;border-radius:8px;"
     />
 </div>
-
-
-

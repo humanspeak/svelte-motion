@@ -83,6 +83,49 @@
             </ul>
         </div>
         <div>
+            <h2 class="mb-3 text-xl font-medium">Drag</h2>
+            <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/basic')}>
+                        Basic Drag
+                    </a>
+                </li>
+                <li>
+                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/axis-x')}>
+                        Drag Axis X
+                    </a>
+                </li>
+                <li>
+                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/axis-y')}>
+                        Drag Axis Y
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/constraints-ref')}
+                    >
+                        Drag Constraints (ref)
+                    </a>
+                </li>
+                <li>
+                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/elastic')}>
+                        Drag Elastic
+                    </a>
+                </li>
+                <li>
+                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/momentum')}>
+                        Drag Momentum
+                    </a>
+                </li>
+                <li>
+                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/controls')}>
+                        Drag Controls
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div>
             <h2 class="mb-3 text-xl font-medium">Utilities</h2>
             <ul class="list-disc space-y-2 pl-5">
                 <li>

@@ -127,6 +127,16 @@ export type MotionWhileFocus =
     | undefined
 
 /**
+ * Animation properties for drag interactions.
+ * When a drag gesture starts, the element animates to this state; when it ends,
+ * it animates back to its baseline (from animate/initial), restoring only the changed keys.
+ */
+export type MotionWhileDrag =
+    | (Record<string, unknown> & { transition?: AnimationOptions })
+    | DOMKeyframesDefinition
+    | undefined
+
+/**
  * Animation transition configuration for hover interactions.
  * Overrides the global transition when provided.
  */
@@ -153,6 +163,50 @@ export type MotionOnFocusEnd = (() => void) | undefined
 export type MotionOnTapStart = (() => void) | undefined
 export type MotionOnTap = (() => void) | undefined
 export type MotionOnTapCancel = (() => void) | undefined
+
+/** Drag specific types */
+export type DragPoint = { x: number; y: number }
+export type DragInfo = {
+    point: DragPoint
+    delta: DragPoint
+    offset: DragPoint
+    velocity: DragPoint
+}
+export type MotionOnDirectionLock = ((axis: 'x' | 'y') => void) | undefined
+export type MotionOnDragTransitionEnd = (() => void) | undefined
+
+export type DragAxis = boolean | 'x' | 'y'
+export type DragConstraints =
+    | {
+          top?: number
+          left?: number
+          right?: number
+          bottom?: number
+      }
+    | HTMLElement
+export type DragTransition = {
+    bounceStiffness?: number
+    bounceDamping?: number
+    power?: number
+    timeConstant?: number
+    restDelta?: number
+    restSpeed?: number
+    min?: number
+    max?: number
+}
+export type DragControls = {
+    /** Imperatively start a drag from any pointer event. */
+    start: (
+        event: PointerEvent,
+        options?: { snapToCursor?: boolean; distanceThreshold?: number }
+    ) => void
+    /** Cancel an active drag without momentum. */
+    cancel: () => void
+    /** Stop current drag and any momentum animation. */
+    stop: () => void
+    /** Subscribe the controls to a target element. */
+    subscribe: (el: HTMLElement) => void
+}
 
 /**
  * Base motion props shared by all motion components.

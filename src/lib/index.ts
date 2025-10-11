@@ -12,15 +12,24 @@ export const motion: MotionComponents = Object.fromEntries(
 export { animate, hover } from 'motion'
 // Re-export all Motion types so consumers can import types from this package
 export type {
+    DragAxis,
+    DragConstraints,
+    DragControls,
+    DragInfo,
+    DragTransition,
     MotionAnimate,
     MotionInitial,
+    MotionOnDirectionLock,
+    MotionOnDragTransitionEnd,
     MotionTransition,
+    MotionWhileDrag,
     MotionWhileFocus,
     MotionWhileHover,
     MotionWhileTap,
     Variants
 } from '$lib/types'
 export { useAnimationFrame } from '$lib/utils/animationFrame'
+export { createDragControls } from '$lib/utils/dragControls'
 export { useSpring } from '$lib/utils/spring'
 export { stringifyStyleObject } from '$lib/utils/styleObject'
 export { useTime } from '$lib/utils/time'
