@@ -293,6 +293,8 @@ export type MotionConfigProps = {
 export type HTMLElementProps = MotionProps & {
     /** Child content rendered inside the element */
     children?: Snippet
+    /** Ref to the element */
+    ref?: HTMLElement | null
     /** Additional HTML attributes */
     [key: string]: unknown
 }
@@ -305,6 +307,8 @@ export type HTMLElementProps = MotionProps & {
  * ```
  */
 export type HTMLVoidElementProps = MotionProps & {
+    /** Ref to the element */
+    ref?: HTMLElement | null
     /** Additional HTML attributes */
     [key: string]: unknown
 } & {
