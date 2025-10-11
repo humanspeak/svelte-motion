@@ -209,7 +209,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
 
         dragging = true
         lockAxis = null
-        lastT = now()
         // Start from current applied transform, not viewport rect
         origin = { x: applied.x, y: applied.y }
         startPoint = { x: e.clientX, y: e.clientY }
@@ -257,7 +256,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             velocity = { x: vx, y: vy }
         }
 
-        lastT = t
         lastPoint = { x: nx, y: ny }
 
         const dx = nx - startPoint.x
