@@ -299,7 +299,12 @@
         // Clean up previous
         teardownDrag?.()
 
-        const axis: DragAxis = dragProp === true || dragProp === 'x' || dragProp === 'y' ? dragProp : !!dragProp ? true : false
+        const axis: DragAxis =
+            dragProp === true || dragProp === 'x' || dragProp === 'y'
+                ? dragProp
+                : !!dragProp
+                  ? true
+                  : false
         if (!axis) return
 
         const controls = dragControlsProp as DragControls | undefined

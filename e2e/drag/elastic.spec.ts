@@ -6,9 +6,21 @@ test.describe('drag/elastic', () => {
         const el = page.getByTestId('elastic-0')
         const s = await el.boundingBox()
         if (!s) throw new Error('no s')
-        await el.dispatchEvent('pointerdown', { clientX: s.x + 10, clientY: s.y + 10, pointerId: 1 })
-        await page.dispatchEvent('body', 'pointermove', { clientX: s.x + 300, clientY: s.y + 10, pointerId: 1 })
-        await page.dispatchEvent('body', 'pointerup', { clientX: s.x + 300, clientY: s.y + 10, pointerId: 1 })
+        await el.dispatchEvent('pointerdown', {
+            clientX: s.x + 10,
+            clientY: s.y + 10,
+            pointerId: 1
+        })
+        await page.dispatchEvent('body', 'pointermove', {
+            clientX: s.x + 300,
+            clientY: s.y + 10,
+            pointerId: 1
+        })
+        await page.dispatchEvent('body', 'pointerup', {
+            clientX: s.x + 300,
+            clientY: s.y + 10,
+            pointerId: 1
+        })
         await page.waitForTimeout(200)
         const e = await el.boundingBox()
         if (!e) throw new Error('no e')
@@ -22,16 +34,40 @@ test.describe('drag/elastic', () => {
         const el = page.getByTestId('elastic-0')
         const s = await el.boundingBox()
         if (!s) throw new Error('no s')
-        await el.dispatchEvent('pointerdown', { clientX: s.x + 10, clientY: s.y + 10, pointerId: 2 })
-        await page.dispatchEvent('body', 'pointermove', { clientX: s.x + 300, clientY: s.y + 10, pointerId: 2 })
-        await page.dispatchEvent('body', 'pointerup', { clientX: s.x + 300, clientY: s.y + 10, pointerId: 2 })
+        await el.dispatchEvent('pointerdown', {
+            clientX: s.x + 10,
+            clientY: s.y + 10,
+            pointerId: 2
+        })
+        await page.dispatchEvent('body', 'pointermove', {
+            clientX: s.x + 300,
+            clientY: s.y + 10,
+            pointerId: 2
+        })
+        await page.dispatchEvent('body', 'pointerup', {
+            clientX: s.x + 300,
+            clientY: s.y + 10,
+            pointerId: 2
+        })
         await page.waitForTimeout(200)
         const mid = await el.boundingBox()
         if (!mid) throw new Error('no mid')
 
-        await el.dispatchEvent('pointerdown', { clientX: mid.x + 10, clientY: mid.y + 10, pointerId: 3 })
-        await page.dispatchEvent('body', 'pointermove', { clientX: mid.x + 300, clientY: mid.y + 10, pointerId: 3 })
-        await page.dispatchEvent('body', 'pointerup', { clientX: mid.x + 300, clientY: mid.y + 10, pointerId: 3 })
+        await el.dispatchEvent('pointerdown', {
+            clientX: mid.x + 10,
+            clientY: mid.y + 10,
+            pointerId: 3
+        })
+        await page.dispatchEvent('body', 'pointermove', {
+            clientX: mid.x + 300,
+            clientY: mid.y + 10,
+            pointerId: 3
+        })
+        await page.dispatchEvent('body', 'pointerup', {
+            clientX: mid.x + 300,
+            clientY: mid.y + 10,
+            pointerId: 3
+        })
         await page.waitForTimeout(200)
         const end = await el.boundingBox()
         if (!end) throw new Error('no end')
@@ -40,5 +76,3 @@ test.describe('drag/elastic', () => {
         expect(dx).toBeLessThanOrEqual(32)
     })
 })
-
-
