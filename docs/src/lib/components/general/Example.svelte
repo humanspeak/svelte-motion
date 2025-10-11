@@ -72,8 +72,8 @@
         /* Light mode default: multiply over light background */
         mix-blend-mode: multiply;
         background-image:
-            radial-gradient(rgba(234, 88, 12, 0.2) 1.6px, transparent 1.6px),
-            /* orange-600 */ radial-gradient(rgba(234, 88, 12, 0.1) 1.6px, transparent 1.6px);
+            radial-gradient(color-mix(in srgb, var(--color-brand-600) 20%, transparent) 1.6px, transparent 1.6px),
+            radial-gradient(color-mix(in srgb, var(--color-brand-600) 10%, transparent) 1.6px, transparent 1.6px);
         background-position:
             0 0,
             12px 12px;
@@ -103,7 +103,7 @@
         /* Dark mode: lighten over dark background */
         mix-blend-mode: screen;
         background-image:
-            radial-gradient(rgba(249, 115, 22, 0.18) 1.6px, transparent 1.6px),
-            radial-gradient(rgba(249, 115, 22, 0.1) 1.6px, transparent 1.6px);
+            radial-gradient(color-mix(in srgb, var(--color-brand-500) 18%, transparent) 1.6px, transparent 1.6px),
+            radial-gradient(color-mix(in srgb, var(--color-brand-500) 10%, transparent) 1.6px, transparent 1.6px);
     }
 </style>
