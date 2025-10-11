@@ -1,4 +1,21 @@
 import type { DragAxis, DragConstraints, DragControls, DragInfo, MotionWhileDrag } from '$lib/types'
+import { pwLog, pwWarn } from '$lib/utils/log'
+/**
+ * Drag utilities
+ *
+ * This module implements low-level drag gesture handling that powers `motion.*` components.
+ * It intentionally avoids Svelte-specific APIs so it can be reused in action-like contexts.
+ *
+ * Troubleshooting tips when drag "doesn't move":
+ * - Ensure we are writing transforms via `animate(el, { x, y }, { duration: 0 })`.
+ *   If computed style shows `transform: none`, another CSS rule may be overwriting the transform.
+ * - Confirm `axis` allows the intended direction (true | 'x' | 'y').
+ * - If using constraints as HTMLElement, verify both element and constraint refs are non-null and connected.
+ * - If movement stops immediately, direction lock may be engaged. Try disabling `directionLock`.
+ * - If post-release momentum never kicks in, velocity history may be empty (e.g., only pointerdown/up).
+ *   Simulate a few `pointermove`s before releasing.
+ * - For nested drags, set `propagation` as needed to avoid parent-child contention.
+ */
 import { computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 
@@ -11,6 +28,13 @@ type Rect = {
     height: number
 }
 
+/**
+ * Options passed to `attachDrag`. These are derived from `MotionProps` and pre-merged
+ * with motion config in `_MotionContainer.svelte`.
+ *
+ * Note: `mergedTransition` should be the already-resolved transition that combines
+ * MotionConfig context and the component's `transition` prop.
+ */
 export type AttachDragOptions = {
     axis: DragAxis
     constraints?: DragConstraints
@@ -41,6 +65,9 @@ export type AttachDragOptions = {
     snapToOrigin?: boolean
 }
 
+/**
+ * Read an element's DOMRect with null-safety.
+ */
 const getRect = (el: HTMLElement | null): Rect | null => {
     if (!el) return null
     const r = el.getBoundingClientRect()
@@ -61,6 +88,12 @@ const getRect = (el: HTMLElement | null): Rect | null => {
  *
  * - HTMLElement: Constrains the element to the bounding box of the provided element.
  * - Pixel object: Direct pixel limits for top/left/right/bottom.
+ */
+/**
+ * Normalize constraints to pixel offsets relative to the dragged element's origin.
+ *
+ * HTMLElement constraints: allow moving within the container bounds (subtractive rect math).
+ * Pixel object: direct min/max per side.
  */
 export const resolveConstraints = (
     el: HTMLElement | null,
@@ -87,12 +120,17 @@ export const resolveConstraints = (
 /**
  * Apply elastic overflow outside of [min, max] using a linear ratio.
  */
+/**
+ * Apply elastic overflow outside the [min, max] range.
+ * When beyond bounds, the extra distance is scaled linearly by `elastic`.
+ */
 export const applyElastic = (value: number, min: number, max: number, elastic: number): number => {
     if (value < min) return min + (value - min) * Math.max(0, Math.min(1, elastic))
     if (value > max) return max + (value - max) * Math.max(0, Math.min(1, elastic))
     return value
 }
 
+/** Prefer high-resolution time in browser; fall back for SSR/tests. */
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
 
 /**
@@ -102,7 +140,34 @@ const now = () => (typeof performance !== 'undefined' ? performance.now() : Date
  * applies elastic overflow against constraints, emits lifecycle callbacks with DragInfo,
  * and runs a momentum animation on release when enabled.
  */
+/**
+ * Attach a drag gesture to an HTMLElement.
+ *
+ * Lifecycle:
+ * - pointerdown → capture pointer, snapshot origin, start velocity history, enter whileDrag
+ * - pointermove → compute deltas, direction lock, apply constraints + elastic, write x/y
+ * - pointerup/cancel → either run momentum decay to a target or settle/clamp instantly
+ *
+ * Important invariants:
+ * - `applied` tracks the currently applied transform (x/y). Always keep it in sync when
+ *   writing transforms or finishing animations so a second drag starts from the right origin.
+ * - If you see a "jump" at the start of a second drag, it usually means `applied` wasn't
+ *   updated after a non-0-duration settle animation.
+ */
 export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => void) => {
+    const EL_ID = el.getAttribute('data-testid') || el.id || el.tagName
+    pwLog('[drag] attach', {
+        el: EL_ID,
+        axis: opts.axis,
+        hasConstraints: !!opts.constraints,
+        momentum: opts.momentum,
+        elastic: opts.elastic,
+        directionLock: opts.directionLock,
+        listener: opts.listener,
+        hasControls: !!opts.controls,
+        snapToOrigin: opts.snapToOrigin,
+        propagation: opts.propagation
+    })
     const axis = opts.axis
     const directionLock = !!opts.directionLock
     const listenerEnabled = opts.listener !== false
@@ -140,7 +205,12 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         velocity: { ...velocity }
     })
 
+    /**
+     * Write absolute element-space translation using Motion's animate() with duration 0.
+     * Also update `applied` so subsequent drags have the correct origin.
+     */
     const setXY = (x: number, y: number) => {
+        pwLog('[drag] setXY → animate(0)', { el: EL_ID, x, y })
         const payload: Record<string, unknown> = {}
         if (axis === true || axis === 'x') payload.x = x
         if (axis === true || axis === 'y') payload.y = y
@@ -151,10 +221,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         if ('y' in payload) applied.y = y
 
         // Verify it's actually applied
+        // Sanity-check: verify transform is applied and not overridden.
         const cs = getComputedStyle(el)
         const actualTransform = cs.transform
         if (actualTransform === 'none' || !actualTransform.includes('matrix')) {
-            console.warn('⚠️ setXY called but no transform applied!', {
+            pwWarn('⚠️ setXY called but no transform applied!', {
                 x,
                 y,
                 transform: actualTransform
@@ -191,7 +262,16 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         beginDrag(e)
     }
 
+    /**
+     * Begin a drag sequence. Optionally rebase the origin under the cursor (`snapToCursor`).
+     * We capture the pointer to receive move/up/cancel regardless of hover state.
+     */
     const beginDrag = (e: PointerEvent, snapToCursor = false) => {
+        pwLog('[drag] begin', {
+            el: EL_ID,
+            pointer: { id: e.pointerId, x: e.clientX, y: e.clientY },
+            snapToCursor
+        })
         try {
             if ('setPointerCapture' in el && typeof e.pointerId === 'number')
                 el.setPointerCapture(e.pointerId)
@@ -205,7 +285,9 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             stopInertia = null
         }
 
+        // Recompute constraints in case bounding boxes changed since last drag
         constraints = resolveConstraints(el, opts.constraints)
+        pwLog('[drag] constraints (px)', { el: EL_ID, constraints })
 
         dragging = true
         lockAxis = null
@@ -222,6 +304,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             const desiredX = e.clientX - rect.width / 2
             const desiredY = e.clientY - rect.height / 2
             origin = { x: desiredX, y: desiredY }
+            pwLog('[drag] snapToCursor origin', { el: EL_ID, origin })
         }
 
         startWhileDrag()
@@ -236,6 +319,13 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         window.addEventListener('pointercancel', onPointerCancel as EventListener)
     }
 
+    /**
+     * Update drag on pointer move:
+     * - Track a small history for velocity smoothing
+     * - Compute dx/dy from initial pointerdown
+     * - Apply direction lock and constraints with elastic
+     * - Write absolute x/y
+     */
     const onPointerMove = (e: PointerEvent) => {
         if (!dragging) return
         const t = now()
@@ -260,10 +350,19 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
 
         const dx = nx - startPoint.x
         const dy = ny - startPoint.y
+        pwLog('[drag] move', {
+            el: EL_ID,
+            pointer: { x: nx, y: ny },
+            deltas: { dx, dy },
+            origin,
+            applied,
+            vel: velocity
+        })
 
         // Direction lock
         if (directionLock && !lockAxis && Math.hypot(dx, dy) >= lockThreshold) {
             lockAxis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'
+            pwLog('[drag] directionLock', { el: EL_ID, lockAxis })
             opts.callbacks?.onDirectionLock?.(lockAxis)
         }
 
@@ -272,6 +371,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
 
         let x = origin.x + (applyX ? dx : 0)
         let y = origin.y + (applyY ? dy : 0)
+        const preClamp = { x, y }
 
         // Respect direction lock
         if (lockAxis === 'x') y = origin.y
@@ -285,6 +385,12 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             const maxY = origin.y + (constraints.bottom ?? Infinity)
             x = applyElastic(x, minX, maxX, elastic)
             y = applyElastic(y, minY, maxY, elastic)
+            pwLog('[drag] constrain+elastic', {
+                el: EL_ID,
+                preClamp,
+                bounds: { minX, maxX, minY, maxY },
+                out: { x, y }
+            })
         }
 
         // Apply absolute transform in element space
@@ -293,16 +399,39 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
     }
 
     const onPointerUp = (e: PointerEvent) => {
+        pwLog('[drag] pointerup', {
+            el: EL_ID,
+            pointer: { id: e.pointerId, x: e.clientX, y: e.clientY },
+            dragging
+        })
         if (!dragging) return
         finishDrag(e)
     }
     const onPointerCancel = (e: PointerEvent) => {
+        pwLog('[drag] pointercancel', {
+            el: EL_ID,
+            pointer: { id: e.pointerId, x: e.clientX, y: e.clientY },
+            dragging
+        })
         if (!dragging) return
         finishDrag(e)
     }
 
+    /**
+     * Finish a drag:
+     * - If momentum is enabled, decay towards a clamped target with exponential easing
+     * - Otherwise, animate back to a clamped position (or origin), then sync `applied`
+     */
     const finishDrag = (e: PointerEvent) => {
         dragging = false
+        pwLog('[drag] finish', {
+            el: EL_ID,
+            lastPoint,
+            startPoint,
+            origin,
+            applied,
+            momentum
+        })
         try {
             if ('releasePointerCapture' in el && typeof e.pointerId === 'number')
                 el.releasePointerCapture(e.pointerId)
@@ -319,7 +448,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
 
         // Momentum/inertia: exponential decay towards ideal target (clamped to constraints)
         if (momentum) {
-            console.log('🚀 STARTING MOMENTUM', {
+            pwLog('🚀 STARTING MOMENTUM', {
                 velocityX: velocity.x,
                 velocityY: velocity.y,
                 appliedX: applied.x,
@@ -349,7 +478,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             const targetX = opts.snapToOrigin ? 0 : Math.max(minX, Math.min(maxX, idealX))
             const targetY = opts.snapToOrigin ? 0 : Math.max(minY, Math.min(maxY, idealY))
 
-            console.log('🎯 TARGET', {
+            pwLog('🎯 TARGET', {
                 targetX,
                 targetY,
                 amplitudeX,
@@ -365,9 +494,10 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             const startY = applied.y
             let frameCount = 0
 
+            /** RAF-driven exponential decay. */
             const raf = () => {
                 if (!running) {
-                    console.log('🛑 RAF stopped (running = false)')
+                    pwLog('🛑 RAF stopped (running = false)')
                     return
                 }
                 const t = now() - startTs
@@ -389,7 +519,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 )
 
                 if (frameCount <= 3 || frameCount % 10 === 0) {
-                    console.log(`🔄 FRAME ${frameCount}`, {
+                    pwLog(`🔄 FRAME ${frameCount}`, {
                         t: t.toFixed(0),
                         px: px.toFixed(2),
                         py: py.toFixed(2),
@@ -400,7 +530,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 }
 
                 if (speed < restSpeed && distX < restDelta && distY < restDelta) {
-                    console.log('✅ REST REACHED', { frameCount, finalX: targetX, finalY: targetY })
+                    pwLog('✅ REST REACHED', { frameCount, finalX: targetX, finalY: targetY })
                     setXY(targetX, targetY)
                     running = false
                     stopInertia = null
@@ -411,15 +541,65 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             }
 
             stopInertia = () => {
-                console.log('❌ MOMENTUM CANCELLED')
+                pwLog('❌ MOMENTUM CANCELLED')
                 running = false
                 stopInertia = null
             }
 
-            console.log('🏁 QUEUING RAF')
+            pwLog('🏁 QUEUING RAF')
             requestAnimationFrame(raf)
         } else {
-            console.log('⏸️ MOMENTUM DISABLED')
+            // No momentum: animate to clamped target or origin to resolve elastic overdrag
+            const applyX = axis === true || axis === 'x'
+            const applyY = axis === true || axis === 'y'
+            const dx = lastPoint.x - startPoint.x
+            const dy = lastPoint.y - startPoint.y
+            let x = origin.x + (applyX ? dx : 0)
+            let y = origin.y + (applyY ? dy : 0)
+
+            // Respect direction lock
+            if (lockAxis === 'x') y = origin.y
+            if (lockAxis === 'y') x = origin.x
+
+            if (opts.snapToOrigin) {
+                x = 0
+                y = 0
+            } else if (constraints) {
+                const minX = origin.x + (constraints.left ?? -Infinity)
+                const maxX = origin.x + (constraints.right ?? Infinity)
+                const minY = origin.y + (constraints.top ?? -Infinity)
+                const maxY = origin.y + (constraints.bottom ?? Infinity)
+                x = Math.max(minX, Math.min(maxX, x))
+                y = Math.max(minY, Math.min(maxY, y))
+            }
+            pwLog('[drag] settle (no momentum)', {
+                el: EL_ID,
+                target: { x, y },
+                origin,
+                applied,
+                dx,
+                dy
+            })
+
+            // Animate with the merged transition so the settle feels consistent with other motion
+            const controls = animate(
+                el,
+                { ...(applyX ? { x } : {}), ...(applyY ? { y } : {}) } as DOMKeyframesDefinition,
+                (mergedTransition ?? {}) as AnimationOptions
+            )
+            // Fire transition end once settled
+            Promise.resolve((controls as unknown as { finished?: Promise<void> }).finished)
+                .then(() => {
+                    // Sync internal applied transform so next drag uses the correct origin
+                    if (applyX) applied.x = x
+                    if (applyY) applied.y = y
+                    pwLog('[drag] settle finished → sync applied', {
+                        el: EL_ID,
+                        applied
+                    })
+                })
+                .catch(() => {})
+                .finally(() => opts.callbacks?.onTransitionEnd?.())
         }
 
         opts.callbacks?.onEnd?.(e, computeInfo())
@@ -432,11 +612,14 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             _bind?: (el: HTMLElement, starter: (e: PointerEvent, snap?: boolean) => void) => void
         }
         internal._bind?.(el, beginDrag)
+        pwLog('[drag] controls bound', { el: EL_ID })
     }
 
     el.addEventListener('pointerdown', onPointerDown)
+    pwLog('[drag] pointerdown listener attached', { el: EL_ID })
 
     return () => {
+        pwLog('[drag] detach', { el: EL_ID })
         el.removeEventListener('pointerdown', onPointerDown)
         el.removeEventListener('pointermove', onPointerMove as EventListener)
         el.removeEventListener('pointerup', onPointerUp as EventListener)

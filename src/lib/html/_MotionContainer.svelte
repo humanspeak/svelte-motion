@@ -1,6 +1,15 @@
 <script lang="ts">
     import { getMotionConfig } from '$lib/components/motionConfig.context'
-    import type { MotionProps, MotionTransition } from '$lib/types'
+    import type {
+        MotionProps,
+        MotionTransition,
+        DragAxis,
+        DragConstraints,
+        DragControls,
+        DragTransition,
+        MotionWhileDrag,
+        DragInfo
+    } from '$lib/types'
     import { isNotEmpty } from '$lib/utils/objects'
     import { sleep } from '$lib/utils/testing'
     import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
@@ -22,6 +31,7 @@
     import { isNativelyFocusable } from '$lib/utils/a11y'
     import { usePresence, getAnimatePresenceContext } from '$lib/utils/presence'
     import { getInitialKeyframes } from '$lib/utils/initial'
+    import { attachDrag } from '$lib/utils/drag'
     import { resolveInitial, resolveAnimate, resolveExit } from '$lib/utils/variants'
     import {
         setVariantContext,
@@ -53,6 +63,7 @@
         whileTap: whileTapProp,
         whileHover: whileHoverProp,
         whileFocus: whileFocusProp,
+        whileDrag: whileDragProp,
         onHoverStart: onHoverStartProp,
         onHoverEnd: onHoverEndProp,
         onFocusStart: onFocusStartProp,
@@ -60,6 +71,21 @@
         onTapStart: onTapStartProp,
         onTap: onTapProp,
         onTapCancel: onTapCancelProp,
+        onDragStart: onDragStartProp,
+        onDrag: onDragProp,
+        onDragEnd: onDragEndProp,
+        onDirectionLock: onDirectionLockProp,
+        onDragTransitionEnd: onDragTransitionEndProp,
+        drag: dragProp,
+        dragConstraints: dragConstraintsProp,
+        dragElastic: dragElasticProp,
+        dragMomentum: dragMomentumProp,
+        dragTransition: dragTransitionProp,
+        dragDirectionLock: dragDirectionLockProp,
+        dragPropagation: dragPropagationProp,
+        dragSnapToOrigin: dragSnapToOriginProp,
+        dragListener: dragListenerProp,
+        dragControls: dragControlsProp,
         layout: layoutProp,
         ref: element = $bindable(null),
         ...rest
@@ -253,6 +279,72 @@
             resolvedAnimate as unknown as Record<string, unknown>
         ),
         class: classProp
+    })
+
+    // Drag wiring
+    //
+    // We attach drag only when the element is in the 'ready' state to avoid fighting
+    // with enter animations or initial keyframe application.
+    //
+    // Debug tips:
+    // - If drags "do nothing", verify that `drag` prop is truthy and that CSS isn't
+    //   overwriting transforms (check computed style for `transform`).
+    // - If second drags "jump", ensure `attachDrag` syncs the internal `applied` origin
+    //   after any non-zero duration settle animation.
+    let teardownDrag: (() => void) | null = null
+    $effect(() => {
+        if (!(element && isLoaded === 'ready')) return
+        // Only attach if drag enabled
+        if (!dragProp) return
+        // Clean up previous
+        teardownDrag?.()
+
+        const axis: DragAxis = dragProp === true || dragProp === 'x' || dragProp === 'y' ? dragProp : !!dragProp ? true : false
+        if (!axis) return
+
+        const controls = dragControlsProp as DragControls | undefined
+        const opts = {
+            axis,
+            constraints: dragConstraintsProp as DragConstraints | undefined,
+            elastic: dragElasticProp as number | undefined,
+            momentum: dragMomentumProp as boolean | undefined,
+            transition: dragTransitionProp as DragTransition | undefined,
+            directionLock: !!dragDirectionLockProp,
+            listener: dragListenerProp !== false,
+            controls,
+            whileDrag: whileDragProp as MotionWhileDrag,
+            mergedTransition: (mergedTransition ?? {}) as AnimationOptions,
+            callbacks: {
+                onStart: onDragStartProp as (e: PointerEvent, info: DragInfo) => void,
+                onMove: onDragProp as (e: PointerEvent, info: DragInfo) => void,
+                onEnd: onDragEndProp as (e: PointerEvent, info: DragInfo) => void,
+                onDirectionLock: onDirectionLockProp as (axis: 'x' | 'y') => void,
+                onTransitionEnd: onDragTransitionEndProp as () => void
+            },
+            baselineSources: {
+                initial: (initialKeyframes ?? {}) as Record<string, unknown>,
+                animate: (resolvedAnimate ?? {}) as Record<string, unknown>
+            },
+            propagation: !!dragPropagationProp,
+            snapToOrigin: !!dragSnapToOriginProp
+        }
+
+        // Attach and hold teardown so we can re-attach if props change
+        teardownDrag = attachDrag(element, opts)
+
+        // If controls passed, subscribe element
+        if (controls && controls.subscribe) {
+            try {
+                controls.subscribe(element)
+            } catch {
+                // ignore
+            }
+        }
+
+        return () => {
+            teardownDrag?.()
+            teardownDrag = null
+        }
     })
 
     const runAnimation = () => {

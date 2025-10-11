@@ -172,6 +172,9 @@ export type DragInfo = {
     offset: DragPoint
     velocity: DragPoint
 }
+export type MotionOnDragStart = ((event: PointerEvent, info: DragInfo) => void) | undefined
+export type MotionOnDrag = ((event: PointerEvent, info: DragInfo) => void) | undefined
+export type MotionOnDragEnd = ((event: PointerEvent, info: DragInfo) => void) | undefined
 export type MotionOnDirectionLock = ((axis: 'x' | 'y') => void) | undefined
 export type MotionOnDragTransitionEnd = (() => void) | undefined
 
@@ -228,6 +231,8 @@ export type MotionProps = {
     whileHover?: MotionWhileHover
     /** Focus interaction animation */
     whileFocus?: MotionWhileFocus
+    /** Drag interaction animation */
+    whileDrag?: MotionWhileDrag
     /** Called right before a main animate transition starts */
     onAnimationStart?: MotionAnimationStart
     /** Called after a main animate transition completes */
@@ -246,6 +251,16 @@ export type MotionProps = {
     onTap?: MotionOnTap
     /** Called when a tap gesture is cancelled (pointercancel) */
     onTapCancel?: MotionOnTapCancel
+    /** Called when a drag gesture starts */
+    onDragStart?: MotionOnDragStart
+    /** Called during a drag gesture */
+    onDrag?: MotionOnDrag
+    /** Called when a drag gesture ends */
+    onDragEnd?: MotionOnDragEnd
+    /** Called once when drag direction is locked to an axis */
+    onDirectionLock?: MotionOnDirectionLock
+    /** Called when the post-drag transition finishes on all axes */
+    onDragTransitionEnd?: MotionOnDragTransitionEnd
     /** Inline styles */
     style?: string
     /** CSS classes */
@@ -254,6 +269,26 @@ export type MotionProps = {
     layout?: boolean | 'position'
     /** Ref to the element */
     ref?: HTMLElement | null
+    /** Enable drag gestures. true for both axes, or lock to 'x'/'y'. */
+    drag?: DragAxis
+    /** Constrain dragging either to pixel bounds or an HTMLElement's bounding box. */
+    dragConstraints?: DragConstraints
+    /** Elasticity when overdragging beyond constraints (0 = none, 1 = full). */
+    dragElastic?: number
+    /** Continue with momentum/inertia after release (default true). */
+    dragMomentum?: boolean
+    /** Configure inertia/bounce physics for momentum. */
+    dragTransition?: DragTransition
+    /** Lock to the first detected axis of movement. */
+    dragDirectionLock?: boolean
+    /** Allow bubbling to parent drags. If false, uses a shared lock to prevent nesting. */
+    dragPropagation?: boolean
+    /** On release, animate back to origin (0). */
+    dragSnapToOrigin?: boolean
+    /** Enable the default drag listener; set false to use dragControls only. */
+    dragListener?: boolean
+    /** Pass controls to start drag imperatively from another element. */
+    dragControls?: DragControls
 }
 
 /**
