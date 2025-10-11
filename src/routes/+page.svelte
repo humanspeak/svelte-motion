@@ -11,7 +11,7 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/motion/enter-animation')}
+                        href={resolve('/tests/motion/enter-animation?@humanspeak-svelte-motion-isPlaywright=true')}
                     >
                         Enter Animation
                     </a>
@@ -19,7 +19,7 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/motion/animate-presence')}
+                        href={resolve('/tests/motion/animate-presence?@humanspeak-svelte-motion-isPlaywright=true')}
                     >
                         Animate Presence
                     </a>
@@ -27,7 +27,7 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/motion/html-content')}
+                        href={resolve('/tests/motion/html-content?@humanspeak-svelte-motion-isPlaywright=true')}
                     >
                         HTML Content (0→100)
                     </a>
@@ -35,7 +35,7 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/motion/aspect-ratio')}
+                        href={resolve('/tests/motion/aspect-ratio?@humanspeak-svelte-motion-isPlaywright=true')}
                     >
                         Aspect Ratio
                     </a>
@@ -43,7 +43,7 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/motion/hover-and-tap')}
+                        href={resolve('/tests/motion/hover-and-tap?@humanspeak-svelte-motion-isPlaywright=true')}
                     >
                         Hover + Tap
                     </a>
@@ -51,7 +51,7 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/motion/while-focus')}
+                        href={resolve('/tests/motion/while-focus?@humanspeak-svelte-motion-isPlaywright=true')}
                     >
                         While Focus
                     </a>
@@ -59,7 +59,7 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/motion/keyframes')}
+                        href={resolve('/tests/motion/keyframes?@humanspeak-svelte-motion-isPlaywright=true')}
                     >
                         Keyframes (shape + scale)
                     </a>
@@ -67,7 +67,7 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/motion/initial-false')}
+                        href={resolve('/tests/motion/initial-false?@humanspeak-svelte-motion-isPlaywright=true')}
                     >
                         initial={'{false}'}
                     </a>
@@ -75,7 +75,7 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/motion/svg-path-length')}
+                        href={resolve('/tests/motion/svg-path-length?@humanspeak-svelte-motion-isPlaywright=true')}
                     >
                         SVG Path Length
                     </a>
@@ -86,40 +86,40 @@
             <h2 class="mb-3 text-xl font-medium">Drag</h2>
             <ul class="list-disc space-y-2 pl-5">
                 <li>
-                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/basic')}>
+                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/basic?@humanspeak-svelte-motion-isPlaywright=true')}>
                         Basic Drag
                     </a>
                 </li>
                 <li>
-                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/axis-x')}>
+                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/axis-x?@humanspeak-svelte-motion-isPlaywright=true')}>
                         Drag Axis X
                     </a>
                 </li>
                 <li>
-                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/axis-y')}>
+                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/axis-y?@humanspeak-svelte-motion-isPlaywright=true')}>
                         Drag Axis Y
                     </a>
                 </li>
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/drag/constraints-ref')}
+                        href={resolve('/tests/drag/constraints-ref?@humanspeak-svelte-motion-isPlaywright=true')}
                     >
                         Drag Constraints (ref)
                     </a>
                 </li>
                 <li>
-                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/elastic')}>
+                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/elastic?@humanspeak-svelte-motion-isPlaywright=true')}>
                         Drag Elastic
                     </a>
                 </li>
                 <li>
-                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/momentum')}>
+                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/momentum?@humanspeak-svelte-motion-isPlaywright=true')}>
                         Drag Momentum
                     </a>
                 </li>
                 <li>
-                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/controls')}>
+                    <a class="text-blue-300 hover:underline" href={resolve('/tests/drag/controls?@humanspeak-svelte-motion-isPlaywright=true')}>
                         Drag Controls
                     </a>
                 </li>
@@ -131,7 +131,7 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/animation-frame')}
+                        href={resolve('/tests/animation-frame?@humanspeak-svelte-motion-isPlaywright=true')}
                     >
                         useAnimationFrame
                     </a>
@@ -144,7 +144,7 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/random/shiny-button')}
+                        href={resolve('/tests/random/shiny-button?@humanspeak-svelte-motion-isPlaywright=true')}
                     >
                         Shiny Button
                     </a>
@@ -152,7 +152,7 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/random/fancy-like-button')}
+                        href={resolve('/tests/random/fancy-like-button?@humanspeak-svelte-motion-isPlaywright=true')}
                     >
                         Fancy Like Button
                     </a>
@@ -160,7 +160,7 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/random/hover-opacity')}
+                        href={resolve('/tests/random/hover-opacity?@humanspeak-svelte-motion-isPlaywright=true')}
                     >
                         Hover Opacity
                     </a>
@@ -168,7 +168,7 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/random/animated-border-gradient')}
+                        href={resolve('/tests/random/animated-border-gradient?@humanspeak-svelte-motion-isPlaywright=true')}
                     >
                         Animated Border Gradient
                     </a>

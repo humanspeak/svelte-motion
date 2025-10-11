@@ -220,16 +220,22 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         if ('x' in payload) applied.x = x
         if ('y' in payload) applied.y = y
 
-        // Verify it's actually applied
-        // Sanity-check: verify transform is applied and not overridden.
+        // Verify it's actually applied; if not, retry once (Playwright visibility only)
         const cs = getComputedStyle(el)
-        const actualTransform = cs.transform
+        let actualTransform = cs.transform
         if (actualTransform === 'none' || !actualTransform.includes('matrix')) {
-            pwWarn('⚠️ setXY called but no transform applied!', {
-                x,
-                y,
-                transform: actualTransform
+            pwWarn('⚠️ setXY transform missing; retrying write', { x, y, transform: actualTransform })
+            animate(el, (('x' in payload || 'y' in payload) ? payload : { x, y }) as DOMKeyframesDefinition, {
+                duration: 0
             })
+            actualTransform = getComputedStyle(el).transform
+            if (actualTransform === 'none' || !actualTransform.includes('matrix')) {
+                pwWarn('⚠️ setXY second attempt still missing transform', {
+                    x,
+                    y,
+                    transform: actualTransform
+                })
+            }
         }
     }
 

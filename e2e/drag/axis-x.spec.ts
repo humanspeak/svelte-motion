@@ -1,6 +1,12 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('drag/axis-x', () => {
+    test('guide is behind box per z-index', async ({ page }) => {
+        await page.goto('/tests/drag/axis-x?@humanspeak-svelte-motion-isPlaywright=true')
+        const guideZ = await page.getByTestId('axis-guide').evaluate((el) => getComputedStyle(el).zIndex)
+        const boxZ = await page.getByTestId('drag-x').evaluate((el) => getComputedStyle(el).zIndex)
+        expect(parseInt(guideZ || '0')).toBeLessThan(parseInt(boxZ || '0'))
+    })
     test('moves on x but not y', async ({ page }) => {
         await page.goto('/tests/drag/axis-x?@humanspeak-svelte-motion-isPlaywright=true')
         const el = page.getByTestId('drag-x')
