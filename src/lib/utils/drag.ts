@@ -497,6 +497,15 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                     (mergedTransition ?? {}) as AnimationOptions
                 )
                 Promise.resolve((controls as unknown as { finished?: Promise<void> }).finished)
+                    .then(() => {
+                        // Sync internal applied transform so next drag uses the correct origin
+                        if (applyX) applied.x = 0
+                        if (applyY) applied.y = 0
+                        pwLog('[drag] snapToOrigin finished → sync applied', {
+                            el: EL_ID,
+                            applied
+                        })
+                    })
                     .catch(() => {})
                     .finally(() => opts.callbacks?.onTransitionEnd?.())
                 return
