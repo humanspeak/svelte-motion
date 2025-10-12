@@ -13,6 +13,7 @@
     import { isNotEmpty } from '$lib/utils/objects'
     import { sleep } from '$lib/utils/testing'
     import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
+    import { pwLog } from '$lib/utils/log'
     import { type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants'
     import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation'
@@ -131,6 +132,11 @@
             if (stopped || !element || !element.isConnected) return
             const rect = element.getBoundingClientRect()
             const style = getComputedStyle(element)
+            pwLog('[motion][measure]', {
+                w: rect.width,
+                h: rect.height,
+                transform: style.transform
+            })
             if (
                 Math.abs(rect.width - lastWidth) > 0.5 ||
                 Math.abs(rect.height - lastHeight) > 0.5
@@ -441,7 +447,9 @@
                 onTapStart: onTapStartProp,
                 onTap: onTapProp,
                 onTapCancel: onTapCancelProp,
-                hoverDef: (whileHoverProp ?? {}) as Record<string, unknown>,
+                hoverDef: isNotEmpty(whileHoverProp ?? {})
+                    ? ((whileHoverProp ?? {}) as Record<string, unknown>)
+                    : undefined,
                 hoverFallbackTransition: (mergedTransition ?? {}) as AnimationOptions
             }
         )

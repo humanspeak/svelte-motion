@@ -1,6 +1,6 @@
 import { isHoverCapable, splitHoverDefinition } from '$lib/utils/hover'
-import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
-import { animate } from 'motion'
+import { pwLog } from '$lib/utils/log'
+import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 
 /**
  * Build a reset record for whileTap on pointerup.
@@ -19,15 +19,19 @@ export const buildTapResetRecord = (
     animateDef: Record<string, unknown>,
     whileTap: Record<string, unknown>
 ): Record<string, unknown> => {
-    const keys = new Set<string>([...Object.keys(initial ?? {}), ...Object.keys(animateDef ?? {})])
-    const overlappingKeys: string[] = []
-    for (const k of keys) if (k in (whileTap ?? {})) overlappingKeys.push(k)
-
+    // Reset any key that whileTap modified. Prefer animate > initial; otherwise provide safe defaults
+    const overlappingKeys: string[] = Object.keys(whileTap ?? {})
     const resetRecord: Record<string, unknown> = {}
     for (const k of overlappingKeys) {
-        resetRecord[k] = Object.prototype.hasOwnProperty.call(animateDef ?? {}, k)
-            ? animateDef[k]
-            : initial[k]
+        if (Object.prototype.hasOwnProperty.call(animateDef ?? {}, k)) {
+            resetRecord[k] = animateDef[k]
+        } else if (Object.prototype.hasOwnProperty.call(initial ?? {}, k)) {
+            resetRecord[k] = initial[k]
+        } else {
+            // Provide sensible defaults when baseline omitted
+            if (k === 'scale' || k === 'scaleX' || k === 'scaleY') resetRecord[k] = 1
+            else resetRecord[k] = undefined as unknown as never
+        }
     }
     return resetRecord
 }
@@ -62,6 +66,8 @@ export const attachWhileTap = (
 
     let keyboardActive = false
     let activePointerId: number | null = null
+    let tapCtl: Animation | null = null
+    let baselineTransform: string | null = null
 
     const handlePointerDown = (event: PointerEvent) => {
         // Capture pointer so we receive up/cancel even if pointer leaves the element
@@ -80,8 +86,30 @@ export const attachWhileTap = (
             document.addEventListener('pointerup', handlePointerUp as EventListener)
             document.addEventListener('pointercancel', handlePointerCancel as EventListener)
         }
+        pwLog('[tap] pointerdown', {
+            w: el.getBoundingClientRect().width,
+            h: el.getBoundingClientRect().height,
+            transform: getComputedStyle(el).transform
+        })
+        baselineTransform = getComputedStyle(el).transform
+        pwLog('[tap] whileTap-def', whileTap)
         callbacks?.onTapStart?.()
-        animate(el, whileTap as unknown as DOMKeyframesDefinition)
+        // Cancel any existing tap animation before starting a new one
+        try {
+            tapCtl?.cancel()
+        } catch {
+            // ignore cancellation errors
+        }
+        tapCtl = animate(el, whileTap as unknown as DOMKeyframesDefinition) as unknown as Animation
+        Promise.resolve((tapCtl as unknown as { finished?: Promise<void> }).finished)
+            .then(() =>
+                pwLog('[tap] applied', {
+                    w: el.getBoundingClientRect().width,
+                    h: el.getBoundingClientRect().height,
+                    transform: getComputedStyle(el).transform
+                })
+            )
+            .catch(() => {})
     }
     const reapplyHoverIfActive = () => {
         if (!callbacks?.hoverDef) return false
@@ -117,13 +145,40 @@ export const attachWhileTap = (
             document.removeEventListener('pointercancel', handlePointerCancel as EventListener)
         }
         callbacks?.onTap?.()
+        pwLog('[tap] pointerup', {
+            w: el.getBoundingClientRect().width,
+            h: el.getBoundingClientRect().height,
+            transform: getComputedStyle(el).transform
+        })
         if (!whileTap) return
         if (reapplyHoverIfActive()) return
-        if (initial || animateDef) {
-            const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
-            if (Object.keys(resetRecord).length > 0) {
-                animate(el, resetRecord as unknown as DOMKeyframesDefinition)
-            }
+        // Ensure the whileTap animation can't finish and overwrite our reset
+        try {
+            tapCtl?.cancel()
+        } catch {
+            // ignore
+        }
+        tapCtl = null
+        const style = (el as HTMLElement).style
+        if (baselineTransform && baselineTransform !== 'none') style.transform = baselineTransform
+        else style.removeProperty('transform')
+        pwLog('[tap] transform-restored', {
+            baseline: baselineTransform,
+            now: getComputedStyle(el).transform
+        })
+        const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
+        pwLog('[tap] reset-record', resetRecord)
+        if (Object.keys(resetRecord).length > 0) {
+            const ctl = animate(el, resetRecord as unknown as DOMKeyframesDefinition)
+            Promise.resolve((ctl as unknown as { finished?: Promise<void> }).finished)
+                .then(() =>
+                    pwLog('[tap] reset-finished', {
+                        w: el.getBoundingClientRect().width,
+                        h: el.getBoundingClientRect().height,
+                        transform: getComputedStyle(el).transform
+                    })
+                )
+                .catch(() => {})
         }
     }
     const handlePointerCancel = (event: PointerEvent) => {
@@ -141,8 +196,18 @@ export const attachWhileTap = (
             document.removeEventListener('pointercancel', handlePointerCancel as EventListener)
         }
         callbacks?.onTapCancel?.()
+        pwLog('[tap] cancel', {
+            w: el.getBoundingClientRect().width,
+            h: el.getBoundingClientRect().height
+        })
         // On cancel, also restore baseline if available
         if (initial || animateDef) {
+            try {
+                tapCtl?.cancel()
+            } catch {
+                // ignore
+            }
+            tapCtl = null
             const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
             if (Object.keys(resetRecord).length > 0) {
                 animate(el, resetRecord as unknown as DOMKeyframesDefinition)
@@ -157,7 +222,17 @@ export const attachWhileTap = (
         if (keyboardActive) return
         keyboardActive = true
         callbacks?.onTapStart?.()
-        animate(el, whileTap as unknown as DOMKeyframesDefinition)
+        pwLog('[tap] keydown', {
+            key: e.key,
+            w: el.getBoundingClientRect().width,
+            h: el.getBoundingClientRect().height
+        })
+        try {
+            tapCtl?.cancel()
+        } catch {
+            // ignore
+        }
+        tapCtl = animate(el, whileTap as unknown as DOMKeyframesDefinition) as unknown as Animation
     }
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -167,8 +242,19 @@ export const attachWhileTap = (
         if (!keyboardActive) return
         keyboardActive = false
         callbacks?.onTap?.()
+        pwLog('[tap] keyup', {
+            key: e.key,
+            w: el.getBoundingClientRect().width,
+            h: el.getBoundingClientRect().height
+        })
         if (reapplyHoverIfActive()) return
         if (initial || animateDef) {
+            try {
+                tapCtl?.cancel()
+            } catch {
+                // ignore
+            }
+            tapCtl = null
             const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
             if (Object.keys(resetRecord).length > 0) {
                 animate(el, resetRecord as unknown as DOMKeyframesDefinition)
@@ -180,6 +266,10 @@ export const attachWhileTap = (
         if (!keyboardActive) return
         keyboardActive = false
         callbacks?.onTapCancel?.()
+        pwLog('[tap] blur', {
+            w: el.getBoundingClientRect().width,
+            h: el.getBoundingClientRect().height
+        })
         if (initial || animateDef) {
             const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
             if (Object.keys(resetRecord).length > 0) {

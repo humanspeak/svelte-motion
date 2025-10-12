@@ -1,6 +1,5 @@
 <script lang="ts">
     import { motion } from '$lib/index'
-    import { ElementRect } from 'runed'
 
     type Heart = {
         id: number
@@ -78,7 +77,7 @@
     }
 
     let heartButtonRef = $state<HTMLButtonElement | null>(null)
-    const heartButtonRect = new ElementRect(() => heartButtonRef)
+    // const heartButtonRect = new ElementRect(() => heartButtonRef)
 
     function onPointerUp(): void {
         stopSpawning()
@@ -100,16 +99,16 @@
     const buttonBg = $derived(isLiked ? 'bg-red-500/50' : 'bg-[#2C3A47]')
 
     function likeInteraction(node: HTMLElement) {
-        const handlePointerDown = (e: PointerEvent) => {
-            console.log('pointerdown', e, heartButtonRect.width, heartButtonRect.height)
+        const handlePointerDown = () => {
+            // console.log('pointerdown', e, heartButtonRect.width, heartButtonRect.height)
             onPointerDown()
         }
-        const handlePointerUp = (e: PointerEvent) => {
-            console.log('pointerup', e, heartButtonRect.width, heartButtonRect.height)
+        const handlePointerUp = () => {
+            // console.log('pointerup', e, heartButtonRect.width, heartButtonRect.height)
             onPointerUp()
         }
         const handleKeyDown = (e: KeyboardEvent) => {
-            console.log('keydown', e, heartButtonRect.width, heartButtonRect.height)
+            // console.log('keydown', e, heartButtonRect.width, heartButtonRect.height)
             onKeyDown(e)
         }
         node.addEventListener('pointerdown', handlePointerDown)
@@ -138,7 +137,7 @@
                 aria-pressed={isLiked}
                 role="button"
                 tabindex="0"
-                data-testid="heart-button"
+                data-testid="fancy-like-button"
                 bind:ref={heartButtonRef}
             >
                 <svg
