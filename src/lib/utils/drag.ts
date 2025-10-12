@@ -217,6 +217,15 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         const payload: Record<string, unknown> = {}
         if (axis === true || axis === 'x') payload.x = x
         if (axis === true || axis === 'y') payload.y = y
+        // Skip no-op writes within a tiny epsilon to reduce layout churn
+        const EPS = 0.01
+        const wantX = 'x' in payload
+        const wantY = 'y' in payload
+        const skipX = wantX && Math.abs(applied.x - x) < EPS
+        const skipY = wantY && Math.abs(applied.y - y) < EPS
+        if ((wantX ? skipX : true) && (wantY ? skipY : true)) {
+            return
+        }
         // duration: 0 to write instantly via Motion
         animate(el, payload as DOMKeyframesDefinition, { duration: 0 })
         // Track applied transform for correct subsequent drag origins
@@ -476,6 +485,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             })
             // If snapToOrigin, skip inertia and spring: use settle path to 0 for consistency
             if (opts.snapToOrigin) {
+                pwLog('↩️ snapToOrigin: settle to (0,0)')
                 const applyX = axis === true || axis === 'x'
                 const applyY = axis === true || axis === 'y'
                 const controls = animate(
@@ -499,6 +509,17 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
 
             const { timeConstantMs, restDelta, restSpeed, bounceStiffness, bounceDamping } =
                 deriveBoundaryPhysics(elastic, opts.transition)
+
+            pwLog('⚙️ boundary-physics', {
+                timeConstantMs,
+                restDelta,
+                restSpeed,
+                bounceStiffness,
+                bounceDamping,
+                bounds: { minX, maxX, minY, maxY },
+                lockAxis,
+                axis
+            })
 
             // Respect direction lock on release: only animate the locked axis
             const applyX = (axis === true || axis === 'x') && lockAxis !== 'y'
@@ -547,7 +568,14 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 }
 
                 if ((rx.done || !stepX) && (ry.done || !stepY)) {
-                    pwLog('✅ REST REACHED', { frameCount, finalX: rx.value, finalY: ry.value })
+                    pwLog('✅ REST REACHED', {
+                        frameCount,
+                        finalX: rx.value,
+                        finalY: ry.value,
+                        timeConstantMs,
+                        restDelta,
+                        restSpeed
+                    })
                     running = false
                     stopInertia = null
                     opts.callbacks?.onTransitionEnd?.()

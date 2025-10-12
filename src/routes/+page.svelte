@@ -11,9 +11,11 @@
     <h1 class="mb-6 text-2xl font-semibold">@humanspeak/svelte-motion — Demos</h1>
     <button
         class="btn inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 active:bg-blue-700"
-        onclick={() => (debug.current = !debug)}
+        onclick={() => {
+            debug.current = !debug.current
+        }}
     >
-        {debug ? 'Debug Mode: On' : 'Debug Mode: Off'}
+        {debug.current ? 'Debug Mode: On' : 'Debug Mode: Off'}
     </button>
     <div class="grid grid-cols-1 gap-8 md:grid-cols-2">
         <div>
@@ -158,6 +160,14 @@
                         href={resolve('/tests/drag/lock-direction') + searchParams}
                     >
                         Drag: Lock Direction
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/snap-to-origin') + searchParams}
+                    >
+                        Drag: Snap To Origin
                     </a>
                 </li>
             </ul>
