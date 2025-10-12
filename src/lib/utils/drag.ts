@@ -347,12 +347,17 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         velocity = { x: 0, y: 0 }
         history = [{ x: e.clientX, y: e.clientY, t: now() }]
 
-        if (snapToCursor) {
+        const applyXAxis = axis === true || axis === 'x'
+        const applyYAxis = axis === true || axis === 'y'
+        // For external dragControls we avoid snap-to-cursor to prevent teleports
+        const useSnapToCursor = snapToCursor && !opts.controls
+        if (useSnapToCursor) {
             const rect = el.getBoundingClientRect()
             // Rebase to center under cursor while preserving accumulated transform frame
             const desiredX = e.clientX - rect.width / 2
             const desiredY = e.clientY - rect.height / 2
-            origin = { x: desiredX, y: desiredY }
+            if (applyXAxis) origin.x = desiredX
+            if (applyYAxis) origin.y = desiredY
             pwLog('[drag] snapToCursor origin', { el: EL_ID, origin })
         }
 
@@ -608,7 +613,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 const rx = stepX ? stepX(t) : { value: applied.x, done: true }
                 const ry = stepY ? stepY(t) : { value: applied.y, done: true }
 
-                setXY(rx.value, ry.value)
+                // Preserve non-animated axis exactly; don't write y during x-only drags, or vice versa
+                const nextX = rx.value
+                const nextY =
+                    (axis === true || axis === 'y') && lockAxis !== 'x' ? ry.value : applied.y
+                setXY(nextX, nextY)
 
                 if (frameCount <= 3 || frameCount % 10 === 0) {
                     pwLog(`🔄 FRAME ${frameCount}`, {
