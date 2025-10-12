@@ -39,8 +39,6 @@
 </motion.button>
 
 <style lang="postcss">
-    @reference "tailwindcss";
-
     :global {
         :root {
             --radial-gradient-background: 250, 250, 250;

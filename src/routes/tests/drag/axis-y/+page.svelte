@@ -7,7 +7,7 @@
     <div
         data-testid="axis-guide"
         style="position:absolute; left: 50%; top: calc(50% - 50vh); height: 100vh; width: 0; border-left: 2px dashed #888; opacity: 0.6; pointer-events: none; z-index: 0;"
-    />
+    ></div>
     <motion.div
         drag="y"
         data-testid="drag-y"

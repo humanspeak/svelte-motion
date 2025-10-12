@@ -17,6 +17,7 @@ import { pwLog, pwWarn } from '$lib/utils/log'
  * - For nested drags, set `propagation` as needed to avoid parent-child contention.
  */
 import { computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
+import { createInertiaToBoundary } from '$lib/utils/inertia'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 
 type Rect = {
@@ -224,10 +225,18 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         const cs = getComputedStyle(el)
         let actualTransform = cs.transform
         if (actualTransform === 'none' || !actualTransform.includes('matrix')) {
-            pwWarn('⚠️ setXY transform missing; retrying write', { x, y, transform: actualTransform })
-            animate(el, (('x' in payload || 'y' in payload) ? payload : { x, y }) as DOMKeyframesDefinition, {
-                duration: 0
+            pwWarn('⚠️ setXY transform missing; retrying write', {
+                x,
+                y,
+                transform: actualTransform
             })
+            animate(
+                el,
+                ('x' in payload || 'y' in payload ? payload : { x, y }) as DOMKeyframesDefinition,
+                {
+                    duration: 0
+                }
+            )
             actualTransform = getComputedStyle(el).transform
             if (actualTransform === 'none' || !actualTransform.includes('matrix')) {
                 pwWarn('⚠️ setXY second attempt still missing transform', {
@@ -452,7 +461,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         window.removeEventListener('pointerup', onPointerUp as EventListener)
         window.removeEventListener('pointercancel', onPointerCancel as EventListener)
 
-        // Momentum/inertia: exponential decay towards ideal target (clamped to constraints)
+        // Momentum/inertia with boundary handoff: inertia until crossing, then spring to boundary
         if (momentum) {
             pwLog('🚀 STARTING MOMENTUM', {
                 velocityX: velocity.x,
@@ -463,6 +472,24 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 historyFirst: history[0],
                 historyLast: history[history.length - 1]
             })
+            // If snapToOrigin, skip inertia and spring: use settle path to 0 for consistency
+            if (opts.snapToOrigin) {
+                const applyX = axis === true || axis === 'x'
+                const applyY = axis === true || axis === 'y'
+                const controls = animate(
+                    el,
+                    {
+                        ...(applyX ? { x: 0 } : {}),
+                        ...(applyY ? { y: 0 } : {})
+                    } as DOMKeyframesDefinition,
+                    (mergedTransition ?? {}) as AnimationOptions
+                )
+                Promise.resolve((controls as unknown as { finished?: Promise<void> }).finished)
+                    .catch(() => {})
+                    .finally(() => opts.callbacks?.onTransitionEnd?.())
+                return
+            }
+
             const minX = origin.x + (constraints?.left ?? -Infinity)
             const maxX = origin.x + (constraints?.right ?? Infinity)
             const minY = origin.y + (constraints?.top ?? -Infinity)
@@ -472,35 +499,34 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             const restDelta = (opts.transition as unknown as { restDelta?: number })?.restDelta ?? 1
             const restSpeed =
                 (opts.transition as unknown as { restSpeed?: number })?.restSpeed ?? 10
+            const bounceStiffness =
+                (opts.transition as unknown as { bounceStiffness?: number })?.bounceStiffness ?? 700
+            const bounceDamping =
+                (opts.transition as unknown as { bounceDamping?: number })?.bounceDamping ?? 35
 
-            // Compute inertia amplitude with power scaling (React uses 0.8)
-            const power = 0.8
-            const amplitudeX = power * velocity.x * (timeConstantMs / 1000)
-            const amplitudeY = power * velocity.y * (timeConstantMs / 1000)
-            const idealX = applied.x + amplitudeX
-            const idealY = applied.y + amplitudeY
+            // Respect direction lock on release: only animate the locked axis
+            const applyX = (axis === true || axis === 'x') && lockAxis !== 'y'
+            const applyY = (axis === true || axis === 'y') && lockAxis !== 'x'
 
-            // Clamp to constraints or snap to origin
-            const targetX = opts.snapToOrigin ? 0 : Math.max(minX, Math.min(maxX, idealX))
-            const targetY = opts.snapToOrigin ? 0 : Math.max(minY, Math.min(maxY, idealY))
-
-            pwLog('🎯 TARGET', {
-                targetX,
-                targetY,
-                amplitudeX,
-                amplitudeY,
-                timeConstantMs,
-                restSpeed,
-                restDelta
-            })
+            const stepX = applyX
+                ? createInertiaToBoundary(
+                      { value: applied.x, velocity: velocity.x },
+                      { min: minX, max: maxX },
+                      { timeConstantMs, restDelta, restSpeed, bounceStiffness, bounceDamping }
+                  )
+                : null
+            const stepY = applyY
+                ? createInertiaToBoundary(
+                      { value: applied.y, velocity: velocity.y },
+                      { min: minY, max: maxY },
+                      { timeConstantMs, restDelta, restSpeed, bounceStiffness, bounceDamping }
+                  )
+                : null
 
             let running = true
             const startTs = now()
-            const startX = applied.x
-            const startY = applied.y
             let frameCount = 0
 
-            /** RAF-driven exponential decay. */
             const raf = () => {
                 if (!running) {
                     pwLog('🛑 RAF stopped (running = false)')
@@ -509,35 +535,23 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 const t = now() - startTs
                 frameCount++
 
-                // Exponential decay towards target
-                const calcDelta = (amp: number) => -amp * Math.exp(-t / timeConstantMs)
-                const px = targetX + calcDelta(targetX - startX)
-                const py = targetY + calcDelta(targetY - startY)
+                const rx = stepX ? stepX(t) : { value: applied.x, done: true }
+                const ry = stepY ? stepY(t) : { value: applied.y, done: true }
 
-                setXY(px, py)
-
-                // Check rest conditions
-                const distX = Math.abs(px - targetX)
-                const distY = Math.abs(py - targetY)
-                const speed = Math.hypot(
-                    Math.abs(calcDelta(targetX - startX) * (1000 / timeConstantMs)),
-                    Math.abs(calcDelta(targetY - startY) * (1000 / timeConstantMs))
-                )
+                setXY(rx.value, ry.value)
 
                 if (frameCount <= 3 || frameCount % 10 === 0) {
                     pwLog(`🔄 FRAME ${frameCount}`, {
                         t: t.toFixed(0),
-                        px: px.toFixed(2),
-                        py: py.toFixed(2),
-                        distX: distX.toFixed(2),
-                        distY: distY.toFixed(2),
-                        speed: speed.toFixed(2)
+                        px: rx.value.toFixed?.(2) ?? rx.value,
+                        py: ry.value.toFixed?.(2) ?? ry.value,
+                        doneX: rx.done,
+                        doneY: ry.done
                     })
                 }
 
-                if (speed < restSpeed && distX < restDelta && distY < restDelta) {
-                    pwLog('✅ REST REACHED', { frameCount, finalX: targetX, finalY: targetY })
-                    setXY(targetX, targetY)
+                if ((rx.done || !stepX) && (ry.done || !stepY)) {
+                    pwLog('✅ REST REACHED', { frameCount, finalX: rx.value, finalY: ry.value })
                     running = false
                     stopInertia = null
                     opts.callbacks?.onTransitionEnd?.()

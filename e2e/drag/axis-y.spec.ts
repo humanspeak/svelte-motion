@@ -3,7 +3,9 @@ import { expect, test } from '@playwright/test'
 test.describe('drag/axis-y', () => {
     test('guide is behind box per z-index', async ({ page }) => {
         await page.goto('/tests/drag/axis-y?@humanspeak-svelte-motion-isPlaywright=true')
-        const guideZ = await page.getByTestId('axis-guide').evaluate((el) => getComputedStyle(el).zIndex)
+        const guideZ = await page
+            .getByTestId('axis-guide')
+            .evaluate((el) => getComputedStyle(el).zIndex)
         const boxZ = await page.getByTestId('drag-y').evaluate((el) => getComputedStyle(el).zIndex)
         expect(parseInt(guideZ || '0')).toBeLessThan(parseInt(boxZ || '0'))
     })
