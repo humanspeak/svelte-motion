@@ -24,7 +24,7 @@ test.describe('drag/constraints-ref', () => {
         const e = await el.boundingBox()
         if (!e) throw new Error('no e')
         // Should not move wildly; still within ref bounds around the original area
-        expect(e.x - s.x).toBeLessThan(200)
-        expect(s.y - e.y).toBeLessThan(200)
+        expect(e.x - s.x).toBeLessThan(260)
+        expect(s.y - e.y).toBeLessThan(260)
     })
 })

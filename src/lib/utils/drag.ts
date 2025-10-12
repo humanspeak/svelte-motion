@@ -542,10 +542,21 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 return
             }
 
-            const minX = origin.x + (constraints?.left ?? -Infinity)
-            const maxX = origin.x + (constraints?.right ?? Infinity)
-            const minY = origin.y + (constraints?.top ?? -Infinity)
-            const maxY = origin.y + (constraints?.bottom ?? Infinity)
+            // If no constraints, disable boundary springs by setting finite but very wide bounds
+            const noConstraints = !constraints
+            const huge = 1e6
+            const minX = noConstraints
+                ? origin.x - huge
+                : origin.x + (constraints?.left ?? -Infinity)
+            const maxX = noConstraints
+                ? origin.x + huge
+                : origin.x + (constraints?.right ?? Infinity)
+            const minY = noConstraints
+                ? origin.y - huge
+                : origin.y + (constraints?.top ?? -Infinity)
+            const maxY = noConstraints
+                ? origin.y + huge
+                : origin.y + (constraints?.bottom ?? Infinity)
 
             const { timeConstantMs, restDelta, restSpeed, bounceStiffness, bounceDamping } =
                 deriveBoundaryPhysics(elastic, opts.transition)
@@ -556,7 +567,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 restSpeed,
                 bounceStiffness,
                 bounceDamping,
-                bounds: { minX, maxX, minY, maxY },
+                boundsX: { minX, maxX },
+                boundsY: { minY, maxY },
                 lockAxis,
                 axis
             })
@@ -592,6 +604,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 const t = now() - startTs
                 frameCount++
 
+                // Use the precomputed step functions (built once per release)
                 const rx = stepX ? stepX(t) : { value: applied.x, done: true }
                 const ry = stepY ? stepY(t) : { value: applied.y, done: true }
 
@@ -603,7 +616,9 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                         px: rx.value.toFixed?.(2) ?? rx.value,
                         py: ry.value.toFixed?.(2) ?? ry.value,
                         doneX: rx.done,
-                        doneY: ry.done
+                        doneY: ry.done,
+                        boundsX: { minX, maxX },
+                        boundsY: { minY, maxY }
                     })
                 }
 

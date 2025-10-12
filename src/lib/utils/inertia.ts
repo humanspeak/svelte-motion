@@ -113,7 +113,7 @@ export function createInertiaToBoundary(
             : undefined
 
     const stepSpring = (dt: number) => {
-        // dt in seconds
+        // dt in seconds (will be called with small fixed steps for stability)
         const stiffness = opts.bounceStiffness
         const damping = opts.bounceDamping
         // Hooke's law with simple semi-implicit Euler integration relative to the boundary
@@ -139,6 +139,22 @@ export function createInertiaToBoundary(
                 springX = at.x
                 springV = at.v // carry velocity continuity
                 mode = 'spring'
+                // Advance spring only for the remaining time after the handoff
+                const remainingMs = tMs - tCross
+                // Perform small fixed substeps for numerical stability
+                let remaining = Math.max(0, remainingMs) / 1000
+                while (remaining > 0) {
+                    const h = Math.min(0.016, remaining)
+                    stepSpring(h)
+                    remaining -= h
+                }
+                lastT = tMs
+                const tgt = boundaryTarget ?? (springX < min ? min : max)
+                const done =
+                    Math.abs(springV) <= opts.restSpeed && Math.abs(springX - tgt) <= opts.restDelta
+                const value = done ? tgt : springX
+                if (done) mode = 'done'
+                return { value, done }
             } else {
                 const at = inertiaAt(initial.value, initial.velocity, tauMs, tMs)
                 x = at.x
@@ -155,7 +171,13 @@ export function createInertiaToBoundary(
         }
 
         if (mode === 'spring') {
-            stepSpring(dt)
+            // Advance with fixed small substeps for numerical stability
+            let remaining = dt
+            while (remaining > 0) {
+                const h = Math.min(0.016, remaining)
+                stepSpring(h)
+                remaining -= h
+            }
             lastT = tMs
             const tgt = boundaryTarget ?? (springX < min ? min : max)
             const done =
@@ -165,7 +187,9 @@ export function createInertiaToBoundary(
             return { value, done }
         }
 
-        // done
-        return { value: Math.min(max, Math.max(min, springX || x)), done: true }
+        // done: return the last settled position from the correct regime
+        // If we ever engaged a spring (boundaryTarget set), use springX; otherwise use inertial x
+        const settled = boundaryTarget != null ? springX : x
+        return { value: Math.min(max, Math.max(min, settled)), done: true }
     }
 }

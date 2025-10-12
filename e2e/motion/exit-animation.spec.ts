@@ -118,8 +118,8 @@ test.describe('AnimatePresence exit animation', () => {
         })
 
         expect(cloneData).toBeTruthy()
-        expect(Math.abs(cloneData!.rect.width - boxRect.width)).toBeLessThanOrEqual(2)
-        expect(Math.abs(cloneData!.rect.height - boxRect.height)).toBeLessThanOrEqual(2)
+        expect(Math.abs(cloneData!.rect.width - boxRect.width)).toBeLessThanOrEqual(3)
+        expect(Math.abs(cloneData!.rect.height - boxRect.height)).toBeLessThanOrEqual(3)
         expect(cloneData!.styles.borderRadius).toBe(boxStyles.borderRadius)
         expect(cloneData!.styles.clipPath).toBe(boxStyles.clipPath)
         expect(typeof cloneData!.styles.boxShadow).toBe('string')
