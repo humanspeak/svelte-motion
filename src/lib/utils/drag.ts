@@ -179,6 +179,10 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
     const mergedTransition = (opts.mergedTransition ?? {}) as AnimationOptions
 
     let constraints = resolveConstraints(el, opts.constraints)
+    // Anchor constraints base:
+    // - Pixel object constraints are offsets from original origin (0,0)
+    // - HTMLElement constraints are measured from current applied transform at drag start
+    let constraintsBase = { x: 0, y: 0 }
 
     // Track state
     let dragging = false
@@ -314,6 +318,25 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         // Recompute constraints in case bounding boxes changed since last drag
         constraints = resolveConstraints(el, opts.constraints)
         pwLog('[drag] constraints (px)', { el: EL_ID, constraints })
+        if (constraints) {
+            if (opts.constraints && !(opts.constraints instanceof HTMLElement)) {
+                // Pixel constraints: always relative to original origin
+                constraintsBase = { x: 0, y: 0 }
+            } else {
+                // HTMLElement constraints: recalc base each drag since layout may change
+                constraintsBase = { x: applied.x, y: applied.y }
+            }
+            pwLog('[drag] constraints-base', {
+                el: EL_ID,
+                base: { ...constraintsBase },
+                applied: { ...applied },
+                origin: { ...origin },
+                kind:
+                    opts.constraints && !(opts.constraints instanceof HTMLElement)
+                        ? 'pixel'
+                        : 'element'
+            })
+        }
 
         dragging = true
         lockAxis = null
@@ -405,16 +428,24 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
 
         // Convert to relative translation by clamping within constraints (float-safe)
         if (constraints) {
-            const minX = origin.x + (constraints.left ?? -Infinity)
-            const maxX = origin.x + (constraints.right ?? Infinity)
-            const minY = origin.y + (constraints.top ?? -Infinity)
-            const maxY = origin.y + (constraints.bottom ?? Infinity)
+            const minX = constraintsBase.x + (constraints.left ?? -Infinity)
+            const maxX = constraintsBase.x + (constraints.right ?? Infinity)
+            const minY = constraintsBase.y + (constraints.top ?? -Infinity)
+            const maxY = constraintsBase.y + (constraints.bottom ?? Infinity)
+            pwLog('[drag] bounds', {
+                el: EL_ID,
+                base: { ...constraintsBase },
+                bounds: { minX, maxX, minY, maxY },
+                preClamp
+            })
             x = applyFloatConstraints(x, { min: minX, max: maxX }, elastic)
             y = applyFloatConstraints(y, { min: minY, max: maxY }, elastic)
             pwLog('[drag] constrain+elastic', {
                 el: EL_ID,
                 preClamp,
+                base: { ...constraintsBase },
                 bounds: { minX, maxX, minY, maxY },
+                elastic,
                 out: { x, y }
             })
         }
@@ -618,12 +649,19 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 x = 0
                 y = 0
             } else if (constraints) {
-                const minX = origin.x + (constraints.left ?? -Infinity)
-                const maxX = origin.x + (constraints.right ?? Infinity)
-                const minY = origin.y + (constraints.top ?? -Infinity)
-                const maxY = origin.y + (constraints.bottom ?? Infinity)
+                const minX = constraintsBase.x + (constraints.left ?? -Infinity)
+                const maxX = constraintsBase.x + (constraints.right ?? Infinity)
+                const minY = constraintsBase.y + (constraints.top ?? -Infinity)
+                const maxY = constraintsBase.y + (constraints.bottom ?? Infinity)
+                pwLog('[drag] settle (no momentum) bounds', {
+                    el: EL_ID,
+                    base: { ...constraintsBase },
+                    bounds: { minX, maxX, minY, maxY },
+                    preClamp: { x, y }
+                })
                 x = applyFloatConstraints(x, { min: minX, max: maxX })
                 y = applyFloatConstraints(y, { min: minY, max: maxY })
+                pwLog('[drag] settle (no momentum) clamped', { el: EL_ID, out: { x, y } })
             }
             pwLog('[drag] settle (no momentum)', {
                 el: EL_ID,

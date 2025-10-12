@@ -1,6 +1,47 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('drag/elastic', () => {
+    test('elastic=0 multiple drags never exceed +30 bound (should fail now)', async ({ page }) => {
+        await page.goto('/tests/drag/elastic?@humanspeak-svelte-motion-isPlaywright=true')
+
+        const box = page.getByTestId('elastic-0')
+        const start = await box.boundingBox()
+        if (!start) throw new Error('no start')
+
+        const containerCenterX = start.x + start.width / 2
+
+        const dragRelease = async (id: number) => {
+            const bb = await box.boundingBox()
+            if (!bb) throw new Error('no bb')
+            await box.dispatchEvent('pointerdown', {
+                clientX: bb.x + bb.width / 2,
+                clientY: bb.y + bb.height / 2,
+                pointerId: id
+            })
+            await page.dispatchEvent('body', 'pointermove', {
+                clientX: bb.x + bb.width / 2 + 200,
+                clientY: bb.y + bb.height / 2,
+                pointerId: id
+            })
+            await page.dispatchEvent('body', 'pointerup', {
+                clientX: bb.x + bb.width / 2 + 200,
+                clientY: bb.y + bb.height / 2,
+                pointerId: id
+            })
+            await page.waitForTimeout(400)
+            const after = await box.boundingBox()
+            if (!after) throw new Error('no after')
+            const centerX = after.x + after.width / 2
+            const dx = centerX - containerCenterX
+            // With elastic=0 and constraints ±30, this should stay around +30 each time
+            expect(dx).toBeGreaterThanOrEqual(28)
+            expect(dx).toBeLessThanOrEqual(32)
+        }
+
+        await dragRelease(31)
+        await dragRelease(32)
+        await dragRelease(33)
+    })
     test('elastic=0 (no overdrag) settles without visible bounce', async ({ page }) => {
         await page.goto('/tests/drag/elastic?@humanspeak-svelte-motion-isPlaywright=true')
 
