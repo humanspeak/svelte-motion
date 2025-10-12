@@ -16,6 +16,7 @@ import { pwLog, pwWarn } from '$lib/utils/log'
  *   Simulate a few `pointermove`s before releasing.
  * - For nested drags, set `propagation` as needed to avoid parent-child contention.
  */
+import { applyConstraints as applyFloatConstraints } from '$lib/utils/dragMath'
 import { deriveBoundaryPhysics } from '$lib/utils/dragParams'
 import { computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
 import { createInertiaToBoundary } from '$lib/utils/inertia'
@@ -393,14 +394,14 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         if (lockAxis === 'x') y = origin.y
         if (lockAxis === 'y') x = origin.x
 
-        // Convert to relative translation by clamping within constraints
+        // Convert to relative translation by clamping within constraints (float-safe)
         if (constraints) {
             const minX = origin.x + (constraints.left ?? -Infinity)
             const maxX = origin.x + (constraints.right ?? Infinity)
             const minY = origin.y + (constraints.top ?? -Infinity)
             const maxY = origin.y + (constraints.bottom ?? Infinity)
-            x = applyElastic(x, minX, maxX, elastic)
-            y = applyElastic(y, minY, maxY, elastic)
+            x = applyFloatConstraints(x, { min: minX, max: maxX }, elastic)
+            y = applyFloatConstraints(y, { min: minY, max: maxY }, elastic)
             pwLog('[drag] constrain+elastic', {
                 el: EL_ID,
                 preClamp,
@@ -584,8 +585,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 const maxX = origin.x + (constraints.right ?? Infinity)
                 const minY = origin.y + (constraints.top ?? -Infinity)
                 const maxY = origin.y + (constraints.bottom ?? Infinity)
-                x = Math.max(minX, Math.min(maxX, x))
-                y = Math.max(minY, Math.min(maxY, y))
+                x = applyFloatConstraints(x, { min: minX, max: maxX })
+                y = applyFloatConstraints(y, { min: minY, max: maxY })
             }
             pwLog('[drag] settle (no momentum)', {
                 el: EL_ID,
