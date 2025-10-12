@@ -16,6 +16,7 @@ import { pwLog, pwWarn } from '$lib/utils/log'
  *   Simulate a few `pointermove`s before releasing.
  * - For nested drags, set `propagation` as needed to avoid parent-child contention.
  */
+import { deriveBoundaryPhysics } from '$lib/utils/dragParams'
 import { computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
 import { createInertiaToBoundary } from '$lib/utils/inertia'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
@@ -495,14 +496,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             const minY = origin.y + (constraints?.top ?? -Infinity)
             const maxY = origin.y + (constraints?.bottom ?? Infinity)
 
-            const timeConstantMs = (opts.transition?.timeConstant ?? 0.75) * 1000
-            const restDelta = (opts.transition as unknown as { restDelta?: number })?.restDelta ?? 1
-            const restSpeed =
-                (opts.transition as unknown as { restSpeed?: number })?.restSpeed ?? 10
-            const bounceStiffness =
-                (opts.transition as unknown as { bounceStiffness?: number })?.bounceStiffness ?? 700
-            const bounceDamping =
-                (opts.transition as unknown as { bounceDamping?: number })?.bounceDamping ?? 35
+            const { timeConstantMs, restDelta, restSpeed, bounceStiffness, bounceDamping } =
+                deriveBoundaryPhysics(elastic, opts.transition)
 
             // Respect direction lock on release: only animate the locked axis
             const applyX = (axis === true || axis === 'x') && lockAxis !== 'y'

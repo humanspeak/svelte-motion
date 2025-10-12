@@ -1,6 +1,44 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('drag/elastic', () => {
+    test('elastic=0 (no overdrag) settles without visible bounce', async ({ page }) => {
+        await page.goto('/tests/drag/elastic?@humanspeak-svelte-motion-isPlaywright=true')
+
+        const box = page.getByTestId('elastic-0')
+        const start = await box.boundingBox()
+        if (!start) throw new Error('no start')
+
+        // Drag to the right past the +30 bound
+        await box.dispatchEvent('pointerdown', {
+            clientX: start.x + 10,
+            clientY: start.y + 10,
+            pointerId: 1
+        })
+        await page.dispatchEvent('body', 'pointermove', {
+            clientX: start.x + 10 + 120,
+            clientY: start.y + 10,
+            pointerId: 1
+        })
+        await page.dispatchEvent('body', 'pointerup', {
+            clientX: start.x + 10 + 120,
+            clientY: start.y + 10,
+            pointerId: 1
+        })
+
+        // Wait and sample; with heavy overdamp there should be minimal oscillation beyond the bound
+        const samples: number[] = []
+        for (let i = 0; i < 10; i++) {
+            await page.waitForTimeout(60)
+            const bb = await box.boundingBox()
+            if (bb) samples.push(bb.x)
+        }
+
+        // Compute differences between samples (absolute)
+        const diffs = samples.slice(1).map((x, i) => Math.abs(x - samples[i]))
+        const maxDelta = Math.max(0, ...diffs)
+        // We expect near-monotonic approach and very small oscillation with overdamp
+        expect(maxDelta).toBeLessThan(2)
+    })
     test('second drag respects click point after elastic settle and clamps within bounds', async ({
         page
     }) => {
