@@ -8,8 +8,7 @@
     }
 
     const isPlaywright =
-        typeof window !== 'undefined' &&
-        window.location.search.includes('@humanspeak-svelte-motion-isPlaywright=true')
+        typeof window !== 'undefined' && window.location.search.includes('@isPlaywright=true')
 
     // Use seconds; duration must be in the transition prop, not keyframes
     const _testTransition = isPlaywright ? { duration: 1 } : undefined

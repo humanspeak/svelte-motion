@@ -4,7 +4,7 @@ test.describe('Hover + Tap', () => {
     test('hover scales up, tap scales down, then returns to hover scale on release', async ({
         page
     }) => {
-        await page.goto('/tests/motion/hover-and-tap?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/motion/hover-and-tap?@isPlaywright=true')
 
         const box = page.getByTestId('motion-hover-and-tap')
         await expect(box).toBeVisible()

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('Keyframes Scale', () => {
     test('should grow (scale 2x) and return to normal size', async ({ page }) => {
-        await page.goto('/tests/motion/keyframes?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/motion/keyframes?@isPlaywright=true')
 
         const el = page.getByTestId('motion-keyframes')
         await expect(el).toBeVisible()

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('whileFocus', () => {
     test('animates on focus and restores on blur', async ({ page }) => {
-        await page.goto('/tests/motion/while-focus?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/motion/while-focus?@isPlaywright=true')
 
         const button = page.getByTestId('motion-while-focus-button')
         await expect(button).toBeVisible()
@@ -45,7 +45,7 @@ test.describe('whileFocus', () => {
     })
 
     test('works with input elements', async ({ page }) => {
-        await page.goto('/tests/motion/while-focus?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/motion/while-focus?@isPlaywright=true')
 
         const input = page.getByTestId('motion-while-focus-input')
         await expect(input).toBeVisible()
@@ -76,7 +76,7 @@ test.describe('whileFocus', () => {
     })
 
     test('works with tabindex on divs', async ({ page }) => {
-        await page.goto('/tests/motion/while-focus?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/motion/while-focus?@isPlaywright=true')
 
         const div = page.getByTestId('motion-while-focus-div')
         await expect(div).toBeVisible()
@@ -96,7 +96,7 @@ test.describe('whileFocus', () => {
     })
 
     test('multiple elements can have independent focus animations', async ({ page }) => {
-        await page.goto('/tests/motion/while-focus?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/motion/while-focus?@isPlaywright=true')
 
         const button = page.getByTestId('motion-while-focus-button')
         const input = page.getByTestId('motion-while-focus-input')

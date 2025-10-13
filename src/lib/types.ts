@@ -127,6 +127,16 @@ export type MotionWhileFocus =
     | undefined
 
 /**
+ * Animation properties for drag interactions.
+ * When a drag gesture starts, the element animates to this state; when it ends,
+ * it animates back to its baseline (from animate/initial), restoring only the changed keys.
+ */
+export type MotionWhileDrag =
+    | (Record<string, unknown> & { transition?: AnimationOptions })
+    | DOMKeyframesDefinition
+    | undefined
+
+/**
  * Animation transition configuration for hover interactions.
  * Overrides the global transition when provided.
  */
@@ -154,6 +164,53 @@ export type MotionOnTapStart = (() => void) | undefined
 export type MotionOnTap = (() => void) | undefined
 export type MotionOnTapCancel = (() => void) | undefined
 
+/** Drag specific types */
+export type DragPoint = { x: number; y: number }
+export type DragInfo = {
+    point: DragPoint
+    delta: DragPoint
+    offset: DragPoint
+    velocity: DragPoint
+}
+export type MotionOnDragStart = ((event: PointerEvent, info: DragInfo) => void) | undefined
+export type MotionOnDrag = ((event: PointerEvent, info: DragInfo) => void) | undefined
+export type MotionOnDragEnd = ((event: PointerEvent, info: DragInfo) => void) | undefined
+export type MotionOnDirectionLock = ((axis: 'x' | 'y') => void) | undefined
+export type MotionOnDragTransitionEnd = (() => void) | undefined
+
+export type DragAxis = boolean | 'x' | 'y'
+export type DragConstraints =
+    | {
+          top?: number
+          left?: number
+          right?: number
+          bottom?: number
+      }
+    | HTMLElement
+export type DragTransition = {
+    bounceStiffness?: number
+    bounceDamping?: number
+    power?: number
+    timeConstant?: number
+    restDelta?: number
+    restSpeed?: number
+    min?: number
+    max?: number
+}
+export type DragControls = {
+    /** Imperatively start a drag from any pointer event. */
+    start: (
+        event: PointerEvent,
+        options?: { snapToCursor?: boolean; distanceThreshold?: number }
+    ) => void
+    /** Cancel an active drag without momentum. */
+    cancel: () => void
+    /** Stop current drag and any momentum animation. */
+    stop: () => void
+    /** Subscribe the controls to a target element. */
+    subscribe: (el: HTMLElement) => void
+}
+
 /**
  * Base motion props shared by all motion components.
  */
@@ -174,6 +231,8 @@ export type MotionProps = {
     whileHover?: MotionWhileHover
     /** Focus interaction animation */
     whileFocus?: MotionWhileFocus
+    /** Drag interaction animation */
+    whileDrag?: MotionWhileDrag
     /** Called right before a main animate transition starts */
     onAnimationStart?: MotionAnimationStart
     /** Called after a main animate transition completes */
@@ -192,6 +251,16 @@ export type MotionProps = {
     onTap?: MotionOnTap
     /** Called when a tap gesture is cancelled (pointercancel) */
     onTapCancel?: MotionOnTapCancel
+    /** Called when a drag gesture starts */
+    onDragStart?: MotionOnDragStart
+    /** Called during a drag gesture */
+    onDrag?: MotionOnDrag
+    /** Called when a drag gesture ends */
+    onDragEnd?: MotionOnDragEnd
+    /** Called once when drag direction is locked to an axis */
+    onDirectionLock?: MotionOnDirectionLock
+    /** Called when the post-drag transition finishes on all axes */
+    onDragTransitionEnd?: MotionOnDragTransitionEnd
     /** Inline styles */
     style?: string
     /** CSS classes */
@@ -200,6 +269,26 @@ export type MotionProps = {
     layout?: boolean | 'position'
     /** Ref to the element */
     ref?: HTMLElement | null
+    /** Enable drag gestures. true for both axes, or lock to 'x'/'y'. */
+    drag?: DragAxis
+    /** Constrain dragging either to pixel bounds or an HTMLElement's bounding box. */
+    dragConstraints?: DragConstraints
+    /** Elasticity when overdragging beyond constraints (0 = none, 1 = full). */
+    dragElastic?: number
+    /** Continue with momentum/inertia after release (default true). */
+    dragMomentum?: boolean
+    /** Configure inertia/bounce physics for momentum. */
+    dragTransition?: DragTransition
+    /** Lock to the first detected axis of movement. */
+    dragDirectionLock?: boolean
+    /** Allow bubbling to parent drags. If false, uses a shared lock to prevent nesting. */
+    dragPropagation?: boolean
+    /** On release, animate back to origin (0). */
+    dragSnapToOrigin?: boolean
+    /** Enable the default drag listener; set false to use dragControls only. */
+    dragListener?: boolean
+    /** Pass controls to start drag imperatively from another element. */
+    dragControls?: DragControls
 }
 
 /**
@@ -239,6 +328,8 @@ export type MotionConfigProps = {
 export type HTMLElementProps = MotionProps & {
     /** Child content rendered inside the element */
     children?: Snippet
+    /** Ref to the element */
+    ref?: HTMLElement | null
     /** Additional HTML attributes */
     [key: string]: unknown
 }
@@ -251,6 +342,8 @@ export type HTMLElementProps = MotionProps & {
  * ```
  */
 export type HTMLVoidElementProps = MotionProps & {
+    /** Ref to the element */
+    ref?: HTMLElement | null
     /** Additional HTML attributes */
     [key: string]: unknown
 } & {

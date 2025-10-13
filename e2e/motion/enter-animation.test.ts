@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 test.describe('Enter Animation', () => {
     test('should animate from invisible to visible', async ({ page }) => {
         // Navigate with query param
-        await page.goto('/tests/motion/enter-animation?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/motion/enter-animation?@isPlaywright=true')
 
         // Wait specifically for the element to appear with initial state
         const element = page.getByTestId('motion-div')

@@ -2,9 +2,9 @@
     import MotionContainer from '$lib/html/_MotionContainer.svelte'
     import type { HTMLElementProps } from '$lib/types'
 
-    let { children, ...rest }: HTMLElementProps = $props()
+    let { children, ref = $bindable(null), ...rest }: HTMLElementProps = $props()
 </script>
 
-<MotionContainer tag="ol" {...rest}>
+<MotionContainer bind:ref tag="ol" {...rest}>
     {@render children?.()}
 </MotionContainer>
