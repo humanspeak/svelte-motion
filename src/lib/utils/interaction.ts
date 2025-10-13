@@ -142,10 +142,12 @@ export const attachWhileTap = (
             document.addEventListener('pointerup', handlePointerUp as EventListener)
             document.addEventListener('pointercancel', handlePointerCancel as EventListener)
         }
+        const incomingScale = parseMatrixScale(getComputedStyle(el).transform) ?? 1
         pwLog('[tap] pointerdown', {
             w: el.getBoundingClientRect().width,
             h: el.getBoundingClientRect().height,
-            transform: getComputedStyle(el).transform
+            transform: getComputedStyle(el).transform,
+            incomingScale
         })
         // Cancel any in-flight reset and rebase to canonical baseline
         try {
@@ -159,6 +161,16 @@ export const attachWhileTap = (
         if (baselineTransform && baselineTransform !== 'none')
             el.style.transform = baselineTransform
         else el.style.removeProperty('transform')
+
+        // Software limit: if incoming scale is runaway, skip whileTap this cycle and force settle
+        const baselineScale = parseMatrixScale(baselineTransform) ?? 1
+        if (Math.abs(incomingScale) > Math.abs(baselineScale) * 1.3) {
+            pwLog('[tap] runaway-detected-skip-whileTap', { incomingScale, baselineScale })
+            callbacks?.onTapStart?.()
+            tapCtl = null
+            return
+        }
+
         pwLog('[tap] whileTap-def', whileTap)
         callbacks?.onTapStart?.()
         // Cancel any existing tap animation before starting a new one
