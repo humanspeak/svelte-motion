@@ -1,3 +1,70 @@
+// Utilities for building and validating transform strings
+
+export type TransformValues = Partial<{
+    x: number
+    y: number
+    scale: number
+    scaleX: number
+    scaleY: number
+    rotate: number
+}>
+
+const DEFAULTS: Required<TransformValues> = {
+    x: 0,
+    y: 0,
+    scale: 1,
+    scaleX: 1,
+    scaleY: 1,
+    rotate: 0
+}
+
+/** Build a CSS transform string from numeric values (no matrices). */
+export function buildTransform(values: TransformValues): string {
+    const v = { ...DEFAULTS, ...values }
+    // If explicit per-axis scales provided, use them; otherwise use uniform scale
+    const useAxes = values.scaleX !== undefined || values.scaleY !== undefined
+    const parts: string[] = []
+    // Translate first for readability; rely on browser to optimize
+    if (v.x !== 0 || v.y !== 0) parts.push(`translate(${round(v.x)}px, ${round(v.y)}px)`)
+    if (v.rotate !== 0) parts.push(`rotate(${round(v.rotate)}deg)`)
+    if (useAxes) {
+        parts.push(`scaleX(${round(v.scaleX)})`)
+        parts.push(`scaleY(${round(v.scaleY)})`)
+    } else if (v.scale !== 1) {
+        parts.push(`scale(${round(v.scale)})`)
+    }
+    return parts.join(' ').trim()
+}
+
+/** Lightweight safety check for transform magnitudes and NaN values. */
+export function isSafeTransform(values: TransformValues, opts?: { maxScale?: number }): boolean {
+    const maxScale = opts?.maxScale ?? 8
+    const entries: Array<[string, number | undefined]> = [
+        ['scale', values.scale],
+        ['scaleX', values.scaleX],
+        ['scaleY', values.scaleY]
+    ]
+    for (const [, val] of entries) {
+        if (val === undefined) continue
+        if (!Number.isFinite(val)) return false
+        if (Math.abs(val) > maxScale) return false
+    }
+    return true
+}
+
+export function parseMatrixScale(matrix: string | null | undefined): number | null {
+    if (!matrix || matrix === 'none') return null
+    const m = matrix.match(/matrix\(([^)]+)\)/)
+    if (!m) return null
+    const [a] = m[1].split(',').map((s) => parseFloat(s.trim()))
+    return Number.isFinite(a) ? a : null
+}
+
+function round(n: number): number {
+    // avoid excessive precision in strings
+    return Math.round(n * 1e6) / 1e6
+}
+
 import { derived, readable, type Readable } from 'svelte/store'
 
 /**

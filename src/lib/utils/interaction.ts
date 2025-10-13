@@ -1,5 +1,6 @@
 import { isHoverCapable, splitHoverDefinition } from '$lib/utils/hover'
 import { pwLog } from '$lib/utils/log'
+import { parseMatrixScale } from '$lib/utils/transform'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 
 /**
@@ -22,15 +23,48 @@ export const buildTapResetRecord = (
     // Reset any key that whileTap modified. Prefer animate > initial; otherwise provide safe defaults
     const overlappingKeys: string[] = Object.keys(whileTap ?? {})
     const resetRecord: Record<string, unknown> = {}
+    const has = (rec: Record<string, unknown> | undefined, key: string) =>
+        !!rec && Object.prototype.hasOwnProperty.call(rec, key)
+
     for (const k of overlappingKeys) {
-        if (Object.prototype.hasOwnProperty.call(animateDef ?? {}, k)) {
+        if (k === 'scale') {
+            if (has(animateDef, 'scale')) resetRecord.scale = animateDef.scale
+            else if (has(initial, 'scale')) resetRecord.scale = initial.scale
+            else if (has(animateDef, 'scaleX') || has(animateDef, 'scaleY')) {
+                const sx = (animateDef.scaleX as number | undefined) ?? 1
+                const sy = (animateDef.scaleY as number | undefined) ?? 1
+                resetRecord.scale = (sx + sy) / 2
+            } else if (has(initial, 'scaleX') || has(initial, 'scaleY')) {
+                const sx = (initial.scaleX as number | undefined) ?? 1
+                const sy = (initial.scaleY as number | undefined) ?? 1
+                resetRecord.scale = (sx + sy) / 2
+            } else {
+                resetRecord.scale = 1
+            }
+            continue
+        }
+        if (k === 'scaleX') {
+            if (has(animateDef, 'scaleX')) resetRecord.scaleX = animateDef.scaleX
+            else if (has(animateDef, 'scale')) resetRecord.scaleX = animateDef.scale
+            else if (has(initial, 'scaleX')) resetRecord.scaleX = initial.scaleX
+            else if (has(initial, 'scale')) resetRecord.scaleX = initial.scale
+            else resetRecord.scaleX = 1
+            continue
+        }
+        if (k === 'scaleY') {
+            if (has(animateDef, 'scaleY')) resetRecord.scaleY = animateDef.scaleY
+            else if (has(animateDef, 'scale')) resetRecord.scaleY = animateDef.scale
+            else if (has(initial, 'scaleY')) resetRecord.scaleY = initial.scaleY
+            else if (has(initial, 'scale')) resetRecord.scaleY = initial.scale
+            else resetRecord.scaleY = 1
+            continue
+        }
+        if (has(animateDef, k)) {
             resetRecord[k] = animateDef[k]
-        } else if (Object.prototype.hasOwnProperty.call(initial ?? {}, k)) {
+        } else if (has(initial, k)) {
             resetRecord[k] = initial[k]
         } else {
-            // Provide sensible defaults when baseline omitted
-            if (k === 'scale' || k === 'scaleX' || k === 'scaleY') resetRecord[k] = 1
-            else resetRecord[k] = undefined as unknown as never
+            resetRecord[k] = undefined as unknown as never
         }
     }
     return resetRecord
@@ -67,7 +101,29 @@ export const attachWhileTap = (
     let keyboardActive = false
     let activePointerId: number | null = null
     let tapCtl: Animation | null = null
+    let resetCtl: Animation | null = null
     let baselineTransform: string | null = null
+    const safetyGuards =
+        typeof window !== 'undefined' &&
+        (window as unknown as Record<string, unknown>)['SM_GESTURE_SAFE_GUARDS'] === true
+
+    const computeCanonicalBaseline = (): string => {
+        // Prefer animateDef > initial for transform-relevant keys when present, else computed style
+        const scaleKeys = ['scale', 'scaleX', 'scaleY'] as const
+        const from = (def?: Record<string, unknown>) =>
+            def && scaleKeys.some((k) => Object.prototype.hasOwnProperty.call(def, k))
+        if (from(animateDef)) {
+            // If animate has scale keys, prefer matrix from current style (already at animate) as baseline
+            const t = getComputedStyle(el).transform
+            return t && t !== 'none' ? t : 'none'
+        }
+        if (from(initial)) {
+            const t = getComputedStyle(el).transform
+            return t && t !== 'none' ? t : 'none'
+        }
+        const t = getComputedStyle(el).transform
+        return t || 'none'
+    }
 
     const handlePointerDown = (event: PointerEvent) => {
         // Capture pointer so we receive up/cancel even if pointer leaves the element
@@ -91,7 +147,18 @@ export const attachWhileTap = (
             h: el.getBoundingClientRect().height,
             transform: getComputedStyle(el).transform
         })
-        baselineTransform = getComputedStyle(el).transform
+        // Cancel any in-flight reset and rebase to canonical baseline
+        try {
+            resetCtl?.cancel()
+        } catch {
+            // ignore
+        }
+        resetCtl = null
+        if (!baselineTransform) baselineTransform = computeCanonicalBaseline()
+        // Apply baseline immediately before whileTap
+        if (baselineTransform && baselineTransform !== 'none')
+            el.style.transform = baselineTransform
+        else el.style.removeProperty('transform')
         pwLog('[tap] whileTap-def', whileTap)
         callbacks?.onTapStart?.()
         // Cancel any existing tap animation before starting a new one
@@ -101,6 +168,18 @@ export const attachWhileTap = (
             // ignore cancellation errors
         }
         tapCtl = animate(el, whileTap as unknown as DOMKeyframesDefinition) as unknown as Animation
+        // Safety clamp for runaway scale
+        if (safetyGuards) {
+            const a =
+                parseMatrixScale(getComputedStyle(el).transform) ??
+                parseMatrixScale(el.style.transform)
+            if (a !== null && Math.abs(a) > 8) {
+                if (baselineTransform && baselineTransform !== 'none')
+                    el.style.transform = baselineTransform
+                else el.style.removeProperty('transform')
+                pwLog('[tap] clamp-on-down', { a, restored: getComputedStyle(el).transform })
+            }
+        }
         Promise.resolve((tapCtl as unknown as { finished?: Promise<void> }).finished)
             .then(() =>
                 pwLog('[tap] applied', {
@@ -151,7 +230,6 @@ export const attachWhileTap = (
             transform: getComputedStyle(el).transform
         })
         if (!whileTap) return
-        if (reapplyHoverIfActive()) return
         // Ensure the whileTap animation can't finish and overwrite our reset
         try {
             tapCtl?.cancel()
@@ -169,8 +247,11 @@ export const attachWhileTap = (
         const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
         pwLog('[tap] reset-record', resetRecord)
         if (Object.keys(resetRecord).length > 0) {
-            const ctl = animate(el, resetRecord as unknown as DOMKeyframesDefinition)
-            Promise.resolve((ctl as unknown as { finished?: Promise<void> }).finished)
+            resetCtl = animate(
+                el,
+                resetRecord as unknown as DOMKeyframesDefinition
+            ) as unknown as Animation
+            Promise.resolve((resetCtl as unknown as { finished?: Promise<void> }).finished)
                 .then(() =>
                     pwLog('[tap] reset-finished', {
                         w: el.getBoundingClientRect().width,
@@ -179,7 +260,14 @@ export const attachWhileTap = (
                     })
                 )
                 .catch(() => {})
+                .finally(() => {
+                    resetCtl = null
+                })
         }
+        // After baseline and reset committed, optionally reapply hover on next frame
+        queueMicrotask(() => {
+            reapplyHoverIfActive()
+        })
     }
     const handlePointerCancel = (event: PointerEvent) => {
         if (typeof event.pointerId === 'number' && activePointerId !== null) {
