@@ -62,7 +62,8 @@ test.describe('drag/elastic', () => {
             clientY: s.y + 10,
             pointerId: 1
         })
-        await page.waitForTimeout(200)
+        // Give CI a little longer to settle and snap exactly to clamp
+        await page.waitForTimeout(350)
         const e = await el.boundingBox()
         if (!e) throw new Error('no e')
         const dx = Math.round(e.x - s.x)

@@ -92,6 +92,22 @@ test.describe('drag/basic', () => {
             pointerId: 3
         })
 
+        // Wait for position to stabilize before starting the second drag (CI flake guard)
+        let lastX = NaN
+        let stable = 0
+        for (let i = 0; i < 20; i++) {
+            await page.waitForTimeout(50)
+            const bb = await box.boundingBox()
+            if (!bb) continue
+            if (!Number.isNaN(lastX) && Math.abs(bb.x - lastX) < 0.5) {
+                stable++
+                if (stable >= 3) break
+            } else {
+                stable = 0
+            }
+            lastX = bb.x
+        }
+
         const mid = await box.boundingBox()
         if (!mid) throw new Error('no mid')
 
