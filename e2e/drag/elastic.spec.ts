@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('drag/elastic', () => {
     test('elastic=0 multiple drags never exceed +30 bound', async ({ page }) => {
-        await page.goto('/tests/drag/elastic?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/elastic?@isPlaywright=true')
 
         const box = page.getByTestId('elastic-0')
         const start = await box.boundingBox()
@@ -43,7 +43,7 @@ test.describe('drag/elastic', () => {
     })
 
     test('elastic=0 clamps exactly to ±30', async ({ page }) => {
-        await page.goto('/tests/drag/elastic?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/elastic?@isPlaywright=true')
         const el = page.getByTestId('elastic-0')
         const s = await el.boundingBox()
         if (!s) throw new Error('no s')
@@ -71,7 +71,7 @@ test.describe('drag/elastic', () => {
     })
 
     test('elastic=0 (no overdrag) settles without visible bounce', async ({ page }) => {
-        await page.goto('/tests/drag/elastic?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/elastic?@isPlaywright=true')
 
         const box = page.getByTestId('elastic-0')
         const start = await box.boundingBox()
@@ -107,7 +107,7 @@ test.describe('drag/elastic', () => {
     test('second drag respects click point after elastic settle and clamps within bounds', async ({
         page
     }) => {
-        await page.goto('/tests/drag/elastic?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/elastic?@isPlaywright=true')
 
         const box = page.getByTestId('elastic-05')
         const start = await box.boundingBox()
@@ -177,7 +177,7 @@ test.describe('drag/elastic', () => {
         expect(absClamp).toBeLessThanOrEqual(LIMIT + 2)
     })
     test('second drag clamps from new origin', async ({ page }) => {
-        await page.goto('/tests/drag/elastic?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/elastic?@isPlaywright=true')
         const el = page.getByTestId('elastic-0')
         const s = await el.boundingBox()
         if (!s) throw new Error('no s')

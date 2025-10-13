@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('initial={false}', () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto('/tests/motion/initial-false?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/motion/initial-false?@isPlaywright=true')
     })
 
     test('All three elements should be visible', async ({ page }) => {

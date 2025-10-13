@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('drag/momentum', () => {
     test('continues moving after release', async ({ page }) => {
-        await page.goto('/tests/drag/momentum?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/momentum?@isPlaywright=true')
         const el = page.getByTestId('drag-momentum')
         const s = await el.boundingBox()
         if (!s) throw new Error('no s')

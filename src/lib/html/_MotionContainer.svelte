@@ -13,7 +13,7 @@
     import { isNotEmpty } from '$lib/utils/objects'
     import { sleep } from '$lib/utils/testing'
     import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
-    import { pwLog } from '$lib/utils/log'
+    import { isPlaywrightEnv, pwLog } from '$lib/utils/log'
     import { type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants'
     import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation'
@@ -179,9 +179,7 @@
         }
     })
 
-    const isPlaywright =
-        typeof window !== 'undefined' &&
-        window.location.search.includes('@humanspeak-svelte-motion-isPlaywright=true')
+    const isPlaywright = isPlaywrightEnv()
 
     // Recognized HTML void elements that cannot contain children
     const isVoidTag = $derived(VOID_TAGS.has(tag as string))

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('drag/axis-y', () => {
     test('guide is behind box per z-index', async ({ page }) => {
-        await page.goto('/tests/drag/axis-y?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/axis-y?@isPlaywright=true')
         const guideZ = await page
             .getByTestId('axis-guide')
             .evaluate((el) => getComputedStyle(el).zIndex)
@@ -10,7 +10,7 @@ test.describe('drag/axis-y', () => {
         expect(parseInt(guideZ || '0')).toBeLessThan(parseInt(boxZ || '0'))
     })
     test('moves on y but not x', async ({ page }) => {
-        await page.goto('/tests/drag/axis-y?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/axis-y?@isPlaywright=true')
         const el = page.getByTestId('drag-y')
         const s = await el.boundingBox()
         if (!s) throw new Error('no s')

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('drag/constraints-ref', () => {
     test('is constrained inside container ref', async ({ page }) => {
-        await page.goto('/tests/drag/constraints-ref?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/constraints-ref?@isPlaywright=true')
         const el = page.getByTestId('drag-ref')
         const s = await el.boundingBox()
         if (!s) throw new Error('no s')

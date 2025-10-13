@@ -2,9 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('Fancy Like Button - size stability', () => {
     test('does not shrink after press animation completes', async ({ page }) => {
-        await page.goto(
-            '/tests/random/fancy-like-button?@humanspeak-svelte-motion-isPlaywright=true'
-        )
+        await page.goto('/tests/random/fancy-like-button?@isPlaywright=true')
 
         const btn = page.getByTestId('fancy-like-button')
         await expect(btn).toBeVisible()
@@ -56,9 +54,7 @@ test.describe('Fancy Like Button - size stability', () => {
     })
 
     test('rapid taps do not exceed baseline transform', async ({ page }) => {
-        await page.goto(
-            '/tests/random/fancy-like-button?@humanspeak-svelte-motion-isPlaywright=true'
-        )
+        await page.goto('/tests/random/fancy-like-button?@isPlaywright=true')
 
         const btn = page.getByTestId('fancy-like-button')
         await expect(btn).toBeVisible()
@@ -95,9 +91,7 @@ test.describe('Fancy Like Button - size stability', () => {
     })
 
     test('rapid taps during reset do not escalate transform', async ({ page }) => {
-        await page.goto(
-            '/tests/random/fancy-like-button?@humanspeak-svelte-motion-isPlaywright=true'
-        )
+        await page.goto('/tests/random/fancy-like-button?@isPlaywright=true')
 
         const btn = page.getByTestId('fancy-like-button')
         await expect(btn).toBeVisible()

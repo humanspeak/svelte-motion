@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('Keyframes Animation', () => {
     test('should morph square -> circle -> square', async ({ page }) => {
-        await page.goto('/tests/motion/keyframes?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/motion/keyframes?@isPlaywright=true')
 
         const el = page.getByTestId('motion-keyframes')
         await expect(el).toBeVisible()

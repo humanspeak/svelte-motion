@@ -4,7 +4,7 @@ test.describe('drag/subpixel constraints', () => {
     test('elastic=0 clamps to 30.5 exactly (±0.25) and float positions appear with elastic', async ({
         page
     }) => {
-        await page.goto('/tests/drag/subpixel?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/subpixel?@isPlaywright=true')
 
         const box0 = page.getByTestId('subpixel-box-e0')
         const start = await box0.boundingBox()

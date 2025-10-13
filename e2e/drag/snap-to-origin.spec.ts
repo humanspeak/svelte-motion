@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('drag/snap-to-origin', () => {
     test('releases back to origin after drag', async ({ page }) => {
-        await page.goto('/tests/drag/snap-to-origin?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/snap-to-origin?@isPlaywright=true')
 
         const box = page.getByTestId('snap-origin-box')
         const start = await box.boundingBox()
@@ -40,7 +40,7 @@ test.describe('drag/snap-to-origin', () => {
     })
 
     test('second drag starts from correct position with no jump', async ({ page }) => {
-        await page.goto('/tests/drag/snap-to-origin?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/snap-to-origin?@isPlaywright=true')
 
         const box = page.getByTestId('snap-origin-box')
         const start = await box.boundingBox()

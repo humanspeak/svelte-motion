@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('drag/basic', () => {
     test('moves when dragged', async ({ page }) => {
-        await page.goto('/tests/drag/basic?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/basic?@isPlaywright=true')
         const box = page.getByTestId('drag-box')
         const start = await box.boundingBox()
         if (!start) throw new Error('no start')
@@ -29,7 +29,7 @@ test.describe('drag/basic', () => {
     })
 
     test('has momentum after release', async ({ page }) => {
-        await page.goto('/tests/drag/basic?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/basic?@isPlaywright=true')
         const box = page.getByTestId('drag-box')
         const start = await box.boundingBox()
         if (!start) throw new Error('no start')
@@ -71,7 +71,7 @@ test.describe('drag/basic', () => {
     })
 
     test('second drag starts from transformed position', async ({ page }) => {
-        await page.goto('/tests/drag/basic?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/basic?@isPlaywright=true')
         const box = page.getByTestId('drag-box')
         const s = await box.boundingBox()
         if (!s) throw new Error('no s')

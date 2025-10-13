@@ -2,9 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('Animated Border Gradient', () => {
     test('rotates conic-gradient background over time', async ({ page }) => {
-        await page.goto(
-            '/tests/random/animated-border-gradient?@humanspeak-svelte-motion-isPlaywright=true'
-        )
+        await page.goto('/tests/random/animated-border-gradient?@isPlaywright=true')
 
         const border = page.locator('[data-rotate-value]')
         await expect(border).toBeVisible()

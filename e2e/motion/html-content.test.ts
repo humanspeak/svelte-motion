@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('HTML Content', () => {
     test('should animate number from 0 to 100', async ({ page }) => {
-        await page.goto('/tests/motion/html-content?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/motion/html-content?@isPlaywright=true')
 
         const pre = page.locator('pre')
 

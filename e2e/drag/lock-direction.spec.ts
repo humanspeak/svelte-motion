@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test.describe('drag/lock-direction', () => {
     test('random jitter after axis pull still settles at center', async ({ page }) => {
-        await page.goto('/tests/drag/lock-direction?@humanspeak-svelte-motion-isPlaywright=true')
+        await page.goto('/tests/drag/lock-direction?@isPlaywright=true')
 
         // Select container and draggable box
         const container = page.getByTestId('lock-container')

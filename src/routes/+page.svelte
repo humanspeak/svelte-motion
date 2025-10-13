@@ -4,7 +4,7 @@
 
     let debug = new PersistedState('debug', false)
 
-    let searchParams = $derived(debug.current ? '?@humanspeak-svelte-motion-isPlaywright=true' : '')
+    let searchParams = $derived(debug.current ? '?@isPlaywright=true' : '')
 </script>
 
 <div class="mx-auto max-w-5xl px-4 py-8">
