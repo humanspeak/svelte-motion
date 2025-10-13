@@ -48,9 +48,11 @@ describe('utils/interaction', () => {
         expect(reset).toMatchObject({ x: 10 })
     })
 
-    it('buildTapResetRecord: negative - returns empty when no overlapping keys', () => {
+    it('buildTapResetRecord: returns defaults for whileTap keys not in baseline', () => {
         const reset = buildTapResetRecord({ a: 1 }, { b: 2 }, { c: 3 })
-        expect(Object.keys(reset)).toHaveLength(0)
+        // 'c' is in whileTap but not in initial/animate, so it gets a default (undefined)
+        expect(Object.keys(reset)).toHaveLength(1)
+        expect(reset.c).toBeUndefined()
     })
 
     it('attachWhileTap: animates on down and restores on up, fires callbacks', async () => {

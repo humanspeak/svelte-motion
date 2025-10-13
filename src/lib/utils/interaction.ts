@@ -147,7 +147,8 @@ export const attachWhileTap = (
             w: el.getBoundingClientRect().width,
             h: el.getBoundingClientRect().height,
             transform: getComputedStyle(el).transform,
-            incomingScale
+            incomingScale,
+            resetCtlActive: resetCtl !== null
         })
         // Cancel any in-flight reset and rebase to canonical baseline
         try {
@@ -164,8 +165,15 @@ export const attachWhileTap = (
 
         // Software limit: if incoming scale is runaway, skip whileTap this cycle and force settle
         const baselineScale = parseMatrixScale(baselineTransform) ?? 1
-        if (Math.abs(incomingScale) > Math.abs(baselineScale) * 1.3) {
-            pwLog('[tap] runaway-detected-skip-whileTap', { incomingScale, baselineScale })
+        const scaleDiff = Math.abs(incomingScale - baselineScale)
+        const tolerance = 0.02 // 2% threshold
+        pwLog('[tap] scale-check', { incomingScale, baselineScale, scaleDiff, tolerance })
+        if (scaleDiff > tolerance) {
+            pwLog('[tap] runaway-detected-skip-whileTap', {
+                incomingScale,
+                baselineScale,
+                scaleDiff
+            })
             callbacks?.onTapStart?.()
             tapCtl = null
             return
@@ -259,9 +267,14 @@ export const attachWhileTap = (
         const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
         pwLog('[tap] reset-record', resetRecord)
         if (Object.keys(resetRecord).length > 0) {
+            // Use a very fast transition to minimize overshoot window for re-entrancy
+            const resetTransition: AnimationOptions = {
+                duration: 0.08
+            }
             resetCtl = animate(
                 el,
-                resetRecord as unknown as DOMKeyframesDefinition
+                resetRecord as unknown as DOMKeyframesDefinition,
+                resetTransition
             ) as unknown as Animation
             Promise.resolve((resetCtl as unknown as { finished?: Promise<void> }).finished)
                 .then(() =>
