@@ -51,7 +51,7 @@
         "prettier-plugin-svelte": "^3.4.0",
         "prettier-plugin-tailwindcss": "^0.6.14",
         "shiki": "^3.13.0",
-        "svelte": "^5.39.11",
+        "svelte": "^5.42.2",
         "svelte-check": "^4.3.3",
         "tailwindcss": "^4.1.14",
         "typescript": "^5.9.3",
