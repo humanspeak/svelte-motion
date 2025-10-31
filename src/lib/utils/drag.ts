@@ -640,6 +640,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                         restDelta,
                         restSpeed
                     })
+                    // Ensure applied is synced to final values (setXY should have done this, but be explicit)
+                    const finalX = stepX ? rx.value : applied.x
+                    const finalY = stepY ? ry.value : applied.y
+                    if (axis === true || axis === 'x') applied.x = finalX
+                    if (axis === true || axis === 'y') applied.y = finalY
                     running = false
                     stopInertia = null
                     opts.callbacks?.onTransitionEnd?.()
