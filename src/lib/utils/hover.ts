@@ -126,8 +126,8 @@ export const computeHoverBaseline = (
 /**
  * Attach whileHover interactions to an element with capability gating.
  *
- * Uses motion-dom's hover function which automatically handles hover capability
- * detection. On pointer enter, animates to `whileHover` (using nested `transition`
+ * Uses motion-dom's hover function which filters out touch events and interoperates
+ * with drag gestures. On pointer enter, animates to `whileHover` (using nested `transition`
  * if provided). On leave, restores changed keys to the baseline using the merged
  * root/component transition.
  *
