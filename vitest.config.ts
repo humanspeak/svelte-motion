@@ -41,7 +41,6 @@ export default defineConfig({
         exclude: [...configDefaults.exclude, 'tests'],
         coverage: {
             provider: 'v8',
-            all: true,
             include: ['src/lib/**/*.{ts,svelte}'],
             exclude: [
                 '**/*.d.ts',

@@ -1,7 +1,6 @@
 import { sveltekit } from '@sveltejs/kit/vite'
 import { svelteTesting } from '@testing-library/svelte/vite'
-import { defineConfig } from 'vite'
-import { configDefaults } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 export default defineConfig({
     plugins: [sveltekit()],
@@ -19,31 +18,32 @@ export default defineConfig({
             'tests-results/**',
             '**/docs/**/*',
             'scripts/**'
-        ],
-        workspace: [
-            {
-                extends: './vite.config.ts',
-                plugins: [svelteTesting()],
-
-                test: {
-                    name: 'client',
-                    environment: 'jsdom',
-                    clearMocks: true,
-                    include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
-                    exclude: ['src/lib/server/**'],
-                    setupFiles: ['./vitest-setup-client.ts']
-                }
-            },
-            {
-                extends: './vite.config.ts',
-
-                test: {
-                    name: 'server',
-                    environment: 'node',
-                    include: ['src/**/*.{test,spec}.{js,ts}'],
-                    exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
-                }
-            }
         ]
-    }
+    },
+    // @ts-expect-error - workspace is a valid vitest config option but svelte-check doesn't recognize it
+    workspace: [
+        {
+            extends: './vite.config.ts',
+            plugins: [svelteTesting()],
+
+            test: {
+                name: 'client',
+                environment: 'jsdom',
+                clearMocks: true,
+                include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
+                exclude: ['src/lib/server/**'],
+                setupFiles: ['./vitest-setup-client.ts']
+            }
+        },
+        {
+            extends: './vite.config.ts',
+
+            test: {
+                name: 'server',
+                environment: 'node',
+                include: ['src/**/*.{test,spec}.{js,ts}'],
+                exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
+            }
+        }
+    ]
 })

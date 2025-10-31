@@ -461,7 +461,6 @@
             (whileHoverProp ?? {}) as Record<string, unknown>,
             (mergedTransition ?? {}) as AnimationOptions,
             { onStart: onHoverStartProp, onEnd: onHoverEndProp },
-            undefined,
             {
                 initial: (resolvedInitial ?? {}) as Record<string, unknown>,
                 animate: (resolvedAnimate ?? {}) as Record<string, unknown>
