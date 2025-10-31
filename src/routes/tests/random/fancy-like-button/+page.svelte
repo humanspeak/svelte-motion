@@ -135,8 +135,6 @@
                 whileTap={{ scale: 0.92 }}
                 transition={{ type: 'spring', stiffness: 400, duration: 0.3 }}
                 aria-pressed={isLiked}
-                role="button"
-                tabindex="0"
                 data-testid="fancy-like-button"
                 bind:ref={heartButtonRef}
             >

@@ -413,21 +413,21 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             vel: velocity
         })
 
-        // Direction lock
-        if (directionLock && !lockAxis && Math.hypot(dx, dy) >= lockThreshold) {
+        const applyX = axis === true || axis === 'x'
+        const applyY = axis === true || axis === 'y'
+
+        // Direction lock: only engage if both axes are enabled
+        if (directionLock && !lockAxis && Math.hypot(dx, dy) >= lockThreshold && axis === true) {
             lockAxis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'
             pwLog('[drag] directionLock', { el: EL_ID, lockAxis })
             opts.callbacks?.onDirectionLock?.(lockAxis)
         }
 
-        const applyX = axis === true || axis === 'x'
-        const applyY = axis === true || axis === 'y'
-
         let x = origin.x + (applyX ? dx : 0)
         let y = origin.y + (applyY ? dy : 0)
         const preClamp = { x, y }
 
-        // Respect direction lock
+        // Respect direction lock (only relevant when axis === true)
         if (lockAxis === 'x') y = origin.y
         if (lockAxis === 'y') x = origin.x
 
