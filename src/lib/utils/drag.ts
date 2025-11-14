@@ -16,6 +16,7 @@ import { pwLog, pwWarn } from '$lib/utils/log'
  *   Simulate a few `pointermove`s before releasing.
  * - For nested drags, set `propagation` as needed to avoid parent-child contention.
  */
+import { isDomElement } from '$lib/utils/dom'
 import { applyConstraints as applyFloatConstraints } from '$lib/utils/dragMath'
 import { deriveBoundaryPhysics } from '$lib/utils/dragParams'
 import { computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
@@ -103,9 +104,9 @@ export const resolveConstraints = (
     constraints: DragConstraints | undefined
 ): { top: number; left: number; right: number; bottom: number } | null => {
     if (!constraints) return null
-    if (constraints instanceof HTMLElement) {
+    if (isDomElement(constraints)) {
         if (!el) return null
-        const c = getRect(constraints)
+        const c = getRect(constraints as unknown as HTMLElement)
         const e = getRect(el)
         if (!c || !e) return null
         // Allow element to move within container bounds
@@ -319,7 +320,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         constraints = resolveConstraints(el, opts.constraints)
         pwLog('[drag] constraints (px)', { el: EL_ID, constraints })
         if (constraints) {
-            if (opts.constraints && !(opts.constraints instanceof HTMLElement)) {
+            if (opts.constraints && !isDomElement(opts.constraints as unknown)) {
                 // Pixel constraints: always relative to original origin
                 constraintsBase = { x: 0, y: 0 }
             } else {
@@ -332,7 +333,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 applied: { ...applied },
                 origin: { ...origin },
                 kind:
-                    opts.constraints && !(opts.constraints instanceof HTMLElement)
+                    opts.constraints && !isDomElement(opts.constraints as unknown)
                         ? 'pixel'
                         : 'element'
             })

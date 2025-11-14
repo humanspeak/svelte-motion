@@ -307,6 +307,10 @@
             dragProp === true || dragProp === 'x' || dragProp === 'y' ? dragProp : !!dragProp
         if (!axis) return
 
+        // If constraints are provided via an element ref but it's not yet bound (null),
+        // defer attaching drag until the ref exists to avoid an unconstrained first drag.
+        if (dragConstraintsProp === null) return
+
         const controls = dragControlsProp as DragControls | undefined
         const opts = {
             axis,
