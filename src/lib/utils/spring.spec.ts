@@ -12,7 +12,6 @@ describe('utils/spring - useSpring', () => {
             rafCb = cb
             return 1 as unknown as number
         })
-        // @ts-expect-error simulate SSR
         cafSpy = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => undefined)
     })
 

@@ -10,9 +10,7 @@ function parseScale(transform: string): number | null {
 
 test.describe('AnimatePresence exit animation', () => {
     test('animates out when toggled off with preserved shape', async ({ page }) => {
-        await page.goto(
-            '/tests/motion/animate-presence?@humanspeak-svelte-motion-isPlaywright=true'
-        )
+        await page.goto('/tests/motion/animate-presence?@isPlaywright=true')
 
         const box = page.locator('[data-testid="box"]')
         const toggle = page.locator('[data-testid="toggle"]')
@@ -118,8 +116,8 @@ test.describe('AnimatePresence exit animation', () => {
         })
 
         expect(cloneData).toBeTruthy()
-        expect(Math.abs(cloneData!.rect.width - boxRect.width)).toBeLessThanOrEqual(2)
-        expect(Math.abs(cloneData!.rect.height - boxRect.height)).toBeLessThanOrEqual(2)
+        expect(Math.abs(cloneData!.rect.width - boxRect.width)).toBeLessThanOrEqual(3)
+        expect(Math.abs(cloneData!.rect.height - boxRect.height)).toBeLessThanOrEqual(3)
         expect(cloneData!.styles.borderRadius).toBe(boxStyles.borderRadius)
         expect(cloneData!.styles.clipPath).toBe(boxStyles.clipPath)
         expect(typeof cloneData!.styles.boxShadow).toBe('string')

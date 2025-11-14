@@ -76,6 +76,9 @@
         }
     }
 
+    let heartButtonRef = $state<HTMLButtonElement | null>(null)
+    // const heartButtonRect = new ElementRect(() => heartButtonRef)
+
     function onPointerUp(): void {
         stopSpawning()
     }
@@ -96,16 +99,16 @@
     const buttonBg = $derived(isLiked ? 'bg-red-500/50' : 'bg-[#2C3A47]')
 
     function likeInteraction(node: HTMLElement) {
-        const handlePointerDown = (e: PointerEvent) => {
-            console.log('pointerdown', e)
+        const handlePointerDown = () => {
+            // console.log('pointerdown', e, heartButtonRect.width, heartButtonRect.height)
             onPointerDown()
         }
-        const handlePointerUp = (e: PointerEvent) => {
-            console.log('pointerup', e)
+        const handlePointerUp = () => {
+            // console.log('pointerup', e, heartButtonRect.width, heartButtonRect.height)
             onPointerUp()
         }
         const handleKeyDown = (e: KeyboardEvent) => {
-            console.log('keydown', e)
+            // console.log('keydown', e, heartButtonRect.width, heartButtonRect.height)
             onKeyDown(e)
         }
         node.addEventListener('pointerdown', handlePointerDown)
@@ -124,101 +127,78 @@
 </script>
 
 <div class="mx-auto flex w-full flex-1 flex-col md:w-1/2">
-    <div class="my-2 flex items-center justify-center rounded-3xl bg-[#606B75] px-5 py-3">
-        <h3 class="flex-1 pl-5 font-mono font-semibold text-[#1B2224]">Fancy like button</h3>
-    </div>
-    <div
-        class="my-2 flex h-96 flex-col items-center justify-center overflow-hidden rounded-2xl bg-[#505C67] p-5"
-    >
-        <div
-            class="flex h-full w-full flex-col items-center justify-center gap-3 rounded-xl p-3 pt-20"
-        >
-            <div class="relative flex" use:likeInteraction>
-                <motion.button
-                    class={`size-6 ${buttonBg} z-30 m-1 flex items-center justify-center rounded-full select-none`}
-                    initial={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.92 }}
-                    transition={{ type: 'spring', stiffness: 400, duration: 0.3 }}
-                    aria-pressed={isLiked}
-                    role="button"
-                    tabindex="0"
+    <div class="flex h-full w-full flex-col items-center justify-center gap-3 rounded-xl p-3 pt-20">
+        <div class="relative flex" use:likeInteraction>
+            <motion.button
+                class={`size-6 ${buttonBg} z-30 m-1 flex items-center justify-center rounded-full select-none`}
+                initial={{ scale: 1.05 }}
+                whileTap={{ scale: 0.92 }}
+                transition={{ type: 'spring', stiffness: 400, duration: 0.3 }}
+                aria-pressed={isLiked}
+                data-testid="fancy-like-button"
+                bind:ref={heartButtonRef}
+            >
+                <svg
+                    version="1.1"
+                    id="Layer_1"
+                    xmlns="http://www.w3.org/2000/svg"
+                    x="0px"
+                    y="-10px"
+                    viewBox="0 0 122.88 107.41"
+                    style="enableBackground: new 0 0 122.88 107.41"
+                    class="size-4 pt-0.5"
                 >
-                    <svg
-                        version="1.1"
-                        id="Layer_1"
-                        xmlns="http://www.w3.org/2000/svg"
-                        x="0px"
-                        y="-10px"
-                        viewBox="0 0 122.88 107.41"
-                        style="enableBackground: new 0 0 122.88 107.41"
-                        class="size-4 pt-0.5"
-                    >
-                        <g>
-                            <path
-                                class="st0"
-                                d="M60.83,17.19C68.84,8.84,74.45,1.62,86.79,0.21c23.17-2.66,44.48,21.06,32.78,44.41 c-3.33,6.65-10.11,14.56-17.61,22.32c-8.23,8.52-17.34,16.87-23.72,23.2l-17.4,17.26L46.46,93.56C29.16,76.9,0.95,55.93,0.02,29.95 C-0.63,11.75,13.73,0.09,30.25,0.3C45.01,0.5,51.22,7.84,60.83,17.19L60.83,17.19L60.83,17.19z"
-                                fill={isLiked ? '#fb2c36' : '#A5AAB1'}
-                            />
-                        </g>
-                    </svg>
-                </motion.button>
-                <!-- Spawn origin centered on the button -->
-                <div
-                    class="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-                >
-                    {#each hearts as heart (heart.id)}
-                        <motion.div
-                            class="pointer-events-none absolute z-20 flex size-5 items-center justify-center text-red-500/50"
-                            style="translate: -50% -50%"
-                            initial={{ opacity: 1, x: 0, y: 0, scale: heart.scale }}
-                            animate={{ x: heart.xOffset, y: -(heart.xOffset + 100), opacity: 0 }}
-                            transition={{
-                                x: { duration: 0.2, ease: 'easeOut' },
-                                y: { duration: 0.6, ease: 'easeInOut' },
-                                opacity: { delay: 0.85, duration: 0.6 }
-                            }}
-                        >
-                            ❤️
-                        </motion.div>
-                    {/each}
-
-                    {#each circles as circle (circle.id)}
-                        <motion.div
-                            class="pointer-events-none absolute z-10 flex size-6 items-center justify-center rounded-full bg-red-500/30"
-                            style="translate: -50% -50%"
-                            initial={{ opacity: 1, x: 0, y: 0, scale: circle.size / 15 }}
-                            animate={{ x: circle.xOffset, y: -(circle.xOffset + 100), opacity: 0 }}
-                            transition={{
-                                x: {
-                                    duration: 0.2 + circle.delay,
-                                    delay: circle.delay,
-                                    ease: 'easeOut'
-                                },
-                                y: {
-                                    duration: 0.6 + circle.delay,
-                                    delay: circle.delay,
-                                    ease: 'easeInOut'
-                                },
-                                opacity: { delay: 0.4 + circle.delay, duration: 0.6 }
-                            }}
+                    <g>
+                        <path
+                            class="st0"
+                            d="M60.83,17.19C68.84,8.84,74.45,1.62,86.79,0.21c23.17-2.66,44.48,21.06,32.78,44.41 c-3.33,6.65-10.11,14.56-17.61,22.32c-8.23,8.52-17.34,16.87-23.72,23.2l-17.4,17.26L46.46,93.56C29.16,76.9,0.95,55.93,0.02,29.95 C-0.63,11.75,13.73,0.09,30.25,0.3C45.01,0.5,51.22,7.84,60.83,17.19L60.83,17.19L60.83,17.19z"
+                            fill={isLiked ? '#fb2c36' : '#A5AAB1'}
                         />
-                    {/each}
-                </div>
+                    </g>
+                </svg>
+            </motion.button>
+            <!-- Spawn origin centered on the button -->
+            <div
+                class="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+            >
+                {#each hearts as heart (heart.id)}
+                    <motion.div
+                        class="pointer-events-none absolute z-20 flex size-5 items-center justify-center text-red-500/50"
+                        style="translate: -50% -50%"
+                        initial={{ opacity: 1, x: 0, y: 0, scale: heart.scale }}
+                        animate={{ x: heart.xOffset, y: -(heart.xOffset + 100), opacity: 0 }}
+                        transition={{
+                            x: { duration: 0.2, ease: 'easeOut' },
+                            y: { duration: 0.6, ease: 'easeInOut' },
+                            opacity: { delay: 0.85, duration: 0.6 }
+                        }}
+                    >
+                        ❤️
+                    </motion.div>
+                {/each}
+
+                {#each circles as circle (circle.id)}
+                    <motion.div
+                        class="pointer-events-none absolute z-10 flex size-6 items-center justify-center rounded-full bg-red-500/30"
+                        style="translate: -50% -50%"
+                        initial={{ opacity: 1, x: 0, y: 0, scale: circle.size / 15 }}
+                        animate={{ x: circle.xOffset, y: -(circle.xOffset + 100), opacity: 0 }}
+                        transition={{
+                            x: {
+                                duration: 0.2 + circle.delay,
+                                delay: circle.delay,
+                                ease: 'easeOut'
+                            },
+                            y: {
+                                duration: 0.6 + circle.delay,
+                                delay: circle.delay,
+                                ease: 'easeInOut'
+                            },
+                            opacity: { delay: 0.4 + circle.delay, duration: 0.6 }
+                        }}
+                    />
+                {/each}
             </div>
         </div>
-    </div>
-    <div class="text-center text-sm text-gray-300 opacity-80">
-        Press or hold to like and spawn hearts. Press again to unlike.
-    </div>
-    <div class="mt-1 text-center text-xs text-gray-400">
-        Inspired by Fancy Like Button — React + Framer Motion
-    </div>
-
-    <div class="sr-only">
-        References:
-        <a href="https://www.npmjs.com/package/framer-motion">Framer Motion</a>,
-        <a href="https://github.com/DRlFTER/fancyLikeButton?utm_source=chatgpt.com"
-            >Fancy Like Button</a
-        >
     </div>
 </div>

@@ -10,6 +10,28 @@ const { animate: animateMock } = (await import('motion')) as unknown as {
 }
 
 describe('utils/interaction', () => {
+    it('press reentrancy: down→up→down during reset does not overshoot baseline', async () => {
+        // Enable safety guards for this test
+        ;(globalThis as unknown as Record<string, unknown>)['SM_GESTURE_SAFE_GUARDS'] = true
+        const el = document.createElement('div')
+        const baseline = 'matrix(1.05, 0, 0, 1.05, 0, 0)'
+        el.style.transform = baseline
+        animateMock.mockClear()
+        const cleanup = attachWhileTap(el, { scale: 0.92 }, { scale: 1.05 }, { scale: 1.05 })
+        // First press
+        el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1 }))
+        await Promise.resolve()
+        // Release triggers reset
+        document.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1 }))
+        await Promise.resolve()
+        // Re-enter quickly during reset
+        el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 2 }))
+        await Promise.resolve()
+        // The inline style should still reflect baseline (no runaway)
+        expect(el.style.transform).toBe(baseline)
+        cleanup()
+        delete (globalThis as unknown as Record<string, unknown>)['SM_GESTURE_SAFE_GUARDS']
+    })
     it('buildTapResetRecord: prefers animate over initial', () => {
         const initial = { scale: 1, backgroundColor: '#111' }
         const animate = { scale: 1.1, backgroundColor: '#000' }
@@ -26,9 +48,11 @@ describe('utils/interaction', () => {
         expect(reset).toMatchObject({ x: 10 })
     })
 
-    it('buildTapResetRecord: negative - returns empty when no overlapping keys', () => {
+    it('buildTapResetRecord: returns defaults for whileTap keys not in baseline', () => {
         const reset = buildTapResetRecord({ a: 1 }, { b: 2 }, { c: 3 })
-        expect(Object.keys(reset)).toHaveLength(0)
+        // 'c' is in whileTap but not in initial/animate, so it gets a default (undefined)
+        expect(Object.keys(reset)).toHaveLength(1)
+        expect(reset.c).toBeUndefined()
     })
 
     it('attachWhileTap: animates on down and restores on up, fires callbacks', async () => {

@@ -1,4 +1,5 @@
 import { type AnimationOptions, type DOMKeyframesDefinition, animate } from 'motion'
+import { hover } from 'motion-dom'
 
 /**
  * Determine whether the current environment supports true hover.
@@ -125,33 +126,31 @@ export const computeHoverBaseline = (
 /**
  * Attach whileHover interactions to an element with capability gating.
  *
- * On pointer enter, animates to `whileHover` (using nested `transition` if
- * provided). On leave, restores changed keys to the baseline using the merged
+ * Uses motion-dom's hover function which filters out touch events and interoperates
+ * with drag gestures. On pointer enter, animates to `whileHover` (using nested `transition`
+ * if provided). On leave, restores changed keys to the baseline using the merged
  * root/component transition.
  *
  * @param el Target element.
  * @param whileHover While-hover definition.
  * @param mergedTransition Root/component merged transition.
  * @param callbacks Optional lifecycle callbacks for hover start/end.
- * @param isCapable Capability predicate (override for testing).
  * @param baselineSources Optional sources used to compute baseline.
- * @return Cleanup function to remove listeners.
+ * @return Cleanup function to remove hover listeners.
  */
 export const attachWhileHover = (
     el: HTMLElement,
     whileHover: Record<string, unknown> | undefined,
     mergedTransition: AnimationOptions,
     callbacks?: { onStart?: () => void; onEnd?: () => void },
-    isCapable: () => boolean = () => isHoverCapable(),
     baselineSources?: { initial?: Record<string, unknown>; animate?: Record<string, unknown> }
 ): (() => void) => {
     if (!whileHover) return () => {}
 
     let hoverBaseline: Record<string, unknown> | null = null
 
-    const handlePointerEnter = () => {
-        if (!isCapable()) return
-        // Don't cancel - let Motion interrupt smoothly from current value
+    return hover(el, () => {
+        // Hover start: compute baseline and animate to whileHover values
         hoverBaseline = computeHoverBaseline(el, {
             initial: baselineSources?.initial,
             animate: baselineSources?.animate,
@@ -164,22 +163,14 @@ export const attachWhileHover = (
             keyframes as unknown as DOMKeyframesDefinition,
             (transition ?? mergedTransition) as AnimationOptions
         )
-    }
 
-    const handlePointerLeave = () => {
-        if (!isCapable()) return
-        // Don't cancel - let Motion interrupt smoothly from current value
-        if (hoverBaseline && Object.keys(hoverBaseline).length > 0) {
-            animate(el, hoverBaseline as unknown as DOMKeyframesDefinition, mergedTransition)
+        // Return cleanup function for hover end
+        return () => {
+            // Hover end: restore baseline values
+            if (hoverBaseline && Object.keys(hoverBaseline).length > 0) {
+                animate(el, hoverBaseline as unknown as DOMKeyframesDefinition, mergedTransition)
+            }
+            callbacks?.onEnd?.()
         }
-        callbacks?.onEnd?.()
-    }
-
-    el.addEventListener('pointerenter', handlePointerEnter)
-    el.addEventListener('pointerleave', handlePointerLeave)
-
-    return () => {
-        el.removeEventListener('pointerenter', handlePointerEnter)
-        el.removeEventListener('pointerleave', handlePointerLeave)
-    }
+    })
 }

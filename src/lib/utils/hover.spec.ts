@@ -15,9 +15,25 @@ const { animate: animateMock } = (await import('motion')) as unknown as {
     animate: ReturnType<typeof vi.fn> & { mockClear: () => void; mock: { calls: unknown[][] } }
 }
 
+// Mock motion-dom.hover
+let hoverCallback: ((element: HTMLElement) => (() => void) | void) | null = null
+let hoverCleanup: (() => void) | null = null
+vi.mock('motion-dom', () => {
+    const hoverMock = vi.fn(
+        (el: HTMLElement, callback: (element: HTMLElement) => (() => void) | void) => {
+            hoverCallback = callback
+            hoverCleanup = vi.fn(() => {})
+            return hoverCleanup
+        }
+    )
+    return { hover: hoverMock }
+})
+
 describe('utils/hover', () => {
     beforeEach(() => {
         animateMock.mockClear()
+        hoverCallback = null
+        hoverCleanup = null
         // default to hover-capable environment
         vi.stubGlobal('matchMedia', ((query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
@@ -134,17 +150,22 @@ describe('utils/hover', () => {
             { scale: 1.2, transition: { duration: 0.12 } },
             { duration: 0.25 },
             undefined,
-            () => true,
             { initial: { scale: 1 }, animate: { scale: 1.1 } }
         )
-        el.dispatchEvent(new PointerEvent('pointerenter'))
+
+        // Simulate hover start by calling the callback
+        expect(hoverCallback).toBeTruthy()
+        const hoverEnd = hoverCallback!(el)
+        expect(hoverEnd).toBeTruthy()
+
         await Promise.resolve()
         expect(animateMock).toHaveBeenCalled()
         const enterCall = animateMock.mock.calls.at(-1)
         expect(enterCall?.[1]).toMatchObject({ scale: 1.2 })
         expect(enterCall?.[2]).toMatchObject({ duration: 0.12 })
 
-        el.dispatchEvent(new PointerEvent('pointerleave'))
+        // Simulate hover end by calling the cleanup function
+        hoverEnd!()
         await Promise.resolve()
         const leaveCall = animateMock.mock.calls.at(-1)
         expect(leaveCall?.[1]).toMatchObject({ scale: 1.1 })
@@ -152,19 +173,29 @@ describe('utils/hover', () => {
         cleanup()
     })
 
-    it('attachWhileHover: negative does nothing when capability is false', async () => {
+    it('attachWhileHover: returns cleanup function when whileHover is undefined', () => {
         const el = document.createElement('div')
-        animateMock.mockClear()
-        const cleanup = attachWhileHover(
-            el,
-            { scale: 1.05 },
-            { duration: 0.2 },
-            undefined,
-            () => false
-        )
-        el.dispatchEvent(new PointerEvent('pointerenter'))
+        const cleanup = attachWhileHover(el, undefined, { duration: 0.2 })
+        expect(cleanup).toBeTypeOf('function')
+        expect(hoverCallback).toBeNull()
+        cleanup()
+    })
+
+    it('attachWhileHover: calls onStart and onEnd callbacks', async () => {
+        const el = document.createElement('div')
+        const onStart = vi.fn()
+        const onEnd = vi.fn()
+        const cleanup = attachWhileHover(el, { scale: 1.2 }, { duration: 0.2 }, { onStart, onEnd })
+
+        expect(hoverCallback).toBeTruthy()
+        const hoverEnd = hoverCallback!(el)
+        expect(hoverEnd).toBeTruthy()
         await Promise.resolve()
-        expect(animateMock).not.toHaveBeenCalled()
+        expect(onStart).toHaveBeenCalledOnce()
+
+        hoverEnd!()
+        await Promise.resolve()
+        expect(onEnd).toHaveBeenCalledOnce()
         cleanup()
     })
 

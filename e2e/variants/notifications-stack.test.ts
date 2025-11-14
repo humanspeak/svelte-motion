@@ -4,9 +4,7 @@ test.describe('Notifications Stack - Variants', () => {
     test('should start in closed state with notifications properly stacked on initial load', async ({
         page
     }) => {
-        await page.goto(
-            '/tests/variants/notifications-stack?@humanspeak-svelte-motion-isPlaywright=true'
-        )
+        await page.goto('/tests/variants/notifications-stack?@isPlaywright=true')
 
         // Wait for page to be fully loaded
         await page.waitForLoadState('networkidle')
@@ -54,9 +52,7 @@ test.describe('Notifications Stack - Variants', () => {
     })
 
     test('should expand when clicked and show all notifications', async ({ page }) => {
-        await page.goto(
-            '/tests/variants/notifications-stack?@humanspeak-svelte-motion-isPlaywright=true'
-        )
+        await page.goto('/tests/variants/notifications-stack?@isPlaywright=true')
         await page.waitForLoadState('networkidle')
 
         const getNotification = (index: number) => page.getByTestId(`notification-${index}`)
@@ -88,9 +84,7 @@ test.describe('Notifications Stack - Variants', () => {
     })
 
     test('should collapse when collapse button is clicked', async ({ page }) => {
-        await page.goto(
-            '/tests/variants/notifications-stack?@humanspeak-svelte-motion-isPlaywright=true'
-        )
+        await page.goto('/tests/variants/notifications-stack?@isPlaywright=true')
         await page.waitForLoadState('networkidle')
 
         const getNotification = (index: number) => page.getByTestId(`notification-${index}`)
@@ -119,9 +113,7 @@ test.describe('Notifications Stack - Variants', () => {
     })
 
     test('should properly inherit variants from parent to children', async ({ page }) => {
-        await page.goto(
-            '/tests/variants/notifications-stack?@humanspeak-svelte-motion-isPlaywright=true'
-        )
+        await page.goto('/tests/variants/notifications-stack?@isPlaywright=true')
         await page.waitForLoadState('networkidle')
 
         const getNotification = (index: number) => page.getByTestId(`notification-${index}`)
@@ -150,9 +142,7 @@ test.describe('Notifications Stack - Variants', () => {
     })
 
     test('should apply stagger delays correctly', async ({ page }) => {
-        await page.goto(
-            '/tests/variants/notifications-stack?@humanspeak-svelte-motion-isPlaywright=true'
-        )
+        await page.goto('/tests/variants/notifications-stack?@isPlaywright=true')
         await page.waitForLoadState('networkidle')
 
         const getNotification = (index: number) => page.getByTestId(`notification-${index}`)
@@ -177,9 +167,7 @@ test.describe('Notifications Stack - Variants', () => {
     })
 
     test('should animate smoothly on first click (not jump instantly)', async ({ page }) => {
-        await page.goto(
-            '/tests/variants/notifications-stack?@humanspeak-svelte-motion-isPlaywright=true'
-        )
+        await page.goto('/tests/variants/notifications-stack?@isPlaywright=true')
         await page.waitForLoadState('networkidle')
 
         const getNotification = (index: number) => page.getByTestId(`notification-${index}`)

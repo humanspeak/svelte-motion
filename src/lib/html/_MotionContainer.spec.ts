@@ -311,23 +311,6 @@ describe('_MotionContainer', () => {
     })
 
     it('whileHover is gated to hover-capable devices', async () => {
-        // Simulate non-hover environment (e.g., touch-only)
-        vi.stubGlobal('matchMedia', ((query: string) => {
-            const matches = false
-            return {
-                matches,
-                media: query,
-                onchange: null,
-                addEventListener() {},
-                removeEventListener() {},
-                addListener() {},
-                removeListener() {},
-                dispatchEvent() {
-                    return false
-                }
-            } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
-
         /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: { tag: 'div', whileHover: { scale: 1.05 } }
@@ -341,12 +324,16 @@ describe('_MotionContainer', () => {
         // Clear any prior animate calls to isolate hover behavior
         animateMock.mockClear()
 
-        await fireEvent.pointerEnter(el)
+        // Simulate touch event - motion-dom's hover filters these out
+        const touchEvent = new PointerEvent('pointerenter', {
+            pointerType: 'touch',
+            bubbles: true,
+            cancelable: true
+        })
+        el.dispatchEvent(touchEvent)
         await flushTimers()
 
-        // No hover animation should be triggered
+        // No hover animation should be triggered for touch events
         expect(animateMock).not.toHaveBeenCalled()
-
-        vi.unstubAllGlobals()
     })
 })
