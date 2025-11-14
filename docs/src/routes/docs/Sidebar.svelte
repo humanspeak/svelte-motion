@@ -46,6 +46,11 @@
                     icon: 'fa-solid fa-clock'
                 },
                 {
+                    title: 'useTransform',
+                    href: '/docs/use-transform',
+                    icon: 'fa-solid fa-sliders'
+                },
+                {
                     title: 'useTime',
                     href: '/docs/use-time',
                     icon: 'fa-solid fa-stopwatch'

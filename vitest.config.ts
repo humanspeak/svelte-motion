@@ -7,10 +7,7 @@ export default defineConfig({
     plugins: [
         tsconfigPaths(),
         svelte({
-            hot: !process.env.VITEST,
-            compilerOptions: {
-                accessors: false
-            }
+            hot: !process.env.VITEST
         }),
         svelteTesting()
     ],

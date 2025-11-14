@@ -339,6 +339,5 @@ Variants can be passed to any motion component via the `variants` prop:
 
 ## Related
 
-- [Animation Overview](/docs/animation) - Learn about other animation techniques
-- [Motion Component](/docs/motion-component) - Full API reference
+- [Motion Component](/docs) - Full API reference
 - [Examples](/examples) - See variants in action

@@ -1,0 +1,182 @@
+---
+title: "useTransform"
+description: "Create a derived store that maps a numeric source across ranges or computes values from other stores."
+---
+
+<svelte:head>
+  <title>useTransform | Docs | Svelte Motion</title>
+</svelte:head>
+
+<script>
+  import Example from '$lib/components/general/Example.svelte';
+  import HTMLContent from '$lib/examples/HTMLContent.svelte';
+  // Reuse the HTML Content example to demonstrate reactive value mapping
+</script>
+
+# useTransform
+
+`useTransform` creates a Svelte `Readable` store derived from other values. It supports two forms:
+
+- Mapping form: Map a numeric source across input/output ranges with options like `clamp`, `ease`, and `mixer`.
+- Function form: Recompute from a function whenever dependency stores change.
+
+```svelte
+<script lang="ts">
+  import { useTime, useTransform } from '@humanspeak/svelte-motion'
+
+  // Time source that ticks every frame
+  const time = useTime()
+
+  // Map 0..4000ms -> 0..360deg (unclamped to allow wrap-around)
+  const rotate = useTransform(time, [0, 4000], [0, 360], { clamp: false })
+</script>
+
+<div style="transform: rotate({$rotate}deg)">Rotating</div>
+```
+
+<Example isSmall>
+  <HTMLContent />
+</Example>
+
+## Usage
+
+### Mapping form
+
+Map a numeric source across input/output ranges. You can shape interpolation with `ease`, clamp input to segment bounds with `clamp`, and provide a custom `mixer` for non‑numeric outputs.
+
+```svelte
+<script lang="ts">
+  import { useTime, useTransform } from '@humanspeak/svelte-motion'
+
+  const time = useTime()
+
+  // Progress cycles 0..1 every 2s
+  const progress = useTransform(time, [0, 2000], [0, 1], { clamp: false })
+
+  // Map progress to degrees
+  const degrees = useTransform(progress, [0, 1], [0, 360])
+</script>
+
+<div style="transform: rotate({$degrees}deg)">↻</div>
+```
+
+#### With easing
+
+Provide a single easing or one per segment.
+
+```svelte
+<script lang="ts">
+  import { useTime, useTransform } from '@humanspeak/svelte-motion'
+  const easeIn = (t: number) => t * t
+
+  const time = useTime()
+  const size = useTransform(time, [0, 1000, 2000], [0.9, 1.1, 0.9], { ease: [easeIn, easeIn] })
+</script>
+
+<div style="transform: scale({$size})">Pulsing</div>
+```
+
+#### Non‑numeric outputs with mixer
+
+For non-numeric outputs, pass a `mixer(from, to)` that returns an interpolator `(t) => value`.
+
+```svelte
+<script lang="ts">
+  import { useTransform } from '@humanspeak/svelte-motion'
+  import { writable } from 'svelte/store'
+
+  // Source 0..1
+  const src = writable(0)
+
+  // Simple discrete color mixer
+  const stepColor = (from: string, to: string) => (t: number) => (t < 0.5 ? from : to)
+
+  const color = useTransform(src, [0, 1], ['red', 'blue'], { mixer: stepColor })
+</script>
+
+<div style="background: {$color}; width: 80px; height: 24px;" />
+```
+
+### Function form
+
+Compute a value from dependency stores. The function can reference deps using Svelte’s `$store` syntax.
+
+```svelte
+<script lang="ts">
+  import { useTransform } from '@humanspeak/svelte-motion'
+  import { writable } from 'svelte/store'
+
+  const a = writable(2)
+  const b = writable(3)
+
+  // Recomputes whenever a or b change
+  const total = useTransform(() => $a + $b, [a, b])
+</script>
+
+<span>Total: {$total}</span>
+```
+
+## How it works
+
+- Mapping form picks the active input segment and interpolates between its corresponding outputs.
+- `clamp` (default `true`) limits the input to current segment bounds; set `false` to allow extrapolation.
+- `ease` shapes the 0..1 progress before mixing.
+- If outputs are numeric, a linear mixer is used; otherwise provide a custom `mixer`.
+- Descending input ranges are supported. Equal segment endpoints produce zero progress for that segment.
+
+## API Reference
+
+### Signatures
+
+```ts
+// Mapping form
+useTransform<T>(
+  source: Readable<number>,
+  input: number[],
+  output: T[],
+  options?: {
+    clamp?: boolean
+    ease?: ((t: number) => number) | Array<(t: number) => number>
+    mixer?: (from: unknown, to: unknown) => (t: number) => unknown
+  }
+): Readable<T>
+
+// Function form
+useTransform<T>(
+  compute: () => T,
+  deps: Readable<unknown>[]
+): Readable<T>
+```
+
+### Parameters
+
+- `source` `Readable<number>`: Numeric source store (mapping form).
+- `input` `number[]`: Input stops (length must match `output`).
+- `output` `T[]`: Output stops (same length as `input`).
+- `options.clamp` `boolean` (default `true`): Clamp to active segment.
+- `options.ease` `((t: number) => number) | Array<...>`: Easing per segment or single easing.
+- `options.mixer` `(from, to) => (t) => any`: Custom mixer for non‑numeric outputs.
+- `compute` `() => T`: Compute function (function form).
+- `deps` `Readable[]`: Dependency stores whose updates trigger recompute (function form).
+
+### Returns
+
+`Readable<T>` — A Svelte readable store with the transformed value.
+
+## When to use
+
+- Link styles directly to time or gesture progress.
+- Derive values from other stores using a declarative, reactive API.
+- Map ranges with easing and clamp behavior without manual math.
+- Interpolate non‑numeric outputs via a custom mixer.
+
+## See also
+
+- [useTime](/docs/use-time) — Time source for mapping and progress.
+- [useAnimationFrame](/docs/use-animation-frame) — Imperative frame callback.
+
+---
+
+Based on [Motion’s useTransform](https://motion.dev/docs/react-use-transform?platform=react) API.
+
+
