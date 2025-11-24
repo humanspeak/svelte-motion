@@ -60,7 +60,7 @@
         "vite-plugin-devtools-json": "^1.0.0",
         "vitest": "^4.0.9",
         "vitest-browser-svelte": "^2.0.1",
-        "wrangler": "^4.48.0"
+        "wrangler": "^4.50.0"
     },
     "volta": {
         "node": "22.20.0"
