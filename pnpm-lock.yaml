@@ -34,8 +34,8 @@ importers:
         specifier: ^2.48.5
         version: 2.48.5(@opentelemetry/api@1.9.0)(@sveltejs/vite-plugin-svelte@6.2.1(svelte@5.43.6)(vite@7.2.2(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6)))(svelte@5.43.6)(vite@7.2.2(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6))
       '@sveltejs/package':
-        specifier: ^2.5.4
-        version: 2.5.4(svelte@5.43.6)(typescript@5.9.3)
+        specifier: ^2.5.6
+        version: 2.5.6(svelte@5.43.6)(typescript@5.9.3)
       '@sveltejs/vite-plugin-svelte':
         specifier: ^6.2.1
         version: 6.2.1(svelte@5.43.6)(vite@7.2.2(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.20.6))
@@ -1618,8 +1618,8 @@ packages:
       '@opentelemetry/api':
         optional: true
 
-  '@sveltejs/package@2.5.4':
-    resolution: {integrity: sha512-8+1hccAt0M3PPkHVPKH54Wc+cc1PNxRqCrICZiv/hEEto8KwbQVRghxNgTB4htIPyle+4CIB8RayTQH5zRQh9A==}
+  '@sveltejs/package@2.5.6':
+    resolution: {integrity: sha512-1rNQYW/TwDZU6HTAWHvwDAdyRcccYKG7sShbCokhX1Z0spPFcTVbK771fVBcWnh+XChZGcOfi4KLN9AaIrehQQ==}
     engines: {node: ^16.14 || >=18}
     hasBin: true
     peerDependencies:
@@ -4455,6 +4455,7 @@ packages:
   wrangler@4.48.0:
     resolution: {integrity: sha512-qkcwysx96XNDWXl4w/5VjAZjqWatxAq9chMXVeqv/etL9e06ouPaZ+Hwwbe5XYV2GYf/XhZVZ3fHJcTBrq60gQ==}
     engines: {node: '>=18.0.0'}
+    deprecated: Unexpected API fields cause wrangler deploy to crash in some code paths. Downgrade to wrangler@4.47
     hasBin: true
     peerDependencies:
       '@cloudflare/workers-types': ^4.20251109.0
@@ -5918,7 +5919,7 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
 
-  '@sveltejs/package@2.5.4(svelte@5.43.6)(typescript@5.9.3)':
+  '@sveltejs/package@2.5.6(svelte@5.43.6)(typescript@5.9.3)':
     dependencies:
       chokidar: 4.0.3
       kleur: 4.1.5
