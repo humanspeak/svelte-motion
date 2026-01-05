@@ -657,6 +657,16 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             stopInertia = () => {
                 pwLog('❌ MOMENTUM CANCELLED')
                 running = false
+                // Sync applied to the current visual position so the next drag starts correctly
+                // Use the last computed values from the steppers if available
+                const finalX = stepX ? stepX(now() - startTs).value : applied.x
+                const finalY = stepY ? stepY(now() - startTs).value : applied.y
+                if (axis === true || axis === 'x') applied.x = finalX
+                if (axis === true || axis === 'y') applied.y = finalY
+                pwLog('[drag] inertia cancelled → sync applied', {
+                    el: EL_ID,
+                    applied: { x: applied.x, y: applied.y }
+                })
                 stopInertia = null
             }
 
@@ -699,14 +709,21 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 origin,
                 applied,
                 dx,
-                dy
+                dy,
+                elastic
             })
+
+            // When elastic=0, the element is already at the clamped position during drag,
+            // so use instant settle (duration: 0) to avoid spring bounce.
+            // Otherwise use the merged transition for smooth settle animation.
+            const settleTransition =
+                elastic === 0 ? { duration: 0 } : ((mergedTransition ?? {}) as AnimationOptions)
 
             // Animate with the merged transition so the settle feels consistent with other motion
             const controls = animate(
                 el,
                 { ...(applyX ? { x } : {}), ...(applyY ? { y } : {}) } as DOMKeyframesDefinition,
-                (mergedTransition ?? {}) as AnimationOptions
+                settleTransition
             )
             // Fire transition end once settled
             Promise.resolve((controls as unknown as { finished?: Promise<void> }).finished)
