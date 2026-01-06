@@ -5,25 +5,17 @@ test.describe('drag/snap-to-origin', () => {
         await page.goto('/tests/drag/snap-to-origin?@isPlaywright=true')
 
         const box = page.getByTestId('snap-origin-box')
+        await box.waitFor({ state: 'visible' })
         const start = await box.boundingBox()
         if (!start) throw new Error('no start')
 
-        // Drag to the right and slightly down
-        await box.dispatchEvent('pointerdown', {
-            clientX: start.x + start.width / 2,
-            clientY: start.y + start.height / 2,
-            pointerId: 71
+        // Drag to the right and slightly down using mouse API
+        await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2)
+        await page.mouse.down()
+        await page.mouse.move(start.x + start.width / 2 + 80, start.y + start.height / 2 + 20, {
+            steps: 5
         })
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: start.x + start.width / 2 + 80,
-            clientY: start.y + start.height / 2 + 20,
-            pointerId: 71
-        })
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: start.x + start.width / 2 + 80,
-            clientY: start.y + start.height / 2 + 20,
-            pointerId: 71
-        })
+        await page.mouse.up()
 
         // Wait for snap-to-origin settle
         await page.waitForTimeout(500)
@@ -43,25 +35,17 @@ test.describe('drag/snap-to-origin', () => {
         await page.goto('/tests/drag/snap-to-origin?@isPlaywright=true')
 
         const box = page.getByTestId('snap-origin-box')
+        await box.waitFor({ state: 'visible' })
         const start = await box.boundingBox()
         if (!start) throw new Error('no start')
 
-        // First drag away and release
-        await box.dispatchEvent('pointerdown', {
-            clientX: start.x + start.width / 2,
-            clientY: start.y + start.height / 2,
-            pointerId: 72
+        // First drag away and release using mouse API
+        await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2)
+        await page.mouse.down()
+        await page.mouse.move(start.x + start.width / 2 + 60, start.y + start.height / 2, {
+            steps: 5
         })
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: start.x + start.width / 2 + 60,
-            clientY: start.y + start.height / 2,
-            pointerId: 72
-        })
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: start.x + start.width / 2 + 60,
-            clientY: start.y + start.height / 2,
-            pointerId: 72
-        })
+        await page.mouse.up()
 
         // Wait for snap settle
         await page.waitForTimeout(600)
@@ -69,21 +53,15 @@ test.describe('drag/snap-to-origin', () => {
         if (!settled) throw new Error('no settled')
 
         // Second drag: pointerdown at current center should not move the box
-        await box.dispatchEvent('pointerdown', {
-            clientX: settled.x + settled.width / 2,
-            clientY: settled.y + settled.height / 2,
-            pointerId: 73
-        })
+        await page.mouse.move(settled.x + settled.width / 2, settled.y + settled.height / 2)
+        await page.mouse.down()
+
         const afterDown = await box.boundingBox()
         if (!afterDown) throw new Error('no afterDown')
         expect(Math.abs(afterDown.x - settled.x)).toBeLessThan(1.5)
         expect(Math.abs(afterDown.y - settled.y)).toBeLessThan(1.5)
 
         // Cleanup
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: afterDown.x + afterDown.width / 2,
-            clientY: afterDown.y + afterDown.height / 2,
-            pointerId: 73
-        })
+        await page.mouse.up()
     })
 })
