@@ -117,7 +117,7 @@ This package carefully selects its dependencies to provide a robust and maintain
 | [Fancy Like Button](https://github.com/DRlFTER/fancyLikeButton)                                          | `/tests/random/fancy-like-button`        | [View Example](https://svelte.dev/playground/c34b7e53d41c48b0ab1eaf21ca120c6e?version=5.38.10) |
 | [Keyframes (square → circle → square; scale 1→2→1)](https://motion.dev/docs/react-animation#keyframes)   | `/tests/motion/keyframes`                | [View Example](https://svelte.dev/playground/05595ce0db124c1cbbe4e74fda68d717?version=5.38.10) |
 | [Animated Border Gradient (conic-gradient rotate)](https://www.youtube.com/watch?v=OgQI1-9T6ZA)          | `/tests/random/animated-border-gradient` | [View Example](https://svelte.dev/playground/6983a61b4c35441b8aa72a971de01a23?version=5.38.10) |
-| [Exit Animation](https://motion.dev/docs/react#exit-animations)                                          | `/tests/motion/animate-presence`         | [View Example](https://svelte.dev/playground/ef277e283d864653ace54e7453801601?version=5.38.10) |
+| [Exit Animation](https://motion.dev/docs/react#exit-animations)                                          | `/tests/animate-presence/basic`          | [View Example](https://svelte.dev/playground/ef277e283d864653ace54e7453801601?version=5.38.10) |
 
 ## Interactions
 

@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { Snippet } from 'svelte'
     import { createAnimatePresenceContext, setAnimatePresenceContext } from '$lib/utils/presence'
+    import { pwLog } from '$lib/utils/log'
 
     /**
      * Provide `AnimatePresence` context to descendants.
@@ -23,6 +24,7 @@
         onExitComplete?: () => void
     }>()
 
+    pwLog('[AnimatePresence] mounting', { initial, hasOnExitComplete: !!onExitComplete })
     const context = createAnimatePresenceContext({ initial, onExitComplete })
     setAnimatePresenceContext(context)
 </script>

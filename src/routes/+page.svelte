@@ -170,7 +170,7 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/motion/animate-presence') + searchParams}
+                        href={resolve('/tests/animate-presence/basic') + searchParams}
                     >
                         Basic (enter + exit)
                     </a>
