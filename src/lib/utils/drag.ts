@@ -552,16 +552,16 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             const noConstraints = !constraints
             const huge = 1e6
             const minX = noConstraints
-                ? origin.x - huge
+                ? applied.x - huge
                 : origin.x + (constraints?.left ?? -Infinity)
             const maxX = noConstraints
-                ? origin.x + huge
+                ? applied.x + huge
                 : origin.x + (constraints?.right ?? Infinity)
             const minY = noConstraints
-                ? origin.y - huge
+                ? applied.y - huge
                 : origin.y + (constraints?.top ?? -Infinity)
             const maxY = noConstraints
-                ? origin.y + huge
+                ? applied.y + huge
                 : origin.y + (constraints?.bottom ?? Infinity)
 
             const { timeConstantMs, restDelta, restSpeed, bounceStiffness, bounceDamping } =
