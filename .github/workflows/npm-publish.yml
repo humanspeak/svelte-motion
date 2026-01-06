@@ -128,12 +128,12 @@ jobs:
                         fi
                       done < <(find src/lib -type f -name "*.svelte" ! -path "*/test/*")
 
-                      # Check TypeScript files
+                      # Check TypeScript files (excluding log.ts which intentionally uses console.log)
                       while IFS= read -r file; do
                         if ! check_file "$file"; then
                           has_errors=1
                         fi
-                      done < <(find src/lib -type f -name "*.ts" ! -name "*.test.ts" ! -path "*/test/*")
+                      done < <(find src/lib -type f -name "*.ts" ! -name "*.test.ts" ! -path "*/test/*" ! -path "src/lib/utils/log.ts")
 
                       exit $has_errors
                     } | tee >(cat >&5)
