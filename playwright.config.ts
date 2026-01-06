@@ -1,7 +1,11 @@
 import { defineConfig, devices } from '@playwright/test'
+import os from 'os'
 
 export default defineConfig({
     testDir: './e2e',
+    // CI uses sharding (2 shards on 4vcpu runners), so 2 workers is optimal
+    // Local dev: cap at 4 workers to reduce flakiness in timing-sensitive animation tests
+    workers: process.env.CI ? 2 : Math.min(4, Math.floor(os.cpus().length / 2)),
     reporter: [['junit', { outputFile: 'junit-playwright.xml' }]],
     webServer: {
         command: 'npm run build && npm run preview',
