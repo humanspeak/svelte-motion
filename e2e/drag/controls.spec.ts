@@ -16,12 +16,15 @@ test.describe('drag/controls', () => {
         // Click on handle to initiate drag
         await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2)
         await page.mouse.down()
-        await page.mouse.move(s.x + 60, s.y + 40, { steps: 5 })
+        // Move further right to ensure clear movement (snapToCursor centers the 100px element on cursor)
+        await page.mouse.move(s.x + 120, s.y + 40, { steps: 5 })
         await page.mouse.up()
 
+        await page.waitForTimeout(100)
         const e = await el.boundingBox()
         if (!e) throw new Error('no e')
-        expect(e.x).toBeGreaterThan(s.x + 10)
+        // With snapToCursor and 100px width, element left edge = cursor - 50 = s.x + 120 - 50 = s.x + 70
+        expect(e.x).toBeGreaterThan(s.x + 50)
         expect(Math.abs(e.y - s.y)).toBeLessThan(5)
     })
 
