@@ -331,8 +331,6 @@ jobs:
               uses: actions/setup-node@v4 # zizmor: ignore[unpinned-uses]
               with:
                   node-version: 22
-                  registry-url: https://registry.npmjs.org
-                  scope: '@humanspeak'
                   cache: '' # zizmor: ignore[cache-poisoning]
 
             - name: Install
@@ -510,9 +508,11 @@ jobs:
             - name: Publish
               if: steps.publish-check.outputs.should_publish == 'true'
               run: |
-                  # Ensure we're publishing to the correct scope
-                  rm -f ./.npmrc
+                  # Clean up any existing npmrc files that might interfere with OIDC
+                  rm -f ./.npmrc ~/.npmrc
+                  # Configure registry for scoped package
                   pnpm config set @humanspeak:registry https://registry.npmjs.org/
+                  # Publish using pnpm with OIDC (trusted publishing)
                   pnpm publish --provenance --access public --no-git-checks
 
             - name: Cleanup on failure
