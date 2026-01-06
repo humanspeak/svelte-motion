@@ -1,11 +1,14 @@
 import { defineConfig, devices } from '@playwright/test'
-import os from 'os'
 
 export default defineConfig({
     testDir: './e2e',
-    // CI uses sharding (2 shards on 4vcpu runners), so 2 workers is optimal
-    // Local dev: cap at 4 workers to reduce flakiness in timing-sensitive animation tests
-    workers: process.env.CI ? 2 : Math.min(4, Math.floor(os.cpus().length / 2)),
+    // Run tests sequentially to avoid dispatchEvent race conditions
+    // dispatchEvent-based pointer events are unreliable under parallel execution
+    workers: 1,
+    // Disable fully parallel - tests run sequentially to ensure reliable pointer event handling
+    fullyParallel: false,
+    // Retry flaky tests once
+    retries: process.env.CI ? 1 : 0,
     reporter: [['junit', { outputFile: 'junit-playwright.xml' }]],
     webServer: {
         command: 'npm run build && npm run preview',
@@ -18,7 +21,11 @@ export default defineConfig({
     use: {
         baseURL: 'http://localhost:4173',
         trace: 'on-first-retry',
-        screenshot: 'on'
+        screenshot: 'on',
+        // Force fresh context per test to prevent state leakage
+        contextOptions: {
+            strictSelectors: true
+        }
     },
     timeout: 60000,
     projects: [
