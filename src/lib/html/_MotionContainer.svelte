@@ -123,7 +123,6 @@
     $effect(() => {
         if (!(context && element && isLoaded === 'ready')) return
 
-        let rafId: number | null = null
         let lastWidth = 0
         let lastHeight = 0
         let stopped = false
@@ -132,11 +131,6 @@
             if (stopped || !element || !element.isConnected) return
             const rect = element.getBoundingClientRect()
             const style = getComputedStyle(element)
-            pwLog('[motion][measure]', {
-                w: rect.width,
-                h: rect.height,
-                transform: style.transform
-            })
             if (
                 Math.abs(rect.width - lastWidth) > 0.5 ||
                 Math.abs(rect.height - lastHeight) > 0.5
@@ -149,6 +143,7 @@
 
         // Observe size changes
         const resizeObserver = new ResizeObserver(() => {
+            pwLog('[motion][resize]', { key: presenceKey })
             measureAndUpdate()
         })
         try {
@@ -157,15 +152,8 @@
             // Ignore
         }
 
-        // Also poll on RAF to catch transform/layout-driven changes
-        const tick = () => {
-            if (stopped) return
-            measureAndUpdate()
-            rafId = requestAnimationFrame(tick)
-        }
-        rafId = requestAnimationFrame(tick)
-
         // Initial measure once
+        pwLog('[motion][initial-measure]', { key: presenceKey })
         measureAndUpdate()
 
         return () => {
@@ -175,7 +163,6 @@
             } catch {
                 // Ignore
             }
-            if (rafId) cancelAnimationFrame(rafId)
         }
     })
 
@@ -218,12 +205,15 @@
 
     // Propagate initial={false} to children BEFORE setting variant context
     const parentInitialFalse = getInitialFalseContext()
+    const presenceInitialFalse = context?.initial === false
     const effectiveInitialProp =
         initialProp !== undefined
             ? initialProp
             : parentInitialFalse && variantsProp
               ? false
-              : undefined
+              : presenceInitialFalse
+                ? false
+                : undefined
 
     if (initialProp === false) {
         setInitialFalseContext(true)

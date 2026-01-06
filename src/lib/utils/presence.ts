@@ -52,6 +52,8 @@ const resetTransforms = (element: HTMLElement): void => {
  * so we can clone and animate them out after removal.
  */
 export type AnimatePresenceContext = {
+    /** When false, children skip their enter animation on initial mount. */
+    initial: boolean
     /** Called when all exit animations complete (optional). */
     onExitComplete?: () => void
     /** Register a child element and its exit definition. */
@@ -102,8 +104,11 @@ export type AnimatePresenceContext = {
  * @returns A presence context with register/update/unregister APIs.
  */
 export function createAnimatePresenceContext(context: {
+    initial?: boolean
     onExitComplete?: () => void
 }): AnimatePresenceContext {
+    // Default initial to true (animate on first mount) unless explicitly false
+    const initial = context.initial !== false
     const children = new Map<string, PresenceChild>()
     // Track number of in-flight exit animations to invoke onExitComplete once
     let inFlightExits = 0
@@ -248,7 +253,8 @@ export function createAnimatePresenceContext(context: {
     }
 
     return {
-        ...context,
+        initial,
+        onExitComplete: context.onExitComplete,
         registerChild,
         updateChildState,
         unregisterChild

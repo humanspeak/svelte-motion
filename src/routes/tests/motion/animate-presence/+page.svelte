@@ -15,7 +15,7 @@
 </script>
 
 <div class="relative flex h-40 w-24 flex-col">
-    <AnimatePresence>
+    <AnimatePresence initial={false}>
         {#if isVisible}
             <motion.div
                 initial={{ opacity: 0, scale: 0 }}

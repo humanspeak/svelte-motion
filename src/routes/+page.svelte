@@ -32,14 +32,6 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/motion/animate-presence') + searchParams}
-                    >
-                        Animate Presence
-                    </a>
-                </li>
-                <li>
-                    <a
-                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/html-content') + searchParams}
                     >
                         HTML Content (0→100)
@@ -168,6 +160,19 @@
                         href={resolve('/tests/drag/snap-to-origin') + searchParams}
                     >
                         Drag: Snap To Origin
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div>
+            <h2 class="mb-3 text-xl font-medium">AnimatePresence</h2>
+            <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/animate-presence') + searchParams}
+                    >
+                        Basic (enter + exit)
                     </a>
                 </li>
             </ul>
