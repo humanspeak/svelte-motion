@@ -5,26 +5,26 @@ test.describe('drag/controls', () => {
         await page.goto('/tests/drag/controls?@isPlaywright=true')
         const el = page.getByTestId('drag-controls')
         const handle = page.getByTestId('handle')
+        await el.waitFor({ state: 'visible' })
+        await handle.waitFor({ state: 'visible' })
         const s = await el.boundingBox()
+        const h = await handle.boundingBox()
         if (!s) throw new Error('no s')
-        await handle.dispatchEvent('pointerdown', {
-            clientX: s.x - 20,
-            clientY: s.y + 10,
-            pointerId: 1
-        })
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: s.x + 60,
-            clientY: s.y + 40,
-            pointerId: 1
-        })
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: s.x + 60,
-            clientY: s.y + 40,
-            pointerId: 1
-        })
+        if (!h) throw new Error('no h')
+
+        // Use Playwright's mouse API for reliable cross-platform behavior
+        // Click on handle to initiate drag
+        await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2)
+        await page.mouse.down()
+        // Move further right to ensure clear movement (snapToCursor centers the 100px element on cursor)
+        await page.mouse.move(s.x + 120, s.y + 40, { steps: 5 })
+        await page.mouse.up()
+
+        await page.waitForTimeout(100)
         const e = await el.boundingBox()
         if (!e) throw new Error('no e')
-        expect(e.x).toBeGreaterThan(s.x + 10)
+        // With snapToCursor and 100px width, element left edge = cursor - 50 = s.x + 120 - 50 = s.x + 70
+        expect(e.x).toBeGreaterThan(s.x + 50)
         expect(Math.abs(e.y - s.y)).toBeLessThan(5)
     })
 
@@ -32,25 +32,19 @@ test.describe('drag/controls', () => {
         await page.goto('/tests/drag/controls?@isPlaywright=true')
         const el = page.getByTestId('drag-controls')
         const handle = page.getByTestId('handle')
+        await el.waitFor({ state: 'visible' })
+        await handle.waitFor({ state: 'visible' })
         const s = await el.boundingBox()
+        const h = await handle.boundingBox()
         if (!s) throw new Error('no s')
+        if (!h) throw new Error('no h')
 
-        await handle.dispatchEvent('pointerdown', {
-            clientX: s.x + 10,
-            clientY: s.y + 10,
-            pointerId: 2
-        })
-        // micro nudge on x
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: s.x + 12,
-            clientY: s.y + 10,
-            pointerId: 2
-        })
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: s.x + 12,
-            clientY: s.y + 10,
-            pointerId: 2
-        })
+        // Use mouse API for micro nudge
+        await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2)
+        await page.mouse.down()
+        // micro nudge on x (just 2px)
+        await page.mouse.move(h.x + h.width / 2 + 2, h.y + h.height / 2, { steps: 2 })
+        await page.mouse.up()
 
         const e = await el.boundingBox()
         if (!e) throw new Error('no e')

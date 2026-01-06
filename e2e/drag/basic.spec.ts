@@ -4,24 +4,15 @@ test.describe('drag/basic', () => {
     test('moves when dragged', async ({ page }) => {
         await page.goto('/tests/drag/basic?@isPlaywright=true')
         const box = page.getByTestId('drag-box')
+        await box.waitFor({ state: 'visible' })
         const start = await box.boundingBox()
         if (!start) throw new Error('no start')
 
-        await box.dispatchEvent('pointerdown', {
-            clientX: start.x + 10,
-            clientY: start.y + 10,
-            pointerId: 1
-        })
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: start.x + 80,
-            clientY: start.y + 40,
-            pointerId: 1
-        })
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: start.x + 80,
-            clientY: start.y + 40,
-            pointerId: 1
-        })
+        // Use Playwright's mouse API for reliable cross-platform behavior
+        await page.mouse.move(start.x + 10, start.y + 10)
+        await page.mouse.down()
+        await page.mouse.move(start.x + 80, start.y + 40, { steps: 5 })
+        await page.mouse.up()
 
         const end = await box.boundingBox()
         if (!end) throw new Error('no end')
@@ -31,31 +22,18 @@ test.describe('drag/basic', () => {
     test('has momentum after release', async ({ page }) => {
         await page.goto('/tests/drag/basic?@isPlaywright=true')
         const box = page.getByTestId('drag-box')
+        await box.waitFor({ state: 'visible' })
         const start = await box.boundingBox()
         if (!start) throw new Error('no start')
 
-        await box.dispatchEvent('pointerdown', {
-            clientX: start.x + 10,
-            clientY: start.y + 10,
-            pointerId: 2
-        })
+        // Use mouse API with delays to generate velocity for momentum
+        await page.mouse.move(start.x + 10, start.y + 10)
+        await page.mouse.down()
         await page.waitForTimeout(40)
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: start.x + 60,
-            clientY: start.y + 20,
-            pointerId: 2
-        })
+        await page.mouse.move(start.x + 60, start.y + 20, { steps: 3 })
         await page.waitForTimeout(40)
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: start.x + 90,
-            clientY: start.y + 30,
-            pointerId: 2
-        })
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: start.x + 90,
-            clientY: start.y + 30,
-            pointerId: 2
-        })
+        await page.mouse.move(start.x + 90, start.y + 30, { steps: 3 })
+        await page.mouse.up()
 
         const baseline = await box.boundingBox()
         if (!baseline) throw new Error('no baseline')
@@ -73,24 +51,15 @@ test.describe('drag/basic', () => {
     test('second drag starts from transformed position', async ({ page }) => {
         await page.goto('/tests/drag/basic?@isPlaywright=true')
         const box = page.getByTestId('drag-box')
+        await box.waitFor({ state: 'visible' })
         const s = await box.boundingBox()
         if (!s) throw new Error('no s')
 
-        await box.dispatchEvent('pointerdown', {
-            clientX: s.x + 10,
-            clientY: s.y + 10,
-            pointerId: 3
-        })
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: s.x + 80,
-            clientY: s.y + 40,
-            pointerId: 3
-        })
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: s.x + 80,
-            clientY: s.y + 40,
-            pointerId: 3
-        })
+        // First drag
+        await page.mouse.move(s.x + 10, s.y + 10)
+        await page.mouse.down()
+        await page.mouse.move(s.x + 80, s.y + 40, { steps: 5 })
+        await page.mouse.up()
 
         // Wait for position to stabilize before starting the second drag (CI flake guard)
         let lastX = NaN
@@ -111,21 +80,12 @@ test.describe('drag/basic', () => {
         const mid = await box.boundingBox()
         if (!mid) throw new Error('no mid')
 
-        await box.dispatchEvent('pointerdown', {
-            clientX: mid.x + 10,
-            clientY: mid.y + 10,
-            pointerId: 4
-        })
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: mid.x + 40,
-            clientY: mid.y + 30,
-            pointerId: 4
-        })
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: mid.x + 40,
-            clientY: mid.y + 30,
-            pointerId: 4
-        })
+        // Second drag
+        await page.mouse.move(mid.x + 10, mid.y + 10)
+        await page.mouse.down()
+        await page.mouse.move(mid.x + 40, mid.y + 30, { steps: 5 })
+        await page.mouse.up()
+
         const end = await box.boundingBox()
         if (!end) throw new Error('no end')
         expect(end.x - mid.x).toBeGreaterThan(10)

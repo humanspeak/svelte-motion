@@ -5,29 +5,19 @@ test.describe('drag/elastic', () => {
         await page.goto('/tests/drag/elastic?@isPlaywright=true')
 
         const box = page.getByTestId('elastic-0')
+        await box.waitFor({ state: 'visible' })
         const start = await box.boundingBox()
         if (!start) throw new Error('no start')
 
         const containerCenterX = start.x + start.width / 2
 
-        const dragRelease = async (id: number) => {
+        const dragRelease = async () => {
             const bb = await box.boundingBox()
             if (!bb) throw new Error('no bb')
-            await box.dispatchEvent('pointerdown', {
-                clientX: bb.x + bb.width / 2,
-                clientY: bb.y + bb.height / 2,
-                pointerId: id
-            })
-            await page.dispatchEvent('body', 'pointermove', {
-                clientX: bb.x + bb.width / 2 + 200,
-                clientY: bb.y + bb.height / 2,
-                pointerId: id
-            })
-            await page.dispatchEvent('body', 'pointerup', {
-                clientX: bb.x + bb.width / 2 + 200,
-                clientY: bb.y + bb.height / 2,
-                pointerId: id
-            })
+            await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2)
+            await page.mouse.down()
+            await page.mouse.move(bb.x + bb.width / 2 + 200, bb.y + bb.height / 2, { steps: 5 })
+            await page.mouse.up()
             await page.waitForTimeout(400)
             const after = await box.boundingBox()
             if (!after) throw new Error('no after')
@@ -37,31 +27,23 @@ test.describe('drag/elastic', () => {
             expect(dx).toBeLessThanOrEqual(32)
         }
 
-        await dragRelease(31)
-        await dragRelease(32)
-        await dragRelease(33)
+        await dragRelease()
+        await dragRelease()
+        await dragRelease()
     })
 
     test('elastic=0 clamps exactly to ±30', async ({ page }) => {
         await page.goto('/tests/drag/elastic?@isPlaywright=true')
         const el = page.getByTestId('elastic-0')
+        await el.waitFor({ state: 'visible' })
         const s = await el.boundingBox()
         if (!s) throw new Error('no s')
-        await el.dispatchEvent('pointerdown', {
-            clientX: s.x + 10,
-            clientY: s.y + 10,
-            pointerId: 1
-        })
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: s.x + 300,
-            clientY: s.y + 10,
-            pointerId: 1
-        })
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: s.x + 300,
-            clientY: s.y + 10,
-            pointerId: 1
-        })
+
+        await page.mouse.move(s.x + 10, s.y + 10)
+        await page.mouse.down()
+        await page.mouse.move(s.x + 300, s.y + 10, { steps: 10 })
+        await page.mouse.up()
+
         // Give CI a little longer to settle and snap exactly to clamp
         await page.waitForTimeout(350)
         const e = await el.boundingBox()
@@ -75,24 +57,14 @@ test.describe('drag/elastic', () => {
         await page.goto('/tests/drag/elastic?@isPlaywright=true')
 
         const box = page.getByTestId('elastic-0')
+        await box.waitFor({ state: 'visible' })
         const start = await box.boundingBox()
         if (!start) throw new Error('no start')
 
-        await box.dispatchEvent('pointerdown', {
-            clientX: start.x + 10,
-            clientY: start.y + 10,
-            pointerId: 1
-        })
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: start.x + 10 + 120,
-            clientY: start.y + 10,
-            pointerId: 1
-        })
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: start.x + 10 + 120,
-            clientY: start.y + 10,
-            pointerId: 1
-        })
+        await page.mouse.move(start.x + 10, start.y + 10)
+        await page.mouse.down()
+        await page.mouse.move(start.x + 10 + 120, start.y + 10, { steps: 5 })
+        await page.mouse.up()
 
         const samples: number[] = []
         for (let i = 0; i < 10; i++) {
@@ -111,50 +83,31 @@ test.describe('drag/elastic', () => {
         await page.goto('/tests/drag/elastic?@isPlaywright=true')
 
         const box = page.getByTestId('elastic-05')
+        await box.waitFor({ state: 'visible' })
         const start = await box.boundingBox()
         if (!start) throw new Error('no start')
 
-        await box.dispatchEvent('pointerdown', {
-            clientX: start.x + 10,
-            clientY: start.y + 10,
-            pointerId: 11
-        })
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: start.x + 120,
-            clientY: start.y + 10,
-            pointerId: 11
-        })
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: start.x + 120,
-            clientY: start.y + 10,
-            pointerId: 11
-        })
+        // First drag
+        await page.mouse.move(start.x + 10, start.y + 10)
+        await page.mouse.down()
+        await page.mouse.move(start.x + 120, start.y + 10, { steps: 5 })
+        await page.mouse.up()
 
         await page.waitForTimeout(400)
         const settled1 = await box.boundingBox()
         if (!settled1) throw new Error('no settled1')
 
-        await box.dispatchEvent('pointerdown', {
-            clientX: settled1.x + 10,
-            clientY: settled1.y + 10,
-            pointerId: 22
-        })
+        // Second drag - start by moving to element
+        await page.mouse.move(settled1.x + 10, settled1.y + 10)
+        await page.mouse.down()
 
         const afterDown = await box.boundingBox()
         if (!afterDown) throw new Error('no afterDown')
         expect(Math.abs(afterDown.x - settled1.x)).toBeLessThan(1.5)
 
         const LIMIT = 30
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: settled1.x + 10 + 200,
-            clientY: settled1.y + 10,
-            pointerId: 22
-        })
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: settled1.x + 10 + 200,
-            clientY: settled1.y + 10,
-            pointerId: 22
-        })
+        await page.mouse.move(settled1.x + 10 + 200, settled1.y + 10, { steps: 5 })
+        await page.mouse.up()
 
         let lastX = NaN
         let stableCount = 0
@@ -177,49 +130,33 @@ test.describe('drag/elastic', () => {
         expect(absClamp).toBeGreaterThanOrEqual(LIMIT - 2)
         expect(absClamp).toBeLessThanOrEqual(LIMIT + 2)
     })
+
     test('second drag clamps from new origin', async ({ page }) => {
         await page.goto('/tests/drag/elastic?@isPlaywright=true')
         const el = page.getByTestId('elastic-0')
+        await el.waitFor({ state: 'visible' })
         const s = await el.boundingBox()
         if (!s) throw new Error('no s')
-        await el.dispatchEvent('pointerdown', {
-            clientX: s.x + 10,
-            clientY: s.y + 10,
-            pointerId: 2
-        })
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: s.x + 300,
-            clientY: s.y + 10,
-            pointerId: 2
-        })
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: s.x + 300,
-            clientY: s.y + 10,
-            pointerId: 2
-        })
+
+        // First drag
+        await page.mouse.move(s.x + 10, s.y + 10)
+        await page.mouse.down()
+        await page.mouse.move(s.x + 300, s.y + 10, { steps: 10 })
+        await page.mouse.up()
         await page.waitForTimeout(200)
+
         const mid = await el.boundingBox()
         if (!mid) throw new Error('no mid')
 
-        await el.dispatchEvent('pointerdown', {
-            clientX: mid.x + 10,
-            clientY: mid.y + 10,
-            pointerId: 3
-        })
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: mid.x + 300,
-            clientY: mid.y + 10,
-            pointerId: 3
-        })
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: mid.x + 300,
-            clientY: mid.y + 10,
-            pointerId: 3
-        })
+        // Second drag
+        await page.mouse.move(mid.x + 10, mid.y + 10)
+        await page.mouse.down()
+        await page.mouse.move(mid.x + 300, mid.y + 10, { steps: 10 })
+        await page.mouse.up()
         await page.waitForTimeout(200)
+
         const end = await el.boundingBox()
         if (!end) throw new Error('no end')
-        // const dx = Math.round(end.x - mid.x)
         // With pixel constraints anchored to base 0, the element's absolute x will continue to be clamped to +30.
         // The delta from mid may be 0 if both clamps resolve to the same absolute bound. Assert absolute clamp.
         const absClamp = Math.round(end.x - s.x)

@@ -7,6 +7,7 @@ test.describe('drag/lock-direction', () => {
         // Select container and draggable box
         const container = page.getByTestId('lock-container')
         const box = page.getByTestId('lock-box')
+        await box.waitFor({ state: 'visible' })
 
         const containerBB = await container.boundingBox()
         const startBB = await box.boundingBox()
@@ -23,12 +24,9 @@ test.describe('drag/lock-direction', () => {
             if (!bb) throw new Error('Missing box bounding box')
 
             // Start near the box center
-            const down = { x: bb.x + bb.width / 2, y: bb.y + bb.height / 2, id: 111 + i }
-            await box.dispatchEvent('pointerdown', {
-                clientX: down.x,
-                clientY: down.y,
-                pointerId: down.id
-            })
+            const down = { x: bb.x + bb.width / 2, y: bb.y + bb.height / 2 }
+            await page.mouse.move(down.x, down.y)
+            await page.mouse.down()
 
             // Choose an axis to pull strongly to engage direction lock
             const pullX = Math.random() < 0.5
@@ -37,29 +35,17 @@ test.describe('drag/lock-direction', () => {
                 x: down.x + (pullX ? (Math.random() < 0.5 ? -1 : 1) * pullDistance : 0),
                 y: down.y + (!pullX ? (Math.random() < 0.5 ? -1 : 1) * pullDistance : 0)
             }
-            await page.dispatchEvent('body', 'pointermove', {
-                clientX: pull.x,
-                clientY: pull.y,
-                pointerId: down.id
-            })
+            await page.mouse.move(pull.x, pull.y, { steps: 5 })
 
             // Inject random jitter across both axes
             const JITTER = 15
             for (let j = 0; j < 10; j++) {
                 const jx = pull.x + (Math.random() - 0.5) * 2 * JITTER
                 const jy = pull.y + (Math.random() - 0.5) * 2 * JITTER
-                await page.dispatchEvent('body', 'pointermove', {
-                    clientX: jx,
-                    clientY: jy,
-                    pointerId: down.id
-                })
+                await page.mouse.move(jx, jy)
             }
 
-            await page.dispatchEvent('body', 'pointerup', {
-                clientX: pull.x,
-                clientY: pull.y,
-                pointerId: down.id
-            })
+            await page.mouse.up()
 
             // Wait for momentum + spring settle
             await page.waitForTimeout(800)

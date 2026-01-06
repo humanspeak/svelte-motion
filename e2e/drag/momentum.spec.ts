@@ -4,28 +4,19 @@ test.describe('drag/momentum', () => {
     test('continues moving after release', async ({ page }) => {
         await page.goto('/tests/drag/momentum?@isPlaywright=true')
         const el = page.getByTestId('drag-momentum')
+        await el.waitFor({ state: 'visible' })
         const s = await el.boundingBox()
         if (!s) throw new Error('no s')
-        await el.dispatchEvent('pointerdown', {
-            clientX: s.x + 10,
-            clientY: s.y + 10,
-            pointerId: 1
-        })
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: s.x + 60,
-            clientY: s.y + 10,
-            pointerId: 1
-        })
-        await page.dispatchEvent('body', 'pointermove', {
-            clientX: s.x + 120,
-            clientY: s.y + 10,
-            pointerId: 1
-        })
-        await page.dispatchEvent('body', 'pointerup', {
-            clientX: s.x + 120,
-            clientY: s.y + 10,
-            pointerId: 1
-        })
+
+        // Use Playwright's mouse API with multiple moves to generate velocity
+        await page.mouse.move(s.x + 10, s.y + 10)
+        await page.mouse.down()
+        await page.waitForTimeout(20)
+        await page.mouse.move(s.x + 60, s.y + 10, { steps: 3 })
+        await page.waitForTimeout(20)
+        await page.mouse.move(s.x + 120, s.y + 10, { steps: 3 })
+        await page.mouse.up()
+
         const baseline = await el.boundingBox()
         if (!baseline) throw new Error('no baseline')
         const samples: number[] = []
