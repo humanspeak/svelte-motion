@@ -195,4 +195,87 @@ test.describe('AnimatePresence re-entry animation', () => {
         // This is the critical assertion - proves animation happened
         expect(hasAnimatedValues).toBe(true)
     })
+
+    test('multiple re-entries all animate correctly', async ({ page }) => {
+        await page.goto('/tests/animate-presence/basic?@isPlaywright=true')
+
+        const toggle = page.locator('[data-testid="toggle"]')
+
+        // Initial appearance (no animation due to initial={false})
+        await page.waitForFunction(
+            () => {
+                const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+                if (!el) return false
+                const styles = getComputedStyle(el)
+                return parseFloat(styles.opacity) >= 0.99
+            },
+            { timeout: 3000 }
+        )
+
+        // Perform multiple hide/show cycles
+        for (let cycle = 1; cycle <= 3; cycle++) {
+            // Hide
+            await toggle.click()
+            await page.waitForFunction(() => !document.querySelector('[data-testid="box"]'), {
+                timeout: 5000
+            })
+
+            // Show again
+            await toggle.click()
+
+            // Capture animation progression for this cycle
+            const samples: { opacity: number; scale: number | null }[] = []
+            const startTime = Date.now()
+
+            while (Date.now() - startTime < 1000 && samples.length < 15) {
+                const sample = await page.evaluate(() => {
+                    const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+                    if (!el) return null
+                    const styles = getComputedStyle(el)
+                    const opacity = parseFloat(styles.opacity)
+                    const transform = styles.transform
+
+                    let scale: number | null = null
+                    if (transform === 'none') {
+                        scale = 1
+                    } else {
+                        const matrixMatch = transform.match(/matrix\(([^)]+)\)/)
+                        if (matrixMatch) {
+                            const values = matrixMatch[1]
+                                .split(',')
+                                .map((v) => parseFloat(v.trim()))
+                            if (values.length >= 4) {
+                                scale = values[0]
+                            }
+                        }
+                    }
+
+                    return { opacity, scale }
+                })
+
+                if (sample) {
+                    samples.push(sample)
+                }
+                await page.waitForTimeout(50)
+            }
+
+            // Verify animation happened for this cycle
+            const hasAnimatedValues = samples.some(
+                (s) => s.opacity < 0.95 || (s.scale !== null && s.scale < 0.95)
+            )
+
+            expect(hasAnimatedValues).toBe(true)
+
+            // Wait for animation to complete before next cycle
+            await page.waitForFunction(
+                () => {
+                    const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+                    if (!el) return false
+                    const styles = getComputedStyle(el)
+                    return parseFloat(styles.opacity) >= 0.99
+                },
+                { timeout: 3000 }
+            )
+        }
+    })
 })

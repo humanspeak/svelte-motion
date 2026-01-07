@@ -289,11 +289,15 @@
                 : styleProp,
             // Apply initialKeyframes as inline styles during mounting and initial phases
             // The animation starts in RAF after 'initial' phase, so we need styles until then
-            // Once animation is running (ready/animated), Motion controls these properties
+            // When ready AND we have initialKeyframes: DON'T set any animated properties!
+            // WAAPI is controlling them and inline styles can override the animation
             isLoaded === 'mounting' || isLoaded === 'initial'
                 ? (initialKeyframes as unknown as Record<string, unknown>)
                 : undefined,
-            resolvedAnimate as unknown as Record<string, unknown>
+            // Only use resolvedAnimate as fallback when we DON'T have initialKeyframes
+            // If we have initialKeyframes, the enter animation is running - setting
+            // inline styles to the target values will override the WAAPI animation
+            initialKeyframes ? undefined : (resolvedAnimate as unknown as Record<string, unknown>)
         ),
         class: classProp
     })
@@ -379,6 +383,7 @@
             pwLog('[motion] runAnimation bailing - no element or resolvedAnimate')
             return
         }
+
         const transitionAnimate: MotionTransition = mergedTransition ?? {}
         let payload = $state.snapshot(resolvedAnimate)
 
@@ -663,8 +668,15 @@
                     // state (from inline styles) before they're removed.
                     runAnimation()
 
-                    // Now we can update isLoaded - the animation is already running
-                    isLoaded = 'ready'
+                    // CRITICAL: Wait for the next animation frame before changing isLoaded.
+                    // This gives WAAPI time to:
+                    // 1. Parse and create the animation
+                    // 2. Start the animation layer
+                    // 3. Lock in the "from" values from current computed style
+                    // Only THEN can we safely clear inline styles without killing the animation
+                    requestAnimationFrame(() => {
+                        isLoaded = 'ready'
+                    })
                 })
             } else {
                 pwLog('[motion] path: no initialKeyframes, skip to ready')
