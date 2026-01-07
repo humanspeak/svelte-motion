@@ -349,6 +349,11 @@ export function createAnimatePresenceContext(context: {
             finalTransition
         })
 
+        // Capture the element reference for this specific exit animation
+        // This prevents race conditions where re-entry registers a new element with the same key
+        // before this exit animation completes
+        const exitingElement = child.element
+
         // Start exit and track in-flight count
         inFlightExits += 1
         requestAnimationFrame(() => {
@@ -363,7 +368,15 @@ export function createAnimatePresenceContext(context: {
                         // ignore
                     }
                     clone.remove()
-                    children.delete(key)
+
+                    // Only delete from children map if the current registration is for the SAME element
+                    // If a re-entry happened while we were animating, a new element is registered
+                    // and we should NOT delete it
+                    const currentChild = children.get(key)
+                    if (currentChild && currentChild.element === exitingElement) {
+                        children.delete(key)
+                    }
+
                     inFlightExits -= 1
                     if (inFlightExits === 0) {
                         pwLog('[presence] all exits complete, calling onExitComplete')

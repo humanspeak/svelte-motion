@@ -413,6 +413,8 @@
     let mountedWithInitialFalse = $state(false)
     // Track if the initial->animate transition has already been triggered by main effect
     let initialAnimationTriggered = $state(false)
+    // Track if we've run the animation for object animateProp on this mount
+    let objectAnimateRanOnMount = $state(false)
     const currentAnimateKey = $derived(
         typeof animateProp === 'string'
             ? animateProp
@@ -532,6 +534,10 @@
         if (initialAnimationTriggered) {
             pwLog('[motion] effect: skipping, initial animation already triggered')
             initialAnimationTriggered = false
+            // Also mark object animate as ran to prevent duplicate runs from effect re-triggers
+            if (animateProp && typeof animateProp !== 'string') {
+                objectAnimateRanOnMount = true
+            }
             return
         }
         if (typeof animateProp === 'string') {
@@ -540,9 +546,13 @@
                 runAnimation()
             }
         } else if (animateProp) {
-            // Object animate props - always run
-            lastRanVariantKey = undefined
-            runAnimation()
+            // Object animate props - only run if we haven't already animated on this mount
+            // This prevents duplicate animations when Svelte re-triggers the effect
+            if (!objectAnimateRanOnMount) {
+                objectAnimateRanOnMount = true
+                lastRanVariantKey = undefined
+                runAnimation()
+            }
         }
     })
 
