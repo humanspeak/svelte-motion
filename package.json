@@ -82,8 +82,8 @@
         }
     },
     "dependencies": {
-        "motion": "^12.24.10",
-        "motion-dom": "^12.24.10"
+        "motion": "^12.24.12",
+        "motion-dom": "^12.24.11"
     },
     "devDependencies": {
         "@changesets/cli": "^2.29.8",
@@ -107,7 +107,7 @@
         "eslint": "^9.39.2",
         "eslint-config-prettier": "10.1.8",
         "eslint-plugin-import": "2.32.0",
-        "eslint-plugin-svelte": "3.13.1",
+        "eslint-plugin-svelte": "3.14.0",
         "eslint-plugin-unused-imports": "4.3.0",
         "esm-env": "^1.2.2",
         "globals": "^17.0.0",
