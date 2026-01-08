@@ -278,4 +278,66 @@ test.describe('AnimatePresence re-entry animation', () => {
             )
         }
     })
+
+    test('rapid toggle leaves only one element after animations complete', async ({ page }) => {
+        await page.goto('/tests/animate-presence/basic?@isPlaywright=true')
+
+        const toggle = page.locator('[data-testid="toggle"]')
+
+        // 1. Initial load - verify 1 box
+        await page.waitForFunction(
+            () => {
+                const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+                if (!el) return false
+                const styles = getComputedStyle(el)
+                return parseFloat(styles.opacity) >= 0.99
+            },
+            { timeout: 3000 }
+        )
+
+        const initialBoxCount = await page.evaluate(
+            () => document.querySelectorAll('[data-testid="box"]').length
+        )
+        expect(initialBoxCount).toBe(1)
+
+        // 2. Click Hide - start exit animation
+        await toggle.click()
+
+        // 3. Wait only 100ms (less than 1s animation duration)
+        await page.waitForTimeout(100)
+
+        // Verify clone exists (exit animation in progress)
+        const clonesDuringExit = await page.evaluate(
+            () => document.querySelectorAll('[data-clone="true"]').length
+        )
+        expect(clonesDuringExit).toBe(1)
+
+        // 4. Click Show - start enter animation while exit is still running
+        await toggle.click()
+
+        // 5. During transition, both clone and new box should exist
+        await page.waitForTimeout(100)
+        const elementsDuringTransition = await page.evaluate(() => ({
+            // Use :not([data-clone]) to exclude clones which also have data-testid="box"
+            boxes: document.querySelectorAll('[data-testid="box"]:not([data-clone="true"])').length,
+            clones: document.querySelectorAll('[data-clone="true"]').length
+        }))
+
+        // During sync mode, we expect both to be visible
+        expect(elementsDuringTransition.boxes).toBe(1) // New box (excluding clone)
+        expect(elementsDuringTransition.clones).toBe(1) // Exiting clone
+
+        // 6. Wait for ALL animations to complete (exit is 1s, enter is also animating)
+        await page.waitForTimeout(2000)
+
+        // 7. Verify final state: EXACTLY 1 box, ZERO clones
+        const finalState = await page.evaluate(() => ({
+            // Use :not([data-clone]) to exclude clones which also have data-testid="box"
+            boxes: document.querySelectorAll('[data-testid="box"]:not([data-clone="true"])').length,
+            clones: document.querySelectorAll('[data-clone="true"]').length
+        }))
+
+        expect(finalState.boxes).toBe(1)
+        expect(finalState.clones).toBe(0)
+    })
 })

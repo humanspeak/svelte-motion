@@ -369,13 +369,34 @@ export function createAnimatePresenceContext(context: {
                     }
                     clone.remove()
 
+                    // Log clone removal and element counts for debugging rapid toggle
+                    pwLog('[presence] clone REMOVED from DOM', {
+                        key,
+                        clonesInDOM: document.querySelectorAll('[data-clone="true"]').length,
+                        boxesInDOM: document.querySelectorAll('[data-testid="box"]').length
+                    })
+
                     // Only delete from children map if the current registration is for the SAME element
                     // If a re-entry happened while we were animating, a new element is registered
                     // and we should NOT delete it
                     const currentChild = children.get(key)
                     if (currentChild && currentChild.element === exitingElement) {
                         children.delete(key)
+                        pwLog('[presence] child deleted from map (same element)', { key })
+                    } else {
+                        pwLog('[presence] child NOT deleted (re-entry registered new element)', {
+                            key,
+                            hasCurrentChild: !!currentChild,
+                            isSameElement: currentChild?.element === exitingElement
+                        })
                     }
+
+                    // Log final state
+                    pwLog('[presence] element count after exit', {
+                        childrenMapSize: children.size,
+                        inFlightExits: inFlightExits - 1,
+                        clonesInDOM: document.querySelectorAll('[data-clone="true"]').length
+                    })
 
                     inFlightExits -= 1
                     if (inFlightExits === 0) {
