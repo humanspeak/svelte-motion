@@ -61,13 +61,9 @@ export default defineConfig({
                 'svelte.config.js'
             ]
         },
-        poolOptions: {
-            threads: {
-                singleThread: false,
-                maxThreads: 4,
-                minThreads: 1
-            }
-        },
+        // Vitest 4: pool options are now top-level
+        maxWorkers: 4,
+        minWorkers: 1,
         testTimeout: 10000,
         hookTimeout: 10000,
         reporters: process.env.CI ? ['verbose'] : ['default']
