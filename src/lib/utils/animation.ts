@@ -1,3 +1,4 @@
+import { pwLog } from '$lib/utils/log'
 import { hasFinishedPromise, isPromiseLike } from '$lib/utils/promise'
 import { type AnimationOptions, type DOMKeyframesDefinition, animate } from 'motion'
 
@@ -45,6 +46,14 @@ export const animateWithLifecycle = (
     onComplete?: (def: unknown) => void
 ): void => {
     const payload = keyframes
+    pwLog('[animateWithLifecycle] starting', {
+        keyframes: payload,
+        transition,
+        currentOpacity: el.style.opacity,
+        currentTransform: el.style.transform,
+        computedOpacity: getComputedStyle(el).opacity,
+        computedTransform: getComputedStyle(el).transform
+    })
     onStart?.(payload)
     const controls = animate(el, payload, transition)
     if (hasFinishedPromise(controls as unknown as { finished?: unknown })) {

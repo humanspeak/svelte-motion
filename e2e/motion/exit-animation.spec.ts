@@ -10,7 +10,7 @@ function parseScale(transform: string): number | null {
 
 test.describe('AnimatePresence exit animation', () => {
     test('animates out when toggled off with preserved shape', async ({ page }) => {
-        await page.goto('/tests/motion/animate-presence?@isPlaywright=true')
+        await page.goto('/tests/animate-presence/basic?@isPlaywright=true')
 
         const box = page.locator('[data-testid="box"]')
         const toggle = page.locator('[data-testid="toggle"]')

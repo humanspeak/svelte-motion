@@ -70,6 +70,7 @@
         <AnimatePresence>
             {#key selectedTab.label}
                 <motion.div
+                    key={selectedTab.label}
                     initial={{ y: 10, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: -10, opacity: 0 }}

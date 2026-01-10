@@ -215,6 +215,21 @@ export type DragControls = {
  * Base motion props shared by all motion components.
  */
 export type MotionProps = {
+    /**
+     * Unique key for AnimatePresence tracking.
+     * Required when inside an AnimatePresence component.
+     * Used to track enter/exit state and determine whether to animate.
+     *
+     * @example
+     * ```svelte
+     * <AnimatePresence>
+     *   {#if isVisible}
+     *     <motion.div key="box" exit={{ opacity: 0 }} />
+     *   {/if}
+     * </AnimatePresence>
+     * ```
+     */
+    key?: string
     /** Variants define named animation states */
     variants?: Variants
     /** Initial state of the animation (object or variant key) */

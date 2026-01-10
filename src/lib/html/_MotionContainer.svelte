@@ -52,6 +52,7 @@
     let {
         children,
         tag = 'div',
+        key: keyProp,
         variants: variantsProp,
         initial: initialProp,
         animate: animateProp,
@@ -95,8 +96,19 @@
     let dataPath = $state<number>(-1)
     const motionConfig = $derived(getMotionConfig())
 
-    // Generate unique key for presence tracking
-    const presenceKey = `motion-${Math.random().toString(36).slice(2)}`
+    // Get presence context to check if we're inside AnimatePresence
+    const context = getAnimatePresenceContext()
+
+    // Validate key prop when inside AnimatePresence
+    if (context && !keyProp) {
+        throw new Error(
+            'motion elements inside AnimatePresence must have a `key` prop. ' +
+                'Example: <motion.div key="unique-id" />'
+        )
+    }
+
+    // Use the provided key for presence tracking
+    const presenceKey = keyProp ?? `motion-${Math.random().toString(36).slice(2)}`
 
     // Compute merged transition without mutating props to avoid effect write loops
     const mergedTransition = $derived<AnimationOptions>(
@@ -118,12 +130,10 @@
         }
     })
 
-    const context = getAnimatePresenceContext()
     // Update presence context with current state when element is ready and has size
     $effect(() => {
         if (!(context && element && isLoaded === 'ready')) return
 
-        let rafId: number | null = null
         let lastWidth = 0
         let lastHeight = 0
         let stopped = false
@@ -132,11 +142,6 @@
             if (stopped || !element || !element.isConnected) return
             const rect = element.getBoundingClientRect()
             const style = getComputedStyle(element)
-            pwLog('[motion][measure]', {
-                w: rect.width,
-                h: rect.height,
-                transform: style.transform
-            })
             if (
                 Math.abs(rect.width - lastWidth) > 0.5 ||
                 Math.abs(rect.height - lastHeight) > 0.5
@@ -149,6 +154,7 @@
 
         // Observe size changes
         const resizeObserver = new ResizeObserver(() => {
+            pwLog('[motion][resize]', { key: presenceKey })
             measureAndUpdate()
         })
         try {
@@ -157,15 +163,8 @@
             // Ignore
         }
 
-        // Also poll on RAF to catch transform/layout-driven changes
-        const tick = () => {
-            if (stopped) return
-            measureAndUpdate()
-            rafId = requestAnimationFrame(tick)
-        }
-        rafId = requestAnimationFrame(tick)
-
         // Initial measure once
+        pwLog('[motion][initial-measure]', { key: presenceKey })
         measureAndUpdate()
 
         return () => {
@@ -175,7 +174,6 @@
             } catch {
                 // Ignore
             }
-            if (rafId) cancelAnimationFrame(rafId)
         }
     })
 
@@ -217,13 +215,23 @@
     )
 
     // Propagate initial={false} to children BEFORE setting variant context
+    // AnimatePresence initial={false} only applies on first render - check shouldAnimateEnter(key)
     const parentInitialFalse = getInitialFalseContext()
-    const effectiveInitialProp =
-        initialProp !== undefined
-            ? initialProp
-            : parentInitialFalse && variantsProp
-              ? false
-              : undefined
+    const presenceSkipEnter = context ? !context.shouldAnimateEnter(presenceKey) : false
+    const effectiveInitialProp = presenceSkipEnter
+        ? false
+        : initialProp !== undefined
+          ? initialProp
+          : parentInitialFalse && variantsProp
+            ? false
+            : undefined
+
+    pwLog('[motion] mount', {
+        presenceSkipEnter,
+        effectiveInitialProp,
+        initialProp,
+        animateProp
+    })
 
     if (initialProp === false) {
         setInitialFalseContext(true)
@@ -279,8 +287,20 @@
             initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting'
                 ? `${styleProp || ''};visibility:hidden`
                 : styleProp,
-            initialKeyframes as unknown as Record<string, unknown>,
-            resolvedAnimate as unknown as Record<string, unknown>
+            // Apply initialKeyframes as inline styles during mounting and initial phases
+            // The animation starts in RAF after 'initial' phase, so we need styles until then
+            // When ready AND we have initialKeyframes: DON'T set any animated properties!
+            // WAAPI is controlling them and inline styles can override the animation
+            isLoaded === 'mounting' || isLoaded === 'initial'
+                ? (initialKeyframes as unknown as Record<string, unknown>)
+                : undefined,
+            // Only use resolvedAnimate as fallback when we DON'T have initialKeyframes
+            // If we have initialKeyframes, the enter animation is running - setting
+            // inline styles to the target values will override the WAAPI animation
+            // Use isNotEmpty to handle empty initial objects (initial: {}) which should fallback
+            isNotEmpty(initialKeyframes)
+                ? undefined
+                : (resolvedAnimate as unknown as Record<string, unknown>)
         ),
         class: classProp
     })
@@ -357,7 +377,16 @@
     })
 
     const runAnimation = () => {
-        if (!element || !resolvedAnimate) return
+        pwLog('[motion] runAnimation called', {
+            hasElement: !!element,
+            resolvedAnimate,
+            mergedTransition
+        })
+        if (!element || !resolvedAnimate) {
+            pwLog('[motion] runAnimation bailing - no element or resolvedAnimate')
+            return
+        }
+
         const transitionAnimate: MotionTransition = mergedTransition ?? {}
         let payload = $state.snapshot(resolvedAnimate)
 
@@ -373,6 +402,11 @@
             ;(element as HTMLElement).style.removeProperty('stroke-dashoffset')
         }
 
+        pwLog('[motion] runAnimation animating', {
+            payload,
+            transitionAnimate
+        })
+
         animateWithLifecycle(
             element,
             payload as unknown as DOMKeyframesDefinition,
@@ -385,6 +419,12 @@
     // Track the last variant key we ran to avoid re-running on mount
     let lastRanVariantKey = $state<string | undefined>(undefined)
     let mountedWithInitialFalse = $state(false)
+    // Track if the initial->animate transition has already been triggered by main effect
+    let initialAnimationTriggered = $state(false)
+    // Track if we've run the animation for object animateProp on this mount
+    let objectAnimateRanOnMount = $state(false)
+    // Track the serialized animateProp to detect changes for object animate props
+    let lastAnimatePropJson = $state<string | undefined>(undefined)
     const currentAnimateKey = $derived(
         typeof animateProp === 'string'
             ? animateProp
@@ -500,15 +540,39 @@
             // Variant has changed, so we should animate
             mountedWithInitialFalse = false
         }
+        // Skip if the initial animation was already triggered by the main effect
+        if (initialAnimationTriggered) {
+            pwLog('[motion] effect: skipping, initial animation already triggered')
+            initialAnimationTriggered = false
+            // Also mark object animate as ran to prevent duplicate runs from effect re-triggers
+            if (animateProp && typeof animateProp !== 'string') {
+                objectAnimateRanOnMount = true
+            }
+            return
+        }
         if (typeof animateProp === 'string') {
             if (lastRanVariantKey !== animateProp) {
                 lastRanVariantKey = animateProp
                 runAnimation()
             }
         } else if (animateProp) {
-            // Object animate props - always run
-            lastRanVariantKey = undefined
-            runAnimation()
+            // Object animate props - detect if the prop actually changed
+            const currentJson = JSON.stringify(animateProp)
+            const propChanged = lastAnimatePropJson !== currentJson
+
+            // Reset flag if animate prop changed
+            if (propChanged) {
+                objectAnimateRanOnMount = false
+                lastAnimatePropJson = currentJson
+            }
+
+            // Only run if we haven't already animated on this mount (or prop changed)
+            // This prevents duplicate animations when Svelte re-triggers the effect
+            if (!objectAnimateRanOnMount) {
+                objectAnimateRanOnMount = true
+                lastRanVariantKey = undefined
+                runAnimation()
+            }
         }
     })
 
@@ -539,9 +603,18 @@
     $effect(() => {
         if (!(element && isLoaded === 'mounting')) return
 
+        pwLog('[motion] main effect running', {
+            effectiveAnimate: !!effectiveAnimate,
+            effectiveInitialProp,
+            resolvedAnimate,
+            initialKeyframes,
+            hasInitialKeyframes: isNotEmpty(initialKeyframes)
+        })
+
         if (effectiveAnimate) {
             // If initial={false}, render at animate state immediately with no transition
             if (effectiveInitialProp === false && resolvedAnimate) {
+                pwLog('[motion] path: initial=false, skip to animate')
                 // Use Motion's animate() with duration:0 so it takes control of these properties
                 // This prevents inline styles from pinning the properties during future animations
                 let snapshot = $state.snapshot(resolvedAnimate) as Record<string, unknown>
@@ -555,6 +628,7 @@
                 dataPath = 5
                 isLoaded = 'ready'
             } else if (isNotEmpty(initialKeyframes)) {
+                pwLog('[motion] path: has initialKeyframes, will animate to target')
                 // Apply initial instantly BEFORE exposing 'initial' state
                 const transformedInitial = transformSVGPathProperties(
                     element!,
@@ -598,11 +672,29 @@
                     if (isPlaywright) {
                         await sleep(10)
                     }
-                    isLoaded = 'ready'
+                    pwLog('[motion] RAF: promoting to ready and running animation')
 
+                    // Mark that we're triggering the initial animation to prevent duplicate runs
+                    initialAnimationTriggered = true
+
+                    // IMPORTANT: Start the animation BEFORE changing isLoaded.
+                    // When isLoaded changes to 'ready', Svelte will reactively remove the
+                    // initial inline styles. We need the animation to capture the current
+                    // state (from inline styles) before they're removed.
                     runAnimation()
+
+                    // CRITICAL: Wait for the next animation frame before changing isLoaded.
+                    // This gives WAAPI time to:
+                    // 1. Parse and create the animation
+                    // 2. Start the animation layer
+                    // 3. Lock in the "from" values from current computed style
+                    // Only THEN can we safely clear inline styles without killing the animation
+                    requestAnimationFrame(() => {
+                        isLoaded = 'ready'
+                    })
                 })
             } else {
+                pwLog('[motion] path: no initialKeyframes, skip to ready')
                 dataPath = 2
                 isLoaded = 'ready'
                 // If we're inheriting a variant and parent had initial={false}, apply the variant instantly

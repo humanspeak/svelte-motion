@@ -1,5 +1,6 @@
 import type { MotionExit, MotionTransition } from '$lib/types'
 import { mergeTransitions } from '$lib/utils/animation'
+import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import { getContext, onDestroy, setContext } from 'svelte'
 
@@ -52,6 +53,14 @@ const resetTransforms = (element: HTMLElement): void => {
  * so we can clone and animate them out after removal.
  */
 export type AnimatePresenceContext = {
+    /** When false, children skip their enter animation on initial mount. */
+    initial: boolean
+    /**
+     * Returns true if a child with the given key should animate its enter.
+     * Returns false only during first render when initial={false} AND the key has never been seen.
+     * Re-entries (after exit) always animate.
+     */
+    shouldAnimateEnter: (key: string) => boolean
     /** Called when all exit animations complete (optional). */
     onExitComplete?: () => void
     /** Register a child element and its exit definition. */
@@ -102,8 +111,81 @@ export type AnimatePresenceContext = {
  * @returns A presence context with register/update/unregister APIs.
  */
 export function createAnimatePresenceContext(context: {
+    initial?: boolean
     onExitComplete?: () => void
 }): AnimatePresenceContext {
+    // Default initial to true (animate on first mount) unless explicitly false
+    const initial = context.initial !== false
+
+    // Track whether we're still in the initial render phase
+    // This is true only when initial={false} and we haven't completed the first frame
+    let isInitialRenderPhase = context.initial === false
+
+    // Track keys that have been seen (registered at least once)
+    const seenKeys = new Set<string>()
+
+    // Track keys that have exited (unregistered after being registered)
+    const exitedKeys = new Set<string>()
+
+    // After first frame, mark initial render phase as complete
+    // Guard for SSR - requestAnimationFrame only exists in browser
+    if (isInitialRenderPhase && typeof window !== 'undefined') {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                pwLog('[presence] initial render phase complete, enabling animations for new keys')
+                isInitialRenderPhase = false
+            })
+        })
+    }
+
+    /**
+     * Determine if a child with the given key should animate its enter.
+     *
+     * - If we're past the initial render phase → always animate
+     * - If key has previously exited → animate (re-entry)
+     * - If key has never been seen AND we're in initial render phase → skip animation
+     */
+    const shouldAnimateEnter = (key: string): boolean => {
+        // If the key has previously exited, it's a re-entry - always animate
+        if (exitedKeys.has(key)) {
+            pwLog('[presence] shouldAnimateEnter', {
+                key,
+                result: true,
+                reason: 're-entry after exit'
+            })
+            return true
+        }
+
+        // If we're past the initial render phase, all new entries animate
+        if (!isInitialRenderPhase) {
+            pwLog('[presence] shouldAnimateEnter', {
+                key,
+                result: true,
+                reason: 'past initial render phase'
+            })
+            return true
+        }
+
+        // We're in initial render phase and key hasn't exited before
+        // Check if key has been seen - if not, skip animation (initial={false} behavior)
+        const hasBeenSeen = seenKeys.has(key)
+        const shouldAnimate = hasBeenSeen // Only animate if we've seen it before (shouldn't happen in initial phase)
+
+        pwLog('[presence] shouldAnimateEnter', {
+            key,
+            result: shouldAnimate,
+            reason: shouldAnimate ? 'previously seen' : 'first appearance during initial render'
+        })
+
+        return shouldAnimate
+    }
+
+    pwLog('[presence] createContext', {
+        initial,
+        isInitialRenderPhase,
+        onExitComplete: !!context.onExitComplete
+    })
+
     const children = new Map<string, PresenceChild>()
     // Track number of in-flight exit animations to invoke onExitComplete once
     let inFlightExits = 0
@@ -119,6 +201,24 @@ export function createAnimatePresenceContext(context: {
     ) => {
         const initialRect = element.getBoundingClientRect()
         const initialStyle = getComputedStyle(element)
+
+        // Mark this key as seen
+        const wasExited = exitedKeys.has(key)
+        seenKeys.add(key)
+
+        // If this key was previously exited, remove it from exitedKeys (it's re-entering)
+        if (wasExited) {
+            exitedKeys.delete(key)
+        }
+
+        pwLog('[presence] registerChild', {
+            key,
+            hasExit: !!exit,
+            exit,
+            wasExited,
+            rect: { w: initialRect.width, h: initialRect.height }
+        })
+
         children.set(key, {
             element,
             exit,
@@ -145,7 +245,18 @@ export function createAnimatePresenceContext(context: {
      */
     const unregisterChild = (key: string) => {
         const child = children.get(key)
+        pwLog('[presence] unregisterChild', {
+            key,
+            found: !!child,
+            hasExit: !!child?.exit,
+            exit: child?.exit
+        })
+
+        // Mark this key as exited so re-entry will animate
+        exitedKeys.add(key)
+
         if (!child || !child.exit) {
+            pwLog('[presence] unregisterChild - no exit animation, removing immediately')
             children.delete(key)
             return
         }
@@ -210,6 +321,10 @@ export function createAnimatePresenceContext(context: {
         clone.setAttribute('data-clone', 'true')
         clone.setAttribute('data-exiting', 'true')
 
+        pwLog('[presence] clone created', {
+            key,
+            rect: { w: rect.width, h: rect.height, top: rect.top, left: rect.left }
+        })
         parent.appendChild(clone)
 
         // Merge transitions: default < mergedTransition < exit.transition (last wins)
@@ -225,12 +340,24 @@ export function createAnimatePresenceContext(context: {
         /* trunk-ignore(eslint/@typescript-eslint/no-unused-vars) */
         const { transition: _ignoredTransition, ...exitKeyframes } = rawExit
 
+        pwLog('[presence] starting exit animation', {
+            key,
+            exitKeyframes,
+            finalTransition
+        })
+
+        // Capture the element reference for this specific exit animation
+        // This prevents race conditions where re-entry registers a new element with the same key
+        // before this exit animation completes
+        const exitingElement = child.element
+
         // Start exit and track in-flight count
         inFlightExits += 1
         requestAnimationFrame(() => {
             animate(clone, exitKeyframes as unknown as DOMKeyframesDefinition, finalTransition)
                 .finished.catch(() => {})
                 .finally(() => {
+                    pwLog('[presence] exit animation complete', { key })
                     // Reset elevated styles then remove
                     try {
                         clone.style.zIndex = ''
@@ -238,9 +365,39 @@ export function createAnimatePresenceContext(context: {
                         // ignore
                     }
                     clone.remove()
-                    children.delete(key)
+
+                    // Log clone removal and element counts for debugging rapid toggle
+                    pwLog('[presence] clone REMOVED from DOM', {
+                        key,
+                        clonesInDOM: document.querySelectorAll('[data-clone="true"]').length,
+                        boxesInDOM: document.querySelectorAll('[data-testid="box"]').length
+                    })
+
+                    // Only delete from children map if the current registration is for the SAME element
+                    // If a re-entry happened while we were animating, a new element is registered
+                    // and we should NOT delete it
+                    const currentChild = children.get(key)
+                    if (currentChild && currentChild.element === exitingElement) {
+                        children.delete(key)
+                        pwLog('[presence] child deleted from map (same element)', { key })
+                    } else {
+                        pwLog('[presence] child NOT deleted (re-entry registered new element)', {
+                            key,
+                            hasCurrentChild: !!currentChild,
+                            isSameElement: currentChild?.element === exitingElement
+                        })
+                    }
+
+                    // Log final state
+                    pwLog('[presence] element count after exit', {
+                        childrenMapSize: children.size,
+                        inFlightExits: inFlightExits - 1,
+                        clonesInDOM: document.querySelectorAll('[data-clone="true"]').length
+                    })
+
                     inFlightExits -= 1
                     if (inFlightExits === 0) {
+                        pwLog('[presence] all exits complete, calling onExitComplete')
                         context.onExitComplete?.()
                     }
                 })
@@ -248,7 +405,9 @@ export function createAnimatePresenceContext(context: {
     }
 
     return {
-        ...context,
+        initial,
+        shouldAnimateEnter,
+        onExitComplete: context.onExitComplete,
         registerChild,
         updateChildState,
         unregisterChild
@@ -300,10 +459,22 @@ export function usePresence(
     mergedTransition?: MotionTransition
 ): void {
     const context = getAnimatePresenceContext()
+    pwLog('[presence] usePresence called', {
+        key,
+        hasElement: !!element,
+        hasContext: !!context,
+        hasExit: !!exit,
+        exit
+    })
     if (element && context && exit) {
         context.registerChild(key, element, exit, mergedTransition)
         onDestroy(() => {
+            pwLog('[presence] onDestroy triggered', { key })
             context.unregisterChild(key)
+        })
+    } else {
+        pwLog('[presence] usePresence - skipping registration', {
+            reason: !element ? 'no element' : !context ? 'no context' : 'no exit'
         })
     }
 }

@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { Snippet } from 'svelte'
     import { createAnimatePresenceContext, setAnimatePresenceContext } from '$lib/utils/presence'
+    import { pwLog } from '$lib/utils/log'
 
     /**
      * Provide `AnimatePresence` context to descendants.
@@ -10,14 +11,21 @@
      * styled clone is animated out before being removed from the DOM.
      *
      * @prop children Slotted content participating in presence.
+     * @prop initial When false, children skip their enter animation on initial mount.
      * @prop onExitComplete Optional callback invoked once all exits complete.
      */
-    const { children, onExitComplete } = $props<{
+    const {
+        children,
+        initial = true,
+        onExitComplete
+    } = $props<{
         children?: Snippet
+        initial?: boolean
         onExitComplete?: () => void
     }>()
 
-    const context = createAnimatePresenceContext({ onExitComplete })
+    pwLog('[AnimatePresence] mounting', { initial, hasOnExitComplete: !!onExitComplete })
+    const context = createAnimatePresenceContext({ initial, onExitComplete })
     setAnimatePresenceContext(context)
 </script>
 
