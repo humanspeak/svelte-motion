@@ -60,10 +60,7 @@ export type AnimatePresenceContext = {
      * Returns false only during first render when initial={false} AND the key has never been seen.
      * Re-entries (after exit) always animate.
      */
-    shouldAnimateEnter: (
-        // trunk-ignore(eslint/no-unused-vars)
-        key: string
-    ) => boolean
+    shouldAnimateEnter: (key: string) => boolean
     /** Called when all exit animations complete (optional). */
     onExitComplete?: () => void
     /** Register a child element and its exit definition. */
