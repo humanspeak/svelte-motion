@@ -88,8 +88,19 @@ test.describe('Fancy Like Button - size stability', () => {
                 clientY: cy,
                 pointerId: 1
             })
-            // Wait for restore animation
-            await page.waitForTimeout(50)
+            // Wait for restore animation to complete by polling until transform stabilizes
+            let stable = 0
+            let lastA: number | null = null
+            for (let j = 0; j < 20 && stable < 3; j++) {
+                await page.waitForTimeout(50)
+                const a = await getTransformA()
+                if (lastA !== null && Math.abs(a - lastA) < 0.01) {
+                    stable++
+                } else {
+                    stable = 0
+                }
+                lastA = a
+            }
             const a = await getTransformA()
             scaleValues.push(a)
         }
@@ -149,8 +160,19 @@ test.describe('Fancy Like Button - size stability', () => {
                 clientY: cy,
                 pointerId: 1
             })
-            // Wait for restore animation
-            await page.waitForTimeout(50)
+            // Wait for restore animation to complete by polling until transform stabilizes
+            let stable = 0
+            let lastA: number | null = null
+            for (let j = 0; j < 20 && stable < 3; j++) {
+                await page.waitForTimeout(50)
+                const a = await getA()
+                if (lastA !== null && Math.abs(a - lastA) < 0.01) {
+                    stable++
+                } else {
+                    stable = 0
+                }
+                lastA = a
+            }
             const a = await getA()
             scaleValues.push(a)
         }
