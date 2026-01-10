@@ -1,0 +1,394 @@
+---
+title: AnimatePresence
+description: Animate components when they are added to or removed from the DOM
+---
+
+<svelte:head>
+  <title>AnimatePresence | Docs | Svelte Motion</title>
+</svelte:head>
+
+<script>
+  import Example from '$lib/components/general/Example.svelte'
+  import AnimatePresenceExample from '$lib/examples/AnimatePresenceExample.svelte'
+</script>
+
+# AnimatePresence
+
+`AnimatePresence` enables exit animations for components when they are removed from the DOM. Wrap your conditional content with `AnimatePresence` to animate children as they enter and exit.
+
+```svelte
+<script>
+  import { motion, AnimatePresence } from '@humanspeak/svelte-motion'
+
+  let isVisible = $state(true)
+</script>
+
+<AnimatePresence>
+  {#if isVisible}
+    <motion.div
+      key="box"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    />
+  {/if}
+</AnimatePresence>
+```
+
+<Example isSmall>
+  <AnimatePresenceExample />
+</Example>
+
+## How it works
+
+When a `motion` component inside `AnimatePresence` is conditionally removed:
+
+1. The component's last position and styles are captured
+2. A visual clone is created at that exact position
+3. The `exit` animation runs on the clone
+4. Once complete, the clone is removed from the DOM
+
+This approach ensures smooth exit animations even though the original Svelte component has already unmounted.
+
+## Usage
+
+### Basic enter/exit
+
+The most common pattern is toggling visibility with enter and exit animations:
+
+```svelte
+<script lang="ts">
+  import { motion, AnimatePresence } from '@humanspeak/svelte-motion'
+
+  let isVisible = $state(true)
+</script>
+
+<AnimatePresence>
+  {#if isVisible}
+    <motion.div
+      key="modal"
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.8 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+    >
+      Modal content
+    </motion.div>
+  {/if}
+</AnimatePresence>
+
+<button onclick={() => isVisible = !isVisible}>
+  Toggle
+</button>
+```
+
+### The `key` prop
+
+When using `AnimatePresence`, motion components need a `key` prop to track their identity:
+
+```svelte
+<AnimatePresence>
+  {#if isVisible}
+    <motion.div
+      key="unique-id"
+      exit={{ opacity: 0 }}
+    />
+  {/if}
+</AnimatePresence>
+```
+
+The `key` is used to:
+- Track which components are entering vs. exiting
+- Ensure the correct exit animation plays for each component
+- Handle re-entry animations correctly
+
+### Suppressing initial animation
+
+By default, all children animate when `AnimatePresence` first mounts. To prevent this, set `initial={false}`:
+
+```svelte
+<AnimatePresence initial={false}>
+  {#if isVisible}
+    <motion.div
+      key="box"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    />
+  {/if}
+</AnimatePresence>
+```
+
+With `initial={false}`:
+- Children present on first render skip their enter animation
+- Only subsequent entries (after exits) will animate in
+
+### Exit completion callback
+
+Use `onExitComplete` to run code after all exit animations finish:
+
+```svelte
+<script>
+  function handleExitComplete() {
+    console.log('All exits complete!')
+    // Navigate, cleanup, etc.
+  }
+</script>
+
+<AnimatePresence onExitComplete={handleExitComplete}>
+  {#if isVisible}
+    <motion.div key="box" exit={{ opacity: 0 }} />
+  {/if}
+</AnimatePresence>
+```
+
+This is useful for:
+- Navigation after a page transition completes
+- Cleanup operations
+- Triggering subsequent animations
+
+## Working with lists
+
+`AnimatePresence` works with dynamic lists using Svelte's `{#each}` block:
+
+```svelte
+<script lang="ts">
+  import { motion, AnimatePresence } from '@humanspeak/svelte-motion'
+
+  let items = $state([
+    { id: 1, text: 'Item 1' },
+    { id: 2, text: 'Item 2' },
+    { id: 3, text: 'Item 3' }
+  ])
+
+  function removeItem(id: number) {
+    items = items.filter(item => item.id !== id)
+  }
+</script>
+
+<AnimatePresence>
+  {#each items as item (item.id)}
+    <motion.div
+      key={String(item.id)}
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+    >
+      {item.text}
+      <button onclick={() => removeItem(item.id)}>Remove</button>
+    </motion.div>
+  {/each}
+</AnimatePresence>
+```
+
+> **Important**: Use Svelte's keyed `{#each}` block (`{#each items as item (item.id)}`) and pass a matching string `key` prop to the motion component.
+
+## Combining with variants
+
+`AnimatePresence` works seamlessly with variants for cleaner, reusable animations:
+
+```svelte
+<script lang="ts">
+  import { motion, AnimatePresence, type Variants } from '@humanspeak/svelte-motion'
+
+  let isVisible = $state(true)
+
+  const itemVariants: Variants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -20 }
+  }
+</script>
+
+<AnimatePresence>
+  {#if isVisible}
+    <motion.div
+      key="item"
+      variants={itemVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+    />
+  {/if}
+</AnimatePresence>
+```
+
+## Exit transition configuration
+
+You can specify a custom transition for the exit animation:
+
+```svelte
+<motion.div
+  key="box"
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  exit={{
+    opacity: 0,
+    scale: 0.8,
+    transition: { duration: 0.2, ease: 'easeIn' }
+  }}
+/>
+```
+
+The exit transition takes precedence over the component's general `transition` prop.
+
+## Props
+
+### AnimatePresence
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `initial` | `boolean` | `true` | When `false`, children skip their enter animation on initial mount |
+| `onExitComplete` | `() => void` | `undefined` | Callback invoked once all exit animations complete |
+
+### Motion component props (for AnimatePresence)
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `key` | `string` | Required. Unique identifier for tracking enter/exit state |
+| `initial` | `object \| string \| false` | Initial animation state |
+| `animate` | `object \| string` | Target animation state |
+| `exit` | `object \| string` | Exit animation state when component is removed |
+
+## Best practices
+
+### 1. Always provide a key
+
+Every motion component inside `AnimatePresence` should have a unique `key`:
+
+```svelte
+<!-- Good -->
+<motion.div key="modal" exit={{ opacity: 0 }} />
+
+<!-- Bad - no key -->
+<motion.div exit={{ opacity: 0 }} />
+```
+
+### 2. Use semantic exit animations
+
+Exit animations should feel natural and match the context:
+
+```svelte
+<!-- Modal: scale down and fade -->
+<motion.div
+  key="modal"
+  exit={{ opacity: 0, scale: 0.95 }}
+/>
+
+<!-- Sidebar: slide out -->
+<motion.div
+  key="sidebar"
+  exit={{ x: -300 }}
+/>
+
+<!-- Toast: slide up and fade -->
+<motion.div
+  key="toast"
+  exit={{ opacity: 0, y: -20 }}
+/>
+```
+
+### 3. Match enter and exit
+
+For visual consistency, exit animations often mirror enter animations:
+
+```svelte
+<motion.div
+  key="item"
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  exit={{ opacity: 0, y: 20 }}  <!-- Same as initial -->
+/>
+```
+
+### 4. Consider performance
+
+Keep exit animations short (200-400ms) to avoid UI feeling sluggish:
+
+```svelte
+<motion.div
+  key="item"
+  exit={{ opacity: 0 }}
+  transition={{ duration: 0.2 }}
+/>
+```
+
+## Common patterns
+
+### Page transitions
+
+```svelte
+<script>
+  import { page } from '$app/stores'
+</script>
+
+<AnimatePresence>
+  {#key $page.url.pathname}
+    <motion.main
+      key={$page.url.pathname}
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+    >
+      <slot />
+    </motion.main>
+  {/key}
+</AnimatePresence>
+```
+
+### Modal/Dialog
+
+```svelte
+<AnimatePresence>
+  {#if showModal}
+    <!-- Backdrop -->
+    <motion.div
+      key="backdrop"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      class="backdrop"
+      onclick={() => showModal = false}
+    />
+
+    <!-- Modal -->
+    <motion.div
+      key="modal"
+      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.9, y: 20 }}
+      class="modal"
+    >
+      Modal content
+    </motion.div>
+  {/if}
+</AnimatePresence>
+```
+
+### Notification stack
+
+```svelte
+<AnimatePresence>
+  {#each notifications as notification (notification.id)}
+    <motion.div
+      key={notification.id}
+      initial={{ opacity: 0, x: 100 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 100 }}
+      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+    >
+      {notification.message}
+    </motion.div>
+  {/each}
+</AnimatePresence>
+```
+
+## Related
+
+- [Variants](/docs/variants) - Define reusable animation states
+- [Examples](/examples/animate-presence) - See AnimatePresence in action
+- [Motion Component](/docs) - Full API reference
+
+---
+
+Based on [Motion's AnimatePresence](https://motion.dev/docs/react-animate-presence) API.

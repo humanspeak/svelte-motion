@@ -4,6 +4,12 @@ export const load: PageLoad = async () => {
     // Load example metadata - this could be expanded to read from individual +page.ts files
     // or from a centralized configuration file
     const examples = {
+        'animate-presence': {
+            title: 'AnimatePresence',
+            description: 'Interactive animatepresence animation example using Svelte Motion.',
+            sourceUrl:
+                'https://github.com/humanspeak/svelte-motion/tree/main/docs/src/routes/examples/animate-presence'
+        },
         'animated-button': {
             title: 'Animated Button',
             description: 'Interactive animated button animation example using Svelte Motion.',

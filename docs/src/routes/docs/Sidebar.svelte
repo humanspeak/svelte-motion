@@ -28,6 +28,16 @@
             items: [{ title: 'Get started', href: '/docs', icon: 'fa-solid fa-play' }]
         },
         {
+            title: 'Components',
+            items: [
+                {
+                    title: 'AnimatePresence',
+                    href: '/docs/animate-presence',
+                    icon: 'fa-solid fa-ghost'
+                }
+            ]
+        },
+        {
             title: 'Animation',
             items: [
                 {
