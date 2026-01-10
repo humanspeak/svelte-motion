@@ -297,7 +297,10 @@
             // Only use resolvedAnimate as fallback when we DON'T have initialKeyframes
             // If we have initialKeyframes, the enter animation is running - setting
             // inline styles to the target values will override the WAAPI animation
-            initialKeyframes ? undefined : (resolvedAnimate as unknown as Record<string, unknown>)
+            // Use isNotEmpty to handle empty initial objects (initial: {}) which should fallback
+            isNotEmpty(initialKeyframes)
+                ? undefined
+                : (resolvedAnimate as unknown as Record<string, unknown>)
         ),
         class: classProp
     })
@@ -420,6 +423,8 @@
     let initialAnimationTriggered = $state(false)
     // Track if we've run the animation for object animateProp on this mount
     let objectAnimateRanOnMount = $state(false)
+    // Track the serialized animateProp to detect changes for object animate props
+    let lastAnimatePropJson = $state<string | undefined>(undefined)
     const currentAnimateKey = $derived(
         typeof animateProp === 'string'
             ? animateProp
@@ -551,7 +556,17 @@
                 runAnimation()
             }
         } else if (animateProp) {
-            // Object animate props - only run if we haven't already animated on this mount
+            // Object animate props - detect if the prop actually changed
+            const currentJson = JSON.stringify(animateProp)
+            const propChanged = lastAnimatePropJson !== currentJson
+
+            // Reset flag if animate prop changed
+            if (propChanged) {
+                objectAnimateRanOnMount = false
+                lastAnimatePropJson = currentJson
+            }
+
+            // Only run if we haven't already animated on this mount (or prop changed)
             // This prevents duplicate animations when Svelte re-triggers the effect
             if (!objectAnimateRanOnMount) {
                 objectAnimateRanOnMount = true
