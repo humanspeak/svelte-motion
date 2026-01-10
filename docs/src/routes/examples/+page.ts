@@ -6,7 +6,7 @@ export const load: PageLoad = async () => {
     const examples = {
         'animate-presence': {
             title: 'AnimatePresence',
-            description: 'Interactive animatepresence animation example using Svelte Motion.',
+            description: 'Interactive AnimatePresence animation example using Svelte Motion.',
             sourceUrl:
                 'https://github.com/humanspeak/svelte-motion/tree/main/docs/src/routes/examples/animate-presence'
         },

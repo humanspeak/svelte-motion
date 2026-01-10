@@ -68,19 +68,8 @@ test.describe('Fancy Like Button - size stability', () => {
             return Number.isFinite(a) ? a : 1
         }
 
-        // Wait for component to be ready (data-is-loaded="ready")
-        await page.waitForFunction(
-            () => {
-                const el = document.querySelector(
-                    '[data-testid="fancy-like-button"]'
-                ) as HTMLElement
-                return el?.getAttribute('data-is-loaded') === 'ready'
-            },
-            { timeout: 3000 }
-        )
-
-        // Give animations time to settle
-        await page.waitForTimeout(100)
+        // Wait for component to be ready using Playwright's managed assertion
+        await expect(btn).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
 
         const baselineA = await getTransformA()
 
@@ -128,19 +117,8 @@ test.describe('Fancy Like Button - size stability', () => {
             return Number.isFinite(a) ? a : 1
         }
 
-        // Wait for component to be ready (data-is-loaded="ready")
-        await page.waitForFunction(
-            () => {
-                const el = document.querySelector(
-                    '[data-testid="fancy-like-button"]'
-                ) as HTMLElement
-                return el?.getAttribute('data-is-loaded') === 'ready'
-            },
-            { timeout: 3000 }
-        )
-
-        // Give animations time to settle
-        await page.waitForTimeout(100)
+        // Wait for component to be ready using Playwright's managed assertion
+        await expect(btn).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
 
         const baselineA = await getA()
 
