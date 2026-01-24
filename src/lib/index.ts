@@ -21,10 +21,13 @@ export type {
     MotionInitial,
     MotionOnDirectionLock,
     MotionOnDragTransitionEnd,
+    MotionOnInViewEnd,
+    MotionOnInViewStart,
     MotionTransition,
     MotionWhileDrag,
     MotionWhileFocus,
     MotionWhileHover,
+    MotionWhileInView,
     MotionWhileTap,
     Variants
 } from '$lib/types'

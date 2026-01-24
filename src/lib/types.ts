@@ -137,6 +137,20 @@ export type MotionWhileDrag =
     | undefined
 
 /**
+ * Animation properties for in-view interactions.
+ * When the element enters the viewport, it animates to this state; when it leaves,
+ * it animates back to its baseline (from animate/initial), restoring only the changed keys.
+ * @example
+ * ```svelte
+ * <motion.div whileInView={{ opacity: 1, y: 0 }} />
+ * ```
+ */
+export type MotionWhileInView =
+    | (Record<string, unknown> & { transition?: AnimationOptions })
+    | DOMKeyframesDefinition
+    | undefined
+
+/**
  * Animation transition configuration for hover interactions.
  * Overrides the global transition when provided.
  */
@@ -158,6 +172,10 @@ export type MotionOnHoverEnd = (() => void) | undefined
 /** Focus lifecycle callbacks */
 export type MotionOnFocusStart = (() => void) | undefined
 export type MotionOnFocusEnd = (() => void) | undefined
+
+/** InView lifecycle callbacks */
+export type MotionOnInViewStart = (() => void) | undefined
+export type MotionOnInViewEnd = (() => void) | undefined
 
 /** Tap lifecycle callbacks */
 export type MotionOnTapStart = (() => void) | undefined
@@ -248,6 +266,8 @@ export type MotionProps = {
     whileFocus?: MotionWhileFocus
     /** Drag interaction animation */
     whileDrag?: MotionWhileDrag
+    /** In-view interaction animation - animates when element enters viewport */
+    whileInView?: MotionWhileInView
     /** Called right before a main animate transition starts */
     onAnimationStart?: MotionAnimationStart
     /** Called after a main animate transition completes */
@@ -260,6 +280,10 @@ export type MotionProps = {
     onFocusStart?: MotionOnFocusStart
     /** Called when element loses keyboard focus */
     onFocusEnd?: MotionOnFocusEnd
+    /** Called when element enters viewport */
+    onInViewStart?: MotionOnInViewStart
+    /** Called when element leaves viewport */
+    onInViewEnd?: MotionOnInViewEnd
     /** Called when a tap gesture starts (pointerdown recognized) */
     onTapStart?: MotionOnTapStart
     /** Called when a tap gesture ends successfully (pointerup) */
