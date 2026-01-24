@@ -64,6 +64,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/while-in-view') + searchParams}
+                    >
+                        While In View
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/keyframes') + searchParams}
                     >
                         Keyframes (shape + scale)
