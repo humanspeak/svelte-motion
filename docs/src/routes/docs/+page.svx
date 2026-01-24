@@ -13,6 +13,7 @@ description: "Svelte Motion is a Svelte animation library for building smooth, p
   import Rotate from '$lib/examples/Rotate.svelte'
   import AnimatedButton from '$lib/examples/AnimatedButton.svelte'
   import HoverAndTap from '$lib/examples/HoverAndTap.svelte'
+  import WhileInViewExample from '$lib/examples/WhileInViewExample.svelte'
 </script>
 
 # Get started with Svelte Motion
@@ -145,11 +146,36 @@ Or disable this initial animation entirely by setting `initial` to `false`.
 
 ## Scroll animation
 
-Svelte Motion supports both styles of scroll animations: **scroll-triggered** and **scroll-linked**.
+Svelte Motion supports scroll-triggered animations via the `whileInView` prop.
 
-To trigger an animation on scroll, you can bind a class, style, or state change based on an `IntersectionObserver`, or pair Motion with stores to flip between `initial` and `animate` states.
+Elements can animate when they enter the viewport:
 
-To link a value directly to scroll position, use utilities like `useTime`/`useTransform` to drive an animated style.
+```svelte
+<motion.div
+  initial={{ opacity: 0, y: 50 }}
+  whileInView={{ opacity: 1, y: 0 }}
+>
+  I animate when scrolled into view
+</motion.div>
+```
+
+<Example isSmall>
+  <WhileInViewExample />
+</Example>
+
+The `whileInView` prop works like `whileHover` and `whileTap`—it defines the target animation state when the element is in the viewport. When the element leaves the viewport, it animates back to its baseline state.
+
+You can also use lifecycle callbacks:
+
+```svelte
+<motion.div
+  whileInView={{ opacity: 1 }}
+  onInViewStart={() => console.log('Entered viewport')}
+  onInViewEnd={() => console.log('Left viewport')}
+/>
+```
+
+For scroll-linked animations (where values track scroll position), use utilities like `useTime`/`useTransform`:
 
 ```svelte
 <script>
