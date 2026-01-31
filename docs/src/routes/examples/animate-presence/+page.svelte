@@ -18,7 +18,6 @@
     <title>AnimatePresence | Examples | Svelte Motion</title>
 </svelte:head>
 
-
 <Example>
     <AnimatePresenceExample />
 </Example>
