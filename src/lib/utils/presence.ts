@@ -252,10 +252,16 @@ export function createAnimatePresenceContext(context: {
             exit: child?.exit
         })
 
+        // Only process if child was actually registered
+        if (!child) {
+            pwLog('[presence] unregisterChild - child not found, ignoring')
+            return
+        }
+
         // Mark this key as exited so re-entry will animate
         exitedKeys.add(key)
 
-        if (!child || !child.exit) {
+        if (!child.exit) {
             pwLog('[presence] unregisterChild - no exit animation, removing immediately')
             children.delete(key)
             return

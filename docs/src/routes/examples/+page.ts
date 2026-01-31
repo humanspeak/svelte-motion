@@ -1,6 +1,6 @@
 import type { PageLoad } from './$types'
 
-export const load: PageLoad = async () => {
+export const load: PageLoad = () => {
     // Load example metadata - this could be expanded to read from individual +page.ts files
     // or from a centralized configuration file
     const examples = {
@@ -75,6 +75,11 @@ export const load: PageLoad = async () => {
             title: 'While Focus',
             description: 'Interactive while focus animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/docs/react-motion-component#focus'
+        },
+        'while-in-view': {
+            title: 'While In View',
+            description: 'Interactive while in view animation example using Svelte Motion.',
+            sourceUrl: 'https://motion.dev/docs/react-motion-component#scroll'
         }
     }
 

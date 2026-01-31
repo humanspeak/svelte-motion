@@ -28,7 +28,6 @@
         <a
             href="https://humanspeak.com"
             target="_blank"
-            rel="noopener noreferrer"
             class="text-brand-500 hover:text-brand-600 hover:underline"
         >
             Humanspeak
@@ -37,7 +36,6 @@
         <a
             href="https://motion.dev/"
             target="_blank"
-            rel="noopener noreferrer"
             class="text-brand-500 hover:text-brand-600 hover:underline"
         >
             Motion.dev

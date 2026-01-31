@@ -3,6 +3,11 @@ description: Set up dependencies for Trunk Code Quality
 runs:
     using: composite
     steps:
+        - name: Setup Node.js
+          uses: actions/setup-node@v6 # zizmor: ignore[unpinned-uses]
+          with:
+              node-version: 24
+
         - uses: pnpm/action-setup@v4 # zizmor: ignore[unpinned-uses]
           with:
               version: 10

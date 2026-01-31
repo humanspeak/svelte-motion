@@ -1,3 +1,8 @@
+<script lang="ts" module>
+    // Module-level counter for deterministic key generation (avoids SSR hydration mismatch)
+    let keyCounter = 0
+</script>
+
 <script lang="ts">
     import { getMotionConfig } from '$lib/components/motionConfig.context'
     import type {
@@ -20,6 +25,7 @@
     import { attachWhileTap } from '$lib/utils/interaction'
     import { attachWhileHover } from '$lib/utils/hover'
     import { attachWhileFocus } from '$lib/utils/focus'
+    import { attachWhileInView } from '$lib/utils/inView'
     import {
         measureRect,
         computeFlipTransforms,
@@ -65,11 +71,14 @@
         whileTap: whileTapProp,
         whileHover: whileHoverProp,
         whileFocus: whileFocusProp,
+        whileInView: whileInViewProp,
         whileDrag: whileDragProp,
         onHoverStart: onHoverStartProp,
         onHoverEnd: onHoverEndProp,
         onFocusStart: onFocusStartProp,
         onFocusEnd: onFocusEndProp,
+        onInViewStart: onInViewStartProp,
+        onInViewEnd: onInViewEndProp,
         onTapStart: onTapStartProp,
         onTap: onTapProp,
         onTapCancel: onTapCancelProp,
@@ -108,7 +117,8 @@
     }
 
     // Use the provided key for presence tracking
-    const presenceKey = keyProp ?? `motion-${Math.random().toString(36).slice(2)}`
+    // When not inside AnimatePresence, use a stable identifier based on component instance
+    const presenceKey = keyProp ?? `motion-${++keyCounter}`
 
     // Compute merged transition without mutating props to avoid effect write loops
     const mergedTransition = $derived<AnimationOptions>(
@@ -520,6 +530,25 @@
             (whileFocusProp ?? {}) as Record<string, unknown>,
             (mergedTransition ?? {}) as AnimationOptions,
             { onStart: onFocusStartProp, onEnd: onFocusEndProp },
+            {
+                initial: (resolvedInitial ?? {}) as Record<string, unknown>,
+                animate: (resolvedAnimate ?? {}) as Record<string, unknown>
+            }
+        )
+    })
+
+    // whileInView handling for viewport intersection
+    $effect(() => {
+        if (!(element && isLoaded === 'ready' && isNotEmpty(whileInViewProp))) return
+        return attachWhileInView(
+            element!,
+            (whileInViewProp ?? {}) as Record<string, unknown>,
+            (mergedTransition ?? {}) as AnimationOptions,
+            {
+                onStart: onInViewStartProp,
+                onEnd: onInViewEndProp,
+                onAnimationComplete: onAnimationCompleteProp
+            },
             {
                 initial: (resolvedInitial ?? {}) as Record<string, unknown>,
                 animate: (resolvedAnimate ?? {}) as Record<string, unknown>

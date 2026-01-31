@@ -62,8 +62,8 @@ export default defineConfig({
             ]
         },
         // Vitest 4: pool options are now top-level
-        maxWorkers: 4,
-        minWorkers: 1,
+        // Use 50% of available cores for dynamic scaling on different CI environments
+        maxWorkers: '50%',
         testTimeout: 10000,
         hookTimeout: 10000,
         reporters: process.env.CI ? ['verbose'] : ['default']
