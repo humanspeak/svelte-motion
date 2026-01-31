@@ -6,7 +6,7 @@ export const load: PageLoad = async () => {
     const examples = {
         'animate-presence': {
             title: 'AnimatePresence',
-            description: 'Interactive AnimatePresence animation example using Svelte Motion.',
+            description: 'Interactive animatepresence animation example using Svelte Motion.',
             sourceUrl:
                 'https://github.com/humanspeak/svelte-motion/tree/main/docs/src/routes/examples/animate-presence'
         },
@@ -75,6 +75,11 @@ export const load: PageLoad = async () => {
             title: 'While Focus',
             description: 'Interactive while focus animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/docs/react-motion-component#focus'
+        },
+        'while-in-view': {
+            title: 'While In View',
+            description: 'Interactive while in view animation example using Svelte Motion.',
+            sourceUrl: 'https://motion.dev/docs/react-motion-component#scroll'
         }
     }
 
