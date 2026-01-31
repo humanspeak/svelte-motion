@@ -3,6 +3,7 @@
     import Example from '$lib/components/general/Example.svelte'
     import AnimatePresenceExample from '$lib/examples/AnimatePresenceExample.svelte'
 
+    let { data } = $props()
     const breadcrumbs = $derived(getBreadcrumbContext())
     $effect(() => {
         if (breadcrumbs) {
@@ -18,6 +19,6 @@
     <title>AnimatePresence | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example>
+<Example motionUrl={data.sourceUrl ?? undefined}>
     <AnimatePresenceExample />
 </Example>

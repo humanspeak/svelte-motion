@@ -1,12 +1,12 @@
 import type { PageLoad } from './$types'
 
-export const load: PageLoad = async () => {
+export const load: PageLoad = () => {
     // Load example metadata - this could be expanded to read from individual +page.ts files
     // or from a centralized configuration file
     const examples = {
         'animate-presence': {
             title: 'AnimatePresence',
-            description: 'Interactive animatepresence animation example using Svelte Motion.',
+            description: 'Interactive AnimatePresence animation example using Svelte Motion.',
             sourceUrl:
                 'https://github.com/humanspeak/svelte-motion/tree/main/docs/src/routes/examples/animate-presence'
         },
