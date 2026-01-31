@@ -1,3 +1,5 @@
 # allow crawling everything by default
 User-agent: *
-Disallow:
+Allow: /
+
+Sitemap: https://motion.svelte.page/sitemap.xml
