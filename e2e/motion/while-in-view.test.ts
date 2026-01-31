@@ -31,9 +31,10 @@ test.describe('whileInView', () => {
         await page.evaluate(() => window.scrollTo(0, 0))
 
         const belowFoldBox = page.getByTestId('below-fold-box')
+        const inViewportBox = page.getByTestId('in-viewport-box')
 
-        // Wait for page to settle and animations to complete
-        await page.waitForTimeout(500)
+        // Wait for page to settle - poll until in-viewport element is animated
+        await expect(inViewportBox).toHaveAttribute('data-animated', 'true', { timeout: 3000 })
 
         // Check element's position to verify it's below fold
         const rect = await belowFoldBox.evaluate((el) => {

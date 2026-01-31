@@ -105,23 +105,6 @@
         border-radius: 8px;
     }
 
-    .box {
-        width: 200px;
-        height: 100px;
-        background: #4ade80;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        color: white;
-        margin-top: 10px;
-    }
-
-    .box-secondary {
-        background: #60a5fa;
-    }
-
     .spacer {
         height: 1500px;
         display: flex;
