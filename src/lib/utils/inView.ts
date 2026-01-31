@@ -4,7 +4,16 @@ import { type AnimationOptions, type DOMKeyframesDefinition, animate } from 'mot
  * Split a whileInView definition into keyframes and an optional nested transition.
  *
  * @param def While-in-view record that may include a nested `transition`.
- * @return Object with `keyframes` (no `transition`) and optional `transition`.
+ * @returns Object with `keyframes` (no `transition`) and optional `transition`.
+ * @example
+ * // With transition
+ * splitInViewDefinition({ opacity: 1, y: 0, transition: { duration: 0.5 } })
+ * // => { keyframes: { opacity: 1, y: 0 }, transition: { duration: 0.5 } }
+ *
+ * @example
+ * // Without transition
+ * splitInViewDefinition({ opacity: 1, scale: 1 })
+ * // => { keyframes: { opacity: 1, scale: 1 }, transition: undefined }
  */
 export const splitInViewDefinition = (
     def: Record<string, unknown>
@@ -24,7 +33,14 @@ export const splitInViewDefinition = (
  *
  * @param el Target element.
  * @param opts Source records for baseline computation.
- * @return Minimal baseline record to restore when element leaves viewport.
+ * @returns Minimal baseline record to restore when element leaves viewport.
+ * @example
+ * computeInViewBaseline(element, {
+ *   initial: { opacity: 0, y: 50 },
+ *   animate: { opacity: 1, y: 0 },
+ *   whileInView: { opacity: 1, scale: 1.1 }
+ * })
+ * // => { opacity: 1, scale: 1 } (scale defaults to 1, opacity from animate)
  */
 export const computeInViewBaseline = (
     el: HTMLElement,
@@ -118,7 +134,19 @@ export const computeInViewBaseline = (
  * @param mergedTransition Root/component merged transition.
  * @param callbacks Optional lifecycle callbacks for in-view start/end and animation completion.
  * @param baselineSources Optional sources used to compute baseline.
- * @return Cleanup function to disconnect the IntersectionObserver.
+ * @returns Cleanup function to disconnect the IntersectionObserver.
+ * @example
+ * const cleanup = attachWhileInView(
+ *   element,
+ *   { opacity: 1, y: 0, transition: { duration: 0.5 } },
+ *   { duration: 0.3 },
+ *   {
+ *     onStart: () => console.log('Entered viewport'),
+ *     onEnd: () => console.log('Left viewport')
+ *   },
+ *   { initial: { opacity: 0, y: 50 } }
+ * )
+ * // Later: cleanup() to disconnect observer
  */
 export const attachWhileInView = (
     el: HTMLElement,
