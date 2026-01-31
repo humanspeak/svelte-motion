@@ -46,13 +46,14 @@ export const animateWithLifecycle = (
     onComplete?: (def: unknown) => void
 ): void => {
     const payload = keyframes
+    const computed = getComputedStyle(el)
     pwLog('[animateWithLifecycle] starting', {
         keyframes: payload,
         transition,
         currentOpacity: el.style.opacity,
         currentTransform: el.style.transform,
-        computedOpacity: getComputedStyle(el).opacity,
-        computedTransform: getComputedStyle(el).transform
+        computedOpacity: computed.opacity,
+        computedTransform: computed.transform
     })
     onStart?.(payload)
     const controls = animate(el, payload, transition)

@@ -1,3 +1,8 @@
+<script lang="ts" module>
+    // Module-level counter for deterministic key generation (avoids SSR hydration mismatch)
+    let keyCounter = 0
+</script>
+
 <script lang="ts">
     import { getMotionConfig } from '$lib/components/motionConfig.context'
     import type {
@@ -112,7 +117,8 @@
     }
 
     // Use the provided key for presence tracking
-    const presenceKey = keyProp ?? `motion-${Math.random().toString(36).slice(2)}`
+    // When not inside AnimatePresence, use a stable identifier based on component instance
+    const presenceKey = keyProp ?? `motion-${++keyCounter}`
 
     // Compute merged transition without mutating props to avoid effect write loops
     const mergedTransition = $derived<AnimationOptions>(
