@@ -64,6 +64,7 @@
         <div class="mb-8 flex justify-center">
             <button
                 onclick={() => (showSvg = !showSvg)}
+                data-testid="toggle-svg"
                 class="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-blue-700"
             >
                 {showSvg ? 'Unmount SVG (Exit Animation)' : 'Mount SVG (Enter Animation)'}
@@ -77,6 +78,7 @@
                     <motion.svg
                         key="test-svg"
                         bind:ref={svgElement}
+                        data-testid="motion-svg"
                         width="200"
                         height="200"
                         viewBox="0 0 200 200"
@@ -88,6 +90,7 @@
                         <motion.circle
                             key="test-circle"
                             bind:ref={circleElement}
+                            data-testid="motion-circle"
                             cx="100"
                             cy="100"
                             r="80"
@@ -101,6 +104,7 @@
                         <motion.path
                             key="test-path"
                             bind:ref={pathElement}
+                            data-testid="motion-path"
                             d="M 50 100 Q 100 50 150 100 Q 100 150 50 100"
                             fill="none"
                             stroke="#10b981"
@@ -112,6 +116,7 @@
                         <motion.line
                             key="test-line"
                             bind:ref={lineElement}
+                            data-testid="motion-line"
                             x1="40"
                             y1="40"
                             x2="160"

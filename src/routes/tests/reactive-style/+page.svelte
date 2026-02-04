@@ -42,6 +42,11 @@
         <!-- Demo Box -->
         <div class="mb-8 flex min-h-64 items-center justify-center rounded-lg bg-gray-800 p-8">
             <div
+                data-testid="demo-box"
+                data-rotation={autoMode ? $autoRotate : rotation}
+                data-scale={scale}
+                data-opacity={opacity}
+                data-hue={hue}
                 style={styleString({
                     width: 150,
                     height: 150,
@@ -70,7 +75,12 @@
             <!-- Auto Rotate Toggle -->
             <div class="flex items-center gap-4">
                 <label class="flex items-center gap-2">
-                    <input type="checkbox" bind:checked={autoMode} class="h-4 w-4" />
+                    <input
+                        type="checkbox"
+                        bind:checked={autoMode}
+                        data-testid="auto-rotate-toggle"
+                        class="h-4 w-4"
+                    />
                     <span>Auto Rotate (using useTime + useTransform)</span>
                 </label>
             </div>
@@ -86,6 +96,7 @@
                     max="360"
                     bind:value={rotation}
                     disabled={autoMode}
+                    data-testid="rotation-slider"
                     class="w-full"
                     aria-labelledby="rotation-label"
                 />
@@ -102,6 +113,7 @@
                     max="2"
                     step="0.1"
                     bind:value={scale}
+                    data-testid="scale-slider"
                     class="w-full"
                     aria-labelledby="scale-label"
                 />
@@ -118,6 +130,7 @@
                     max="1"
                     step="0.1"
                     bind:value={opacity}
+                    data-testid="opacity-slider"
                     class="w-full"
                     aria-labelledby="opacity-label"
                 />
@@ -133,6 +146,7 @@
                     min="0"
                     max="360"
                     bind:value={hue}
+                    data-testid="hue-slider"
                     class="w-full"
                     aria-labelledby="hue-label"
                 />
