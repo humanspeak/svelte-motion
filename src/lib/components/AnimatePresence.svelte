@@ -35,6 +35,6 @@
 
 <style>
     .animate-presence-container {
-        position: relative;
+        display: contents;
     }
 </style>
