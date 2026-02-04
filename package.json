@@ -122,7 +122,7 @@
         "prettier-plugin-tailwindcss": "^0.7.2",
         "publint": "^0.3.17",
         "runed": "0.37.1",
-        "svelte": "^5.49.1",
+        "svelte": "^5.49.2",
         "svelte-check": "^4.3.6",
         "svg-tags": "^1.0.0",
         "tailwind-merge": "^3.4.0",
