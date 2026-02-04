@@ -81,6 +81,16 @@ export const load: PageLoad = () => {
             description: 'Interactive usetime (synced) animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/docs/react-use-time'
         },
+        'variants-basic': {
+            title: 'Variants Basic',
+            description: 'Interactive variants basic animation example using Svelte Motion.',
+            sourceUrl: null
+        },
+        'variants-propagation': {
+            title: 'Variants Propagation',
+            description: 'Interactive variants propagation animation example using Svelte Motion.',
+            sourceUrl: null
+        },
         'while-focus': {
             title: 'While Focus',
             description: 'Interactive while focus animation example using Svelte Motion.',
