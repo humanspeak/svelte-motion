@@ -1,6 +1,7 @@
 <script lang="ts">
     import { motion } from '@humanspeak/svelte-motion'
     import { cn } from '$lib/shadcn/utils'
+    import * as m from '$msgs'
     import type { Snippet } from 'svelte'
 
     type ExampleProps = {
@@ -35,7 +36,7 @@
                     class="inline-flex items-center justify-center gap-1.5 rounded-md border border-border-muted px-2 py-1 text-sm text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
                 >
                     <i class="fa-solid fa-grid-2 fa-xs"></i>
-                    Examples
+                    {m.example_examples()}
                 </motion.a>
             {/if}
             {#if exampleUrl}
@@ -46,7 +47,7 @@
                     class="inline-flex items-center justify-center gap-1.5 rounded-md border border-border-muted px-2 py-1 text-sm text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
                 >
                     <i class="fa-solid fa-arrow-up-right-from-square fa-xs"></i>
-                    Open
+                    {m.example_open()}
                 </motion.a>
             {/if}
         </div>
@@ -59,7 +60,7 @@
                     whileHover={{ scale: 1.1 }}
                     class="inline-flex items-center justify-center rounded-md border border-border-muted px-2 py-1 text-sm text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
                 >
-                    Motion.dev
+                    {m.example_motion_dev()}
                 </motion.button>
             {/if}
             <motion.button
