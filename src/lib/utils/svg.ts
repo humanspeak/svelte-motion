@@ -5,6 +5,92 @@
 export const SVG_PATH_PROPERTIES = new Set(['pathLength', 'pathOffset', 'pathSpacing'])
 
 /**
+ * The SVG namespace URI.
+ */
+export const SVG_NAMESPACE = 'http://www.w3.org/2000/svg'
+
+/**
+ * Set of SVG tag names that should be created in the SVG namespace.
+ * This list covers all standard SVG elements.
+ */
+export const SVG_TAGS = new Set([
+    'svg',
+    'animate',
+    'animateMotion',
+    'animateTransform',
+    'circle',
+    'clipPath',
+    'defs',
+    'desc',
+    'ellipse',
+    'feBlend',
+    'feColorMatrix',
+    'feComponentTransfer',
+    'feComposite',
+    'feConvolveMatrix',
+    'feDiffuseLighting',
+    'feDisplacementMap',
+    'feDistantLight',
+    'feDropShadow',
+    'feFlood',
+    'feFuncA',
+    'feFuncB',
+    'feFuncG',
+    'feFuncR',
+    'feGaussianBlur',
+    'feImage',
+    'feMerge',
+    'feMergeNode',
+    'feMorphology',
+    'feOffset',
+    'fePointLight',
+    'feSpecularLighting',
+    'feSpotLight',
+    'feTile',
+    'feTurbulence',
+    'filter',
+    'foreignObject',
+    'g',
+    'image',
+    'line',
+    'linearGradient',
+    'marker',
+    'mask',
+    'metadata',
+    'mpath',
+    'path',
+    'pattern',
+    'polygon',
+    'polyline',
+    'radialGradient',
+    'rect',
+    'set',
+    'stop',
+    'switch',
+    'symbol',
+    'text',
+    'textPath',
+    'title',
+    'tref',
+    'tspan',
+    'use',
+    'view'
+])
+
+/**
+ * Determines whether the provided tag name is an SVG element tag.
+ *
+ * @param {string} tag The tag name to test.
+ * @returns {boolean} True when the tag is an SVG element.
+ * @example
+ * isSVGTag('path') // true
+ * isSVGTag('div') // false
+ */
+export const isSVGTag = (tag: string): boolean => {
+    return SVG_TAGS.has(tag.toLowerCase())
+}
+
+/**
  * Check if an element is an SVG path element.
  */
 /**

@@ -52,7 +52,12 @@
         getInitialFalseContext
     } from '$lib/components/variantContext.context'
     import { writable } from 'svelte/store'
-    import { transformSVGPathProperties, computeNormalizedSVGInitialAttrs } from '$lib/utils/svg'
+    import {
+        transformSVGPathProperties,
+        computeNormalizedSVGInitialAttrs,
+        isSVGTag,
+        SVG_NAMESPACE
+    } from '$lib/utils/svg'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -779,7 +784,15 @@
 </script>
 
 {#if isVoidTag}
-    <svelte:element this={tag} bind:this={element} {...derivedAttrs} />
+    {#if isSVGTag(String(tag))}
+        <svelte:element this={tag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs} />
+    {:else}
+        <svelte:element this={tag} bind:this={element} {...derivedAttrs} />
+    {/if}
+{:else if isSVGTag(String(tag))}
+    <svelte:element this={tag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs}>
+        {@render children?.()}
+    </svelte:element>
 {:else}
     <svelte:element this={tag} bind:this={element} {...derivedAttrs}>
         {@render children?.()}
