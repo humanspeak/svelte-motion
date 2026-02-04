@@ -51,7 +51,7 @@
         <!-- Manual Rotation -->
         <div class="flex flex-col gap-1" class:opacity-40={autoMode}>
             <div class="flex justify-between text-xs">
-                <span>Rotation</span>
+                <span id="rotation-label">Rotation</span>
                 <span class="font-mono">{rotation}°</span>
             </div>
             <input
@@ -61,13 +61,14 @@
                 bind:value={rotation}
                 disabled={autoMode}
                 class="w-40 accent-blue-500"
+                aria-labelledby="rotation-label"
             />
         </div>
 
         <!-- Scale -->
         <div class="flex flex-col gap-1">
             <div class="flex justify-between text-xs">
-                <span>Scale</span>
+                <span id="scale-label">Scale</span>
                 <span class="font-mono">{scale.toFixed(1)}</span>
             </div>
             <input
@@ -77,16 +78,24 @@
                 step="0.1"
                 bind:value={scale}
                 class="w-40 accent-blue-500"
+                aria-labelledby="scale-label"
             />
         </div>
 
         <!-- Hue -->
         <div class="flex flex-col gap-1">
             <div class="flex justify-between text-xs">
-                <span>Hue</span>
+                <span id="hue-label">Hue</span>
                 <span class="font-mono">{hue}°</span>
             </div>
-            <input type="range" min="0" max="360" bind:value={hue} class="w-40 accent-blue-500" />
+            <input
+                type="range"
+                min="0"
+                max="360"
+                bind:value={hue}
+                class="w-40 accent-blue-500"
+                aria-labelledby="hue-label"
+            />
         </div>
 
         <!-- Reset Button -->

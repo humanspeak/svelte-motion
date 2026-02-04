@@ -13,9 +13,7 @@ vi.mock('svelte', async (importOriginal) => {
         }),
         getContext: vi.fn((key: symbol | string) => {
             return contextStore.get(key)
-        }),
-        // Helper to clear context between tests
-        __clearContextStore: () => contextStore.clear()
+        })
     }
 })
 

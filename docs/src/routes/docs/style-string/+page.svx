@@ -262,8 +262,7 @@ Works seamlessly with motion components:
 
 ```svelte
 <script>
-  import { motion } from '@humanspeak/svelte-motion'
-  import { styleString } from '@humanspeak/svelte-motion'
+  import { motion, styleString } from '@humanspeak/svelte-motion'
 
   let scale = $state(1)
 </script>

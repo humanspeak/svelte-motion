@@ -456,10 +456,8 @@ export function setAnimatePresenceContext(context: AnimatePresenceContext) {
  *
  * Note: Trivial wrapper - ignored for coverage.
  */
-/* c8 ignore next 3 */
-export function getPresenceDepth(): number | undefined {
-    return getContext(PRESENCE_DEPTH_CONTEXT)
-}
+/* c8 ignore next */
+export const getPresenceDepth = (): number | undefined => getContext(PRESENCE_DEPTH_CONTEXT)
 
 /**
  * Set the presence depth in Svelte component context.
@@ -469,8 +467,8 @@ export function getPresenceDepth(): number | undefined {
  *
  * Note: Trivial wrapper - ignored for coverage.
  */
-/* c8 ignore next 3 */
-export function setPresenceDepth(depth: number) {
+/* c8 ignore next */
+export const setPresenceDepth = (depth: number): void => {
     setContext(PRESENCE_DEPTH_CONTEXT, depth)
 }
 

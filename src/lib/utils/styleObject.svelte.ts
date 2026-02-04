@@ -26,7 +26,7 @@ export type StyleObject = Record<string, string | number>
  * @param input - A style object or a function returning a style object
  * @returns A CSS style string
  */
-export function styleString(input: StyleObject | (() => StyleObject)): string {
+export const styleString = (input: StyleObject | (() => StyleObject)): string => {
     const obj = typeof input === 'function' ? input() : input
     return stringifyStyleObject(obj)
 }

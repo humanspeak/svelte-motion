@@ -4,7 +4,7 @@
     import WhileFocusExample from '$lib/examples/WhileFocusExample.svelte'
 
     let { data } = $props()
-    const breadcrumbs = $derived(getBreadcrumbContext())
+    const breadcrumbs = getBreadcrumbContext()
     $effect(() => {
         if (breadcrumbs) {
             breadcrumbs.breadcrumbs = [

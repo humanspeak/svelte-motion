@@ -3,7 +3,7 @@
     import Example from '$lib/components/general/Example.svelte'
     import NotificationsStackExample from '$lib/examples/NotificationsStackExample.svelte'
 
-    const breadcrumbs = $derived(getBreadcrumbContext())
+    const breadcrumbs = getBreadcrumbContext()
     $effect(() => {
         if (breadcrumbs) {
             breadcrumbs.breadcrumbs = [

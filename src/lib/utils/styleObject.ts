@@ -34,6 +34,8 @@ const DEGREE_PROPERTIES = new Set([
  * @deprecated Use `styleString` from `@humanspeak/svelte-motion` instead for reactive styles.
  * This function is non-reactive and will not update when values change.
  *
+ * @param obj - Style object with camelCase keys and string/number values
+ * @returns CSS style string with kebab-case properties and appropriate units
  * @example
  * ```ts
  * // Old (deprecated, non-reactive):
@@ -45,7 +47,7 @@ const DEGREE_PROPERTIES = new Set([
  * const style = styleString(() => ({ rotate, opacity }))
  * ```
  */
-export function stringifyStyleObject(obj: Record<string, string | number>): string {
+export const stringifyStyleObject = (obj: Record<string, string | number>): string => {
     return Object.entries(obj)
         .map(([key, value]) => {
             const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase()

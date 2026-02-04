@@ -4,7 +4,7 @@
     import UseAnimationFrameExample from '$lib/examples/UseAnimationFrameExample.svelte'
 
     let { data } = $props()
-    const breadcrumbs = $derived(getBreadcrumbContext())
+    const breadcrumbs = getBreadcrumbContext()
     $effect(() => {
         if (breadcrumbs) {
             breadcrumbs.breadcrumbs = [

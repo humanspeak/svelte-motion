@@ -4,7 +4,7 @@
     import ColorInterpolationExample from '$lib/examples/ColorInterpolationExample.svelte'
 
     let { data } = $props()
-    const breadcrumbs = $derived(getBreadcrumbContext())
+    const breadcrumbs = getBreadcrumbContext()
     $effect(() => {
         if (breadcrumbs) {
             breadcrumbs.breadcrumbs = [
