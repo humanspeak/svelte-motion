@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion, stringifyStyleObject, type Variants } from '@humanspeak/svelte-motion'
+    import { motion, styleString, type Variants } from '@humanspeak/svelte-motion'
 
     let isOpen = $state(false)
 
@@ -18,7 +18,7 @@
 </script>
 
 <div
-    style={stringifyStyleObject({
+    style={styleString(() => ({
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
@@ -27,10 +27,10 @@
         background: 'var(--color-background-secondary)',
         borderRadius: 8,
         margin: '2rem 0'
-    })}
+    }))}
 >
     <motion.button
-        style={stringifyStyleObject({
+        style={styleString(() => ({
             padding: '1rem 2rem',
             background: 'var(--color-primary)',
             color: 'white',
@@ -39,7 +39,7 @@
             fontSize: '1rem',
             fontWeight: 600,
             cursor: 'pointer'
-        })}
+        }))}
         {variants}
         initial="closed"
         animate={isOpen ? 'open' : 'closed'}

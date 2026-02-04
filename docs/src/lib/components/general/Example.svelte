@@ -1,15 +1,17 @@
 <script lang="ts">
     import { motion } from '@humanspeak/svelte-motion'
     import { cn } from '$lib/shadcn/utils'
+    import * as m from '$msgs'
     import type { Snippet } from 'svelte'
 
     type ExampleProps = {
         children: Snippet
         isSmall?: boolean
         motionUrl?: string
+        exampleUrl?: string
     }
 
-    const { children, isSmall = false, motionUrl }: ExampleProps = $props()
+    const { children, isSmall = false, motionUrl, exampleUrl }: ExampleProps = $props()
 
     let refreshId = $state(0)
     const refreshMotion = () => {
@@ -25,7 +27,30 @@
     )}
 >
     <div class="flex h-12 w-full items-center border-b border-border px-3 py-2">
-        <div class="flex flex-1 items-center gap-4"></div>
+        <div class="flex flex-1 items-center gap-2">
+            {#if isSmall}
+                <motion.a
+                    href="/examples"
+                    whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.1 }}
+                    class="inline-flex items-center justify-center gap-1.5 rounded-md border border-border-muted px-2 py-1 text-sm text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
+                >
+                    <i class="fa-solid fa-grid-2 fa-xs"></i>
+                    {m.example_examples()}
+                </motion.a>
+            {/if}
+            {#if exampleUrl}
+                <motion.a
+                    href={exampleUrl}
+                    whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.1 }}
+                    class="inline-flex items-center justify-center gap-1.5 rounded-md border border-border-muted px-2 py-1 text-sm text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
+                >
+                    <i class="fa-solid fa-arrow-up-right-from-square fa-xs"></i>
+                    {m.example_open()}
+                </motion.a>
+            {/if}
+        </div>
         <div class="flex flex-1 items-center justify-center gap-4"></div>
         <div class="flex flex-1 items-center justify-end gap-4">
             {#if motionUrl}
@@ -35,7 +60,7 @@
                     whileHover={{ scale: 1.1 }}
                     class="inline-flex items-center justify-center rounded-md border border-border-muted px-2 py-1 text-sm text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
                 >
-                    Motion.dev
+                    {m.example_motion_dev()}
                 </motion.button>
             {/if}
             <motion.button

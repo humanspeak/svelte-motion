@@ -36,7 +36,12 @@
     import type { SvelteHTMLElements } from 'svelte/elements'
     import { mergeInlineStyles } from '$lib/utils/style'
     import { isNativelyFocusable } from '$lib/utils/a11y'
-    import { usePresence, getAnimatePresenceContext } from '$lib/utils/presence'
+    import {
+        usePresence,
+        getAnimatePresenceContext,
+        getPresenceDepth,
+        setPresenceDepth
+    } from '$lib/utils/presence'
     import { getInitialKeyframes } from '$lib/utils/initial'
     import { attachDrag } from '$lib/utils/drag'
     import { resolveInitial, resolveAnimate, resolveExit } from '$lib/utils/variants'
@@ -47,7 +52,12 @@
         getInitialFalseContext
     } from '$lib/components/variantContext.context'
     import { writable } from 'svelte/store'
-    import { transformSVGPathProperties, computeNormalizedSVGInitialAttrs } from '$lib/utils/svg'
+    import {
+        transformSVGPathProperties,
+        computeNormalizedSVGInitialAttrs,
+        isSVGTag,
+        SVG_NAMESPACE
+    } from '$lib/utils/svg'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -108,17 +118,32 @@
     // Get presence context to check if we're inside AnimatePresence
     const context = getAnimatePresenceContext()
 
-    // Validate key prop when inside AnimatePresence
-    if (context && !keyProp) {
+    // Get current presence depth (0 = direct child of AnimatePresence, undefined = not in AnimatePresence)
+    const presenceDepth = getPresenceDepth()
+
+    // Validate key prop only for direct children of AnimatePresence (depth 0)
+    // This matches Framer Motion behavior where only immediate children need keys
+    if (context && presenceDepth === 0 && !keyProp) {
         throw new Error(
-            'motion elements inside AnimatePresence must have a `key` prop. ' +
+            'motion elements that are direct children of AnimatePresence must have a `key` prop. ' +
                 'Example: <motion.div key="unique-id" />'
         )
+    }
+
+    // Increment depth for descendants so nested motion elements don't require keys
+    if (presenceDepth !== undefined) {
+        setPresenceDepth(presenceDepth + 1)
     }
 
     // Use the provided key for presence tracking
     // When not inside AnimatePresence, use a stable identifier based on component instance
     const presenceKey = keyProp ?? `motion-${++keyCounter}`
+
+    // Track previous key for key-change detection (simulates React's key-based remounting)
+    // Using $state for idiomatic Svelte 5 reactivity
+    let keyTrackerPrev = $state(keyProp)
+    let keyTrackerIsTransitioning = $state(false)
+    let keyTransitionStopped = $state(false)
 
     // Compute merged transition without mutating props to avoid effect write loops
     const mergedTransition = $derived<AnimationOptions>(
@@ -556,6 +581,92 @@
         )
     })
 
+    // Handle key prop changes inside AnimatePresence (simulates React's key-based remounting)
+    // When key changes, run exit → initial → animate sequence on the same element
+    $effect(() => {
+        // Access keyProp to create reactive dependency
+        const currentKey = keyProp
+
+        // Only handle key changes when:
+        // 1. We're inside AnimatePresence (context exists)
+        // 2. Element is ready (not during initial mount)
+        // 3. Key actually changed (not undefined → value on mount)
+        // 4. Not already transitioning
+        if (
+            !context ||
+            !element ||
+            isLoaded !== 'ready' ||
+            keyTrackerIsTransitioning ||
+            currentKey === keyTrackerPrev ||
+            keyTrackerPrev === undefined
+        ) {
+            // Update prev for next comparison
+            if (currentKey !== keyTrackerPrev) {
+                keyTrackerPrev = currentKey
+            }
+            return
+        }
+
+        pwLog('[motion] key changed, running exit→initial→animate', {
+            prevKey: keyTrackerPrev,
+            newKey: currentKey
+        })
+
+        // Mark as transitioning to prevent re-entry
+        keyTrackerIsTransitioning = true
+        keyTrackerPrev = currentKey
+
+        // Run the key transition sequence
+        const runKeyTransition = async () => {
+            try {
+                // 1. Run exit animation if defined
+                if (resolvedExit && element && !keyTransitionStopped) {
+                    const exitKeyframes = { ...(resolvedExit as Record<string, unknown>) }
+                    // Remove transition from keyframes (it's passed separately)
+                    delete exitKeyframes.transition
+
+                    pwLog('[motion] key transition: running exit', { exitKeyframes })
+                    await animate(
+                        element,
+                        exitKeyframes as DOMKeyframesDefinition,
+                        mergedTransition
+                    ).finished
+                }
+
+                // Check if component was unmounted during exit animation
+                if (keyTransitionStopped || !element) return
+
+                // 2. Snap to initial state
+                if (initialKeyframes && element) {
+                    const transformedInitial = transformSVGPathProperties(
+                        element,
+                        initialKeyframes as Record<string, unknown>
+                    )
+                    pwLog('[motion] key transition: snapping to initial', { transformedInitial })
+                    animate(element, transformedInitial as DOMKeyframesDefinition, { duration: 0 })
+                }
+
+                // Check again before running enter animation
+                if (keyTransitionStopped || !element) return
+
+                // 3. Run enter animation
+                pwLog('[motion] key transition: running enter animation')
+                runAnimation()
+            } finally {
+                if (!keyTransitionStopped) {
+                    keyTrackerIsTransitioning = false
+                }
+            }
+        }
+
+        runKeyTransition()
+
+        // Cleanup on unmount
+        return () => {
+            keyTransitionStopped = true
+        }
+    })
+
     // Re-run animate when animateProp changes while ready
     $effect(() => {
         if (!(element && isLoaded === 'ready')) return
@@ -765,7 +876,15 @@
 </script>
 
 {#if isVoidTag}
-    <svelte:element this={tag} bind:this={element} {...derivedAttrs} />
+    {#if isSVGTag(String(tag))}
+        <svelte:element this={tag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs} />
+    {:else}
+        <svelte:element this={tag} bind:this={element} {...derivedAttrs} />
+    {/if}
+{:else if isSVGTag(String(tag))}
+    <svelte:element this={tag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs}>
+        {@render children?.()}
+    </svelte:element>
 {:else}
     <svelte:element this={tag} bind:this={element} {...derivedAttrs}>
         {@render children?.()}

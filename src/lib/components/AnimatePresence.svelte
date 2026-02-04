@@ -1,6 +1,10 @@
 <script lang="ts">
     import type { Snippet } from 'svelte'
-    import { createAnimatePresenceContext, setAnimatePresenceContext } from '$lib/utils/presence'
+    import {
+        createAnimatePresenceContext,
+        setAnimatePresenceContext,
+        setPresenceDepth
+    } from '$lib/utils/presence'
     import { pwLog } from '$lib/utils/log'
 
     /**
@@ -27,6 +31,10 @@
     pwLog('[AnimatePresence] mounting', { initial, hasOnExitComplete: !!onExitComplete })
     const context = createAnimatePresenceContext({ initial, onExitComplete })
     setAnimatePresenceContext(context)
+
+    // Initialize presence depth to 0 for direct children
+    // Only direct children (depth 0) require explicit key props, matching Framer Motion behavior
+    setPresenceDepth(0)
 </script>
 
 <div class="animate-presence-container">
@@ -35,6 +43,6 @@
 
 <style>
     .animate-presence-container {
-        position: relative;
+        display: contents;
     }
 </style>

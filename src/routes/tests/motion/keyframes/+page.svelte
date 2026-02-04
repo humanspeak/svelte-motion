@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion } from '$lib/index'
+    import { motion } from '$lib'
 </script>
 
 <motion.div

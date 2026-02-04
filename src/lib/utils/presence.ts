@@ -12,6 +12,14 @@ import { getContext, onDestroy, setContext } from 'svelte'
 const ANIMATE_PRESENCE_CONTEXT = Symbol('animate-presence-context')
 
 /**
+ * Context key for tracking nesting depth within AnimatePresence.
+ *
+ * Used to enforce key requirements only on direct children (depth 0),
+ * matching Framer Motion behavior where only immediate children need keys.
+ */
+const PRESENCE_DEPTH_CONTEXT = Symbol('presence-depth-context')
+
+/**
  * Internal record for a registered presence child.
  *
  * Tracks its element, last known layout/style snapshot, and exit definition
@@ -438,6 +446,51 @@ export function getAnimatePresenceContext(): AnimatePresenceContext | undefined 
 /* c8 ignore next 3 */
 export function setAnimatePresenceContext(context: AnimatePresenceContext) {
     setContext(ANIMATE_PRESENCE_CONTEXT, context)
+}
+
+/**
+ * Get the current presence depth from Svelte component context.
+ *
+ * Returns undefined if not inside an AnimatePresence, or the depth level
+ * where 0 means direct child of AnimatePresence.
+ *
+ * @returns The current depth level (0 for direct children), or undefined if outside AnimatePresence.
+ * @example
+ * ```ts
+ * const depth = getPresenceDepth()
+ * if (depth === 0) {
+ *   // Direct child of AnimatePresence - key prop required
+ * }
+ * ```
+ *
+ * Note: Trivial wrapper - ignored for coverage.
+ */
+/* c8 ignore next */
+export const getPresenceDepth = (): number | undefined => getContext(PRESENCE_DEPTH_CONTEXT)
+
+/**
+ * Set the presence depth in Svelte component context.
+ *
+ * AnimatePresence sets this to 0, and each motion element increments it
+ * for its descendants so only direct children (depth 0) require keys.
+ *
+ * @param depth - The nesting depth to set (0 for direct children of AnimatePresence).
+ * @returns void
+ * @example
+ * ```ts
+ * // In AnimatePresence component
+ * setPresenceDepth(0)
+ *
+ * // In nested motion element
+ * const currentDepth = getPresenceDepth() ?? 0
+ * setPresenceDepth(currentDepth + 1)
+ * ```
+ *
+ * Note: Trivial wrapper - ignored for coverage.
+ */
+/* c8 ignore next */
+export const setPresenceDepth = (depth: number): void => {
+    setContext(PRESENCE_DEPTH_CONTEXT, depth)
 }
 
 /**

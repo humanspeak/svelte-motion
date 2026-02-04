@@ -43,8 +43,8 @@
         </p>
         <p>
             Unlike <code class="rounded bg-gray-100 px-1">useTime</code> which returns a store,
-            <code class="rounded bg-gray-100 px-1">useAnimationFrame</code> gives you direct control
-            over when and how to update your elements on each frame.
+            <code class="rounded bg-gray-100 px-1">useAnimationFrame</code> gives you direct control over
+            when and how to update your elements on each frame.
         </p>
     </div>
 </div>

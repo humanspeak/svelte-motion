@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion } from '$lib/index'
+    import { motion } from '$lib'
 </script>
 
 <div class="grid grid-cols-1 gap-4 md:grid-cols-3">

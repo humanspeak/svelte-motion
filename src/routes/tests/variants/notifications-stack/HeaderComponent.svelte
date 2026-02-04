@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { motion, stringifyStyleObject, type Variants } from '$lib'
+    import { motion, type Variants } from '$lib'
+    import { styleString } from '$lib/utils/styleObject.svelte.js'
 
     type Props = {
         isOpen: boolean
@@ -24,7 +25,7 @@
 
 <motion.div
     data-testid="header-container"
-    style={stringifyStyleObject({
+    style={styleString(() => ({
         position: 'absolute',
         top: '-40px',
         left: '0',
@@ -35,7 +36,7 @@
         justifyContent: 'space-between',
         transformOrigin: 'bottom center',
         pointerEvents: 'none'
-    })}
+    }))}
     {variants}
     transition={{
         type: 'spring',
@@ -45,16 +46,16 @@
     }}
 >
     <motion.h2
-        style={stringifyStyleObject({
+        style={styleString(() => ({
             fontSize: 18,
             lineHeight: 1,
             marginLeft: 8
-        })}
+        }))}
     >
         Notifications
     </motion.h2>
     <motion.button
-        style={stringifyStyleObject({
+        style={styleString(() => ({
             fontSize: 14,
             lineHeight: 1,
             marginRight: 8,
@@ -68,7 +69,7 @@
             cursor: 'pointer',
             pointerEvents: 'auto',
             userSelect: 'none'
-        })}
+        }))}
         whileHover={{
             backgroundColor: '#f5f5f5',
             color: '#0f1115'

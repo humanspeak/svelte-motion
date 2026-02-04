@@ -54,7 +54,7 @@ The store value represents elapsed milliseconds, making it perfect for time-base
 </div>
 ```
 
-<Example isSmall>
+<Example isSmall exampleUrl="/examples/use-time">
   <UseTimeExample />
 </Example>
 
@@ -148,7 +148,7 @@ Here's a complete example demonstrating the power of shared timelines. Notice ho
 </div>
 ```
 
-<Example isSmall>
+<Example isSmall exampleUrl="/examples/use-time-synced">
   <UseTimeSyncedExample />
 </Example>
 

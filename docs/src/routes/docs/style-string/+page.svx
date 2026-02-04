@@ -1,0 +1,287 @@
+---
+title: "styleString"
+description: "A helper for creating CSS style strings with automatic unit handling."
+---
+
+<svelte:head>
+  <title>styleString | Docs | Svelte Motion</title>
+</svelte:head>
+
+<script>
+  import Example from '$lib/components/general/Example.svelte';
+  import StyleStringExample from '$lib/examples/StyleStringExample.svelte';
+</script>
+
+# styleString
+
+`styleString` converts a style object into a CSS string with automatic unit handling. It's reactive when used in Svelte 5 templates with `$state` values.
+
+```svelte
+<script>
+  import { styleString } from '@humanspeak/svelte-motion'
+
+  let rotate = $state(0)
+  let opacity = $state(1)
+</script>
+
+<!-- Reactive - updates when rotate or opacity change -->
+<div style={styleString({ rotate, opacity })}>
+  This div's style updates reactively!
+</div>
+```
+
+<Example isSmall exampleUrl="/examples/style-string">
+  <StyleStringExample />
+</Example>
+
+## Why styleString?
+
+### Automatic Unit Handling
+
+Numbers are automatically converted to appropriate CSS units:
+
+| Property Type | Unit Applied | Examples |
+|---------------|--------------|----------|
+| Dimensions | `px` | `width`, `height`, `padding`, `margin` |
+| Angles | `deg` | `rotate`, `rotateX`, `skew`, `skewX` |
+| Unitless | none | `opacity`, `scale`, `zIndex`, `flex`, `fontWeight` |
+
+```svelte
+<script>
+  import { styleString } from '@humanspeak/svelte-motion'
+</script>
+
+<div style={styleString({
+  width: 100,      // → "width: 100px"
+  rotate: 45,      // → "rotate: 45deg"
+  scale: 1.5,      // → "scale: 1.5"
+  opacity: 0.5     // → "opacity: 0.5"
+})}>
+  Auto units!
+</div>
+```
+
+### camelCase to kebab-case
+
+Property names are automatically converted:
+
+```svelte
+<div style={styleString({
+  backgroundColor: 'red',   // → "background-color: red"
+  borderRadius: 8,          // → "border-radius: 8px"
+  fontSize: 16              // → "font-size: 16px"
+})}>
+```
+
+## Usage
+
+### Basic Usage
+
+Import the helper and pass a style object:
+
+```svelte
+<script lang="ts">
+  import { styleString } from '@humanspeak/svelte-motion'
+
+  let isActive = $state(false)
+</script>
+
+<div
+  style={styleString({
+    backgroundColor: isActive ? '#22c55e' : '#ef4444',
+    padding: 16,
+    borderRadius: 8
+  })}
+>
+  Click to toggle
+</div>
+```
+
+### With Animations
+
+Combine with `useTime` and `useTransform` for smooth time-based animations:
+
+```svelte
+<script lang="ts">
+  import { useTime, useTransform } from '@humanspeak/svelte-motion'
+  import { styleString } from '@humanspeak/svelte-motion'
+
+  const time = useTime()
+  const rotate = useTransform(time, [0, 1000], [0, 360], { clamp: false })
+</script>
+
+<div
+  style={styleString({
+    rotate: $rotate,
+    width: 100,
+    height: 100,
+    backgroundColor: '#3b82f6'
+  })}
+>
+  Spinning!
+</div>
+```
+
+### Factory Function Form
+
+You can also pass a factory function if preferred:
+
+```svelte
+<script lang="ts">
+  import { styleString } from '@humanspeak/svelte-motion'
+
+  let scale = $state(1)
+  let hue = $state(200)
+</script>
+
+<div
+  style={styleString(() => ({
+    scale,
+    backgroundColor: `hsl(${hue}, 70%, 50%)`,
+    width: 150,
+    height: 150
+  }))}
+>
+  Dynamic styles
+</div>
+```
+
+### String Values Preserved
+
+String values are kept as-is for custom units or complex values:
+
+```svelte
+<div style={styleString({
+  width: '50%',
+  height: 'auto',
+  transform: 'translateX(10px) scale(1.2)',
+  backgroundColor: 'linear-gradient(45deg, red, blue)'
+})}>
+```
+
+## Reactivity in Svelte 5
+
+In Svelte 5, template expressions are automatically reactive. When you use `$state` variables in a template expression like `style={styleString({ rotate })}`, Svelte tracks the dependency and re-evaluates the expression when `rotate` changes.
+
+This means you don't need any special reactive wrappers - just use `styleString` directly in your templates!
+
+```svelte
+<script>
+  let x = $state(0)
+  let y = $state(0)
+</script>
+
+<!-- This automatically updates when x or y change -->
+<div style={styleString({
+  transform: `translate(${x}px, ${y}px)`
+})}>
+  Moves with x and y
+</div>
+```
+
+## API Reference
+
+### Import
+
+```typescript
+import { styleString } from '@humanspeak/svelte-motion'
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `input` | `StyleObject \| (() => StyleObject)` | A style object or a function returning one |
+
+### Returns
+
+A `string` containing the CSS style declarations.
+
+### Type Definition
+
+```typescript
+type StyleObject = Record<string, string | number>
+
+function styleString(input: StyleObject | (() => StyleObject)): string
+```
+
+## Migration from stringifyStyleObject
+
+The older `stringifyStyleObject` function is deprecated. Migration is simple:
+
+### Before (deprecated)
+
+```svelte
+<script>
+  import { stringifyStyleObject } from '@humanspeak/svelte-motion'
+</script>
+
+<div style={stringifyStyleObject({ width: 100, rotate: 45 })}>
+```
+
+### After (recommended)
+
+```svelte
+<script>
+  import { styleString } from '@humanspeak/svelte-motion'
+</script>
+
+<div style={styleString({ width: 100, rotate: 45 })}>
+```
+
+The API is nearly identical - just change the import and function name.
+
+## Tips
+
+### Reusing Style Objects
+
+For reusable base styles:
+
+```svelte
+<script>
+  import { styleString } from '@humanspeak/svelte-motion'
+
+  const baseStyles = {
+    padding: 16,
+    borderRadius: 8,
+    display: 'flex'
+  }
+
+  let isActive = $state(false)
+</script>
+
+<div style={styleString({
+  ...baseStyles,
+  backgroundColor: isActive ? 'green' : 'red'
+})}>
+```
+
+### Combining with motion Components
+
+Works seamlessly with motion components:
+
+```svelte
+<script>
+  import { motion, styleString } from '@humanspeak/svelte-motion'
+
+  let scale = $state(1)
+</script>
+
+<motion.div
+  style={styleString({
+    width: 100,
+    height: 100,
+    scale
+  })}
+  whileHover={{ scale: 1.1 }}
+  whileTap={{ scale: 0.95 }}
+>
+  Interactive!
+</motion.div>
+```
+
+## See also
+
+- [useTime](/docs/use-time) - Time-based reactive values
+- [useTransform](/docs/use-transform) - Transform and map values
+- [Examples](/examples) - See styleString in action

@@ -6,7 +6,7 @@ export const load: PageLoad = () => {
     const examples = {
         'animate-presence': {
             title: 'AnimatePresence',
-            description: 'Interactive AnimatePresence animation example using Svelte Motion.',
+            description: 'Interactive animatepresence animation example using Svelte Motion.',
             sourceUrl:
                 'https://github.com/humanspeak/svelte-motion/tree/main/docs/src/routes/examples/animate-presence'
         },
@@ -35,6 +35,11 @@ export const load: PageLoad = () => {
             description: 'Interactive motion path animation example using Svelte Motion.',
             sourceUrl: 'https://examples.motion.dev/react/motion-path'
         },
+        'multi-state-badge': {
+            title: 'Multi-State Badge',
+            description: 'Interactive multi-state badge animation example using Svelte Motion.',
+            sourceUrl: 'https://motion.dev/examples/react-multi-state-badge'
+        },
         'notifications-stack': {
             title: 'Notifications Stack',
             description: 'Interactive notifications stack animation example using Svelte Motion.',
@@ -50,6 +55,11 @@ export const load: PageLoad = () => {
             title: 'Rotate',
             description: 'Interactive rotate animation example using Svelte Motion.',
             sourceUrl: 'https://examples.motion.dev/react/rotate?utm_source=embed'
+        },
+        'style-string': {
+            title: 'styleString',
+            description: 'Interactive stylestring animation example using Svelte Motion.',
+            sourceUrl: null
         },
         'toggle-switch': {
             title: 'Toggle Switch',
@@ -70,6 +80,16 @@ export const load: PageLoad = () => {
             title: 'useTime (Synced)',
             description: 'Interactive usetime (synced) animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/docs/react-use-time'
+        },
+        'variants-basic': {
+            title: 'Variants Basic',
+            description: 'Interactive variants basic animation example using Svelte Motion.',
+            sourceUrl: null
+        },
+        'variants-propagation': {
+            title: 'Variants Propagation',
+            description: 'Interactive variants propagation animation example using Svelte Motion.',
+            sourceUrl: null
         },
         'while-focus': {
             title: 'While Focus',

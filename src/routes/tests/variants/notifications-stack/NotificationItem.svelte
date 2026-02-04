@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { motion, stringifyStyleObject, type Variants } from '$lib'
+    import { motion, type Variants } from '$lib'
+    import { styleString } from '$lib/utils/styleObject.svelte.js'
 
     const N_NOTIFICATIONS = 3
     const NOTIFICATION_HEIGHT = 60
@@ -31,7 +32,7 @@
     }
 
     const getNotificationStyle = (index: number): string => {
-        return stringifyStyleObject({
+        return styleString(() => ({
             height: NOTIFICATION_HEIGHT,
             width: NOTIFICATION_WIDTH,
             backgroundColor: `#f5f5f5`,
@@ -41,7 +42,7 @@
             alignItems: 'center',
             zIndex: N_NOTIFICATIONS - index,
             userSelect: 'none'
-        })
+        }))
     }
 
     const notificationStyle = $derived(getNotificationStyle(index))

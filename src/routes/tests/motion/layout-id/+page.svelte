@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { AnimatePresence, motion } from '$lib/index'
+    import { AnimatePresence, motion } from '$lib'
 
     /**
      * Type definition for tab items

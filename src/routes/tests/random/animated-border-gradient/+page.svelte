@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion, useSpring, useTime, useTransform } from '$lib/index'
+    import { motion, useSpring, useTime, useTransform } from '$lib'
 
     const time = useTime()
 

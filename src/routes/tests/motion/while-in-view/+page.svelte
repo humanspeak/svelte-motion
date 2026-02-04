@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion } from '$lib/index'
+    import { motion } from '$lib'
 
     // Track which elements have animated for test verification
     let inViewportAnimated = $state(false)

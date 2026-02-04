@@ -4,9 +4,9 @@
 </script>
 
 <footer
-    class="flex items-center justify-center border-t border-border bg-background py-6 text-sm text-foreground"
+    class="flex items-center justify-center border-t border-border bg-background py-4 text-sm text-foreground"
 >
-    <div class="mx-auto flex max-w-7xl gap-2 px-4 text-center">
+    <div class="mx-auto flex max-w-7xl gap-1 px-4 text-center">
         {m.footer_made_with()}
         <motion.span
             aria-label={m.footer_love()}

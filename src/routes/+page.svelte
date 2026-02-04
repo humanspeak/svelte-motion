@@ -183,6 +183,27 @@
                         Basic (enter + exit)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/nested-keys') + searchParams}
+                    >
+                        Nested Keys (no key required)
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div>
+            <h2 class="mb-3 text-xl font-medium">SVG</h2>
+            <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/svg/namespace') + searchParams}
+                    >
+                        SVG Namespace Test
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
@@ -194,6 +215,14 @@
                         href={resolve('/tests/animation-frame') + searchParams}
                     >
                         useAnimationFrame
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reactive-style') + searchParams}
+                    >
+                        styleString (Reactive Styles)
                     </a>
                 </li>
             </ul>

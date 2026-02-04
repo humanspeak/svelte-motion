@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion, stringifyStyleObject, type Variants } from '@humanspeak/svelte-motion'
+    import { motion, styleString, type Variants } from '@humanspeak/svelte-motion'
 
     const N_NOTIFICATIONS = 3
     const NOTIFICATION_HEIGHT = 60
@@ -54,7 +54,7 @@
     }
 
     function getNotificationStyle(index: number): string {
-        return stringifyStyleObject({
+        return styleString(() => ({
             height: NOTIFICATION_HEIGHT,
             width: NOTIFICATION_WIDTH,
             backgroundColor: `#f5f5f5`,
@@ -66,10 +66,10 @@
             userSelect: 'none',
             fontWeight: 600,
             color: '#0f1115'
-        })
+        }))
     }
 
-    const headerButtonStyle = stringifyStyleObject({
+    const headerButtonStyle = styleString(() => ({
         fontSize: '14px',
         lineHeight: 1,
         marginRight: '8px',
@@ -85,33 +85,33 @@
         pointerEvents: 'auto',
         userSelect: 'none',
         border: 'none'
-    })
+    }))
 </script>
 
 <div
-    style={stringifyStyleObject({
+    style={styleString(() => ({
         background: 'var(--color-background-secondary)',
         borderRadius: 8,
         padding: '2rem',
         margin: '2rem 0'
-    })}
+    }))}
 >
     <div
-        style={stringifyStyleObject({
+        style={styleString(() => ({
             display: 'flex',
             minHeight: '400px',
             alignItems: 'center',
             justifyContent: 'center'
-        })}
+        }))}
     >
         <motion.div
-            style={stringifyStyleObject({
+            style={styleString(() => ({
                 position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: `${NOTIFICATION_GAP}px`,
                 width: `${NOTIFICATION_WIDTH}px`
-            })}
+            }))}
             variants={stackVariants}
             initial={false}
             animate={isOpen ? 'open' : 'closed'}
@@ -122,7 +122,7 @@
         >
             <!-- Header -->
             <motion.div
-                style={stringifyStyleObject({
+                style={styleString(() => ({
                     position: 'absolute',
                     top: -40,
                     left: 0,
@@ -133,7 +133,7 @@
                     justifyContent: 'space-between',
                     transformOrigin: 'bottom center',
                     pointerEvents: 'none'
-                })}
+                }))}
                 variants={headerVariants}
                 transition={{
                     type: 'spring',
@@ -143,11 +143,11 @@
                 }}
             >
                 <motion.h2
-                    style={stringifyStyleObject({
+                    style={styleString(() => ({
                         fontSize: 18,
                         lineHeight: 1,
                         marginLeft: 8
-                    })}
+                    }))}
                 >
                     Notifications
                 </motion.h2>
@@ -184,19 +184,19 @@
     </div>
 
     <div
-        style={stringifyStyleObject({
+        style={styleString(() => ({
             textAlign: 'center',
             marginTop: '2rem',
             fontSize: '0.875rem',
             color: 'var(--color-text-secondary)'
-        })}
+        }))}
     >
         State: <span
-            style={stringifyStyleObject({
+            style={styleString(() => ({
                 fontFamily: 'monospace',
                 fontWeight: 600,
                 color: 'var(--color-text-primary)'
-            })}>{isOpen ? 'open' : 'closed'}</span
+            }))}>{isOpen ? 'open' : 'closed'}</span
         >
     </div>
 </div>

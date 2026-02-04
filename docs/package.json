@@ -21,7 +21,7 @@
     },
     "dependencies": {
         "@humanspeak/svelte-motion": "workspace:*",
-        "@inlang/paraglide-js": "^2.9.1",
+        "@inlang/paraglide-js": "^2.10.0",
         "@sentry/sveltekit": "^10.38.0",
         "github-slugger": "^2.0.0"
     },
@@ -30,7 +30,7 @@
         "@eslint/js": "^9.39.2",
         "@sveltejs/adapter-auto": "^7.0.0",
         "@sveltejs/adapter-cloudflare": "^7.2.6",
-        "@sveltejs/kit": "^2.50.1",
+        "@sveltejs/kit": "^2.50.2",
         "@sveltejs/vite-plugin-svelte": "^6.2.4",
         "@tailwindcss/typography": "^0.5.19",
         "@tailwindcss/vite": "^4.1.18",
@@ -42,7 +42,7 @@
         "eslint-plugin-import": "2.32.0",
         "eslint-plugin-svelte": "3.14.0",
         "eslint-plugin-unused-imports": "4.3.0",
-        "globals": "^17.2.0",
+        "globals": "^17.3.0",
         "mdsvex": "^0.12.6",
         "mode-watcher": "^1.1.0",
         "playwright": "^1.58.1",
@@ -51,7 +51,7 @@
         "prettier-plugin-svelte": "^3.4.1",
         "prettier-plugin-tailwindcss": "^0.7.2",
         "shiki": "^3.22.0",
-        "svelte": "^5.49.1",
+        "svelte": "^5.49.2",
         "svelte-check": "^4.3.6",
         "tailwindcss": "^4.1.18",
         "typescript": "^5.9.3",
@@ -60,7 +60,7 @@
         "vite-plugin-devtools-json": "^1.0.0",
         "vitest": "^4.0.18",
         "vitest-browser-svelte": "^2.0.2",
-        "wrangler": "^4.61.1"
+        "wrangler": "^4.62.0"
     },
     "volta": {
         "node": "24.12.0"

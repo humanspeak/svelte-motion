@@ -44,7 +44,7 @@ Svelte gives you the power to build dynamic user interfaces with excellent perfo
 
 ```
 
-<Example isSmall>
+<Example isSmall exampleUrl="/examples/animated-button">
   <AnimatedButton />
 </Example>
 
@@ -90,7 +90,7 @@ The `<motion>` component is the core API in Svelte Motion. It's a DOM element, s
 />
 ```
 
-<Example isSmall>
+<Example isSmall exampleUrl="/examples/rotate">
   <Rotate />
 </Example>
 
@@ -140,7 +140,7 @@ Or disable this initial animation entirely by setting `initial` to `false`.
 </motion.button>
 ```
 
-<Example isSmall>
+<Example isSmall exampleUrl="/examples/hover-and-tap">
     <HoverAndTap />
 </Example>
 
@@ -159,7 +159,7 @@ Elements can animate when they enter the viewport:
 </motion.div>
 ```
 
-<Example isSmall>
+<Example isSmall exampleUrl="/examples/while-in-view">
   <WhileInViewExample />
 </Example>
 

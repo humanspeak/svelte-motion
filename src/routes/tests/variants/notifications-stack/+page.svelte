@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { motion, stringifyStyleObject, type Variants } from '$lib'
+    import { motion, type Variants } from '$lib'
+    import { styleString } from '$lib/utils/styleObject.svelte.js'
     import HeaderComponent from './HeaderComponent.svelte'
     import NotificationItem from './NotificationItem.svelte'
 
@@ -32,13 +33,13 @@
 
         <motion.div
             data-testid="stack-container"
-            style={stringifyStyleObject({
+            style={styleString(() => ({
                 position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '8px',
                 width: '300px'
-            })}
+            }))}
             variants={stackVariants}
             initial={false}
             animate={isOpen ? 'open' : 'closed'}
