@@ -35,6 +35,11 @@ export const load: PageLoad = () => {
             description: 'Interactive motion path animation example using Svelte Motion.',
             sourceUrl: 'https://examples.motion.dev/react/motion-path'
         },
+        'multi-state-badge': {
+            title: 'Multi-State Badge',
+            description: 'Interactive multi-state badge animation example using Svelte Motion.',
+            sourceUrl: 'https://motion.dev/examples/react-multi-state-badge'
+        },
         'notifications-stack': {
             title: 'Notifications Stack',
             description: 'Interactive notifications stack animation example using Svelte Motion.',
