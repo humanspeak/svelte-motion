@@ -6,7 +6,7 @@ export const load: PageLoad = () => {
     const examples = {
         'animate-presence': {
             title: 'AnimatePresence',
-            description: 'Interactive AnimatePresence animation example using Svelte Motion.',
+            description: 'Interactive animatepresence animation example using Svelte Motion.',
             sourceUrl:
                 'https://github.com/humanspeak/svelte-motion/tree/main/docs/src/routes/examples/animate-presence'
         },
@@ -55,6 +55,11 @@ export const load: PageLoad = () => {
             title: 'Rotate',
             description: 'Interactive rotate animation example using Svelte Motion.',
             sourceUrl: 'https://examples.motion.dev/react/rotate?utm_source=embed'
+        },
+        'style-string': {
+            title: 'styleString',
+            description: 'Interactive stylestring animation example using Svelte Motion.',
+            sourceUrl: null
         },
         'toggle-switch': {
             title: 'Toggle Switch',

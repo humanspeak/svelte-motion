@@ -68,6 +68,16 @@
             ]
         },
         {
+            title: 'Utilities',
+            items: [
+                {
+                    title: 'styleString',
+                    href: '/docs/style-string',
+                    icon: 'fa-solid fa-paintbrush'
+                }
+            ]
+        },
+        {
             title: 'Love and Respect',
             items: [{ title: 'Beye.ai', href: 'https://beye.ai', icon: 'fa-solid fa-heart' }]
         },
