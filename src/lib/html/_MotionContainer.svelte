@@ -139,6 +139,10 @@
     // When not inside AnimatePresence, use a stable identifier based on component instance
     const presenceKey = keyProp ?? `motion-${++keyCounter}`
 
+    // Track previous key for key-change detection (simulates React's key-based remounting)
+    // We use a ref object to track the previous value across effect runs
+    const keyTracker = { prev: keyProp, isTransitioning: false }
+
     // Compute merged transition without mutating props to avoid effect write loops
     const mergedTransition = $derived<AnimationOptions>(
         mergeTransitions(
@@ -573,6 +577,79 @@
                 animate: (resolvedAnimate ?? {}) as Record<string, unknown>
             }
         )
+    })
+
+    // Handle key prop changes inside AnimatePresence (simulates React's key-based remounting)
+    // When key changes, run exit → initial → animate sequence on the same element
+    $effect(() => {
+        // Access keyProp to create reactive dependency
+        const currentKey = keyProp
+
+        // Only handle key changes when:
+        // 1. We're inside AnimatePresence (context exists)
+        // 2. Element is ready (not during initial mount)
+        // 3. Key actually changed (not undefined → value on mount)
+        // 4. Not already transitioning
+        if (
+            !context ||
+            !element ||
+            isLoaded !== 'ready' ||
+            keyTracker.isTransitioning ||
+            currentKey === keyTracker.prev ||
+            keyTracker.prev === undefined
+        ) {
+            // Update prev for next comparison
+            if (currentKey !== keyTracker.prev) {
+                keyTracker.prev = currentKey
+            }
+            return
+        }
+
+        pwLog('[motion] key changed, running exit→initial→animate', {
+            prevKey: keyTracker.prev,
+            newKey: currentKey
+        })
+
+        // Mark as transitioning to prevent re-entry
+        keyTracker.isTransitioning = true
+        keyTracker.prev = currentKey
+
+        // Run the key transition sequence
+        const runKeyTransition = async () => {
+            try {
+                // 1. Run exit animation if defined
+                if (resolvedExit && element) {
+                    const exitKeyframes = { ...(resolvedExit as Record<string, unknown>) }
+                    // Remove transition from keyframes (it's passed separately)
+                    delete exitKeyframes.transition
+
+                    pwLog('[motion] key transition: running exit', { exitKeyframes })
+                    await animate(
+                        element,
+                        exitKeyframes as DOMKeyframesDefinition,
+                        mergedTransition
+                    ).finished
+                }
+
+                // 2. Snap to initial state
+                if (initialKeyframes && element) {
+                    const transformedInitial = transformSVGPathProperties(
+                        element,
+                        initialKeyframes as Record<string, unknown>
+                    )
+                    pwLog('[motion] key transition: snapping to initial', { transformedInitial })
+                    animate(element, transformedInitial as DOMKeyframesDefinition, { duration: 0 })
+                }
+
+                // 3. Run enter animation
+                pwLog('[motion] key transition: running enter animation')
+                runAnimation()
+            } finally {
+                keyTracker.isTransitioning = false
+            }
+        }
+
+        runKeyTransition()
     })
 
     // Re-run animate when animateProp changes while ready
