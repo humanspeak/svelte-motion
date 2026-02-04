@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion, stringifyStyleObject } from '@humanspeak/svelte-motion'
+    import { motion, styleString } from '@humanspeak/svelte-motion'
 
     const transition = {
         duration: 4,
@@ -23,7 +23,7 @@
     }
 </script>
 
-<div style={stringifyStyleObject({ position: 'relative' })}>
+<div style={styleString(() => ({ position: 'relative' }))}>
     <svg xmlns="http://www.w3.org/2000/svg" width="451" height="437">
         <motion.path
             d={pathData}
@@ -38,7 +38,7 @@
         />
     </svg>
     <motion.div
-        style={stringifyStyleObject(box)}
+        style={styleString(() => box)}
         initial={{ offsetDistance: '0%', scale: 2.5 }}
         animate={{ offsetDistance: '100%', scale: 1 }}
         {transition}

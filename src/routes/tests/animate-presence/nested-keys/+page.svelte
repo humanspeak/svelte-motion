@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion, AnimatePresence } from '$lib/index'
+    import { motion, AnimatePresence } from '$lib'
 
     let isVisible = $state(true)
     let showNested = $state(true)

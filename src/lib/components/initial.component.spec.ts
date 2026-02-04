@@ -1,4 +1,4 @@
-import { motion } from '$lib/index'
+import { motion } from '$lib'
 import { render } from '@testing-library/svelte'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 

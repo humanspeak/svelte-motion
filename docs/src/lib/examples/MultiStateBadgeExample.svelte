@@ -13,7 +13,7 @@
         AnimatePresence,
         useTime,
         useTransform,
-        stringifyStyleObject
+        styleString
     } from '@humanspeak/svelte-motion'
     import { animate } from 'motion'
 
@@ -130,14 +130,14 @@
 </script>
 
 <div
-    style={stringifyStyleObject({
+    style={styleString(() => ({
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 16,
         minHeight: 200
-    })}
+    }))}
 >
     <button
         onclick={() => {
@@ -148,7 +148,7 @@
         <!-- Badge -->
         <motion.div
             bind:ref={badgeElement}
-            style={stringifyStyleObject({
+            style={styleString(() => ({
                 backgroundColor: '#f5f5f5',
                 color: '#0f1115',
                 display: 'flex',
@@ -159,17 +159,17 @@
                 borderRadius: 999,
                 willChange: 'transform, filter',
                 gap: badgeState === 'idle' ? 0 : 8
-            })}
+            }))}
         >
             <!-- Icon Container -->
             <motion.span
-                style={stringifyStyleObject({
+                style={styleString(() => ({
                     height: 20,
                     position: 'relative',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
-                })}
+                }))}
                 animate={{
                     width: badgeState === 'idle' ? 0 : 20
                 }}
@@ -178,11 +178,11 @@
                 <AnimatePresence>
                     <motion.span
                         key={badgeState}
-                        style={stringifyStyleObject({
+                        style={styleString(() => ({
                             position: 'absolute',
                             left: 0,
                             top: 0
-                        })}
+                        }))}
                         initial={{
                             y: -40,
                             scale: 0.5,
@@ -282,19 +282,19 @@
             <!-- Hidden copy of label to measure width -->
             <div
                 bind:this={measureElement}
-                style={stringifyStyleObject({
+                style={styleString(() => ({
                     position: 'absolute',
                     visibility: 'hidden',
                     whiteSpace: 'nowrap'
-                })}
+                }))}
             >
                 {STATES[badgeState]}
             </div>
 
             <motion.span
-                style={stringifyStyleObject({
+                style={styleString(() => ({
                     position: 'relative'
-                })}
+                }))}
                 initial={false}
                 animate={{
                     width: labelWidth
@@ -304,9 +304,9 @@
                 <AnimatePresence initial={false}>
                     <motion.div
                         key={badgeState}
-                        style={stringifyStyleObject({
+                        style={styleString(() => ({
                             whiteSpace: 'nowrap'
-                        })}
+                        }))}
                         initial={{
                             y: -20,
                             opacity: 0,
@@ -338,11 +338,11 @@
     </button>
 
     <div
-        style={stringifyStyleObject({
+        style={styleString(() => ({
             marginTop: '2rem',
             fontSize: '0.875rem',
             color: 'var(--color-text-secondary, #888)'
-        })}
+        }))}
     >
         Click badge to cycle states
     </div>

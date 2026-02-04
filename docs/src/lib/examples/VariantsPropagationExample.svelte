@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion, stringifyStyleObject, type Variants } from '@humanspeak/svelte-motion'
+    import { motion, styleString, type Variants } from '@humanspeak/svelte-motion'
 
     let isVisible = $state(false)
 
@@ -27,15 +27,15 @@
 </script>
 
 <div
-    style={stringifyStyleObject({
+    style={styleString(() => ({
         padding: '2rem',
         background: 'var(--color-background-secondary)',
         borderRadius: 8,
         margin: '2rem 0'
-    })}
+    }))}
 >
     <button
-        style={stringifyStyleObject({
+        style={styleString(() => ({
             padding: '0.5rem 1rem',
             background: 'var(--color-primary)',
             color: 'white',
@@ -45,33 +45,33 @@
             fontWeight: 600,
             cursor: 'pointer',
             marginBottom: '1rem'
-        })}
+        }))}
         onclick={() => (isVisible = !isVisible)}
     >
         {isVisible ? 'Hide' : 'Show'} Items
     </button>
 
     <motion.ul
-        style={stringifyStyleObject({
+        style={styleString(() => ({
             listStyle: 'none',
             padding: 0,
             margin: 0,
             display: 'flex',
             flexDirection: 'column',
             gap: '0.5rem'
-        })}
+        }))}
         variants={containerVariants}
         initial="hidden"
         animate={isVisible ? 'visible' : 'hidden'}
     >
         {#each items as item, i (i)}
             <motion.li
-                style={stringifyStyleObject({
+                style={styleString(() => ({
                     padding: '1rem',
                     background: 'var(--color-background)',
                     borderRadius: 6,
                     border: '1px solid var(--color-border)'
-                })}
+                }))}
                 variants={itemVariants}
                 transition={{
                     type: 'spring',

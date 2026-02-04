@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion, stringifyStyleObject } from '@humanspeak/svelte-motion'
+    import { motion, styleString } from '@humanspeak/svelte-motion'
     import { onMount } from 'svelte'
 
     const initialOrder = ['#ff0088', '#dd00ee', '#9911ff', '#0d63f8']
@@ -58,15 +58,15 @@
     }
 </script>
 
-<motion.ul style={stringifyStyleObject(container)}>
+<motion.ul style={styleString(() => container)}>
     {#each order as backgroundColor (backgroundColor)}
         <motion.li
             layout
             transition={spring}
-            style={stringifyStyleObject({
+            style={styleString(() => ({
                 ...item,
                 backgroundColor
-            })}
+            }))}
         />
     {/each}
 </motion.ul>

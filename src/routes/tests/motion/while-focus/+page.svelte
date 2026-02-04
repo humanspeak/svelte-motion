@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion } from '$lib/index'
+    import { motion } from '$lib'
 </script>
 
 <div style="display: flex; gap: 20px; padding: 20px; flex-direction: column;">
