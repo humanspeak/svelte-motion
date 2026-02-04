@@ -83,6 +83,34 @@ describe('stringifyStyleObject', () => {
         expect(result).not.toContain('2px')
     })
 
+    it('adds deg to numeric rotate and skew values', () => {
+        const result = stringifyStyleObject({
+            rotate: 45,
+            rotateX: 15,
+            rotateY: -30,
+            rotateZ: 90,
+            skew: 12,
+            skewX: -8,
+            skewY: 6
+        })
+        expect(result).toContain('rotate: 45deg')
+        expect(result).toContain('rotate-x: 15deg')
+        expect(result).toContain('rotate-y: -30deg')
+        expect(result).toContain('rotate-z: 90deg')
+        expect(result).toContain('skew: 12deg')
+        expect(result).toContain('skew-x: -8deg')
+        expect(result).toContain('skew-y: 6deg')
+    })
+
+    it('preserves string values for degree properties', () => {
+        const result = stringifyStyleObject({
+            rotate: '45deg',
+            skewX: '10deg'
+        })
+        expect(result).toContain('rotate: 45deg')
+        expect(result).toContain('skew-x: 10deg')
+    })
+
     it('handles mixed unitless and unit-required properties', () => {
         const result = stringifyStyleObject({
             width: 200,
