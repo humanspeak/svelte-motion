@@ -454,6 +454,15 @@ export function setAnimatePresenceContext(context: AnimatePresenceContext) {
  * Returns undefined if not inside an AnimatePresence, or the depth level
  * where 0 means direct child of AnimatePresence.
  *
+ * @returns The current depth level (0 for direct children), or undefined if outside AnimatePresence.
+ * @example
+ * ```ts
+ * const depth = getPresenceDepth()
+ * if (depth === 0) {
+ *   // Direct child of AnimatePresence - key prop required
+ * }
+ * ```
+ *
  * Note: Trivial wrapper - ignored for coverage.
  */
 /* c8 ignore next */
@@ -464,6 +473,18 @@ export const getPresenceDepth = (): number | undefined => getContext(PRESENCE_DE
  *
  * AnimatePresence sets this to 0, and each motion element increments it
  * for its descendants so only direct children (depth 0) require keys.
+ *
+ * @param depth - The nesting depth to set (0 for direct children of AnimatePresence).
+ * @returns void
+ * @example
+ * ```ts
+ * // In AnimatePresence component
+ * setPresenceDepth(0)
+ *
+ * // In nested motion element
+ * const currentDepth = getPresenceDepth() ?? 0
+ * setPresenceDepth(currentDepth + 1)
+ * ```
  *
  * Note: Trivial wrapper - ignored for coverage.
  */

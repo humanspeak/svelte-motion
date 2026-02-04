@@ -169,4 +169,55 @@ describe('stringifyStyleObject', () => {
         })
         expect(result).toBe('width: 100px; height: 50px')
     })
+
+    it('handles zero values for rotate and skew with deg unit', () => {
+        const result = stringifyStyleObject({
+            rotate: 0,
+            skew: 0,
+            skewX: 0,
+            skewY: 0
+        })
+        expect(result).toContain('rotate: 0deg')
+        expect(result).toContain('skew: 0deg')
+        expect(result).toContain('skew-x: 0deg')
+        expect(result).toContain('skew-y: 0deg')
+    })
+
+    it('handles negative scale values (reflection)', () => {
+        const result = stringifyStyleObject({
+            scale: -1,
+            scaleX: -0.5,
+            scaleY: -2
+        })
+        expect(result).toContain('scale: -1')
+        expect(result).toContain('scale-x: -0.5')
+        expect(result).toContain('scale-y: -2')
+        expect(result).not.toContain('px')
+    })
+
+    it('handles negative rotation values', () => {
+        const result = stringifyStyleObject({
+            rotate: -45,
+            rotateX: -90,
+            skewX: -15
+        })
+        expect(result).toContain('rotate: -45deg')
+        expect(result).toContain('rotate-x: -90deg')
+        expect(result).toContain('skew-x: -15deg')
+    })
+
+    it('handles zero values for unitless properties', () => {
+        const result = stringifyStyleObject({
+            opacity: 0,
+            zIndex: 0,
+            scale: 0,
+            order: 0
+        })
+        expect(result).toContain('opacity: 0')
+        expect(result).toContain('z-index: 0')
+        expect(result).toContain('scale: 0')
+        expect(result).toContain('order: 0')
+        expect(result).not.toContain('0px')
+        expect(result).not.toContain('0deg')
+    })
 })

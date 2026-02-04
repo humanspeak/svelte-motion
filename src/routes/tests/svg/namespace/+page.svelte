@@ -4,14 +4,16 @@
     // Toggle for mounting/unmounting SVG elements
     let showSvg = $state(true)
 
-    // Element references to check namespace (using HTMLElement for the ref prop type)
+    // Element references to check namespace
+    // Note: Using HTMLElement due to motion component type constraints, but these will
+    // actually hold SVG elements at runtime (which have namespaceURI property)
     let svgElement = $state<HTMLElement | null>(null)
     let pathElement = $state<HTMLElement | null>(null)
     let circleElement = $state<HTMLElement | null>(null)
     let lineElement = $state<HTMLElement | null>(null)
 
-    // Computed namespace info
-    const svgInfo = $derived(() => {
+    // Computed namespace info (using $derived.by for lazy evaluation)
+    const svgInfo = $derived.by(() => {
         if (!svgElement) return { namespace: 'not mounted', type: 'N/A' }
         return {
             namespace: svgElement.namespaceURI ?? 'null',
@@ -19,7 +21,7 @@
         }
     })
 
-    const pathInfo = $derived(() => {
+    const pathInfo = $derived.by(() => {
         if (!pathElement) return { namespace: 'not mounted', type: 'N/A' }
         return {
             namespace: pathElement.namespaceURI ?? 'null',
@@ -27,7 +29,7 @@
         }
     })
 
-    const circleInfo = $derived(() => {
+    const circleInfo = $derived.by(() => {
         if (!circleElement) return { namespace: 'not mounted', type: 'N/A' }
         return {
             namespace: circleElement.namespaceURI ?? 'null',
@@ -35,7 +37,7 @@
         }
     })
 
-    const lineInfo = $derived(() => {
+    const lineInfo = $derived.by(() => {
         if (!lineElement) return { namespace: 'not mounted', type: 'N/A' }
         return {
             namespace: lineElement.namespaceURI ?? 'null',
@@ -154,12 +156,12 @@
                     <tbody>
                         <tr class="border-b border-gray-700">
                             <td class="px-4 py-3 font-mono">motion.svg</td>
-                            <td class="px-4 py-3 font-mono text-xs">{svgInfo().namespace}</td>
-                            <td class="px-4 py-3 font-mono">{svgInfo().type}</td>
+                            <td class="px-4 py-3 font-mono text-xs">{svgInfo.namespace}</td>
+                            <td class="px-4 py-3 font-mono">{svgInfo.type}</td>
                             <td class="px-4 py-3">
-                                {#if svgInfo().namespace === 'not mounted'}
+                                {#if svgInfo.namespace === 'not mounted'}
                                     <span class="text-gray-500">Not Mounted</span>
-                                {:else if isCorrectNamespace(svgInfo().namespace)}
+                                {:else if isCorrectNamespace(svgInfo.namespace)}
                                     <span class="text-green-400">Correct</span>
                                 {:else}
                                     <span class="text-red-400">Incorrect</span>
@@ -168,12 +170,12 @@
                         </tr>
                         <tr class="border-b border-gray-700">
                             <td class="px-4 py-3 font-mono">motion.path</td>
-                            <td class="px-4 py-3 font-mono text-xs">{pathInfo().namespace}</td>
-                            <td class="px-4 py-3 font-mono">{pathInfo().type}</td>
+                            <td class="px-4 py-3 font-mono text-xs">{pathInfo.namespace}</td>
+                            <td class="px-4 py-3 font-mono">{pathInfo.type}</td>
                             <td class="px-4 py-3">
-                                {#if pathInfo().namespace === 'not mounted'}
+                                {#if pathInfo.namespace === 'not mounted'}
                                     <span class="text-gray-500">Not Mounted</span>
-                                {:else if isCorrectNamespace(pathInfo().namespace)}
+                                {:else if isCorrectNamespace(pathInfo.namespace)}
                                     <span class="text-green-400">Correct</span>
                                 {:else}
                                     <span class="text-red-400">Incorrect</span>
@@ -182,12 +184,12 @@
                         </tr>
                         <tr class="border-b border-gray-700">
                             <td class="px-4 py-3 font-mono">motion.circle</td>
-                            <td class="px-4 py-3 font-mono text-xs">{circleInfo().namespace}</td>
-                            <td class="px-4 py-3 font-mono">{circleInfo().type}</td>
+                            <td class="px-4 py-3 font-mono text-xs">{circleInfo.namespace}</td>
+                            <td class="px-4 py-3 font-mono">{circleInfo.type}</td>
                             <td class="px-4 py-3">
-                                {#if circleInfo().namespace === 'not mounted'}
+                                {#if circleInfo.namespace === 'not mounted'}
                                     <span class="text-gray-500">Not Mounted</span>
-                                {:else if isCorrectNamespace(circleInfo().namespace)}
+                                {:else if isCorrectNamespace(circleInfo.namespace)}
                                     <span class="text-green-400">Correct</span>
                                 {:else}
                                     <span class="text-red-400">Incorrect</span>
@@ -196,12 +198,12 @@
                         </tr>
                         <tr>
                             <td class="px-4 py-3 font-mono">motion.line</td>
-                            <td class="px-4 py-3 font-mono text-xs">{lineInfo().namespace}</td>
-                            <td class="px-4 py-3 font-mono">{lineInfo().type}</td>
+                            <td class="px-4 py-3 font-mono text-xs">{lineInfo.namespace}</td>
+                            <td class="px-4 py-3 font-mono">{lineInfo.type}</td>
                             <td class="px-4 py-3">
-                                {#if lineInfo().namespace === 'not mounted'}
+                                {#if lineInfo.namespace === 'not mounted'}
                                     <span class="text-gray-500">Not Mounted</span>
-                                {:else if isCorrectNamespace(lineInfo().namespace)}
+                                {:else if isCorrectNamespace(lineInfo.namespace)}
                                     <span class="text-green-400">Correct</span>
                                 {:else}
                                     <span class="text-red-400">Incorrect</span>

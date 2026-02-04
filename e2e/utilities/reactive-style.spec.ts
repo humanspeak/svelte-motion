@@ -103,12 +103,13 @@ test.describe('Reactive Style (styleString)', () => {
         // Rotation slider should be disabled
         await expect(rotationSlider).toBeDisabled()
 
-        // Wait a bit for auto rotation to progress
-        await page.waitForTimeout(500)
-
-        // Rotation should have changed from 0
-        const rotation = await demoBox.getAttribute('data-rotation')
-        expect(parseFloat(rotation || '0')).toBeGreaterThan(0)
+        // Wait for auto rotation to progress from 0 using polling
+        await expect
+            .poll(async () => {
+                const rotation = await demoBox.getAttribute('data-rotation')
+                return parseFloat(rotation || '0')
+            })
+            .toBeGreaterThan(0)
     })
 
     test('styleString should correctly handle unit conversion', async ({ page }) => {
@@ -117,10 +118,11 @@ test.describe('Reactive Style (styleString)', () => {
         const demoBox = page.getByTestId('demo-box')
         const style = await demoBox.getAttribute('style')
 
-        // Check that dimensions have px units
-        expect(style).toContain('150px') // width and height
+        // Check that numeric dimensions get px units (using regex for resilience)
+        expect(style).toMatch(/width:\s*\d+px/)
+        expect(style).toMatch(/height:\s*\d+px/)
 
         // Check that border-radius has px units
-        expect(style).toContain('16px') // borderRadius
+        expect(style).toMatch(/border-radius:\s*\d+px/)
     })
 })
