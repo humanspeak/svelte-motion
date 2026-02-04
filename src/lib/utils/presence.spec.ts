@@ -2,17 +2,19 @@ import { getContext, setContext } from 'svelte'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAnimatePresenceContext, getPresenceDepth, setPresenceDepth } from './presence'
 
+// Shared context store for mock - exposed for clearing between tests
+const mockContextStore = new Map<symbol | string, unknown>()
+
 // Mock svelte context functions for depth tests
 vi.mock('svelte', async (importOriginal) => {
     const original = await importOriginal<typeof import('svelte')>()
-    const contextStore = new Map<symbol | string, unknown>()
     return {
         ...original,
         setContext: vi.fn((key: symbol | string, value: unknown) => {
-            contextStore.set(key, value)
+            mockContextStore.set(key, value)
         }),
         getContext: vi.fn((key: symbol | string) => {
-            return contextStore.get(key)
+            return mockContextStore.get(key)
         })
     }
 })
@@ -166,9 +168,10 @@ describe('presence context', () => {
 
 describe('presence depth context', () => {
     beforeEach(() => {
-        // Clear mock call history between tests
+        // Clear mock call history and shared context store between tests
         vi.mocked(setContext).mockClear()
         vi.mocked(getContext).mockClear()
+        mockContextStore.clear()
     })
 
     it('getPresenceDepth returns undefined when not set', () => {
