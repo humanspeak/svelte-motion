@@ -62,7 +62,7 @@ The callback receives a `DOMHighResTimeStamp` representing the time elapsed sinc
 </div>
 ```
 
-<Example isSmall>
+<Example isSmall exampleUrl="/examples/use-animation-frame">
   <UseAnimationFrameExample />
 </Example>
 

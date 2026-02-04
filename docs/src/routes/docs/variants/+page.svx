@@ -50,7 +50,7 @@ Instead of defining animation objects inline, you can create a `Variants` object
 </motion.div>
 ```
 
-<Example isSmall>
+<Example isSmall exampleUrl="/examples/variants-basic">
 <VariantsBasicExample />
 </Example>
 
@@ -130,7 +130,7 @@ One of the most powerful features of variants is **automatic propagation** throu
 </motion.ul>
 ```
 
-<Example isSmall>
+<Example isSmall exampleUrl="/examples/variants-propagation">
 <VariantsPropagationExample />
 </Example>
 
@@ -171,7 +171,7 @@ Here's a real-world example showing how variants enable complex orchestration. T
 
 **Click the stack to see variants in action:**
 
-<Example isSmall>
+<Example isSmall exampleUrl="/examples/notifications-stack">
 <NotificationsStackExample />
 </Example>
 

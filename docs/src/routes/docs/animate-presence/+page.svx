@@ -35,7 +35,7 @@ description: Animate components when they are added to or removed from the DOM
 </AnimatePresence>
 ```
 
-<Example isSmall>
+<Example isSmall exampleUrl="/examples/animate-presence">
   <AnimatePresenceExample />
 </Example>
 

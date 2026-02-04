@@ -34,7 +34,7 @@ description: "Create a derived store that maps a numeric source across ranges or
 <div style="transform: rotate({$rotate}deg)">Rotating</div>
 ```
 
-<Example isSmall>
+<Example isSmall exampleUrl="/examples/html-content">
   <HTMLContent />
 </Example>
 
