@@ -36,7 +36,12 @@
     import type { SvelteHTMLElements } from 'svelte/elements'
     import { mergeInlineStyles } from '$lib/utils/style'
     import { isNativelyFocusable } from '$lib/utils/a11y'
-    import { usePresence, getAnimatePresenceContext } from '$lib/utils/presence'
+    import {
+        usePresence,
+        getAnimatePresenceContext,
+        getPresenceDepth,
+        setPresenceDepth
+    } from '$lib/utils/presence'
     import { getInitialKeyframes } from '$lib/utils/initial'
     import { attachDrag } from '$lib/utils/drag'
     import { resolveInitial, resolveAnimate, resolveExit } from '$lib/utils/variants'
@@ -108,12 +113,21 @@
     // Get presence context to check if we're inside AnimatePresence
     const context = getAnimatePresenceContext()
 
-    // Validate key prop when inside AnimatePresence
-    if (context && !keyProp) {
+    // Get current presence depth (0 = direct child of AnimatePresence, undefined = not in AnimatePresence)
+    const presenceDepth = getPresenceDepth()
+
+    // Validate key prop only for direct children of AnimatePresence (depth 0)
+    // This matches Framer Motion behavior where only immediate children need keys
+    if (context && presenceDepth === 0 && !keyProp) {
         throw new Error(
-            'motion elements inside AnimatePresence must have a `key` prop. ' +
+            'motion elements that are direct children of AnimatePresence must have a `key` prop. ' +
                 'Example: <motion.div key="unique-id" />'
         )
+    }
+
+    // Increment depth for descendants so nested motion elements don't require keys
+    if (presenceDepth !== undefined) {
+        setPresenceDepth(presenceDepth + 1)
     }
 
     // Use the provided key for presence tracking

@@ -1,5 +1,23 @@
+import { getContext, setContext } from 'svelte'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createAnimatePresenceContext } from './presence'
+import { createAnimatePresenceContext, getPresenceDepth, setPresenceDepth } from './presence'
+
+// Mock svelte context functions for depth tests
+vi.mock('svelte', async (importOriginal) => {
+    const original = await importOriginal<typeof import('svelte')>()
+    const contextStore = new Map<symbol | string, unknown>()
+    return {
+        ...original,
+        setContext: vi.fn((key: symbol | string, value: unknown) => {
+            contextStore.set(key, value)
+        }),
+        getContext: vi.fn((key: symbol | string) => {
+            return contextStore.get(key)
+        }),
+        // Helper to clear context between tests
+        __clearContextStore: () => contextStore.clear()
+    }
+})
 
 // Mock motion.animate to return an object with a finished promise
 vi.mock('motion', () => {
@@ -145,5 +163,51 @@ describe('presence context', () => {
         await Promise.resolve()
         clone = document.querySelector('[data-clone="true"]') as HTMLElement | null
         expect(clone).toBeFalsy()
+    })
+})
+
+describe('presence depth context', () => {
+    beforeEach(() => {
+        // Clear mock call history between tests
+        vi.mocked(setContext).mockClear()
+        vi.mocked(getContext).mockClear()
+    })
+
+    it('getPresenceDepth returns undefined when not set', () => {
+        // Simulate fresh context with no depth set
+        vi.mocked(getContext).mockReturnValueOnce(undefined)
+        const depth = getPresenceDepth()
+        expect(depth).toBeUndefined()
+    })
+
+    it('setPresenceDepth calls setContext with correct depth value', () => {
+        // Verify setContext is called with correct value
+        setPresenceDepth(0)
+        expect(setContext).toHaveBeenCalledWith(expect.any(Symbol), 0)
+
+        setPresenceDepth(1)
+        expect(setContext).toHaveBeenCalledWith(expect.any(Symbol), 1)
+
+        setPresenceDepth(5)
+        expect(setContext).toHaveBeenCalledWith(expect.any(Symbol), 5)
+    })
+
+    it('depth value 0 indicates direct child of AnimatePresence', () => {
+        // Simulate AnimatePresence setting initial depth of 0
+        vi.mocked(getContext).mockReturnValueOnce(0)
+        const depth = getPresenceDepth()
+        expect(depth).toBe(0)
+    })
+
+    it('depth value > 0 indicates nested motion element', () => {
+        // Simulate nested motion element at depth 1
+        vi.mocked(getContext).mockReturnValueOnce(1)
+        const depth = getPresenceDepth()
+        expect(depth).toBe(1)
+
+        // Simulate deeply nested motion element at depth 3
+        vi.mocked(getContext).mockReturnValueOnce(3)
+        const deepDepth = getPresenceDepth()
+        expect(deepDepth).toBe(3)
     })
 })
