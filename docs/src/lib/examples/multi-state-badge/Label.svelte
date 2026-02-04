@@ -35,6 +35,7 @@
 </div>
 
 <motion.span
+    layout
     style={styleString(() => ({
         position: 'relative'
     }))}
@@ -43,11 +44,13 @@
     }}
     transition={SPRING_CONFIG}
 >
+    <!-- Note: AnimatePresence mode="sync" not yet implemented -->
     <AnimatePresence initial={false}>
         <motion.div
             key={badgeState}
+            data-debug="label-motion"
             style={styleString(() => ({
-                whiteSpace: 'nowrap'
+                textWrap: 'nowrap'
             }))}
             initial={{
                 y: -20,

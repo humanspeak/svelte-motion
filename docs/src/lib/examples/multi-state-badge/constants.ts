@@ -52,3 +52,41 @@ export function getNextState(state: BadgeState): BadgeState {
     const nextIndex = (states.indexOf(state) + 1) % states.length
     return states[nextIndex]
 }
+
+/**
+ * ==============   Styles   ================
+ * Matches the React example exactly
+ */
+export const styles = {
+    container: {
+        display: 'flex',
+        flexDirection: 'column' as const,
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        height: 80
+    },
+    badge: {
+        backgroundColor: '#f5f5f5',
+        color: '#0f1115',
+        display: 'flex',
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '12px 20px',
+        borderRadius: 999,
+        willChange: 'transform, filter'
+    },
+    iconContainer: {
+        height: 20,
+        position: 'relative' as const,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    icon: {
+        position: 'absolute' as const,
+        left: 0,
+        top: 0
+    }
+} as const

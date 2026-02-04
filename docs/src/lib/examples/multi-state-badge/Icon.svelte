@@ -1,6 +1,6 @@
 <script lang="ts">
     import { motion, AnimatePresence, styleString } from '@humanspeak/svelte-motion'
-    import { SPRING_CONFIG, type BadgeState } from './constants'
+    import { SPRING_CONFIG, styles, type BadgeState } from './constants'
     import Check from './Check.svelte'
     import Loader from './Loader.svelte'
     import XIcon from './XIcon.svelte'
@@ -13,13 +13,7 @@
 </script>
 
 <motion.span
-    style={styleString(() => ({
-        height: 20,
-        position: 'relative',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-    }))}
+    style={styleString(() => styles.iconContainer)}
     animate={{
         width: badgeState === 'idle' ? 0 : 20
     }}
@@ -28,11 +22,8 @@
     <AnimatePresence>
         <motion.span
             key={badgeState}
-            style={styleString(() => ({
-                position: 'absolute',
-                left: 0,
-                top: 0
-            }))}
+            data-debug="icon-motion"
+            style={styleString(() => styles.icon)}
             initial={{
                 y: -40,
                 scale: 0.5,
