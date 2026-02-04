@@ -10,7 +10,11 @@ const UNITLESS_PROPERTIES = new Set([
     'order',
     'grid-column',
     'grid-row',
-    'column-count'
+    'column-count',
+    'scale',
+    'scale-x',
+    'scale-y',
+    'scale-z'
 ])
 
 // CSS properties that need 'deg' unit instead of 'px'
@@ -24,6 +28,23 @@ const DEGREE_PROPERTIES = new Set([
     'skew-y'
 ])
 
+/**
+ * Converts a style object to a CSS style string.
+ *
+ * @deprecated Use `styleString` from `@humanspeak/svelte-motion` instead for reactive styles.
+ * This function is non-reactive and will not update when values change.
+ *
+ * @example
+ * ```ts
+ * // Old (deprecated, non-reactive):
+ * import { stringifyStyleObject } from '$lib'
+ * const style = stringifyStyleObject({ rotate: 45, opacity: 0.5 })
+ *
+ * // New (reactive):
+ * import { styleString } from '@humanspeak/svelte-motion'
+ * const style = styleString(() => ({ rotate, opacity }))
+ * ```
+ */
 export function stringifyStyleObject(obj: Record<string, string | number>): string {
     return Object.entries(obj)
         .map(([key, value]) => {

@@ -34,7 +34,11 @@ export type {
 export { useAnimationFrame } from '$lib/utils/animationFrame'
 export { createDragControls } from '$lib/utils/dragControls'
 export { useSpring } from '$lib/utils/spring'
+/**
+ * @deprecated Use `styleString` instead for reactive styles with automatic unit handling.
+ */
 export { stringifyStyleObject } from '$lib/utils/styleObject'
+export { styleString } from '$lib/utils/styleObject.svelte'
 export { useTime } from '$lib/utils/time'
 export { useTransform } from '$lib/utils/transform'
 export { AnimatePresence, MotionConfig }

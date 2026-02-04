@@ -83,6 +83,26 @@ describe('stringifyStyleObject', () => {
         expect(result).not.toContain('2px')
     })
 
+    it('does NOT add px to scale (unitless property)', () => {
+        const result = stringifyStyleObject({
+            scale: 1.5
+        })
+        expect(result).toBe('scale: 1.5')
+        expect(result).not.toContain('1.5px')
+    })
+
+    it('does NOT add px to scaleX, scaleY, scaleZ (unitless properties)', () => {
+        const result = stringifyStyleObject({
+            scaleX: 0.8,
+            scaleY: 1.2,
+            scaleZ: 1
+        })
+        expect(result).toContain('scale-x: 0.8')
+        expect(result).toContain('scale-y: 1.2')
+        expect(result).toContain('scale-z: 1')
+        expect(result).not.toContain('px')
+    })
+
     it('adds deg to numeric rotate and skew values', () => {
         const result = stringifyStyleObject({
             rotate: 45,
