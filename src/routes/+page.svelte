@@ -191,6 +191,14 @@
                         Nested Keys (no key required)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/modes') + searchParams}
+                    >
+                        Modes (sync/wait/popLayout)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

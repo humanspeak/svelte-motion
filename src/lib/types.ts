@@ -356,6 +356,24 @@ export type MotionConfigProps = {
 }
 
 /**
+ * AnimatePresence mode controls how enter and exit animations are coordinated.
+ *
+ * - `sync` (default): Enter and exit animations happen simultaneously
+ * - `wait`: Exit animations complete before enter animations start
+ * - `popLayout`: Like sync, but exiting elements are removed from layout flow immediately
+ *
+ * @example
+ * ```svelte
+ * <AnimatePresence mode="wait">
+ *   {#if isVisible}
+ *     <motion.div key="box" exit={{ opacity: 0 }} />
+ *   {/if}
+ * </AnimatePresence>
+ * ```
+ */
+export type AnimatePresenceMode = 'sync' | 'wait' | 'popLayout'
+
+/**
  * Props for regular HTML elements that can have children
  * @example
  * ```svelte

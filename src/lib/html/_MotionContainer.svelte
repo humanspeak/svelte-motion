@@ -411,14 +411,12 @@
         }
     })
 
-    const runAnimation = () => {
-        pwLog('[motion] runAnimation called', {
-            hasElement: !!element,
-            resolvedAnimate,
-            mergedTransition
-        })
+    /**
+     * Execute the actual animation without wait mode checks.
+     */
+    const executeAnimation = () => {
         if (!element || !resolvedAnimate) {
-            pwLog('[motion] runAnimation bailing - no element or resolvedAnimate')
+            pwLog('[motion] executeAnimation bailing - no element or resolvedAnimate')
             return
         }
 
@@ -437,10 +435,11 @@
             ;(element as HTMLElement).style.removeProperty('stroke-dashoffset')
         }
 
-        pwLog('[motion] runAnimation animating', {
+        pwLog('[motion] executeAnimation animating', {
             payload,
             transitionAnimate
         })
+        console.log('[motion] executeAnimation: running animation')
 
         animateWithLifecycle(
             element,
@@ -449,6 +448,104 @@
             (def) => onAnimationStartProp?.(def as unknown as DOMKeyframesDefinition | undefined),
             (def) => onAnimationCompleteProp?.(def as unknown as DOMKeyframesDefinition | undefined)
         )
+    }
+
+    // Track if we've already registered a wait callback to prevent duplicates
+    let waitCallbackRegistered = $state(false)
+    let waitUnsubscribe: (() => void) | null = null
+
+    // Cleanup wait callback on component unmount to prevent memory leaks
+    $effect(() => {
+        return () => {
+            waitUnsubscribe?.()
+            waitUnsubscribe = null
+        }
+    })
+
+    /**
+     * Run the enter animation, respecting wait mode if inside AnimatePresence.
+     * Returns true if animation was deferred (wait mode with blocked enters).
+     */
+    const runAnimation = (): boolean => {
+        pwLog('[motion] runAnimation called', {
+            hasElement: !!element,
+            resolvedAnimate,
+            mergedTransition,
+            mode: context?.mode
+        })
+        console.log('[motion] runAnimation called', {
+            hasElement: !!element,
+            mode: context?.mode,
+            waitCallbackRegistered
+        })
+
+        if (!element || !resolvedAnimate) {
+            pwLog('[motion] runAnimation bailing - no element or resolvedAnimate')
+            return false
+        }
+
+        // For mode='wait': check immediately if enters are blocked
+        if (context?.mode === 'wait') {
+            // Skip if we already have a wait callback registered
+            if (waitCallbackRegistered) {
+                console.log('[motion] runAnimation: wait callback already registered, skipping')
+                return true // Still deferred
+            }
+
+            const blocked = context.isEnterBlocked?.()
+            console.log('[motion] runAnimation: wait mode, isEnterBlocked =', blocked)
+
+            if (blocked) {
+                console.log('[motion] runAnimation: enters blocked, registering callback')
+                pwLog('[motion] runAnimation: enters blocked, deferring')
+
+                waitCallbackRegistered = true
+
+                // Register callback to run animation when unblocked
+                waitUnsubscribe = context.onEnterUnblocked(() => {
+                    console.log('[motion] runAnimation: enters unblocked, now running animation')
+                    pwLog('[motion] runAnimation: enters unblocked, running')
+                    waitUnsubscribe?.()
+                    waitUnsubscribe = null
+                    waitCallbackRegistered = false
+
+                    // Snap to initial state first (in case inline styles were removed)
+                    if (initialKeyframes && element) {
+                        const transformedInitial = transformSVGPathProperties(
+                            element,
+                            initialKeyframes as Record<string, unknown>
+                        )
+                        animate(element, transformedInitial as DOMKeyframesDefinition, {
+                            duration: 0
+                        })
+                    }
+
+                    // Use RAF to ensure DOM is settled, then run animation
+                    requestAnimationFrame(() => {
+                        executeAnimation()
+                        // Now it's safe to mark as ready
+                        requestAnimationFrame(() => {
+                            // Ensure follow-up effects treat this as the initial enter animation.
+                            // Without this, the ready-state effects can fire and re-run enter,
+                            // which shows up as a "pop" after the deferred animation completes.
+                            pwLog('[motion] wait-unblocked: marking enter handled')
+                            initialAnimationTriggered = true
+                            if (animateProp && typeof animateProp !== 'string') {
+                                objectAnimateRanOnMount = true
+                                lastAnimatePropJson = JSON.stringify(animateProp)
+                            }
+                            isLoaded = 'ready'
+                        })
+                    })
+                })
+                return true // Animation was deferred
+            }
+        }
+
+        // Not blocked - run animation immediately
+        console.log('[motion] runAnimation: not blocked, executing')
+        executeAnimation()
+        return false
     }
 
     // Track the last variant key we ran to avoid re-running on mount
@@ -821,7 +918,7 @@
                     // When isLoaded changes to 'ready', Svelte will reactively remove the
                     // initial inline styles. We need the animation to capture the current
                     // state (from inline styles) before they're removed.
-                    runAnimation()
+                    const wasDeferred = runAnimation()
 
                     // CRITICAL: Wait for the next animation frame before changing isLoaded.
                     // This gives WAAPI time to:
@@ -829,9 +926,13 @@
                     // 2. Start the animation layer
                     // 3. Lock in the "from" values from current computed style
                     // Only THEN can we safely clear inline styles without killing the animation
-                    requestAnimationFrame(() => {
-                        isLoaded = 'ready'
-                    })
+                    // BUT: If animation was deferred (wait mode), don't change isLoaded yet -
+                    // the callback will handle it when the animation actually runs.
+                    if (!wasDeferred) {
+                        requestAnimationFrame(() => {
+                            isLoaded = 'ready'
+                        })
+                    }
                 })
             } else {
                 pwLog('[motion] path: no initialKeyframes, skip to ready')

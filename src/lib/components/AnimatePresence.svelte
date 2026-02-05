@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { Snippet } from 'svelte'
+    import type { AnimatePresenceMode } from '$lib/types'
     import {
         createAnimatePresenceContext,
         setAnimatePresenceContext,
@@ -16,20 +17,27 @@
      *
      * @prop children Slotted content participating in presence.
      * @prop initial When false, children skip their enter animation on initial mount.
+     * @prop mode Controls enter/exit coordination: 'sync' (default), 'wait', or 'popLayout'.
      * @prop onExitComplete Optional callback invoked once all exits complete.
      */
     const {
         children,
         initial = true,
+        mode = 'sync',
         onExitComplete
     } = $props<{
         children?: Snippet
         initial?: boolean
+        mode?: AnimatePresenceMode
         onExitComplete?: () => void
     }>()
 
-    pwLog('[AnimatePresence] mounting', { initial, hasOnExitComplete: !!onExitComplete })
-    const context = createAnimatePresenceContext({ initial, onExitComplete })
+    pwLog('[AnimatePresence] mounting', { initial, mode, hasOnExitComplete: !!onExitComplete })
+    console.log('[AnimatePresence] mounting with mode:', mode, {
+        initial,
+        hasOnExitComplete: !!onExitComplete
+    })
+    const context = createAnimatePresenceContext({ initial, mode, onExitComplete })
     setAnimatePresenceContext(context)
 
     // Initialize presence depth to 0 for direct children
