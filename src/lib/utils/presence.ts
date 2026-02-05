@@ -1,4 +1,4 @@
-import type { MotionExit, MotionTransition } from '$lib/types'
+import type { AnimatePresenceMode, MotionExit, MotionTransition } from '$lib/types'
 import { mergeTransitions } from '$lib/utils/animation'
 import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
@@ -63,12 +63,24 @@ const resetTransforms = (element: HTMLElement): void => {
 export type AnimatePresenceContext = {
     /** When false, children skip their enter animation on initial mount. */
     initial: boolean
+    /** Animation coordination mode: 'sync', 'wait', or 'popLayout'. */
+    mode: AnimatePresenceMode
     /**
      * Returns true if a child with the given key should animate its enter.
      * Returns false only during first render when initial={false} AND the key has never been seen.
      * Re-entries (after exit) always animate.
      */
     shouldAnimateEnter: (key: string) => boolean
+    /**
+     * For mode='wait': Returns true if enters should be blocked (exits in progress).
+     * Motion elements should delay their enter animation until this returns false.
+     */
+    isEnterBlocked: () => boolean
+    /**
+     * For mode='wait': Register a callback to be invoked when enters are unblocked.
+     * Returns an unsubscribe function.
+     */
+    onEnterUnblocked: (callback: () => void) => () => void
     /** Called when all exit animations complete (optional). */
     onExitComplete?: () => void
     /** Register a child element and its exit definition. */
@@ -120,10 +132,14 @@ export type AnimatePresenceContext = {
  */
 export function createAnimatePresenceContext(context: {
     initial?: boolean
+    mode?: AnimatePresenceMode
     onExitComplete?: () => void
 }): AnimatePresenceContext {
     // Default initial to true (animate on first mount) unless explicitly false
     const initial = context.initial !== false
+
+    // Default mode to 'sync' if not specified
+    const mode: AnimatePresenceMode = context.mode ?? 'sync'
 
     // Track whether we're still in the initial render phase
     // This is true only when initial={false} and we haven't completed the first frame
@@ -135,12 +151,25 @@ export function createAnimatePresenceContext(context: {
     // Track keys that have exited (unregistered after being registered)
     const exitedKeys = new Set<string>()
 
+    // For mode='wait': track whether enters should be blocked
+    let enterBlocked = false
+
+    // For mode='wait': callbacks to invoke when enters are unblocked
+    const enterUnblockedCallbacks: Set<() => void> = new Set()
+
+    console.log('[presence] createContext', {
+        initial,
+        mode,
+        onExitComplete: !!context.onExitComplete
+    })
+
     // After first frame, mark initial render phase as complete
     // Guard for SSR - requestAnimationFrame only exists in browser
     if (isInitialRenderPhase && typeof window !== 'undefined') {
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 pwLog('[presence] initial render phase complete, enabling animations for new keys')
+                console.log('[presence] initial render phase complete')
                 isInitialRenderPhase = false
             })
         })
@@ -161,6 +190,7 @@ export function createAnimatePresenceContext(context: {
                 result: true,
                 reason: 're-entry after exit'
             })
+            console.log('[presence] shouldAnimateEnter:', key, '→ true (re-entry)')
             return true
         }
 
@@ -171,6 +201,7 @@ export function createAnimatePresenceContext(context: {
                 result: true,
                 reason: 'past initial render phase'
             })
+            console.log('[presence] shouldAnimateEnter:', key, '→ true (past initial)')
             return true
         }
 
@@ -184,12 +215,96 @@ export function createAnimatePresenceContext(context: {
             result: shouldAnimate,
             reason: shouldAnimate ? 'previously seen' : 'first appearance during initial render'
         })
+        console.log('[presence] shouldAnimateEnter:', key, '→', shouldAnimate, '(initial render)')
 
         return shouldAnimate
     }
 
+    /**
+     * Check if enter animations should be blocked.
+     *
+     * For mode='wait': returns true when exit animations are in progress,
+     * signaling that new elements should defer their enter animations until
+     * all exits complete. For 'sync' and 'popLayout' modes, always returns false.
+     *
+     * @returns True if enters should be blocked (wait mode with exits in progress)
+     * @example
+     * ```ts
+     * if (context.isEnterBlocked()) {
+     *   // Defer animation until unblocked
+     *   context.onEnterUnblocked(() => runAnimation())
+     * }
+     * ```
+     */
+    const isEnterBlocked = (): boolean => {
+        const blocked = mode === 'wait' && enterBlocked
+        console.log('[presence] isEnterBlocked:', blocked, {
+            mode,
+            enterBlocked,
+            inFlightExits,
+            childrenKeys: Array.from(children.keys())
+        })
+        return blocked
+    }
+
+    /**
+     * Register a callback to be invoked when enter animations are unblocked.
+     *
+     * For mode='wait': the callback is called when all exit animations complete
+     * and new elements can begin their enter animations. Useful for deferring
+     * animations until the appropriate time.
+     *
+     * @param callback - Function to call when enters are unblocked
+     * @returns Unsubscribe function to remove the callback
+     * @example
+     * ```ts
+     * const unsubscribe = context.onEnterUnblocked(() => {
+     *   console.log('Exits complete, starting enter animation')
+     *   runAnimation()
+     * })
+     * // Later, to cancel:
+     * unsubscribe()
+     * ```
+     */
+    const onEnterUnblocked = (callback: () => void): (() => void) => {
+        console.log('[presence] onEnterUnblocked: registering callback')
+        enterUnblockedCallbacks.add(callback)
+        return () => {
+            console.log('[presence] onEnterUnblocked: removing callback')
+            enterUnblockedCallbacks.delete(callback)
+        }
+    }
+
+    /**
+     * Invoke all registered enter-unblocked callbacks.
+     *
+     * Called internally when all exit animations complete in wait mode.
+     * Each callback is invoked in a try-catch to prevent one failing callback
+     * from blocking others.
+     *
+     * @internal
+     */
+    const notifyEnterUnblocked = () => {
+        console.log(
+            '[presence] notifyEnterUnblocked: notifying',
+            enterUnblockedCallbacks.size,
+            'callbacks'
+        )
+        // Copy and clear to prevent re-invocation on multiple exit completions
+        const callbacks = Array.from(enterUnblockedCallbacks)
+        enterUnblockedCallbacks.clear()
+        callbacks.forEach((cb) => {
+            try {
+                cb()
+            } catch (e) {
+                console.error('[presence] onEnterUnblocked callback error:', e)
+            }
+        })
+    }
+
     pwLog('[presence] createContext', {
         initial,
+        mode,
         isInitialRenderPhase,
         onExitComplete: !!context.onExitComplete
     })
@@ -219,12 +334,42 @@ export function createAnimatePresenceContext(context: {
             exitedKeys.delete(key)
         }
 
+        // For mode='wait': Check if there are OTHER children that will exit
+        // If so, block enters preemptively (they will exit when their component unmounts)
+        if (mode === 'wait') {
+            // Look for any other registered children (different key) that have exit animations
+            // These will be unregistered soon and need to exit first
+            let willHaveExits = false
+            for (const [existingKey, existingChild] of children) {
+                if (existingKey !== key && existingChild.exit) {
+                    willHaveExits = true
+                    break
+                }
+            }
+            if (willHaveExits && !enterBlocked) {
+                enterBlocked = true
+                console.log(
+                    '[presence] registerChild: mode=wait, blocking enters (other children will exit)',
+                    { key }
+                )
+                pwLog('[presence] registerChild: blocking enters preemptively', { key })
+            }
+        }
+
         pwLog('[presence] registerChild', {
             key,
             hasExit: !!exit,
             exit,
             wasExited,
+            mode,
+            enterBlocked,
             rect: { w: initialRect.width, h: initialRect.height }
+        })
+        console.log('[presence] registerChild:', key, {
+            mode,
+            enterBlocked,
+            wasExited,
+            hasExit: !!exit
         })
 
         children.set(key, {
@@ -255,14 +400,21 @@ export function createAnimatePresenceContext(context: {
         const child = children.get(key)
         pwLog('[presence] unregisterChild', {
             key,
+            mode,
             found: !!child,
             hasExit: !!child?.exit,
             exit: child?.exit
+        })
+        console.log('[presence] unregisterChild:', key, {
+            mode,
+            found: !!child,
+            hasExit: !!child?.exit
         })
 
         // Only process if child was actually registered
         if (!child) {
             pwLog('[presence] unregisterChild - child not found, ignoring')
+            console.log('[presence] unregisterChild - child not found, ignoring')
             return
         }
 
@@ -271,8 +423,15 @@ export function createAnimatePresenceContext(context: {
 
         if (!child.exit) {
             pwLog('[presence] unregisterChild - no exit animation, removing immediately')
+            console.log('[presence] unregisterChild - no exit animation, removing immediately')
             children.delete(key)
             return
+        }
+
+        // For mode='wait': block new enters while exit is in progress
+        if (mode === 'wait') {
+            enterBlocked = true
+            console.log('[presence] mode=wait: blocking enters during exit')
         }
 
         const rect = child.lastRect
@@ -297,13 +456,36 @@ export function createAnimatePresenceContext(context: {
         }
 
         // Attach to original parent and position absolutely at the last known rect
-        const parent = child.element.parentElement ?? document.body
-        const parentRect = parent.getBoundingClientRect()
+        // Find the nearest positioned ancestor that isn't display: contents
+        let parent = child.element.parentElement ?? document.body
+        let positioningParent = parent
 
-        const parentPosition = getComputedStyle(parent).position
-        if (parentPosition === 'static') {
-            ;(parent as HTMLElement).style.position = 'relative'
+        // Walk up to find a parent that has actual layout (not display: contents)
+        while (positioningParent && positioningParent !== document.body) {
+            const parentDisplay = getComputedStyle(positioningParent).display
+            if (parentDisplay !== 'contents') {
+                break
+            }
+            positioningParent = positioningParent.parentElement ?? document.body
         }
+
+        console.log('[presence] positioning parent:', {
+            original: parent.className,
+            actual: positioningParent.className || positioningParent.tagName
+        })
+
+        const parentRect = positioningParent.getBoundingClientRect()
+
+        const parentPosition = getComputedStyle(positioningParent).position
+        if (parentPosition === 'static') {
+            ;(positioningParent as HTMLElement).style.position = 'relative'
+        }
+
+        // Append to the actual positioning parent
+        parent = positioningParent
+
+        // Preserve the original display property (especially flex for centered content)
+        const originalDisplay = computed.display
 
         clone.style.position = 'absolute'
         clone.style.top = `${rect.top - parentRect.top + ((parent as HTMLElement).scrollTop ?? 0)}px`
@@ -312,7 +494,10 @@ export function createAnimatePresenceContext(context: {
         clone.style.height = `${rect.height}px`
         clone.style.pointerEvents = 'none'
         clone.style.visibility = 'visible'
-        clone.style.display = 'block'
+        // Preserve flex/grid layout, only force 'block' if it was 'none' or 'contents'
+        if (originalDisplay === 'none' || originalDisplay === 'contents') {
+            clone.style.display = 'block'
+        }
         clone.style.margin = '0'
         clone.style.boxSizing = 'border-box'
         // Redundantly ensure no transforms are applied before positioning/z-index take effect
@@ -334,31 +519,47 @@ export function createAnimatePresenceContext(context: {
 
         clone.setAttribute('data-clone', 'true')
         clone.setAttribute('data-exiting', 'true')
+        clone.setAttribute('data-mode', mode)
 
         pwLog('[presence] clone created', {
             key,
+            mode,
             rect: { w: rect.width, h: rect.height, top: rect.top, left: rect.left }
+        })
+        console.log('[presence] clone created:', key, {
+            mode,
+            rect: { w: rect.width, h: rect.height }
         })
         parent.appendChild(clone)
 
-        // Merge transitions: default < mergedTransition < exit.transition (last wins)
+        // Prepare exit keyframes - extract ease separately, filter out transition
+        // Note: transition is filtered out here as it's accessed via exitObj.transition for merging
+        const rawExit = (child.exit ?? {}) as unknown as Record<string, unknown>
+        const { ease: exitEase, transition: __, ...exitKeyframes } = rawExit
+        void __ // Suppress unused variable warning - transition is accessed via exitObj.transition
+
+        // Merge transitions: default < mergedTransition < exit.transition < exit.ease (last wins)
         const exitObj = (child.exit ?? {}) as unknown as { transition?: MotionTransition }
         const finalTransition = mergeTransitions(
             { duration: 0.35 } as AnimationOptions,
             (child.mergedTransition ?? {}) as AnimationOptions,
-            (exitObj.transition ?? {}) as AnimationOptions
+            (exitObj.transition ?? {}) as AnimationOptions,
+            exitEase ? ({ ease: exitEase } as AnimationOptions) : {}
         )
 
-        // Prepare exit keyframes without any inline transition data
-        const rawExit = (child.exit ?? {}) as unknown as Record<string, unknown>
-        /* trunk-ignore(eslint/@typescript-eslint/no-unused-vars) */
-        const { transition: _ignoredTransition, ...exitKeyframes } = rawExit
+        console.log('[presence] exit animation config:', {
+            exitKeyframes,
+            finalTransition,
+            exitEase
+        })
 
         pwLog('[presence] starting exit animation', {
             key,
+            mode,
             exitKeyframes,
             finalTransition
         })
+        console.log('[presence] starting exit animation:', key, { mode, exitKeyframes })
 
         // Capture the element reference for this specific exit animation
         // This prevents race conditions where re-entry registers a new element with the same key
@@ -367,11 +568,15 @@ export function createAnimatePresenceContext(context: {
 
         // Start exit and track in-flight count
         inFlightExits += 1
+        console.log('[presence] inFlightExits incremented to:', inFlightExits)
+
         requestAnimationFrame(() => {
             animate(clone, exitKeyframes as unknown as DOMKeyframesDefinition, finalTransition)
                 .finished.catch(() => {})
                 .finally(() => {
-                    pwLog('[presence] exit animation complete', { key })
+                    pwLog('[presence] exit animation complete', { key, mode })
+                    console.log('[presence] exit animation complete:', key, { mode })
+
                     // Reset elevated styles then remove
                     try {
                         clone.style.zIndex = ''
@@ -383,8 +588,12 @@ export function createAnimatePresenceContext(context: {
                     // Log clone removal and element counts for debugging rapid toggle
                     pwLog('[presence] clone REMOVED from DOM', {
                         key,
+                        mode,
                         clonesInDOM: document.querySelectorAll('[data-clone="true"]').length,
                         boxesInDOM: document.querySelectorAll('[data-testid="box"]').length
+                    })
+                    console.log('[presence] clone REMOVED:', key, {
+                        clonesInDOM: document.querySelectorAll('[data-clone="true"]').length
                     })
 
                     // Only delete from children map if the current registration is for the SAME element
@@ -394,12 +603,14 @@ export function createAnimatePresenceContext(context: {
                     if (currentChild && currentChild.element === exitingElement) {
                         children.delete(key)
                         pwLog('[presence] child deleted from map (same element)', { key })
+                        console.log('[presence] child deleted from map (same element):', key)
                     } else {
                         pwLog('[presence] child NOT deleted (re-entry registered new element)', {
                             key,
                             hasCurrentChild: !!currentChild,
                             isSameElement: currentChild?.element === exitingElement
                         })
+                        console.log('[presence] child NOT deleted (re-entry):', key)
                     }
 
                     // Log final state
@@ -410,9 +621,21 @@ export function createAnimatePresenceContext(context: {
                     })
 
                     inFlightExits -= 1
+                    console.log('[presence] inFlightExits decremented to:', inFlightExits)
+
                     if (inFlightExits === 0) {
                         pwLog('[presence] all exits complete, calling onExitComplete')
+                        console.log('[presence] all exits complete')
                         context.onExitComplete?.()
+
+                        // For mode='wait': unblock enters now that all exits are complete
+                        if (mode === 'wait' && enterBlocked) {
+                            enterBlocked = false
+                            console.log(
+                                '[presence] mode=wait: unblocking enters, notifying callbacks'
+                            )
+                            notifyEnterUnblocked()
+                        }
                     }
                 })
         })
@@ -420,7 +643,10 @@ export function createAnimatePresenceContext(context: {
 
     return {
         initial,
+        mode,
         shouldAnimateEnter,
+        isEnterBlocked,
+        onEnterUnblocked,
         onExitComplete: context.onExitComplete,
         registerChild,
         updateChildState,

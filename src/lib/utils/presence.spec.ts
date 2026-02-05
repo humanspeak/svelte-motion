@@ -166,6 +166,214 @@ describe('presence context', () => {
     })
 })
 
+describe('AnimatePresence modes', () => {
+    let parent: HTMLElement
+    let el: HTMLElement
+    let el2: HTMLElement
+
+    beforeEach(() => {
+        document.body.innerHTML = ''
+        parent = document.createElement('div')
+        Object.assign(parent.style, { position: 'relative', width: '200px', height: '200px' })
+        document.body.appendChild(parent)
+
+        el = document.createElement('div')
+        parent.appendChild(el)
+
+        el2 = document.createElement('div')
+        parent.appendChild(el2)
+
+        // Provide stable rects
+        const mockRect = {
+            x: 10,
+            y: 20,
+            top: 20,
+            left: 10,
+            bottom: 120,
+            right: 110,
+            width: 100,
+            height: 100,
+            toJSON: () => {}
+        } as unknown as DOMRect
+
+        vi.spyOn(el, 'getBoundingClientRect').mockReturnValue(mockRect)
+        vi.spyOn(el2, 'getBoundingClientRect').mockReturnValue(mockRect)
+
+        vi.spyOn(parent, 'getBoundingClientRect').mockReturnValue({
+            x: 0,
+            y: 0,
+            top: 0,
+            left: 0,
+            bottom: 200,
+            right: 200,
+            width: 200,
+            height: 200,
+            toJSON: () => {}
+        } as unknown as DOMRect)
+
+        vi.spyOn(window, 'getComputedStyle').mockImplementation(() =>
+            mockComputedStyle({ borderRadius: '8px', boxSizing: 'border-box', display: 'block' })
+        )
+
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(((
+            cb: FrameRequestCallback
+        ) => {
+            cb(0)
+            return 1 as unknown as number
+        }) as unknown as typeof requestAnimationFrame)
+    })
+
+    describe('mode property', () => {
+        it('defaults mode to sync when not specified', () => {
+            const ctx = createAnimatePresenceContext({})
+            expect(ctx.mode).toBe('sync')
+        })
+
+        it('accepts mode=sync explicitly', () => {
+            const ctx = createAnimatePresenceContext({ mode: 'sync' })
+            expect(ctx.mode).toBe('sync')
+        })
+
+        it('accepts mode=wait', () => {
+            const ctx = createAnimatePresenceContext({ mode: 'wait' })
+            expect(ctx.mode).toBe('wait')
+        })
+
+        it('accepts mode=popLayout', () => {
+            const ctx = createAnimatePresenceContext({ mode: 'popLayout' })
+            expect(ctx.mode).toBe('popLayout')
+        })
+    })
+
+    describe('isEnterBlocked', () => {
+        it('returns false for sync mode regardless of exits', () => {
+            const ctx = createAnimatePresenceContext({ mode: 'sync' })
+            ctx.registerChild('k1', el, { opacity: 0 })
+            expect(ctx.isEnterBlocked()).toBe(false)
+
+            // Even during unregister (exit in progress)
+            ctx.unregisterChild('k1')
+            expect(ctx.isEnterBlocked()).toBe(false)
+        })
+
+        it('returns false for wait mode when no exits in progress', () => {
+            const ctx = createAnimatePresenceContext({ mode: 'wait' })
+            ctx.registerChild('k1', el, { opacity: 0 })
+            expect(ctx.isEnterBlocked()).toBe(false)
+        })
+
+        it('returns true for wait mode when exits in progress', async () => {
+            const ctx = createAnimatePresenceContext({ mode: 'wait' })
+            ctx.registerChild('k1', el, { opacity: 0 })
+
+            // Start exit
+            ctx.unregisterChild('k1')
+
+            // Now enters should be blocked
+            expect(ctx.isEnterBlocked()).toBe(true)
+
+            // After exit completes, should unblock
+            await Promise.resolve()
+            await Promise.resolve()
+            expect(ctx.isEnterBlocked()).toBe(false)
+        })
+
+        it('returns false for popLayout mode (same as sync)', () => {
+            const ctx = createAnimatePresenceContext({ mode: 'popLayout' })
+            ctx.registerChild('k1', el, { opacity: 0 })
+            ctx.unregisterChild('k1')
+            expect(ctx.isEnterBlocked()).toBe(false)
+        })
+    })
+
+    describe('onEnterUnblocked', () => {
+        it('registers and calls callback when enters unblock', async () => {
+            const ctx = createAnimatePresenceContext({ mode: 'wait' })
+            const callback = vi.fn()
+
+            ctx.registerChild('k1', el, { opacity: 0 })
+            ctx.unregisterChild('k1') // Start exit, blocks enters
+
+            // Register callback
+            ctx.onEnterUnblocked(callback)
+
+            // Callback not called yet (exit in progress)
+            expect(callback).not.toHaveBeenCalled()
+
+            // After exit completes
+            await Promise.resolve()
+            await Promise.resolve()
+
+            expect(callback).toHaveBeenCalledTimes(1)
+        })
+
+        it('returns unsubscribe function that removes callback', async () => {
+            const ctx = createAnimatePresenceContext({ mode: 'wait' })
+            const callback = vi.fn()
+
+            ctx.registerChild('k1', el, { opacity: 0 })
+            ctx.unregisterChild('k1')
+
+            const unsubscribe = ctx.onEnterUnblocked(callback)
+            unsubscribe() // Remove before exit completes
+
+            await Promise.resolve()
+            await Promise.resolve()
+
+            expect(callback).not.toHaveBeenCalled()
+        })
+
+        it('calls multiple callbacks when enters unblock', async () => {
+            const ctx = createAnimatePresenceContext({ mode: 'wait' })
+            const callback1 = vi.fn()
+            const callback2 = vi.fn()
+
+            ctx.registerChild('k1', el, { opacity: 0 })
+            ctx.unregisterChild('k1')
+
+            ctx.onEnterUnblocked(callback1)
+            ctx.onEnterUnblocked(callback2)
+
+            await Promise.resolve()
+            await Promise.resolve()
+
+            expect(callback1).toHaveBeenCalledTimes(1)
+            expect(callback2).toHaveBeenCalledTimes(1)
+        })
+    })
+
+    describe('wait mode enter blocking', () => {
+        it('blocks new registrations when exit is in progress', () => {
+            const ctx = createAnimatePresenceContext({ mode: 'wait' })
+
+            // Register first child
+            ctx.registerChild('k1', el, { opacity: 0 })
+
+            // Start exit for first child
+            ctx.unregisterChild('k1')
+
+            // Now register second child - enters should be blocked
+            ctx.registerChild('k2', el2, { opacity: 0 })
+            expect(ctx.isEnterBlocked()).toBe(true)
+        })
+
+        it('preemptively blocks when registering with other children having exits', () => {
+            const ctx = createAnimatePresenceContext({ mode: 'wait' })
+
+            // Register first child with exit
+            ctx.registerChild('k1', el, { opacity: 0 })
+
+            // Register second child - should detect k1 will exit and block
+            ctx.registerChild('k2', el2, { opacity: 0 })
+
+            // At this point, k1 is still registered but will exit
+            // The blocking happens in unregisterChild, so check after unregister
+            ctx.unregisterChild('k1')
+            expect(ctx.isEnterBlocked()).toBe(true)
+        })
+    })
+})
+
 describe('presence depth context', () => {
     beforeEach(() => {
         // Clear mock call history and shared context store between tests
