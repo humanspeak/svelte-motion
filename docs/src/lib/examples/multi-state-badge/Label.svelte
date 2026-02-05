@@ -44,8 +44,7 @@
     }}
     transition={SPRING_CONFIG}
 >
-    <!-- Note: AnimatePresence mode="sync" not yet implemented -->
-    <AnimatePresence initial={false}>
+    <AnimatePresence mode="sync" initial={false}>
         <motion.div
             key={badgeState}
             data-debug="label-motion"

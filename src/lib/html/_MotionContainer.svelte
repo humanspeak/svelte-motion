@@ -525,6 +525,15 @@
                         executeAnimation()
                         // Now it's safe to mark as ready
                         requestAnimationFrame(() => {
+                            // Ensure follow-up effects treat this as the initial enter animation.
+                            // Without this, the ready-state effects can fire and re-run enter,
+                            // which shows up as a "pop" after the deferred animation completes.
+                            pwLog('[motion] wait-unblocked: marking enter handled')
+                            initialAnimationTriggered = true
+                            if (animateProp && typeof animateProp !== 'string') {
+                                objectAnimateRanOnMount = true
+                                lastAnimatePropJson = JSON.stringify(animateProp)
+                            }
                             isLoaded = 'ready'
                         })
                     })

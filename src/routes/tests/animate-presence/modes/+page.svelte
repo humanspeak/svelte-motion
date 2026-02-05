@@ -2,7 +2,7 @@
     import { motion } from '$lib'
     import { pwLog } from '$lib/utils/log'
     import ModeExample from './ModeExample.svelte'
-    // import SyncIcon from './SyncIcon.svelte'
+    import SyncIcon from './SyncIcon.svelte'
     import WaitIcon from './WaitIcon.svelte'
     // import PopLayoutIcon from './PopLayoutIcon.svelte'
 
@@ -57,11 +57,11 @@
     <h1 style="font-size: 24px; font-weight: 600; margin-bottom: 20px;">AnimatePresence Modes</h1>
 
     <div style={modesContainer}>
-        <!-- <ModeExample mode="sync" state={internalState}>
+        <ModeExample mode="sync" state={internalState}>
             {#snippet icon()}
                 <SyncIcon />
             {/snippet}
-        </ModeExample> -->
+        </ModeExample>
 
         <ModeExample mode="wait" state={internalState}>
             {#snippet icon()}
