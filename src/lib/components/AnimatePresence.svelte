@@ -33,10 +33,6 @@
     }>()
 
     pwLog('[AnimatePresence] mounting', { initial, mode, hasOnExitComplete: !!onExitComplete })
-    console.log('[AnimatePresence] mounting with mode:', mode, {
-        initial,
-        hasOnExitComplete: !!onExitComplete
-    })
     const context = createAnimatePresenceContext({ initial, mode, onExitComplete })
     setAnimatePresenceContext(context)
 
