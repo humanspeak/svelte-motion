@@ -237,7 +237,8 @@ export function createAnimatePresenceContext(context: {
      * ```
      */
     const isEnterBlocked = (): boolean => {
-        const blocked = mode === 'wait' && enterBlocked
+        // For wait mode, block enters only when there are actual in-flight exits
+        const blocked = mode === 'wait' && inFlightExits > 0
         console.log('[presence] isEnterBlocked:', blocked, {
             mode,
             enterBlocked,
@@ -334,27 +335,10 @@ export function createAnimatePresenceContext(context: {
             exitedKeys.delete(key)
         }
 
-        // For mode='wait': Check if there are OTHER children that will exit
-        // If so, block enters preemptively (they will exit when their component unmounts)
-        if (mode === 'wait') {
-            // Look for any other registered children (different key) that have exit animations
-            // These will be unregistered soon and need to exit first
-            let willHaveExits = false
-            for (const [existingKey, existingChild] of children) {
-                if (existingKey !== key && existingChild.exit) {
-                    willHaveExits = true
-                    break
-                }
-            }
-            if (willHaveExits && !enterBlocked) {
-                enterBlocked = true
-                console.log(
-                    '[presence] registerChild: mode=wait, blocking enters (other children will exit)',
-                    { key }
-                )
-                pwLog('[presence] registerChild: blocking enters preemptively', { key })
-            }
-        }
+        // Note: For mode='wait', we do NOT preemptively block enters here.
+        // Blocking only happens when an exit actually starts (in unregisterChild).
+        // This ensures pure additions don't stall when other children merely have
+        // exit definitions but aren't actually exiting.
 
         pwLog('[presence] registerChild', {
             key,

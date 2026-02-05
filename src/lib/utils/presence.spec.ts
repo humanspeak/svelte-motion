@@ -366,17 +366,21 @@ describe('AnimatePresence modes', () => {
             expect(ctx.isEnterBlocked()).toBe(true)
         })
 
-        it('preemptively blocks when registering with other children having exits', () => {
+        it('does not block when children have exit definitions but no exits in progress', () => {
             const ctx = createAnimatePresenceContext({ mode: 'wait' })
 
-            // Register first child with exit
+            // Register first child with exit definition
             ctx.registerChild('k1', el, { opacity: 0 })
 
-            // Register second child - should detect k1 will exit and block
+            // Register second child with exit definition
+            // Should NOT be blocked - having an exit definition doesn't mean it's exiting
             ctx.registerChild('k2', el2, { opacity: 0 })
 
-            // At this point, k1 is still registered but will exit
-            // The blocking happens in unregisterChild, so check after unregister
+            // At this point, both children are registered but neither is exiting
+            // Enters should NOT be blocked since no exits are in progress
+            expect(ctx.isEnterBlocked()).toBe(false)
+
+            // Only after an actual exit starts should it be blocked
             ctx.unregisterChild('k1')
             expect(ctx.isEnterBlocked()).toBe(true)
         })
