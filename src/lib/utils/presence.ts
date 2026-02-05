@@ -157,19 +157,12 @@ export function createAnimatePresenceContext(context: {
     // For mode='wait': callbacks to invoke when enters are unblocked
     const enterUnblockedCallbacks: Set<() => void> = new Set()
 
-    console.log('[presence] createContext', {
-        initial,
-        mode,
-        onExitComplete: !!context.onExitComplete
-    })
-
     // After first frame, mark initial render phase as complete
     // Guard for SSR - requestAnimationFrame only exists in browser
     if (isInitialRenderPhase && typeof window !== 'undefined') {
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 pwLog('[presence] initial render phase complete, enabling animations for new keys')
-                console.log('[presence] initial render phase complete')
                 isInitialRenderPhase = false
             })
         })
@@ -190,7 +183,6 @@ export function createAnimatePresenceContext(context: {
                 result: true,
                 reason: 're-entry after exit'
             })
-            console.log('[presence] shouldAnimateEnter:', key, '→ true (re-entry)')
             return true
         }
 
@@ -201,7 +193,6 @@ export function createAnimatePresenceContext(context: {
                 result: true,
                 reason: 'past initial render phase'
             })
-            console.log('[presence] shouldAnimateEnter:', key, '→ true (past initial)')
             return true
         }
 
@@ -215,7 +206,6 @@ export function createAnimatePresenceContext(context: {
             result: shouldAnimate,
             reason: shouldAnimate ? 'previously seen' : 'first appearance during initial render'
         })
-        console.log('[presence] shouldAnimateEnter:', key, '→', shouldAnimate, '(initial render)')
 
         return shouldAnimate
     }
@@ -239,12 +229,7 @@ export function createAnimatePresenceContext(context: {
     const isEnterBlocked = (): boolean => {
         // For wait mode, block enters only when there are actual in-flight exits
         const blocked = mode === 'wait' && inFlightExits > 0
-        console.log('[presence] isEnterBlocked:', blocked, {
-            mode,
-            enterBlocked,
-            inFlightExits,
-            childrenKeys: Array.from(children.keys())
-        })
+        pwLog('[presence] isEnterBlocked', { blocked, mode, inFlightExits })
         return blocked
     }
 
@@ -268,10 +253,10 @@ export function createAnimatePresenceContext(context: {
      * ```
      */
     const onEnterUnblocked = (callback: () => void): (() => void) => {
-        console.log('[presence] onEnterUnblocked: registering callback')
+        pwLog('[presence] onEnterUnblocked: registering callback')
         enterUnblockedCallbacks.add(callback)
         return () => {
-            console.log('[presence] onEnterUnblocked: removing callback')
+            pwLog('[presence] onEnterUnblocked: removing callback')
             enterUnblockedCallbacks.delete(callback)
         }
     }
@@ -286,11 +271,7 @@ export function createAnimatePresenceContext(context: {
      * @internal
      */
     const notifyEnterUnblocked = () => {
-        console.log(
-            '[presence] notifyEnterUnblocked: notifying',
-            enterUnblockedCallbacks.size,
-            'callbacks'
-        )
+        pwLog('[presence] notifyEnterUnblocked', { callbackCount: enterUnblockedCallbacks.size })
         // Copy and clear to prevent re-invocation on multiple exit completions
         const callbacks = Array.from(enterUnblockedCallbacks)
         enterUnblockedCallbacks.clear()
@@ -349,12 +330,6 @@ export function createAnimatePresenceContext(context: {
             enterBlocked,
             rect: { w: initialRect.width, h: initialRect.height }
         })
-        console.log('[presence] registerChild:', key, {
-            mode,
-            enterBlocked,
-            wasExited,
-            hasExit: !!exit
-        })
 
         children.set(key, {
             element,
@@ -389,16 +364,10 @@ export function createAnimatePresenceContext(context: {
             hasExit: !!child?.exit,
             exit: child?.exit
         })
-        console.log('[presence] unregisterChild:', key, {
-            mode,
-            found: !!child,
-            hasExit: !!child?.exit
-        })
 
         // Only process if child was actually registered
         if (!child) {
             pwLog('[presence] unregisterChild - child not found, ignoring')
-            console.log('[presence] unregisterChild - child not found, ignoring')
             return
         }
 
@@ -407,7 +376,6 @@ export function createAnimatePresenceContext(context: {
 
         if (!child.exit) {
             pwLog('[presence] unregisterChild - no exit animation, removing immediately')
-            console.log('[presence] unregisterChild - no exit animation, removing immediately')
             children.delete(key)
             return
         }
@@ -415,7 +383,7 @@ export function createAnimatePresenceContext(context: {
         // For mode='wait': block new enters while exit is in progress
         if (mode === 'wait') {
             enterBlocked = true
-            console.log('[presence] mode=wait: blocking enters during exit')
+            pwLog('[presence] mode=wait: blocking enters during exit')
         }
 
         const rect = child.lastRect
@@ -478,11 +446,6 @@ export function createAnimatePresenceContext(context: {
             positioningParent = positioningParent.parentElement ?? document.body
         }
 
-        console.log('[presence] positioning parent:', {
-            original: parent.className,
-            actual: positioningParent.className || positioningParent.tagName
-        })
-
         const parentRect = positioningParent.getBoundingClientRect()
 
         const parentPosition = getComputedStyle(positioningParent).position
@@ -535,10 +498,6 @@ export function createAnimatePresenceContext(context: {
             mode,
             rect: { w: rect.width, h: rect.height, top: rect.top, left: rect.left }
         })
-        console.log('[presence] clone created:', key, {
-            mode,
-            rect: { w: rect.width, h: rect.height }
-        })
         parent.appendChild(clone)
 
         // Prepare exit keyframes - extract ease separately, filter out transition
@@ -556,19 +515,12 @@ export function createAnimatePresenceContext(context: {
             exitEase ? ({ ease: exitEase } as AnimationOptions) : {}
         )
 
-        console.log('[presence] exit animation config:', {
-            exitKeyframes,
-            finalTransition,
-            exitEase
-        })
-
         pwLog('[presence] starting exit animation', {
             key,
             mode,
             exitKeyframes,
             finalTransition
         })
-        console.log('[presence] starting exit animation:', key, { mode, exitKeyframes })
 
         // Capture the element reference for this specific exit animation
         // This prevents race conditions where re-entry registers a new element with the same key
@@ -577,14 +529,12 @@ export function createAnimatePresenceContext(context: {
 
         // Start exit and track in-flight count
         inFlightExits += 1
-        console.log('[presence] inFlightExits incremented to:', inFlightExits)
 
         requestAnimationFrame(() => {
             animate(clone, exitKeyframes as unknown as DOMKeyframesDefinition, finalTransition)
                 .finished.catch(() => {})
                 .finally(() => {
                     pwLog('[presence] exit animation complete', { key, mode })
-                    console.log('[presence] exit animation complete:', key, { mode })
 
                     // Reset elevated styles then remove
                     try {
@@ -602,9 +552,6 @@ export function createAnimatePresenceContext(context: {
                         clonesInDOM: document.querySelectorAll('[data-clone="true"]').length,
                         boxesInDOM: document.querySelectorAll('[data-testid="box"]').length
                     })
-                    console.log('[presence] clone REMOVED:', key, {
-                        clonesInDOM: document.querySelectorAll('[data-clone="true"]').length
-                    })
 
                     // Only delete from children map if the current registration is for the SAME element
                     // If a re-entry happened while we were animating, a new element is registered
@@ -613,14 +560,12 @@ export function createAnimatePresenceContext(context: {
                     if (currentChild && currentChild.element === exitingElement) {
                         children.delete(key)
                         pwLog('[presence] child deleted from map (same element)', { key })
-                        console.log('[presence] child deleted from map (same element):', key)
                     } else {
                         pwLog('[presence] child NOT deleted (re-entry registered new element)', {
                             key,
                             hasCurrentChild: !!currentChild,
                             isSameElement: currentChild?.element === exitingElement
                         })
-                        console.log('[presence] child NOT deleted (re-entry):', key)
                     }
 
                     // Log final state
@@ -631,19 +576,15 @@ export function createAnimatePresenceContext(context: {
                     })
 
                     inFlightExits -= 1
-                    console.log('[presence] inFlightExits decremented to:', inFlightExits)
 
                     if (inFlightExits === 0) {
                         pwLog('[presence] all exits complete, calling onExitComplete')
-                        console.log('[presence] all exits complete')
                         context.onExitComplete?.()
 
                         // For mode='wait': unblock enters now that all exits are complete
                         if (mode === 'wait' && enterBlocked) {
                             enterBlocked = false
-                            console.log(
-                                '[presence] mode=wait: unblocking enters, notifying callbacks'
-                            )
+                            pwLog('[presence] mode=wait: unblocking enters, notifying callbacks')
                             notifyEnterUnblocked()
                         }
                     }

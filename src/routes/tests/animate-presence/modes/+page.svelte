@@ -50,7 +50,7 @@
         outline: none;
     `
 
-    pwLog('[AnimatePresenceModes] Page mounted', { state: $state.snapshot(internalState) })
+    pwLog('[AnimatePresenceModes] Page mounted', { state: internalState })
 </script>
 
 <div style={container} data-testid="modes-container">
