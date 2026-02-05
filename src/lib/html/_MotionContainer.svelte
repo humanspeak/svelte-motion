@@ -439,7 +439,6 @@
             payload,
             transitionAnimate
         })
-        console.log('[motion] executeAnimation: running animation')
 
         animateWithLifecycle(
             element,
@@ -473,11 +472,6 @@
             mergedTransition,
             mode: context?.mode
         })
-        console.log('[motion] runAnimation called', {
-            hasElement: !!element,
-            mode: context?.mode,
-            waitCallbackRegistered
-        })
 
         if (!element || !resolvedAnimate) {
             pwLog('[motion] runAnimation bailing - no element or resolvedAnimate')
@@ -488,22 +482,20 @@
         if (context?.mode === 'wait') {
             // Skip if we already have a wait callback registered
             if (waitCallbackRegistered) {
-                console.log('[motion] runAnimation: wait callback already registered, skipping')
+                pwLog('[motion] runAnimation: wait callback already registered, skipping')
                 return true // Still deferred
             }
 
             const blocked = context.isEnterBlocked?.()
-            console.log('[motion] runAnimation: wait mode, isEnterBlocked =', blocked)
+            pwLog('[motion] runAnimation: wait mode', { blocked })
 
             if (blocked) {
-                console.log('[motion] runAnimation: enters blocked, registering callback')
                 pwLog('[motion] runAnimation: enters blocked, deferring')
 
                 waitCallbackRegistered = true
 
                 // Register callback to run animation when unblocked
                 waitUnsubscribe = context.onEnterUnblocked(() => {
-                    console.log('[motion] runAnimation: enters unblocked, now running animation')
                     pwLog('[motion] runAnimation: enters unblocked, running')
                     waitUnsubscribe?.()
                     waitUnsubscribe = null
@@ -543,7 +535,7 @@
         }
 
         // Not blocked - run animation immediately
-        console.log('[motion] runAnimation: not blocked, executing')
+        pwLog('[motion] runAnimation: not blocked, executing')
         executeAnimation()
         return false
     }
