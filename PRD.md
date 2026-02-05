@@ -77,6 +77,10 @@ Phase 3 — Ecosystem
 - Visual fidelity:
     - Clone preserves computed styles and last rect; absolute positioned relative to parent.
     - Pointer-events none; z-index elevated during exit.
+- Wait mode coordination:
+    - When enter is deferred, mark the enter as handled before switching `isLoaded` to `ready`
+      to prevent a second enter pass ("pop" after exit completes).
+    - For object `animate` props, record the serialized animate payload to avoid duplicate runs.
 
 ## 7) Parity Matrix
 
