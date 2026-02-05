@@ -4,7 +4,7 @@
     import ModeExample from './ModeExample.svelte'
     import SyncIcon from './SyncIcon.svelte'
     import WaitIcon from './WaitIcon.svelte'
-    // import PopLayoutIcon from './PopLayoutIcon.svelte'
+    import PopLayoutIcon from './PopLayoutIcon.svelte'
 
     let internalState = $state(true)
 
@@ -69,11 +69,11 @@
             {/snippet}
         </ModeExample>
 
-        <!-- <ModeExample mode="popLayout" state={internalState}>
+        <ModeExample mode="popLayout" state={internalState}>
             {#snippet icon()}
                 <PopLayoutIcon />
             {/snippet}
-        </ModeExample> -->
+        </ModeExample>
     </div>
 
     <motion.button

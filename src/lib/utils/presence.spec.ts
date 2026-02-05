@@ -256,6 +256,15 @@ describe('AnimatePresence modes', () => {
             expect(ctx.isEnterBlocked()).toBe(false)
         })
 
+        it('returns false for popLayout mode regardless of exits', () => {
+            const ctx = createAnimatePresenceContext({ mode: 'popLayout' })
+            ctx.registerChild('k1', el, { opacity: 0 })
+            expect(ctx.isEnterBlocked()).toBe(false)
+
+            ctx.unregisterChild('k1')
+            expect(ctx.isEnterBlocked()).toBe(false)
+        })
+
         it('returns false for wait mode when no exits in progress', () => {
             const ctx = createAnimatePresenceContext({ mode: 'wait' })
             ctx.registerChild('k1', el, { opacity: 0 })
@@ -370,6 +379,38 @@ describe('AnimatePresence modes', () => {
             // The blocking happens in unregisterChild, so check after unregister
             ctx.unregisterChild('k1')
             expect(ctx.isEnterBlocked()).toBe(true)
+        })
+    })
+
+    describe('popLayout layout behavior', () => {
+        it('does not insert a placeholder during exit', async () => {
+            const ctx = createAnimatePresenceContext({ mode: 'popLayout' })
+            ctx.registerChild('k1', el, { opacity: 0 })
+            ctx.unregisterChild('k1')
+
+            const placeholder = document.querySelector('[data-presence-placeholder="true"]')
+            expect(placeholder).toBeFalsy()
+
+            const clone = document.querySelector('[data-clone="true"]')
+            expect(clone).toBeTruthy()
+
+            await Promise.resolve()
+            await Promise.resolve()
+        })
+
+        it('inserts and removes a placeholder for sync mode', async () => {
+            const ctx = createAnimatePresenceContext({ mode: 'sync' })
+            ctx.registerChild('k1', el, { opacity: 0 })
+            ctx.unregisterChild('k1')
+
+            let placeholder = document.querySelector('[data-presence-placeholder="true"]')
+            expect(placeholder).toBeTruthy()
+
+            await Promise.resolve()
+            await Promise.resolve()
+
+            placeholder = document.querySelector('[data-presence-placeholder="true"]')
+            expect(placeholder).toBeFalsy()
         })
     })
 })

@@ -437,6 +437,31 @@ export function createAnimatePresenceContext(context: {
         const rect = child.lastRect
         const computed = child.lastComputedStyle
 
+        // For sync/wait, preserve layout by inserting a hidden placeholder.
+        // For popLayout, we remove from layout immediately (no placeholder).
+        const shouldPreserveLayout = mode !== 'popLayout'
+        let placeholder: HTMLElement | null = null
+        const layoutParent = child.element.parentElement
+        if (shouldPreserveLayout && layoutParent) {
+            placeholder = document.createElement(child.element.tagName.toLowerCase())
+            placeholder.setAttribute('data-presence-placeholder', 'true')
+            placeholder.style.display = computed.display === 'contents' ? 'block' : computed.display
+            placeholder.style.width = `${rect.width}px`
+            placeholder.style.height = `${rect.height}px`
+            placeholder.style.margin = computed.margin
+            placeholder.style.boxSizing = computed.boxSizing
+            placeholder.style.position = 'static'
+            placeholder.style.visibility = 'hidden'
+            placeholder.style.pointerEvents = 'none'
+            if (computed.flex) {
+                placeholder.style.flex = computed.flex
+            }
+            if (computed.alignSelf) {
+                placeholder.style.alignSelf = computed.alignSelf
+            }
+            layoutParent.insertBefore(placeholder, child.element)
+        }
+
         // Clone original node to preserve structure/classes, then inline computed styles to freeze look
         const clone = child.element.cloneNode(true) as HTMLElement
         if (clone.id) clone.removeAttribute('id')
@@ -584,6 +609,7 @@ export function createAnimatePresenceContext(context: {
                         // ignore
                     }
                     clone.remove()
+                    placeholder?.remove()
 
                     // Log clone removal and element counts for debugging rapid toggle
                     pwLog('[presence] clone REMOVED from DOM', {
