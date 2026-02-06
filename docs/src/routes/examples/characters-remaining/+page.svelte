@@ -18,9 +18,6 @@
     <title>Characters Remaining | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example
-    motionUrl="https://examples.motion.dev/react/characters-remaining"
-    exampleUrl="/examples/characters-remaining"
->
+<Example motionUrl="https://examples.motion.dev/react/characters-remaining">
     <CharactersRemainingExample />
 </Example>
