@@ -3,6 +3,7 @@
   Hierarchical structure with FontAwesome icons and proper styling
 -->
 <script lang="ts">
+    import { motion } from '@humanspeak/svelte-motion'
     import { onMount } from 'svelte'
 
     const { currentPath } = $props()
@@ -11,6 +12,7 @@
         title: string
         href: string
         icon: string
+        external?: boolean
     }
 
     type OtherProject = {
@@ -68,18 +70,21 @@
             ]
         },
         {
-            title: 'Utilities',
+            title: 'Love and Respect',
             items: [
                 {
-                    title: 'styleString',
-                    href: '/docs/style-string',
-                    icon: 'fa-solid fa-paintbrush'
+                    title: 'Beye.ai',
+                    href: 'https://beye.ai',
+                    icon: 'fa-solid fa-heart',
+                    external: true
+                },
+                {
+                    title: 'Emil',
+                    href: 'https://animations.dev/',
+                    icon: 'fa-solid fa-compass-drafting',
+                    external: true
                 }
             ]
-        },
-        {
-            title: 'Love and Respect',
-            items: [{ title: 'Beye.ai', href: 'https://beye.ai', icon: 'fa-solid fa-heart' }]
         },
         ...(otherProjects.length > 0
             ? [
@@ -132,27 +137,43 @@
                 </h3>
                 <ul class="space-y-1">
                     {#each section.items as item (item.href)}
-                        <li>
+                        <motion.li
+                            whileHover={{ x: 4 }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                        >
                             <a
                                 href={item.href}
+                                target={item.external ? '_blank' : undefined}
+                                rel={item.external ? 'noopener' : undefined}
                                 class="group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150
 						     	{isActive(item.href)
                                     ? 'bg-sidebar-active text-sidebar-active-foreground'
                                     : 'text-sidebar-foreground hover:bg-muted hover:text-text-primary'}"
                             >
                                 {#if item.icon}
-                                    <i
-                                        class="{item.icon} mr-3 text-sm {isActive(item.href)
-                                            ? 'text-sidebar-active-foreground'
-                                            : 'text-text-muted group-hover:text-text-secondary'}"
-                                    ></i>
+                                    <motion.span
+                                        class="mr-3 inline-flex"
+                                        whileHover={{ scale: 1.25 }}
+                                        transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+                                    >
+                                        <i
+                                            class="{item.icon} fa-fw text-sm {isActive(item.href)
+                                                ? 'text-sidebar-active-foreground'
+                                                : 'text-text-muted group-hover:text-text-secondary'}"
+                                        ></i>
+                                    </motion.span>
                                 {:else}
                                     <i class="fa-solid fa-arrow-right mr-3 text-xs text-text-muted"
                                     ></i>
                                 {/if}
                                 {item.title}
+                                {#if item.external}
+                                    <i
+                                        class="fa-solid fa-arrow-up-right-from-square ml-2 text-xs opacity-50"
+                                    ></i>
+                                {/if}
                             </a>
-                        </li>
+                        </motion.li>
                     {/each}
                 </ul>
             </div>
