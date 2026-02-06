@@ -124,4 +124,19 @@ describe('public API: index.ts', () => {
         expect(mapper(50)).toBeCloseTo(0.5)
         expect(mapper(100)).toBe(1)
     })
+
+    it('transform clamps out-of-range inputs to the output range', () => {
+        // transform clamps (does not extrapolate) when input falls outside the input range
+        const mapper = transform([0, 100], [0, 1])
+
+        // Below input range: -10 maps to 0 (clamped to output minimum)
+        expect(mapper(-10)).toBe(0)
+
+        // Above input range: 150 maps to 1 (clamped to output maximum)
+        expect(mapper(150)).toBe(1)
+
+        // Verify clamping holds for more extreme out-of-range values
+        expect(mapper(-50)).toBe(0)
+        expect(mapper(200)).toBe(1)
+    })
 })
