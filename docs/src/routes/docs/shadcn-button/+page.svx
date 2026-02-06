@@ -1,0 +1,162 @@
+---
+title: Animated Button (shadcn)
+description: Drop-in animated replacement for the shadcn Button component
+---
+
+<svelte:head>
+  <title>Animated Button (shadcn) | Docs | Svelte Motion</title>
+</svelte:head>
+
+<script>
+  import { Button, buttonVariants } from '$lib/shadcn/ui/button'
+</script>
+
+# Animated Button
+
+A drop-in replacement for the [shadcn-svelte Button](https://www.shadcn-svelte.com/docs/components/button) powered by `svelte-motion`. Spring-based press feedback and subtle hover lift come out of the box — no extra config needed.
+
+## Live Demo
+
+Try clicking and hovering on each variant:
+
+<div class="not-prose my-8 flex flex-col gap-8">
+
+### Variants
+
+<div class="flex flex-wrap items-center gap-3">
+  <Button variant="default">Default</Button>
+  <Button variant="secondary">Secondary</Button>
+  <Button variant="outline">Outline</Button>
+  <Button variant="ghost">Ghost</Button>
+  <Button variant="link">Link</Button>
+  <Button variant="destructive">Destructive</Button>
+</div>
+
+### Sizes
+
+<div class="flex flex-wrap items-center gap-3">
+  <Button size="sm">Small</Button>
+  <Button size="default">Default</Button>
+  <Button size="lg">Large</Button>
+  <Button size="icon"><i class="fa-solid fa-heart"></i></Button>
+  <Button size="icon-sm" variant="outline"><i class="fa-solid fa-star"></i></Button>
+  <Button size="icon-lg" variant="secondary"><i class="fa-solid fa-bolt"></i></Button>
+</div>
+
+### With Icons
+
+<div class="flex flex-wrap items-center gap-3">
+  <Button><i class="fa-solid fa-paper-plane"></i> Send</Button>
+  <Button variant="secondary"><i class="fa-solid fa-download"></i> Download</Button>
+  <Button variant="outline"><i class="fa-solid fa-gear"></i> Settings</Button>
+  <Button variant="ghost"><i class="fa-solid fa-trash"></i> Delete</Button>
+</div>
+
+### As Link
+
+<div class="flex flex-wrap items-center gap-3">
+  <Button href="https://motion.svelte.page" variant="default">Visit Docs</Button>
+  <Button href="https://github.com/humanspeak/svelte-motion" variant="outline">GitHub <i class="fa-solid fa-arrow-up-right-from-square"></i></Button>
+</div>
+
+### Disabled State
+
+<div class="flex flex-wrap items-center gap-3">
+  <Button disabled>Disabled</Button>
+  <Button variant="outline" disabled>Disabled Outline</Button>
+  <Button variant="secondary" disabled>Disabled Secondary</Button>
+</div>
+
+### Without Animation
+
+Set `animated={false}` to get vanilla shadcn behavior with no motion:
+
+<div class="flex flex-wrap items-center gap-3">
+  <Button animated={false}>No Animation</Button>
+  <Button animated={false} variant="outline">Static Outline</Button>
+  <Button animated={false} variant="secondary">Static Secondary</Button>
+</div>
+
+</div>
+
+## Installation
+
+```bash
+npx shadcn@latest add button
+```
+
+Then replace the generated `button.svelte` with the animated version:
+
+```svelte
+<script lang="ts" module>
+  import { cn, type WithElementRef } from "$lib/utils.js";
+  import type { HTMLAnchorAttributes, HTMLButtonAttributes } from "svelte/elements";
+  import { type VariantProps, tv } from "tailwind-variants";
+
+  export const buttonVariants = tv({
+    base: "focus-visible:border-ring focus-visible:ring-ring/50 ...",
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs",
+        // ... all standard variants
+      },
+      size: {
+        default: "h-9 px-4 py-2 has-[>svg]:px-3",
+        // ... all standard sizes
+      },
+    },
+  });
+
+  export type ButtonProps = WithElementRef<HTMLButtonAttributes> &
+    WithElementRef<HTMLAnchorAttributes> & {
+      variant?: ButtonVariant;
+      size?: ButtonSize;
+      animated?: boolean;  // NEW: toggle motion on/off
+    };
+</script>
+
+<script lang="ts">
+  import { motion } from '@humanspeak/svelte-motion';
+
+  let { animated = true, ...restProps }: ButtonProps = $props();
+
+  const springTransition = { type: 'spring', stiffness: 400, damping: 25 };
+</script>
+
+<!-- Use motion.button instead of button -->
+{#if animated}
+  <motion.button
+    whileTap={{ scale: 0.97 }}
+    whileHover={{ y: -1 }}
+    transition={springTransition}
+    {...restProps}
+  >
+    {@render children?.()}
+  </motion.button>
+{:else}
+  <button {...restProps}>
+    {@render children?.()}
+  </button>
+{/if}
+```
+
+## Animation Details
+
+| Variant | whileTap | whileHover | Transition |
+|---------|----------|------------|------------|
+| default, secondary, outline, ghost, destructive | `scale: 0.97` | `y: -1` | Spring (400/25) |
+| icon, icon-sm, icon-lg | `scale: 0.9` | `scale: 1.08` | Spring (400/25) |
+| link | none | none | — |
+
+The `animated` prop (default `true`) lets consumers opt out entirely for vanilla shadcn behavior — useful for cases where the animation conflicts with a parent layout.
+
+## API
+
+All standard [shadcn-svelte Button props](https://www.shadcn-svelte.com/docs/components/button) are supported, plus:
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `animated` | `boolean` | `true` | Enable/disable motion animations |
+| `variant` | `string` | `"default"` | Visual variant |
+| `size` | `string` | `"default"` | Size variant |
+| `href` | `string` | — | Renders as `<a>` (or `motion.a`) when set |
