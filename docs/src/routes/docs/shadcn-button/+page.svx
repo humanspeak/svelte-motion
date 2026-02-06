@@ -81,64 +81,29 @@ Set `animated={false}` to get vanilla shadcn behavior with no motion:
 
 ## Installation
 
+Install via the shadcn-svelte CLI from our registry:
+
 ```bash
-npx shadcn@latest add button
+npx shadcn-svelte@latest add https://motion.svelte.page/r/animated-button.json
 ```
 
-Then replace the generated `button.svelte` with the animated version:
+This installs `AnimatedButton` alongside your existing `Button`. It automatically pulls in `@humanspeak/svelte-motion` and the base shadcn button as dependencies.
+
+Then use it:
 
 ```svelte
-<script lang="ts" module>
-  import { cn, type WithElementRef } from "$lib/utils.js";
-  import type { HTMLAnchorAttributes, HTMLButtonAttributes } from "svelte/elements";
-  import { type VariantProps, tv } from "tailwind-variants";
-
-  export const buttonVariants = tv({
-    base: "focus-visible:border-ring focus-visible:ring-ring/50 ...",
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs",
-        // ... all standard variants
-      },
-      size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        // ... all standard sizes
-      },
-    },
-  });
-
-  export type ButtonProps = WithElementRef<HTMLButtonAttributes> &
-    WithElementRef<HTMLAnchorAttributes> & {
-      variant?: ButtonVariant;
-      size?: ButtonSize;
-      animated?: boolean;  // NEW: toggle motion on/off
-    };
+<script>
+  import { AnimatedButton } from '$lib/components/ui/animated-button'
 </script>
 
-<script lang="ts">
-  import { motion } from '@humanspeak/svelte-motion';
-
-  let { animated = true, ...restProps }: ButtonProps = $props();
-
-  const springTransition = { type: 'spring', stiffness: 400, damping: 25 };
-</script>
-
-<!-- Use motion.button instead of button -->
-{#if animated}
-  <motion.button
-    whileTap={{ scale: 0.97 }}
-    whileHover={{ y: -1 }}
-    transition={springTransition}
-    {...restProps}
-  >
-    {@render children?.()}
-  </motion.button>
-{:else}
-  <button {...restProps}>
-    {@render children?.()}
-  </button>
-{/if}
+<AnimatedButton variant="default">Click me</AnimatedButton>
+<AnimatedButton variant="outline" size="icon"><i class="fa-solid fa-heart" /></AnimatedButton>
+<AnimatedButton animated={false}>No motion</AnimatedButton>
 ```
+
+### Manual Installation
+
+Alternatively, copy the component source directly from [GitHub](https://github.com/humanspeak/svelte-motion/tree/main/docs/src/lib/shadcn/ui/button).
 
 ## Animation Details
 
@@ -146,7 +111,7 @@ Then replace the generated `button.svelte` with the animated version:
 |---------|----------|------------|------------|
 | default, secondary, outline, ghost, destructive | `scale: 0.97` | `y: -1` | Spring (400/25) |
 | icon, icon-sm, icon-lg | `scale: 0.9` | `scale: 1.08` | Spring (400/25) |
-| link | none | none | — |
+| link | `scale: 0.97` | `scale: 1.03` | Spring (400/25) |
 
 The `animated` prop (default `true`) lets consumers opt out entirely for vanilla shadcn behavior — useful for cases where the animation conflicts with a parent layout.
 
