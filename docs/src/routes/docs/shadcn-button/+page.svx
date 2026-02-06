@@ -38,9 +38,9 @@ Try clicking and hovering on each variant:
   <Button size="sm">Small</Button>
   <Button size="default">Default</Button>
   <Button size="lg">Large</Button>
-  <Button size="icon"><i class="fa-solid fa-heart"></i></Button>
-  <Button size="icon-sm" variant="outline"><i class="fa-solid fa-star"></i></Button>
-  <Button size="icon-lg" variant="secondary"><i class="fa-solid fa-bolt"></i></Button>
+  <Button size="icon" aria-label="Like"><i class="fa-solid fa-heart"></i></Button>
+  <Button size="icon-sm" variant="outline" aria-label="Favorite"><i class="fa-solid fa-star"></i></Button>
+  <Button size="icon-lg" variant="secondary" aria-label="Boost"><i class="fa-solid fa-bolt"></i></Button>
 </div>
 
 ### With Icons
@@ -87,7 +87,7 @@ Install via the shadcn-svelte CLI from our registry:
 npx shadcn-svelte@latest add https://motion.svelte.page/r/animated-button.json
 ```
 
-This installs `AnimatedButton` alongside your existing `Button`. It automatically pulls in `@humanspeak/svelte-motion` and the base shadcn button as dependencies.
+This installs `AnimatedButton` alongside your existing `Button`. It automatically pulls in `@humanspeak/svelte-motion` and `tailwind-variants` as dependencies.
 
 Then use it:
 
@@ -97,7 +97,7 @@ Then use it:
 </script>
 
 <AnimatedButton variant="default">Click me</AnimatedButton>
-<AnimatedButton variant="outline" size="icon"><i class="fa-solid fa-heart" /></AnimatedButton>
+<AnimatedButton variant="outline" size="icon" aria-label="Like"><i class="fa-solid fa-heart" /></AnimatedButton>
 <AnimatedButton animated={false}>No motion</AnimatedButton>
 ```
 
