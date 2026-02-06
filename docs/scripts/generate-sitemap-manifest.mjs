@@ -107,7 +107,20 @@ async function updateExamplesPageTs(examples) {
         // Find the examples object in the file and replace it
         // More robust regex that matches the entire examples object declaration
         const examplesObjectRegex = /const examples\s*=\s*\{[\s\S]*?\n\s*\}(?=\s*\n\s*return)/
-        const newExamplesObject = `const examples = ${JSON.stringify(examples, null, 4).replace(/^/gm, '    ').trim()}`
+
+        // Format as prettier-compatible JS (single quotes, no trailing commas, no semis)
+        const formatValue = (v) => (v === null ? 'null' : `'${v.replace(/'/g, "\\'")}'`)
+        const lines = Object.entries(examples).map(([slug, meta]) => {
+            const props = [
+                `            title: ${formatValue(meta.title)}`,
+                `            description: ${formatValue(meta.description)}`,
+                `            sourceUrl: ${formatValue(meta.sourceUrl)}`
+            ]
+            // Quote keys that aren't valid identifiers (contain hyphens)
+            const key = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(slug) ? slug : `'${slug}'`
+            return `        ${key}: {\n${props.join(',\n')}\n        }`
+        })
+        const newExamplesObject = `const examples = {\n${lines.join(',\n')}\n    }`
 
         if (examplesObjectRegex.test(content)) {
             content = content.replace(examplesObjectRegex, newExamplesObject)

@@ -1,0 +1,127 @@
+---
+title: Animated Button (shadcn)
+description: Drop-in animated replacement for the shadcn Button component
+---
+
+<svelte:head>
+  <title>Animated Button (shadcn) | Docs | Svelte Motion</title>
+</svelte:head>
+
+<script>
+  import { Button } from '$lib/shadcn/ui/button'
+</script>
+
+# Animated Button
+
+A drop-in replacement for the [shadcn-svelte Button](https://www.shadcn-svelte.com/docs/components/button) powered by `svelte-motion`. Spring-based press feedback and subtle hover lift come out of the box — no extra config needed.
+
+## Live Demo
+
+Try clicking and hovering on each variant:
+
+<div class="not-prose my-8 flex flex-col gap-8">
+
+### Variants
+
+<div class="flex flex-wrap items-center gap-3">
+  <Button variant="default">Default</Button>
+  <Button variant="secondary">Secondary</Button>
+  <Button variant="outline">Outline</Button>
+  <Button variant="ghost">Ghost</Button>
+  <Button variant="link">Link</Button>
+  <Button variant="destructive">Destructive</Button>
+</div>
+
+### Sizes
+
+<div class="flex flex-wrap items-center gap-3">
+  <Button size="sm">Small</Button>
+  <Button size="default">Default</Button>
+  <Button size="lg">Large</Button>
+  <Button size="icon" aria-label="Like"><i class="fa-solid fa-heart"></i></Button>
+  <Button size="icon-sm" variant="outline" aria-label="Favorite"><i class="fa-solid fa-star"></i></Button>
+  <Button size="icon-lg" variant="secondary" aria-label="Boost"><i class="fa-solid fa-bolt"></i></Button>
+</div>
+
+### With Icons
+
+<div class="flex flex-wrap items-center gap-3">
+  <Button><i class="fa-solid fa-paper-plane"></i> Send</Button>
+  <Button variant="secondary"><i class="fa-solid fa-download"></i> Download</Button>
+  <Button variant="outline"><i class="fa-solid fa-gear"></i> Settings</Button>
+  <Button variant="ghost"><i class="fa-solid fa-trash"></i> Delete</Button>
+</div>
+
+### As Link
+
+<div class="flex flex-wrap items-center gap-3">
+  <Button href="https://motion.svelte.page" variant="default">Visit Docs</Button>
+  <Button href="https://github.com/humanspeak/svelte-motion" variant="outline">GitHub <i class="fa-solid fa-arrow-up-right-from-square"></i></Button>
+</div>
+
+### Disabled State
+
+<div class="flex flex-wrap items-center gap-3">
+  <Button disabled>Disabled</Button>
+  <Button variant="outline" disabled>Disabled Outline</Button>
+  <Button variant="secondary" disabled>Disabled Secondary</Button>
+</div>
+
+### Without Animation
+
+Set `animated={false}` to get vanilla shadcn behavior with no motion:
+
+<div class="flex flex-wrap items-center gap-3">
+  <Button animated={false}>No Animation</Button>
+  <Button animated={false} variant="outline">Static Outline</Button>
+  <Button animated={false} variant="secondary">Static Secondary</Button>
+</div>
+
+</div>
+
+## Installation
+
+Install via the shadcn-svelte CLI from our registry:
+
+```bash
+npx shadcn-svelte@latest add https://motion.svelte.page/r/animated-button.json
+```
+
+This installs `AnimatedButton` alongside your existing `Button`. It automatically pulls in `@humanspeak/svelte-motion` and `tailwind-variants` as dependencies.
+
+Then use it:
+
+```svelte
+<script>
+  import { AnimatedButton } from '$lib/components/ui/animated-button'
+</script>
+
+<AnimatedButton variant="default">Click me</AnimatedButton>
+<AnimatedButton variant="outline" size="icon" aria-label="Like"><i class="fa-solid fa-heart" /></AnimatedButton>
+<AnimatedButton animated={false}>No motion</AnimatedButton>
+```
+
+### Manual Installation
+
+Alternatively, copy the component source directly from [GitHub](https://github.com/humanspeak/svelte-motion/tree/main/docs/src/lib/shadcn/ui/button).
+
+## Animation Details
+
+| Variant | whileTap | whileHover | Transition |
+|---------|----------|------------|------------|
+| default, secondary, outline, ghost, destructive | `scale: 0.97` | `y: -1` | Spring (400/25) |
+| icon, icon-sm, icon-lg | `scale: 0.9` | `scale: 1.08` | Spring (400/25) |
+| link | `scale: 0.97` | `scale: 1.03` | Spring (400/25) |
+
+The `animated` prop (default `true`) lets consumers opt out entirely for vanilla shadcn behavior — useful for cases where the animation conflicts with a parent layout.
+
+## API
+
+All standard [shadcn-svelte Button props](https://www.shadcn-svelte.com/docs/components/button) are supported, plus:
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `animated` | `boolean` | `true` | Enable/disable motion animations |
+| `variant` | `string` | `"default"` | Visual variant |
+| `size` | `string` | `"default"` | Size variant |
+| `href` | `string` | — | Renders as `<a>` (or `motion.a`) when set |
