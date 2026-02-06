@@ -93,6 +93,12 @@
                     href: 'https://animations.dev/',
                     icon: 'fa-solid fa-compass-drafting',
                     external: true
+                },
+                {
+                    title: 'shadcn-svelte',
+                    href: 'https://www.shadcn-svelte.com',
+                    icon: 'fa-solid fa-cube',
+                    external: true
                 }
             ]
         },
