@@ -15,6 +15,11 @@ export const load: PageLoad = () => {
             description: 'Interactive animated button animation example using Svelte Motion.',
             sourceUrl: null
         },
+        'characters-remaining': {
+            title: 'Characters Remaining',
+            description: 'Interactive characters remaining animation example using Svelte Motion.',
+            sourceUrl: null
+        },
         'color-interpolation': {
             title: 'Color Interpolation',
             description: 'Interactive color interpolation animation example using Svelte Motion.',
