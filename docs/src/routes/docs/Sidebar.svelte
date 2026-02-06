@@ -21,7 +21,7 @@
         shortDescription: string
     }
 
-    let otherProjects: NavItem[] = $state([])
+    let otherProjects = $state<NavItem[]>([])
 
     // Navigation structure matching Motion.dev with FontAwesome icons
     let navigation = $derived([
@@ -70,6 +70,16 @@
             ]
         },
         {
+            title: 'shadcn/ui',
+            items: [
+                {
+                    title: 'Button',
+                    href: '/docs/shadcn-button',
+                    icon: 'fa-solid fa-hand-pointer'
+                }
+            ]
+        },
+        {
             title: 'Love and Respect',
             items: [
                 {
@@ -108,7 +118,8 @@
             otherProjects = projects.map((project) => ({
                 title: formatTitle(project.slug),
                 href: project.url,
-                icon: 'fa-solid fa-heart'
+                icon: 'fa-solid fa-heart',
+                external: true
             }))
         } catch (error) {
             console.error('Failed to load other projects:', error)
@@ -143,8 +154,8 @@
                         >
                             <a
                                 href={item.href}
-                                target={item.external ? '_blank' : undefined}
-                                rel={item.external ? 'noopener' : undefined}
+                                target={item?.external ? '_blank' : undefined}
+                                rel={item?.external ? 'noopener' : undefined}
                                 class="group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150
 						     	{isActive(item.href)
                                     ? 'bg-sidebar-active text-sidebar-active-foreground'
@@ -167,7 +178,7 @@
                                     ></i>
                                 {/if}
                                 {item.title}
-                                {#if item.external}
+                                {#if item?.external}
                                     <i
                                         class="fa-solid fa-arrow-up-right-from-square ml-2 text-xs opacity-50"
                                     ></i>
