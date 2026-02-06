@@ -29,7 +29,7 @@ import type { DragControls } from '$lib/types'
  * </motion.div>
  * ```
  */
-export function createDragControls(): DragControls {
+export const createDragControls = (): DragControls => {
     let target: HTMLElement | null = null
     let starter: ((e: PointerEvent, snap?: boolean) => void) | null = null
     let cancelInertia: (() => void) | null = null
