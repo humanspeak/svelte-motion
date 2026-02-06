@@ -1,0 +1,11 @@
+{
+    "$schema": "https://shadcn-svelte.com/schema/registry.json",
+    "name": "svelte-motion",
+    "homepage": "https://motion.svelte.page",
+    "items": [
+        {
+            "name": "animated-button",
+            "type": "registry:ui"
+        }
+    ]
+}
