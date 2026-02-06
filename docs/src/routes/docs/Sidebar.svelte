@@ -160,8 +160,8 @@
                         >
                             <a
                                 href={item.href}
-                                target={item?.external ? '_blank' : undefined}
-                                rel={item?.external ? 'noopener' : undefined}
+                                target={item.external ? '_blank' : undefined}
+                                rel={item.external ? 'noopener' : undefined}
                                 class="group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150
 						     	{isActive(item.href)
                                     ? 'bg-sidebar-active text-sidebar-active-foreground'
@@ -184,10 +184,12 @@
                                     ></i>
                                 {/if}
                                 {item.title}
-                                {#if item?.external}
+                                {#if item.external}
                                     <i
                                         class="fa-solid fa-arrow-up-right-from-square ml-2 text-xs opacity-50"
+                                        aria-hidden="true"
                                     ></i>
+                                    <span class="sr-only">(opens in new tab)</span>
                                 {/if}
                             </a>
                         </motion.li>

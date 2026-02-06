@@ -35,8 +35,8 @@ const COMPONENT_MAP = {
         title: 'AnimatedButton',
         description:
             'Animated shadcn Button with spring-based press and hover via svelte-motion. Installs alongside the standard Button.',
-        dependencies: ['@humanspeak/svelte-motion'],
-        devDependencies: ['tailwind-variants'],
+        dependencies: ['@humanspeak/svelte-motion', 'tailwind-variants'],
+        devDependencies: [],
         registryDependencies: [],
         categories: ['buttons'],
         docs: 'Requires @humanspeak/svelte-motion. Set animated={false} to disable motion.',
@@ -54,12 +54,12 @@ const COMPONENT_MAP = {
  * Rewrite internal import paths for consumer projects.
  *
  * @param {string} content - Raw file content
- * @param {string} componentName - The registry component name (e.g. 'animated-button')
  * @param {string} sourceFilename - Original source filename
  * @param {Record<string, string>} fileRenames - Filename rename map
+ * @param {string} pascalName - The PascalCase name for export rewriting (e.g. 'AnimatedButton')
  * @returns {string} Rewritten content
  */
-function rewriteImports(content, componentName, sourceFilename, fileRenames) {
+function rewriteImports(content, sourceFilename, fileRenames, pascalName) {
     let result = content
 
     // Rewrite $lib/shadcn/utils → $UTILS$ (CLI resolves this to consumer's utils path)
@@ -70,21 +70,15 @@ function rewriteImports(content, componentName, sourceFilename, fileRenames) {
     for (const [srcName, destName] of Object.entries(fileRenames)) {
         if (srcName !== destName) {
             result = result.replace(
-                new RegExp(`\\./${srcName.replace('.', '\\.')}`, 'g'),
+                new RegExp(`\\./${srcName.replaceAll('.', '\\.')}`, 'g'),
                 `./${destName}`
             )
         }
     }
 
     // Rewrite export names: Root as Button → Root as AnimatedButton
-    if (sourceFilename === 'index.ts') {
-        const pascalName =
-            COMPONENT_MAP[
-                Object.keys(COMPONENT_MAP).find((k) => COMPONENT_MAP[k].name === componentName)
-            ]?.title
-        if (pascalName) {
-            result = result.replace(/Root as Button/g, `Root as ${pascalName}`)
-        }
+    if (sourceFilename === 'index.ts' && pascalName) {
+        result = result.replace(/Root as Button/g, `Root as ${pascalName}`)
     }
 
     return result
@@ -127,7 +121,7 @@ async function readComponentFiles(dirPath) {
 function generateRegistryItem(sourceDirName, config, sourceFiles) {
     const files = sourceFiles.map(({ filename, content }) => {
         const renamedFilename = config.fileRenames?.[filename] ?? filename
-        const rewritten = rewriteImports(content, config.name, filename, config.fileRenames ?? {})
+        const rewritten = rewriteImports(content, filename, config.fileRenames ?? {}, config.title)
 
         return {
             content: rewritten,

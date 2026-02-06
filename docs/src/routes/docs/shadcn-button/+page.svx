@@ -8,7 +8,7 @@ description: Drop-in animated replacement for the shadcn Button component
 </svelte:head>
 
 <script>
-  import { Button, buttonVariants } from '$lib/shadcn/ui/button'
+  import { Button } from '$lib/shadcn/ui/button'
 </script>
 
 # Animated Button

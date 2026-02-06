@@ -4,8 +4,8 @@
     "type": "registry:ui",
     "title": "AnimatedButton",
     "description": "Animated shadcn Button with spring-based press and hover via svelte-motion. Installs alongside the standard Button.",
-    "dependencies": ["@humanspeak/svelte-motion"],
-    "devDependencies": ["tailwind-variants"],
+    "dependencies": ["@humanspeak/svelte-motion", "tailwind-variants"],
+    "devDependencies": [],
     "registryDependencies": [],
     "files": [
         {
