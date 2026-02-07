@@ -18,6 +18,6 @@
     <title>Notifications Stack | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example>
+<Example title="Notifications Stack">
     <NotificationsStackExample />
 </Example>

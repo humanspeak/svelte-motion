@@ -20,6 +20,6 @@
     <title>Hover and Tap | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example motionUrl={data.sourceUrl}>
+<Example title="Hover and Tap" motionUrl={data.sourceUrl}>
     <HoverAndTap />
 </Example>

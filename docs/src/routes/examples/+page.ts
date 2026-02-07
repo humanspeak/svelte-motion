@@ -109,6 +109,9 @@ export const load: PageLoad = () => {
     }
 
     return {
+        title: 'Examples',
+        description:
+            'Interactive animation examples built with Svelte Motion. Browse hover effects, transitions, gestures, and more.',
         examples
     }
 }

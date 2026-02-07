@@ -19,6 +19,6 @@
     <title>While Focus | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example motionUrl={data.sourceUrl ?? undefined}>
+<Example title="While Focus" motionUrl={data.sourceUrl ?? undefined}>
     <WhileFocusExample />
 </Example>

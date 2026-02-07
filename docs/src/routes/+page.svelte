@@ -72,10 +72,6 @@
 
 <svelte:head>
     <title>Svelte Motion - Animation Library for Svelte</title>
-    <meta
-        name="description"
-        content="Svelte Motion is a Svelte animation library for building smooth, production-grade UI animations."
-    />
 </svelte:head>
 
 <div class="flex min-h-svh flex-col">

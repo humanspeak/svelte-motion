@@ -19,6 +19,6 @@
     <title>Toggle Switch | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example motionUrl={data.sourceUrl ?? undefined}>
+<Example title="Toggle Switch" motionUrl={data.sourceUrl ?? undefined}>
     <ToggleSwitchExample />
 </Example>

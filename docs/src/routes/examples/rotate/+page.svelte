@@ -20,6 +20,6 @@
     <title>Rotate | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example motionUrl={data.sourceUrl}>
+<Example title="Rotate" motionUrl={data.sourceUrl}>
     <Rotate />
 </Example>

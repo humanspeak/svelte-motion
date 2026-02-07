@@ -19,6 +19,6 @@
     <title>Color Interpolation | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example motionUrl={data.sourceUrl}>
+<Example title="Color Interpolation" motionUrl={data.sourceUrl}>
     <ColorInterpolationExample />
 </Example>

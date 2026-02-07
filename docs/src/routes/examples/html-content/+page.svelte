@@ -21,6 +21,6 @@
     <title>HTML Content | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example motionUrl={data.sourceUrl}>
+<Example title="HTML Content" motionUrl={data.sourceUrl}>
     <HTMLContent />
 </Example>
