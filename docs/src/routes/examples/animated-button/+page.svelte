@@ -19,6 +19,6 @@
     <title>Animated Button | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example>
+<Example title="Animated Button">
     <AnimatedButton />
 </Example>

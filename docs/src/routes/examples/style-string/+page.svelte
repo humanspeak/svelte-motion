@@ -18,6 +18,6 @@
     <title>styleString | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example>
+<Example title="styleString">
     <StyleStringExample />
 </Example>

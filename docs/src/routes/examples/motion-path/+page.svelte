@@ -20,6 +20,6 @@
     <title>Motion Path | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example motionUrl={data.sourceUrl ?? undefined}>
+<Example title="Motion Path" motionUrl={data.sourceUrl ?? undefined}>
     <MotionPath />
 </Example>

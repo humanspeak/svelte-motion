@@ -19,6 +19,6 @@
     <title>useTime | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example motionUrl={data.sourceUrl}>
+<Example title="useTime" motionUrl={data.sourceUrl}>
     <UseTimeExample />
 </Example>

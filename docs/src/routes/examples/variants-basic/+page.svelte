@@ -18,6 +18,6 @@
     <title>Variants Basic | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example>
+<Example title="Variants Basic">
     <VariantsBasicExample />
 </Example>

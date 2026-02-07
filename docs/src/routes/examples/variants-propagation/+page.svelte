@@ -18,6 +18,6 @@
     <title>Variants Propagation | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example>
+<Example title="Variants Propagation">
     <VariantsPropagationExample />
 </Example>

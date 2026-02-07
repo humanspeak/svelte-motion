@@ -19,6 +19,6 @@
     <title>Multi-State Badge | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example motionUrl={data.sourceUrl ?? undefined}>
+<Example title="Multi-State Badge" motionUrl={data.sourceUrl ?? undefined}>
     <MultiStateBadgeExample />
 </Example>

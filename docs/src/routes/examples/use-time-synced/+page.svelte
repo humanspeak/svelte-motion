@@ -19,6 +19,6 @@
     <title>useTime (Synced) | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example motionUrl={data.sourceUrl}>
+<Example title="useTime (Synced)" motionUrl={data.sourceUrl}>
     <UseTimeSyncedExample />
 </Example>

@@ -20,6 +20,6 @@
     <title>Reordering | Examples | Svelte Motion</title>
 </svelte:head>
 
-<Example motionUrl={data.sourceUrl}>
+<Example title="Reordering" motionUrl={data.sourceUrl}>
     <Reordering />
 </Example>
