@@ -9,9 +9,10 @@
         isSmall?: boolean
         motionUrl?: string
         exampleUrl?: string
+        title?: string
     }
 
-    const { children, isSmall = false, motionUrl, exampleUrl }: ExampleProps = $props()
+    const { children, isSmall = false, motionUrl, exampleUrl, title }: ExampleProps = $props()
 
     let refreshId = $state(0)
     const refreshMotion = () => {
@@ -83,6 +84,9 @@
         ></div>
     {/if}
     <div class="relative z-10 m-0 flex w-full flex-1 items-center justify-center p-0">
+        {#if title && !isSmall}
+            <h1 class="sr-only">{title}</h1>
+        {/if}
         <main class="flex h-full w-full max-w-none flex-1 items-center justify-center">
             {#key refreshId}
                 {@render children()}
