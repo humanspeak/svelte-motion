@@ -137,6 +137,7 @@
 
     // Use the provided key for presence tracking
     // When not inside AnimatePresence, use a stable identifier based on component instance
+    // trunk-ignore(eslint/no-useless-assignment): false positive — presenceKey is used throughout the component
     const presenceKey = keyProp ?? `motion-${++keyCounter}`
 
     // Track previous key for key-change detection (simulates React's key-based remounting)

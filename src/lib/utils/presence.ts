@@ -85,29 +85,15 @@ export type AnimatePresenceContext = {
     onExitComplete?: () => void
     /** Register a child element and its exit definition. */
     registerChild: (
-        // trunk-ignore(eslint/no-unused-vars)
         key: string,
-        // trunk-ignore(eslint/no-unused-vars)
         element: HTMLElement,
-        // trunk-ignore(eslint/no-unused-vars)
         exit?: MotionExit,
-        // trunk-ignore(eslint/no-unused-vars)
         mergedTransition?: MotionTransition
     ) => void
     /** Update the last known rect/style snapshot for a registered child. */
-    updateChildState: (
-        // trunk-ignore(eslint/no-unused-vars)
-        key: string,
-        // trunk-ignore(eslint/no-unused-vars)
-        rect: DOMRect,
-        // trunk-ignore(eslint/no-unused-vars)
-        computedStyle: CSSStyleDeclaration
-    ) => void
+    updateChildState: (key: string, rect: DOMRect, computedStyle: CSSStyleDeclaration) => void
     /** Unregister a child. If it has an exit, clone and animate it out. */
-    unregisterChild: (
-        // trunk-ignore(eslint/no-unused-vars)
-        key: string
-    ) => void
+    unregisterChild: (key: string) => void
 }
 
 /**
