@@ -43,7 +43,7 @@
         "eslint-config-prettier": "10.1.8",
         "eslint-plugin-import": "2.32.0",
         "eslint-plugin-svelte": "3.14.0",
-        "eslint-plugin-unused-imports": "4.3.0",
+        "eslint-plugin-unused-imports": "4.4.1",
         "globals": "^17.3.0",
         "mdsvex": "^0.12.6",
         "mode-watcher": "^1.1.0",
