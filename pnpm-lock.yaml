@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       motion:
-        specifier: ^12.33.2
-        version: 12.33.2
+        specifier: ^12.34.0
+        version: 12.34.0
       motion-dom:
         specifier: ^12.33.2
         version: 12.33.2
@@ -2703,8 +2703,8 @@ packages:
   forwarded-parse@2.1.2:
     resolution: {integrity: sha512-alTFZZQDKMporBH77856pXgzhEzaUVmLCDk+egLgIgHst3Tpndzz8MnKe+GzRJRfvVdn69HhpW7cmXzvtLvJAw==}
 
-  framer-motion@12.33.2:
-    resolution: {integrity: sha512-7AwePP8vKvsAzAESRac0iWWrLrjhYsa58nPknV+ELFfNt1JDnfLbm/4xJCgIbWyYtHtPwhoyOAm8sRe8uCSHtA==}
+  framer-motion@12.34.0:
+    resolution: {integrity: sha512-+/H49owhzkzQyxtn7nZeF4kdH++I2FWrESQ184Zbcw5cEqNHYkE5yxWxcTLSj5lNx3NWdbIRy5FHqUvetD8FWg==}
     peerDependencies:
       '@emotion/is-prop-valid': '*'
       react: ^18.0.0 || ^19.0.0
@@ -2785,6 +2785,7 @@ packages:
 
   glob@10.5.0:
     resolution: {integrity: sha512-DfXN8DfhJ7NH3Oe7cFmu3NCu1wKbkReJ8TorzSAFbSKrlNaQSKfIzqYqVY8zlbs2NLBbWpRiU52GX2PbaBVNkg==}
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
     hasBin: true
 
   globals@14.0.0:
@@ -3352,11 +3353,14 @@ packages:
   motion-dom@12.33.2:
     resolution: {integrity: sha512-GRoe/TVBJsBzfRXD5JZGA4H3XZk3+CUNQspivJa6O4dCuZskkkqz48QT75nv27kNnfXGyqJz+5hWrMedGyHf5Q==}
 
+  motion-dom@12.34.0:
+    resolution: {integrity: sha512-Lql3NuEcScRDxTAO6GgUsRHBZOWI/3fnMlkMcH5NftzcN37zJta+bpbMAV9px4Nj057TuvRooMK7QrzMCgtz6Q==}
+
   motion-utils@12.29.2:
     resolution: {integrity: sha512-G3kc34H2cX2gI63RqU+cZq+zWRRPSsNIOjpdl9TN4AQwC4sgwYPl/Q/Obf/d53nOm569T0fYK+tcoSV50BWx8A==}
 
-  motion@12.33.2:
-    resolution: {integrity: sha512-n5lNvMmri9Y68YfCJQqVbVp3igWcKPyvZ454aFaPWgmKln6JrzQtqjxccQ5uopek2B/m+4HuheIBMh5yMYQV4g==}
+  motion@12.34.0:
+    resolution: {integrity: sha512-01Sfa/zgsD/di8zA/uFW5Eb7/SPXoGyUfy+uMRMW5Spa8j0z/UbfQewAYvPMYFCXRlyD6e5aLHh76TxeeJD+RA==}
     peerDependencies:
       '@emotion/is-prop-valid': '*'
       react: ^18.0.0 || ^19.0.0
@@ -7208,9 +7212,9 @@ snapshots:
 
   forwarded-parse@2.1.2: {}
 
-  framer-motion@12.33.2:
+  framer-motion@12.34.0:
     dependencies:
-      motion-dom: 12.33.2
+      motion-dom: 12.34.0
       motion-utils: 12.29.2
       tslib: 2.8.1
 
@@ -7858,11 +7862,15 @@ snapshots:
     dependencies:
       motion-utils: 12.29.2
 
+  motion-dom@12.34.0:
+    dependencies:
+      motion-utils: 12.29.2
+
   motion-utils@12.29.2: {}
 
-  motion@12.33.2:
+  motion@12.34.0:
     dependencies:
-      framer-motion: 12.33.2
+      framer-motion: 12.34.0
       tslib: 2.8.1
 
   mri@1.2.0: {}

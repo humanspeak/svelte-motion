@@ -82,7 +82,7 @@
         }
     },
     "dependencies": {
-        "motion": "^12.33.2",
+        "motion": "^12.34.0",
         "motion-dom": "^12.33.2"
     },
     "devDependencies": {
