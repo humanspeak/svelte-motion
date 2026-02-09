@@ -206,8 +206,8 @@ The `info` object passed to drag callbacks contains:
 | Property | Type | Description |
 |----------|------|-------------|
 | `point` | `{ x, y }` | Current pointer position |
-| `delta` | `{ x, y }` | Change since drag started |
-| `offset` | `{ x, y }` | Absolute transform offset |
+| `delta` | `{ x, y }` | Change since the last drag event (per-frame delta) |
+| `offset` | `{ x, y }` | Cumulative transform offset since drag start |
 | `velocity` | `{ x, y }` | Current velocity in px/s |
 
 ## Props
