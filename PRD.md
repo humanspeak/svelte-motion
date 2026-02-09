@@ -1,190 +1,171 @@
 # Svelte Motion — Product Requirements Document (PRD)
 
-## 1) Vision and Context
+## 1) Vision
 
-Svelte Motion aims to bring a Framer Motion–style developer experience to Svelte by offering ergonomic, declarative animation primitives via `motion.<element>` components, interaction props, and composable configuration.
+Svelte Motion brings Framer Motion-style ergonomics to Svelte 5 with:
 
-Reference: Framer Motion for React [`motion` on npm](https://www.npmjs.com/package/motion).
+- `motion.<element>` components
+- Declarative animation props
+- Gesture props and callbacks
+- Presence orchestration for exit animations
+- Composable defaults via `MotionConfig`
 
-## 2) Current State Assessment (as of this repo)
+Target outcome: React Motion examples should translate to Svelte with minimal conceptual changes.
 
-- **Exports**:
-    - `motion`: Object map of HTML and SVG tag components (e.g., `motion.div`, `motion.button`, `motion.svg`) generated from canonical lists, exported via `src/lib/html/`.
-    - `MotionConfig` context component.
-    - `AnimatePresence` wrapper enabling exit animations on unmount.
-    - Types: `MotionInitial`, `MotionAnimate`, `MotionExit`, `MotionTransition`, `MotionWhileTap`, `MotionWhileHover`, `MotionWhileFocus`, `Variants`.
-    - Utilities: `useTime(id?)`, `useSpring`, `useTransform`, `useAnimationFrame`.
-- **Implemented props**: `initial`, `animate`, `transition`, `exit`, `whileTap`, `whileHover`, `whileFocus`, `onAnimationStart`, `onAnimationComplete`, `class`, `style`, `layout` (FLIP-based), `variants`.
-- **Presence / Exit**:
-    - Exit animations are supported via `AnimatePresence`.
-    - Transition precedence for exits (merged): `{ duration: 0.35 } < component transition (merged with MotionConfig) < exit.transition`.
-- **Tap callbacks & a11y**: `onTapStart`, `onTap`, `onTapCancel` implemented, keyboard accessible.
-- **SSR**: Initial styles reflected in server HTML; hydration-safe.
-- **Tests**: Extensive unit tests for utils and components; E2E demos.
+## 2) Current state (verified)
 
-Gaps vs Framer Motion core:
+This section reflects the current codebase state as of February 8, 2026.
 
-- Variants API (`variants`, `initial`/`animate`/`exit` by variant key, inheritance).
-- Gesture system beyond tap/hover (drag/pan).
-- Motion values orchestration helpers (stagger, timelines).
-- Shared layout / `layoutId` (planned).
+### 2.1 Public API
 
-## 3) Product Goals
+From `src/lib/index.ts` and `src/lib/types.ts`:
 
-Primary goal: API and behavioral parity for core day-1 Framer Motion features that enable common examples to “copy-paste translate” into Svelte with minimal changes.
+- `motion` object with generated HTML/SVG components
+- Components: `AnimatePresence`, `MotionConfig`
+- Hooks/utilities: `useAnimationFrame`, `useSpring`, `useTime`, `useTransform`, `styleString`, `createDragControls`
+- Deprecated export: `stringifyStyleObject`
+- Re-exports from `motion`: `animate`, `stagger`, `transform`, `hover`, `press`, `scroll`, `inView`, easing and utility helpers
 
-## 4) Phased Roadmap
+### 2.2 Implemented component props
 
-Phase 0 — Foundations (status)
+Core animation and lifecycle:
 
-- Core wrappers, SSR, `whileHover`, `whileTap`, lifecycle callbacks, FLIP layout. [Done]
+- `initial`, `animate`, `exit`, `transition`, `variants`
+- `onAnimationStart`, `onAnimationComplete`
 
-Phase 1 — Variants and Presence
+Gestures and in-view:
 
-- Variants (MVP). [Planned]
-- `AnimatePresence` for exit-on-unmount. [Done]
-- Exit transition precedence and docs. [Done]
+- `whileHover`, `onHoverStart`, `onHoverEnd`
+- `whileTap`, `onTapStart`, `onTap`, `onTapCancel`
+- `whileFocus`, `onFocusStart`, `onFocusEnd`
+- `whileInView`, `onInViewStart`, `onInViewEnd`
 
-Phase 2 — Gestures and Motion Values
+Drag:
 
-- `drag`/`pan`; motion values + transforms; timelines/stagger. [Planned]
+- `drag`, `whileDrag`
+- `dragConstraints`, `dragElastic`, `dragMomentum`, `dragTransition`
+- `dragDirectionLock`, `dragPropagation`, `dragSnapToOrigin`
+- `dragListener`, `dragControls`
+- `onDragStart`, `onDrag`, `onDragEnd`, `onDirectionLock`, `onDragTransitionEnd`
 
-Phase 3 — Ecosystem
+Layout and element access:
 
-- Docs with parity table and examples. [In progress]
+- `layout` and `layout="position"` (single-element FLIP)
+- `bind:ref` support via `ref`
 
-### 4.1) Next Focus
+### 2.3 Presence behavior
 
-- Variants MVP.
-- Docs: Add presence/exit examples to homepage and README. [Done]
-- E2E: Presence/exit tests. [Done]
+`AnimatePresence` supports:
 
-## 5) API Design Targets (Parity-Oriented)
+- `initial` (skip first enter animations)
+- `mode`: `sync | wait | popLayout`
+- `onExitComplete`
 
-- `initial`, `animate`, `transition`, `exit`, `variants`, `whileTap`, `whileHover`, `whileFocus`.
-- Presence manager: `AnimatePresence`.
+Additional behavior:
 
-## 6) Exit Animations — Requirements
+- Direct children of `AnimatePresence` require `key`
+- Exit transition precedence:
+    1. Base `{ duration: 0.35 }`
+    2. Merged component `transition` (including `MotionConfig` defaults)
+    3. `exit.transition`
 
-- Unmount-time exit animations orchestrated by `AnimatePresence`.
-- Element API:
-    - `exit`: keyframes; can include `transition` to override exit timing.
-    - `transition`: component-level transition merged with `MotionConfig`.
-- Precedence (merged left→right):
-    - base `{ duration: 0.35 }`
-    - component `transition` (with `MotionConfig`)
-    - `exit.transition`
-- Visual fidelity:
-    - Clone preserves computed styles and last rect; absolute positioned relative to parent.
-    - Pointer-events none; z-index elevated during exit.
-- Wait mode coordination:
-    - When enter is deferred, mark the enter as handled before switching `isLoaded` to `ready`
-      to prevent a second enter pass ("pop" after exit completes).
-    - For object `animate` props, record the serialized animate payload to avoid duplicate runs.
+### 2.4 SSR behavior
 
-## 7) Parity Matrix
+Motion components render initial visual state during SSR and promote safely on hydration.
 
-| Capability                         | Framer Motion (React) | Svelte Motion (now)    | Phase |
-| ---------------------------------- | --------------------- | ---------------------- | ----- |
-| `initial`, `animate`, `transition` | Yes                   | Yes                    | 0     |
-| `whileTap`                         | Yes                   | Yes                    | 0     |
-| `whileHover`                       | Yes                   | Yes                    | 0     |
-| `whileFocus`                       | Yes                   | Yes                    | 0     |
-| `variants`                         | Yes                   | Yes                    | 1     |
-| `exit` + presence                  | Yes                   | Yes                    | 1     |
-| `drag`/`pan`                       | Yes                   | No                     | 2     |
-| Motion values/transforms           | Yes                   | No                     | 2     |
-| Timelines/stagger                  | Yes                   | No                     | 2     |
-| Layout (single element)            | Yes                   | Yes (FLIP)             | 0     |
-| SSR initial render parity          | Yes                   | Yes                    | 0     |
-| Shared layout                      | Yes                   | No (prototype planned) | 3     |
-| Docs/examples parity               | Yes                   | In progress            | 3     |
+### 2.5 Test/quality snapshot
 
-## 8) Testing and Quality
+Local verification run:
 
-- Unit: presence context (register/update/unregister, clone create/remove, onExitComplete).
-- Component: `_MotionContainer` behaviors.
-- E2E: Exit animation visibility and cleanup. [Done]
-- Lint/typecheck in CI; workflow validation with artifact logs. [Done]
+- `pnpm run test:only`: `31 files`, `259 tests` passed
+- `pnpm run check`: no type errors (warnings present)
+- `pnpm run test:e2e`: `78 passed`, `1 skipped`
 
-## 9) References
+## 3) Parity assessment vs Framer Motion
 
-- Motion for React docs (exit animations): [motion.dev/docs/react](https://motion.dev/docs/react)
+### 3.1 Core parity achieved
 
----
+- Declarative motion component model (`motion.<tag>`)
+- Core animation props (`initial`/`animate`/`transition`/`exit`)
+- Variants with key resolution and inheritance
+- Gestures: hover, tap, focus, in-view, drag
+- Presence orchestration with wait/popLayout modes
+- Basic layout FLIP (`layout`, `layout="position"`)
 
-## Appendix A — Technical Approach Notes
+### 3.2 Partial parity
 
-- Leverage the `motion` JS engine already used for typing to drive keyframes/WAAPI under the hood.
-- Encapsulate prop parsing into a shared container (`_MotionContainer.svelte`) to minimize duplication across elements.
-- Implement interaction props as composed keyframe sets, merged with `transition` settings and interactive state.
-- Layout: FLIP implementation using `ResizeObserver`. On size/position change we measure previous and next rects, pre-apply the inverted transform (translate/scale from previous to next) synchronously to avoid flashing, then animate back to identity using Motion's `animate`. `layout="position"` restricts to translation only; `layout` enables translation + scaling.
-- Variants: resolve variant keys contextually, support nested inheritance, and per-prop `transition` overrides. [Planned]
-- Presence: wrapper component coordinating mount/unmount and exit states with deferred DOM removal. [Done]
-- Gestures: build on pointer events; compute velocity; apply inertial transitions via the motion engine. [Planned]
-- Motion values: create Svelte stores for values and derived transforms; connect to style updates efficiently. [Planned]
+- Motion value ecosystem: usable hooks exist (`useTime`, `useTransform`, `useSpring`) but not full Framer MotionValue API surface
+- `MotionConfig`: currently scoped to transition defaults (not full Framer config parity)
+- In-view API: supports `whileInView`, but not Framer-style `viewport` configuration options
 
-## Appendix B — Shared Layout Plan (post-Variants/Presence)
+### 3.3 Missing parity
 
-- Goal
-    - Seamless position/size morph between elements that share identity across renders, supporting both same-tree moves and exit→enter handoff.
-- API
-    - `layoutId={string}` on `motion.*` elements to opt into shared layout transitions.
-    - Optional `layout` mode: `true | 'position' | 'scale' | 'crossfade'` (default `true` → translate + scale; may iterate during prototype).
-- Behavior
-    - Same-tree reflow: elements with `layoutId` animate between measured previous and next rects using FLIP.
-    - Handoff on unmount→mount: when an element with `layoutId` unmounts and another mounts with the same id, animate from last snapshot to the new rect; integrates with Presence so exit performs the handoff.
-    - Stacking: during transition, temporarily elevate to an overlay layer to avoid clipping, then restore.
-- Implementation outline
-    - Registry in context mapping `layoutId → { el, rect, time, styleSnapshot }`.
-    - On mount/resize/mutation: measure via `measureRect` and coalesced observers (RAF) from `observeLayoutChanges`.
-    - On unmount: store a snapshot for a short TTL (e.g., 120ms) to allow handoff.
-    - When a new element with the same `layoutId` mounts within TTL, run shared FLIP from prior snapshot to next rect; apply compositor hints during the transition.
-    - Overlay layer: create a portal layer (single absolute container) to move animating elements temporarily; restore DOM position afterward.
-- Milestones
-    1. Prototype same-tree shared layout with `layoutId` (translate+scale).
-    2. Integrate with `AnimatePresence` for exit→enter handoff across lists/routes.
-    3. Add mode switches: `'position'` (no scale) and optional `'crossfade'`.
-    4. Hardening: scrolling containers, transforms, overflow/clipping, border-radius.
-- Testing
-    - Unit: registry lifecycle; measurement/coalescing; overlay attach/detach.
-    - Component: card grid reorder; list item move; exit→enter handoff with `layoutId`.
-    - E2E: reorder animation smoothness; no flicker; correct z-order.
-- Risks
-    - Stacking contexts and transformed ancestors may disrupt overlay positioning.
-    - Forced reflow if measurement is not batched; mitigated via RAF batching already in place.
-    - Scroll offset and nested scroll containers affecting rect accuracy.
+- Shared layout identity: `layoutId` / `LayoutGroup`
+- Pan gesture API: `whilePan`, `onPan`, `onPanStart`, `onPanEnd`
+- Framer-specific feature flags/config (for example `features`, `transformPagePoint`)
+- Reduced-motion config parity
 
-## Appendix C — Featured Example Requirement — Fancy Like Button
+## 4) Product goals
 
-Target UX: A like button inspired by Fancy Like Button (React, Framer Motion) [`DRlFTER/fancyLikeButton` on GitHub](https://github.com/DRlFTER/fancyLikeButton?utm_source=chatgpt.com).
+### 4.1 Primary goal
 
-Behavioral spec:
+Reach practical API and behavior parity for high-value Framer Motion patterns in Svelte.
 
-- The button acts as a toggle: first press sets "liked" and turns the button red; next press unlikes and returns to default styling.
-- While the button is pressed and the state is "liked", emit animated hearts and accent circles at an interval until release.
-- Short press toggles state; long-press also toggles to "liked" and continuously emits until release.
-- Emitted items float upward with slight horizontal variation, fade out, and optionally scale.
-- Input support: mouse and touch (`pointerdown`/`pointerup`/`pointercancel`).
-- Accessibility: role="button" or `<button>`, `aria-pressed` reflects state, keyboard activation (Space/Enter) toggles state, focus ring.
-- Performance: no dropped frames on typical devices; GC-friendly (cap max hearts on screen, recycle where possible).
+### 4.2 Success criteria
 
-Acceptance criteria:
+- Most documented Motion React examples can be translated with only syntax-level changes
+- Clear docs parity matrix for Supported / Partial / Not Yet
+- High confidence via unit + e2e coverage for every advertised capability
 
-- Toggle behavior works with both mouse and touch; keyboard toggles state.
-- While pressed in the liked state, hearts/circles spawn continuously and animate smoothly.
-- Releasing press stops spawning within ≤1 frame; ongoing animations complete.
-- Toggling to unliked immediately updates styling and stops new spawns.
-- No console errors; zero linter errors in example; Playwright test verifying spawn-while-hold and toggle visuals.
+## 5) Next-stage roadmap
 
-Deliverables for this feature:
+### Stage A — Documentation and parity truth (short-term)
 
-- `src/routes/tests/random/fancy-like-button/+page.svelte` example. [Done]
-- Aligned spawn origin container; size changes keep alignment. [Done]
-- E2E: press-and-hold spawns, second press unlikes and stops. [Done]
+- Align README/docs/PRD with current runtime behavior
+- Publish explicit “partial vs missing” parity table
+- Add docs pages for drag and in-view API details, including current limitations
 
-## Appendix D — Risks
+### Stage B — Shared layout (`layoutId`) MVP
 
-- Gesture complexity across devices and browser quirks.
-- Performance regressions with many concurrent animated nodes.
-- API drift from Framer Motion causing migration friction.
+- Add `layoutId` to motion props
+- Implement same-tree shared FLIP transitions first
+- Integrate with `AnimatePresence` handoff for exit→enter transitions
+- Add targeted unit + e2e tests for no-flicker, correct stacking, and cleanup
+
+### Stage C — Feature parity hardening
+
+- Add pan gesture API
+- Add viewport options for in-view behavior
+- Expand `MotionConfig` parity (`reducedMotion` and feature configuration)
+- Evaluate additional parity surfaces (`LayoutGroup`, advanced orchestration semantics)
+
+## 6) Parity matrix
+
+| Capability                         | Framer Motion (React) | Svelte Motion (current) | Status            |
+| ---------------------------------- | --------------------- | ----------------------- | ----------------- |
+| `initial`, `animate`, `transition` | Yes                   | Yes                     | Supported         |
+| `exit` + presence                  | Yes                   | Yes                     | Supported         |
+| Variants + inheritance             | Yes                   | Yes                     | Supported         |
+| `whileHover`                       | Yes                   | Yes                     | Supported         |
+| `whileTap`                         | Yes                   | Yes                     | Supported         |
+| `whileFocus`                       | Yes                   | Yes                     | Supported         |
+| `whileInView`                      | Yes                   | Yes                     | Supported (basic) |
+| Drag core API                      | Yes                   | Yes                     | Supported         |
+| `AnimatePresence` modes            | Yes                   | Yes                     | Supported         |
+| Layout single-element FLIP         | Yes                   | Yes                     | Supported         |
+| Motion values ecosystem            | Yes                   | Partial                 | Partial           |
+| Shared layout (`layoutId`)         | Yes                   | No                      | Missing           |
+| Pan gesture API                    | Yes                   | No                      | Missing           |
+| `MotionConfig` full parity         | Yes                   | Partial                 | Partial           |
+
+## 7) Risks
+
+- Overstating parity before docs and test coverage match runtime details
+- Shared layout complexity (stacking contexts, clipping, nested scroll containers)
+- Performance regressions with many concurrent animated nodes
+- API drift from Framer Motion reducing migration ergonomics
+
+## 8) References
+
+- [Motion for React docs](https://motion.dev/docs/react)
+- [Svelte Motion package](https://www.npmjs.com/package/@humanspeak/svelte-motion)
