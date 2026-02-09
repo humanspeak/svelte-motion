@@ -101,7 +101,7 @@
         "@tailwindcss/typography": "^0.5.19",
         "@testing-library/jest-dom": "^6.9.1",
         "@testing-library/svelte": "^5.3.1",
-        "@types/node": "^25.2.1",
+        "@types/node": "^25.2.2",
         "@vitest/coverage-v8": "^4.0.18",
         "concurrently": "^9.2.1",
         "eslint": "^10.0.0",
