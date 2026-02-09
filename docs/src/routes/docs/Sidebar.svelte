@@ -50,6 +50,16 @@
             ]
         },
         {
+            title: 'Gestures',
+            items: [
+                {
+                    title: 'Drag',
+                    href: '/docs/drag',
+                    icon: 'fa-solid fa-hand'
+                }
+            ]
+        },
+        {
             title: 'Hooks',
             items: [
                 {
