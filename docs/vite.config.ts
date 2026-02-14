@@ -27,6 +27,7 @@ export default defineConfig({
             disableAsyncLocalStorage: true
         })
     ],
+    server: { port: 8320 },
     // With pnpm workspace linking, no manual alias is required
     test: {
         expect: { requireAssertions: true },

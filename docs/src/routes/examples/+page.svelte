@@ -1,5 +1,6 @@
 <script lang="ts">
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
+    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import { motion } from '@humanspeak/svelte-motion'
     import { cn } from '$lib/shadcn/utils'
     import sitemapManifest from '$lib/sitemap-manifest.json'
@@ -16,9 +17,15 @@
     const { data }: { data: PageData } = $props()
 
     const breadcrumbs = $derived(getBreadcrumbContext())
+    const seo = getSeoContext()
     $effect(() => {
         if (breadcrumbs) {
             breadcrumbs.breadcrumbs = [{ title: 'Examples' }]
+        }
+        if (seo) {
+            seo.title = 'Examples | Svelte Motion'
+            seo.description =
+                'Interactive animation examples built with Svelte Motion. Browse hover effects, spring transitions, gesture animations, and scroll triggers.'
         }
     })
 
@@ -75,10 +82,6 @@
         visible: { opacity: 1, y: 0 }
     }
 </script>
-
-<svelte:head>
-    <title>Examples | Svelte Motion</title>
-</svelte:head>
 
 <div class="container mx-auto px-4 py-12">
     <!-- Hero Section -->

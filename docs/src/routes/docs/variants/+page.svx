@@ -3,15 +3,20 @@ title: Variants
 description: Define reusable animation states and orchestrate complex animations across component trees
 ---
 
-<svelte:head>
-  <title>Variants | Docs | Svelte Motion</title>
-</svelte:head>
-
 <script>
     import VariantsBasicExample from '$lib/examples/VariantsBasicExample.svelte'
     import Example from '$lib/components/general/Example.svelte'
     import VariantsPropagationExample from '$lib/examples/VariantsPropagationExample.svelte'
     import NotificationsStackExample from '$lib/examples/NotificationsStackExample.svelte'
+    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+    const seo = getSeoContext()
+    $effect(() => {
+        if (seo) {
+            seo.title = 'Variants | Docs | Svelte Motion'
+            seo.description = 'Define reusable animation states and orchestrate complex animations across component trees with Svelte Motion variants. Stagger and propagate.'
+        }
+    })
 </script>
 
 # Variants

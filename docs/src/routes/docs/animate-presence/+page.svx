@@ -3,13 +3,18 @@ title: AnimatePresence
 description: Animate components when they are added to or removed from the DOM
 ---
 
-<svelte:head>
-  <title>AnimatePresence | Docs | Svelte Motion</title>
-</svelte:head>
-
 <script>
   import Example from '$lib/components/general/Example.svelte'
   import AnimatePresenceExample from '$lib/examples/AnimatePresenceExample.svelte'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  $effect(() => {
+      if (seo) {
+          seo.title = 'AnimatePresence | Docs | Svelte Motion'
+          seo.description = 'Animate components when they are added to or removed from the DOM using Svelte Motion AnimatePresence. Smooth enter and exit transitions.'
+      }
+  })
 </script>
 
 # AnimatePresence

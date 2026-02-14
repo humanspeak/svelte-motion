@@ -3,14 +3,19 @@ title: "useTransform"
 description: "Create a derived store that maps a numeric source across ranges or computes values from other stores."
 ---
 
-<svelte:head>
-  <title>useTransform | Docs | Svelte Motion</title>
-</svelte:head>
-
 <script>
   import Example from '$lib/components/general/Example.svelte';
   import HTMLContent from '$lib/examples/HTMLContent.svelte';
   // Reuse the HTML Content example to demonstrate reactive value mapping
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  $effect(() => {
+      if (seo) {
+          seo.title = 'useTransform | Docs | Svelte Motion'
+          seo.description = 'Create a derived store that maps numeric values across input/output ranges or computes from other stores with Svelte Motion useTransform.'
+      }
+  })
 </script>
 
 # useTransform

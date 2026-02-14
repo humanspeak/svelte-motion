@@ -1,10 +1,11 @@
 <script lang="ts">
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
+    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import AnimatedButton from '$lib/examples/AnimatedButton.svelte'
 
-    // Placeholder canvas; hook up live example later.
     const breadcrumbs = getBreadcrumbContext()
+    const seo = getSeoContext()
     $effect(() => {
         if (breadcrumbs) {
             breadcrumbs.breadcrumbs = [
@@ -12,12 +13,13 @@
                 { title: 'Animated Button' }
             ]
         }
+        if (seo) {
+            seo.title = 'Animated Button | Examples | Svelte Motion'
+            seo.description =
+                'Build a spring-based animated button with Svelte Motion featuring press feedback, hover lift, and smooth transitions for interactive UIs.'
+        }
     })
 </script>
-
-<svelte:head>
-    <title>Animated Button | Examples | Svelte Motion</title>
-</svelte:head>
 
 <Example title="Animated Button">
     <AnimatedButton />

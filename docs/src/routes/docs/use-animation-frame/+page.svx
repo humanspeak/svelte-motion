@@ -3,14 +3,19 @@ title: "useAnimationFrame"
 description: "Run a callback on every animation frame for smooth, time-based animations."
 ---
 
-<svelte:head>
-  <title>useAnimationFrame | Docs | Svelte Motion</title>
-</svelte:head>
-
 <script>
   import { useAnimationFrame } from '@humanspeak/svelte-motion';
   import Example from '$lib/components/general/Example.svelte';
   import UseAnimationFrameExample from '$lib/examples/UseAnimationFrameExample.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  $effect(() => {
+      if (seo) {
+          seo.title = 'useAnimationFrame | Docs | Svelte Motion'
+          seo.description = 'Run a callback on every animation frame for smooth, time-based animations with Svelte Motion useAnimationFrame. Access delta and elapsed time.'
+      }
+  })
 </script>
 
 # useAnimationFrame
