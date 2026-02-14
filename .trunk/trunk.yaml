@@ -48,15 +48,7 @@ lint:
         - sort-package-json@3.6.1
         - actionlint@1.7.10
         - checkov@3.2.500
-        - eslint@9.39.2:
-              config: eslint.config.mjs
-              packages:
-                  - '@typescript-eslint/eslint-plugin'
-                  - svelte-eslint-parser
-                  - '@eslint/js'
-                  - eslint-plugin-svelte
-                  - eslint-plugin-import
-                  - eslint-plugin-unused-imports
+        - eslint@9.39.2
         - git-diff-check
         - markdownlint@0.47.0
         - osv-scanner@2.3.2
