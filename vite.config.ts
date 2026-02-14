@@ -5,6 +5,8 @@ import { configDefaults, defineConfig } from 'vitest/config'
 export default defineConfig({
     plugins: [sveltekit()],
 
+    server: { port: 8310 },
+
     test: {
         exclude: [
             ...configDefaults.exclude,
