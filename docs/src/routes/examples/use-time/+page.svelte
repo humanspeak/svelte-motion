@@ -1,10 +1,12 @@
 <script lang="ts">
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
+    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import UseTimeExample from '$lib/examples/UseTimeExample.svelte'
 
     let { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
+    const seo = getSeoContext()
     $effect(() => {
         if (breadcrumbs) {
             breadcrumbs.breadcrumbs = [
@@ -12,12 +14,13 @@
                 { title: 'useTime' }
             ]
         }
+        if (seo) {
+            seo.title = 'useTime | Examples | Svelte Motion'
+            seo.description =
+                'Time-based animations using the Svelte Motion useTime reactive store. Creates smooth, continuously updating animations driven by elapsed time.'
+        }
     })
 </script>
-
-<svelte:head>
-    <title>useTime | Examples | Svelte Motion</title>
-</svelte:head>
 
 <Example title="useTime" motionUrl={data.sourceUrl}>
     <UseTimeExample />

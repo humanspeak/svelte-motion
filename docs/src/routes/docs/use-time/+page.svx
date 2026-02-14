@@ -3,15 +3,20 @@ title: "useTime"
 description: "A reactive store that ticks once per animation frame with elapsed milliseconds."
 ---
 
-<svelte:head>
-  <title>useTime | Docs | Svelte Motion</title>
-</svelte:head>
-
 <script>
   import { useTime } from '@humanspeak/svelte-motion';
   import Example from '$lib/components/general/Example.svelte';
   import UseTimeExample from '$lib/examples/UseTimeExample.svelte';
   import UseTimeSyncedExample from '$lib/examples/UseTimeSyncedExample.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  $effect(() => {
+      if (seo) {
+          seo.title = 'useTime | Docs | Svelte Motion'
+          seo.description = 'A reactive Svelte store that ticks once per animation frame with elapsed milliseconds. Drive continuous animations with Svelte Motion useTime.'
+      }
+  })
 </script>
 
 # useTime

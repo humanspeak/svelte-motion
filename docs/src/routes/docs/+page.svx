@@ -3,10 +3,6 @@ title: "Get started with Svelte Motion"
 description: "Svelte Motion is a Svelte animation library for building smooth, production-grade UI animations."
 ---
 
-<svelte:head>
-  <title>Get Started | Docs | Svelte Motion</title>
-</svelte:head>
-
 <script>
   import { motion, AnimatePresence } from '@humanspeak/svelte-motion';
   import Example from '$lib/components/general/Example.svelte'
@@ -14,6 +10,15 @@ description: "Svelte Motion is a Svelte animation library for building smooth, p
   import AnimatedButton from '$lib/examples/AnimatedButton.svelte'
   import HoverAndTap from '$lib/examples/HoverAndTap.svelte'
   import WhileInViewExample from '$lib/examples/WhileInViewExample.svelte'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  $effect(() => {
+      if (seo) {
+          seo.title = 'Get Started | Docs | Svelte Motion'
+          seo.description = 'Get started with Svelte Motion, a Svelte animation library for smooth, production-grade UI animations with spring physics and gestures.'
+      }
+  })
 </script>
 
 # Get started with Svelte Motion

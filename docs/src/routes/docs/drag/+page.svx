@@ -3,14 +3,19 @@ title: Drag
 description: Make any element draggable with physics-based constraints, momentum, and gesture callbacks
 ---
 
-<svelte:head>
-  <title>Drag | Docs | Svelte Motion</title>
-</svelte:head>
-
 <script>
   import Example from '$lib/components/general/Example.svelte'
   import DragExample from '$lib/examples/DragExample.svelte'
   import DragConstraintsExample from '$lib/examples/DragConstraintsExample.svelte'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  $effect(() => {
+      if (seo) {
+          seo.title = 'Drag | Docs | Svelte Motion'
+          seo.description = 'Make any element draggable with physics-based constraints, momentum, and gesture callbacks using Svelte Motion. Full touch and pointer support.'
+      }
+  })
 </script>
 
 # Drag

@@ -3,13 +3,18 @@ title: "styleString"
 description: "A helper for creating CSS style strings with automatic unit handling."
 ---
 
-<svelte:head>
-  <title>styleString | Docs | Svelte Motion</title>
-</svelte:head>
-
 <script>
   import Example from '$lib/components/general/Example.svelte';
   import StyleStringExample from '$lib/examples/StyleStringExample.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  $effect(() => {
+      if (seo) {
+          seo.title = 'styleString | Docs | Svelte Motion'
+          seo.description = 'A helper utility for creating reactive CSS style strings with automatic unit handling. Simplifies dynamic inline styles in Svelte components.'
+      }
+  })
 </script>
 
 # styleString

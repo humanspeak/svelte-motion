@@ -3,12 +3,17 @@ title: Animated Button (shadcn)
 description: Drop-in animated replacement for the shadcn Button component
 ---
 
-<svelte:head>
-  <title>Animated Button (shadcn) | Docs | Svelte Motion</title>
-</svelte:head>
-
 <script>
   import { Button } from '$lib/shadcn/ui/button'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  $effect(() => {
+      if (seo) {
+          seo.title = 'Animated Button (shadcn) | Docs | Svelte Motion'
+          seo.description = 'Drop-in animated replacement for the shadcn-svelte Button component. Spring-based press feedback and subtle hover lift powered by Svelte Motion.'
+      }
+  })
 </script>
 
 # Animated Button

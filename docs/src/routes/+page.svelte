@@ -6,15 +6,22 @@
     import * as m from '$msgs'
     import { type BreadcrumbContext } from '$lib/components/contexts/Breadcrumb/type'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
+    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import { goto } from '$app/navigation'
 
     // mounted no longer needed for CSS enter
     let headingContainer: HTMLDivElement | null = $state(null)
     const breadcrumbContext = $state<BreadcrumbContext | undefined>(getBreadcrumbContext())
+    const seo = getSeoContext()
 
     $effect(() => {
         if (breadcrumbContext) {
             breadcrumbContext.breadcrumbs = []
+        }
+        if (seo) {
+            seo.title = 'Svelte Motion - Animation Library for Svelte'
+            seo.description =
+                'Svelte Motion is a Svelte animation library for building smooth, production-grade UI animations with spring physics, gestures, and more.'
         }
     })
 
@@ -69,10 +76,6 @@
             })
     })
 </script>
-
-<svelte:head>
-    <title>Svelte Motion - Animation Library for Svelte</title>
-</svelte:head>
 
 <div class="flex min-h-svh flex-col">
     <!-- Header with links -->
