@@ -114,7 +114,7 @@
         "html-tags": "^5.1.0",
         "html-void-elements": "^3.0.0",
         "husky": "^9.1.7",
-        "jsdom": "^28.0.0",
+        "jsdom": "^28.1.0",
         "prettier": "^3.8.1",
         "prettier-plugin-organize-imports": "^4.3.0",
         "prettier-plugin-sort-json": "^4.2.0",
