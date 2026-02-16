@@ -23,7 +23,7 @@
     },
     "dependencies": {
         "@humanspeak/svelte-motion": "workspace:*",
-        "@inlang/paraglide-js": "^2.11.0",
+        "@inlang/paraglide-js": "^2.12.0",
         "@sentry/sveltekit": "^10.38.0",
         "github-slugger": "^2.0.0"
     },
