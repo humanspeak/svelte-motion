@@ -80,6 +80,16 @@
             ]
         },
         {
+            title: 'Utilities',
+            items: [
+                {
+                    title: 'styleString',
+                    href: '/docs/style-string',
+                    icon: 'fa-solid fa-wand-magic-sparkles'
+                }
+            ]
+        },
+        {
             title: 'shadcn/ui',
             items: [
                 {
