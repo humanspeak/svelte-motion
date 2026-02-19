@@ -52,8 +52,8 @@
     --color-sidebar-background: #ffffff;
     --color-sidebar-foreground: #0f172a;
     --color-sidebar-border: #e2e8f0;
-    --color-sidebar-active: rgba(255, 62, 0, 0.1);
-    --color-sidebar-active-foreground: #ea580c;
+    --color-sidebar-active: color-mix(in oklab, var(--color-brand-500) 10%, transparent);
+    --color-sidebar-active-foreground: var(--color-brand-600);
 
     /* Code colors (light mode: lighter bg, dark text) */
     --color-code-background: #f8f9f9; /* inline code bg */
@@ -101,8 +101,8 @@
     --color-sidebar-background: #0b1011;
     --color-sidebar-foreground: #f8fafc;
     --color-sidebar-border: #334155;
-    --color-sidebar-active: rgba(255, 62, 0, 0.1);
-    --color-sidebar-active-foreground: #fb923c;
+    --color-sidebar-active: color-mix(in oklab, var(--color-brand-500) 10%, transparent);
+    --color-sidebar-active-foreground: var(--color-brand-400);
 
     /* Code block colors */
     --color-code-background: #1e293b;
