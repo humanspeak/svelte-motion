@@ -611,7 +611,7 @@
         }
     })
 
-    // whileTap handling without relying on motion.press (fallback compatible)
+    // whileTap handling via motion-dom's press()
     $effect(() => {
         if (!(element && isLoaded === 'ready' && isNotEmpty(whileTapProp))) return
         return attachWhileTap(
