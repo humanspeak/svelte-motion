@@ -1,4 +1,5 @@
 import { isHoverCapable, splitHoverDefinition } from '$lib/utils/hover'
+import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import { press } from 'motion-dom'
 
@@ -98,19 +99,38 @@ export const attachWhileTap = (
 ): (() => void) => {
     if (!whileTap) return () => {}
 
+    pwLog('[tap] attached', { whileTap, initial, animateDef, hasHoverDef: !!callbacks?.hoverDef })
+
     // Tween transitions prevent spring velocity accumulation during rapid
     // press/release cycles. Cubic-bezier with slight overshoot mimics the
     // reference spring feel (~275ms settle, ~7% overshoot).
     const pressTransition: AnimationOptions = { duration: 0.25, ease: [0.22, 1.1, 0.36, 1] }
     const releaseTransition: AnimationOptions = { duration: 0.3, ease: [0.22, 1.1, 0.36, 1] }
 
+    // Motion's animate() returns AnimationPlaybackControls (not native Animation).
+    type GestureCtl = {
+        stop: () => void
+        cancel: () => void
+        currentTime: number | null
+        finished?: Promise<void>
+    }
+
     // Single control tracking whatever gesture animation is in-flight
     // (tap, reset, or hover reapply). Every new gesture cancels the previous.
-    let gestureCtl: Animation | null = null
+    let gestureCtl: GestureCtl | null = null
 
     const cancelGesture = () => {
+        if (gestureCtl) {
+            pwLog('[tap] cancel-gesture', {
+                currentTime: gestureCtl.currentTime,
+                transform: getComputedStyle(el).transform
+            })
+        }
         try {
-            gestureCtl?.cancel()
+            // Use stop() instead of cancel(). cancel() reverts to the
+            // pre-animation state (causing a visual snap), while stop()
+            // holds the element at its current interpolated position.
+            gestureCtl?.stop()
         } catch {
             // ignore
         }
@@ -118,35 +138,79 @@ export const attachWhileTap = (
     }
 
     const animateTap = () => {
+        pwLog('[tap] animate-tap', {
+            w: el.getBoundingClientRect().width,
+            h: el.getBoundingClientRect().height,
+            transform: getComputedStyle(el).transform,
+            whileTap,
+            gestureActive: gestureCtl !== null
+        })
         cancelGesture()
         callbacks?.onTapStart?.()
         gestureCtl = animate(
             el,
             whileTap as unknown as DOMKeyframesDefinition,
             pressTransition
-        ) as unknown as Animation
+        ) as unknown as GestureCtl
+        Promise.resolve(gestureCtl?.finished)
+            .then(() =>
+                pwLog('[tap] tap-applied', {
+                    w: el.getBoundingClientRect().width,
+                    h: el.getBoundingClientRect().height,
+                    transform: getComputedStyle(el).transform
+                })
+            )
+            .catch(() => {})
     }
 
     const reapplyHoverIfActive = (): boolean => {
-        if (!callbacks?.hoverDef) return false
-        if (!isHoverCapable()) return false
+        if (!callbacks?.hoverDef) {
+            pwLog('[tap] hover-reapply-skip', { reason: 'no hoverDef' })
+            return false
+        }
+        if (!isHoverCapable()) {
+            pwLog('[tap] hover-reapply-skip', { reason: 'not hover-capable' })
+            return false
+        }
         try {
-            if (!el.matches(':hover')) return false
+            if (!el.matches(':hover')) {
+                pwLog('[tap] hover-reapply-skip', { reason: 'not :hover' })
+                return false
+            }
         } catch {
+            pwLog('[tap] hover-reapply-skip', { reason: 'matches threw' })
             return false
         }
         const { keyframes } = splitHoverDefinition(callbacks.hoverDef as Record<string, unknown>)
-        // Use gestureTransition (tween) instead of the hover's own transition
-        // to prevent spring velocity accumulation during rapid press/release.
+        pwLog('[tap] hover-reapply', {
+            keyframes,
+            transform: getComputedStyle(el).transform,
+            w: el.getBoundingClientRect().width
+        })
         gestureCtl = animate(
             el,
             keyframes as unknown as DOMKeyframesDefinition,
             releaseTransition
-        ) as unknown as Animation
+        ) as unknown as GestureCtl
+        Promise.resolve(gestureCtl?.finished)
+            .then(() =>
+                pwLog('[tap] hover-reapply-done', {
+                    w: el.getBoundingClientRect().width,
+                    transform: getComputedStyle(el).transform
+                })
+            )
+            .catch(() => {})
         return true
     }
 
     const animateReset = (success: boolean) => {
+        pwLog('[tap] animate-reset', {
+            success,
+            w: el.getBoundingClientRect().width,
+            h: el.getBoundingClientRect().height,
+            transform: getComputedStyle(el).transform,
+            gestureActive: gestureCtl !== null
+        })
         if (success) callbacks?.onTap?.()
         else callbacks?.onTapCancel?.()
 
@@ -156,19 +220,40 @@ export const attachWhileTap = (
         if (success && reapplyHoverIfActive()) return
 
         const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
+        pwLog('[tap] reset-record', resetRecord)
         if (Object.keys(resetRecord).length > 0) {
             gestureCtl = animate(
                 el,
                 resetRecord as unknown as DOMKeyframesDefinition,
                 releaseTransition
-            ) as unknown as Animation
+            ) as unknown as GestureCtl
+            Promise.resolve(gestureCtl?.finished)
+                .then(() =>
+                    pwLog('[tap] reset-done', {
+                        w: el.getBoundingClientRect().width,
+                        h: el.getBoundingClientRect().height,
+                        transform: getComputedStyle(el).transform
+                    })
+                )
+                .catch(() => {})
         }
     }
 
     // Use press() for pointer + Enter key handling
     const cancelPress = press(el, () => {
+        pwLog('[tap] press-start', {
+            w: el.getBoundingClientRect().width,
+            transform: getComputedStyle(el).transform
+        })
         animateTap()
-        return (_endEvent: PointerEvent, { success }: { success: boolean }) => animateReset(success)
+        return (_endEvent: PointerEvent, { success }: { success: boolean }) => {
+            pwLog('[tap] press-end', {
+                success,
+                w: el.getBoundingClientRect().width,
+                transform: getComputedStyle(el).transform
+            })
+            animateReset(success)
+        }
     })
 
     // Add Space key support (press() only handles Enter)
@@ -179,6 +264,10 @@ export const attachWhileTap = (
         e.preventDefault()
         if (spaceActive) return
         spaceActive = true
+        pwLog('[tap] space-down', {
+            w: el.getBoundingClientRect().width,
+            transform: getComputedStyle(el).transform
+        })
         animateTap()
     }
 
@@ -187,12 +276,20 @@ export const attachWhileTap = (
         e.preventDefault()
         if (!spaceActive) return
         spaceActive = false
+        pwLog('[tap] space-up', {
+            w: el.getBoundingClientRect().width,
+            transform: getComputedStyle(el).transform
+        })
         animateReset(true)
     }
 
     const onBlur = () => {
         if (!spaceActive) return
         spaceActive = false
+        pwLog('[tap] blur', {
+            w: el.getBoundingClientRect().width,
+            transform: getComputedStyle(el).transform
+        })
         animateReset(false)
     }
 
@@ -201,6 +298,7 @@ export const attachWhileTap = (
     el.addEventListener('blur', onBlur)
 
     return () => {
+        pwLog('[tap] cleanup')
         cancelPress()
         el.removeEventListener('keydown', onKeyDown)
         el.removeEventListener('keyup', onKeyUp)

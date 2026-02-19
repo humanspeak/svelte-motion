@@ -3,7 +3,11 @@ import { attachWhileTap, buildTapResetRecord } from './interaction.js'
 
 // Mock motion.animate
 vi.mock('motion', () => {
-    const animateMock = vi.fn(() => ({ finished: Promise.resolve() }))
+    const animateMock = vi.fn(() => ({
+        finished: Promise.resolve(),
+        stop: vi.fn(),
+        cancel: vi.fn()
+    }))
     return { animate: animateMock }
 })
 const { animate: animateMock } = (await import('motion')) as unknown as {
