@@ -29,7 +29,16 @@
      * Environment Variables
      * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
      */
-    "vars": { "PUBLIC_SITE_URL": "https://motion.svelte.page" }
+    "vars": {
+        "PUBLIC_SITE_URL": "https://motion.svelte.page"
+    },
+    "kv_namespaces": [
+        {
+            "binding": "REGISTRY_DOWNLOADS",
+            "id": "a66bf65fcb27412c9b9b6d3951f5bc68",
+            "preview_id": "cac17b9101f644faaf3e88c370050db9"
+        }
+    ]
     /**
      * Note: Use secrets to store sensitive data.
      * https://developers.cloudflare.com/workers/configuration/secrets/

@@ -4,6 +4,7 @@
 declare namespace Cloudflare {
     interface Env {
         CF_VERSION_METADATA: WorkerVersionMetadata
+        REGISTRY_DOWNLOADS: KVNamespace
     }
 }
 interface Env extends Cloudflare.Env {}
