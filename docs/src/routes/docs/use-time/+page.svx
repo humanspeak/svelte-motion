@@ -310,6 +310,7 @@ For direct DOM manipulation or frame-by-frame control, consider [useAnimationFra
 
 - [useAnimationFrame](/docs/use-animation-frame) - For direct frame control
 - [useTransform](/docs/use-transform) - For mapping and transforming values
+- [styleString](/docs/style-string) - For building CSS style strings with automatic unit handling
 - [Examples](/examples) - See useTime in action
 
 ---

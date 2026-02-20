@@ -179,6 +179,7 @@ useTransform<T>(
 
 - [useTime](/docs/use-time) — Time source for mapping and progress.
 - [useAnimationFrame](/docs/use-animation-frame) — Imperative frame callback.
+- [styleString](/docs/style-string) — Build CSS style strings with automatic unit handling.
 
 ---
 

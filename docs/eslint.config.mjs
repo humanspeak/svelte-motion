@@ -37,6 +37,9 @@ export default [
             globals: {
                 ...globals.browser,
                 ...globals.node
+            },
+            parserOptions: {
+                tsconfigRootDir: import.meta.dirname
             }
         },
 
@@ -89,7 +92,7 @@ export default [
     },
     {
         /* location of your components where you would like to apply these rules  */
-        files: ['**/shadcn/components/ui/**/*.svelte', '**/shadcn/components/ui/**/*.ts'],
+        files: ['**/shadcn/**/*.svelte', '**/shadcn/**/*.ts'],
         languageOptions: {
             parserOptions: {
                 parser: ts.parser

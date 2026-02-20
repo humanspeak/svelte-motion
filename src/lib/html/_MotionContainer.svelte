@@ -19,7 +19,7 @@
     import { sleep } from '$lib/utils/testing'
     import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
     import { isPlaywrightEnv, pwLog } from '$lib/utils/log'
-    import { type Snippet } from 'svelte'
+    import { onDestroy, type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants'
     import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation'
     import { attachWhileTap } from '$lib/utils/interaction'
@@ -37,7 +37,6 @@
     import { mergeInlineStyles } from '$lib/utils/style'
     import { isNativelyFocusable } from '$lib/utils/a11y'
     import {
-        usePresence,
         getAnimatePresenceContext,
         getPresenceDepth,
         setPresenceDepth
@@ -154,10 +153,20 @@
         )
     )
 
-    // Register with AnimatePresence so onDestroy triggers exit cloning
+    // Register onDestroy at component level (guaranteed to work in Svelte 5)
+    // usePresence() cannot be called inside $effect because it uses getContext() and onDestroy(),
+    // which must be called during component initialization.
+    if (context) {
+        onDestroy(() => {
+            pwLog('[presence] onDestroy triggered', { key: presenceKey })
+            context.unregisterChild(presenceKey)
+        })
+    }
+
+    // Reactively update registration when element/exit/transition props change
     $effect(() => {
-        if (element) {
-            usePresence(
+        if (element && context && resolvedExit) {
+            context.registerChild(
                 presenceKey,
                 element,
                 resolvedExit,
@@ -602,7 +611,7 @@
         }
     })
 
-    // whileTap handling without relying on motion.press (fallback compatible)
+    // whileTap handling via motion-dom's press()
     $effect(() => {
         if (!(element && isLoaded === 'ready' && isNotEmpty(whileTapProp))) return
         return attachWhileTap(

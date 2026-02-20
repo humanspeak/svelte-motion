@@ -4,7 +4,7 @@
     import Example from '$lib/components/general/Example.svelte'
     import Rotate from '$lib/examples/Rotate.svelte'
 
-    let { data } = $props()
+    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     $effect(() => {

@@ -1,7 +1,7 @@
 import { isHoverCapable, splitHoverDefinition } from '$lib/utils/hover'
 import { pwLog } from '$lib/utils/log'
-import { parseMatrixScale } from '$lib/utils/transform'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
+import { press } from 'motion-dom'
 
 /**
  * Build a reset record for whileTap on pointerup.
@@ -73,14 +73,15 @@ export const buildTapResetRecord = (
 /**
  * Attach whileTap interactions to an element.
  *
- * On `pointerdown`, animates to the whileTap definition. On `pointerup` or
- * `pointercancel`, restores overlapping keys back to the animate-or-initial
- * baseline.
+ * Uses motion-dom's `press()` for pointer and Enter-key handling (with
+ * primary-pointer filtering, drag interop, and global release listeners).
+ * Space-key support is added manually since `press()` only handles Enter.
  *
  * @param el Element to attach listeners to.
  * @param whileTap While-tap keyframe record.
  * @param initial Initial keyframe record.
  * @param animateDef Animate keyframe record.
+ * @param callbacks Optional lifecycle callbacks.
  * @return Cleanup function to remove listeners.
  */
 export const attachWhileTap = (
@@ -98,111 +99,62 @@ export const attachWhileTap = (
 ): (() => void) => {
     if (!whileTap) return () => {}
 
-    let keyboardActive = false
-    let activePointerId: number | null = null
-    let tapCtl: Animation | null = null
-    let resetCtl: Animation | null = null
-    let baselineTransform: string | null = null
-    const safetyGuards =
-        typeof window !== 'undefined' &&
-        (window as unknown as Record<string, unknown>)['SM_GESTURE_SAFE_GUARDS'] === true
+    pwLog('[tap] attached', { whileTap, initial, animateDef, hasHoverDef: !!callbacks?.hoverDef })
 
-    const computeCanonicalBaseline = (): string => {
-        // Prefer animateDef > initial for transform-relevant keys when present, else computed style
-        const scaleKeys = ['scale', 'scaleX', 'scaleY'] as const
-        const from = (def?: Record<string, unknown>) =>
-            def && scaleKeys.some((k) => Object.prototype.hasOwnProperty.call(def, k))
-        if (from(animateDef)) {
-            // If animate has scale keys, prefer matrix from current style (already at animate) as baseline
-            const t = getComputedStyle(el).transform
-            return t && t !== 'none' ? t : 'none'
-        }
-        if (from(initial)) {
-            const t = getComputedStyle(el).transform
-            return t && t !== 'none' ? t : 'none'
-        }
-        const t = getComputedStyle(el).transform
-        return t || 'none'
+    // Tween transitions prevent spring velocity accumulation during rapid
+    // press/release cycles. Cubic-bezier with slight overshoot mimics the
+    // reference spring feel (~275ms settle, ~7% overshoot).
+    const pressTransition: AnimationOptions = { duration: 0.25, ease: [0.22, 1.1, 0.36, 1] }
+    const releaseTransition: AnimationOptions = { duration: 0.3, ease: [0.22, 1.1, 0.36, 1] }
+
+    // Motion's animate() returns AnimationPlaybackControls (not native Animation).
+    type GestureCtl = {
+        stop: () => void
+        cancel: () => void
+        currentTime: number | null
+        finished?: Promise<void>
     }
 
-    const handlePointerDown = (event: PointerEvent) => {
-        // Capture pointer so we receive up/cancel even if pointer leaves the element
-        if (typeof event.pointerId === 'number') {
-            try {
-                if ('setPointerCapture' in el) {
-                    el.setPointerCapture(event.pointerId)
-                }
-            } catch {
-                // noop if not supported
-            }
-            activePointerId = event.pointerId
-            // Attach global listeners to catch off-element releases (even if capture unsupported)
-            window.addEventListener('pointerup', handlePointerUp as EventListener)
-            window.addEventListener('pointercancel', handlePointerCancel as EventListener)
-            document.addEventListener('pointerup', handlePointerUp as EventListener)
-            document.addEventListener('pointercancel', handlePointerCancel as EventListener)
+    // Single control tracking whatever gesture animation is in-flight
+    // (tap, reset, or hover reapply). Every new gesture cancels the previous.
+    let gestureCtl: GestureCtl | null = null
+
+    const cancelGesture = () => {
+        if (gestureCtl) {
+            pwLog('[tap] cancel-gesture', {
+                currentTime: gestureCtl.currentTime,
+                transform: getComputedStyle(el).transform
+            })
         }
-        const incomingScale = parseMatrixScale(getComputedStyle(el).transform) ?? 1
-        pwLog('[tap] pointerdown', {
-            w: el.getBoundingClientRect().width,
-            h: el.getBoundingClientRect().height,
-            transform: getComputedStyle(el).transform,
-            incomingScale,
-            resetCtlActive: resetCtl !== null
-        })
-        // Cancel any in-flight reset and rebase to canonical baseline
         try {
-            resetCtl?.cancel()
+            // Use stop() instead of cancel(). cancel() reverts to the
+            // pre-animation state (causing a visual snap), while stop()
+            // holds the element at its current interpolated position.
+            gestureCtl?.stop()
         } catch {
             // ignore
         }
-        resetCtl = null
-        if (!baselineTransform) baselineTransform = computeCanonicalBaseline()
-        // Apply baseline immediately before whileTap
-        if (baselineTransform && baselineTransform !== 'none')
-            el.style.transform = baselineTransform
-        else el.style.removeProperty('transform')
+        gestureCtl = null
+    }
 
-        // Software limit: if incoming scale is runaway, skip whileTap this cycle and force settle
-        const baselineScale = parseMatrixScale(baselineTransform) ?? 1
-        const scaleDiff = Math.abs(incomingScale - baselineScale)
-        const tolerance = 0.02 // 2% threshold
-        pwLog('[tap] scale-check', { incomingScale, baselineScale, scaleDiff, tolerance })
-        if (scaleDiff > tolerance) {
-            pwLog('[tap] runaway-detected-skip-whileTap', {
-                incomingScale,
-                baselineScale,
-                scaleDiff
-            })
-            callbacks?.onTapStart?.()
-            tapCtl = null
-            return
-        }
-
-        pwLog('[tap] whileTap-def', whileTap)
+    const animateTap = () => {
+        pwLog('[tap] animate-tap', {
+            w: el.getBoundingClientRect().width,
+            h: el.getBoundingClientRect().height,
+            transform: getComputedStyle(el).transform,
+            whileTap,
+            gestureActive: gestureCtl !== null
+        })
+        cancelGesture()
         callbacks?.onTapStart?.()
-        // Cancel any existing tap animation before starting a new one
-        try {
-            tapCtl?.cancel()
-        } catch {
-            // ignore cancellation errors
-        }
-        tapCtl = animate(el, whileTap as unknown as DOMKeyframesDefinition) as unknown as Animation
-        // Safety clamp for runaway scale
-        if (safetyGuards) {
-            const a =
-                parseMatrixScale(getComputedStyle(el).transform) ??
-                parseMatrixScale(el.style.transform)
-            if (a !== null && Math.abs(a) > 8) {
-                if (baselineTransform && baselineTransform !== 'none')
-                    el.style.transform = baselineTransform
-                else el.style.removeProperty('transform')
-                pwLog('[tap] clamp-on-down', { a, restored: getComputedStyle(el).transform })
-            }
-        }
-        Promise.resolve((tapCtl as unknown as { finished?: Promise<void> }).finished)
+        gestureCtl = animate(
+            el,
+            whileTap as unknown as DOMKeyframesDefinition,
+            pressTransition
+        ) as unknown as GestureCtl
+        Promise.resolve(gestureCtl?.finished)
             .then(() =>
-                pwLog('[tap] applied', {
+                pwLog('[tap] tap-applied', {
                     w: el.getBoundingClientRect().width,
                     h: el.getBoundingClientRect().height,
                     transform: getComputedStyle(el).transform
@@ -210,204 +162,146 @@ export const attachWhileTap = (
             )
             .catch(() => {})
     }
-    const reapplyHoverIfActive = () => {
-        if (!callbacks?.hoverDef) return false
-        if (!isHoverCapable()) return false
-        try {
-            if (!el.matches(':hover')) return false
-        } catch {
+
+    const reapplyHoverIfActive = (): boolean => {
+        if (!callbacks?.hoverDef) {
+            pwLog('[tap] hover-reapply-skip', { reason: 'no hoverDef' })
             return false
         }
-        const { keyframes, transition } = splitHoverDefinition(
-            callbacks.hoverDef as Record<string, unknown>
-        )
-        animate(
+        if (!isHoverCapable()) {
+            pwLog('[tap] hover-reapply-skip', { reason: 'not hover-capable' })
+            return false
+        }
+        try {
+            if (!el.matches(':hover')) {
+                pwLog('[tap] hover-reapply-skip', { reason: 'not :hover' })
+                return false
+            }
+        } catch {
+            pwLog('[tap] hover-reapply-skip', { reason: 'matches threw' })
+            return false
+        }
+        const { keyframes } = splitHoverDefinition(callbacks.hoverDef as Record<string, unknown>)
+        pwLog('[tap] hover-reapply', {
+            keyframes,
+            transform: getComputedStyle(el).transform,
+            w: el.getBoundingClientRect().width
+        })
+        gestureCtl = animate(
             el,
             keyframes as unknown as DOMKeyframesDefinition,
-            (transition ?? callbacks.hoverFallbackTransition) as AnimationOptions
-        )
+            releaseTransition
+        ) as unknown as GestureCtl
+        Promise.resolve(gestureCtl?.finished)
+            .then(() =>
+                pwLog('[tap] hover-reapply-done', {
+                    w: el.getBoundingClientRect().width,
+                    transform: getComputedStyle(el).transform
+                })
+            )
+            .catch(() => {})
         return true
     }
 
-    const handlePointerUp = (event: PointerEvent) => {
-        if (typeof event.pointerId === 'number' && activePointerId !== null) {
-            if (event.pointerId !== activePointerId) return
-            try {
-                if ('releasePointerCapture' in el) el.releasePointerCapture(event.pointerId)
-            } catch {
-                // noop
-            }
-            activePointerId = null
-            window.removeEventListener('pointerup', handlePointerUp as EventListener)
-            window.removeEventListener('pointercancel', handlePointerCancel as EventListener)
-            document.removeEventListener('pointerup', handlePointerUp as EventListener)
-            document.removeEventListener('pointercancel', handlePointerCancel as EventListener)
-        }
-        callbacks?.onTap?.()
-        pwLog('[tap] pointerup', {
+    const animateReset = (success: boolean) => {
+        pwLog('[tap] animate-reset', {
+            success,
             w: el.getBoundingClientRect().width,
             h: el.getBoundingClientRect().height,
-            transform: getComputedStyle(el).transform
+            transform: getComputedStyle(el).transform,
+            gestureActive: gestureCtl !== null
         })
-        if (!whileTap) return
-        // Ensure the whileTap animation can't finish and overwrite our reset
-        try {
-            tapCtl?.cancel()
-        } catch {
-            // ignore
-        }
-        tapCtl = null
-        const style = (el as HTMLElement).style
-        if (baselineTransform && baselineTransform !== 'none') style.transform = baselineTransform
-        else style.removeProperty('transform')
-        pwLog('[tap] transform-restored', {
-            baseline: baselineTransform,
-            now: getComputedStyle(el).transform
-        })
+        if (success) callbacks?.onTap?.()
+        else callbacks?.onTapCancel?.()
+
+        cancelGesture()
+
+        // If still hovering after a successful tap, animate to hover state
+        if (success && reapplyHoverIfActive()) return
+
         const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
         pwLog('[tap] reset-record', resetRecord)
         if (Object.keys(resetRecord).length > 0) {
-            // Use a very fast transition to minimize overshoot window for re-entrancy
-            const resetTransition: AnimationOptions = {
-                duration: 0.08
-            }
-            resetCtl = animate(
+            gestureCtl = animate(
                 el,
                 resetRecord as unknown as DOMKeyframesDefinition,
-                resetTransition
-            ) as unknown as Animation
-            Promise.resolve((resetCtl as unknown as { finished?: Promise<void> }).finished)
+                releaseTransition
+            ) as unknown as GestureCtl
+            Promise.resolve(gestureCtl?.finished)
                 .then(() =>
-                    pwLog('[tap] reset-finished', {
+                    pwLog('[tap] reset-done', {
                         w: el.getBoundingClientRect().width,
                         h: el.getBoundingClientRect().height,
                         transform: getComputedStyle(el).transform
                     })
                 )
                 .catch(() => {})
-                .finally(() => {
-                    resetCtl = null
-                })
-        }
-        // After baseline and reset committed, optionally reapply hover on next frame
-        queueMicrotask(() => {
-            reapplyHoverIfActive()
-        })
-    }
-    const handlePointerCancel = (event: PointerEvent) => {
-        if (typeof event.pointerId === 'number' && activePointerId !== null) {
-            if (event.pointerId !== activePointerId) return
-            try {
-                if ('releasePointerCapture' in el) el.releasePointerCapture(event.pointerId)
-            } catch {
-                // noop
-            }
-            activePointerId = null
-            window.removeEventListener('pointerup', handlePointerUp as EventListener)
-            window.removeEventListener('pointercancel', handlePointerCancel as EventListener)
-            document.removeEventListener('pointerup', handlePointerUp as EventListener)
-            document.removeEventListener('pointercancel', handlePointerCancel as EventListener)
-        }
-        callbacks?.onTapCancel?.()
-        pwLog('[tap] cancel', {
-            w: el.getBoundingClientRect().width,
-            h: el.getBoundingClientRect().height
-        })
-        // On cancel, also restore baseline if available
-        if (initial || animateDef) {
-            try {
-                tapCtl?.cancel()
-            } catch {
-                // ignore
-            }
-            tapCtl = null
-            const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
-            if (Object.keys(resetRecord).length > 0) {
-                animate(el, resetRecord as unknown as DOMKeyframesDefinition)
-            }
         }
     }
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-        if (!(e.key === 'Enter' || e.key === ' ' || e.key === 'Space')) return
-        // Prevent page scroll/activation for Space
-        if (e.key === ' ' || e.key === 'Space') e.preventDefault?.()
-        if (keyboardActive) return
-        keyboardActive = true
-        callbacks?.onTapStart?.()
-        pwLog('[tap] keydown', {
-            key: e.key,
+    // Use press() for pointer + Enter key handling
+    const cancelPress = press(el, () => {
+        pwLog('[tap] press-start', {
             w: el.getBoundingClientRect().width,
-            h: el.getBoundingClientRect().height
+            transform: getComputedStyle(el).transform
         })
-        try {
-            tapCtl?.cancel()
-        } catch {
-            // ignore
+        animateTap()
+        return (_endEvent: PointerEvent, { success }: { success: boolean }) => {
+            pwLog('[tap] press-end', {
+                success,
+                w: el.getBoundingClientRect().width,
+                transform: getComputedStyle(el).transform
+            })
+            animateReset(success)
         }
-        tapCtl = animate(el, whileTap as unknown as DOMKeyframesDefinition) as unknown as Animation
+    })
+
+    // Add Space key support (press() only handles Enter)
+    let spaceActive = false
+
+    const onKeyDown = (e: KeyboardEvent) => {
+        if (e.key !== ' ' && e.key !== 'Space') return
+        e.preventDefault()
+        if (spaceActive) return
+        spaceActive = true
+        pwLog('[tap] space-down', {
+            w: el.getBoundingClientRect().width,
+            transform: getComputedStyle(el).transform
+        })
+        animateTap()
     }
 
-    const handleKeyUp = (e: KeyboardEvent) => {
-        if (!(e.key === 'Enter' || e.key === ' ' || e.key === 'Space')) return
-        // Prevent page scroll/activation for Space
-        if (e.key === ' ' || e.key === 'Space') e.preventDefault?.()
-        if (!keyboardActive) return
-        keyboardActive = false
-        callbacks?.onTap?.()
-        pwLog('[tap] keyup', {
-            key: e.key,
+    const onKeyUp = (e: KeyboardEvent) => {
+        if (e.key !== ' ' && e.key !== 'Space') return
+        e.preventDefault()
+        if (!spaceActive) return
+        spaceActive = false
+        pwLog('[tap] space-up', {
             w: el.getBoundingClientRect().width,
-            h: el.getBoundingClientRect().height
+            transform: getComputedStyle(el).transform
         })
-        if (reapplyHoverIfActive()) return
-        if (initial || animateDef) {
-            try {
-                tapCtl?.cancel()
-            } catch {
-                // ignore
-            }
-            tapCtl = null
-            const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
-            if (Object.keys(resetRecord).length > 0) {
-                animate(el, resetRecord as unknown as DOMKeyframesDefinition)
-            }
-        }
+        animateReset(true)
     }
 
-    const handleBlur = () => {
-        if (!keyboardActive) return
-        keyboardActive = false
-        callbacks?.onTapCancel?.()
+    const onBlur = () => {
+        if (!spaceActive) return
+        spaceActive = false
         pwLog('[tap] blur', {
             w: el.getBoundingClientRect().width,
-            h: el.getBoundingClientRect().height
+            transform: getComputedStyle(el).transform
         })
-        if (initial || animateDef) {
-            const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
-            if (Object.keys(resetRecord).length > 0) {
-                animate(el, resetRecord as unknown as DOMKeyframesDefinition)
-            }
-        }
+        animateReset(false)
     }
 
-    el.addEventListener('pointerdown', handlePointerDown)
-    el.addEventListener('pointerup', handlePointerUp)
-    el.addEventListener('pointercancel', handlePointerCancel)
-    el.addEventListener('keydown', handleKeyDown)
-    el.addEventListener('keyup', handleKeyUp)
-    el.addEventListener('blur', handleBlur)
+    el.addEventListener('keydown', onKeyDown)
+    el.addEventListener('keyup', onKeyUp)
+    el.addEventListener('blur', onBlur)
 
     return () => {
-        el.removeEventListener('pointerdown', handlePointerDown)
-        el.removeEventListener('pointerup', handlePointerUp)
-        el.removeEventListener('pointercancel', handlePointerCancel)
-        window.removeEventListener('pointerup', handlePointerUp as EventListener)
-        window.removeEventListener('pointercancel', handlePointerCancel as EventListener)
-        document.removeEventListener('pointerup', handlePointerUp as EventListener)
-        document.removeEventListener('pointercancel', handlePointerCancel as EventListener)
-        el.removeEventListener('keydown', handleKeyDown)
-        el.removeEventListener('keyup', handleKeyUp)
-        el.removeEventListener('blur', handleBlur)
+        pwLog('[tap] cleanup')
+        cancelPress()
+        el.removeEventListener('keydown', onKeyDown)
+        el.removeEventListener('keyup', onKeyUp)
+        el.removeEventListener('blur', onBlur)
     }
 }

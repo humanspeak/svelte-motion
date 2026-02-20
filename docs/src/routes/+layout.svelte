@@ -13,7 +13,7 @@
         'Svelte Motion is a Svelte animation library for building smooth, production-grade UI animations with spring physics, gestures, and more.'
     const DEFAULT_IMAGE = 'https://motion.svelte.page/og-default.png'
 
-    let { children } = $props()
+    const { children } = $props()
 
     const seo = $state<SeoContextType>({
         title: `${SITE_NAME} - Animation Library for Svelte`,
