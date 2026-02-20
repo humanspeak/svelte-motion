@@ -140,10 +140,10 @@
     const presenceKey = keyProp ?? `motion-${++keyCounter}`
 
     // Track previous key for key-change detection (simulates React's key-based remounting)
-    // Using $state for idiomatic Svelte 5 reactivity
-    let keyTrackerPrev = $state(keyProp)
-    let keyTrackerIsTransitioning = $state(false)
-    let keyTransitionStopped = $state(false)
+    // Plain variables (not $state) to avoid self-triggering the key-change $effect
+    let keyTrackerPrev = keyProp
+    let keyTrackerIsTransitioning = false
+    let keyTransitionStopped = false
 
     // Compute merged transition without mutating props to avoid effect write loops
     const mergedTransition = $derived<AnimationOptions>(
@@ -699,6 +699,14 @@
             currentKey === keyTrackerPrev ||
             keyTrackerPrev === undefined
         ) {
+            pwLog('[motion] key effect: early return', {
+                currentKey,
+                keyTrackerPrev,
+                isLoaded,
+                hasElement: !!element,
+                hasContext: !!context,
+                keyTrackerIsTransitioning
+            })
             // Update prev for next comparison
             if (currentKey !== keyTrackerPrev) {
                 keyTrackerPrev = currentKey
@@ -713,6 +721,7 @@
 
         // Mark as transitioning to prevent re-entry
         keyTrackerIsTransitioning = true
+        keyTransitionStopped = false
         keyTrackerPrev = currentKey
 
         // Run the key transition sequence
@@ -731,6 +740,11 @@
                         mergedTransition
                     ).finished
                 }
+
+                pwLog('[motion] key transition: exit done', {
+                    keyTransitionStopped,
+                    hasElement: !!element
+                })
 
                 // Check if component was unmounted during exit animation
                 if (keyTransitionStopped || !element) return
@@ -752,6 +766,7 @@
                 pwLog('[motion] key transition: running enter animation')
                 runAnimation()
             } finally {
+                pwLog('[motion] key transition: finally', { keyTransitionStopped })
                 if (!keyTransitionStopped) {
                     keyTrackerIsTransitioning = false
                 }
@@ -762,6 +777,7 @@
 
         // Cleanup on unmount
         return () => {
+            pwLog('[motion] key effect: cleanup, stopping transition')
             keyTransitionStopped = true
         }
     })
