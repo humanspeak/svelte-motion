@@ -7,8 +7,11 @@ export const load: PageServerLoad = async ({ platform }) => {
         try {
             const value = await kv.get('downloads:animated-button')
             downloads = value ? parseInt(value, 10) : 0
-        } catch {
-            /* silently fail */
+        } catch (err) {
+            console.error(
+                '[shadcn-button/+page.server.ts] KV get "downloads:animated-button" failed:',
+                err
+            )
         }
     }
 
