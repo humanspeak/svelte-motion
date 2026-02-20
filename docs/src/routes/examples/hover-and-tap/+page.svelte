@@ -4,7 +4,7 @@
     import Example from '$lib/components/general/Example.svelte'
     import HoverAndTap from '$lib/examples/HoverAndTap.svelte'
 
-    let { data } = $props()
+    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     $effect(() => {

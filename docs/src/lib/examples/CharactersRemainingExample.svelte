@@ -10,7 +10,7 @@
 
     let value = $state('')
     const maxLength = 12
-    let charactersRemaining = $derived(maxLength - value.length)
+    const charactersRemaining = $derived(maxLength - value.length)
     let counterEl: HTMLElement | null = $state(null)
 
     const mapRemainingToColor = transform([2, 6], ['#ff008c', '#ccc'])
