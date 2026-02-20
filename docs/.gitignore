@@ -25,6 +25,9 @@ vite.config.ts.timestamp-*
 # Paraglide
 src/lib/paraglide
 
+# Generated registry data
+src/lib/generated
+
 .dev.vars*
 !.dev.vars.example
 .env*
