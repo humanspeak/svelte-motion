@@ -52,7 +52,9 @@ export type {
 } from '$lib/types'
 export { useAnimationFrame } from '$lib/utils/animationFrame'
 export { createDragControls } from '$lib/utils/dragControls'
+export { useMotionTemplate } from '$lib/utils/motionTemplate'
 export { useSpring } from '$lib/utils/spring'
+export { useVelocity } from '$lib/utils/velocity'
 /**
  * @deprecated Use `styleString` instead for reactive styles with automatic unit handling.
  */
