@@ -1,0 +1,265 @@
+---
+title: "useSpring"
+description: "Create a spring-animated store with physics-based motion."
+---
+
+<script>
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  $effect(() => {
+      if (seo) {
+          seo.title = 'useSpring | Docs | Svelte Motion'
+          seo.description = 'Create a spring-animated Svelte store with physics-based motion. Animate values with configurable stiffness, damping, and mass using Svelte Motion.'
+      }
+  })
+</script>
+
+# useSpring
+
+`useSpring` creates a spring-animated readable store. Set a target value and it animates smoothly using spring physics.
+
+```svelte
+<script>
+  import { useSpring } from '@humanspeak/svelte-motion'
+
+  const x = useSpring(0)
+</script>
+
+<div
+  style="transform: translateX({$x}px)"
+  onpointermove={(e) => x.set(e.clientX)}
+>
+  Follows pointer with spring physics
+</div>
+```
+
+## Usage
+
+### From an initial value
+
+Pass a number or unit string to create a spring with an initial value. Use `.set()` to animate toward a new target.
+
+```svelte
+<script lang="ts">
+  import { useSpring } from '@humanspeak/svelte-motion'
+
+  const scale = useSpring(1)
+</script>
+
+<div
+  style="transform: scale({$scale})"
+  onpointerenter={() => scale.set(1.2)}
+  onpointerleave={() => scale.set(1)}
+>
+  Hover to scale
+</div>
+```
+
+### Following a store
+
+Pass a readable store and the spring will automatically follow its value:
+
+```svelte
+<script>
+  import { useSpring } from '@humanspeak/svelte-motion'
+  import { writable } from 'svelte/store'
+
+  const target = writable(0)
+  const smoothed = useSpring(target)
+
+  // When target changes, smoothed animates toward it
+</script>
+
+<input type="range" min="0" max="100" oninput={(e) => $target = +e.currentTarget.value} />
+<div style="transform: translateX({$smoothed}px)">Smooth</div>
+```
+
+### With unit strings
+
+`useSpring` handles unit strings like `"100px"` or `"45deg"`:
+
+```svelte
+<script>
+  import { useSpring } from '@humanspeak/svelte-motion'
+
+  const rotation = useSpring('0deg')
+</script>
+
+<button onclick={() => rotation.set('180deg')}>
+  <div style="transform: rotate({$rotation})">Flip</div>
+</button>
+```
+
+## Configuration
+
+Customize the spring physics by passing options:
+
+```svelte
+<script>
+  import { useSpring } from '@humanspeak/svelte-motion'
+
+  // Snappy spring
+  const fast = useSpring(0, { stiffness: 400, damping: 30 })
+
+  // Bouncy spring
+  const bouncy = useSpring(0, { stiffness: 200, damping: 10 })
+
+  // Heavy, slow spring
+  const heavy = useSpring(0, { stiffness: 100, damping: 20, mass: 3 })
+</script>
+```
+
+### Option presets
+
+| Preset | stiffness | damping | mass | Feel |
+|--------|-----------|---------|------|------|
+| Default | 170 | 26 | 1 | Balanced, natural |
+| Snappy | 400 | 30 | 1 | Quick, minimal overshoot |
+| Bouncy | 200 | 10 | 1 | Playful, oscillating |
+| Heavy | 100 | 20 | 3 | Slow, weighty |
+
+## Methods
+
+### `set(value)`
+
+Animate toward a new target value:
+
+```svelte
+<script>
+  const x = useSpring(0)
+
+  // Smoothly animate to 200
+  x.set(200)
+</script>
+```
+
+### `jump(value)`
+
+Immediately set the value without animation:
+
+```svelte
+<script>
+  const x = useSpring(0)
+
+  // Instantly set to 200 (no animation)
+  x.jump(200)
+</script>
+```
+
+This is useful for resetting state or initializing to a known position without a visible transition.
+
+## How it works
+
+1. Maintains current position and velocity as internal state
+2. On each `requestAnimationFrame`, applies spring forces based on Hooke's Law: `F = -kx - cv`
+3. Updates position using the computed acceleration and velocity
+4. Stops the animation loop when both velocity and displacement fall below rest thresholds
+5. When following a store, subscribes to updates and calls `.set()` on each emission
+
+## Performance
+
+- **On-demand**: The RAF loop only runs while the spring is in motion
+- **Auto-settle**: Stops computing when position reaches the target within rest thresholds
+- **Cleanup**: Cancels animation frames and unsubscribes when all subscribers leave
+- **SSR-safe**: Returns a static store with no-op methods on the server
+
+## Common patterns
+
+### Pointer tracking
+
+```svelte
+<script>
+  import { useSpring } from '@humanspeak/svelte-motion'
+
+  const x = useSpring(0, { stiffness: 300, damping: 25 })
+  const y = useSpring(0, { stiffness: 300, damping: 25 })
+</script>
+
+<svelte:window onpointermove={(e) => { x.set(e.clientX); y.set(e.clientY) }} />
+
+<div style="transform: translate({$x}px, {$y}px)">
+  Cursor follower
+</div>
+```
+
+### Toggle animation
+
+```svelte
+<script>
+  import { useSpring } from '@humanspeak/svelte-motion'
+
+  const rotation = useSpring(0, { stiffness: 200, damping: 15 })
+  let toggled = false
+</script>
+
+<button onclick={() => { toggled = !toggled; rotation.set(toggled ? 180 : 0) }}>
+  <div style="transform: rotate({$rotation}deg)">Toggle</div>
+</button>
+```
+
+### With useVelocity
+
+Track the velocity of a spring for momentum-based effects:
+
+```svelte
+<script>
+  import { useSpring, useVelocity, useTransform } from '@humanspeak/svelte-motion'
+
+  const x = useSpring(0)
+  const xVelocity = useVelocity(x)
+  const skew = useTransform(xVelocity, [-1000, 0, 1000], [-20, 0, 20])
+</script>
+
+<div style="transform: translateX({$x}px) skewX({$skew}deg)">
+  Momentum skew
+</div>
+```
+
+## API Reference
+
+### Signature
+
+```ts
+useSpring(
+  source: number | string | Readable<number | string>,
+  options?: SpringOptions
+): Readable<number | string> & { set: SetType; jump: JumpType }
+```
+
+### Parameters
+
+- **source** `number | string | Readable<number | string>` - Initial value, unit string, or a readable store to follow
+- **options** `SpringOptions` (optional):
+  - `stiffness` `number` - Spring stiffness; higher = snappier. Default `170`
+  - `damping` `number` - Damping coefficient; higher = less oscillation. Default `26`
+  - `mass` `number` - Mass of the object. Default `1`
+  - `restDelta` `number` - Position threshold to stop. Default `0.01`
+  - `restSpeed` `number` - Velocity threshold to stop. Default `0.01`
+
+### Returns
+
+`Readable<number | string>` with additional methods:
+
+- **set(v)** `(v: number | string) => void` - Animate toward a new target value
+- **jump(v)** `(v: number | string) => void` - Immediately set the value without animation
+
+## When to use
+
+- **Smooth value transitions**: Animate any numeric value with natural-feeling motion
+- **Pointer following**: Track cursor or touch position with spring physics
+- **Interactive toggles**: Smoothly animate between states on user interaction
+- **Store following**: Smoothly track changes from another reactive store
+
+For gesture-driven springs, use `useSpring` with event handlers. For time-based animations, consider [useTime](/docs/use-time) with [useTransform](/docs/use-transform).
+
+## See also
+
+- [useVelocity](/docs/use-velocity) - Track the velocity of a spring or any store
+- [useTransform](/docs/use-transform) - Map spring values to visual ranges
+- [useMotionTemplate](/docs/use-motion-template) - Compose CSS strings from spring stores
+- [useTime](/docs/use-time) - Reactive time source for continuous animations
+
+---
+
+Based on [Motion's useSpring](https://motion.dev/docs/react-use-spring) API.

@@ -231,9 +231,11 @@ Single-element FLIP layout animation:
 ## Utilities
 
 - `useAnimationFrame`
+- `useMotionTemplate`
 - `useSpring`
 - `useTime`
 - `useTransform`
+- `useVelocity`
 - `styleString`
 - `stringifyStyleObject` (deprecated)
 - `createDragControls`

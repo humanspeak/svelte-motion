@@ -1,0 +1,193 @@
+---
+title: "useMotionTemplate"
+description: "Compose reactive CSS strings from multiple stores using a tagged template literal."
+---
+
+<script>
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  $effect(() => {
+      if (seo) {
+          seo.title = 'useMotionTemplate | Docs | Svelte Motion'
+          seo.description = 'Compose reactive CSS strings from multiple stores using a tagged template literal. Build dynamic filter, transform, and background values with Svelte Motion.'
+      }
+  })
+</script>
+
+# useMotionTemplate
+
+`useMotionTemplate` is a tagged template literal that composes a reactive string from multiple stores. When any input store changes, the resulting store recomputes.
+
+```svelte
+<script>
+  import { useSpring, useMotionTemplate } from '@humanspeak/svelte-motion'
+
+  const blur = useSpring(0)
+  const filter = useMotionTemplate`blur(${blur}px)`
+</script>
+
+<div style="filter: {$filter}">Content</div>
+```
+
+## Usage
+
+Pass readable stores as template interpolations. Static strings and store values are interleaved to produce the final string.
+
+```svelte
+<script lang="ts">
+  import { useSpring, useMotionTemplate } from '@humanspeak/svelte-motion'
+
+  const x = useSpring(0)
+  const y = useSpring(0)
+  const shadow = useMotionTemplate`${x}px ${y}px 20px rgba(0, 0, 0, 0.3)`
+</script>
+
+<div style="box-shadow: {$shadow}">
+  Dynamic shadow
+</div>
+```
+
+### Multiple stores
+
+You can interpolate as many stores as needed:
+
+```svelte
+<script>
+  import { useSpring, useMotionTemplate } from '@humanspeak/svelte-motion'
+
+  const hue = useSpring(200)
+  const saturation = useSpring(70)
+  const lightness = useSpring(50)
+
+  const background = useMotionTemplate`hsl(${hue}, ${saturation}%, ${lightness}%)`
+</script>
+
+<div style="background: {$background}">
+  Reactive color
+</div>
+```
+
+### With useTransform
+
+Combine with `useTransform` to map values before composing:
+
+```svelte
+<script>
+  import { useTime, useTransform, useMotionTemplate } from '@humanspeak/svelte-motion'
+  import { derived } from 'svelte/store'
+
+  const time = useTime()
+  const progress = derived(time, (t) => (t % 3000) / 3000)
+  const blur = useTransform(progress, [0, 0.5, 1], [0, 8, 0])
+  const brightness = useTransform(progress, [0, 0.5, 1], [1, 1.5, 1])
+
+  const filter = useMotionTemplate`blur(${blur}px) brightness(${brightness})`
+</script>
+
+<div style="filter: {$filter}">
+  Animated filter
+</div>
+```
+
+## How it works
+
+1. Tagged template function receives static string parts and readable store interpolations
+2. Returns a `derived` store that subscribes to all input stores
+3. When any input store updates, recomputes the template string by interleaving static parts with current values
+4. Works identically on the server since it uses `derived` from `svelte/store`
+
+## Performance
+
+- **Efficient**: Uses Svelte's `derived` store, so it only recomputes when inputs change
+- **No overhead**: No animation frames or polling — purely reactive
+- **SSR-safe**: Works on the server since `derived` from `svelte/store` is universal
+
+## Common patterns
+
+### Dynamic CSS filter
+
+```svelte
+<script>
+  import { useSpring, useMotionTemplate } from '@humanspeak/svelte-motion'
+
+  const blur = useSpring(0)
+  const brightness = useSpring(1)
+  const filter = useMotionTemplate`blur(${blur}px) brightness(${brightness})`
+</script>
+
+<img style="filter: {$filter}" src="photo.jpg" alt="Filtered" />
+```
+
+### Animated gradient
+
+```svelte
+<script>
+  import { useTime, useTransform, useMotionTemplate } from '@humanspeak/svelte-motion'
+  import { derived } from 'svelte/store'
+
+  const time = useTime()
+  const angle = derived(time, (t) => (t / 20) % 360)
+  const background = useMotionTemplate`linear-gradient(${angle}deg, #ff6b6b, #4ecdc4)`
+</script>
+
+<div style="background: {$background}">
+  Rotating gradient
+</div>
+```
+
+### Reactive box-shadow
+
+```svelte
+<script>
+  import { useSpring, useMotionTemplate } from '@humanspeak/svelte-motion'
+
+  const offsetX = useSpring(0)
+  const offsetY = useSpring(4)
+  const blurRadius = useSpring(12)
+  const shadow = useMotionTemplate`${offsetX}px ${offsetY}px ${blurRadius}px rgba(0, 0, 0, 0.2)`
+</script>
+
+<div style="box-shadow: {$shadow}">
+  Hover to lift
+</div>
+```
+
+## API Reference
+
+### Signature
+
+```ts
+useMotionTemplate(
+  strings: TemplateStringsArray,
+  ...values: Readable<number | string>[]
+): Readable<string>
+```
+
+### Parameters
+
+- **strings** `TemplateStringsArray` - Static template string parts (provided automatically by the tagged template syntax)
+- **values** `Readable<number | string>[]` - Readable stores to interpolate into the template
+
+### Returns
+
+`Readable<string>` - A readable store containing the composed string.
+
+## When to use
+
+- **CSS filter chains**: Compose `blur()`, `brightness()`, `saturate()` from reactive values
+- **Dynamic gradients**: Build `linear-gradient()` or `radial-gradient()` with animated stops
+- **Complex box-shadows**: Animate shadow offsets, blur, and spread independently
+- **Any CSS value**: Anywhere you need to compose a string from multiple reactive sources
+
+For single-value CSS properties, you can use Svelte's built-in `{$store}` interpolation directly. `useMotionTemplate` is most useful when combining multiple reactive values into one CSS string.
+
+## See also
+
+- [useVelocity](/docs/use-velocity) - Track velocity of store values
+- [useTransform](/docs/use-transform) - Map and transform reactive values
+- [styleString](/docs/style-string) - Build complete CSS style strings with automatic unit handling
+
+---
+
+Based on [Motion's useMotionTemplate](https://motion.dev/docs/react-use-motion-template) API.
