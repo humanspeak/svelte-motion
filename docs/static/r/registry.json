@@ -6,6 +6,10 @@
         {
             "name": "animated-button",
             "type": "registry:ui"
+        },
+        {
+            "name": "animated-tabs",
+            "type": "registry:ui"
         }
     ]
 }

@@ -46,6 +46,24 @@ const COMPONENT_MAP = {
             'button.svelte': 'animated-button.svelte',
             'index.ts': 'index.ts'
         }
+    },
+    tabs: {
+        name: 'animated-tabs',
+        title: 'AnimatedTabs',
+        description:
+            'Animated shadcn Tabs with spring-based sliding indicator via svelte-motion layoutId.',
+        dependencies: ['@humanspeak/svelte-motion', 'bits-ui'],
+        devDependencies: [],
+        registryDependencies: [],
+        categories: ['navigation'],
+        docs: 'Requires @humanspeak/svelte-motion and bits-ui. Set animated={false} on Root to disable.',
+        fileRenames: {
+            'tabs.svelte': 'animated-tabs.svelte',
+            'tabs-list.svelte': 'animated-tabs-list.svelte',
+            'tabs-trigger.svelte': 'animated-tabs-trigger.svelte',
+            'tabs-content.svelte': 'animated-tabs-content.svelte',
+            'index.ts': 'index.ts'
+        }
     }
 }
 
@@ -77,9 +95,10 @@ function rewriteImports(content, sourceFilename, fileRenames, pascalName) {
         }
     }
 
-    // Rewrite export names: Root as Button → Root as AnimatedButton
+    // Rewrite export names: Root as <Name> → Root as <PascalName>
+    // e.g. Root as Button → Root as AnimatedButton, Root as Tabs → Root as AnimatedTabs
     if (sourceFilename === 'index.ts' && pascalName) {
-        result = result.replace(/Root as Button/g, `Root as ${pascalName}`)
+        result = result.replace(/Root as (\w+)/g, `Root as ${pascalName}`)
     }
 
     return result
