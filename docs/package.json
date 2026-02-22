@@ -25,6 +25,7 @@
         "@humanspeak/svelte-motion": "workspace:*",
         "@inlang/paraglide-js": "^2.12.0",
         "@sentry/sveltekit": "^10.39.0",
+        "bits-ui": "^2.16.2",
         "github-slugger": "^2.0.0",
         "runed": "^0.37.1"
     },
