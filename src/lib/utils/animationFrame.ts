@@ -32,7 +32,7 @@
  * <div bind:this={ref}>Animated content</div>
  * ```
  */
-export function useAnimationFrame(callback: (time: DOMHighResTimeStamp) => void): () => void {
+export const useAnimationFrame = (callback: (time: DOMHighResTimeStamp) => void): (() => void) => {
     // SSR guard
     if (typeof window === 'undefined') return () => {}
 

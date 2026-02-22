@@ -116,11 +116,11 @@ export type AnimatePresenceContext = {
  * @param context Optional callbacks, for example `onExitComplete`.
  * @returns A presence context with register/update/unregister APIs.
  */
-export function createAnimatePresenceContext(context: {
+export const createAnimatePresenceContext = (context: {
     initial?: boolean
     mode?: AnimatePresenceMode
     onExitComplete?: () => void
-}): AnimatePresenceContext {
+}): AnimatePresenceContext => {
     // Default initial to true (animate on first mount) unless explicitly false
     const initial = context.initial !== false
 
@@ -597,7 +597,7 @@ export function createAnimatePresenceContext(context: {
  * Note: Trivial wrapper - ignored for coverage.
  */
 /* c8 ignore next 3 */
-export function getAnimatePresenceContext(): AnimatePresenceContext | undefined {
+export const getAnimatePresenceContext = (): AnimatePresenceContext | undefined => {
     return getContext(ANIMATE_PRESENCE_CONTEXT)
 }
 
@@ -607,7 +607,7 @@ export function getAnimatePresenceContext(): AnimatePresenceContext | undefined 
  * Note: Trivial wrapper - ignored for coverage.
  */
 /* c8 ignore next 3 */
-export function setAnimatePresenceContext(context: AnimatePresenceContext) {
+export const setAnimatePresenceContext = (context: AnimatePresenceContext): void => {
     setContext(ANIMATE_PRESENCE_CONTEXT, context)
 }
 
@@ -674,12 +674,12 @@ export const setPresenceDepth = (depth: number): void => {
  * @param exit The exit keyframes definition.
  * @param mergedTransition The element's merged transition for precedence.
  */
-export function usePresence(
+export const usePresence = (
     key: string,
     element: HTMLElement | null,
     exit: MotionExit,
     mergedTransition?: MotionTransition
-): void {
+): void => {
     const context = getAnimatePresenceContext()
     pwLog('[presence] usePresence called', {
         key,

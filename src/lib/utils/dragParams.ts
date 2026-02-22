@@ -28,7 +28,7 @@ export type BoundaryPhysics = {
  *   - `timeConstant` is expressed in seconds and internally converted to milliseconds.
  * @returns {BoundaryPhysics} Fully resolved physics parameters for inertia and boundary spring.
  */
-export function deriveBoundaryPhysics(
+export const deriveBoundaryPhysics = (
     elastic: number | undefined,
     transition?: {
         bounceStiffness?: number
@@ -37,7 +37,7 @@ export function deriveBoundaryPhysics(
         restDelta?: number
         restSpeed?: number
     }
-): BoundaryPhysics {
+): BoundaryPhysics => {
     const truthyElastic = typeof elastic === 'number' ? elastic > 0 : !!elastic
     let bounceStiffness = truthyElastic ? 200 : 1_000_000
     let bounceDamping = truthyElastic ? 40 : 10_000_000

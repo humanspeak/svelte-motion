@@ -8,8 +8,17 @@
  * This module is SSR-safe and holds no references to the DOM or timers.
  */
 
+/** Current position and velocity on a single axis. */
 export type AxisState = { value: number; velocity: number }
+
+/** Min/max boundary pair for clamping an axis. */
 export type Bounds = { min: number; max: number }
+
+/**
+ * Parameters controlling the inertia decay and boundary spring phases.
+ *
+ * @see deriveBoundaryPhysics
+ */
 export type InertiaHandoffOptions = {
     timeConstantMs: number
     restDelta: number
@@ -18,6 +27,7 @@ export type InertiaHandoffOptions = {
     bounceDamping: number
 }
 
+/** Value returned by each step of the inertia/spring simulation. */
 export type StepResult = { value: number; done: boolean }
 
 type Mode = 'inertia' | 'spring' | 'done'
@@ -75,12 +85,17 @@ const solveCrossTimeMs = (
 /**
  * Create a stepper that yields a value at each elapsed time. Handoff from
  * inertia to spring when crossing the bounds.
+ *
+ * @param initial Starting position and velocity on the axis.
+ * @param bounds Min/max boundaries for the axis.
+ * @param opts Physics parameters for decay and boundary spring.
+ * @returns A function that accepts elapsed time in ms and returns the current `StepResult`.
  */
-export function createInertiaToBoundary(
+export const createInertiaToBoundary = (
     initial: AxisState,
     bounds: Bounds,
     opts: InertiaHandoffOptions
-): (tMs: number) => StepResult {
+): ((tMs: number) => StepResult) => {
     const min = bounds.min
     const max = bounds.max
     const tauMs = Math.max(1, opts.timeConstantMs)
