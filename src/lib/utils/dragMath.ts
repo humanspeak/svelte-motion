@@ -14,6 +14,21 @@ export type ConstraintElastic = { min: number; max: number } | number | undefine
  * Apply float-safe constraints with optional elastic mixing.
  * Mirrors Framer Motion behavior: clamp via Math.min/Math.max with no rounding.
  * If `elastic` provided, blends toward the bound using its side-specific factor.
+ *
+ * @param point The unconstrained value to clamp.
+ * @param range Min/max boundaries. Either or both may be omitted.
+ * @param elastic Optional per-side elastic factor(s) in [0,1]. When provided,
+ *   the value is interpolated toward the boundary instead of hard-clamped.
+ * @returns The constrained (and optionally elastically blended) value.
+ *
+ * @example
+ * ```ts
+ * // Hard clamp to [0, 100]
+ * applyConstraints(120, { min: 0, max: 100 }) // 100
+ *
+ * // Elastic overshoot (50 % blend toward max)
+ * applyConstraints(120, { min: 0, max: 100 }, 0.5) // 110
+ * ```
  */
 export const applyConstraints = (
     point: number,
