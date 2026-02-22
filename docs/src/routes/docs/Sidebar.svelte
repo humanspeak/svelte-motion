@@ -81,14 +81,29 @@
                     icon: 'fa-solid fa-clock'
                 },
                 {
-                    title: 'useTransform',
-                    href: '/docs/use-transform',
-                    icon: 'fa-solid fa-sliders'
+                    title: 'useMotionTemplate',
+                    href: '/docs/use-motion-template',
+                    icon: 'fa-solid fa-code'
+                },
+                {
+                    title: 'useSpring',
+                    href: '/docs/use-spring',
+                    icon: 'fa-solid fa-wave-square'
                 },
                 {
                     title: 'useTime',
                     href: '/docs/use-time',
                     icon: 'fa-solid fa-stopwatch'
+                },
+                {
+                    title: 'useTransform',
+                    href: '/docs/use-transform',
+                    icon: 'fa-solid fa-sliders'
+                },
+                {
+                    title: 'useVelocity',
+                    href: '/docs/use-velocity',
+                    icon: 'fa-solid fa-gauge-high'
                 }
             ]
         },

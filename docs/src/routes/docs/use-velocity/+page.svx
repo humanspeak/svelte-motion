@@ -1,0 +1,163 @@
+---
+title: "useVelocity"
+description: "Track the velocity of a reactive store value in units per second."
+---
+
+<script>
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  $effect(() => {
+      if (seo) {
+          seo.title = 'useVelocity | Docs | Svelte Motion'
+          seo.description = 'Track the velocity of a reactive store value in units per second. Use velocity to create momentum-based effects with Svelte Motion.'
+      }
+  })
+</script>
+
+# useVelocity
+
+`useVelocity` returns a readable store tracking the velocity of a source store's value in units per second.
+
+```svelte
+<script>
+  import { useSpring, useVelocity } from '@humanspeak/svelte-motion'
+
+  const x = useSpring(0)
+  const xVelocity = useVelocity(x)
+</script>
+
+<div>Velocity: {$xVelocity} px/s</div>
+```
+
+## Usage
+
+Pass any `Readable<number | string>` store. The returned store emits the rate of change in units per second, settling to `0` when the source stops moving.
+
+```svelte
+<script lang="ts">
+  import { useSpring, useVelocity, useTransform } from '@humanspeak/svelte-motion'
+  import { writable } from 'svelte/store'
+
+  const x = useSpring(0)
+  const xVelocity = useVelocity(x)
+
+  // Map velocity to visual effects
+  const skew = useTransform(xVelocity, [-1000, 0, 1000], [-20, 0, 20])
+  const opacity = useTransform(xVelocity, [-500, 0, 500], [0.5, 1, 0.5])
+</script>
+
+<div
+  style="transform: skewX({$skew}deg); opacity: {$opacity}"
+  onpointermove={(e) => x.set(e.clientX)}
+>
+  Move your pointer
+</div>
+```
+
+### With unit strings
+
+`useVelocity` parses numeric values from unit strings like `"120px"` or `"45deg"`:
+
+```svelte
+<script>
+  import { useSpring, useVelocity } from '@humanspeak/svelte-motion'
+
+  const rotation = useSpring('0deg')
+  const rotationVelocity = useVelocity(rotation)
+</script>
+```
+
+## How it works
+
+1. Creates an internal `motionValue` from `motion-dom` for timestamp-based velocity tracking
+2. Subscribes to the source store and forwards each value to the motion value via `.set()`
+3. Polls `motionValue.getVelocity()` via `requestAnimationFrame` to emit velocity updates
+4. Automatically stops polling when velocity settles near zero, and restarts when the source moves again
+5. Cleans up the RAF loop and source subscription when all subscribers unsubscribe
+
+## Performance
+
+- **On-demand polling**: The RAF loop only runs while velocity is non-zero
+- **Auto-settle**: Stops polling when movement stops, avoiding idle CPU usage
+- **Cleanup**: Cancels animation frames and unsubscribes when no longer needed
+- **SSR-safe**: Returns a static `readable(0)` on the server
+
+## Common patterns
+
+### Momentum-based skew
+
+```svelte
+<script>
+  import { useSpring, useVelocity, useTransform } from '@humanspeak/svelte-motion'
+
+  const x = useSpring(0)
+  const xVelocity = useVelocity(x)
+  const skew = useTransform(xVelocity, [-1000, 0, 1000], [-25, 0, 25])
+</script>
+
+<div
+  style="transform: skewX({$skew}deg)"
+  onpointermove={(e) => x.set(e.clientX)}
+>
+  Skews with momentum
+</div>
+```
+
+### Velocity-driven blur
+
+```svelte
+<script>
+  import { useSpring, useVelocity, useTransform, useMotionTemplate } from '@humanspeak/svelte-motion'
+
+  const y = useSpring(0)
+  const yVelocity = useVelocity(y)
+  const blur = useTransform(yVelocity, [-2000, 0, 2000], [10, 0, 10])
+  const filter = useMotionTemplate`blur(${blur}px)`
+</script>
+
+<div style="filter: {$filter}">
+  Blurs when moving fast
+</div>
+```
+
+### Chaining velocities
+
+You can derive the velocity of a velocity to get acceleration:
+
+```svelte
+<script>
+  import { useSpring, useVelocity } from '@humanspeak/svelte-motion'
+
+  const x = useSpring(0)
+  const xVelocity = useVelocity(x)
+  const xAcceleration = useVelocity(xVelocity)
+</script>
+```
+
+## API Reference
+
+### Parameters
+
+- **source** `Readable<number | string>` - A readable store whose value changes over time
+
+### Returns
+
+`Readable<number>` - A readable store of the current velocity in units per second.
+
+## When to use
+
+- **Momentum effects**: Skew, stretch, or blur elements based on how fast a value is changing
+- **Physics-based UI**: React to acceleration or deceleration of animations
+- **Gesture feedback**: Show speed-dependent visual feedback during pointer or scroll interactions
+- **Chained dynamics**: Derive acceleration by passing a velocity store back into `useVelocity`
+
+## See also
+
+- [useTransform](/docs/use-transform) - Map velocity values to visual ranges
+- [useMotionTemplate](/docs/use-motion-template) - Compose CSS strings from reactive stores
+- [useTime](/docs/use-time) - Reactive time source for continuous animations
+
+---
+
+Based on [Motion's useVelocity](https://motion.dev/docs/react-use-velocity) API.
