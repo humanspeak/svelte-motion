@@ -1,6 +1,6 @@
 {
     "name": "@humanspeak/svelte-motion",
-    "version": "0.1.24",
+    "version": "0.1.25",
     "description": "A lightweight animation library for Svelte 5 that provides smooth, hardware-accelerated animations. Features include spring physics, custom easing, and fluid transitions. Built on top of the motion library, it offers a simple API for creating complex animations with minimal code. Perfect for interactive UIs, micro-interactions, and engaging user experiences.",
     "keywords": [
         "svelte",
