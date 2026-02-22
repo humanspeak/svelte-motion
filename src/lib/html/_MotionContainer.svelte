@@ -57,6 +57,7 @@
         isSVGTag,
         SVG_NAMESPACE
     } from '$lib/utils/svg'
+    import { getLayoutIdRegistry } from '$lib/utils/layoutId'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -107,6 +108,7 @@
         dragListener: dragListenerProp,
         dragControls: dragControlsProp,
         layout: layoutProp,
+        layoutId: layoutIdProp,
         ref: element = $bindable(null),
         ...rest
     }: Props = $props()
@@ -116,6 +118,9 @@
 
     // Get presence context to check if we're inside AnimatePresence
     const context = getAnimatePresenceContext()
+
+    // Get layoutId registry (provided by AnimatePresence or a parent LayoutGroup)
+    const layoutIdRegistry = getLayoutIdRegistry()
 
     // Get current presence depth (0 = direct child of AnimatePresence, undefined = not in AnimatePresence)
     const presenceDepth = getPresenceDepth()
@@ -160,6 +165,20 @@
         onDestroy(() => {
             pwLog('[presence] onDestroy triggered', { key: presenceKey })
             context.unregisterChild(presenceKey)
+        })
+    }
+
+    // Snapshot layoutId rect before DOM removal so the next element can FLIP from it
+    if (layoutIdProp && layoutIdRegistry) {
+        onDestroy(() => {
+            if (element) {
+                const rect = element.getBoundingClientRect()
+                layoutIdRegistry.snapshot(
+                    layoutIdProp,
+                    rect,
+                    (mergedTransition ?? {}) as AnimationOptions
+                )
+            }
         })
     }
 
@@ -609,6 +628,25 @@
             }
             if (rafId) cancelAnimationFrame(rafId)
         }
+    })
+
+    // Shared layout animation via layoutId.
+    // On mount, consume the previous snapshot and FLIP from its position.
+    $effect(() => {
+        if (!(element && layoutIdProp && layoutIdRegistry && isLoaded === 'ready')) return
+
+        const prev = layoutIdRegistry.consume(layoutIdProp)
+        if (!prev) return // First appearance, no animation needed
+
+        const next = measureRect(element)
+        const transforms = computeFlipTransforms(prev.rect, next, true)
+
+        setCompositorHints(element, true)
+        runFlipAnimation(
+            element,
+            transforms,
+            (prev.transition ?? mergedTransition ?? {}) as AnimationOptions
+        )
     })
 
     // whileTap handling via motion-dom's press()

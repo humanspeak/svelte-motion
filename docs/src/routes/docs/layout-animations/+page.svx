@@ -1,0 +1,112 @@
+---
+title: Layout Animations
+description: Animate elements between positions with layout and layoutId for smooth shared layout transitions
+---
+
+<script>
+    import SharedLayoutAnimationExample from '$lib/examples/SharedLayoutAnimationExample.svelte'
+    import Example from '$lib/components/general/Example.svelte'
+    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+    const seo = getSeoContext()
+    $effect(() => {
+        if (seo) {
+            seo.title = 'Layout Animations | Docs | Svelte Motion'
+            seo.description = 'Animate elements between positions with layout and layoutId for smooth shared layout transitions in Svelte Motion.'
+        }
+    })
+</script>
+
+# Layout Animations
+
+Svelte Motion supports two kinds of layout animation:
+
+- **`layout`** — animate a single element when its own size or position changes (FLIP).
+- **`layoutId`** — animate between two different elements that share the same identifier. When one unmounts and another with the same `layoutId` mounts, the new element FLIP-animates from the old one's position.
+
+## Single-element layout animation
+
+Add `layout` to any motion element to have it automatically animate when its position or size changes in the DOM.
+
+```svelte
+<motion.div layout>
+    <!-- This element will FLIP-animate whenever its bounding rect changes -->
+</motion.div>
+```
+
+Use `layout="position"` to only animate translation (no scale):
+
+```svelte
+<motion.div layout="position">
+    <!-- Translates smoothly, does not scale -->
+</motion.div>
+```
+
+## Shared layout with `layoutId`
+
+The `layoutId` prop enables shared layout animations between completely different elements. When element A with `layoutId="foo"` unmounts and element B with the same `layoutId="foo"` mounts, B automatically animates from A's last known position.
+
+### Tab underline example
+
+The most common use case is a tab indicator that slides between tabs:
+
+```svelte
+<script lang="ts">
+    import { AnimatePresence, motion } from '@humanspeak/svelte-motion'
+
+    let selectedTab = $state(0)
+    const tabs = ['Home', 'About', 'Contact']
+</script>
+
+{#each tabs as tab, i (tab)}
+    <button onclick={() => (selectedTab = i)}>
+        {tab}
+        <AnimatePresence>
+            {#if selectedTab === i}
+                <motion.div
+                    key="underline"
+                    layoutId="underline"
+                    style="position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: royalblue;"
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                />
+            {/if}
+        </AnimatePresence>
+    </button>
+{/each}
+```
+
+### How it works
+
+1. Only one element with a given `layoutId` should be mounted at a time (use conditional rendering).
+2. When the old element unmounts, its bounding rect is captured.
+3. When the new element mounts, it reads the stored rect and performs a FLIP animation from the old position to its own natural position.
+4. The animation uses the element's `transition` prop, or falls back to the previous element's transition.
+
+### Full interactive example
+
+<Example isSmall exampleUrl="/examples/shared-layout-animation">
+<SharedLayoutAnimationExample />
+</Example>
+
+## API reference
+
+### `layout`
+
+| Value | Behavior |
+|---|---|
+| `true` | Animate translate + scale on layout change |
+| `"position"` | Animate translate only (no scale) |
+| `false` / omitted | No layout animation |
+
+### `layoutId`
+
+| Prop | Type | Description |
+|---|---|---|
+| `layoutId` | `string` | Shared identifier. Elements with matching `layoutId` animate between each other's positions. |
+
+`layoutId` works best inside `AnimatePresence`, which provides the registry that coordinates the snapshot/consume handoff.
+
+## Related
+
+- [AnimatePresence](/docs/animate-presence) — Coordinate enter/exit animations
+- [Shared Layout Animation example](/examples/shared-layout-animation) — Full interactive demo

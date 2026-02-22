@@ -44,7 +44,7 @@ Goal: Framer Motion API parity for Svelte where common React examples can be tra
 | Drag (`drag`, constraints, momentum, controls, callbacks) | Supported                       |
 | `AnimatePresence` (`initial`, `mode`, `onExitComplete`)   | Supported                       |
 | Layout (`layout`, `layout="position"`)                    | Supported (single-element FLIP) |
-| Shared layout (`layoutId`)                                | Not yet supported               |
+| Shared layout (`layoutId`)                                | Supported                       |
 | Pan gesture API (`whilePan`, `onPan*`)                    | Not yet supported               |
 | `MotionConfig` parity beyond `transition`                 | Partial                         |
 | `reducedMotion`, `features`, `transformPagePoint`         | Not yet supported               |
