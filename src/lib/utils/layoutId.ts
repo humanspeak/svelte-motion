@@ -1,5 +1,4 @@
 import type { AnimationOptions } from 'motion'
-import { getContext, setContext } from 'svelte'
 
 /**
  * Snapshot stored for a layoutId when an element unmounts.
@@ -20,40 +19,27 @@ export type LayoutIdRegistry = {
     consume(id: string): LayoutIdEntry | undefined
 }
 
-const LAYOUT_ID_CONTEXT = Symbol('layout-id-registry')
-
 /**
- * Create a new `LayoutIdRegistry` backed by a simple Map.
+ * Module-level singleton registry shared across the entire component tree.
+ * This matches React Framer Motion's behavior where layoutId is shared globally
+ * (or within a LayoutGroup, which we can add later).
  */
-export function createLayoutIdRegistry(): LayoutIdRegistry {
-    const entries = new Map<string, LayoutIdEntry>()
+const entries = new Map<string, LayoutIdEntry>()
 
-    return {
-        snapshot(id, rect, transition) {
-            entries.set(id, { rect, transition })
-        },
-        consume(id) {
-            const entry = entries.get(id)
-            if (entry) entries.delete(id)
-            return entry
-        }
+export const layoutIdRegistry: LayoutIdRegistry = {
+    snapshot(id, rect, transition) {
+        entries.set(id, { rect, transition })
+    },
+    consume(id) {
+        const entry = entries.get(id)
+        if (entry) entries.delete(id)
+        return entry
     }
 }
 
 /**
- * Retrieve the `LayoutIdRegistry` from Svelte context.
+ * Get the global layoutId registry.
  */
-export function getLayoutIdRegistry(): LayoutIdRegistry | undefined {
-    try {
-        return getContext<LayoutIdRegistry | undefined>(LAYOUT_ID_CONTEXT)
-    } catch {
-        return undefined
-    }
-}
-
-/**
- * Set the `LayoutIdRegistry` in Svelte context.
- */
-export function setLayoutIdRegistry(registry: LayoutIdRegistry): void {
-    setContext(LAYOUT_ID_CONTEXT, registry)
+export function getLayoutIdRegistry(): LayoutIdRegistry {
+    return layoutIdRegistry
 }

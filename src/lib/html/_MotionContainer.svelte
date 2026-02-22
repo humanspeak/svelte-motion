@@ -168,19 +168,35 @@
         })
     }
 
-    // Snapshot layoutId rect before DOM removal so the next element can FLIP from it
-    if (layoutIdProp && layoutIdRegistry) {
-        onDestroy(() => {
+    // Keep a live snapshot of the layoutId element's rect so the next element can FLIP from it.
+    // We store the last-known-good rect and push it to the registry on cleanup,
+    // because onDestroy fires after the element is removed from DOM (rect would be zeros).
+    let layoutIdLastRect: DOMRect | null = null
+    $effect(() => {
+        if (!(element && layoutIdProp && layoutIdRegistry)) return
+
+        // Capture rect on every frame while mounted
+        let rafId: number
+        const captureRect = () => {
             if (element) {
-                const rect = element.getBoundingClientRect()
+                layoutIdLastRect = element.getBoundingClientRect()
+            }
+            rafId = requestAnimationFrame(captureRect)
+        }
+        rafId = requestAnimationFrame(captureRect)
+
+        // On cleanup (before DOM removal), push last-known rect to registry
+        return () => {
+            cancelAnimationFrame(rafId)
+            if (layoutIdLastRect && layoutIdProp) {
                 layoutIdRegistry.snapshot(
                     layoutIdProp,
-                    rect,
+                    layoutIdLastRect,
                     (mergedTransition ?? {}) as AnimationOptions
                 )
             }
-        })
-    }
+        }
+    })
 
     // Reactively update registration when element/exit/transition props change
     $effect(() => {

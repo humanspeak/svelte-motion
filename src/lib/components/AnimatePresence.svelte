@@ -6,7 +6,6 @@
         setAnimatePresenceContext,
         setPresenceDepth
     } from '$lib/utils/presence'
-    import { createLayoutIdRegistry, setLayoutIdRegistry } from '$lib/utils/layoutId'
     import { pwLog } from '$lib/utils/log'
 
     /**
@@ -36,10 +35,6 @@
     pwLog('[AnimatePresence] mounting', { initial, mode, hasOnExitComplete: !!onExitComplete })
     const context = createAnimatePresenceContext({ initial, mode, onExitComplete })
     setAnimatePresenceContext(context)
-
-    // Provide a layoutId registry scoped to this AnimatePresence boundary
-    const layoutIdRegistry = createLayoutIdRegistry()
-    setLayoutIdRegistry(layoutIdRegistry)
 
     // Initialize presence depth to 0 for direct children
     // Only direct children (depth 0) require explicit key props, matching Framer Motion behavior
