@@ -18,8 +18,13 @@ const DEFAULTS: Required<TransformValues> = {
     rotate: 0
 }
 
-/** Build a CSS transform string from numeric values (no matrices). */
-export function buildTransform(values: TransformValues): string {
+/**
+ * Build a CSS transform string from numeric values (no matrices).
+ *
+ * @param values Partial map of translate/scale/rotate values.
+ * @returns A space-separated CSS `transform` string, or `""` when all values are defaults.
+ */
+export const buildTransform = (values: TransformValues): string => {
     const v = { ...DEFAULTS, ...values }
     // If explicit per-axis scales provided, use them; otherwise use uniform scale
     const useAxes = values.scaleX !== undefined || values.scaleY !== undefined
@@ -36,8 +41,14 @@ export function buildTransform(values: TransformValues): string {
     return parts.join(' ').trim()
 }
 
-/** Lightweight safety check for transform magnitudes and NaN values. */
-export function isSafeTransform(values: TransformValues, opts?: { maxScale?: number }): boolean {
+/**
+ * Lightweight safety check for transform magnitudes and NaN values.
+ *
+ * @param values Transform values to validate.
+ * @param opts Optional configuration; `maxScale` caps allowable absolute scale (default 8).
+ * @returns `true` if all scale values are finite and within bounds.
+ */
+export const isSafeTransform = (values: TransformValues, opts?: { maxScale?: number }): boolean => {
     const maxScale = opts?.maxScale ?? 8
     const entries: Array<[string, number | undefined]> = [
         ['scale', values.scale],
@@ -52,7 +63,13 @@ export function isSafeTransform(values: TransformValues, opts?: { maxScale?: num
     return true
 }
 
-export function parseMatrixScale(matrix: string | null | undefined): number | null {
+/**
+ * Extract the uniform scale factor from a CSS `matrix()` string.
+ *
+ * @param matrix A CSS `matrix(...)` value, `"none"`, `null`, or `undefined`.
+ * @returns The `a` component of the matrix (uniform scale), or `null` if unparseable.
+ */
+export const parseMatrixScale = (matrix: string | null | undefined): number | null => {
     if (!matrix || matrix === 'none') return null
     const m = matrix.match(/matrix\(([^)]+)\)/)
     if (!m) return null
@@ -60,8 +77,13 @@ export function parseMatrixScale(matrix: string | null | undefined): number | nu
     return Number.isFinite(a) ? a : null
 }
 
-function round(n: number): number {
-    // avoid excessive precision in strings
+/**
+ * Round a number to six decimal places to avoid excessive precision in CSS strings.
+ *
+ * @param n The number to round.
+ * @returns The rounded value.
+ */
+const round = (n: number): number => {
     return Math.round(n * 1e6) / 1e6
 }
 

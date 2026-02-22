@@ -16,7 +16,10 @@
             {#each allIngredients as ingredient, i (ingredient.label)}
                 <motion.li
                     animate={{
-                        backgroundColor: i === selectedTab ? '#eee' : '#eee0'
+                        backgroundColor:
+                            i === selectedTab
+                                ? 'color-mix(in srgb, var(--color-card-foreground) 10%, transparent)'
+                                : 'transparent'
                     }}
                     class="tab"
                     role="tab"
@@ -62,7 +65,8 @@
 <style>
     .wrapper {
         width: 320px;
-        background: #fff;
+        background: var(--color-card);
+        color: var(--color-card-foreground);
         border-radius: 16px;
         overflow: hidden;
         box-shadow:
@@ -72,7 +76,7 @@
 
     nav {
         padding: 6px 6px 0;
-        border-bottom: 1px solid #eee;
+        border-bottom: 1px solid var(--color-border);
     }
 
     ul {
@@ -101,6 +105,7 @@
         font-size: 14px;
         cursor: pointer;
         user-select: none;
+        color: var(--color-text-primary);
     }
 
     :global(.underline) {

@@ -39,7 +39,9 @@ export const layoutIdRegistry: LayoutIdRegistry = {
 
 /**
  * Get the global layoutId registry.
+ *
+ * @returns The singleton `LayoutIdRegistry` instance.
  */
-export function getLayoutIdRegistry(): LayoutIdRegistry {
+export const getLayoutIdRegistry = (): LayoutIdRegistry => {
     return layoutIdRegistry
 }

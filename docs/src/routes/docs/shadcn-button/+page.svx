@@ -31,6 +31,32 @@ description: Drop-in animated replacement for the shadcn Button component
 
 A drop-in replacement for the [shadcn-svelte Button](https://www.shadcn-svelte.com/docs/components/button) powered by `svelte-motion`. Spring-based press feedback and subtle hover lift come out of the box — no extra config needed.
 
+## Installation
+
+Install via the shadcn-svelte CLI from our registry:
+
+```bash
+npx shadcn-svelte@latest add https://motion.svelte.page/r/animated-button.json
+```
+
+This installs `AnimatedButton` alongside your existing `Button`. It automatically pulls in `@humanspeak/svelte-motion` and `tailwind-variants` as dependencies.
+
+Then use it:
+
+```svelte
+<script>
+  import { AnimatedButton } from '$lib/components/ui/animated-button'
+</script>
+
+<AnimatedButton variant="default">Click me</AnimatedButton>
+<AnimatedButton variant="outline" size="icon" aria-label="Like"><i class="fa-solid fa-heart" /></AnimatedButton>
+<AnimatedButton animated={false}>No motion</AnimatedButton>
+```
+
+### Manual Installation
+
+Alternatively, copy the component source directly from [GitHub](https://github.com/humanspeak/svelte-motion/tree/main/docs/src/lib/shadcn/ui/button).
+
 ## Live Demo
 
 Try clicking and hovering on each variant:
@@ -94,32 +120,6 @@ Set `animated={false}` to get vanilla shadcn behavior with no motion:
 </div>
 
 </div>
-
-## Installation
-
-Install via the shadcn-svelte CLI from our registry:
-
-```bash
-npx shadcn-svelte@latest add https://motion.svelte.page/r/animated-button.json
-```
-
-This installs `AnimatedButton` alongside your existing `Button`. It automatically pulls in `@humanspeak/svelte-motion` and `tailwind-variants` as dependencies.
-
-Then use it:
-
-```svelte
-<script>
-  import { AnimatedButton } from '$lib/components/ui/animated-button'
-</script>
-
-<AnimatedButton variant="default">Click me</AnimatedButton>
-<AnimatedButton variant="outline" size="icon" aria-label="Like"><i class="fa-solid fa-heart" /></AnimatedButton>
-<AnimatedButton animated={false}>No motion</AnimatedButton>
-```
-
-### Manual Installation
-
-Alternatively, copy the component source directly from [GitHub](https://github.com/humanspeak/svelte-motion/tree/main/docs/src/lib/shadcn/ui/button).
 
 ## Animation Details
 
