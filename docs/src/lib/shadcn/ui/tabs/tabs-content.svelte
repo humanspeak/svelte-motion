@@ -50,15 +50,15 @@
 {#if isAnimated}
     <TabsPrimitive.Content bind:ref {value} {...restProps}>
         {#snippet child({ props: panelProps })}
-            <!-- eslint-disable-next-line @typescript-eslint/no-unused-vars -->
-            {@const { hidden: _hidden, style: _style, ...safeProps } = panelProps}
+            <!-- eslint-disable-next-line @typescript-eslint/no-unused-vars -- hidden must be stripped so the panel stays in the DOM -->
+            {@const { hidden: _hidden, style: panelStyle, ...safeProps } = panelProps}
             <div
                 {...safeProps}
                 class={cn(
                     'focus-visible:ring-ring mt-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
                     className
                 )}
-                style:display={isActive ? undefined : 'none'}
+                style="{panelStyle ?? ''}{isActive ? '' : ';display:none'}"
             >
                 {#key ctx.value()}
                     <motion.div
