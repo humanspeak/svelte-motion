@@ -101,6 +101,7 @@
         font-size: 14px;
         cursor: pointer;
         user-select: none;
+        color: var(--color-text-primary);
     }
 
     :global(.underline) {
