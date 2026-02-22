@@ -306,6 +306,8 @@ export type MotionProps = {
     class?: string
     /** Enable FLIP layout animations; "position" limits to translation only */
     layout?: boolean | 'position'
+    /** Shared layout animation identifier. Elements with matching layoutId animate between positions. */
+    layoutId?: string
     /** Ref to the element */
     ref?: HTMLElement | null
     /** Enable drag gestures. true for both axes, or lock to 'x'/'y'. */

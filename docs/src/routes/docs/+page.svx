@@ -202,6 +202,9 @@ Animate between changes in layout using transforms. It's as easy as applying the
 
 - `layout` animates translation and scale between layout changes.
 - `layout="position"` animates translation only.
+- `layoutId` animates between different elements that share the same identifier (shared layout animations).
+
+See [Layout Animations](/docs/layout-animations) for the full guide.
 
 ## Exit animations
 

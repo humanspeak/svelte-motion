@@ -202,6 +202,19 @@
             </ul>
         </div>
         <div>
+            <h2 class="mb-3 text-xl font-medium">Layout</h2>
+            <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id') + searchParams}
+                    >
+                        layoutId (shared layout)
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div>
             <h2 class="mb-3 text-xl font-medium">SVG</h2>
             <ul class="list-disc space-y-2 pl-5">
                 <li>

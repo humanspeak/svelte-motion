@@ -54,6 +54,11 @@
             icon: 'fa-solid fa-layer-group',
             items: [
                 {
+                    title: 'Layout Animations',
+                    href: '/docs/layout-animations',
+                    icon: 'fa-solid fa-up-down-left-right'
+                },
+                {
                     title: 'Variants',
                     href: '/docs/variants',
                     icon: 'fa-solid fa-layer-group'

@@ -57,6 +57,7 @@
         isSVGTag,
         SVG_NAMESPACE
     } from '$lib/utils/svg'
+    import { getLayoutIdRegistry } from '$lib/utils/layoutId'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -107,6 +108,7 @@
         dragListener: dragListenerProp,
         dragControls: dragControlsProp,
         layout: layoutProp,
+        layoutId: layoutIdProp,
         ref: element = $bindable(null),
         ...rest
     }: Props = $props()
@@ -116,6 +118,9 @@
 
     // Get presence context to check if we're inside AnimatePresence
     const context = getAnimatePresenceContext()
+
+    // Get layoutId registry (provided by AnimatePresence or a parent LayoutGroup)
+    const layoutIdRegistry = getLayoutIdRegistry()
 
     // Get current presence depth (0 = direct child of AnimatePresence, undefined = not in AnimatePresence)
     const presenceDepth = getPresenceDepth()
@@ -162,6 +167,36 @@
             context.unregisterChild(presenceKey)
         })
     }
+
+    // Keep a live snapshot of the layoutId element's rect so the next element can FLIP from it.
+    // We store the last-known-good rect and push it to the registry on cleanup,
+    // because onDestroy fires after the element is removed from DOM (rect would be zeros).
+    let layoutIdLastRect: DOMRect | null = null
+    $effect(() => {
+        if (!(element && layoutIdProp && layoutIdRegistry)) return
+
+        // Capture rect on every frame while mounted
+        let rafId: number
+        const captureRect = () => {
+            if (element) {
+                layoutIdLastRect = element.getBoundingClientRect()
+            }
+            rafId = requestAnimationFrame(captureRect)
+        }
+        rafId = requestAnimationFrame(captureRect)
+
+        // On cleanup (before DOM removal), push last-known rect to registry
+        return () => {
+            cancelAnimationFrame(rafId)
+            if (layoutIdLastRect && layoutIdProp) {
+                layoutIdRegistry.snapshot(
+                    layoutIdProp,
+                    layoutIdLastRect,
+                    (mergedTransition ?? {}) as AnimationOptions
+                )
+            }
+        }
+    })
 
     // Reactively update registration when element/exit/transition props change
     $effect(() => {
@@ -609,6 +644,25 @@
             }
             if (rafId) cancelAnimationFrame(rafId)
         }
+    })
+
+    // Shared layout animation via layoutId.
+    // On mount, consume the previous snapshot and FLIP from its position.
+    $effect(() => {
+        if (!(element && layoutIdProp && layoutIdRegistry && isLoaded === 'ready')) return
+
+        const prev = layoutIdRegistry.consume(layoutIdProp)
+        if (!prev) return // First appearance, no animation needed
+
+        const next = measureRect(element)
+        const transforms = computeFlipTransforms(prev.rect, next, true)
+
+        setCompositorHints(element, true)
+        runFlipAnimation(
+            element,
+            transforms,
+            (prev.transition ?? mergedTransition ?? {}) as AnimationOptions
+        )
     })
 
     // whileTap handling via motion-dom's press()
