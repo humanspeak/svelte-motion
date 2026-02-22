@@ -6,7 +6,6 @@ description: "Create a derived store that maps a numeric source across ranges or
 <script>
   import Example from '$lib/components/general/Example.svelte';
   import HTMLContent from '$lib/examples/HTMLContent.svelte';
-  // Reuse the HTML Content example to demonstrate reactive value mapping
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()
@@ -47,7 +46,7 @@ description: "Create a derived store that maps a numeric source across ranges or
 
 ### Mapping form
 
-Map a numeric source across input/output ranges. You can shape interpolation with `ease`, clamp input to segment bounds with `clamp`, and provide a custom `mixer` for non‑numeric outputs.
+Map a numeric source across input/output ranges. You can shape interpolation with `ease`, clamp input to segment bounds with `clamp`, and provide a custom `mixer` for non-numeric outputs.
 
 ```svelte
 <script lang="ts">
@@ -81,7 +80,7 @@ Provide a single easing or one per segment.
 <div style="transform: scale({$size})">Pulsing</div>
 ```
 
-#### Non‑numeric outputs with mixer
+#### Non-numeric outputs with mixer
 
 For non-numeric outputs, pass a `mixer(from, to)` that returns an interpolator `(t) => value`.
 
@@ -104,7 +103,7 @@ For non-numeric outputs, pass a `mixer(from, to)` that returns an interpolator `
 
 ### Function form
 
-Compute a value from dependency stores. The function can reference deps using Svelte’s `$store` syntax.
+Compute a value from dependency stores. The function can reference deps using Svelte's `$store` syntax.
 
 ```svelte
 <script lang="ts">
@@ -135,22 +134,20 @@ Compute a value from dependency stores. The function can reference deps using Sv
 
 ```ts
 // Mapping form
-useTransform<T>(
-  source: Readable<number>,
-  input: number[],
-  output: T[],
-  options?: {
-    clamp?: boolean
-    ease?: ((t: number) => number) | Array<(t: number) => number>
-    mixer?: (from: unknown, to: unknown) => (t: number) => unknown
-  }
-): Readable<T>
+useTransform(source, input, output, options?)
+  source: Readable<number>   // numeric source store
+  input:  number[]           // input stops
+  output: T[]                // output stops (same length as input)
+  options.clamp:  boolean    // clamp to active segment (default true)
+  options.ease:   Function | Function[]  // easing per segment
+  options.mixer:  (from, to) => (t) => value  // custom mixer
+  Returns: Readable<T>
 
 // Function form
-useTransform<T>(
-  compute: () => T,
-  deps: Readable<unknown>[]
-): Readable<T>
+useTransform(compute, deps)
+  compute: () => T           // compute function
+  deps:    Readable[]        // dependency stores
+  Returns: Readable<T>
 ```
 
 ### Parameters
@@ -160,7 +157,7 @@ useTransform<T>(
 - `output` `T[]`: Output stops (same length as `input`).
 - `options.clamp` `boolean` (default `true`): Clamp to active segment.
 - `options.ease` `((t: number) => number) | Array<...>`: Easing per segment or single easing.
-- `options.mixer` `(from, to) => (t) => any`: Custom mixer for non‑numeric outputs.
+- `options.mixer` `(from, to) => (t) => any`: Custom mixer for non-numeric outputs.
 - `compute` `() => T`: Compute function (function form).
 - `deps` `Readable[]`: Dependency stores whose updates trigger recompute (function form).
 
@@ -173,7 +170,7 @@ useTransform<T>(
 - Link styles directly to time or gesture progress.
 - Derive values from other stores using a declarative, reactive API.
 - Map ranges with easing and clamp behavior without manual math.
-- Interpolate non‑numeric outputs via a custom mixer.
+- Interpolate non-numeric outputs via a custom mixer.
 
 ## See also
 
@@ -183,6 +180,4 @@ useTransform<T>(
 
 ---
 
-Based on [Motion’s useTransform](https://motion.dev/docs/react-use-transform?platform=react) API.
-
-
+Based on [Motion's useTransform](https://motion.dev/docs/react-use-transform?platform=react) API.
