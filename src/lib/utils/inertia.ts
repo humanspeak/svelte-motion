@@ -90,6 +90,16 @@ const solveCrossTimeMs = (
  * @param bounds Min/max boundaries for the axis.
  * @param opts Physics parameters for decay and boundary spring.
  * @returns A function that accepts elapsed time in ms and returns the current `StepResult`.
+ *
+ * @example
+ * ```ts
+ * const step = createInertiaToBoundary(
+ *     { value: 50, velocity: 200 },
+ *     { min: 0, max: 300 },
+ *     { timeConstantMs: 350, restDelta: 0.5, restSpeed: 10, bounceStiffness: 500, bounceDamping: 25 }
+ * )
+ * const { value, done } = step(16) // advance 16 ms
+ * ```
  */
 export const createInertiaToBoundary = (
     initial: AxisState,
