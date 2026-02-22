@@ -63,13 +63,19 @@ export const load: PageLoad = () => {
         },
         'shared-layout-animation': {
             title: 'Shared Layout Animation',
-            description: 'Interactive shared layout animation example using Svelte Motion.',
+            description:
+                'Interactive shared layout animation animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/docs/react-layout-animations'
         },
         'style-string': {
             title: 'styleString',
             description: 'Interactive stylestring animation example using Svelte Motion.',
             sourceUrl: null
+        },
+        'tab-select': {
+            title: 'Tab Select',
+            description: 'Interactive tab select animation example using Svelte Motion.',
+            sourceUrl: 'https://examples.motion.dev/react/tab-select'
         },
         'toggle-switch': {
             title: 'Toggle Switch',
