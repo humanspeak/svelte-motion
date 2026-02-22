@@ -131,6 +131,11 @@
                     title: 'Button',
                     href: '/docs/shadcn-button',
                     icon: 'fa-solid fa-hand-pointer'
+                },
+                {
+                    title: 'Tabs',
+                    href: '/docs/shadcn-tabs',
+                    icon: 'fa-solid fa-table-columns'
                 }
             ]
         },

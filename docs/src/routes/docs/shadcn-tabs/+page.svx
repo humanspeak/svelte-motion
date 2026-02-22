@@ -1,0 +1,212 @@
+---
+title: Animated Tabs (shadcn)
+description: Drop-in animated replacement for shadcn Tabs with a spring-based sliding indicator
+---
+
+<script>
+  import * as Tabs from '$lib/shadcn/ui/tabs'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const { data } = $props()
+
+  const seo = getSeoContext()
+  $effect(() => {
+      if (seo) {
+          seo.title = 'Animated Tabs (shadcn) | Docs | Svelte Motion'
+          seo.description = 'Drop-in animated replacement for shadcn-svelte Tabs. Spring-based sliding indicator powered by svelte-motion layoutId with full ARIA compliance via bits-ui.'
+      }
+  })
+</script>
+
+# Animated Tabs
+
+{#if data.downloads !== null}
+<div class="not-prose mb-6">
+  <span class="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-sm text-muted-foreground">
+    <i class="fa-solid fa-download text-xs"></i>
+    {data.downloads.toLocaleString()} installs
+  </span>
+</div>
+{/if}
+
+A drop-in replacement for [shadcn-svelte Tabs](https://www.shadcn-svelte.com/docs/components/tabs) powered by `svelte-motion` and `bits-ui`. A spring-based sliding indicator animates between triggers using `layoutId` — no extra config needed.
+
+## Installation
+
+Install via the shadcn-svelte CLI from our registry:
+
+```bash
+npx shadcn-svelte@latest add https://motion.svelte.page/r/animated-tabs.json
+```
+
+This installs `AnimatedTabs` alongside your existing components. It automatically pulls in `@humanspeak/svelte-motion` and `bits-ui` as dependencies.
+
+Then use it:
+
+```svelte
+<script>
+  import * as Tabs from '$lib/components/ui/animated-tabs'
+</script>
+
+<Tabs.Root value="account">
+  <Tabs.List>
+    <Tabs.Trigger value="account">Account</Tabs.Trigger>
+    <Tabs.Trigger value="password">Password</Tabs.Trigger>
+  </Tabs.List>
+  <Tabs.Content value="account">Account content</Tabs.Content>
+  <Tabs.Content value="password">Password content</Tabs.Content>
+</Tabs.Root>
+```
+
+### Manual Installation
+
+Alternatively, copy the component source directly from [GitHub](https://github.com/humanspeak/svelte-motion/tree/main/docs/src/lib/shadcn/ui/tabs).
+
+## Live Demo
+
+Click the tabs to see the sliding indicator:
+
+<div class="not-prose my-8 flex flex-col gap-8">
+
+### Default (Animated)
+
+<Tabs.Root value="account">
+  <Tabs.List>
+    <Tabs.Trigger value="account">Account</Tabs.Trigger>
+    <Tabs.Trigger value="password">Password</Tabs.Trigger>
+    <Tabs.Trigger value="settings">Settings</Tabs.Trigger>
+  </Tabs.List>
+  <Tabs.Content value="account" class="rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
+    <h3 class="text-lg font-semibold">Account</h3>
+    <p class="mt-2 text-sm text-muted-foreground">Make changes to your account here. Click save when you're done.</p>
+  </Tabs.Content>
+  <Tabs.Content value="password" class="rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
+    <h3 class="text-lg font-semibold">Password</h3>
+    <p class="mt-2 text-sm text-muted-foreground">Change your password here. After saving, you'll be logged out.</p>
+  </Tabs.Content>
+  <Tabs.Content value="settings" class="rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
+    <h3 class="text-lg font-semibold">Settings</h3>
+    <p class="mt-2 text-sm text-muted-foreground">Configure your preferences and notification settings.</p>
+  </Tabs.Content>
+</Tabs.Root>
+
+### Without Animation
+
+Set `animated={false}` on Root to get vanilla shadcn behavior with no motion:
+
+<Tabs.Root value="tab1" animated={false}>
+  <Tabs.List>
+    <Tabs.Trigger value="tab1">Tab 1</Tabs.Trigger>
+    <Tabs.Trigger value="tab2">Tab 2</Tabs.Trigger>
+    <Tabs.Trigger value="tab3">Tab 3</Tabs.Trigger>
+  </Tabs.List>
+  <Tabs.Content value="tab1" class="rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
+    <p class="text-sm text-muted-foreground">Standard CSS background swap — no animation.</p>
+  </Tabs.Content>
+  <Tabs.Content value="tab2" class="rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
+    <p class="text-sm text-muted-foreground">Static tab content for tab 2.</p>
+  </Tabs.Content>
+  <Tabs.Content value="tab3" class="rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
+    <p class="text-sm text-muted-foreground">Static tab content for tab 3.</p>
+  </Tabs.Content>
+</Tabs.Root>
+
+### Tabs Only (No Content Animation)
+
+Set `animated={false}` on Content to keep the sliding indicator but skip the content entrance animation:
+
+<Tabs.Root value="t1">
+  <Tabs.List>
+    <Tabs.Trigger value="t1">Overview</Tabs.Trigger>
+    <Tabs.Trigger value="t2">Details</Tabs.Trigger>
+    <Tabs.Trigger value="t3">History</Tabs.Trigger>
+  </Tabs.List>
+  <Tabs.Content value="t1" animated={false} class="rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
+    <p class="text-sm text-muted-foreground">The tab indicator slides, but this content appears instantly.</p>
+  </Tabs.Content>
+  <Tabs.Content value="t2" animated={false} class="rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
+    <p class="text-sm text-muted-foreground">No fade or slide — just an instant swap for the content.</p>
+  </Tabs.Content>
+  <Tabs.Content value="t3" animated={false} class="rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
+    <p class="text-sm text-muted-foreground">Useful when content animation feels too busy.</p>
+  </Tabs.Content>
+</Tabs.Root>
+
+### Multiple Groups (Unique layoutIds)
+
+Each tab group automatically gets a unique `layoutId`, so multiple groups on the same page don't conflict:
+
+<div class="flex flex-col gap-4 sm:flex-row sm:gap-8">
+  <Tabs.Root value="a1">
+    <Tabs.List>
+      <Tabs.Trigger value="a1">Alpha</Tabs.Trigger>
+      <Tabs.Trigger value="a2">Beta</Tabs.Trigger>
+    </Tabs.List>
+  </Tabs.Root>
+
+  <Tabs.Root value="b2">
+    <Tabs.List>
+      <Tabs.Trigger value="b1">One</Tabs.Trigger>
+      <Tabs.Trigger value="b2">Two</Tabs.Trigger>
+      <Tabs.Trigger value="b3">Three</Tabs.Trigger>
+    </Tabs.List>
+  </Tabs.Root>
+</div>
+
+</div>
+
+## Animation Details
+
+| Property | Value | Description |
+|----------|-------|-------------|
+| `layoutId` | Auto-generated per group | Shared layout animation between triggers |
+| Transition | Spring (500/30) | `stiffness: 500, damping: 30` |
+| Indicator | `bg-background` | Absolute-positioned div behind trigger text |
+
+The sliding indicator uses `AnimatePresence` + `motion.div` with `layoutId` to animate smoothly between the active trigger. Each tab group instance gets its own unique `layoutId` via a module-level counter, so multiple groups on the same page animate independently.
+
+## Accessibility
+
+Full ARIA compliance via [bits-ui](https://bits-ui.com/docs/components/tabs) Tabs primitives:
+
+- `role="tablist"`, `role="tab"`, `role="tabpanel"`
+- `aria-selected` on triggers
+- Roving tabindex (only active trigger is in tab order)
+- Arrow keys cycle between triggers
+- Home/End jump to first/last trigger
+- Enter/Space activate a focused trigger
+
+## API
+
+### Root
+
+All standard bits-ui Tabs.Root props are supported, plus:
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `value` | `string` | `''` | Active tab value (bindable) |
+| `onValueChange` | `(value: string) => void` | — | Callback when selection changes |
+| `animated` | `boolean` | `true` | Enable/disable all animation (indicator + content) |
+
+### List
+
+Styled wrapper for the trigger container. Accepts all standard HTML div attributes.
+
+### Trigger
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `value` | `string` | — | Tab value (required) |
+| `disabled` | `boolean` | `false` | Disable this trigger |
+| `animated` | `boolean` | Inherits from Root | Override animation for this trigger |
+| `transition` | `object` | `{ type: 'spring', stiffness: 500, damping: 30 }` | Override the indicator spring transition |
+
+### Content
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `value` | `string` | — | Tab value (required) |
+| `animated` | `boolean` | Inherits from Root | Override animation for this panel |
+| `initial` | `object` | `{ opacity: 0, y: 8 }` | Override the content entrance initial state |
+| `animate` | `object` | `{ opacity: 1, y: 0 }` | Override the content entrance animate target |
+| `transition` | `object` | `{ duration: 0.3, ease: 'easeOut' }` | Override the content entrance transition |

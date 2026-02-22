@@ -241,4 +241,4 @@ Transition precedence for exit timing (merged):
 
 ## Learn next
 
-That's a quick overview of Svelte Motion's basic features. Next, explore animation patterns, layout, and gestures—or dive straight into our examples. For React-oriented reference material, see the Motion for React docs ([motion.dev](https://motion.dev/docs/react)).
+That's a quick overview of Svelte Motion's basic features. Next, explore animation patterns, layout, and gestures—or dive straight into our examples.
