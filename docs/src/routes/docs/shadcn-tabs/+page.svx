@@ -5,6 +5,7 @@ description: Drop-in animated replacement for shadcn Tabs with a spring-based sl
 
 <script>
   import * as Tabs from '$lib/shadcn/ui/tabs'
+  import ComponentSource from '$lib/components/general/ComponentSource.svelte'
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const { data } = $props()
@@ -20,14 +21,15 @@ description: Drop-in animated replacement for shadcn Tabs with a spring-based sl
 
 # Animated Tabs
 
-{#if data.downloads !== null}
-<div class="not-prose mb-6">
+<div class="not-prose mb-6 flex flex-wrap items-center justify-between gap-2">
+  {#if data.downloads !== null}
   <span class="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-sm text-muted-foreground">
     <i class="fa-solid fa-download text-xs"></i>
     {data.downloads.toLocaleString()} installs
   </span>
+  {/if}
+  <ComponentSource slug="animated-tabs" defaultFile="index.ts" />
 </div>
-{/if}
 
 A drop-in replacement for [shadcn-svelte Tabs](https://www.shadcn-svelte.com/docs/components/tabs) powered by `svelte-motion` and `bits-ui`. A spring-based sliding indicator animates between triggers using `layoutId` — no extra config needed.
 

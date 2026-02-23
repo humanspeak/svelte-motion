@@ -264,6 +264,15 @@
         width: 100%;
     }
 
+    /* Shiki theme switching (outside prose, e.g., ComponentSource) */
+    html:not(.dark) .shiki-dark {
+        display: none;
+    }
+
+    html.dark .shiki-light {
+        display: none;
+    }
+
     .prose a {
         @apply text-accent no-underline hover:text-accent/80;
     }
@@ -331,4 +340,30 @@
     --radial-gradient-background: 250, 250, 250;
     --solid-color-background: 15, 15, 15;
     --overlay-color: 255, 255, 255;
+}
+
+/* ComponentSource dialog */
+.component-source-dialog {
+    @apply fixed inset-4 z-50 flex flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl;
+    max-width: 1100px;
+    max-height: 80vh;
+    margin: auto;
+}
+
+/* Code area inside ComponentSource */
+.component-source-code pre.shiki {
+    @apply m-0 rounded-none bg-transparent! p-4;
+    counter-reset: line;
+}
+
+.component-source-code pre.shiki code {
+    @apply bg-transparent!;
+    counter-reset: line;
+}
+
+/* Line numbers */
+.component-source-code pre.shiki code .line::before {
+    counter-increment: line;
+    content: counter(line);
+    @apply mr-6 inline-block w-4 text-right text-muted-foreground/50;
 }

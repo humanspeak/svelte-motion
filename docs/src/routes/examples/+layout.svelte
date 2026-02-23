@@ -8,7 +8,7 @@
 
 <div class="relative flex min-h-screen flex-col bg-background">
     <Header />
-    <main class="flex-1">
+    <main class="flex flex-1 flex-col">
         <MotionConfig transition={{ duration: 0.6 }}>
             {@render children?.()}
         </MotionConfig>

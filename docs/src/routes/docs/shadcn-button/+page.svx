@@ -5,6 +5,7 @@ description: Drop-in animated replacement for the shadcn Button component
 
 <script>
   import { Button } from '$lib/shadcn/ui/button'
+  import ComponentSource from '$lib/components/general/ComponentSource.svelte'
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const { data } = $props()
@@ -20,14 +21,15 @@ description: Drop-in animated replacement for the shadcn Button component
 
 # Animated Button
 
-{#if data.downloads !== null}
-<div class="not-prose mb-6">
+<div class="not-prose mb-6 flex flex-wrap items-center justify-between gap-2">
+  {#if data.downloads !== null}
   <span class="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-sm text-muted-foreground">
     <i class="fa-solid fa-download text-xs"></i>
     {data.downloads.toLocaleString()} installs
   </span>
+  {/if}
+  <ComponentSource slug="animated-button" />
 </div>
-{/if}
 
 A drop-in replacement for the [shadcn-svelte Button](https://www.shadcn-svelte.com/docs/components/button) powered by `svelte-motion`. Spring-based press feedback and subtle hover lift come out of the box — no extra config needed.
 
