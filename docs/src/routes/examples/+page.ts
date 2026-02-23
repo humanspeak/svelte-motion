@@ -66,6 +66,11 @@ export const load: PageLoad = () => {
             description: 'Interactive rotate animation example using Svelte Motion.',
             sourceUrl: 'https://examples.motion.dev/react/rotate?utm_source=embed'
         },
+        'scroll-progress': {
+            title: 'Scroll Progress',
+            description: 'Interactive scroll progress animation example using Svelte Motion.',
+            sourceUrl: 'https://motion.dev/docs/react-use-scroll'
+        },
         'shared-layout-animation': {
             title: 'Shared Layout Animation',
             description:
