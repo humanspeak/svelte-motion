@@ -17,8 +17,7 @@ const config = {
         vitePreprocess(),
         mdsvex({
             highlight: {
-                highlighter: async (code, lang = 'text') => {
-                    // Generate separate HTML for light and dark themes
+                highlighter: async (code, lang = 'text', meta = '') => {
                     const lightHtml = highlighter.codeToHtml(code, {
                         lang,
                         theme: 'github-light'
@@ -28,9 +27,12 @@ const config = {
                         theme: 'one-dark-pro'
                     })
 
-                    // Wrap each theme in a container with theme-specific classes
+                    const titleMatch = meta?.match(/title="([^"]+)"/)
+                    const title = titleMatch ? ` data-title="${titleMatch[1]}"` : ''
+                    const codeBase64 = Buffer.from(code).toString('base64')
+
                     const combinedHtml = `
-                        <div class="shiki-container">
+                        <div class="shiki-container" data-lang="${lang}" data-code="${codeBase64}"${title}>
                             <div class="shiki-light">${lightHtml}</div>
                             <div class="shiki-dark">${darkHtml}</div>
                         </div>

@@ -42,6 +42,9 @@
     --color-accent-foreground: #ffffff;
     --color-accent-muted: #dbeafe;
 
+    /* Success color (copy confirmation, status indicators) */
+    --color-success: #22c55e;
+
     /* Text colors for different states */
     --color-text-primary: #0f172a;
     --color-text-secondary: #475569;
@@ -91,6 +94,9 @@
     --color-accent-foreground: #ffffff;
     --color-accent-muted: #1e3a8a;
 
+    /* Success color */
+    --color-success: #4ade80;
+
     /* Text colors for different states */
     --color-text-primary: #f8fafc;
     --color-text-secondary: #e2e8f0; /* brighter secondary for readability */
@@ -134,6 +140,9 @@
     --color-accent: var(--color-accent);
     --color-accent-foreground: var(--color-accent-foreground);
     --color-accent-muted: var(--color-accent-muted);
+
+    /* Success color */
+    --color-success: var(--color-success);
 
     /* Text colors */
     --color-text-primary: var(--color-text-primary);
@@ -366,4 +375,58 @@
     counter-increment: line;
     content: counter(line);
     @apply mr-6 inline-block w-4 text-right text-muted-foreground/50;
+}
+
+/* Code block header bar (injected by enhanceCodeBlocks action) */
+.prose .shiki-container.code-enhanced {
+    @apply relative;
+}
+
+.prose .shiki-container.code-enhanced pre.shiki {
+    @apply pt-2;
+}
+
+.prose .code-block-header {
+    @apply flex items-center justify-between border-b border-border px-3 py-1.5;
+    background: var(--color-code-background);
+}
+
+.prose .code-block-lang {
+    @apply text-xs font-medium text-muted-foreground;
+}
+
+.prose .code-block-copy {
+    @apply relative flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-muted-foreground;
+    transition:
+        background-color 0.2s,
+        color 0.2s;
+}
+
+.prose .code-block-copy:hover {
+    @apply bg-muted text-foreground;
+}
+
+/* Copy icon swap animation */
+.prose .code-block-copy .icon-copy,
+.prose .code-block-copy .icon-check {
+    position: absolute;
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s ease;
+}
+
+.prose .code-block-copy .icon-check {
+    opacity: 0;
+    transform: scale(0.5);
+    color: var(--color-success);
+}
+
+.prose .code-block-copy.copied .icon-copy {
+    opacity: 0;
+    transform: scale(0.5);
+}
+
+.prose .code-block-copy.copied .icon-check {
+    opacity: 1;
+    transform: scale(1);
 }
