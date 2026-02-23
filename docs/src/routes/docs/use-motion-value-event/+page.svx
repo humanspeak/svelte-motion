@@ -1,0 +1,166 @@
+---
+title: "useMotionValueEvent"
+description: "Subscribe to motion value store changes with automatic cleanup."
+---
+
+<script>
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  $effect(() => {
+      if (seo) {
+          seo.title = 'useMotionValueEvent | Docs | Svelte Motion'
+          seo.description = 'Subscribe to motion value store changes with automatic cleanup in Svelte Motion.'
+      }
+  })
+</script>
+
+# useMotionValueEvent
+
+`useMotionValueEvent` manages subscriptions to motion value store changes. It skips the initial synchronous emission that Svelte stores produce on subscribe, so the callback only fires on actual *changes*.
+
+```svelte
+<script>
+  import { useMotionValueEvent, useSpring } from '@humanspeak/svelte-motion'
+  import { onDestroy } from 'svelte'
+
+  const x = useSpring(0)
+
+  const unsub = useMotionValueEvent(x, 'change', (latest) => {
+    console.log('x changed to', latest)
+  })
+
+  onDestroy(unsub)
+</script>
+```
+
+## Usage
+
+### Import
+
+```svelte
+<script>
+  import { useMotionValueEvent } from '@humanspeak/svelte-motion'
+</script>
+```
+
+### Subscribe to changes
+
+Pass a readable store, the event type `'change'`, and a callback:
+
+```svelte
+<script>
+  import { useMotionValueEvent, useSpring } from '@humanspeak/svelte-motion'
+  import { onDestroy } from 'svelte'
+
+  const scale = useSpring(1)
+
+  const unsub = useMotionValueEvent(scale, 'change', (latest) => {
+    if (latest > 1.5) {
+      console.log('Scale is large!')
+    }
+  })
+
+  onDestroy(unsub)
+</script>
+
+<div
+  style="transform: scale({$scale})"
+  onpointerenter={() => scale.set(2)}
+  onpointerleave={() => scale.set(1)}
+>
+  Hover me
+</div>
+```
+
+### Available events
+
+| Event | Description |
+|-------|-------------|
+| `'change'` | Fires whenever the store value updates (after the initial emission). |
+
+### Cleanup
+
+`useMotionValueEvent` returns an unsubscribe function. Call it inside `onDestroy` or at the end of an `$effect`:
+
+```svelte
+<script>
+  import { useMotionValueEvent, useSpring } from '@humanspeak/svelte-motion'
+  import { onDestroy } from 'svelte'
+
+  const y = useSpring(0)
+
+  // Option 1: onDestroy
+  const unsub = useMotionValueEvent(y, 'change', (v) => console.log(v))
+  onDestroy(unsub)
+</script>
+```
+
+```svelte
+<script>
+  import { useMotionValueEvent, useSpring } from '@humanspeak/svelte-motion'
+
+  const y = useSpring(0)
+
+  // Option 2: $effect cleanup
+  $effect(() => {
+    const unsub = useMotionValueEvent(y, 'change', (v) => console.log(v))
+    return unsub
+  })
+</script>
+```
+
+### Advanced — raw subscribe
+
+For full control you can use `store.subscribe()` directly. Note that Svelte stores fire the callback immediately with the current value on subscribe:
+
+```svelte
+<script>
+  import { useSpring } from '@humanspeak/svelte-motion'
+  import { onDestroy } from 'svelte'
+
+  const x = useSpring(0)
+
+  // Fires immediately with current value, then on every change
+  const unsub = x.subscribe((value) => {
+    console.log('value:', value)
+  })
+
+  onDestroy(unsub)
+</script>
+```
+
+`useMotionValueEvent` is preferred when you only want to react to *changes* and not the initial value.
+
+## API Reference
+
+### Signature
+
+```ts
+useMotionValueEvent<T>(
+  store: Readable<T>,
+  event: 'change',
+  callback: (latest: T) => void
+): () => void
+```
+
+### Parameters
+
+- **store** `Readable<T>` — any Svelte readable store (e.g. `useSpring`, `useTransform`, `useTime`)
+- **event** `'change'` — the event type to listen for
+- **callback** `(latest: T) => void` — invoked with the latest value on each change
+
+### Returns
+
+`() => void` — an unsubscribe function that stops the subscription.
+
+## See also
+
+- [Motion values overview](/docs/motion-values) — introduction to motion value stores
+- [useSpring](/docs/use-spring) — spring-animated store
+- [useTransform](/docs/use-transform) — map and transform stores
+- [useVelocity](/docs/use-velocity) — derive velocity from a store
+
+---
+
+Based on [Motion's useMotionValueEvent](https://motion.dev/docs/react-use-motion-value-event) API.
