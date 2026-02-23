@@ -23,6 +23,20 @@
     const canonicalUrl = $derived(`${$page.url.origin}${$page.url.pathname}`)
     const resolvedTitle = $derived(seo.title)
     const resolvedDescription = $derived(seo.description || DEFAULT_DESCRIPTION)
+
+    const websiteJsonLd = `<${'script'} type="application/ld+json">${JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: SITE_NAME,
+        url: 'https://motion.svelte.page',
+        description: DEFAULT_DESCRIPTION,
+        publisher: {
+            '@type': 'Organization',
+            name: 'Humanspeak',
+            url: 'https://humanspeak.com',
+            logo: 'https://humanspeak.com/humanspeak.svg'
+        }
+    })}</${'script'}>`
 </script>
 
 <svelte:head>
@@ -40,6 +54,8 @@
     <meta name="twitter:title" content={resolvedTitle} />
     <meta name="twitter:description" content={resolvedDescription} />
     <meta name="twitter:image" content={DEFAULT_IMAGE} />
+    <!-- eslint-disable-next-line svelte/no-at-html-tags -- static JSON-LD, no user input -->
+    {@html websiteJsonLd}
 </svelte:head>
 
 <ModeWatcher />

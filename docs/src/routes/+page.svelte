@@ -75,7 +75,29 @@
                 headingContainer!.style.visibility = 'visible'
             })
     })
+
+    const softwareJsonLd = `<${'script'} type="application/ld+json">${JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: 'Svelte Motion',
+        applicationCategory: 'DeveloperApplication',
+        operatingSystem: 'Any',
+        url: 'https://motion.svelte.page',
+        description:
+            'Svelte Motion is a Svelte animation library for building smooth, production-grade UI animations with spring physics, gestures, and more.',
+        offers: {
+            '@type': 'Offer',
+            price: '0',
+            priceCurrency: 'USD'
+        },
+        license: 'https://opensource.org/licenses/MIT'
+    })}</${'script'}>`
 </script>
+
+<svelte:head>
+    <!-- eslint-disable-next-line svelte/no-at-html-tags -- static JSON-LD, no user input -->
+    {@html softwareJsonLd}
+</svelte:head>
 
 <div class="flex min-h-svh flex-col">
     <!-- Header with links -->
