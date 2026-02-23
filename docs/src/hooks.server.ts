@@ -17,6 +17,7 @@ const handleSecurityHeaders: Handle = async ({ event, resolve }) => {
         'Strict-Transport-Security',
         'max-age=31536000; includeSubDomains; preload'
     )
+    response.headers.set('Cross-Origin-Opener-Policy', 'same-origin')
     return response
 }
 

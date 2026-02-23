@@ -25,19 +25,11 @@
             ❤️
         </motion.span>
         {m.footer_by()}
-        <a
-            href="https://humanspeak.com"
-            target="_blank"
-            class="text-brand-800 hover:text-brand-900 hover:underline dark:text-brand-400 dark:hover:text-brand-300"
-        >
+        <a href="https://humanspeak.com" target="_blank" class="underline hover:text-brand-800">
             Humanspeak
         </a>
         ・ {m.footer_inspired_by()}
-        <a
-            href="https://motion.dev/"
-            target="_blank"
-            class="text-brand-800 hover:text-brand-900 hover:underline dark:text-brand-400 dark:hover:text-brand-300"
-        >
+        <a href="https://motion.dev/" target="_blank" class="underline hover:text-brand-800">
             Motion.dev
         </a>
     </div>
