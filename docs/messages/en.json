@@ -17,6 +17,7 @@
     "nav_github": "GitHub Repository",
     "nav_home": "Home",
     "nav_npm": "NPM Package",
+    "nav_toggle_theme": "Toggle theme",
     "pill_easy": "Easy to use",
     "pill_free_oss": "Free and open‑source",
     "pill_tiny": "Tiny footprint"
