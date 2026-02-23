@@ -4,6 +4,22 @@ import { initCloudflareSentryHandle, sentryHandle } from '@sentry/sveltekit'
 import type { Handle } from '@sveltejs/kit'
 import { sequence } from '@sveltejs/kit/hooks'
 
+const handleSecurityHeaders: Handle = async ({ event, resolve }) => {
+    const response = await resolve(event)
+    response.headers.set('X-Content-Type-Options', 'nosniff')
+    response.headers.set('X-Frame-Options', 'DENY')
+    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+    response.headers.set(
+        'Permissions-Policy',
+        'camera=(), microphone=(), geolocation=(), payment=()'
+    )
+    response.headers.set(
+        'Strict-Transport-Security',
+        'max-age=31536000; includeSubDomains; preload'
+    )
+    return response
+}
+
 const handleParaglide: Handle = ({ event, resolve }) =>
     paraglideMiddleware(event.request, ({ request, locale }) => {
         event.request = request
@@ -32,4 +48,4 @@ export const fullSentryHandle = sequence(
     sentryHandle()
 )
 
-export const handle: Handle = sequence(fullSentryHandle, handleParaglide)
+export const handle: Handle = sequence(fullSentryHandle, handleParaglide, handleSecurityHeaders)
