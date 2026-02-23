@@ -53,6 +53,8 @@ export type {
 export { useAnimationFrame } from '$lib/utils/animationFrame'
 export { createDragControls } from '$lib/utils/dragControls'
 export { useMotionTemplate } from '$lib/utils/motionTemplate'
+export { useMotionValueEvent } from '$lib/utils/motionValueEvent'
+export { useScroll } from '$lib/utils/scroll'
 export { useSpring } from '$lib/utils/spring'
 export { useVelocity } from '$lib/utils/velocity'
 /**

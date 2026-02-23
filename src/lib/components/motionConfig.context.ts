@@ -15,7 +15,7 @@ export const getMotionConfig = (): MotionConfigProps | undefined => {
 /**
  * Provide motion configuration to descendant components via Svelte context.
  *
- * @param motionConfig The configuration to propagate (e.g. `reducedMotion`, `transition`).
+ * @param motionConfig The configuration to propagate (e.g. `transition`).
  * @returns The same `MotionConfigProps` that was set.
  */
 export const createMotionConfig = (motionConfig: MotionConfigProps): MotionConfigProps => {

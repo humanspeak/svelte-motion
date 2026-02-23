@@ -41,6 +41,13 @@ export const layoutIdRegistry: LayoutIdRegistry = {
  * Get the global layoutId registry.
  *
  * @returns The singleton `LayoutIdRegistry` instance.
+ *
+ * @example
+ * ```ts
+ * const registry = getLayoutIdRegistry()
+ * registry.snapshot('hero', element.getBoundingClientRect())
+ * const entry = registry.consume('hero') // one-shot: returns and deletes
+ * ```
  */
 export const getLayoutIdRegistry = (): LayoutIdRegistry => {
     return layoutIdRegistry

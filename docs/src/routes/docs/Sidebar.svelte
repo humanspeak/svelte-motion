@@ -77,18 +77,28 @@
             ]
         },
         {
-            title: 'Hooks',
-            icon: 'fa-solid fa-clock',
+            title: 'Motion values',
+            icon: 'fa-solid fa-signal',
             items: [
                 {
-                    title: 'useAnimationFrame',
-                    href: '/docs/use-animation-frame',
-                    icon: 'fa-solid fa-clock'
+                    title: 'Overview',
+                    href: '/docs/motion-values',
+                    icon: 'fa-solid fa-signal'
                 },
                 {
                     title: 'useMotionTemplate',
                     href: '/docs/use-motion-template',
                     icon: 'fa-solid fa-code'
+                },
+                {
+                    title: 'useMotionValueEvent',
+                    href: '/docs/use-motion-value-event',
+                    icon: 'fa-solid fa-bolt'
+                },
+                {
+                    title: 'useScroll',
+                    href: '/docs/use-scroll',
+                    icon: 'fa-solid fa-arrows-up-down'
                 },
                 {
                     title: 'useSpring',
@@ -109,6 +119,17 @@
                     title: 'useVelocity',
                     href: '/docs/use-velocity',
                     icon: 'fa-solid fa-gauge-high'
+                }
+            ]
+        },
+        {
+            title: 'Hooks',
+            icon: 'fa-solid fa-clock',
+            items: [
+                {
+                    title: 'useAnimationFrame',
+                    href: '/docs/use-animation-frame',
+                    icon: 'fa-solid fa-clock'
                 }
             ]
         },

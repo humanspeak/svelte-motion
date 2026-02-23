@@ -7,10 +7,10 @@
 </script>
 
 <nav class="container">
-    <ul>
+    <ul role="tablist">
         {#each tabs as name, index (name)}
             {@const isSelected = selectedTab === index}
-            <li class={isSelected ? 'selected' : ''} role="tab" aria-selected={isSelected}>
+            <li class={isSelected ? 'selected' : ''}>
                 <AnimatePresence>
                     {#if isSelected}
                         <motion.div
@@ -22,7 +22,9 @@
                     {/if}
                 </AnimatePresence>
                 <motion.button
-                    onTapStart={() => (selectedTab = index)}
+                    role="tab"
+                    aria-selected={isSelected}
+                    onclick={() => (selectedTab = index)}
                     whileTap={{ scale: 0.9 }}
                     whileFocus={{
                         backgroundColor: 'var(--accent-transparent)'

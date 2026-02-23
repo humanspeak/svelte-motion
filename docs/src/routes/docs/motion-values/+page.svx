@@ -1,0 +1,173 @@
+---
+title: "Motion values"
+description: "An overview of motion values — reactive stores that drive animations outside the render cycle."
+---
+
+<script>
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  $effect(() => {
+      if (seo) {
+          seo.title = 'Motion values | Docs | Svelte Motion'
+          seo.description = 'An overview of motion values — reactive Svelte stores that drive animations outside the render cycle.'
+      }
+  })
+</script>
+
+# Motion values overview
+
+Motion values are reactive stores that track the state and velocity of animating values. In Svelte Motion they are standard Svelte readable stores — you subscribe with the `$` prefix and compose them with `derived`, `useTransform`, and `useSpring`.
+
+```svelte
+<script>
+  import { useSpring } from '@humanspeak/svelte-motion'
+
+  const x = useSpring(0)
+</script>
+
+<div
+  style="transform: translateX({$x}px)"
+  onpointerdown={() => x.set(100)}
+>
+  Spring animated
+</div>
+```
+
+Motion values:
+
+- Can be updated and read **outside** Svelte's reactive render cycle
+- Track **velocity** automatically so springs and transforms stay smooth
+- Can be **composed** — pass one store into another to build animation chains
+- Are **SSR-safe** — on the server they return static stores with no timers
+
+### Composition
+
+Motion values become powerful when you chain them. The output of one feeds into the next:
+
+```svelte
+<script>
+  import { useSpring, useTransform } from '@humanspeak/svelte-motion'
+
+  const x = useSpring(0)
+  const opacity = useTransform(x, [0, 200], [0, 1])
+  const backgroundColor = useTransform(x, [0, 200], ['#ff0088', '#00ccff'])
+</script>
+
+<div
+  style="transform: translateX({$x}px); opacity: {$opacity}; background: {$backgroundColor}"
+  onpointermove={(e) => x.set(e.clientX)}
+>
+  Composed motion values
+</div>
+```
+
+## Usage
+
+### Creating motion value stores
+
+The simplest way to create a motion value is with `useSpring`:
+
+```svelte
+<script>
+  import { useSpring } from '@humanspeak/svelte-motion'
+
+  const x = useSpring(0)
+</script>
+```
+
+You can also use a plain Svelte `writable` store whenever you need a value without spring physics:
+
+```svelte
+<script>
+  import { writable } from 'svelte/store'
+
+  const x = writable(0)
+</script>
+```
+
+### Reading values
+
+Use the `$` prefix to read the current value reactively:
+
+```svelte
+<div style="transform: translateX({$x}px)">
+  Current value: {$x}
+</div>
+```
+
+### Setting values
+
+Call `.set()` on stores that support it (e.g. `useSpring`):
+
+```svelte
+<script>
+  x.set(200)  // animates toward 200
+  x.jump(200) // instantly sets to 200
+</script>
+```
+
+### Events
+
+Subscribe to value changes with `useMotionValueEvent` or directly with `store.subscribe()`:
+
+```svelte
+<script>
+  import { useMotionValueEvent, useSpring } from '@humanspeak/svelte-motion'
+  import { onDestroy } from 'svelte'
+
+  const x = useSpring(0)
+  const unsub = useMotionValueEvent(x, 'change', (latest) => {
+    console.log('x is now', latest)
+  })
+  onDestroy(unsub)
+</script>
+```
+
+### Composition
+
+Chain stores to build rich animations from simple building blocks:
+
+- **[useTransform](/docs/use-transform)** — map a store's output range to a new range
+- **[useSpring](/docs/use-spring)** — add spring physics to any store
+- **[useVelocity](/docs/use-velocity)** — derive velocity from any store
+- **[useMotionTemplate](/docs/use-motion-template)** — build CSS strings from multiple stores
+
+```svelte
+<script>
+  import { useSpring, useTransform, useVelocity } from '@humanspeak/svelte-motion'
+
+  const x = useSpring(0)
+  const xVelocity = useVelocity(x)
+  const skew = useTransform(xVelocity, [-1000, 0, 1000], [-20, 0, 20])
+</script>
+```
+
+## API
+
+All motion value stores implement Svelte's `Readable` interface:
+
+| Method | Description |
+|--------|-------------|
+| `subscribe(callback)` | Subscribe to value changes. Returns an unsubscribe function. |
+
+Stores created by `useSpring` also expose:
+
+| Method | Description |
+|--------|-------------|
+| `set(value)` | Animate toward a new target value. |
+| `jump(value)` | Immediately set the value without animation. |
+
+## See also
+
+- [useMotionTemplate](/docs/use-motion-template) — compose CSS strings from motion value stores
+- [useMotionValueEvent](/docs/use-motion-value-event) — subscribe to store change events with cleanup
+- [useScroll](/docs/use-scroll) — create scroll-linked motion value stores
+- [useSpring](/docs/use-spring) — spring-animated motion value store
+- [useTime](/docs/use-time) — time-based motion value store
+- [useTransform](/docs/use-transform) — map and transform motion value stores
+- [useVelocity](/docs/use-velocity) — derive velocity from a motion value store
+
+---
+
+Based on [Motion's motion value](https://motion.dev/docs/react-motion-value) API.
