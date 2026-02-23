@@ -56,9 +56,13 @@
         justify-content: center;
         width: 100%;
         height: 100%;
-        background: #0b1011;
+        background: transparent;
         border-radius: 12px;
         padding: 40px;
+    }
+
+    :global(.dark) .outer {
+        background: #0b1011;
     }
 
     .input-container {
@@ -71,9 +75,9 @@
         position: relative;
         font-size: 32px;
         line-height: 1;
-        background-color: #0b1011;
-        color: #f5f5f5;
-        border: 2px solid #1d2628;
+        background-color: #ffffff;
+        color: #1a1a1a;
+        border: 2px solid #d1d5db;
         border-radius: 10px;
         padding: 20px;
         padding-right: 70px;
@@ -81,13 +85,19 @@
         outline: none;
     }
 
+    :global(.dark) .input-container input {
+        background-color: #0b1011;
+        color: #f5f5f5;
+        border-color: #1d2628;
+    }
+
     .input-container input:focus {
         border-color: #3b82f6;
     }
 
     .counter {
-        color: #ccc;
-        background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, #0b1011 20%);
+        color: #6b7280;
+        background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, #ffffff 20%);
         position: absolute;
         top: 50%;
         right: 2px;
@@ -95,5 +105,10 @@
         padding: 10px;
         padding-right: 20px;
         padding-left: 50px;
+    }
+
+    :global(.dark) .counter {
+        color: #ccc;
+        background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, #0b1011 20%);
     }
 </style>
