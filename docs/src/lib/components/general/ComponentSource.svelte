@@ -218,7 +218,7 @@
                                 {#if copied}
                                     <motion.i
                                         key="check"
-                                        class="fa-solid fa-check absolute text-green-500"
+                                        class="fa-solid fa-check absolute text-success"
                                         initial={{ opacity: 0, scale: 0.5 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         exit={{ opacity: 0, scale: 0.5 }}
