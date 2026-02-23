@@ -27,6 +27,18 @@ export default defineConfig({
             disableAsyncLocalStorage: true
         })
     ],
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    if (id.includes('@humanspeak/svelte-motion')) return 'svelte-motion'
+                    if (id.includes('@sentry')) return 'sentry'
+                    if (id.includes('paraglide')) return 'paraglide'
+                    if (id.includes('mode-watcher')) return 'mode-watcher'
+                }
+            }
+        }
+    },
     server: { port: 8320 },
     // With pnpm workspace linking, no manual alias is required
     test: {

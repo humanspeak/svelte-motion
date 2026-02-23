@@ -87,6 +87,7 @@
                 whileTap={{ scale: 0.9 }}
                 whileHover={{ scale: 1.1 }}
                 class="inline-flex size-6 items-center justify-center rounded-full border border-border-muted text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
+                aria-label={m.nav_toggle_theme()}
             >
                 {#if mode.current === 'dark'}
                     <i class="fa-sm fa-solid fa-sun transition-all"></i>

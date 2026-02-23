@@ -8,6 +8,8 @@
     import TableOfContents from './TableOfContents.svelte'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
 
+    const BASE_URL = 'https://motion.svelte.page'
+
     const { children } = $props()
 
     let contentElement: HTMLElement | undefined = $state(undefined)
@@ -19,6 +21,24 @@
         if (breadcrumbs) {
             breadcrumbs.breadcrumbs = [{ title: 'Docs', href: '/docs' }, { title: 'Get Started' }]
         }
+    })
+
+    const breadcrumbJsonLd = $derived.by(() => {
+        const items = breadcrumbs?.breadcrumbs ?? []
+        const listItems = [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+            ...items.map((b, i) => ({
+                '@type': 'ListItem',
+                position: i + 2,
+                name: b.title,
+                ...(b.href ? { item: `${BASE_URL}${b.href}` } : {})
+            }))
+        ]
+        return `<${'script'} type="application/ld+json">${JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: listItems
+        })}</${'script'}>`
     })
 
     /**
@@ -86,6 +106,11 @@
         }
     })
 </script>
+
+<svelte:head>
+    <!-- eslint-disable-next-line svelte/no-at-html-tags -- static JSON-LD, no user input -->
+    {@html breadcrumbJsonLd}
+</svelte:head>
 
 <div class="flex min-h-screen flex-col justify-between bg-background">
     <Header />

@@ -75,12 +75,34 @@
                 headingContainer!.style.visibility = 'visible'
             })
     })
+
+    const softwareJsonLd = `<${'script'} type="application/ld+json">${JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: 'Svelte Motion',
+        applicationCategory: 'DeveloperApplication',
+        operatingSystem: 'Any',
+        url: 'https://motion.svelte.page',
+        description:
+            'Svelte Motion is a Svelte animation library for building smooth, production-grade UI animations with spring physics, gestures, and more.',
+        offers: {
+            '@type': 'Offer',
+            price: '0',
+            priceCurrency: 'USD'
+        },
+        license: 'https://opensource.org/licenses/MIT'
+    })}</${'script'}>`
 </script>
+
+<svelte:head>
+    <!-- eslint-disable-next-line svelte/no-at-html-tags -- static JSON-LD, no user input -->
+    {@html softwareJsonLd}
+</svelte:head>
 
 <div class="flex min-h-svh flex-col">
     <!-- Header with links -->
     <Header />
-    <div class="flex flex-1 flex-col">
+    <main class="flex flex-1 flex-col">
         <section class="relative flex flex-1 overflow-hidden">
             <!-- Layer: subtle grid -->
             <div class="bg-grid pointer-events-none absolute inset-0 -z-20"></div>
@@ -133,7 +155,7 @@
                                 }}
                                 whileTap={{ scale: 0.96 }}
                                 whileHover={{ scale: 1.03, filter: 'brightness(0.95)' }}
-                                class="inline-flex items-center justify-center rounded-full border border-border-mid bg-brand-200 px-4 py-2 text-sm font-semibold text-background"
+                                class="inline-flex items-center justify-center rounded-full border border-border-mid bg-brand-200 px-4 py-2 text-sm font-semibold text-brand-900"
                             >
                                 {m.cta_primary()}
                             </motion.button>
@@ -175,7 +197,7 @@
                 </motion.div>
             </div>
         </section>
-    </div>
+    </main>
     <Footer />
 </div>
 

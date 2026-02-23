@@ -28,7 +28,7 @@
         <a
             href="https://humanspeak.com"
             target="_blank"
-            class="text-brand-500 hover:text-brand-600 hover:underline"
+            class="text-brand-800 hover:text-brand-900 hover:underline dark:text-brand-400 dark:hover:text-brand-300"
         >
             Humanspeak
         </a>
@@ -36,7 +36,7 @@
         <a
             href="https://motion.dev/"
             target="_blank"
-            class="text-brand-500 hover:text-brand-600 hover:underline"
+            class="text-brand-800 hover:text-brand-900 hover:underline dark:text-brand-400 dark:hover:text-brand-300"
         >
             Motion.dev
         </a>
