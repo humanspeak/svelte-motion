@@ -8,8 +8,10 @@
 
 <div class="relative flex min-h-screen flex-col bg-background">
     <Header />
-    <MotionConfig transition={{ duration: 0.6 }}>
-        {@render children?.()}
-    </MotionConfig>
+    <main class="flex-1">
+        <MotionConfig transition={{ duration: 0.6 }}>
+            {@render children?.()}
+        </MotionConfig>
+    </main>
     <Footer />
 </div>

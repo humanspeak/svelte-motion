@@ -102,7 +102,7 @@
 <div class="flex min-h-svh flex-col">
     <!-- Header with links -->
     <Header />
-    <div class="flex flex-1 flex-col">
+    <main class="flex flex-1 flex-col">
         <section class="relative flex flex-1 overflow-hidden">
             <!-- Layer: subtle grid -->
             <div class="bg-grid pointer-events-none absolute inset-0 -z-20"></div>
@@ -197,7 +197,7 @@
                 </motion.div>
             </div>
         </section>
-    </div>
+    </main>
     <Footer />
 </div>
 
