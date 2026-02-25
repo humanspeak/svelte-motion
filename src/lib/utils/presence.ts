@@ -31,6 +31,10 @@ type PresenceChild = {
     mergedTransition?: MotionTransition
     lastRect: DOMRect
     lastComputedStyle: CSSStyleDeclaration
+    /** Last captured mid-animation opacity (from rAF polling). */
+    lastAnimatedOpacity?: string
+    /** Last captured mid-animation transform (from rAF polling). */
+    lastAnimatedTransform?: string
 }
 
 /**
@@ -92,6 +96,8 @@ export type AnimatePresenceContext = {
     ) => void
     /** Update the last known rect/style snapshot for a registered child. */
     updateChildState: (key: string, rect: DOMRect, computedStyle: CSSStyleDeclaration) => void
+    /** Update the last captured mid-animation style values for a child. */
+    updateChildAnimatedStyle: (key: string, opacity: string, transform: string) => void
     /** Unregister a child. If it has an exit, clone and animate it out. */
     unregisterChild: (key: string) => void
 }
@@ -338,6 +344,18 @@ export const createAnimatePresenceContext = (context: {
     }
 
     /**
+     * Update the last captured mid-animation style values for a child.
+     * Called from a rAF loop while WAAPI animations are running.
+     */
+    const updateChildAnimatedStyle = (key: string, opacity: string, transform: string) => {
+        const child = children.get(key)
+        if (child) {
+            child.lastAnimatedOpacity = opacity
+            child.lastAnimatedTransform = transform
+        }
+    }
+
+    /**
      * Unregister a child. If it has an `exit` definition, create a styled
      * clone and run the exit animation using Motion. Cleans up after finish.
      */
@@ -416,6 +434,14 @@ export const createAnimatePresenceContext = (context: {
             resetTransforms(clone)
         } catch {
             // Ignore
+        }
+
+        // Apply last captured mid-animation values (from rAF polling) so that
+        // exit clones start from the correct visual state when interrupting
+        // an enter animation. The element is disconnected by now so
+        // getComputedStyle/getAnimations won't reflect in-flight values.
+        if (child.lastAnimatedOpacity != null) {
+            clone.style.opacity = child.lastAnimatedOpacity
         }
 
         // Attach to original parent and position absolutely at the last known rect
@@ -587,6 +613,7 @@ export const createAnimatePresenceContext = (context: {
         onExitComplete: context.onExitComplete,
         registerChild,
         updateChildState,
+        updateChildAnimatedStyle,
         unregisterChild
     }
 }

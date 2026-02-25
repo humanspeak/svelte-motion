@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="Shared Layout Animation" motionUrl={data.sourceUrl ?? undefined}>
+<Example title="Shared Layout Animation" sourceUrl={data.sourceUrl ?? undefined}>
     <SharedLayoutAnimationExample />
 </Example>

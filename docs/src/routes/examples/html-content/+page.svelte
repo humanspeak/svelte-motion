@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="HTML Content" motionUrl={data.sourceUrl}>
+<Example title="HTML Content" sourceUrl={data.sourceUrl}>
     <HTMLContent />
 </Example>

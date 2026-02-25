@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="Hover and Tap" motionUrl={data.sourceUrl}>
+<Example title="Hover and Tap" sourceUrl={data.sourceUrl}>
     <HoverAndTap />
 </Example>

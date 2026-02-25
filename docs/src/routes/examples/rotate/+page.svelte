@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="Rotate" motionUrl={data.sourceUrl}>
+<Example title="Rotate" sourceUrl={data.sourceUrl}>
     <Rotate />
 </Example>

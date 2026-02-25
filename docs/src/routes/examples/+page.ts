@@ -7,8 +7,7 @@ export const load: PageLoad = () => {
         'animate-presence': {
             title: 'AnimatePresence',
             description: 'Interactive animatepresence animation example using Svelte Motion.',
-            sourceUrl:
-                'https://github.com/humanspeak/svelte-motion/tree/main/docs/src/routes/examples/animate-presence'
+            sourceUrl: 'https://motion.dev/examples/react-exit-animation'
         },
         'animated-button': {
             title: 'Animated Button',
@@ -35,6 +34,11 @@ export const load: PageLoad = () => {
             description: 'Interactive conic gradient animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/examples/react-conic-gradient-pointer'
         },
+        'fancy-like-button': {
+            title: 'Fancy Like Button',
+            description: 'Interactive fancy like button animation example using Svelte Motion.',
+            sourceUrl: 'https://github.com/DRlFTER/fancyLikeButton'
+        },
         'hover-and-tap': {
             title: 'Hover and Tap',
             description: 'Interactive hover and tap animation example using Svelte Motion.',
@@ -44,6 +48,11 @@ export const load: PageLoad = () => {
             title: 'HTML Content',
             description: 'Interactive html content animation example using Svelte Motion.',
             sourceUrl: 'https://examples.motion.dev/react/html-content'
+        },
+        keyframes: {
+            title: 'Keyframes',
+            description: 'Interactive keyframes animation example using Svelte Motion.',
+            sourceUrl: 'https://motion.dev/examples/react-keyframes'
         },
         'motion-path': {
             title: 'Motion Path',
@@ -58,8 +67,7 @@ export const load: PageLoad = () => {
         'notifications-stack': {
             title: 'Notifications Stack',
             description: 'Interactive notifications stack animation example using Svelte Motion.',
-            sourceUrl:
-                'https://github.com/humanspeak/svelte-motion/tree/main/docs/src/routes/examples/notifications-stack'
+            sourceUrl: 'https://motion.dev/examples/react-notifications-stack'
         },
         reordering: {
             title: 'Reordering',

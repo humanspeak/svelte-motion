@@ -2,7 +2,7 @@
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
-    import MotionPath from '$lib/examples/MotionPath.svelte'
+    import KeyframesExample from '$lib/examples/KeyframesExample.svelte'
 
     const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
@@ -11,17 +11,17 @@
         if (breadcrumbs) {
             breadcrumbs.breadcrumbs = [
                 { title: 'Examples', href: '/examples' },
-                { title: 'Motion Path' }
+                { title: 'Keyframes' }
             ]
         }
         if (seo) {
-            seo.title = 'Motion Path | Examples | Svelte Motion'
+            seo.title = 'Keyframes | Examples | Svelte Motion'
             seo.description =
-                'Animate elements along an SVG path with offset distance using Svelte Motion. Create complex motion trajectories with minimal configuration.'
+                'Multi-property keyframe animation with scale, rotate, and borderRadius using Svelte Motion.'
         }
     })
 </script>
 
-<Example title="Motion Path" sourceUrl={data.sourceUrl ?? undefined}>
-    <MotionPath />
+<Example title="Keyframes" sourceUrl={data.sourceUrl ?? undefined}>
+    <KeyframesExample />
 </Example>

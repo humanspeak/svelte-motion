@@ -66,12 +66,12 @@
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             style={styleString(() => ({
-                width: 120,
+                width: 100,
                 padding: '0.75rem 1.5rem',
                 borderRadius: 8,
                 border: 'none',
-                backgroundColor: 'var(--color-text-primary)',
-                color: 'var(--color-background)',
+                backgroundColor: '#06b6d4',
+                color: '#0f1115',
                 cursor: 'pointer',
                 fontWeight: 600,
                 textAlign: 'center'

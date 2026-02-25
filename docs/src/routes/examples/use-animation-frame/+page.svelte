@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="useAnimationFrame" motionUrl={data.sourceUrl}>
+<Example title="useAnimationFrame" sourceUrl={data.sourceUrl}>
     <UseAnimationFrameExample />
 </Example>

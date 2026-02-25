@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="Scroll Progress" motionUrl={data.sourceUrl ?? undefined}>
+<Example title="Scroll Progress" sourceUrl={data.sourceUrl ?? undefined}>
     <ScrollProgressExample />
 </Example>

@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="Color Interpolation" motionUrl={data.sourceUrl}>
+<Example title="Color Interpolation" sourceUrl={data.sourceUrl}>
     <ColorInterpolationExample />
 </Example>
