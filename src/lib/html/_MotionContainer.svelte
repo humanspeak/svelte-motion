@@ -168,6 +168,24 @@
         })
     }
 
+    // Capture mid-animation computed styles via rAF so exit clones can start
+    // from the correct visual state. Without this, interrupting an enter animation
+    // causes the exit to snap (the element is disconnected before onDestroy, so
+    // getAnimations()/commitStyles() can't work at clone time).
+    $effect(() => {
+        if (!(element && context)) return
+        let rafId: number
+        const capture = () => {
+            if (element && element.isConnected && element.getAnimations().length > 0) {
+                const cs = getComputedStyle(element)
+                context.updateChildAnimatedStyle(presenceKey, cs.opacity, cs.transform)
+            }
+            rafId = requestAnimationFrame(capture)
+        }
+        rafId = requestAnimationFrame(capture)
+        return () => cancelAnimationFrame(rafId)
+    })
+
     // Keep a live snapshot of the layoutId element's rect so the next element can FLIP from it.
     // We store the last-known-good rect and push it to the registry on cleanup,
     // because onDestroy fires after the element is removed from DOM (rect would be zeros).
