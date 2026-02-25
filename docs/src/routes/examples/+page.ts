@@ -45,6 +45,11 @@ export const load: PageLoad = () => {
             description: 'Interactive html content animation example using Svelte Motion.',
             sourceUrl: 'https://examples.motion.dev/react/html-content'
         },
+        keyframes: {
+            title: 'Keyframes',
+            description: 'Interactive keyframes animation example using Svelte Motion.',
+            sourceUrl: 'https://motion.dev/examples/react-keyframes'
+        },
         'motion-path': {
             title: 'Motion Path',
             description: 'Interactive motion path animation example using Svelte Motion.',
@@ -58,8 +63,7 @@ export const load: PageLoad = () => {
         'notifications-stack': {
             title: 'Notifications Stack',
             description: 'Interactive notifications stack animation example using Svelte Motion.',
-            sourceUrl:
-                'https://github.com/humanspeak/svelte-motion/tree/main/docs/src/routes/examples/notifications-stack'
+            sourceUrl: 'https://motion.dev/examples/react-notifications-stack'
         },
         reordering: {
             title: 'Reordering',
