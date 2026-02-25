@@ -7,8 +7,7 @@ export const load: PageLoad = () => {
         'animate-presence': {
             title: 'AnimatePresence',
             description: 'Interactive animatepresence animation example using Svelte Motion.',
-            sourceUrl:
-                'https://github.com/humanspeak/svelte-motion/tree/main/docs/src/routes/examples/animate-presence'
+            sourceUrl: 'https://motion.dev/examples/react-exit-animation'
         },
         'animated-button': {
             title: 'Animated Button',
@@ -34,6 +33,11 @@ export const load: PageLoad = () => {
             title: 'Conic Gradient',
             description: 'Interactive conic gradient animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/examples/react-conic-gradient-pointer'
+        },
+        'fancy-like-button': {
+            title: 'Fancy Like Button',
+            description: 'Interactive fancy like button animation example using Svelte Motion.',
+            sourceUrl: 'https://github.com/DRlFTER/fancyLikeButton'
         },
         'hover-and-tap': {
             title: 'Hover and Tap',
