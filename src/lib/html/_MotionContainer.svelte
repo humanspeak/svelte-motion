@@ -985,6 +985,9 @@
 
                     // Mark that we're triggering the initial animation to prevent duplicate runs
                     initialAnimationTriggered = true
+                    if (animateProp && typeof animateProp !== 'string') {
+                        lastAnimatePropJson = JSON.stringify(animateProp)
+                    }
 
                     // IMPORTANT: Start the animation BEFORE changing isLoaded.
                     // When isLoaded changes to 'ready', Svelte will reactively remove the
