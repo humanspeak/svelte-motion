@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="useTime" motionUrl={data.sourceUrl}>
+<Example title="useTime" sourceUrl={data.sourceUrl}>
     <UseTimeExample />
 </Example>

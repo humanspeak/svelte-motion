@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="Toggle Switch" motionUrl={data.sourceUrl ?? undefined}>
+<Example title="Toggle Switch" sourceUrl={data.sourceUrl ?? undefined}>
     <ToggleSwitchExample />
 </Example>

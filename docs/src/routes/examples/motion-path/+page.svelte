@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="Motion Path" motionUrl={data.sourceUrl ?? undefined}>
+<Example title="Motion Path" sourceUrl={data.sourceUrl ?? undefined}>
     <MotionPath />
 </Example>

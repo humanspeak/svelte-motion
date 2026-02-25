@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="Keyframes" motionUrl={data.sourceUrl ?? undefined}>
+<Example title="Keyframes" sourceUrl={data.sourceUrl ?? undefined}>
     <KeyframesExample />
 </Example>

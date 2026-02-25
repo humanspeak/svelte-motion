@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="Reordering" motionUrl={data.sourceUrl}>
+<Example title="Reordering" sourceUrl={data.sourceUrl}>
     <Reordering />
 </Example>

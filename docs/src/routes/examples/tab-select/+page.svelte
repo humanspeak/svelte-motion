@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="Tab Select" motionUrl={data.sourceUrl ?? undefined}>
+<Example title="Tab Select" sourceUrl={data.sourceUrl ?? undefined}>
     <TabSelectExample />
 </Example>

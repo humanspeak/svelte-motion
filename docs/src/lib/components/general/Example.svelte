@@ -7,12 +7,18 @@
     type ExampleProps = {
         children: Snippet
         isSmall?: boolean
-        motionUrl?: string
+        sourceUrl?: string
         exampleUrl?: string
         title?: string
     }
 
-    const { children, isSmall = false, motionUrl, exampleUrl, title }: ExampleProps = $props()
+    const { children, isSmall = false, sourceUrl, exampleUrl, title }: ExampleProps = $props()
+
+    const sourceHost = $derived.by(() => {
+        if (!sourceUrl) return ''
+        const host = new URL(sourceUrl).hostname.replace(/^www\./i, '')
+        return host.charAt(0).toUpperCase() + host.slice(1)
+    })
 
     let refreshId = $state(0)
     const refreshMotion = () => {
@@ -54,14 +60,14 @@
         </div>
         <div class="flex flex-1 items-center justify-center gap-4"></div>
         <div class="flex flex-1 items-center justify-end gap-4">
-            {#if motionUrl}
+            {#if sourceUrl}
                 <motion.button
-                    onclick={() => window.open(motionUrl, '_blank')}
+                    onclick={() => window.open(sourceUrl, '_blank')}
                     whileTap={{ scale: 0.9 }}
                     whileHover={{ scale: 1.1 }}
                     class="inline-flex items-center justify-center rounded-md border border-border-muted px-2 py-1 text-sm text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
                 >
-                    {m.example_motion_dev()}
+                    {sourceHost}
                 </motion.button>
             {/if}
             <motion.button

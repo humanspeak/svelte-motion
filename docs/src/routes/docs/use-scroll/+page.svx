@@ -76,7 +76,7 @@ By default, `useScroll` tracks the page scroll position:
 />
 ```
 
-<Example isSmall exampleUrl="/examples/scroll-progress" motionUrl="https://motion.dev/docs/react-use-scroll">
+<Example isSmall exampleUrl="/examples/scroll-progress" sourceUrl="https://motion.dev/docs/react-use-scroll">
   <ScrollProgressExample />
 </Example>
 

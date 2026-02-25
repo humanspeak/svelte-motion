@@ -23,7 +23,7 @@
 
 <Example
     title="Characters Remaining"
-    motionUrl="https://examples.motion.dev/react/characters-remaining"
+    sourceUrl="https://examples.motion.dev/react/characters-remaining"
 >
     <CharactersRemainingExample />
 </Example>

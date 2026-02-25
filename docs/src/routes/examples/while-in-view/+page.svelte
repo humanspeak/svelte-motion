@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="While In View" motionUrl={data.sourceUrl ?? undefined}>
+<Example title="While In View" sourceUrl={data.sourceUrl ?? undefined}>
     <WhileInViewExample />
 </Example>

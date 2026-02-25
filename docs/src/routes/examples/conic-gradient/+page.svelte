@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="Conic Gradient" motionUrl={data.sourceUrl}>
+<Example title="Conic Gradient" sourceUrl={data.sourceUrl}>
     <ConicGradientExample />
 </Example>

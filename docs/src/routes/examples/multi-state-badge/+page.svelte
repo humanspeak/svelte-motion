@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="Multi-State Badge" motionUrl={data.sourceUrl ?? undefined}>
+<Example title="Multi-State Badge" sourceUrl={data.sourceUrl ?? undefined}>
     <MultiStateBadgeExample />
 </Example>

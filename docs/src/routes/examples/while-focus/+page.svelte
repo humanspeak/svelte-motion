@@ -22,6 +22,6 @@
     })
 </script>
 
-<Example title="While Focus" motionUrl={data.sourceUrl ?? undefined}>
+<Example title="While Focus" sourceUrl={data.sourceUrl ?? undefined}>
     <WhileFocusExample />
 </Example>
