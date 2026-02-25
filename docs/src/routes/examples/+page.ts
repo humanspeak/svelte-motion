@@ -30,6 +30,11 @@ export const load: PageLoad = () => {
             description: 'Interactive color interpolation animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/docs/motion-animate#color-interpolation'
         },
+        'conic-gradient': {
+            title: 'Conic Gradient',
+            description: 'Interactive conic gradient animation example using Svelte Motion.',
+            sourceUrl: 'https://motion.dev/examples/react-conic-gradient-pointer'
+        },
         'hover-and-tap': {
             title: 'Hover and Tap',
             description: 'Interactive hover and tap animation example using Svelte Motion.',

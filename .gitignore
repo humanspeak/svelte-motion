@@ -38,3 +38,4 @@ junit-playwright.xml
 .notes
 docs/src/lib/sitemap-manifest.json
 .playwright-mcp/
+mprocs.log

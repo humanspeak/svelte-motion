@@ -1,0 +1,13 @@
+procs:
+    urls:
+        shell: node --no-warnings scripts/dev-urls.mjs
+        autostart: true
+        autorestart: false
+    pkg:
+        shell: pnpm -w -r --filter @humanspeak/svelte-motion run dev
+    docs:
+        shell: pnpm --filter docs run dev
+    sitemap:
+        shell: pnpm --filter docs run sitemap:watch
+    registry:
+        shell: pnpm --filter docs run registry:watch
