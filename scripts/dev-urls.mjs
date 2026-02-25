@@ -27,9 +27,15 @@ function readPkgName(dir) {
     }
 }
 
-/** Copy text to clipboard (macOS). */
+/** Copy text to system clipboard. */
 function copyToClipboard(text) {
-    execSync('pbcopy', { input: text })
+    const cmd =
+        process.platform === 'darwin'
+            ? 'pbcopy'
+            : process.platform === 'win32'
+              ? 'clip'
+              : 'xclip -selection clipboard'
+    execSync(cmd, { input: text })
 }
 
 /** @type {Map<string, {name: string, port: number, source: string}>} */
