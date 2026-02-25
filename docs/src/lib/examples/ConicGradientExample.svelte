@@ -5,7 +5,7 @@
 -->
 <script lang="ts">
     import { writable } from 'svelte/store'
-    import { motion, useTransform } from '@humanspeak/svelte-motion'
+    import { motion, styleString, useTransform } from '@humanspeak/svelte-motion'
 
     let el: HTMLElement | undefined = $state(undefined)
     let width = $state(400)
@@ -44,7 +44,7 @@
 >
     <motion.div
         class="gradient-box"
-        style="background: {$background}; width: {width}px; height: {height}px;"
+        style={styleString(() => ({ background: $background, width, height }))}
     />
 </div>
 
