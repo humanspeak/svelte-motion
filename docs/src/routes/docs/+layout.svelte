@@ -20,7 +20,11 @@
     const breadcrumbs = $derived(getBreadcrumbContext())
     $effect(() => {
         if (breadcrumbs) {
-            breadcrumbs.breadcrumbs = [{ title: 'Docs', href: '/docs' }, { title: 'Get Started' }]
+            const pageTitle = page.data?.title as string | undefined
+            breadcrumbs.breadcrumbs = [
+                { title: 'Docs', href: '/docs' },
+                { title: pageTitle || 'Get Started' }
+            ]
         }
     })
 

@@ -10,7 +10,7 @@
 
     const SITE_NAME = 'Svelte Motion'
     const DEFAULT_DESCRIPTION =
-        'Svelte Motion is a Svelte animation library for building smooth, production-grade UI animations with spring physics, gestures, and more.'
+        'Svelte Motion is a Framer Motion-compatible animation library for Svelte 5. Spring physics, gestures, layout animations, exit animations, and scroll effects with a familiar declarative API.'
     const DEFAULT_IMAGE = 'https://motion.svelte.page/og-default.png'
 
     const { children } = $props()
@@ -35,7 +35,11 @@
             name: 'Humanspeak',
             url: 'https://humanspeak.com',
             logo: 'https://humanspeak.com/humanspeak.svg'
-        }
+        },
+        sameAs: [
+            'https://github.com/humanspeak/svelte-motion',
+            'https://www.npmjs.com/package/@humanspeak/svelte-motion'
+        ]
     })}</${'script'}>`
 </script>
 
@@ -44,9 +48,14 @@
     <meta name="description" content={resolvedDescription} />
     <link rel="icon" href={favicon} />
     <link rel="canonical" href={canonicalUrl} />
+    <meta name="author" content="Humanspeak" />
     <meta property="og:title" content={resolvedTitle} />
     <meta property="og:description" content={resolvedDescription} />
     <meta property="og:image" content={DEFAULT_IMAGE} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:alt" content="Svelte Motion — Framer Motion API for Svelte 5" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={SITE_NAME} />
     <meta property="og:url" content={canonicalUrl} />

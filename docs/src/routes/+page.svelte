@@ -21,7 +21,7 @@
         if (seo) {
             seo.title = 'Svelte Motion - Animation Library for Svelte'
             seo.description =
-                'Svelte Motion is a Svelte animation library for building smooth, production-grade UI animations with spring physics, gestures, and more.'
+                'Svelte Motion is a Framer Motion-compatible animation library for Svelte 5. Spring physics, gestures, layout animations, exit animations, and scroll effects with a familiar declarative API.'
         }
     })
 
@@ -84,7 +84,17 @@
         operatingSystem: 'Any',
         url: 'https://motion.svelte.page',
         description:
-            'Svelte Motion is a Svelte animation library for building smooth, production-grade UI animations with spring physics, gestures, and more.',
+            'Svelte Motion is a Framer Motion-compatible animation library for Svelte 5. Spring physics, gestures, layout animations, exit animations, and scroll effects with a familiar declarative API.',
+        codeRepository: 'https://github.com/humanspeak/svelte-motion',
+        programmingLanguage: ['TypeScript', 'Svelte'],
+        keywords: [
+            'animation',
+            'Framer Motion',
+            'Svelte 5',
+            'gestures',
+            'spring physics',
+            'layout animation'
+        ],
         offers: {
             '@type': 'Offer',
             price: '0',

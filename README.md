@@ -1,4 +1,4 @@
-# @humanspeak/svelte-motion
+# Svelte Motion — Framer Motion API for Svelte 5
 
 [![NPM version](https://img.shields.io/npm/v/@humanspeak/svelte-motion.svg)](https://www.npmjs.com/package/@humanspeak/svelte-motion)
 [![Build Status](https://github.com/humanspeak/svelte-motion/actions/workflows/npm-publish.yml/badge.svg)](https://github.com/humanspeak/svelte-motion/actions/workflows/npm-publish.yml)
@@ -32,7 +32,7 @@ npm install @humanspeak/svelte-motion
 </motion.button>
 ```
 
-## API parity snapshot (current)
+## Framer Motion API Parity
 
 Goal: Framer Motion API parity for Svelte where common React examples can be translated with minimal changes.
 
