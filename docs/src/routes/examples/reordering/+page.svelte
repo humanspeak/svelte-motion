@@ -22,6 +22,7 @@
             seo.ogTagline =
                 'Drag-to-reorder list items with smooth layout animations using Svelte Motion'
             seo.ogFeatures = ['Drag Gestures', 'Layout Animation', 'List Reorder', 'Smooth FLIP']
+            seo.ogSlug = 'examples-reordering'
         }
     })
 </script>

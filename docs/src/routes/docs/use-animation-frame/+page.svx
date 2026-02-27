@@ -17,6 +17,7 @@ description: "Run a callback on every animation frame for smooth, time-based ani
           seo.ogTitle = 'useAnimationFrame'
           seo.ogTagline = 'Run logic on every animation frame with delta timing'
           seo.ogFeatures = ['Delta Timing', 'Frame Callback', 'Elapsed Time', 'Smooth Animation']
+          seo.ogSlug = 'docs-use-animation-frame'
       }
   })
 </script>

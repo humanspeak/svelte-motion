@@ -16,6 +16,7 @@ description: "Create a derived store that maps a numeric source across ranges or
           seo.ogTitle = 'useTransform'
           seo.ogTagline = 'Map one motion value range to another'
           seo.ogFeatures = ['Range Mapping', 'Derived Values', 'Input/Output', 'Multi-Store']
+          seo.ogSlug = 'docs-use-transform'
       }
   })
 </script>

@@ -27,6 +27,7 @@
                 'Viewport Detection',
                 'Reveal Animation'
             ]
+            seo.ogSlug = 'examples-while-in-view'
         }
     })
 </script>

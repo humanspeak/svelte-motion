@@ -20,6 +20,7 @@
             seo.ogTitle = 'Animated Button'
             seo.ogTagline = 'Build a spring-based animated button with Svelte Motion'
             seo.ogFeatures = ['Spring Press', 'Hover Lift', 'Smooth Transitions', 'Interactive UI']
+            seo.ogSlug = 'examples-animated-button'
         }
     })
 </script>

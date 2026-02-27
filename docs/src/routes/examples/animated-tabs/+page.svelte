@@ -21,6 +21,7 @@
             seo.ogTagline =
                 'Spring-based animated tabs with a sliding indicator powered by svelte-motion layoutId'
             seo.ogFeatures = ['layoutId', 'Sliding Indicator', 'Spring Physics', 'bits-ui']
+            seo.ogSlug = 'examples-animated-tabs'
         }
     })
 </script>

@@ -34,6 +34,7 @@
                 'Gesture Animations',
                 'Scroll Triggers'
             ]
+            seo.ogSlug = 'examples'
         }
     })
 

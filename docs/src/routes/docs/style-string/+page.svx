@@ -16,6 +16,7 @@ description: "A helper for creating CSS style strings with automatic unit handli
           seo.ogTitle = 'Style String'
           seo.ogTagline = 'Animate inline style strings with motion components'
           seo.ogFeatures = ['Auto Units', 'Reactive CSS', 'Style Objects', 'Dynamic Inline']
+          seo.ogSlug = 'docs-style-string'
       }
   })
 </script>

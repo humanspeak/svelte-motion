@@ -16,6 +16,7 @@ description: "Create scroll-linked animations like progress indicators and paral
           seo.ogTitle = 'useScroll'
           seo.ogTagline = 'Track scroll progress of the page or a container'
           seo.ogFeatures = ['Scroll Progress', 'Parallax Effects', 'Container Scroll', 'Scroll Velocity']
+          seo.ogSlug = 'docs-use-scroll'
       }
   })
 </script>

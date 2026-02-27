@@ -26,6 +26,7 @@
                 'Conditional Rendering',
                 'Smooth Unmount'
             ]
+            seo.ogSlug = 'examples-animate-presence'
         }
     })
 </script>

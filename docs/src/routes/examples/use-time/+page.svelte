@@ -26,6 +26,7 @@
                 'Continuous Motion',
                 'Reactive Store'
             ]
+            seo.ogSlug = 'examples-use-time'
         }
     })
 </script>

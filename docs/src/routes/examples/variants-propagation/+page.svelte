@@ -26,6 +26,7 @@
                 'Auto Propagation',
                 'Variant States'
             ]
+            seo.ogSlug = 'examples-variants-propagation'
         }
     })
 </script>

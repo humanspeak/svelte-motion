@@ -22,6 +22,7 @@
             seo.ogTagline =
                 'Animated tab selector using layoutId for a shared indicator that slides between tabs'
             seo.ogFeatures = ['layoutId', 'Shared Indicator', 'Tab Navigation', 'Slide Animation']
+            seo.ogSlug = 'examples-tab-select'
         }
     })
 </script>

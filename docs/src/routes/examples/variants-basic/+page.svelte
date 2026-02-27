@@ -21,6 +21,7 @@
             seo.ogTagline =
                 'Define and switch between named animation states with Svelte Motion variants'
             seo.ogFeatures = ['Named States', 'Declarative', 'Reusable Presets', 'State Switching']
+            seo.ogSlug = 'examples-variants-basic'
         }
     })
 </script>

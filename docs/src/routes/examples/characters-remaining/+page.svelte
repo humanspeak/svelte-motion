@@ -26,6 +26,7 @@
                 'Reactive Updates',
                 'Visual Feedback'
             ]
+            seo.ogSlug = 'examples-characters-remaining'
         }
     })
 </script>

@@ -18,6 +18,7 @@ description: Define reusable animation states and orchestrate complex animations
             seo.ogTitle = 'Variants'
             seo.ogTagline = 'Define named animation states for orchestrated transitions'
             seo.ogFeatures = ['Named States', 'Stagger Children', 'Propagation', 'Orchestration']
+            seo.ogSlug = 'docs-variants'
         }
     })
 </script>

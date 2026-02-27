@@ -22,6 +22,7 @@
             seo.ogTagline =
                 'Animate elements when they receive keyboard focus using Svelte Motion whileFocus'
             seo.ogFeatures = ['whileFocus', 'Accessibility', 'Keyboard Focus', 'Visual Feedback']
+            seo.ogSlug = 'examples-while-focus'
         }
     })
 </script>

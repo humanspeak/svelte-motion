@@ -27,6 +27,7 @@
                 'Smooth Interpolation',
                 'Multi-Color'
             ]
+            seo.ogSlug = 'examples-color-interpolation'
         }
     })
 </script>

@@ -27,6 +27,7 @@
                 'Multiple States',
                 'AnimatePresence'
             ]
+            seo.ogSlug = 'examples-multi-state-badge'
         }
     })
 </script>

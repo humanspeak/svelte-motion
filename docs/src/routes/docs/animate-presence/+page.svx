@@ -16,6 +16,7 @@ description: Animate components when they are added to or removed from the DOM
           seo.ogTitle = 'AnimatePresence'
           seo.ogTagline = 'Animate components when they enter and leave the DOM'
           seo.ogFeatures = ['Exit Animations', 'Enter Transitions', 'List Support', 'Conditional Rendering']
+          seo.ogSlug = 'docs-animate-presence'
       }
   })
 </script>

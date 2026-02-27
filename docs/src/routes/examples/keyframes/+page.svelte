@@ -27,6 +27,7 @@
                 'Border Radius',
                 'Sequence Animation'
             ]
+            seo.ogSlug = 'examples-keyframes'
         }
     })
 </script>

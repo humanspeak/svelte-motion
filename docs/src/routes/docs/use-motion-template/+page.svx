@@ -14,6 +14,7 @@ description: "Compose reactive CSS strings from multiple stores using a tagged t
           seo.ogTitle = 'useMotionTemplate'
           seo.ogTagline = 'Compose motion values into CSS template strings'
           seo.ogFeatures = ['Template Literals', 'CSS Composition', 'Multi-Store', 'Reactive Strings']
+          seo.ogSlug = 'docs-use-motion-template'
       }
   })
 </script>

@@ -18,6 +18,7 @@ description: Drop-in animated replacement for the shadcn Button component
           seo.ogTitle = 'Shadcn Button'
           seo.ogTagline = 'Animated button component built with Shadcn UI'
           seo.ogFeatures = ['Spring Press', 'Hover Lift', 'Drop-in Ready', 'Accessible']
+          seo.ogSlug = 'docs-shadcn-button'
       }
   })
 </script>

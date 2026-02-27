@@ -14,6 +14,7 @@ description: "Track the velocity of a reactive store value in units per second."
           seo.ogTitle = 'useVelocity'
           seo.ogTagline = 'Track the velocity of a motion value'
           seo.ogFeatures = ['Velocity Tracking', 'Units Per Second', 'Momentum Effects', 'Derived Store']
+          seo.ogSlug = 'docs-use-velocity'
       }
   })
 </script>

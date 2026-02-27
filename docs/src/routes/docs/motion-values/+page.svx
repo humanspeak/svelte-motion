@@ -14,6 +14,7 @@ description: "An overview of motion values — reactive stores that drive animat
           seo.ogTitle = 'Motion Values'
           seo.ogTagline = 'Reactive values that drive animations outside the render cycle'
           seo.ogFeatures = ['Reactive Stores', 'Velocity Tracking', 'Composable', 'Render-Free']
+          seo.ogSlug = 'docs-motion-values'
       }
   })
 </script>

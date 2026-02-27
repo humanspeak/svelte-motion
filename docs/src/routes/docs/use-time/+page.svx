@@ -18,6 +18,7 @@ description: "A reactive store that ticks once per animation frame with elapsed 
           seo.ogTitle = 'useTime'
           seo.ogTagline = 'Motion value that updates with elapsed time'
           seo.ogFeatures = ['Elapsed Time', 'Frame Updates', 'Continuous Motion', 'Reactive Store']
+          seo.ogSlug = 'docs-use-time'
       }
   })
 </script>

@@ -22,6 +22,7 @@
             seo.ogTagline =
                 'Synchronized time-based animations across multiple elements using a shared useTime store'
             seo.ogFeatures = ['Shared Store', 'Synchronized', 'Multi-Element', 'Coordinated Motion']
+            seo.ogSlug = 'examples-use-time-synced'
         }
     })
 </script>

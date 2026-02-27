@@ -27,6 +27,7 @@
                 'Writable Stores',
                 'CSS Gradients'
             ]
+            seo.ogSlug = 'examples-conic-gradient'
         }
     })
 </script>

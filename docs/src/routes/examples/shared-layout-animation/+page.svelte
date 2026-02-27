@@ -22,6 +22,7 @@
             seo.ogTagline =
                 'Animate elements between positions using layoutId for smooth shared layout transitions'
             seo.ogFeatures = ['layoutId', 'FLIP Animation', 'Shared Transitions', 'Position Morph']
+            seo.ogSlug = 'examples-shared-layout-animation'
         }
     })
 </script>

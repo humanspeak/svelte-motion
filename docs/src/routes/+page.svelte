@@ -31,6 +31,7 @@
                 'Gestures & Drag',
                 'Layout Animation'
             ]
+            seo.ogSlug = 'home'
         }
     })
 

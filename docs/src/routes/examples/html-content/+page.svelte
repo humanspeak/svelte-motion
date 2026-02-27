@@ -22,6 +22,7 @@
             seo.ogTagline =
                 'Animate HTML content with smooth enter and exit transitions using Svelte Motion'
             seo.ogFeatures = ['AnimatePresence', 'Enter/Exit', 'Dynamic HTML', 'Smooth Transitions']
+            seo.ogSlug = 'examples-html-content'
         }
     })
 </script>

@@ -17,6 +17,7 @@ description: Make any element draggable with physics-based constraints, momentum
           seo.ogTitle = 'Drag'
           seo.ogTagline = 'Physics-based dragging with constraints and momentum'
           seo.ogFeatures = ['Physics Momentum', 'Elastic Constraints', 'Touch Support', 'Gesture Callbacks']
+          seo.ogSlug = 'docs-drag'
       }
   })
 </script>

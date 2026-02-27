@@ -22,6 +22,7 @@
             seo.ogTagline =
                 'Gesture-driven animations for hover and tap interactions using Svelte Motion'
             seo.ogFeatures = ['whileHover', 'whileTap', 'Spring Physics', 'Gesture Events']
+            seo.ogSlug = 'examples-hover-and-tap'
         }
     })
 </script>

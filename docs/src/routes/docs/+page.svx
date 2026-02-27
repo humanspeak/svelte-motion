@@ -20,6 +20,7 @@ description: "Svelte Motion is a Svelte animation library for building smooth, p
           seo.ogTitle = 'Get Started'
           seo.ogTagline = 'Build smooth, production-grade UI animations with Svelte Motion'
           seo.ogFeatures = ['Simple API', 'Spring Physics', 'Gesture Support', 'Scroll Effects']
+          seo.ogSlug = 'docs'
       }
   })
 </script>

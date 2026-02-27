@@ -21,6 +21,7 @@
             seo.ogTagline =
                 'Reactive style strings with automatic unit handling via the Svelte Motion styleString utility'
             seo.ogFeatures = ['Auto Units', 'Reactive CSS', 'Dynamic Styles', 'Style Objects']
+            seo.ogSlug = 'examples-style-string'
         }
     })
 </script>

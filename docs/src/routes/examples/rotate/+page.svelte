@@ -22,6 +22,7 @@
             seo.ogTagline =
                 'Continuous rotation animation with configurable easing built with Svelte Motion'
             seo.ogFeatures = ['Infinite Loop', 'Transform', 'Configurable Easing', 'Simple API']
+            seo.ogSlug = 'examples-rotate'
         }
     })
 </script>

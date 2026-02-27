@@ -26,6 +26,7 @@
                 'Gesture Driven',
                 'State Toggle'
             ]
+            seo.ogSlug = 'examples-toggle-switch'
         }
     })
 </script>

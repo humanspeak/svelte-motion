@@ -22,6 +22,7 @@
             seo.ogTagline =
                 'Animate elements along an SVG path with offset distance using Svelte Motion'
             seo.ogFeatures = ['SVG Path', 'Offset Distance', 'Path Following', 'Trajectory']
+            seo.ogSlug = 'examples-motion-path'
         }
     })
 </script>
