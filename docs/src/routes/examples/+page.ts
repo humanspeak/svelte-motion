@@ -69,6 +69,11 @@ export const load: PageLoad = () => {
             description: 'Interactive notifications stack animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/examples/react-notifications-stack'
         },
+        'path-morphing': {
+            title: 'Path Morphing',
+            description: 'Interactive path morphing animation example using Svelte Motion.',
+            sourceUrl: 'https://examples.motion.dev/react/path-morphing'
+        },
         reordering: {
             title: 'Reordering',
             description: 'Interactive reordering animation example using Svelte Motion.',
