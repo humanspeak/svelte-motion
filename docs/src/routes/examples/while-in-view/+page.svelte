@@ -7,29 +7,22 @@
     const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
-    $effect(() => {
-        if (breadcrumbs) {
-            breadcrumbs.breadcrumbs = [
-                { title: 'Examples', href: '/examples' },
-                { title: 'While In View' }
-            ]
-        }
-        if (seo) {
-            seo.title = 'While In View | Examples | Svelte Motion'
-            seo.description =
-                'Animate elements when they enter or leave the viewport using Svelte Motion whileInView. Create scroll-triggered reveal and exit animations.'
-            seo.ogTitle = 'While In View'
-            seo.ogTagline =
-                'Animate elements when they enter or leave the viewport using Svelte Motion whileInView'
-            seo.ogFeatures = [
-                'whileInView',
-                'Scroll Trigger',
-                'Viewport Detection',
-                'Reveal Animation'
-            ]
-            seo.ogSlug = 'examples-while-in-view'
-        }
-    })
+    if (breadcrumbs) {
+        breadcrumbs.breadcrumbs = [
+            { title: 'Examples', href: '/examples' },
+            { title: 'While In View' }
+        ]
+    }
+    if (seo) {
+        seo.title = 'While In View | Examples | Svelte Motion'
+        seo.description =
+            'Animate elements when they enter or leave the viewport using Svelte Motion whileInView. Create scroll-triggered reveal and exit animations.'
+        seo.ogTitle = 'While In View'
+        seo.ogTagline =
+            'Animate elements when they enter or leave the viewport using Svelte Motion whileInView'
+        seo.ogFeatures = ['whileInView', 'Scroll Trigger', 'Viewport Detection', 'Reveal Animation']
+        seo.ogSlug = 'examples-while-in-view'
+    }
 </script>
 
 <Example title="While In View" sourceUrl={data.sourceUrl ?? undefined}>

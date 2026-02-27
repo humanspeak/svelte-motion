@@ -7,24 +7,22 @@
     const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
-    $effect(() => {
-        if (breadcrumbs) {
-            breadcrumbs.breadcrumbs = [
-                { title: 'Examples', href: '/examples' },
-                { title: 'While Focus' }
-            ]
-        }
-        if (seo) {
-            seo.title = 'While Focus | Examples | Svelte Motion'
-            seo.description =
-                'Animate elements when they receive keyboard focus using Svelte Motion whileFocus. Enhance accessibility with visual feedback on focus events.'
-            seo.ogTitle = 'While Focus'
-            seo.ogTagline =
-                'Animate elements when they receive keyboard focus using Svelte Motion whileFocus'
-            seo.ogFeatures = ['whileFocus', 'Accessibility', 'Keyboard Focus', 'Visual Feedback']
-            seo.ogSlug = 'examples-while-focus'
-        }
-    })
+    if (breadcrumbs) {
+        breadcrumbs.breadcrumbs = [
+            { title: 'Examples', href: '/examples' },
+            { title: 'While Focus' }
+        ]
+    }
+    if (seo) {
+        seo.title = 'While Focus | Examples | Svelte Motion'
+        seo.description =
+            'Animate elements when they receive keyboard focus using Svelte Motion whileFocus. Enhance accessibility with visual feedback on focus events.'
+        seo.ogTitle = 'While Focus'
+        seo.ogTagline =
+            'Animate elements when they receive keyboard focus using Svelte Motion whileFocus'
+        seo.ogFeatures = ['whileFocus', 'Accessibility', 'Keyboard Focus', 'Visual Feedback']
+        seo.ogSlug = 'examples-while-focus'
+    }
 </script>
 
 <Example title="While Focus" sourceUrl={data.sourceUrl ?? undefined}>

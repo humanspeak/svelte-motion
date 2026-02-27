@@ -18,25 +18,23 @@
 
     const breadcrumbs = $derived(getBreadcrumbContext())
     const seo = getSeoContext()
-    $effect(() => {
-        if (breadcrumbs) {
-            breadcrumbs.breadcrumbs = [{ title: 'Examples' }]
-        }
-        if (seo) {
-            seo.title = 'Examples | Svelte Motion'
-            seo.description =
-                'Interactive animation examples built with Svelte Motion. Browse hover effects, spring transitions, gesture animations, and scroll triggers.'
-            seo.ogTitle = 'Examples'
-            seo.ogTagline = 'Interactive animation examples built with Svelte Motion'
-            seo.ogFeatures = [
-                'Hover Effects',
-                'Spring Transitions',
-                'Gesture Animations',
-                'Scroll Triggers'
-            ]
-            seo.ogSlug = 'examples'
-        }
-    })
+    if (breadcrumbs) {
+        breadcrumbs.breadcrumbs = [{ title: 'Examples' }]
+    }
+    if (seo) {
+        seo.title = 'Examples | Svelte Motion'
+        seo.description =
+            'Interactive animation examples built with Svelte Motion. Browse hover effects, spring transitions, gesture animations, and scroll triggers.'
+        seo.ogTitle = 'Examples'
+        seo.ogTagline = 'Interactive animation examples built with Svelte Motion'
+        seo.ogFeatures = [
+            'Hover Effects',
+            'Spring Transitions',
+            'Gesture Animations',
+            'Scroll Triggers'
+        ]
+        seo.ogSlug = 'examples'
+    }
 
     /**
      * Get all example routes from the sitemap manifest

@@ -7,24 +7,22 @@
     const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
-    $effect(() => {
-        if (breadcrumbs) {
-            breadcrumbs.breadcrumbs = [
-                { title: 'Examples', href: '/examples' },
-                { title: 'useTime (Synced)' }
-            ]
-        }
-        if (seo) {
-            seo.title = 'useTime (Synced) | Examples | Svelte Motion'
-            seo.description =
-                'Synchronized time-based animations across multiple elements using a shared Svelte Motion useTime store for coordinated motion effects.'
-            seo.ogTitle = 'useTime (Synced)'
-            seo.ogTagline =
-                'Synchronized time-based animations across multiple elements using a shared useTime store'
-            seo.ogFeatures = ['Shared Store', 'Synchronized', 'Multi-Element', 'Coordinated Motion']
-            seo.ogSlug = 'examples-use-time-synced'
-        }
-    })
+    if (breadcrumbs) {
+        breadcrumbs.breadcrumbs = [
+            { title: 'Examples', href: '/examples' },
+            { title: 'useTime (Synced)' }
+        ]
+    }
+    if (seo) {
+        seo.title = 'useTime (Synced) | Examples | Svelte Motion'
+        seo.description =
+            'Synchronized time-based animations across multiple elements using a shared Svelte Motion useTime store for coordinated motion effects.'
+        seo.ogTitle = 'useTime (Synced)'
+        seo.ogTagline =
+            'Synchronized time-based animations across multiple elements using a shared useTime store'
+        seo.ogFeatures = ['Shared Store', 'Synchronized', 'Multi-Element', 'Coordinated Motion']
+        seo.ogSlug = 'examples-use-time-synced'
+    }
 </script>
 
 <Example title="useTime (Synced)" sourceUrl={data.sourceUrl}>

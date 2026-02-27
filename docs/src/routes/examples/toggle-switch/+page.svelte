@@ -7,28 +7,21 @@
     const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
-    $effect(() => {
-        if (breadcrumbs) {
-            breadcrumbs.breadcrumbs = [
-                { title: 'Examples', href: '/examples' },
-                { title: 'Toggle Switch' }
-            ]
-        }
-        if (seo) {
-            seo.title = 'Toggle Switch | Examples | Svelte Motion'
-            seo.description =
-                'Animated toggle switch with spring physics built using Svelte Motion. Demonstrates layout animations and gesture-driven state transitions.'
-            seo.ogTitle = 'Toggle Switch'
-            seo.ogTagline = 'Animated toggle switch with spring physics built using Svelte Motion'
-            seo.ogFeatures = [
-                'Layout Animation',
-                'Spring Physics',
-                'Gesture Driven',
-                'State Toggle'
-            ]
-            seo.ogSlug = 'examples-toggle-switch'
-        }
-    })
+    if (breadcrumbs) {
+        breadcrumbs.breadcrumbs = [
+            { title: 'Examples', href: '/examples' },
+            { title: 'Toggle Switch' }
+        ]
+    }
+    if (seo) {
+        seo.title = 'Toggle Switch | Examples | Svelte Motion'
+        seo.description =
+            'Animated toggle switch with spring physics built using Svelte Motion. Demonstrates layout animations and gesture-driven state transitions.'
+        seo.ogTitle = 'Toggle Switch'
+        seo.ogTagline = 'Animated toggle switch with spring physics built using Svelte Motion'
+        seo.ogFeatures = ['Layout Animation', 'Spring Physics', 'Gesture Driven', 'State Toggle']
+        seo.ogSlug = 'examples-toggle-switch'
+    }
 </script>
 
 <Example title="Toggle Switch" sourceUrl={data.sourceUrl ?? undefined}>

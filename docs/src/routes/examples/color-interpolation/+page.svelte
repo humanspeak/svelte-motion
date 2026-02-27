@@ -7,29 +7,26 @@
     const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
-    $effect(() => {
-        if (breadcrumbs) {
-            breadcrumbs.breadcrumbs = [
-                { title: 'Examples', href: '/examples' },
-                { title: 'Color Interpolation' }
-            ]
-        }
-        if (seo) {
-            seo.title = 'Color Interpolation | Examples | Svelte Motion'
-            seo.description =
-                'Smooth color transitions between multiple color values using Svelte Motion. Demonstrates interpolation across the full color spectrum.'
-            seo.ogTitle = 'Color Interpolation'
-            seo.ogTagline =
-                'Smooth color transitions between multiple color values using Svelte Motion'
-            seo.ogFeatures = [
-                'Color Transitions',
-                'Spectrum Animation',
-                'Smooth Interpolation',
-                'Multi-Color'
-            ]
-            seo.ogSlug = 'examples-color-interpolation'
-        }
-    })
+    if (breadcrumbs) {
+        breadcrumbs.breadcrumbs = [
+            { title: 'Examples', href: '/examples' },
+            { title: 'Color Interpolation' }
+        ]
+    }
+    if (seo) {
+        seo.title = 'Color Interpolation | Examples | Svelte Motion'
+        seo.description =
+            'Smooth color transitions between multiple color values using Svelte Motion. Demonstrates interpolation across the full color spectrum.'
+        seo.ogTitle = 'Color Interpolation'
+        seo.ogTagline = 'Smooth color transitions between multiple color values using Svelte Motion'
+        seo.ogFeatures = [
+            'Color Transitions',
+            'Spectrum Animation',
+            'Smooth Interpolation',
+            'Multi-Color'
+        ]
+        seo.ogSlug = 'examples-color-interpolation'
+    }
 </script>
 
 <Example title="Color Interpolation" sourceUrl={data.sourceUrl}>

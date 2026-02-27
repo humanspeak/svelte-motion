@@ -7,24 +7,22 @@
     const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
-    $effect(() => {
-        if (breadcrumbs) {
-            breadcrumbs.breadcrumbs = [
-                { title: 'Examples', href: '/examples' },
-                { title: 'Tab Select' }
-            ]
-        }
-        if (seo) {
-            seo.title = 'Tab Select | Examples | Svelte Motion'
-            seo.description =
-                'Animated tab selector using layoutId for a shared indicator that slides between tabs in Svelte Motion.'
-            seo.ogTitle = 'Tab Select'
-            seo.ogTagline =
-                'Animated tab selector using layoutId for a shared indicator that slides between tabs'
-            seo.ogFeatures = ['layoutId', 'Shared Indicator', 'Tab Navigation', 'Slide Animation']
-            seo.ogSlug = 'examples-tab-select'
-        }
-    })
+    if (breadcrumbs) {
+        breadcrumbs.breadcrumbs = [
+            { title: 'Examples', href: '/examples' },
+            { title: 'Tab Select' }
+        ]
+    }
+    if (seo) {
+        seo.title = 'Tab Select | Examples | Svelte Motion'
+        seo.description =
+            'Animated tab selector using layoutId for a shared indicator that slides between tabs in Svelte Motion.'
+        seo.ogTitle = 'Tab Select'
+        seo.ogTagline =
+            'Animated tab selector using layoutId for a shared indicator that slides between tabs'
+        seo.ogFeatures = ['layoutId', 'Shared Indicator', 'Tab Navigation', 'Slide Animation']
+        seo.ogSlug = 'examples-tab-select'
+    }
 </script>
 
 <Example title="Tab Select" sourceUrl={data.sourceUrl ?? undefined}>
