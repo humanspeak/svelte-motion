@@ -39,6 +39,9 @@ export default defineConfig({
             }
         }
     },
+    ssr: {
+        noExternal: ['flubber']
+    },
     server: { port: 8320 },
     // With pnpm workspace linking, no manual alias is required
     test: {
