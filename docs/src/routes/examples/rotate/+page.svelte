@@ -18,6 +18,11 @@
             seo.title = 'Rotate | Examples | Svelte Motion'
             seo.description =
                 'Continuous rotation animation with configurable easing built with Svelte Motion. A simple example demonstrating infinite transform animations.'
+            seo.ogTitle = 'Rotate'
+            seo.ogTagline =
+                'Continuous rotation animation with configurable easing built with Svelte Motion'
+            seo.ogFeatures = ['Infinite Loop', 'Transform', 'Configurable Easing', 'Simple API']
+            seo.ogSlug = 'examples-rotate'
         }
     })
 </script>

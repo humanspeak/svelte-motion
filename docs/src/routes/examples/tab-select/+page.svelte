@@ -18,6 +18,11 @@
             seo.title = 'Tab Select | Examples | Svelte Motion'
             seo.description =
                 'Animated tab selector using layoutId for a shared indicator that slides between tabs in Svelte Motion.'
+            seo.ogTitle = 'Tab Select'
+            seo.ogTagline =
+                'Animated tab selector using layoutId for a shared indicator that slides between tabs'
+            seo.ogFeatures = ['layoutId', 'Shared Indicator', 'Tab Navigation', 'Slide Animation']
+            seo.ogSlug = 'examples-tab-select'
         }
     })
 </script>

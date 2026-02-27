@@ -13,6 +13,10 @@ description: Animate components when they are added to or removed from the DOM
       if (seo) {
           seo.title = 'AnimatePresence | Docs | Svelte Motion'
           seo.description = 'Animate components when they are added to or removed from the DOM using Svelte Motion AnimatePresence. Smooth enter and exit transitions.'
+          seo.ogTitle = 'AnimatePresence'
+          seo.ogTagline = 'Animate components when they enter and leave the DOM'
+          seo.ogFeatures = ['Exit Animations', 'Enter Transitions', 'List Support', 'Conditional Rendering']
+          seo.ogSlug = 'docs-animate-presence'
       }
   })
 </script>

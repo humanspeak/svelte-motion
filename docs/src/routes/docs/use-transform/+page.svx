@@ -13,6 +13,10 @@ description: "Create a derived store that maps a numeric source across ranges or
       if (seo) {
           seo.title = 'useTransform | Docs | Svelte Motion'
           seo.description = 'Create a derived store that maps numeric values across input/output ranges or computes from other stores with Svelte Motion useTransform.'
+          seo.ogTitle = 'useTransform'
+          seo.ogTagline = 'Map one motion value range to another'
+          seo.ogFeatures = ['Range Mapping', 'Derived Values', 'Input/Output', 'Multi-Store']
+          seo.ogSlug = 'docs-use-transform'
       }
   })
 </script>

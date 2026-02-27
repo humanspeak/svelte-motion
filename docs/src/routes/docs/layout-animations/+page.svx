@@ -13,6 +13,10 @@ description: Animate elements between positions with layout and layoutId for smo
         if (seo) {
             seo.title = 'Layout Animations | Docs | Svelte Motion'
             seo.description = 'Animate elements between positions with layout and layoutId for smooth shared layout transitions in Svelte Motion.'
+            seo.ogTitle = 'Layout Animations'
+            seo.ogTagline = 'Smooth transitions when elements change size or position'
+            seo.ogFeatures = ['FLIP Animation', 'Shared Layout', 'layoutId', 'Position Tracking']
+            seo.ogSlug = 'docs-layout-animations'
         }
     })
 </script>

@@ -18,6 +18,11 @@
             seo.title = 'Scroll Progress | Examples | Svelte Motion'
             seo.description =
                 'Interactive scroll progress animation example using Svelte Motion useScroll and useSpring.'
+            seo.ogTitle = 'Scroll Progress'
+            seo.ogTagline =
+                'Interactive scroll progress animation example using Svelte Motion useScroll and useSpring'
+            seo.ogFeatures = ['useScroll', 'useSpring', 'Progress Bar', 'Scroll-Linked']
+            seo.ogSlug = 'examples-scroll-progress'
         }
     })
 </script>

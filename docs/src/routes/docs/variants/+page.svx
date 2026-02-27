@@ -15,6 +15,10 @@ description: Define reusable animation states and orchestrate complex animations
         if (seo) {
             seo.title = 'Variants | Docs | Svelte Motion'
             seo.description = 'Define reusable animation states and orchestrate complex animations across component trees with Svelte Motion variants. Stagger and propagate.'
+            seo.ogTitle = 'Variants'
+            seo.ogTagline = 'Define named animation states for orchestrated transitions'
+            seo.ogFeatures = ['Named States', 'Stagger Children', 'Propagation', 'Orchestration']
+            seo.ogSlug = 'docs-variants'
         }
     })
 </script>

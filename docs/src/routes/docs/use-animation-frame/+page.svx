@@ -14,6 +14,10 @@ description: "Run a callback on every animation frame for smooth, time-based ani
       if (seo) {
           seo.title = 'useAnimationFrame | Docs | Svelte Motion'
           seo.description = 'Run a callback on every animation frame for smooth, time-based animations with Svelte Motion useAnimationFrame. Access delta and elapsed time.'
+          seo.ogTitle = 'useAnimationFrame'
+          seo.ogTagline = 'Run logic on every animation frame with delta timing'
+          seo.ogFeatures = ['Delta Timing', 'Frame Callback', 'Elapsed Time', 'Smooth Animation']
+          seo.ogSlug = 'docs-use-animation-frame'
       }
   })
 </script>

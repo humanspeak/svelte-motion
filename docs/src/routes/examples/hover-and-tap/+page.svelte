@@ -18,6 +18,11 @@
             seo.title = 'Hover and Tap | Examples | Svelte Motion'
             seo.description =
                 'Gesture-driven animations for hover and tap interactions using Svelte Motion. Create responsive, interactive elements with spring physics.'
+            seo.ogTitle = 'Hover and Tap'
+            seo.ogTagline =
+                'Gesture-driven animations for hover and tap interactions using Svelte Motion'
+            seo.ogFeatures = ['whileHover', 'whileTap', 'Spring Physics', 'Gesture Events']
+            seo.ogSlug = 'examples-hover-and-tap'
         }
     })
 </script>

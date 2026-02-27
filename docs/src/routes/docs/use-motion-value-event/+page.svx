@@ -11,6 +11,10 @@ description: "Subscribe to motion value store changes with automatic cleanup."
       if (seo) {
           seo.title = 'useMotionValueEvent | Docs | Svelte Motion'
           seo.description = 'Subscribe to motion value store changes with automatic cleanup in Svelte Motion.'
+          seo.ogTitle = 'useMotionValueEvent'
+          seo.ogTagline = 'Listen for motion value change events'
+          seo.ogFeatures = ['Event Subscription', 'Auto Cleanup', 'Change Detection', 'Store Events']
+          seo.ogSlug = 'docs-use-motion-value-event'
       }
   })
 </script>

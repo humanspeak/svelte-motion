@@ -22,6 +22,16 @@
             seo.title = 'Svelte Motion - Animation Library for Svelte'
             seo.description =
                 'Svelte Motion is a Framer Motion-compatible animation library for Svelte 5. Spring physics, gestures, layout animations, exit animations, and scroll effects with a familiar declarative API.'
+            seo.ogTitle = 'Svelte Motion'
+            seo.ogTagline =
+                'Spring physics, gestures, layout animations, exit animations, and scroll effects with a familiar declarative API.'
+            seo.ogFeatures = [
+                'AnimatePresence',
+                'Spring Physics',
+                'Gestures & Drag',
+                'Layout Animation'
+            ]
+            seo.ogSlug = 'home'
         }
     })
 

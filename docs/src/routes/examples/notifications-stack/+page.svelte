@@ -17,6 +17,11 @@
             seo.title = 'Notifications Stack | Examples | Svelte Motion'
             seo.description =
                 'iOS-style notification stack with variant-based stagger animations built with Svelte Motion. Smooth enter, exit, and reorder transitions.'
+            seo.ogTitle = 'Notifications Stack'
+            seo.ogTagline =
+                'iOS-style notification stack with variant-based stagger animations built with Svelte Motion'
+            seo.ogFeatures = ['Stagger Animation', 'Exit Transitions', 'Reorder', 'iOS Style']
+            seo.ogSlug = 'examples-notifications-stack'
         }
     })
 </script>

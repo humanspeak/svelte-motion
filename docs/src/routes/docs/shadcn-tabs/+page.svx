@@ -15,6 +15,10 @@ description: Drop-in animated replacement for shadcn Tabs with a spring-based sl
       if (seo) {
           seo.title = 'Animated Tabs (shadcn) | Docs | Svelte Motion'
           seo.description = 'Drop-in animated replacement for shadcn-svelte Tabs. Spring-based sliding indicator powered by svelte-motion layoutId with full ARIA compliance via bits-ui.'
+          seo.ogTitle = 'Shadcn Tabs'
+          seo.ogTagline = 'Animated tab component built with Shadcn UI'
+          seo.ogFeatures = ['Sliding Indicator', 'Spring Physics', 'ARIA Compliant', 'bits-ui']
+          seo.ogSlug = 'docs-shadcn-tabs'
       }
   })
 </script>

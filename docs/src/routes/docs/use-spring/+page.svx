@@ -11,6 +11,10 @@ description: "Create a spring-animated store with physics-based motion."
       if (seo) {
           seo.title = 'useSpring | Docs | Svelte Motion'
           seo.description = 'Create a spring-animated Svelte store with physics-based motion. Animate values with configurable stiffness, damping, and mass using Svelte Motion.'
+          seo.ogTitle = 'useSpring'
+          seo.ogTagline = 'Spring-based motion values with natural physics'
+          seo.ogFeatures = ['Spring Physics', 'Stiffness Control', 'Damping', 'Natural Motion']
+          seo.ogSlug = 'docs-use-spring'
       }
   })
 </script>

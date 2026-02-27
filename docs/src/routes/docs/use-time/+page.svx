@@ -15,6 +15,10 @@ description: "A reactive store that ticks once per animation frame with elapsed 
       if (seo) {
           seo.title = 'useTime | Docs | Svelte Motion'
           seo.description = 'A reactive Svelte store that ticks once per animation frame with elapsed milliseconds. Drive continuous animations with Svelte Motion useTime.'
+          seo.ogTitle = 'useTime'
+          seo.ogTagline = 'Motion value that updates with elapsed time'
+          seo.ogFeatures = ['Elapsed Time', 'Frame Updates', 'Continuous Motion', 'Reactive Store']
+          seo.ogSlug = 'docs-use-time'
       }
   })
 </script>

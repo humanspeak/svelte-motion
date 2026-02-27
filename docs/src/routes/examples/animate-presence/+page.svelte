@@ -17,6 +17,16 @@
             seo.title = 'AnimatePresence | Examples | Svelte Motion'
             seo.description =
                 'Animate components when they are added to or removed from the DOM using Svelte Motion. Smooth enter and exit transitions made easy.'
+            seo.ogTitle = 'AnimatePresence'
+            seo.ogTagline =
+                'Animate components when they are added to or removed from the DOM using Svelte Motion'
+            seo.ogFeatures = [
+                'Exit Animations',
+                'Enter Transitions',
+                'Conditional Rendering',
+                'Smooth Unmount'
+            ]
+            seo.ogSlug = 'examples-animate-presence'
         }
     })
 </script>

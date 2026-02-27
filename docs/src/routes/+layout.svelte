@@ -23,6 +23,9 @@
     const canonicalUrl = $derived(`${$page.url.origin}${$page.url.pathname}`)
     const resolvedTitle = $derived(seo.title)
     const resolvedDescription = $derived(seo.description || DEFAULT_DESCRIPTION)
+    const ogImageUrl = $derived(
+        seo.ogSlug ? `${$page.url.origin}/social-cards/og-${seo.ogSlug}.png` : DEFAULT_IMAGE
+    )
 
     const websiteJsonLd = `<${'script'} type="application/ld+json">${JSON.stringify({
         '@context': 'https://schema.org',
@@ -54,18 +57,23 @@
     <meta name="author" content="Humanspeak" />
     <meta property="og:title" content={resolvedTitle} />
     <meta property="og:description" content={resolvedDescription} />
-    <meta property="og:image" content={DEFAULT_IMAGE} />
+    <meta property="og:image" content={ogImageUrl} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:type" content="image/png" />
-    <meta property="og:image:alt" content="Svelte Motion — Framer Motion API for Svelte 5" />
+    <meta
+        property="og:image:alt"
+        content={seo.ogTitle
+            ? `${seo.ogTitle} — Svelte Motion`
+            : 'Svelte Motion — Framer Motion API for Svelte 5'}
+    />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={SITE_NAME} />
     <meta property="og:url" content={canonicalUrl} />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={resolvedTitle} />
     <meta name="twitter:description" content={resolvedDescription} />
-    <meta name="twitter:image" content={DEFAULT_IMAGE} />
+    <meta name="twitter:image" content={ogImageUrl} />
     <!-- eslint-disable-next-line svelte/no-at-html-tags -- static JSON-LD, no user input -->
     {@html websiteJsonLd}
 </svelte:head>
