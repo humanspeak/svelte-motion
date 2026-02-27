@@ -29,11 +29,15 @@
         "@sentry/sveltekit": "^10.40.0",
         "bits-ui": "^2.16.2",
         "github-slugger": "^2.0.0",
-        "runed": "^0.37.1"
+        "runed": "^0.37.1",
+        "satori": "^0.19.2",
+        "satori-html": "^0.3.2"
     },
     "devDependencies": {
         "@eslint/compat": "^2.0.2",
         "@eslint/js": "^10.0.1",
+        "@humanspeak/svelte-satori-fix": "^0.0.2",
+        "@resvg/resvg-js": "^2.6.2",
         "@sveltejs/adapter-auto": "^7.0.1",
         "@sveltejs/adapter-cloudflare": "^7.2.8",
         "@sveltejs/kit": "^2.53.3",
