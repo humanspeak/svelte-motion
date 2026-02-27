@@ -218,16 +218,6 @@
                             <li class="rounded-full border border-border-muted px-3 py-1">
                                 {m.pill_tiny()}
                             </li>
-                            <li class="rounded-full border border-border-muted px-3 py-1">
-                                <a class="hover:underline" href="/examples/rotate"
-                                    >Examples: Rotate</a
-                                >
-                            </li>
-                            <li class="rounded-full border border-border-muted px-3 py-1">
-                                <a class="hover:underline" href="/examples/motion-path"
-                                    >Examples: SVG Path Length</a
-                                >
-                            </li>
                         </ul>
                     </div>
                 </motion.div>
