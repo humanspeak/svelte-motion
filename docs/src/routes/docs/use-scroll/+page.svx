@@ -13,6 +13,9 @@ description: "Create scroll-linked animations like progress indicators and paral
       if (seo) {
           seo.title = 'useScroll | Docs | Svelte Motion'
           seo.description = 'Create scroll-linked animations like progress indicators and parallax effects with Svelte Motion useScroll.'
+          seo.ogTitle = 'useScroll'
+          seo.ogTagline = 'Track scroll progress of the page or a container'
+          seo.ogFeatures = ['Scroll Progress', 'Parallax Effects', 'Container Scroll', 'Scroll Velocity']
       }
   })
 </script>

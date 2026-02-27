@@ -18,6 +18,10 @@
             seo.title = 'Fancy Like Button | Examples | Svelte Motion'
             seo.description =
                 'Heart button with animated particle burst on press and hold using Svelte Motion.'
+            seo.ogTitle = 'Fancy Like Button'
+            seo.ogTagline =
+                'Heart button with animated particle burst on press and hold using Svelte Motion'
+            seo.ogFeatures = ['Particle Burst', 'Press & Hold', 'Heart Animation', 'Spring Physics']
         }
     })
 </script>

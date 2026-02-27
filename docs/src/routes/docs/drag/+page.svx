@@ -14,6 +14,9 @@ description: Make any element draggable with physics-based constraints, momentum
       if (seo) {
           seo.title = 'Drag | Docs | Svelte Motion'
           seo.description = 'Make any element draggable with physics-based constraints, momentum, and gesture callbacks using Svelte Motion. Full touch and pointer support.'
+          seo.ogTitle = 'Drag'
+          seo.ogTagline = 'Physics-based dragging with constraints and momentum'
+          seo.ogFeatures = ['Physics Momentum', 'Elastic Constraints', 'Touch Support', 'Gesture Callbacks']
       }
   })
 </script>

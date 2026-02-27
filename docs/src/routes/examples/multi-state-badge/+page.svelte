@@ -18,6 +18,15 @@
             seo.title = 'Multi-State Badge | Examples | Svelte Motion'
             seo.description =
                 'A badge component that cycles through idle, processing, success, and error states with smooth animated transitions in Svelte Motion.'
+            seo.ogTitle = 'Multi-State Badge'
+            seo.ogTagline =
+                'A badge component that cycles through idle, processing, success, and error states'
+            seo.ogFeatures = [
+                'State Machine',
+                'Smooth Transitions',
+                'Multiple States',
+                'AnimatePresence'
+            ]
         }
     })
 </script>

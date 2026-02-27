@@ -18,6 +18,15 @@
             seo.title = 'Keyframes | Examples | Svelte Motion'
             seo.description =
                 'Multi-property keyframe animation with scale, rotate, and borderRadius using Svelte Motion.'
+            seo.ogTitle = 'Keyframes'
+            seo.ogTagline =
+                'Multi-property keyframe animation with scale, rotate, and borderRadius using Svelte Motion'
+            seo.ogFeatures = [
+                'Multi-Property',
+                'Scale & Rotate',
+                'Border Radius',
+                'Sequence Animation'
+            ]
         }
     })
 </script>

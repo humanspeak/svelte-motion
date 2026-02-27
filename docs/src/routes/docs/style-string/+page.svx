@@ -13,6 +13,9 @@ description: "A helper for creating CSS style strings with automatic unit handli
       if (seo) {
           seo.title = 'styleString | Docs | Svelte Motion'
           seo.description = 'A helper utility for creating reactive CSS style strings with automatic unit handling. Simplifies dynamic inline styles in Svelte components.'
+          seo.ogTitle = 'Style String'
+          seo.ogTagline = 'Animate inline style strings with motion components'
+          seo.ogFeatures = ['Auto Units', 'Reactive CSS', 'Style Objects', 'Dynamic Inline']
       }
   })
 </script>

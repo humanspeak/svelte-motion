@@ -18,6 +18,15 @@
             seo.title = 'While In View | Examples | Svelte Motion'
             seo.description =
                 'Animate elements when they enter or leave the viewport using Svelte Motion whileInView. Create scroll-triggered reveal and exit animations.'
+            seo.ogTitle = 'While In View'
+            seo.ogTagline =
+                'Animate elements when they enter or leave the viewport using Svelte Motion whileInView'
+            seo.ogFeatures = [
+                'whileInView',
+                'Scroll Trigger',
+                'Viewport Detection',
+                'Reveal Animation'
+            ]
         }
     })
 </script>

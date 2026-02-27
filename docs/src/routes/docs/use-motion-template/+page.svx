@@ -11,6 +11,9 @@ description: "Compose reactive CSS strings from multiple stores using a tagged t
       if (seo) {
           seo.title = 'useMotionTemplate | Docs | Svelte Motion'
           seo.description = 'Compose reactive CSS strings from multiple stores using a tagged template literal. Build dynamic filter, transform, and background values with Svelte Motion.'
+          seo.ogTitle = 'useMotionTemplate'
+          seo.ogTagline = 'Compose motion values into CSS template strings'
+          seo.ogFeatures = ['Template Literals', 'CSS Composition', 'Multi-Store', 'Reactive Strings']
       }
   })
 </script>
