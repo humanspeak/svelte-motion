@@ -28,6 +28,7 @@
         '@context': 'https://schema.org',
         '@type': 'WebSite',
         name: SITE_NAME,
+        alternateName: '@humanspeak/svelte-motion',
         url: 'https://motion.svelte.page',
         description: DEFAULT_DESCRIPTION,
         publisher: {
@@ -48,6 +49,8 @@
     <meta name="description" content={resolvedDescription} />
     <link rel="icon" href={favicon} />
     <link rel="canonical" href={canonicalUrl} />
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM-optimized content" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
     <meta name="author" content="Humanspeak" />
     <meta property="og:title" content={resolvedTitle} />
     <meta property="og:description" content={resolvedDescription} />

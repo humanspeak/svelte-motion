@@ -95,6 +95,17 @@
             'spring physics',
             'layout animation'
         ],
+        author: {
+            '@type': 'Organization',
+            name: 'Humanspeak',
+            url: 'https://humanspeak.com',
+            sameAs: [
+                'https://github.com/humanspeak',
+                'https://github.com/humanspeak/svelte-motion',
+                'https://www.npmjs.com/package/@humanspeak/svelte-motion'
+            ]
+        },
+        downloadUrl: 'https://www.npmjs.com/package/@humanspeak/svelte-motion',
         offers: {
             '@type': 'Offer',
             price: '0',

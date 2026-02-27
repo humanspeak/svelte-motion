@@ -8,6 +8,7 @@
     import TableOfContents from './TableOfContents.svelte'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { enhanceCodeBlocks } from '$lib/actions/enhanceCodeBlocks'
+    import sitemapManifest from '$lib/sitemap-manifest.json'
 
     const BASE_URL = 'https://motion.svelte.page'
 
@@ -43,6 +44,35 @@
             '@context': 'https://schema.org',
             '@type': 'BreadcrumbList',
             itemListElement: listItems
+        })}</${'script'}>`
+    })
+
+    const techArticleJsonLd = $derived.by(() => {
+        const title = page.data?.title as string | undefined
+        const description = page.data?.description as string | undefined
+        if (!title) return ''
+        const pathname = page.url.pathname
+        const lastmod =
+            (sitemapManifest as Record<string, string>)[pathname] ??
+            new Date().toISOString().split('T')[0]
+        return `<${'script'} type="application/ld+json">${JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'TechArticle',
+            headline: title,
+            description: description || title,
+            url: `${BASE_URL}${pathname}`,
+            dateModified: lastmod,
+            author: {
+                '@type': 'Organization',
+                name: 'Humanspeak',
+                url: 'https://humanspeak.com'
+            },
+            publisher: {
+                '@type': 'Organization',
+                name: 'Humanspeak',
+                url: 'https://humanspeak.com'
+            },
+            proficiencyLevel: 'Beginner'
         })}</${'script'}>`
     })
 
@@ -115,6 +145,10 @@
 <svelte:head>
     <!-- eslint-disable-next-line svelte/no-at-html-tags -- static JSON-LD, no user input -->
     {@html breadcrumbJsonLd}
+    {#if techArticleJsonLd}
+        <!-- eslint-disable-next-line svelte/no-at-html-tags -- static JSON-LD, no user input -->
+        {@html techArticleJsonLd}
+    {/if}
 </svelte:head>
 
 <div class="flex min-h-screen flex-col justify-between bg-background">
