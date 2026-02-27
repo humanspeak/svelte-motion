@@ -4,11 +4,8 @@
 -->
 <script lang="ts">
     import { motion } from '@humanspeak/svelte-motion'
-    import { onMount } from 'svelte'
     import { slide } from 'svelte/transition'
     import { PersistedState } from 'runed'
-
-    const { currentPath } = $props()
 
     type NavItem = {
         title: string
@@ -29,7 +26,21 @@
         shortDescription: string
     }
 
-    let otherProjects: NavItem[] = $state([])
+    const {
+        currentPath,
+        otherProjects: otherProjectsRaw = []
+    }: { currentPath: string; otherProjects: OtherProject[] } = $props()
+
+    const formatTitle = (slug: string): string => slug.toLowerCase()
+
+    const otherProjectItems: NavItem[] = $derived(
+        otherProjectsRaw.map((project) => ({
+            title: formatTitle(project.slug),
+            href: project.url,
+            icon: 'fa-solid fa-heart',
+            external: true
+        }))
+    )
     const openSections = new PersistedState<Record<string, boolean>>('sidebar-sections', {})
 
     const navigation: NavSection[] = $derived([
@@ -184,12 +195,12 @@
                 }
             ]
         },
-        ...(otherProjects.length > 0
+        ...(otherProjectItems.length > 0
             ? [
                   {
                       title: 'Other Projects',
                       icon: 'fa-solid fa-cube',
-                      items: otherProjects
+                      items: otherProjectItems
                   }
               ]
             : [])
@@ -206,27 +217,6 @@
             [section.title]: !isSectionOpen(section)
         }
     }
-
-    onMount(async () => {
-        try {
-            const response = await fetch('/api/other-projects')
-            if (!response.ok) {
-                return
-            }
-            const projects: OtherProject[] = await response.json()
-
-            otherProjects = projects.map((project) => ({
-                title: formatTitle(project.slug),
-                href: project.url,
-                icon: 'fa-solid fa-heart',
-                external: true
-            }))
-        } catch (error) {
-            console.error('Failed to load other projects:', error)
-        }
-    })
-
-    const formatTitle = (slug: string): string => slug.toLowerCase()
 
     const isActive = (href: string) => {
         const basePath = currentPath.split(/[?#]/)[0]

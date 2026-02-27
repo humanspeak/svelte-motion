@@ -12,7 +12,7 @@
 
     const BASE_URL = 'https://motion.svelte.page'
 
-    const { children } = $props()
+    const { children, data } = $props()
 
     let contentElement: HTMLElement | undefined = $state(undefined)
     let headings: { id: string; text: string; level: number; element: HTMLElement }[] = $state([])
@@ -159,7 +159,7 @@
         <aside
             class="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar-background/95 shadow-sm lg:sticky lg:top-0 lg:block lg:h-screen lg:overflow-y-auto"
         >
-            <Sidebar currentPath={page.url.pathname} />
+            <Sidebar currentPath={page.url.pathname} otherProjects={data.otherProjects} />
         </aside>
 
         <!-- Main content area -->
