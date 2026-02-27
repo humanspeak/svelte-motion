@@ -11,6 +11,7 @@
         "deploy": "pnpm run build && wrangler pages deploy",
         "dev": "vite dev",
         "format": "prettier --write .",
+        "generate-social": "tsx ./scripts/generate-social-images.ts",
         "lint": "prettier --check . && eslint .",
         "prepare": "svelte-kit sync || echo ''",
         "preview": "pnpm run build && wrangler pages dev",
@@ -18,12 +19,13 @@
         "registry:watch": "chokidar 'src/lib/shadcn/ui/**/*.svelte' 'src/lib/shadcn/ui/**/*.ts' -c 'node ./scripts/generate-registry.mjs' --initial --silent",
         "sitemap:manifest": "node ./scripts/generate-sitemap-manifest.mjs",
         "sitemap:watch": "chokidar 'src/routes/**/*.svelte' 'src/routes/**/*.svx' 'src/routes/**/*.md' --ignore 'src/routes/examples/+page.ts' -c 'node ./scripts/generate-sitemap-manifest.mjs' --initial --silent",
+        "social:watch": "chokidar 'src/lib/components/OG.svelte' -c 'tsx ./scripts/generate-social-images.ts' --initial --silent",
         "test": "npm run test:unit -- --run",
         "test:unit": "vitest"
     },
     "dependencies": {
         "@humanspeak/svelte-motion": "workspace:*",
-        "@inlang/paraglide-js": "^2.12.0",
+        "@inlang/paraglide-js": "^2.13.0",
         "@sentry/sveltekit": "^10.40.0",
         "bits-ui": "^2.16.2",
         "github-slugger": "^2.0.0",
@@ -34,7 +36,7 @@
         "@eslint/js": "^10.0.1",
         "@sveltejs/adapter-auto": "^7.0.1",
         "@sveltejs/adapter-cloudflare": "^7.2.8",
-        "@sveltejs/kit": "^2.53.0",
+        "@sveltejs/kit": "^2.53.3",
         "@sveltejs/vite-plugin-svelte": "^6.2.4",
         "@tailwindcss/typography": "^0.5.19",
         "@tailwindcss/vite": "^4.2.1",
@@ -54,9 +56,10 @@
         "prettier-plugin-sort-json": "^4.2.0",
         "prettier-plugin-svelte": "^3.5.0",
         "prettier-plugin-tailwindcss": "^0.7.2",
-        "shiki": "^3.22.0",
-        "svelte": "^5.53.3",
-        "svelte-check": "^4.4.3",
+        "puppeteer": "^24.37.5",
+        "shiki": "^3.23.0",
+        "svelte": "^5.53.5",
+        "svelte-check": "^4.4.4",
         "tailwind-merge": "^3.5.0",
         "tailwind-variants": "^3.2.2",
         "tailwindcss": "^4.2.1",
@@ -66,7 +69,7 @@
         "vite-plugin-devtools-json": "^1.0.0",
         "vitest": "^4.0.18",
         "vitest-browser-svelte": "^2.0.2",
-        "wrangler": "^4.68.1"
+        "wrangler": "^4.69.0"
     },
     "volta": {
         "node": "22.16.0"

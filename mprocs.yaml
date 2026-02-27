@@ -11,3 +11,5 @@ procs:
         shell: pnpm --filter docs run sitemap:watch
     registry:
         shell: pnpm --filter docs run registry:watch
+    social:
+        shell: pnpm --filter docs run social:watch
