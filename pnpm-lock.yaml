@@ -183,12 +183,6 @@ importers:
       runed:
         specifier: ^0.37.1
         version: 0.37.1(@sveltejs/kit@2.53.3(@opentelemetry/api@1.9.0)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.5)(vite@7.3.1(@types/node@25.3.2)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)))(svelte@5.53.5)(typescript@5.9.3)(vite@7.3.1(@types/node@25.3.2)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)))(svelte@5.53.5)
-      satori:
-        specifier: ^0.19.2
-        version: 0.19.2
-      satori-html:
-        specifier: ^0.3.2
-        version: 0.3.2
     devDependencies:
       '@eslint/compat':
         specifier: ^2.0.2
@@ -197,8 +191,8 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.0.2(jiti@2.6.1))
       '@humanspeak/svelte-satori-fix':
-        specifier: ^0.0.2
-        version: 0.0.2(svelte@5.53.5)
+        specifier: ^0.0.3
+        version: 0.0.3(svelte@5.53.5)
       '@resvg/resvg-js':
         specifier: ^2.6.2
         version: 2.6.2
@@ -271,6 +265,12 @@ importers:
       puppeteer:
         specifier: ^24.37.5
         version: 24.37.5(typescript@5.9.3)
+      satori:
+        specifier: ^0.19.2
+        version: 0.19.2
+      satori-html:
+        specifier: ^0.3.2
+        version: 0.3.2
       shiki:
         specifier: ^4.0.0
         version: 4.0.0
@@ -946,8 +946,8 @@ packages:
     resolution: {integrity: sha512-/zUx+yOsIrG4Y43Eh2peDeKCxlRt/gET6aHfaKpuq267qXdYDFViVHfMaLyygZOnl0kGWxFIgsBy8QFuTLUXEQ==}
     engines: {node: '>=18.18.0'}
 
-  '@humanspeak/svelte-satori-fix@0.0.2':
-    resolution: {integrity: sha512-4onAvV0rzpxOZtYjUjLfeCAoSwI912ZNOgaEnRtRyyHnGP4IJYGV9iOX5eDzA7Ku7peGWjdYgjoEx9ccegeBeA==}
+  '@humanspeak/svelte-satori-fix@0.0.3':
+    resolution: {integrity: sha512-8oLATwSYZh8A/nGE1QAs5292jnBMkhBqgMtpMIl/fYzokgIR3Ds4J4ks81q+HTwTyGm7ID7tVUG/iWf7v5I3Jw==}
     peerDependencies:
       svelte: ^5.0.0
 
@@ -3623,10 +3623,6 @@ packages:
   lodash.throttle@4.1.1:
     resolution: {integrity: sha512-wIkUCfVKpVsWo3JSZlc+8MB5it+2AN5W8J7YVMST30UrvcQNZ1Okbj+rbVniijTWE6FGYy4XJq/rHkas8qJMLQ==}
 
-  lru-cache@11.2.5:
-    resolution: {integrity: sha512-vFrFJkWtJvJnD5hg+hJvVE8Lh/TcMzKnTgCWmtBipwI5yLX/iX+5UB2tfuyODF5E7k9xEzMdYgGqaSb1c0c5Yw==}
-    engines: {node: 20 || >=22}
-
   lru-cache@11.2.6:
     resolution: {integrity: sha512-ESL2CrkS/2wTPfuend7Zhkzo2u0daGJ/A2VucJOgQ/C48S/zB8MMeMHSGKYpXhIjbPxfuezITkaBH1wqv00DDQ==}
     engines: {node: 20 || >=22}
@@ -5120,7 +5116,7 @@ snapshots:
       '@csstools/css-color-parser': 4.0.1(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)
       '@csstools/css-parser-algorithms': 4.0.0(@csstools/css-tokenizer@4.0.0)
       '@csstools/css-tokenizer': 4.0.0
-      lru-cache: 11.2.5
+      lru-cache: 11.2.6
 
   '@asamuzakjp/dom-selector@6.8.1':
     dependencies:
@@ -5670,7 +5666,7 @@ snapshots:
       '@humanfs/core': 0.19.1
       '@humanwhocodes/retry': 0.4.3
 
-  '@humanspeak/svelte-satori-fix@0.0.2(svelte@5.53.5)':
+  '@humanspeak/svelte-satori-fix@0.0.3(svelte@5.53.5)':
     dependencies:
       svelte: 5.53.5
 
@@ -7404,7 +7400,7 @@ snapshots:
       '@asamuzakjp/css-color': 4.1.2
       '@csstools/css-syntax-patches-for-csstree': 1.0.26
       css-tree: 3.1.0
-      lru-cache: 11.2.5
+      lru-cache: 11.2.6
 
   data-uri-to-buffer@6.0.2: {}
 
@@ -8486,8 +8482,6 @@ snapshots:
   lodash.startcase@4.4.0: {}
 
   lodash.throttle@4.1.1: {}
-
-  lru-cache@11.2.5: {}
 
   lru-cache@11.2.6: {}
 
@@ -9621,7 +9615,7 @@ snapshots:
 
   tsx@4.21.0:
     dependencies:
-      esbuild: 0.27.2
+      esbuild: 0.27.3
       get-tsconfig: 4.13.1
     optionalDependencies:
       fsevents: 2.3.3

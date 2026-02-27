@@ -5,7 +5,6 @@
     import BreadcrumbContext from '$lib/components/contexts/Breadcrumb/BreadcrumbContext.svelte'
     import SeoContext from '$lib/components/contexts/Seo/SeoContext.svelte'
     import type { SeoContext as SeoContextType } from '$lib/components/contexts/Seo/type'
-    import { encodeMessageData } from '$lib/components/shared-link/utils'
     import { ModeWatcher } from 'mode-watcher'
     import { page } from '$app/stores'
 
@@ -25,9 +24,7 @@
     const resolvedTitle = $derived(seo.title)
     const resolvedDescription = $derived(seo.description || DEFAULT_DESCRIPTION)
     const ogImageUrl = $derived(
-        seo.ogTitle
-            ? `${$page.url.origin}/social-cards/${encodeMessageData({ title: seo.ogTitle, description: seo.ogTagline, features: seo.ogFeatures })}.png`
-            : DEFAULT_IMAGE
+        seo.ogSlug ? `${$page.url.origin}/social-cards/og-${seo.ogSlug}.png` : DEFAULT_IMAGE
     )
 
     const websiteJsonLd = `<${'script'} type="application/ld+json">${JSON.stringify({

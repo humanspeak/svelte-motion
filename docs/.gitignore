@@ -28,6 +28,9 @@ src/lib/paraglide
 # Generated registry data
 src/lib/generated
 
+# Generated social card images
+static/social-cards/
+
 .dev.vars*
 !.dev.vars.example
 .env*
