@@ -58,7 +58,6 @@
         "prettier-plugin-sort-json": "^4.2.0",
         "prettier-plugin-svelte": "^3.5.0",
         "prettier-plugin-tailwindcss": "^0.7.2",
-        "puppeteer": "^24.37.5",
         "satori": "^0.19.2",
         "satori-html": "^0.3.2",
         "shiki": "^4.0.0",
