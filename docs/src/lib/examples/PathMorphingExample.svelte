@@ -1,52 +1,75 @@
 <script lang="ts">
     import { animate, useMotionValue, useTransform } from '@humanspeak/svelte-motion'
     import { interpolate } from 'flubber'
-    import { onDestroy, onMount } from 'svelte'
+    import { onDestroy } from 'svelte'
 
-    const star = 'M 50 0 L 61 35 L 98 35 L 68 57 L 79 91 L 50 70 L 21 91 L 32 57 L 2 35 L 39 35 Z'
-    const heart =
-        'M 50 90 C 25 70 0 50 0 30 C 0 12 15 0 30 0 C 40 0 48 5 50 15 C 52 5 60 0 70 0 C 85 0 100 12 100 30 C 100 50 75 70 50 90 Z'
+    const lightning = 'M7 2v11h3v9l7-12h-4l4-8z'
     const hand =
-        'M 40 95 L 20 95 L 20 55 L 5 55 L 5 35 L 20 35 L 20 5 L 35 5 L 35 35 L 45 35 L 45 15 L 60 15 L 60 35 L 70 35 L 70 20 L 85 20 L 85 40 L 90 40 L 90 55 L 95 55 L 95 75 L 80 95 Z'
+        'M23 5.5V20c0 2.2-1.8 4-4 4h-7.3c-1.08 0-2.1-.43-2.85-1.19L1 14.83s1.26-1.23 1.3-1.25c.22-.19.49-.29.79-.29.22 0 .42.06.6.16.04.01 4.31 2.46 4.31 2.46V4c0-.83.67-1.5 1.5-1.5S11 3.17 11 4v7h1V1.5c0-.83.67-1.5 1.5-1.5S15 .67 15 1.5V11h1V2.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5V11h1V5.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5z'
     const plane =
-        'M 50 5 L 95 50 L 65 50 L 65 65 L 80 95 L 55 75 L 50 95 L 45 75 L 20 95 L 35 65 L 35 50 L 5 50 Z'
-    const lightning = 'M 55 0 L 30 50 L 50 50 L 25 100 L 75 40 L 55 40 L 80 0 Z'
+        'M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z'
+    const heart =
+        'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'
     const note =
-        'M 35 5 L 65 5 L 65 70 C 65 85 55 95 40 95 C 25 95 15 85 15 70 C 15 55 25 45 40 45 C 45 45 50 47 55 50 L 55 5 Z'
+        'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'
+    const star =
+        'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'
 
-    const paths = [star, heart, hand, plane, lightning, note]
-    const colors = ['#00cc88', '#ff0055', '#ee7752', '#0099ff', '#ffcc00', '#7c3aed']
+    // Lightning duplicated at end for seamless loop
+    const paths = [lightning, hand, plane, heart, note, star, lightning]
+    const colors = ['#fff312', '#ff0088', '#dd00ee', '#9911ff', '#0d63f8', '#0cdcf7', '#4ff0b7']
+
+    // Pre-compute flubber interpolators once (expensive operation)
+    const pathInterpolators = paths.map((p, i) => {
+        if (i === paths.length - 1) return null // last→first not needed (we snap)
+        return interpolate(p, paths[i + 1], { maxSegmentLength: 0.1 })
+    })
 
     const progress = useMotionValue(0)
 
-    const indices = paths.map((_, i) => i)
-    const fill = useTransform(progress, indices, colors)
-    const path = useTransform(progress, indices, paths, {
-        mixer: (a, b) => interpolate(a as string, b as string, { maxSegmentLength: 0.1 })
-    })
+    const fill = useTransform(
+        progress,
+        paths.map((_, i) => i),
+        colors
+    )
 
+    // Use function form — calls cheap pre-computed interpolator per frame
+    const path = useTransform(() => {
+        const v = progress.get()
+        const i = Math.min(Math.floor(v), paths.length - 2)
+        const t = v - i
+        if (t < 0.001) return paths[Math.max(0, i)]
+        const interp = pathInterpolators[i]
+        if (!interp) return paths[i]
+        return interp(t)
+    }, [progress])
+
+    let pathIndex = $state(0)
     let animation: ReturnType<typeof animate> | undefined
-    let mounted = false
 
-    function startAnimation(from: number) {
-        const to = from + 1 >= paths.length ? 0 : from + 1
-        animation = animate(from, to, {
-            duration: 0.8,
+    $effect(() => {
+        // Read pathIndex to subscribe
+        const target = pathIndex
+
+        animation?.stop()
+
+        animation = animate(progress.get(), target, {
+            duration: 1.0,
             ease: 'easeInOut',
             onUpdate: (v: number) => progress.set(v),
             onComplete: () => {
-                if (mounted) startAnimation(to)
+                if (target === paths.length - 1) {
+                    // Snap back to 0 (same shape — lightning) then animate to 1
+                    progress.set(0)
+                    pathIndex = 1
+                } else {
+                    pathIndex = target + 1
+                }
             }
         })
-    }
-
-    onMount(() => {
-        mounted = true
-        startAnimation(0)
     })
 
     onDestroy(() => {
-        mounted = false
         animation?.stop()
     })
 </script>
@@ -54,7 +77,9 @@
 <div
     style="display: flex; align-items: center; justify-content: center; width: 100%; min-height: 300px;"
 >
-    <svg width="200" height="200" viewBox="0 0 100 100">
-        <path d={$path} fill={$fill} />
+    <svg width="400" height="400">
+        <g transform="translate(10 10) scale(17 17)">
+            <path d={$path} fill={$fill} />
+        </g>
     </svg>
 </div>
