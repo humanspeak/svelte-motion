@@ -61,7 +61,8 @@ const config = {
                     'https://*.ingest.us.sentry.io',
                     'https://*.ahrefs.com',
                     'https://*.posthog.com',
-                    'unsafe-inline'
+                    'unsafe-inline',
+                    'wasm-unsafe-eval'
                 ],
                 'style-src': ['self', 'unsafe-inline', 'https://kit.fontawesome.com'],
                 'img-src': ['self', 'data:', 'https:'],
