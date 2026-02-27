@@ -7,16 +7,14 @@ description: "An overview of motion values — reactive stores that drive animat
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()
-  $effect(() => {
-      if (seo) {
-          seo.title = 'Motion values | Docs | Svelte Motion'
-          seo.description = 'An overview of motion values — reactive Svelte stores that drive animations outside the render cycle.'
-          seo.ogTitle = 'Motion Values'
-          seo.ogTagline = 'Reactive values that drive animations outside the render cycle'
-          seo.ogFeatures = ['Reactive Stores', 'Velocity Tracking', 'Composable', 'Render-Free']
-          seo.ogSlug = 'docs-motion-values'
-      }
-  })
+  if (seo) {
+      seo.title = 'Motion values | Docs | Svelte Motion'
+      seo.description = 'An overview of motion values — reactive Svelte stores that drive animations outside the render cycle.'
+      seo.ogTitle = 'Motion Values'
+      seo.ogTagline = 'Reactive values that drive animations outside the render cycle'
+      seo.ogFeatures = ['Reactive Stores', 'Velocity Tracking', 'Composable', 'Render-Free']
+      seo.ogSlug = 'docs-motion-values'
+  }
 </script>
 
 # Motion values overview

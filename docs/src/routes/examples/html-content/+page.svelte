@@ -7,24 +7,22 @@
     const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
-    $effect(() => {
-        if (breadcrumbs) {
-            breadcrumbs.breadcrumbs = [
-                { title: 'Examples', href: '/examples' },
-                { title: 'HTML Content' }
-            ]
-        }
-        if (seo) {
-            seo.title = 'HTML Content | Examples | Svelte Motion'
-            seo.description =
-                'Animate HTML content with smooth enter and exit transitions using Svelte Motion. Demonstrates AnimatePresence with dynamic HTML elements.'
-            seo.ogTitle = 'HTML Content'
-            seo.ogTagline =
-                'Animate HTML content with smooth enter and exit transitions using Svelte Motion'
-            seo.ogFeatures = ['AnimatePresence', 'Enter/Exit', 'Dynamic HTML', 'Smooth Transitions']
-            seo.ogSlug = 'examples-html-content'
-        }
-    })
+    if (breadcrumbs) {
+        breadcrumbs.breadcrumbs = [
+            { title: 'Examples', href: '/examples' },
+            { title: 'HTML Content' }
+        ]
+    }
+    if (seo) {
+        seo.title = 'HTML Content | Examples | Svelte Motion'
+        seo.description =
+            'Animate HTML content with smooth enter and exit transitions using Svelte Motion. Demonstrates AnimatePresence with dynamic HTML elements.'
+        seo.ogTitle = 'HTML Content'
+        seo.ogTagline =
+            'Animate HTML content with smooth enter and exit transitions using Svelte Motion'
+        seo.ogFeatures = ['AnimatePresence', 'Enter/Exit', 'Dynamic HTML', 'Smooth Transitions']
+        seo.ogSlug = 'examples-html-content'
+    }
 </script>
 
 <Example title="HTML Content" sourceUrl={data.sourceUrl}>

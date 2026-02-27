@@ -4,7 +4,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "tsx ./scripts/generate-social-cards.ts && node ./scripts/generate-registry.mjs && vite build",
+        "build": "tsx ./scripts/fetch-github-stats.ts && tsx ./scripts/generate-social-cards.ts && node ./scripts/generate-registry.mjs && vite build",
         "cf-typegen": "wrangler types src/worker-configuration.d.ts",
         "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
         "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",

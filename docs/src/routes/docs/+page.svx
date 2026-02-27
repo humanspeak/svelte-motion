@@ -13,16 +13,14 @@ description: "Svelte Motion is a Svelte animation library for building smooth, p
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()
-  $effect(() => {
-      if (seo) {
-          seo.title = 'Get Started | Docs | Svelte Motion'
-          seo.description = 'Get started with Svelte Motion, a Svelte animation library for smooth, production-grade UI animations with spring physics and gestures.'
-          seo.ogTitle = 'Get Started'
-          seo.ogTagline = 'Build smooth, production-grade UI animations with Svelte Motion'
-          seo.ogFeatures = ['Simple API', 'Spring Physics', 'Gesture Support', 'Scroll Effects']
-          seo.ogSlug = 'docs'
-      }
-  })
+  if (seo) {
+      seo.title = 'Get Started | Docs | Svelte Motion'
+      seo.description = 'Get started with Svelte Motion, a Svelte animation library for smooth, production-grade UI animations with spring physics and gestures.'
+      seo.ogTitle = 'Get Started'
+      seo.ogTagline = 'Build smooth, production-grade UI animations with Svelte Motion'
+      seo.ogFeatures = ['Simple API', 'Spring Physics', 'Gesture Support', 'Scroll Effects']
+      seo.ogSlug = 'docs'
+  }
 </script>
 
 # Get started with Svelte Motion

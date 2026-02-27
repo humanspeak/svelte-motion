@@ -6,29 +6,22 @@
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
-    $effect(() => {
-        if (breadcrumbs) {
-            breadcrumbs.breadcrumbs = [
-                { title: 'Examples', href: '/examples' },
-                { title: 'Variants Propagation' }
-            ]
-        }
-        if (seo) {
-            seo.title = 'Variants Propagation | Examples | Svelte Motion'
-            seo.description =
-                'Propagate variant animations through nested component trees with Svelte Motion. Parent state changes automatically cascade to child elements.'
-            seo.ogTitle = 'Variants Propagation'
-            seo.ogTagline =
-                'Propagate variant animations through nested component trees with Svelte Motion'
-            seo.ogFeatures = [
-                'Parent Cascade',
-                'Nested Trees',
-                'Auto Propagation',
-                'Variant States'
-            ]
-            seo.ogSlug = 'examples-variants-propagation'
-        }
-    })
+    if (breadcrumbs) {
+        breadcrumbs.breadcrumbs = [
+            { title: 'Examples', href: '/examples' },
+            { title: 'Variants Propagation' }
+        ]
+    }
+    if (seo) {
+        seo.title = 'Variants Propagation | Examples | Svelte Motion'
+        seo.description =
+            'Propagate variant animations through nested component trees with Svelte Motion. Parent state changes automatically cascade to child elements.'
+        seo.ogTitle = 'Variants Propagation'
+        seo.ogTagline =
+            'Propagate variant animations through nested component trees with Svelte Motion'
+        seo.ogFeatures = ['Parent Cascade', 'Nested Trees', 'Auto Propagation', 'Variant States']
+        seo.ogSlug = 'examples-variants-propagation'
+    }
 </script>
 
 <Example title="Variants Propagation">

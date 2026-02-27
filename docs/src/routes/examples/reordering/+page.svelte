@@ -7,24 +7,22 @@
     const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
-    $effect(() => {
-        if (breadcrumbs) {
-            breadcrumbs.breadcrumbs = [
-                { title: 'Examples', href: '/examples' },
-                { title: 'Reordering' }
-            ]
-        }
-        if (seo) {
-            seo.title = 'Reordering | Examples | Svelte Motion'
-            seo.description =
-                'Drag-to-reorder list items with smooth layout animations using Svelte Motion. Demonstrates drag gestures and automatic layout transitions.'
-            seo.ogTitle = 'Reordering'
-            seo.ogTagline =
-                'Drag-to-reorder list items with smooth layout animations using Svelte Motion'
-            seo.ogFeatures = ['Drag Gestures', 'Layout Animation', 'List Reorder', 'Smooth FLIP']
-            seo.ogSlug = 'examples-reordering'
-        }
-    })
+    if (breadcrumbs) {
+        breadcrumbs.breadcrumbs = [
+            { title: 'Examples', href: '/examples' },
+            { title: 'Reordering' }
+        ]
+    }
+    if (seo) {
+        seo.title = 'Reordering | Examples | Svelte Motion'
+        seo.description =
+            'Drag-to-reorder list items with smooth layout animations using Svelte Motion. Demonstrates drag gestures and automatic layout transitions.'
+        seo.ogTitle = 'Reordering'
+        seo.ogTagline =
+            'Drag-to-reorder list items with smooth layout animations using Svelte Motion'
+        seo.ogFeatures = ['Drag Gestures', 'Layout Animation', 'List Reorder', 'Smooth FLIP']
+        seo.ogSlug = 'examples-reordering'
+    }
 </script>
 
 <Example title="Reordering" sourceUrl={data.sourceUrl}>

@@ -6,29 +6,22 @@
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
-    $effect(() => {
-        if (breadcrumbs) {
-            breadcrumbs.breadcrumbs = [
-                { title: 'Examples', href: '/examples' },
-                { title: 'Characters Remaining' }
-            ]
-        }
-        if (seo) {
-            seo.title = 'Characters Remaining | Examples | Svelte Motion'
-            seo.description =
-                'Character counter with spring-based bounce animation and color-mapped feedback built with Svelte Motion for smooth, reactive UI updates.'
-            seo.ogTitle = 'Characters Remaining'
-            seo.ogTagline =
-                'Character counter with spring-based bounce animation and color-mapped feedback'
-            seo.ogFeatures = [
-                'Spring Bounce',
-                'Color Mapping',
-                'Reactive Updates',
-                'Visual Feedback'
-            ]
-            seo.ogSlug = 'examples-characters-remaining'
-        }
-    })
+    if (breadcrumbs) {
+        breadcrumbs.breadcrumbs = [
+            { title: 'Examples', href: '/examples' },
+            { title: 'Characters Remaining' }
+        ]
+    }
+    if (seo) {
+        seo.title = 'Characters Remaining | Examples | Svelte Motion'
+        seo.description =
+            'Character counter with spring-based bounce animation and color-mapped feedback built with Svelte Motion for smooth, reactive UI updates.'
+        seo.ogTitle = 'Characters Remaining'
+        seo.ogTagline =
+            'Character counter with spring-based bounce animation and color-mapped feedback'
+        seo.ogFeatures = ['Spring Bounce', 'Color Mapping', 'Reactive Updates', 'Visual Feedback']
+        seo.ogSlug = 'examples-characters-remaining'
+    }
 </script>
 
 <Example

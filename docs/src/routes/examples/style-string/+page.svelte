@@ -6,24 +6,22 @@
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
-    $effect(() => {
-        if (breadcrumbs) {
-            breadcrumbs.breadcrumbs = [
-                { title: 'Examples', href: '/examples' },
-                { title: 'styleString' }
-            ]
-        }
-        if (seo) {
-            seo.title = 'styleString | Examples | Svelte Motion'
-            seo.description =
-                'Reactive style strings with automatic unit handling via the Svelte Motion styleString utility. Simplifies dynamic inline styles in components.'
-            seo.ogTitle = 'styleString'
-            seo.ogTagline =
-                'Reactive style strings with automatic unit handling via the Svelte Motion styleString utility'
-            seo.ogFeatures = ['Auto Units', 'Reactive CSS', 'Dynamic Styles', 'Style Objects']
-            seo.ogSlug = 'examples-style-string'
-        }
-    })
+    if (breadcrumbs) {
+        breadcrumbs.breadcrumbs = [
+            { title: 'Examples', href: '/examples' },
+            { title: 'styleString' }
+        ]
+    }
+    if (seo) {
+        seo.title = 'styleString | Examples | Svelte Motion'
+        seo.description =
+            'Reactive style strings with automatic unit handling via the Svelte Motion styleString utility. Simplifies dynamic inline styles in components.'
+        seo.ogTitle = 'styleString'
+        seo.ogTagline =
+            'Reactive style strings with automatic unit handling via the Svelte Motion styleString utility'
+        seo.ogFeatures = ['Auto Units', 'Reactive CSS', 'Dynamic Styles', 'Style Objects']
+        seo.ogSlug = 'examples-style-string'
+    }
 </script>
 
 <Example title="styleString">

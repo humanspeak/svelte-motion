@@ -8,32 +8,31 @@
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import { goto } from '$app/navigation'
+    import githubStats from '$lib/github-stats.json'
 
     // mounted no longer needed for CSS enter
     let headingContainer: HTMLDivElement | null = $state(null)
     const breadcrumbContext = $state<BreadcrumbContext | undefined>(getBreadcrumbContext())
     const seo = getSeoContext()
 
-    $effect(() => {
-        if (breadcrumbContext) {
-            breadcrumbContext.breadcrumbs = []
-        }
-        if (seo) {
-            seo.title = 'Svelte Motion - Animation Library for Svelte'
-            seo.description =
-                'Svelte Motion is a Framer Motion-compatible animation library for Svelte 5. Spring physics, gestures, layout animations, exit animations, and scroll effects with a familiar declarative API.'
-            seo.ogTitle = 'Svelte Motion'
-            seo.ogTagline =
-                'Spring physics, gestures, layout animations, exit animations, and scroll effects with a familiar declarative API.'
-            seo.ogFeatures = [
-                'AnimatePresence',
-                'Spring Physics',
-                'Gestures & Drag',
-                'Layout Animation'
-            ]
-            seo.ogSlug = 'home'
-        }
-    })
+    if (breadcrumbContext) {
+        breadcrumbContext.breadcrumbs = []
+    }
+    if (seo) {
+        seo.title = 'Svelte Motion - Animation Library for Svelte'
+        seo.description =
+            'Svelte Motion is a Framer Motion-compatible animation library for Svelte 5. Spring physics, gestures, layout animations, exit animations, and scroll effects with a familiar declarative API.'
+        seo.ogTitle = 'Svelte Motion'
+        seo.ogTagline =
+            'Spring physics, gestures, layout animations, exit animations, and scroll effects with a familiar declarative API.'
+        seo.ogFeatures = [
+            'AnimatePresence',
+            'Spring Physics',
+            'Gestures & Drag',
+            'Layout Animation'
+        ]
+        seo.ogSlug = 'home'
+    }
 
     function splitHeadingWords(root: HTMLElement) {
         const lines = root.querySelectorAll('h1 span')
@@ -121,7 +120,13 @@
             price: '0',
             priceCurrency: 'USD'
         },
-        license: 'https://opensource.org/licenses/MIT'
+        license: 'https://opensource.org/licenses/MIT',
+        aggregateRating: {
+            '@type': 'AggregateRating',
+            ratingValue: '5',
+            ratingCount: String(githubStats.stars),
+            bestRating: '5'
+        }
     })}</${'script'}>`
 </script>
 

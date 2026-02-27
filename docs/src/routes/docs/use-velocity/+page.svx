@@ -7,16 +7,14 @@ description: "Track the velocity of a reactive store value in units per second."
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()
-  $effect(() => {
-      if (seo) {
-          seo.title = 'useVelocity | Docs | Svelte Motion'
-          seo.description = 'Track the velocity of a reactive store value in units per second. Use velocity to create momentum-based effects with Svelte Motion.'
-          seo.ogTitle = 'useVelocity'
-          seo.ogTagline = 'Track the velocity of a motion value'
-          seo.ogFeatures = ['Velocity Tracking', 'Units Per Second', 'Momentum Effects', 'Derived Store']
-          seo.ogSlug = 'docs-use-velocity'
-      }
-  })
+  if (seo) {
+      seo.title = 'useVelocity | Docs | Svelte Motion'
+      seo.description = 'Track the velocity of a reactive store value in units per second. Use velocity to create momentum-based effects with Svelte Motion.'
+      seo.ogTitle = 'useVelocity'
+      seo.ogTagline = 'Track the velocity of a motion value'
+      seo.ogFeatures = ['Velocity Tracking', 'Units Per Second', 'Momentum Effects', 'Derived Store']
+      seo.ogSlug = 'docs-use-velocity'
+  }
 </script>
 
 # useVelocity
