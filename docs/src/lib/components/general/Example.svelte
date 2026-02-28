@@ -16,7 +16,7 @@
 
     const sourceHost = $derived.by(() => {
         if (!sourceUrl) return ''
-        const host = new URL(sourceUrl).hostname.replace(/^www\./i, '')
+        const host = new URL(sourceUrl).hostname.replace(/^www\./i, '').replace(/^examples\./i, '')
         return host.charAt(0).toUpperCase() + host.slice(1)
     })
 

@@ -28,6 +28,7 @@
         "@inlang/paraglide-js": "^2.13.0",
         "@sentry/sveltekit": "^10.40.0",
         "bits-ui": "^2.16.2",
+        "flubber": "^0.4.2",
         "github-slugger": "^2.0.0",
         "runed": "^0.37.1"
     },
@@ -42,6 +43,7 @@
         "@sveltejs/vite-plugin-svelte": "^6.2.4",
         "@tailwindcss/typography": "^0.5.19",
         "@tailwindcss/vite": "^4.2.1",
+        "@types/flubber": "^0.4.0",
         "@vitest/browser": "^4.0.18",
         "chokidar-cli": "^3.0.0",
         "clsx": "^2.1.1",
