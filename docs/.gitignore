@@ -30,6 +30,11 @@ src/lib/generated
 
 # Generated social card images
 static/social-cards/
+static/og-default.png
+static/twitter-default.png
+
+# Generated sitemap manifest
+src/lib/sitemap-manifest.json
 
 # Generated GitHub stats (build artifact)
 src/lib/github-stats.json
