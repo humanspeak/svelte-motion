@@ -22,7 +22,8 @@
 
     // Top-level assignment runs during SSR
     if (breadcrumbs) {
-        breadcrumbs.breadcrumbs = [{ title: 'Docs', href: '/docs' }, { title: 'Get Started' }]
+        const initialTitle = (page.data?.title as string | undefined) || 'Get Started'
+        breadcrumbs.breadcrumbs = [{ title: 'Docs', href: '/docs' }, { title: initialTitle }]
     }
 
     // $effect updates breadcrumbs on client-side navigation
