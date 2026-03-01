@@ -2,6 +2,7 @@
     import '../app.css'
     import { MotionConfig } from '@humanspeak/svelte-motion'
     import BreadcrumbContext from '$lib/components/contexts/Breadcrumb/BreadcrumbContext.svelte'
+    import BreadcrumbJsonLd from '$lib/components/contexts/Breadcrumb/BreadcrumbJsonLd.svelte'
     import SeoContext from '$lib/components/contexts/Seo/SeoContext.svelte'
     import SeoHead from '$lib/components/contexts/Seo/SeoHead.svelte'
     import type { SeoContext as SeoContextType } from '$lib/components/contexts/Seo/type'
@@ -20,6 +21,7 @@
 
 <ModeWatcher />
 <BreadcrumbContext>
+    <BreadcrumbJsonLd />
     <SeoContext {seo}>
         <MotionConfig transition={{ duration: 0.5 }}>
             {@render children?.()}
