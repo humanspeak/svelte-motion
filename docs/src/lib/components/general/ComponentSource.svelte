@@ -133,6 +133,7 @@
                     </Dialog.Description>
                 </div>
                 <Dialog.Close
+                    aria-label="Close"
                     class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     <X size={16} />
