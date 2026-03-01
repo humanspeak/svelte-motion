@@ -18,7 +18,7 @@
     let headings: { id: string; text: string; level: number; element: HTMLElement }[] = $state([])
 
     // Create breadcrumb store and context
-    const breadcrumbs = $derived(getBreadcrumbContext())
+    const breadcrumbs = getBreadcrumbContext()
 
     // Top-level assignment runs during SSR
     if (breadcrumbs) {

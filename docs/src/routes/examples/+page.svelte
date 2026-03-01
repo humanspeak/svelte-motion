@@ -17,7 +17,7 @@
 
     const { data }: { data: PageData } = $props()
 
-    const breadcrumbs = $derived(getBreadcrumbContext())
+    const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
         breadcrumbs.breadcrumbs = [{ title: 'Examples' }]
