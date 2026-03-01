@@ -3,6 +3,7 @@
     import { cn } from '$lib/shadcn/utils'
     import * as m from '$msgs'
     import type { Snippet } from 'svelte'
+    import { LayoutGrid, ExternalLink, RotateCw } from '@lucide/svelte'
 
     type ExampleProps = {
         children: Snippet
@@ -42,7 +43,7 @@
                     whileHover={{ scale: 1.1 }}
                     class="inline-flex items-center justify-center gap-1.5 rounded-md border border-border-muted px-2 py-1 text-sm text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
                 >
-                    <i class="fa-solid fa-grid-2 fa-xs"></i>
+                    <LayoutGrid size={12} />
                     {m.example_examples()}
                 </motion.a>
             {/if}
@@ -53,7 +54,7 @@
                     whileHover={{ scale: 1.1 }}
                     class="inline-flex items-center justify-center gap-1.5 rounded-md border border-border-muted px-2 py-1 text-sm text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
                 >
-                    <i class="fa-solid fa-arrow-up-right-from-square fa-xs"></i>
+                    <ExternalLink size={12} />
                     {m.example_open()}
                 </motion.a>
             {/if}
@@ -76,7 +77,7 @@
                 whileHover={{ scale: 1.1 }}
                 class="inline-flex size-6 items-center justify-center rounded-full border border-border-muted text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
             >
-                <i class="fa-solid fa-rotate-right fa-xs"></i>
+                <RotateCw size={12} />
             </motion.button>
         </div>
     </div>

@@ -7,6 +7,7 @@ description: Drop-in animated replacement for shadcn Tabs with a spring-based sl
   import * as Tabs from '$lib/shadcn/ui/tabs'
   import ComponentSource from '$lib/components/general/ComponentSource.svelte'
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import { Download } from '@lucide/svelte'
 
   const { data } = $props()
 
@@ -26,7 +27,7 @@ description: Drop-in animated replacement for shadcn Tabs with a spring-based sl
 <div class="not-prose mb-6 flex flex-wrap items-center justify-between gap-2">
   {#if data.downloads !== null}
   <span class="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-sm text-muted-foreground">
-    <i class="fa-solid fa-download text-xs"></i>
+    <Download size={12} />
     {data.downloads.toLocaleString()} installs
   </span>
   {/if}

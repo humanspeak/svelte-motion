@@ -1,6 +1,7 @@
 <script lang="ts">
     import { useTime } from '@humanspeak/svelte-motion'
     import { derived } from 'svelte/store'
+    import { Link } from '@lucide/svelte'
 
     // All elements use the same shared timeline
     const time = useTime('synced-timeline')
@@ -51,7 +52,7 @@
     <!-- Sync indicator -->
     <div class="sync-info">
         <div class="sync-badge">
-            <i class="fa-solid fa-link"></i>
+            <Link size={14} />
             Synchronized Timeline
         </div>
         <div class="values-container">

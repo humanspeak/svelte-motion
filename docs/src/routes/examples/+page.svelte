@@ -5,6 +5,7 @@
     import { cn } from '$lib/shadcn/utils'
     import sitemapManifest from '$lib/sitemap-manifest.json'
     import type { PageData } from './$types'
+    import { Play, ArrowRight, BookOpen } from '@lucide/svelte'
 
     type ExampleData = {
         title: string
@@ -16,7 +17,7 @@
 
     const { data }: { data: PageData } = $props()
 
-    const breadcrumbs = $derived(getBreadcrumbContext())
+    const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
         breadcrumbs.breadcrumbs = [{ title: 'Examples' }]
@@ -144,7 +145,7 @@
                     <div
                         class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 transition-transform duration-300 group-hover:scale-110"
                     >
-                        <i class="fa-solid fa-play text-lg text-white"></i>
+                        <Play size={18} class="text-white" />
                     </div>
 
                     <h3
@@ -162,9 +163,10 @@
                         class="flex items-center text-sm font-medium text-brand-600 group-hover:text-brand-700"
                     >
                         View Example
-                        <i
-                            class="fa-solid fa-arrow-right ml-2 transition-transform duration-200 group-hover:translate-x-1"
-                        ></i>
+                        <ArrowRight
+                            size={14}
+                            class="ml-2 transition-transform duration-200 group-hover:translate-x-1"
+                        />
                     </div>
                 </div>
 
@@ -197,7 +199,7 @@
                 whileTap={{ scale: 0.95 }}
             >
                 View Documentation
-                <i class="fa-solid fa-book ml-2"></i>
+                <BookOpen size={16} class="ml-2" />
             </motion.a>
         </div>
     </motion.div>

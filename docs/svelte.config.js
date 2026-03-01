@@ -57,20 +57,14 @@ const config = {
                 'default-src': ['self'],
                 'script-src': [
                     'self',
-                    'https://kit.fontawesome.com',
                     'https://*.ingest.us.sentry.io',
                     'https://*.ahrefs.com',
                     'https://*.posthog.com',
                     'unsafe-inline'
                 ],
-                'style-src': ['self', 'unsafe-inline', 'https://kit.fontawesome.com'],
+                'style-src': ['self', 'unsafe-inline'],
                 'img-src': ['self', 'data:', 'https:'],
-                'font-src': [
-                    'self',
-                    'data:',
-                    'https://kit.fontawesome.com',
-                    'https://ka-p.fontawesome.com'
-                ],
+                'font-src': ['self', 'data:'],
                 'worker-src': ['self', 'blob:'],
                 'connect-src': ['self', 'https:'],
                 'frame-ancestors': ['none'],

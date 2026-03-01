@@ -2,6 +2,16 @@
     import { Dialog } from 'bits-ui'
     import { AnimatePresence, motion } from '@humanspeak/svelte-motion'
     import { registryItems } from '$lib/generated/registry-data'
+    import {
+        Code,
+        ChevronRight,
+        ChevronDown,
+        X,
+        Folder,
+        FileCode,
+        Copy,
+        Check
+    } from '@lucide/svelte'
 
     type Props = {
         slug: string
@@ -38,7 +48,7 @@
         return map[ext ?? ''] ?? 'text'
     }
 
-    // Map file extension to an icon: SVG path or null (fallback to FontAwesome)
+    // Map file extension to an icon: SVG path or null (fallback to generic file icon)
     const getFileIcon = (target: string): string | null => {
         const ext = target.split('.').pop()
         const map: Record<string, string> = {
@@ -104,9 +114,9 @@
     <Dialog.Trigger
         class="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground shadow-xs transition-colors hover:bg-secondary/80"
     >
-        <i class="fa-solid fa-code text-xs"></i>
+        <Code size={12} />
         Component Source
-        <i class="fa-solid fa-chevron-right text-[10px] text-muted-foreground"></i>
+        <ChevronRight size={10} class="text-muted-foreground" />
     </Dialog.Trigger>
 
     <Dialog.Portal>
@@ -123,9 +133,10 @@
                     </Dialog.Description>
                 </div>
                 <Dialog.Close
+                    aria-label="Close"
                     class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-                    <i class="fa-solid fa-xmark"></i>
+                    <X size={16} />
                 </Dialog.Close>
             </div>
 
@@ -145,9 +156,8 @@
                         <div
                             class="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-foreground"
                         >
-                            <i class="fa-solid fa-chevron-down text-[9px] text-muted-foreground"
-                            ></i>
-                            <i class="fa-solid fa-folder text-[11px] text-brand-400"></i>
+                            <ChevronDown size={9} class="text-muted-foreground" />
+                            <Folder size={11} class="text-brand-400" />
                             {folderName}
                         </div>
                         <!-- File list -->
@@ -166,7 +176,7 @@
                                         class="h-3.5 w-3.5 flex-shrink-0 opacity-60 grayscale"
                                     />
                                 {:else}
-                                    <i class="fa-solid fa-file-code flex-shrink-0 text-[10px]"></i>
+                                    <FileCode size={10} class="flex-shrink-0" />
                                 {/if}
                                 <span class="truncate">{getFileName(file.target)}</span>
                             </button>
@@ -186,7 +196,7 @@
                                     class="h-4 w-4 opacity-60 grayscale"
                                 />
                             {:else}
-                                <i class="fa-solid fa-file-code text-xs text-muted-foreground"></i>
+                                <FileCode size={12} class="text-muted-foreground" />
                             {/if}
                             <!-- Mobile: file selector dropdown -->
                             <select
@@ -216,23 +226,27 @@
                         >
                             <AnimatePresence mode="wait">
                                 {#if copied}
-                                    <motion.i
+                                    <motion.span
                                         key="check"
-                                        class="fa-solid fa-check absolute text-success"
+                                        class="absolute text-success"
                                         initial={{ opacity: 0, scale: 0.5 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         exit={{ opacity: 0, scale: 0.5 }}
                                         transition={{ duration: 0.2 }}
-                                    />
+                                    >
+                                        <Check size={14} />
+                                    </motion.span>
                                 {:else}
-                                    <motion.i
+                                    <motion.span
                                         key="copy"
-                                        class="fa-solid fa-copy absolute"
+                                        class="absolute"
                                         initial={{ opacity: 0, scale: 0.5 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         exit={{ opacity: 0, scale: 0.5 }}
                                         transition={{ duration: 0.2 }}
-                                    />
+                                    >
+                                        <Copy size={14} />
+                                    </motion.span>
                                 {/if}
                             </AnimatePresence>
                         </motion.button>

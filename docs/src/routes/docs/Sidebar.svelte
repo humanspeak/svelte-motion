@@ -1,22 +1,73 @@
 <!--
   Left sidebar navigation component
-  Hierarchical structure with FontAwesome icons, collapsible sections, and proper styling
+  Hierarchical structure with Lucide icons, collapsible sections, and proper styling
 -->
 <script lang="ts">
     import { motion } from '@humanspeak/svelte-motion'
     import { slide } from 'svelte/transition'
     import { PersistedState } from 'runed'
+    import type { Component } from 'svelte'
+    import {
+        Play,
+        Ghost,
+        Layers,
+        Move,
+        Hand,
+        Signal,
+        Code,
+        Zap,
+        ArrowUpDown,
+        Activity,
+        Timer,
+        SlidersHorizontal,
+        Gauge,
+        Clock,
+        Wand,
+        MousePointer,
+        Columns2,
+        Heart,
+        Compass,
+        Box,
+        ChevronDown,
+        ArrowRight,
+        ExternalLink
+    } from '@lucide/svelte'
+
+    const iconMap = {
+        play: Play,
+        ghost: Ghost,
+        layers: Layers,
+        move: Move,
+        hand: Hand,
+        signal: Signal,
+        code: Code,
+        zap: Zap,
+        'arrow-up-down': ArrowUpDown,
+        activity: Activity,
+        timer: Timer,
+        'sliders-horizontal': SlidersHorizontal,
+        gauge: Gauge,
+        clock: Clock,
+        wand: Wand,
+        'mouse-pointer': MousePointer,
+        columns2: Columns2,
+        heart: Heart,
+        compass: Compass,
+        box: Box
+    } as const satisfies Record<string, Component>
+
+    type IconKey = keyof typeof iconMap
 
     type NavItem = {
         title: string
         href: string
-        icon: string
+        icon: IconKey
         external?: boolean
     }
 
     type NavSection = {
         title: string
-        icon: string
+        icon: IconKey
         items: NavItem[]
     }
 
@@ -37,7 +88,7 @@
         otherProjectsRaw.map((project) => ({
             title: formatTitle(project.slug),
             href: project.url,
-            icon: 'fa-solid fa-heart',
+            icon: 'heart',
             external: true
         }))
     )
@@ -46,151 +97,151 @@
     const navigation: NavSection[] = $derived([
         {
             title: 'Get started',
-            icon: 'fa-solid fa-play',
-            items: [{ title: 'Get started', href: '/docs', icon: 'fa-solid fa-play' }]
+            icon: 'play',
+            items: [{ title: 'Get started', href: '/docs', icon: 'play' }]
         },
         {
             title: 'Components',
-            icon: 'fa-solid fa-ghost',
+            icon: 'ghost',
             items: [
                 {
                     title: 'AnimatePresence',
                     href: '/docs/animate-presence',
-                    icon: 'fa-solid fa-ghost'
+                    icon: 'ghost'
                 }
             ]
         },
         {
             title: 'Animation',
-            icon: 'fa-solid fa-layer-group',
+            icon: 'layers',
             items: [
                 {
                     title: 'Layout Animations',
                     href: '/docs/layout-animations',
-                    icon: 'fa-solid fa-up-down-left-right'
+                    icon: 'move'
                 },
                 {
                     title: 'Variants',
                     href: '/docs/variants',
-                    icon: 'fa-solid fa-layer-group'
+                    icon: 'layers'
                 }
             ]
         },
         {
             title: 'Gestures',
-            icon: 'fa-solid fa-hand',
+            icon: 'hand',
             items: [
                 {
                     title: 'Drag',
                     href: '/docs/drag',
-                    icon: 'fa-solid fa-hand'
+                    icon: 'hand'
                 }
             ]
         },
         {
             title: 'Motion values',
-            icon: 'fa-solid fa-signal',
+            icon: 'signal',
             items: [
                 {
                     title: 'Overview',
                     href: '/docs/motion-values',
-                    icon: 'fa-solid fa-signal'
+                    icon: 'signal'
                 },
                 {
                     title: 'useMotionTemplate',
                     href: '/docs/use-motion-template',
-                    icon: 'fa-solid fa-code'
+                    icon: 'code'
                 },
                 {
                     title: 'useMotionValueEvent',
                     href: '/docs/use-motion-value-event',
-                    icon: 'fa-solid fa-bolt'
+                    icon: 'zap'
                 },
                 {
                     title: 'useScroll',
                     href: '/docs/use-scroll',
-                    icon: 'fa-solid fa-arrows-up-down'
+                    icon: 'arrow-up-down'
                 },
                 {
                     title: 'useSpring',
                     href: '/docs/use-spring',
-                    icon: 'fa-solid fa-wave-square'
+                    icon: 'activity'
                 },
                 {
                     title: 'useTime',
                     href: '/docs/use-time',
-                    icon: 'fa-solid fa-stopwatch'
+                    icon: 'timer'
                 },
                 {
                     title: 'useTransform',
                     href: '/docs/use-transform',
-                    icon: 'fa-solid fa-sliders'
+                    icon: 'sliders-horizontal'
                 },
                 {
                     title: 'useVelocity',
                     href: '/docs/use-velocity',
-                    icon: 'fa-solid fa-gauge-high'
+                    icon: 'gauge'
                 }
             ]
         },
         {
             title: 'Hooks',
-            icon: 'fa-solid fa-clock',
+            icon: 'clock',
             items: [
                 {
                     title: 'useAnimationFrame',
                     href: '/docs/use-animation-frame',
-                    icon: 'fa-solid fa-clock'
+                    icon: 'clock'
                 }
             ]
         },
         {
             title: 'Utilities',
-            icon: 'fa-solid fa-wand-magic-sparkles',
+            icon: 'wand',
             items: [
                 {
                     title: 'styleString',
                     href: '/docs/style-string',
-                    icon: 'fa-solid fa-wand-magic-sparkles'
+                    icon: 'wand'
                 }
             ]
         },
         {
             title: 'shadcn/ui',
-            icon: 'fa-solid fa-hand-pointer',
+            icon: 'mouse-pointer',
             items: [
                 {
                     title: 'Button',
                     href: '/docs/shadcn-button',
-                    icon: 'fa-solid fa-hand-pointer'
+                    icon: 'mouse-pointer'
                 },
                 {
                     title: 'Tabs',
                     href: '/docs/shadcn-tabs',
-                    icon: 'fa-solid fa-table-columns'
+                    icon: 'columns2'
                 }
             ]
         },
         {
             title: 'Love and Respect',
-            icon: 'fa-solid fa-heart',
+            icon: 'heart',
             items: [
                 {
                     title: 'Beye.ai',
                     href: 'https://beye.ai',
-                    icon: 'fa-solid fa-heart',
+                    icon: 'heart',
                     external: true
                 },
                 {
                     title: 'Emil',
                     href: 'https://animations.dev/',
-                    icon: 'fa-solid fa-compass-drafting',
+                    icon: 'compass',
                     external: true
                 },
                 {
                     title: 'shadcn-svelte',
                     href: 'https://www.shadcn-svelte.com',
-                    icon: 'fa-solid fa-cube',
+                    icon: 'box',
                     external: true
                 }
             ]
@@ -199,7 +250,7 @@
             ? [
                   {
                       title: 'Other Projects',
-                      icon: 'fa-solid fa-cube',
+                      icon: 'box',
                       items: otherProjectItems
                   }
               ]
@@ -250,17 +301,22 @@
                             whileHover={{ scale: 1.25 }}
                             transition={{ type: 'spring', stiffness: 500, damping: 15 }}
                         >
-                            <i class="{section.icon} fa-fw text-sm text-muted-foreground"></i>
+                            <svelte:component
+                                this={iconMap[section.icon]}
+                                size={14}
+                                class="text-muted-foreground"
+                            />
                         </motion.span>
                         {section.title}
                     </span>
-                    <i
-                        class="fa-solid fa-chevron-down shrink-0 text-xs text-muted-foreground transition-transform duration-200 {isSectionOpen(
+                    <ChevronDown
+                        size={12}
+                        class="shrink-0 text-muted-foreground transition-transform duration-200 {isSectionOpen(
                             section
                         )
                             ? 'rotate-180'
                             : ''}"
-                    ></i>
+                    />
                 </button>
                 {#if isSectionOpen(section)}
                     <ul
@@ -281,7 +337,7 @@
                                         ? 'bg-sidebar-active text-sidebar-active-foreground'
                                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
                                 >
-                                    {#if item.icon}
+                                    {#if item.icon && iconMap[item.icon]}
                                         <motion.span
                                             class="mr-3 inline-flex"
                                             whileHover={{ scale: 1.25 }}
@@ -291,24 +347,20 @@
                                                 damping: 15
                                             }}
                                         >
-                                            <i
-                                                class="{item.icon} fa-fw text-sm {isActive(
-                                                    item.href
-                                                )
+                                            <svelte:component
+                                                this={iconMap[item.icon]}
+                                                size={14}
+                                                class={isActive(item.href)
                                                     ? 'text-sidebar-active-foreground'
-                                                    : 'text-muted-foreground group-hover:text-foreground'}"
-                                            ></i>
+                                                    : 'text-muted-foreground group-hover:text-foreground'}
+                                            />
                                         </motion.span>
                                     {:else}
-                                        <i
-                                            class="fa-solid fa-arrow-right fa-fw mr-3 text-xs text-muted-foreground"
-                                        ></i>
+                                        <ArrowRight size={12} class="mr-3 text-muted-foreground" />
                                     {/if}
                                     {item.title}
                                     {#if item?.external}
-                                        <i
-                                            class="fa-solid fa-arrow-up-right-from-square ml-2 text-xs opacity-50"
-                                        ></i>
+                                        <ExternalLink size={12} class="ml-2 opacity-50" />
                                     {/if}
                                 </a>
                             </motion.li>

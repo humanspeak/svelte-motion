@@ -18,7 +18,15 @@
     let headings: { id: string; text: string; level: number; element: HTMLElement }[] = $state([])
 
     // Create breadcrumb store and context
-    const breadcrumbs = $derived(getBreadcrumbContext())
+    const breadcrumbs = getBreadcrumbContext()
+
+    // Top-level assignment runs during SSR
+    if (breadcrumbs) {
+        const initialTitle = (page.data?.title as string | undefined) || 'Get Started'
+        breadcrumbs.breadcrumbs = [{ title: 'Docs', href: '/docs' }, { title: initialTitle }]
+    }
+
+    // $effect updates breadcrumbs on client-side navigation
     $effect(() => {
         if (breadcrumbs) {
             const pageTitle = page.data?.title as string | undefined
@@ -27,24 +35,6 @@
                 { title: pageTitle || 'Get Started' }
             ]
         }
-    })
-
-    const breadcrumbJsonLd = $derived.by(() => {
-        const items = breadcrumbs?.breadcrumbs ?? []
-        const listItems = [
-            { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
-            ...items.map((b, i) => ({
-                '@type': 'ListItem',
-                position: i + 2,
-                name: b.title,
-                ...(b.href ? { item: `${BASE_URL}${b.href}` } : {})
-            }))
-        ]
-        return `<${'script'} type="application/ld+json">${JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'BreadcrumbList',
-            itemListElement: listItems
-        })}</${'script'}>`
     })
 
     const techArticleJsonLd = $derived.by(() => {
@@ -143,8 +133,6 @@
 </script>
 
 <svelte:head>
-    <!-- eslint-disable-next-line svelte/no-at-html-tags -- static JSON-LD, no user input -->
-    {@html breadcrumbJsonLd}
     {#if techArticleJsonLd}
         <!-- eslint-disable-next-line svelte/no-at-html-tags -- static JSON-LD, no user input -->
         {@html techArticleJsonLd}
