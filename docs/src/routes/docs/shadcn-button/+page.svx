@@ -7,6 +7,7 @@ description: Drop-in animated replacement for the shadcn Button component
   import { Button } from '$lib/shadcn/ui/button'
   import ComponentSource from '$lib/components/general/ComponentSource.svelte'
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import { Download, Heart, Star, Zap, Send, Settings, Trash2, ExternalLink } from '@lucide/svelte'
 
   const { data } = $props()
 
@@ -26,7 +27,7 @@ description: Drop-in animated replacement for the shadcn Button component
 <div class="not-prose mb-6 flex flex-wrap items-center justify-between gap-2">
   {#if data.downloads !== null}
   <span class="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-sm text-muted-foreground">
-    <i class="fa-solid fa-download text-xs"></i>
+    <Download size={12} />
     {data.downloads.toLocaleString()} installs
   </span>
   {/if}
@@ -53,7 +54,7 @@ Then use it:
 </script>
 
 <AnimatedButton variant="default">Click me</AnimatedButton>
-<AnimatedButton variant="outline" size="icon" aria-label="Like"><i class="fa-solid fa-heart" /></AnimatedButton>
+<AnimatedButton variant="outline" size="icon" aria-label="Like"><Heart size={16} /></AnimatedButton>
 <AnimatedButton animated={false}>No motion</AnimatedButton>
 ```
 
@@ -84,25 +85,25 @@ Try clicking and hovering on each variant:
   <Button size="sm">Small</Button>
   <Button size="default">Default</Button>
   <Button size="lg">Large</Button>
-  <Button size="icon" aria-label="Like"><i class="fa-solid fa-heart"></i></Button>
-  <Button size="icon-sm" variant="outline" aria-label="Favorite"><i class="fa-solid fa-star"></i></Button>
-  <Button size="icon-lg" variant="secondary" aria-label="Boost"><i class="fa-solid fa-bolt"></i></Button>
+  <Button size="icon" aria-label="Like"><Heart size={16} /></Button>
+  <Button size="icon-sm" variant="outline" aria-label="Favorite"><Star size={14} /></Button>
+  <Button size="icon-lg" variant="secondary" aria-label="Boost"><Zap size={18} /></Button>
 </div>
 
 ### With Icons
 
 <div class="flex flex-wrap items-center gap-3">
-  <Button><i class="fa-solid fa-paper-plane"></i> Send</Button>
-  <Button variant="secondary"><i class="fa-solid fa-download"></i> Download</Button>
-  <Button variant="outline"><i class="fa-solid fa-gear"></i> Settings</Button>
-  <Button variant="ghost"><i class="fa-solid fa-trash"></i> Delete</Button>
+  <Button><Send size={14} /> Send</Button>
+  <Button variant="secondary"><Download size={14} /> Download</Button>
+  <Button variant="outline"><Settings size={14} /> Settings</Button>
+  <Button variant="ghost"><Trash2 size={14} /> Delete</Button>
 </div>
 
 ### As Link
 
 <div class="flex flex-wrap items-center gap-3">
   <Button href="https://motion.svelte.page" variant="default">Visit Docs</Button>
-  <Button href="https://github.com/humanspeak/svelte-motion" variant="outline">GitHub <i class="fa-solid fa-arrow-up-right-from-square"></i></Button>
+  <Button href="https://github.com/humanspeak/svelte-motion" variant="outline">GitHub <ExternalLink size={14} /></Button>
 </div>
 
 ### Disabled State
