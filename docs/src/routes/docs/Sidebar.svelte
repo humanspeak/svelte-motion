@@ -33,7 +33,7 @@
         ExternalLink
     } from '@lucide/svelte'
 
-    const iconMap: Record<string, Component> = {
+    const iconMap = {
         play: Play,
         ghost: Ghost,
         layers: Layers,
@@ -54,18 +54,20 @@
         heart: Heart,
         compass: Compass,
         box: Box
-    }
+    } as const satisfies Record<string, Component>
+
+    type IconKey = keyof typeof iconMap
 
     type NavItem = {
         title: string
         href: string
-        icon: string
+        icon: IconKey
         external?: boolean
     }
 
     type NavSection = {
         title: string
-        icon: string
+        icon: IconKey
         items: NavItem[]
     }
 
