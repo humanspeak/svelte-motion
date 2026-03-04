@@ -81,8 +81,8 @@
             </motion.button>
         </div>
     </div>
-    <!-- Subtle orange background that never clips content -->
-    <!-- Subtle dotted grid background in brand orange -->
+    <!-- Subtle brand background that never clips content -->
+    <!-- Subtle dotted grid background in brand teal -->
     <!-- Keep dots within same stacking context so parent background doesn't cover them -->
     {#if !isSmall}
         <div
@@ -103,7 +103,7 @@
 </div>
 
 <style>
-    /* Dotted grid similar to examples.motion.dev, tinted with brand orange */
+    /* Dotted grid similar to examples.motion.dev, tinted with brand teal */
     .bg-grid-orange {
         /* Light mode default: multiply over light background */
         mix-blend-mode: multiply;
