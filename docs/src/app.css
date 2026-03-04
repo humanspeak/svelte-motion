@@ -1,364 +1,25 @@
 @import 'tailwindcss';
+@source '../node_modules/@humanspeak/docs-kit/dist';
+@import '@humanspeak/docs-kit/styles/base.css';
 @plugin '@tailwindcss/typography';
 
-@font-face {
-    font-family: 'lato';
-    src: url('./lib/fonts/lato/Lato-Light.ttf') format('truetype');
-    font-weight: 300;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'lato';
-    src: url('./lib/fonts/lato/Lato-LightItalic.ttf') format('truetype');
-    font-weight: 300;
-    font-style: italic;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'lato';
-    src: url('./lib/fonts/lato/Lato-Regular.ttf') format('truetype');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'lato';
-    src: url('./lib/fonts/lato/Lato-Italic.ttf') format('truetype');
-    font-weight: 400;
-    font-style: italic;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'lato';
-    src: url('./lib/fonts/lato/Lato-Bold.ttf') format('truetype');
-    font-weight: 700;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'lato';
-    src: url('./lib/fonts/lato/Lato-BoldItalic.ttf') format('truetype');
-    font-weight: 700;
-    font-style: italic;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'lato';
-    src: url('./lib/fonts/lato/Lato-Black.ttf') format('truetype');
-    font-weight: 900;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'lato';
-    src: url('./lib/fonts/lato/Lato-BlackItalic.ttf') format('truetype');
-    font-weight: 900;
-    font-style: italic;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'lato-extrabold';
-    src: url('./lib/fonts/lato/Lato-ExtraBold.ttf') format('truetype');
-    font-weight: 800;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'lato-extrabold';
-    src: url('./lib/fonts/lato/Lato-ExtraBoldItalic.ttf') format('truetype');
-    font-weight: 800;
-    font-style: italic;
-    font-display: swap;
-}
-
+/* ── Project-specific tokens ── */
 :root {
-    /* Brand colors - Svelte orange */
-    --color-brand-50: #fff7ed;
-    --color-brand-100: #ffedd5;
-    --color-brand-200: #fed7aa;
-    --color-brand-300: #fdba74;
-    --color-brand-400: #fb923c;
-    --color-brand-500: #ff3e00;
-    --color-brand-600: #ea580c;
-    --color-brand-700: #c2410c;
-    --color-brand-800: #9a3412;
-    --color-brand-900: #7c2d12;
-
-    /* Light mode colors */
-    --color-background: #ffffff;
-    --color-foreground: #0f172a;
-    --color-muted: #f8fafc;
-    --color-muted-foreground: #64748b;
-
-    /* Card colors */
-    --color-card: #ffffff;
-    --color-card-foreground: #0f172a;
-
-    /* Border colors */
-    --color-border: #e2e8f0;
-    --color-border-muted: #f1f5f9;
-    --color-border-mid: #e2e8f0;
-
-    /* Primary colors (using brand) */
-    --color-primary: var(--color-brand-500);
-    --color-primary-foreground: #ffffff;
-
-    /* Secondary colors */
-    --color-secondary: #f1f5f9;
-    --color-secondary-foreground: #0f172a;
-
-    /* Accent colors (blue for links/active states) */
-    --color-accent: #3b82f6;
-    --color-accent-foreground: #ffffff;
-    --color-accent-muted: #dbeafe;
-
     /* Success color (copy confirmation, status indicators) */
     --color-success: #22c55e;
-
-    /* Text colors for different states */
-    --color-text-primary: #0f172a;
-    --color-text-secondary: #475569;
-    --color-text-muted: #64748b;
-    --color-text-inverse: #ffffff;
-
-    /* Sidebar specific colors */
-    --color-sidebar-background: #ffffff;
-    --color-sidebar-foreground: #0f172a;
-    --color-sidebar-border: #e2e8f0;
-    --color-sidebar-active: color-mix(in oklab, var(--color-brand-500) 10%, transparent);
-    --color-sidebar-active-foreground: var(--color-brand-600);
-
-    /* Code colors (light mode: lighter bg, dark text) */
-    --color-code-background: #f8f9f9; /* inline code bg */
-    --color-code-foreground: #111827; /* near-black text */
-    --color-code-block-background: #f5f6f8; /* very light grey block bg */
-    --color-code-block-foreground: #111827; /* black/muted text */
 }
 
 .dark {
-    /* Dark mode colors */
-    --color-background: #0b1011;
-    --color-foreground: #f8fafc;
-    --color-muted: #1e293b;
-    --color-muted-foreground: #a3b2c4; /* slightly brighter for contrast */
-
-    /* Card colors */
-    --color-card: #1e293b;
-    --color-card-foreground: #f8fafc;
-
-    /* Border colors */
-    --color-border: #334155;
-    --color-border-muted: rgba(255, 255, 255, 0.1);
-    --color-border-mid: rgba(255, 255, 255, 0.15);
-
-    /* Primary colors (using brand) */
-    --color-primary: var(--color-brand-500);
-    --color-primary-foreground: #ffffff;
-
-    /* Secondary colors */
-    --color-secondary: #1e293b;
-    --color-secondary-foreground: #f8fafc;
-
-    /* Accent colors */
-    --color-accent: #3b82f6;
-    --color-accent-foreground: #ffffff;
-    --color-accent-muted: #1e3a8a;
-
-    /* Success color */
     --color-success: #4ade80;
-
-    /* Text colors for different states */
-    --color-text-primary: #f8fafc;
-    --color-text-secondary: #e2e8f0; /* brighter secondary for readability */
-    --color-text-muted: #cbd5e1; /* raise contrast of muted */
-    --color-text-inverse: #0f172a;
-
-    /* Sidebar specific colors */
-    --color-sidebar-background: #0b1011;
-    --color-sidebar-foreground: #f8fafc;
-    --color-sidebar-border: #334155;
-    --color-sidebar-active: color-mix(in oklab, var(--color-brand-500) 10%, transparent);
-    --color-sidebar-active-foreground: var(--color-brand-400);
-
-    /* Code block colors */
-    --color-code-background: #1e293b;
-    --color-code-foreground: #f8fafc;
-    --color-code-block-background: #0f172a;
-    --color-code-block-foreground: #f1f5f9;
 }
 
-@theme {
-    /* Map CSS variables to Tailwind colors */
-    --color-background: var(--color-background);
-    --color-foreground: var(--color-foreground);
-    --color-muted: var(--color-muted);
-    --color-muted-foreground: var(--color-muted-foreground);
-
-    --color-card: var(--color-card);
-    --color-card-foreground: var(--color-card-foreground);
-
-    --color-border: var(--color-border);
-    --color-border-muted: var(--color-border-muted);
-    --color-border-mid: var(--color-border-mid);
-
-    --color-primary: var(--color-primary);
-    --color-primary-foreground: var(--color-primary-foreground);
-
-    --color-secondary: var(--color-secondary);
-    --color-secondary-foreground: var(--color-secondary-foreground);
-
-    --color-accent: var(--color-accent);
-    --color-accent-foreground: var(--color-accent-foreground);
-    --color-accent-muted: var(--color-accent-muted);
-
-    /* Success color */
+/* Register project-specific tokens */
+@theme inline {
     --color-success: var(--color-success);
-
-    /* Text colors */
-    --color-text-primary: var(--color-text-primary);
-    --color-text-secondary: var(--color-text-secondary);
-    --color-text-muted: var(--color-text-muted);
-    --color-text-inverse: var(--color-text-inverse);
-
-    /* Sidebar colors */
-    --color-sidebar-background: var(--color-sidebar-background);
-    --color-sidebar-foreground: var(--color-sidebar-foreground);
-    --color-sidebar-border: var(--color-sidebar-border);
-    --color-sidebar-active: var(--color-sidebar-active);
-    --color-sidebar-active-foreground: var(--color-sidebar-active-foreground);
-
-    /* Code colors */
-    --color-code-background: var(--color-code-background);
-    --color-code-foreground: var(--color-code-foreground);
-    --color-code-block-background: var(--color-code-block-background);
-    --color-code-block-foreground: var(--color-code-block-foreground);
-
-    /* Brand colors */
-    --color-brand-50: var(--color-brand-50);
-    --color-brand-100: var(--color-brand-100);
-    --color-brand-200: var(--color-brand-200);
-    --color-brand-300: var(--color-brand-300);
-    --color-brand-400: var(--color-brand-400);
-    --color-brand-500: var(--color-brand-500);
-    --color-brand-600: var(--color-brand-600);
-    --color-brand-700: var(--color-brand-700);
-    --color-brand-800: var(--color-brand-800);
-    --color-brand-900: var(--color-brand-900);
 }
 
-/* Global base styles */
+/* ── Shiki theme switching outside .prose (e.g. ComponentSource) ── */
 @layer base {
-    * {
-        @apply border-border;
-    }
-
-    html {
-        @apply scroll-smooth;
-    }
-
-    body {
-        @apply bg-background text-foreground;
-        font-family:
-            'lato',
-            system-ui,
-            -apple-system,
-            sans-serif;
-        font-feature-settings:
-            'rlig' 1,
-            'calt' 1;
-    }
-
-    /* Prose styles for markdown content */
-    .prose {
-        @apply text-text-primary;
-    }
-
-    /* Ensure headings override typography plugin defaults in light mode */
-    .prose :where(h1, h2, h3, h4, h5, h6) {
-        @apply font-bold !text-text-primary;
-    }
-
-    /* Ensure heading links inherit heading color/contrast */
-    .prose h1 a,
-    .prose h2 a,
-    .prose h3 a,
-    .prose h4 a,
-    .prose h5 a,
-    .prose h6 a {
-        @apply text-text-primary no-underline hover:text-text-primary;
-    }
-
-    .prose p {
-        @apply text-text-secondary;
-    }
-
-    /* Strong emphasis readability in dark mode */
-    .prose strong,
-    .prose b {
-        @apply font-bold text-text-primary!;
-    }
-
-    /* ensure link color inside paragraphs and lists has adequate contrast */
-    .prose p a,
-    .prose li a {
-        @apply text-accent! underline-offset-2 hover:text-accent/80!;
-    }
-
-    .prose code {
-        @apply rounded bg-code-background! px-1.5 py-0.5 font-mono text-sm text-code-foreground!;
-    }
-
-    .prose pre {
-        @apply rounded-lg border border-border bg-code-background! text-code-block-foreground!;
-    }
-
-    .prose pre code {
-        @apply bg-transparent p-0 text-code-block-foreground;
-    }
-
-    /* Shiki syntax highlighting support */
-    .prose .shiki-container {
-        @apply overflow-hidden rounded-lg border border-border;
-    }
-
-    .prose .shiki-container pre {
-        @apply m-0 rounded-none border-0;
-    }
-
-    .prose .shiki-container pre.shiki {
-        @apply bg-transparent! p-4 text-inherit!;
-    }
-
-    .prose .shiki-container pre.shiki code {
-        @apply bg-transparent! p-0 text-inherit!;
-    }
-
-    /* Theme switching for Shiki */
-    html:not(.dark) .prose .shiki-dark {
-        display: none;
-    }
-
-    html.dark .prose .shiki-light {
-        display: none;
-    }
-
-    /* Ensure proper display */
-    .prose .shiki-light,
-    .prose .shiki-dark {
-        width: 100%;
-    }
-
-    /* Shiki theme switching (outside prose, e.g., ComponentSource) */
     html:not(.dark) .shiki-dark {
         display: none;
     }
@@ -366,39 +27,9 @@
     html.dark .shiki-light {
         display: none;
     }
-
-    .prose a {
-        @apply text-accent no-underline hover:text-accent/80;
-    }
-
-    /* Maintain paragraph/list contrast in dark mode */
-    .dark .prose p,
-    .dark .prose li {
-        @apply text-text-secondary;
-    }
-
-    .prose blockquote {
-        @apply border-l-4 border-border pl-4 text-text-muted italic;
-    }
-
-    /* Improve list readability and marker contrast (light/dark) */
-    .prose ul,
-    .prose ol {
-        @apply text-text-secondary;
-    }
-
-    .prose ul > li::marker,
-    .prose ol > li::marker {
-        color: var(--color-accent);
-    }
-
-    .prose code::before,
-    .prose code::after {
-        content: '' !important;
-    }
 }
 
-/* Orb backgrounds using the brand color */
+/* ── Project-specific: landing page decorative styles ── */
 .orb-a-bg {
     background: radial-gradient(
         circle at 30% 30%,
@@ -436,7 +67,7 @@
     --overlay-color: 255, 255, 255;
 }
 
-/* ComponentSource dialog */
+/* ── Project-specific: ComponentSource dialog ── */
 .component-source-dialog {
     @apply fixed inset-4 z-50 flex flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl;
     max-width: 1100px;
@@ -444,7 +75,6 @@
     margin: auto;
 }
 
-/* Code area inside ComponentSource */
 .component-source-code pre.shiki {
     @apply m-0 rounded-none bg-transparent! p-4;
     counter-reset: line;
@@ -455,14 +85,15 @@
     counter-reset: line;
 }
 
-/* Line numbers */
 .component-source-code pre.shiki code .line::before {
     counter-increment: line;
     content: counter(line);
     @apply mr-6 inline-block w-4 text-right text-muted-foreground/50;
 }
 
-/* Code block header bar (injected by enhanceCodeBlocks action) */
+/* ── Project-specific: code-block-header style overrides ── */
+/* svelte-motion uses a fade+scale copy button animation instead of
+   the docs-kit default show/hide. These override prose.css styles. */
 .prose .shiki-container.code-enhanced {
     @apply relative;
 }
