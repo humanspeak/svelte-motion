@@ -55,7 +55,7 @@
             <div
                 {...safeProps}
                 class={cn(
-                    'focus-visible:ring-ring mt-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
+                    'mt-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
                     className
                 )}
                 style="{panelStyle ?? ''}{isActive ? '' : ';display:none'}"
@@ -77,7 +77,7 @@
         bind:ref
         {value}
         class={cn(
-            'focus-visible:ring-ring mt-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
+            'mt-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
             className
         )}
         {...restProps}
