@@ -4,10 +4,10 @@
     import GithubSlugger from 'github-slugger'
     import Header from '$lib/components/general/Header.svelte'
     import Footer from '$lib/components/general/Footer.svelte'
-    import Sidebar from './Sidebar.svelte'
+    import { Sidebar, getBreadcrumbContext, enhanceCodeBlocks } from '@humanspeak/docs-kit'
+    import { docsConfig } from '$lib/docs-config'
+    import { docsSections, motionLoveAndRespect } from '$lib/docsNav'
     import TableOfContents from './TableOfContents.svelte'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { enhanceCodeBlocks } from '$lib/actions/enhanceCodeBlocks'
     import sitemapManifest from '$lib/sitemap-manifest.json'
 
     const BASE_URL = 'https://motion.svelte.page'
@@ -147,7 +147,13 @@
         <aside
             class="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar-background/95 shadow-sm lg:sticky lg:top-0 lg:block lg:h-screen lg:overflow-y-auto"
         >
-            <Sidebar currentPath={page.url.pathname} otherProjects={data.otherProjects} />
+            <Sidebar
+                config={docsConfig}
+                sections={docsSections}
+                currentPath={page.url.pathname}
+                otherProjects={data.otherProjects}
+                loveAndRespect={motionLoveAndRespect}
+            />
         </aside>
 
         <!-- Main content area -->
