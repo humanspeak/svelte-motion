@@ -30,7 +30,8 @@
      * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
      */
     "vars": {
-        "PUBLIC_SITE_URL": "https://motion.svelte.page"
+        "PUBLIC_SITE_URL": "https://motion.svelte.page",
+        "PUBLIC_ENVIRONMENT": "production"
     },
     "kv_namespaces": [
         {
