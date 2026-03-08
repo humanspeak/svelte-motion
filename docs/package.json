@@ -24,7 +24,7 @@
         "test:unit": "vitest"
     },
     "dependencies": {
-        "@humanspeak/docs-kit": "github:humanspeak/docs-kit#2026.3.12",
+        "@humanspeak/docs-kit": "github:humanspeak/docs-kit#2026.3.13",
         "@humanspeak/svelte-motion": "workspace:*",
         "@inlang/paraglide-js": "^2.13.2",
         "@lucide/svelte": "^0.577.0",

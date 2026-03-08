@@ -13,10 +13,7 @@
     import favicon from '$lib/assets/logo.svg'
     const { children } = $props()
 
-    const seo = $state<SeoContext>({
-        title: `${docsConfig.name} - Animation Library for Svelte`,
-        description: docsConfig.description
-    })
+    const seo = $state<SeoContext>({})
 </script>
 
 <ModeWatcher />
