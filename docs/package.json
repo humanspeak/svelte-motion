@@ -26,7 +26,7 @@
     "dependencies": {
         "@humanspeak/docs-kit": "github:humanspeak/docs-kit#2026.3.13",
         "@humanspeak/svelte-motion": "workspace:*",
-        "@inlang/paraglide-js": "^2.13.2",
+        "@inlang/paraglide-js": "^2.15.0",
         "@lucide/svelte": "^0.577.0",
         "@sentry/sveltekit": "^10.42.0",
         "bits-ui": "^2.16.3",
