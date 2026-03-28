@@ -19,6 +19,11 @@ describe('svelteMotionOptimize', () => {
         expect(transform(code, 'test.ts')).toBeNull()
     })
 
+    it('returns null for files in node_modules', () => {
+        const code = `<script>import { motion } from '@humanspeak/svelte-motion'</script><motion.div>Hi</motion.div>`
+        expect(transform(code, 'node_modules/@humanspeak/docs-kit/dist/Footer.svelte')).toBeNull()
+    })
+
     it('returns null when no svelte-motion import exists', () => {
         const code = `<script>let x = 1</script><div>Hello</div>`
         expect(transform(code, 'test.svelte')).toBeNull()
@@ -39,9 +44,11 @@ describe('svelteMotionOptimize', () => {
         const result = transform(code)
         expect(result).not.toBeNull()
         expect(result).toContain(
-            "import __MotionDiv from '@humanspeak/svelte-motion/html/Div.svelte'"
+            "import SvelteMotionDiv from '@humanspeak/svelte-motion/html/Div.svelte'"
         )
-        expect(result).toContain('<__MotionDiv animate={{ opacity: 1 }}>Hello</__MotionDiv>')
+        expect(result).toContain(
+            '<SvelteMotionDiv animate={{ opacity: 1 }}>Hello</SvelteMotionDiv>'
+        )
         expect(result).not.toContain('motion.div')
         expect(result).not.toContain('import { motion }')
     })
@@ -59,17 +66,19 @@ describe('svelteMotionOptimize', () => {
         const result = transform(code)
         expect(result).not.toBeNull()
         expect(result).toContain(
-            "import __MotionDiv from '@humanspeak/svelte-motion/html/Div.svelte'"
+            "import SvelteMotionDiv from '@humanspeak/svelte-motion/html/Div.svelte'"
         )
         expect(result).toContain(
-            "import __MotionSpan from '@humanspeak/svelte-motion/html/Span.svelte'"
+            "import SvelteMotionSpan from '@humanspeak/svelte-motion/html/Span.svelte'"
         )
         expect(result).toContain(
-            "import __MotionButton from '@humanspeak/svelte-motion/html/Button.svelte'"
+            "import SvelteMotionButton from '@humanspeak/svelte-motion/html/Button.svelte'"
         )
-        expect(result).toContain('<__MotionDiv>')
-        expect(result).toContain('<__MotionSpan>text</__MotionSpan>')
-        expect(result).toContain('<__MotionButton onclick={handleClick}>Click</__MotionButton>')
+        expect(result).toContain('<SvelteMotionDiv>')
+        expect(result).toContain('<SvelteMotionSpan>text</SvelteMotionSpan>')
+        expect(result).toContain(
+            '<SvelteMotionButton onclick={handleClick}>Click</SvelteMotionButton>'
+        )
     })
 
     it('preserves other named imports from svelte-motion', () => {
@@ -83,7 +92,7 @@ describe('svelteMotionOptimize', () => {
         expect(result).not.toBeNull()
         expect(result).toContain("import { animate, useSpring } from '@humanspeak/svelte-motion'")
         expect(result).toContain(
-            "import __MotionDiv from '@humanspeak/svelte-motion/html/Div.svelte'"
+            "import SvelteMotionDiv from '@humanspeak/svelte-motion/html/Div.svelte'"
         )
     })
 
@@ -97,8 +106,8 @@ describe('svelteMotionOptimize', () => {
 
         const result = transform(code)
         expect(result).not.toBeNull()
-        expect(result).toContain('<__MotionHr />')
-        expect(result).toContain('<__MotionImg />')
+        expect(result).toContain('<SvelteMotionHr />')
+        expect(result).toContain('<SvelteMotionImg />')
     })
 
     it('handles motion.TAG in script expressions', () => {
@@ -111,7 +120,7 @@ describe('svelteMotionOptimize', () => {
 
         const result = transform(code)
         expect(result).not.toBeNull()
-        expect(result).toContain('const Component = __MotionDiv')
+        expect(result).toContain('const Component = SvelteMotionDiv')
     })
 
     it('keeps motion import when motion is used as a bare reference', () => {
@@ -128,7 +137,7 @@ describe('svelteMotionOptimize', () => {
         expect(result).toContain("import { motion } from '@humanspeak/svelte-motion'")
         // But also add the individual import
         expect(result).toContain(
-            "import __MotionDiv from '@humanspeak/svelte-motion/html/Div.svelte'"
+            "import SvelteMotionDiv from '@humanspeak/svelte-motion/html/Div.svelte'"
         )
     })
 
@@ -145,13 +154,13 @@ describe('svelteMotionOptimize', () => {
         const result = transform(code)
         expect(result).not.toBeNull()
         expect(result).toContain(
-            "import __MotionSvg from '@humanspeak/svelte-motion/html/Svg.svelte'"
+            "import SvelteMotionSvg from '@humanspeak/svelte-motion/html/Svg.svelte'"
         )
         expect(result).toContain(
-            "import __MotionCircle from '@humanspeak/svelte-motion/html/Circle.svelte'"
+            "import SvelteMotionCircle from '@humanspeak/svelte-motion/html/Circle.svelte'"
         )
         expect(result).toContain(
-            "import __MotionPath from '@humanspeak/svelte-motion/html/Path.svelte'"
+            "import SvelteMotionPath from '@humanspeak/svelte-motion/html/Path.svelte'"
         )
     })
 

@@ -12,6 +12,179 @@ const toComponentName = (tag: string): string =>
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
         .join('')
 
+/** Set of valid HTML/SVG element names that have motion component wrappers. */
+const VALID_TAGS = new Set([
+    'a',
+    'abbr',
+    'address',
+    'animate',
+    'animatemotion',
+    'animatetransform',
+    'area',
+    'article',
+    'aside',
+    'audio',
+    'b',
+    'base',
+    'bdi',
+    'bdo',
+    'blockquote',
+    'br',
+    'button',
+    'canvas',
+    'caption',
+    'circle',
+    'cite',
+    'clippath',
+    'code',
+    'col',
+    'colgroup',
+    'cursor',
+    'data',
+    'datalist',
+    'dd',
+    'defs',
+    'del',
+    'desc',
+    'details',
+    'dfn',
+    'dialog',
+    'div',
+    'dl',
+    'dt',
+    'ellipse',
+    'em',
+    'embed',
+    'feblend',
+    'fecolormatrix',
+    'fecomponenttransfer',
+    'fecomposite',
+    'feconvolvematrix',
+    'fediffuselighting',
+    'fedisplacementmap',
+    'fedistantlight',
+    'feflood',
+    'fefunca',
+    'fefuncb',
+    'fefuncg',
+    'fefuncr',
+    'fegaussianblur',
+    'feimage',
+    'femerge',
+    'femergenode',
+    'femorphology',
+    'feoffset',
+    'fepointlight',
+    'fespecularlighting',
+    'fespotlight',
+    'fetile',
+    'feturbulence',
+    'fieldset',
+    'figcaption',
+    'figure',
+    'filter',
+    'footer',
+    'foreignobject',
+    'form',
+    'g',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'header',
+    'hgroup',
+    'hr',
+    'i',
+    'iframe',
+    'image',
+    'img',
+    'input',
+    'ins',
+    'kbd',
+    'label',
+    'legend',
+    'li',
+    'line',
+    'lineargradient',
+    'main',
+    'map',
+    'mark',
+    'marker',
+    'mask',
+    'math',
+    'menu',
+    'metadata',
+    'meter',
+    'mpath',
+    'nav',
+    'noscript',
+    'object',
+    'ol',
+    'optgroup',
+    'option',
+    'output',
+    'p',
+    'path',
+    'pattern',
+    'picture',
+    'polygon',
+    'polyline',
+    'pre',
+    'progress',
+    'q',
+    'radialgradient',
+    'rect',
+    'rp',
+    'rt',
+    'ruby',
+    's',
+    'samp',
+    'script',
+    'search',
+    'section',
+    'select',
+    'selectedcontent',
+    'set',
+    'slot',
+    'small',
+    'source',
+    'span',
+    'stop',
+    'strong',
+    'style',
+    'sub',
+    'summary',
+    'sup',
+    'svg',
+    'switch',
+    'symbol',
+    'table',
+    'tbody',
+    'td',
+    'template',
+    'text',
+    'textarea',
+    'textpath',
+    'tfoot',
+    'th',
+    'thead',
+    'time',
+    'title',
+    'tr',
+    'track',
+    'tref',
+    'tspan',
+    'u',
+    'ul',
+    'use',
+    'var',
+    'video',
+    'view',
+    'wbr'
+])
+
 /**
  * Regex to match import of `motion` from the library.
  *
@@ -72,9 +245,9 @@ const MOTION_SCRIPT_RE = /\bmotion\.([a-z][a-z0-9-]*)\b/g
  * After (only Div.svelte bundled):
  * ```svelte
  * <script>
- *     import __MotionDiv from '@humanspeak/svelte-motion/html/Div.svelte'
+ *     import SvelteMotionDiv from '@humanspeak/svelte-motion/html/Div.svelte'
  * </script>
- * <__MotionDiv animate={{ opacity: 1 }}>Hello</__MotionDiv>
+ * <SvelteMotionDiv animate={{ opacity: 1 }}>Hello</SvelteMotionDiv>
  * ```
  */
 export const svelteMotionOptimize = (): Plugin => ({
@@ -82,8 +255,9 @@ export const svelteMotionOptimize = (): Plugin => ({
     enforce: 'pre',
 
     transform(code: string, id: string) {
-        // Only process .svelte files that import motion
+        // Only process .svelte files that import motion (skip node_modules)
         if (!id.endsWith('.svelte')) return null
+        if (id.includes('node_modules')) return null
         if (!code.includes('@humanspeak/svelte-motion')) return null
 
         const importMatch = MOTION_IMPORT_RE.exec(code)
@@ -96,18 +270,24 @@ export const svelteMotionOptimize = (): Plugin => ({
         let match: RegExpExecArray | null
         MOTION_TEMPLATE_OPEN_RE.lastIndex = 0
         while ((match = MOTION_TEMPLATE_OPEN_RE.exec(code)) !== null) {
-            usedTags.add(match[1])
+            if (VALID_TAGS.has(match[1])) usedTags.add(match[1])
         }
 
         MOTION_TEMPLATE_CLOSE_RE.lastIndex = 0
         while ((match = MOTION_TEMPLATE_CLOSE_RE.exec(code)) !== null) {
-            usedTags.add(match[1])
+            if (VALID_TAGS.has(match[1])) usedTags.add(match[1])
         }
 
-        // Scan script for motion.TAG in JS expressions
-        MOTION_SCRIPT_RE.lastIndex = 0
-        while ((match = MOTION_SCRIPT_RE.exec(code)) !== null) {
-            usedTags.add(match[1])
+        // Scan script blocks for motion.TAG in JS expressions
+        // Only match inside <script> tags to avoid false positives in comments/text
+        const scriptBlockRe = /<script[^>]*>([\s\S]*?)<\/script>/g
+        let scriptMatch: RegExpExecArray | null
+        while ((scriptMatch = scriptBlockRe.exec(code)) !== null) {
+            const scriptContent = scriptMatch[1]
+            MOTION_SCRIPT_RE.lastIndex = 0
+            while ((match = MOTION_SCRIPT_RE.exec(scriptContent)) !== null) {
+                if (VALID_TAGS.has(match[1])) usedTags.add(match[1])
+            }
         }
 
         if (usedTags.size === 0) return null
@@ -120,7 +300,7 @@ export const svelteMotionOptimize = (): Plugin => ({
 
         for (const tag of usedTags) {
             const componentName = toComponentName(tag)
-            const localName = `__Motion${componentName}`
+            const localName = `SvelteMotion${componentName}`
             tagToLocal.set(tag, localName)
             componentImports.push(
                 `import ${localName} from '@humanspeak/svelte-motion/html/${componentName}.svelte'`
@@ -163,7 +343,7 @@ export const svelteMotionOptimize = (): Plugin => ({
             transformed = transformed.replace(MOTION_IMPORT_RE, componentImports.join('\n'))
         }
 
-        // Replace template usage: <motion.TAG → <__MotionTag, </motion.TAG> → </__MotionTag>
+        // Replace template usage: <motion.TAG → <SvelteMotionTag, </motion.TAG> → </SvelteMotionTag>
         for (const [tag, localName] of tagToLocal) {
             const openRe = new RegExp(`<motion\\.${escapeRegExp(tag)}(?=[\\s/>])`, 'g')
             const closeRe = new RegExp(`</motion\\.${escapeRegExp(tag)}\\s*>`, 'g')
