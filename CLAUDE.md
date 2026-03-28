@@ -1,4 +1,14 @@
-# CLAUDE Notes
+# CLAUDE.md
+
+## Project Overview
+
+`@humanspeak/svelte-motion` — A Framer Motion-compatible animation library for Svelte 5. Spring physics, gestures, layout animations, exit animations, and scroll effects with a familiar declarative API.
+
+- **Package**: `@humanspeak/svelte-motion`
+- **Homepage**: <https://motion.svelte.page>
+- **Repository**: <https://github.com/humanspeak/svelte-motion>
+
+## Notes
 
 ## AnimatePresence wait mode
 

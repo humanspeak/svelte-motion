@@ -70,6 +70,11 @@ export const docsSections: NavSection[] = [
         items: [{ title: 'styleString', href: '/docs/style-string', icon: Wand }]
     },
     {
+        title: 'Performance',
+        icon: Zap,
+        items: [{ title: 'Tree Shaking', href: '/docs/tree-shaking', icon: Zap }]
+    },
+    {
         title: 'shadcn/ui',
         icon: MousePointer,
         items: [

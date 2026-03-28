@@ -8,7 +8,7 @@
 -->
 <script lang="ts">
     import { cn, type WithoutChildrenOrChild } from '$lib/shadcn/utils'
-    import { AnimatePresence, motion } from '@humanspeak/svelte-motion'
+    import { AnimatePresence, MotionDiv } from '@humanspeak/svelte-motion'
     import { Tabs as TabsPrimitive, type TabsTriggerProps as BitsTabsTriggerProps } from 'bits-ui'
     import { getContext } from 'svelte'
     import { TABS_CTX, type TabsContext } from './tabs.svelte'
@@ -51,7 +51,7 @@
     {#if isAnimated}
         <AnimatePresence>
             {#if isActive}
-                <motion.div
+                <MotionDiv
                     key="indicator"
                     layoutId={ctx.layoutId}
                     class="absolute inset-0 rounded-md bg-background shadow-sm dark:border dark:border-input dark:bg-input/30"

@@ -53,7 +53,7 @@
 </script>
 
 <script lang="ts">
-    import { motion } from '@humanspeak/svelte-motion'
+    import { MotionA, MotionButton } from '@humanspeak/svelte-motion'
 
     let {
         class: className,
@@ -99,7 +99,7 @@
 
 {#if href}
     {#if animated}
-        <motion.a
+        <MotionA
             bind:ref
             data-slot="button"
             class={cn(buttonVariants({ variant, size }), className)}
@@ -114,7 +114,7 @@
             {...restProps}
         >
             {@render children?.()}
-        </motion.a>
+        </MotionA>
     {:else}
         <a
             bind:this={ref}
@@ -131,7 +131,7 @@
         </a>
     {/if}
 {:else if animated}
-    <motion.button
+    <MotionButton
         bind:ref
         data-slot="button"
         class={cn(buttonVariants({ variant, size }), className)}
@@ -144,7 +144,7 @@
         {...restProps}
     >
         {@render children?.()}
-    </motion.button>
+    </MotionButton>
 {:else}
     <button
         bind:this={ref}

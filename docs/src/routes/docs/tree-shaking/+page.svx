@@ -1,0 +1,154 @@
+---
+title: Tree Shaking
+description: Reduce bundle size by importing only the motion components you use
+---
+
+<script>
+    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+    const seo = getSeoContext()
+    if (seo) {
+        seo.title = 'Tree Shaking | Docs | Svelte Motion'
+        seo.description = 'Reduce bundle size by importing only the motion components you use. Three approaches: named exports, Vite plugin, and direct imports.'
+        seo.ogTitle = 'Tree Shaking'
+        seo.ogTagline = 'Import only what you use'
+        seo.ogFeatures = ['Named Exports', 'Vite Plugin', 'Direct Imports', 'Zero Config']
+        seo.ogSlug = 'docs-tree-shaking'
+    }
+</script>
+
+# Tree Shaking
+
+The `motion` object (`motion.div`, `motion.span`, etc.) provides a convenient API that mirrors Framer Motion, but it bundles all 170+ HTML and SVG element wrappers regardless of how many you actually use. For production apps where bundle size matters, svelte-motion offers three ways to import only what you need.
+
+## The problem
+
+When you use the `motion` object, bundlers cannot determine which properties are accessed at build time:
+
+```svelte
+<script>
+    import { motion } from '@humanspeak/svelte-motion'
+</script>
+
+<!-- Only uses 2 elements, but all 170+ wrappers are bundled -->
+<motion.div animate={{ opacity: 1 }}>
+    <motion.button whileTap={{ scale: 0.95 }}>Click me</motion.button>
+</motion.div>
+```
+
+This is because JavaScript object property access is a runtime operation that static analysis cannot optimize.
+
+## Option 1: Named exports
+
+The simplest approach. Import components by name and they tree-shake automatically with any bundler:
+
+```svelte
+<script>
+    import { MotionDiv, MotionButton } from '@humanspeak/svelte-motion'
+</script>
+
+<MotionDiv animate={{ opacity: 1 }}>
+    <MotionButton whileTap={{ scale: 0.95 }}>Click me</MotionButton>
+</MotionDiv>
+```
+
+Every HTML and SVG element has a corresponding `Motion`-prefixed export. The naming convention is `Motion` + the PascalCase element name:
+
+| Element | Named export |
+|---|---|
+| `div` | `MotionDiv` |
+| `button` | `MotionButton` |
+| `span` | `MotionSpan` |
+| `a` | `MotionA` |
+| `svg` | `MotionSvg` |
+| `circle` | `MotionCircle` |
+| `path` | `MotionPath` |
+| `h1`...`h6` | `MotionH1`...`MotionH6` |
+| `input` | `MotionInput` |
+| `img` | `MotionImg` |
+
+All other exports (`animate`, `useSpring`, `AnimatePresence`, types, etc.) continue to work alongside named component imports:
+
+```svelte
+<script>
+    import { MotionDiv, AnimatePresence, type Variants } from '@humanspeak/svelte-motion'
+</script>
+```
+
+## Option 2: Vite plugin
+
+If you prefer the `motion.div` syntax, the `svelteMotionOptimize` Vite plugin automatically rewrites it into direct imports at build time. Your source code stays unchanged:
+
+```svelte
+<!-- You write this: -->
+<script>
+    import { motion } from '@humanspeak/svelte-motion'
+</script>
+<motion.div animate={{ opacity: 1 }}>Hello</motion.div>
+
+<!-- The plugin transforms it to: -->
+<script>
+    import SvelteMotionDiv from '@humanspeak/svelte-motion/html/Div.svelte'
+</script>
+<SvelteMotionDiv animate={{ opacity: 1 }}>Hello</SvelteMotionDiv>
+```
+
+### Setup
+
+Add the plugin to your `vite.config.ts` before the SvelteKit plugin:
+
+```ts
+import { svelteMotionOptimize } from '@humanspeak/svelte-motion/vite'
+import { sveltekit } from '@sveltejs/kit/vite'
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+    plugins: [
+        svelteMotionOptimize(),
+        sveltekit()
+    ]
+})
+```
+
+No changes to your `.svelte` files are needed. The plugin handles:
+
+- Opening and closing tags: `<motion.div>` ... `</motion.div>`
+- Self-closing tags: `<motion.hr />`
+- Script references: `const C = motion.div`
+- Mixed imports: preserves other named imports like `animate`, `useSpring`
+- SVG elements: `motion.circle`, `motion.path`, etc.
+
+## Option 3: Direct imports
+
+For maximum control, import components directly from their `.svelte` files:
+
+```svelte
+<script>
+    import Div from '@humanspeak/svelte-motion/html/Div.svelte'
+    import Button from '@humanspeak/svelte-motion/html/Button.svelte'
+</script>
+
+<Div animate={{ opacity: 1 }}>
+    <Button whileTap={{ scale: 0.95 }}>Click me</Button>
+</Div>
+```
+
+This bypasses the package entry point entirely and works with any bundler.
+
+## Which approach to choose
+
+| | Named exports | Vite plugin | Direct imports |
+|---|---|---|---|
+| **Setup** | None | One line in vite.config | None |
+| **Syntax** | `<MotionDiv>` | `<motion.div>` | `<Div>` |
+| **Bundler support** | All | Vite only | All |
+| **Tree-shakes** | Yes | Yes | Yes |
+| **Autocomplete** | Full | Full | Per-import |
+
+**Recommended:** Use **named exports** for new projects. They work everywhere, require no configuration, and provide full autocomplete. Use the **Vite plugin** if you're migrating an existing codebase and want to keep the `motion.div` syntax.
+
+## Related
+
+- [Get started](/docs) — Motion component overview
+- [AnimatePresence](/docs/animate-presence) — Exit animations
+- [Variants](/docs/variants) — Named animation states

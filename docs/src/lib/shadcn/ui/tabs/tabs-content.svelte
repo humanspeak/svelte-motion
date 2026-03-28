@@ -5,12 +5,12 @@
   Wraps bits-ui Tabs.Content. When animated, uses the child render prop
   to keep the panel element always in the DOM (never `hidden`). Inactive
   panels use `display:none` so they collapse. The active panel's children
-  are wrapped in a motion.div that replays a fade+slide entrance on each
+  are wrapped in a MotionDiv that replays a fade+slide entrance on each
   tab switch — the panel container (and any styling on it) stays stable.
 -->
 <script lang="ts">
     import { cn, type WithoutChildrenOrChild } from '$lib/shadcn/utils'
-    import { motion } from '@humanspeak/svelte-motion'
+    import { MotionDiv } from '@humanspeak/svelte-motion'
     import { Tabs as TabsPrimitive, type TabsContentProps as BitsTabsContentProps } from 'bits-ui'
     import { getContext } from 'svelte'
     import { TABS_CTX, type TabsContext } from './tabs.svelte'
@@ -61,13 +61,13 @@
                 style="{panelStyle ?? ''}{isActive ? '' : ';display:none'}"
             >
                 {#key ctx.value()}
-                    <motion.div
+                    <MotionDiv
                         initial={initial ?? defaultInitial}
                         animate={animate ?? defaultAnimate}
                         transition={transition ?? defaultTransition}
                     >
                         {@render children?.()}
-                    </motion.div>
+                    </MotionDiv>
                 {/key}
             </div>
         {/snippet}
