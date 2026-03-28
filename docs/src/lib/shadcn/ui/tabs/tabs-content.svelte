@@ -10,7 +10,7 @@
 -->
 <script lang="ts">
     import { cn, type WithoutChildrenOrChild } from '$lib/shadcn/utils'
-    import { motion } from '@humanspeak/svelte-motion'
+    import { MotionDiv } from '@humanspeak/svelte-motion'
     import { Tabs as TabsPrimitive, type TabsContentProps as BitsTabsContentProps } from 'bits-ui'
     import { getContext } from 'svelte'
     import { TABS_CTX, type TabsContext } from './tabs.svelte'
@@ -61,13 +61,13 @@
                 style="{panelStyle ?? ''}{isActive ? '' : ';display:none'}"
             >
                 {#key ctx.value()}
-                    <motion.div
+                    <MotionDiv
                         initial={initial ?? defaultInitial}
                         animate={animate ?? defaultAnimate}
                         transition={transition ?? defaultTransition}
                     >
                         {@render children?.()}
-                    </motion.div>
+                    </MotionDiv>
                 {/key}
             </div>
         {/snippet}

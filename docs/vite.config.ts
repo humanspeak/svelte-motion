@@ -1,3 +1,4 @@
+import { svelteMotionOptimize } from '@humanspeak/svelte-motion/vite'
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
 import { sentrySvelteKit } from '@sentry/sveltekit'
 import { sveltekit } from '@sveltejs/kit/vite'
@@ -17,6 +18,7 @@ export default defineConfig({
                 project: 'motion-svelte-page'
             }
         }),
+        svelteMotionOptimize(),
         tailwindcss(),
         sveltekit(),
         devtoolsJson(),
