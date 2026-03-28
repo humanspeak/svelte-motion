@@ -266,15 +266,10 @@ export const svelteMotionOptimize = (): Plugin => ({
         // Collect all motion.TAG usages (both template and script)
         const usedTags = new Set<string>()
 
-        // Scan template for <motion.TAG and </motion.TAG>
+        // Scan template for <motion.TAG (closing tags always pair with an opening tag)
         let match: RegExpExecArray | null
         MOTION_TEMPLATE_OPEN_RE.lastIndex = 0
         while ((match = MOTION_TEMPLATE_OPEN_RE.exec(code)) !== null) {
-            if (VALID_TAGS.has(match[1])) usedTags.add(match[1])
-        }
-
-        MOTION_TEMPLATE_CLOSE_RE.lastIndex = 0
-        while ((match = MOTION_TEMPLATE_CLOSE_RE.exec(code)) !== null) {
             if (VALID_TAGS.has(match[1])) usedTags.add(match[1])
         }
 

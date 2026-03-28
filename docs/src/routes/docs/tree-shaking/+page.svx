@@ -84,7 +84,7 @@ If you prefer the `motion.div` syntax, the `svelteMotionOptimize` Vite plugin au
 <motion.div animate={{ opacity: 1 }}>Hello</motion.div>
 
 <!-- The plugin transforms it to: -->
-<__MotionDiv animate={{ opacity: 1 }}>Hello</__MotionDiv>
+<SvelteMotionDiv animate={{ opacity: 1 }}>Hello</SvelteMotionDiv>
 ```
 
 ### Setup
