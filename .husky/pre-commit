@@ -13,12 +13,13 @@ else
 
 	# Format files without force‑adding unrelated changes
 	echo "✨ Formatting code..."
-	"${TRUNK_BIN}" fmt >/dev/null 2>&1 || {
+	FMT_OUTPUT=$("${TRUNK_BIN}" fmt 2>&1) || {
 		EXIT_CODE=$?
 		# trunk fmt returns 1 when it formats files (makes changes), which is success
 		# Only fail on exit codes > 1 (actual errors)
 		if [ "${EXIT_CODE}" -gt 1 ]; then
-			echo "❌ Code formatting failed with exit code ${EXIT_CODE}. Run 'trunk fmt' to see details."
+			echo "❌ Code formatting failed. Details:"
+			echo "${FMT_OUTPUT}"
 			exit 1
 		fi
 	}
@@ -31,10 +32,11 @@ else
 
 	# Lint with auto-fix and re-stage only originally staged files
 	echo "🔍 Running linter checks..."
-	if ! "${TRUNK_BIN}" check --fix >/dev/null 2>&1; then
-		echo "❌ Linting failed. Run 'trunk check' to see errors and fix them."
+	LINT_OUTPUT=$("${TRUNK_BIN}" check --fix 2>&1) || {
+		echo "❌ Linting failed. Details:"
+		echo "${LINT_OUTPUT}"
 		exit 1
-	fi
+	}
 	if [ -n "${INITIAL_STAGED}" ]; then
 		echo "Restaging originally staged files after lint fixes..."
 		for f in ${INITIAL_STAGED}; do
