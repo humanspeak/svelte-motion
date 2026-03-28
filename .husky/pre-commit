@@ -52,7 +52,7 @@ else
 	echo "🧪 Running svelte-check..."
 	SVELTE_OUTPUT=$(pnpm run -s check 2>&1) || {
 		echo "❌ Type/Svelte checks failed. Details:"
-		echo "${SVELTE_OUTPUT}" | grep -E "ERROR|error TS|✖" | head -20
+		echo "${SVELTE_OUTPUT}" | grep -E "ERROR|error TS|Warning:|✖" | head -30
 		exit 1
 	}
 fi

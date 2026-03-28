@@ -81,9 +81,15 @@ If you prefer the `motion.div` syntax, the `svelteMotionOptimize` Vite plugin au
 
 ```svelte
 <!-- You write this: -->
+<script>
+    import { motion } from '@humanspeak/svelte-motion'
+</script>
 <motion.div animate={{ opacity: 1 }}>Hello</motion.div>
 
 <!-- The plugin transforms it to: -->
+<script>
+    import SvelteMotionDiv from '@humanspeak/svelte-motion/html/Div.svelte'
+</script>
 <SvelteMotionDiv animate={{ opacity: 1 }}>Hello</SvelteMotionDiv>
 ```
 

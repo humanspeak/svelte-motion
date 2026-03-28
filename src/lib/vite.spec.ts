@@ -164,6 +164,48 @@ describe('svelteMotionOptimize', () => {
         )
     })
 
+    it('ignores invalid/unknown tags', () => {
+        const code = `<script>
+    import { motion } from '@humanspeak/svelte-motion'
+</script>
+
+<motion.invalidtag>Hello</motion.invalidtag>`
+
+        const result = transform(code)
+        expect(result).toBeNull()
+    })
+
+    it('does not transform motion.TAG in HTML text or comments', () => {
+        const code = `<script>
+    import { motion } from '@humanspeak/svelte-motion'
+</script>
+
+<!-- Ported from the motion.dev example -->
+<motion.div>Hello</motion.div>
+<p>See motion.dev for details</p>`
+
+        const result = transform(code)
+        expect(result).not.toBeNull()
+        // Template tags are transformed
+        expect(result).toContain('<SvelteMotionDiv>Hello</SvelteMotionDiv>')
+        // "motion.dev" in comments and text is not a valid tag, so no import generated for "dev"
+        expect(result).not.toContain('SvelteMotionDev')
+    })
+
+    it('generates single import for duplicate tag usage', () => {
+        const code = `<script>
+    import { motion } from '@humanspeak/svelte-motion'
+</script>
+
+<motion.div>One</motion.div>
+<motion.div>Two</motion.div>`
+
+        const result = transform(code)
+        expect(result).not.toBeNull()
+        const importMatches = result!.match(/import SvelteMotionDiv/g)
+        expect(importMatches).toHaveLength(1)
+    })
+
     it('returns the plugin with correct metadata', () => {
         const plugin = svelteMotionOptimize()
         expect(plugin.name).toBe('svelte-motion-optimize')
