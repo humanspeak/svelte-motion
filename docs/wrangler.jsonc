@@ -5,12 +5,18 @@
 {
     "$schema": "node_modules/wrangler/config-schema.json",
     "name": "svelte-page-motion",
-    "compatibility_date": "2026-01-20",
+    "compatibility_date": "2026-04-21",
     "compatibility_flags": ["nodejs_als", "nodejs_compat"],
-    "pages_build_output_dir": ".svelte-kit/cloudflare",
+    "main": ".svelte-kit/cloudflare/_worker.js",
+    "assets": {
+        "directory": ".svelte-kit/cloudflare",
+        "binding": "ASSETS",
+        "not_found_handling": "404-page"
+    },
     "observability": {
         "enabled": true
     },
+    "upload_source_maps": true,
     "version_metadata": {
         "binding": "CF_VERSION_METADATA"
     },

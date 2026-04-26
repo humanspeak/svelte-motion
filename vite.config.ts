@@ -8,6 +8,10 @@ export default defineConfig({
 
     server: { port: 8310 },
 
+    build: {
+        sourcemap: false
+    },
+
     test: {
         exclude: [
             ...configDefaults.exclude,

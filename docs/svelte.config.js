@@ -57,7 +57,6 @@ const config = {
                 'default-src': ['self'],
                 'script-src': [
                     'self',
-                    'https://*.ingest.us.sentry.io',
                     'https://*.ahrefs.com',
                     'https://*.posthog.com',
                     'unsafe-inline'
@@ -71,14 +70,6 @@ const config = {
                 'form-action': ['self'],
                 'base-uri': ['self'],
                 'upgrade-insecure-requests': true
-            }
-        },
-        experimental: {
-            instrumentation: {
-                server: true
-            },
-            tracing: {
-                server: true
             }
         }
     },
