@@ -10,8 +10,7 @@
     "main": ".svelte-kit/cloudflare/_worker.js",
     "assets": {
         "directory": ".svelte-kit/cloudflare",
-        "binding": "ASSETS",
-        "not_found_handling": "404-page"
+        "binding": "ASSETS"
     },
     "observability": {
         "enabled": true
@@ -37,7 +36,9 @@
      */
     "vars": {
         "PUBLIC_SITE_URL": "https://motion.svelte.page",
-        "PUBLIC_ENVIRONMENT": "production"
+        "PUBLIC_ENVIRONMENT": "production",
+        "ENVIRONMENT": "production",
+        "NODE_ENV": "production"
     },
     "kv_namespaces": [
         {
