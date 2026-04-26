@@ -1,6 +1,5 @@
 import { svelteMotionOptimize } from '@humanspeak/svelte-motion/vite'
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
-import { sentrySvelteKit } from '@sentry/sveltekit'
 import { sveltekit } from '@sveltejs/kit/vite'
 import tailwindcss from '@tailwindcss/vite'
 // import path from 'node:path'
@@ -12,12 +11,6 @@ import devtoolsJson from 'vite-plugin-devtools-json'
 
 export default defineConfig({
     plugins: [
-        sentrySvelteKit({
-            sourceMapsUploadOptions: {
-                org: 'humanspeak',
-                project: 'motion-svelte-page'
-            }
-        }),
         svelteMotionOptimize(),
         tailwindcss(),
         sveltekit(),
@@ -34,7 +27,6 @@ export default defineConfig({
             output: {
                 manualChunks(id) {
                     if (id.includes('@humanspeak/svelte-motion')) return 'svelte-motion'
-                    if (id.includes('@sentry')) return 'sentry'
                     if (id.includes('paraglide')) return 'paraglide'
                     if (id.includes('mode-watcher')) return 'mode-watcher'
                 }
