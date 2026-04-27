@@ -43,6 +43,7 @@ export type {
     MotionWhileHover,
     MotionWhileInView,
     MotionWhileTap,
+    ReducedMotionConfig,
     Variants
 } from '$lib/types'
 export { useAnimationFrame } from '$lib/utils/animationFrame'
@@ -52,6 +53,7 @@ export { useMotionValue } from '$lib/utils/motionValue'
 export type { MotionValue } from '$lib/utils/motionValue'
 export { useMotionValueEvent } from '$lib/utils/motionValueEvent'
 export { useReducedMotion } from '$lib/utils/reducedMotion'
+export { useReducedMotionConfig } from '$lib/utils/reducedMotionConfig'
 export { useScroll } from '$lib/utils/scroll'
 export { useSpring } from '$lib/utils/spring'
 export { useVelocity } from '$lib/utils/velocity'
