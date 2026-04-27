@@ -47,6 +47,8 @@ export type {
     Variants
 } from '$lib/types'
 export { useAnimationFrame } from '$lib/utils/animationFrame'
+export { useCycle } from '$lib/utils/cycle'
+export type { Cycle, CycleState } from '$lib/utils/cycle'
 export { createDragControls } from '$lib/utils/dragControls'
 export { useMotionTemplate } from '$lib/utils/motionTemplate'
 export { useMotionValue } from '$lib/utils/motionValue'

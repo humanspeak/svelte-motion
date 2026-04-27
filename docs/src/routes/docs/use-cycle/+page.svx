@@ -1,0 +1,124 @@
+---
+title: 'useCycle'
+description: 'Cycle through a series of values to drive variants, properties, or any state machine.'
+---
+
+<script>
+  import { useCycle } from '@humanspeak/svelte-motion';
+  import Example from '$lib/components/general/Example.svelte';
+  import UseCycleExample from '$lib/examples/UseCycleExample.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'useCycle | Docs | Svelte Motion'
+      seo.description = 'Cycle through a series of values - perfect for toggling animation variants in Svelte. useCycle returns a reactive store and a cycle function.'
+      seo.ogTitle = 'useCycle'
+      seo.ogTagline = 'Cycle through animation states'
+      seo.ogFeatures = ['Variants', 'State Toggle', 'Reactive Store', 'SSR Safe']
+      seo.ogSlug = 'docs-use-cycle'
+  }
+</script>
+
+# useCycle
+
+`useCycle` cycles through a series of values. It is the Svelte equivalent of
+Framer Motion's `useCycle` hook and pairs naturally with `motion` variants or
+any prop you want to toggle on user interaction.
+
+```svelte
+<script>
+    import { motion, useCycle } from '@humanspeak/svelte-motion'
+
+    const [x, cycleX] = useCycle(0, 50, 100)
+</script>
+
+<motion.div animate={{ x: $x }} onclick={() => cycleX()} />
+```
+
+`useCycle` returns a `[value, cycle]` tuple:
+
+- `value` is a Svelte `Readable<T>` &mdash; subscribe with `$value`.
+- `cycle()` advances to the next item, wrapping back to the first when it
+  passes the end.
+- `cycle(i)` jumps directly to the value at index `i`.
+
+<Example isSmall exampleUrl="/examples/use-cycle">
+  <UseCycleExample />
+</Example>
+
+## Cycling through variants
+
+The most common use is toggling between named variants on a `motion`
+component. Pass the variant names to `useCycle` and bind the current name to
+the `animate` prop:
+
+```svelte
+<script lang="ts">
+    import { motion, useCycle } from '@humanspeak/svelte-motion'
+
+    const variants = {
+        rest: { x: 0, rotate: 0 },
+        nudge: { x: 80, rotate: 8 },
+        flip: { x: 80, rotate: 188 }
+    }
+
+    const [variant, cycleVariant] = useCycle<keyof typeof variants>(
+        'rest',
+        'nudge',
+        'flip'
+    )
+</script>
+
+<motion.button
+    {variants}
+    animate={$variant}
+    transition={{ type: 'spring', stiffness: 220, damping: 18 }}
+    onclick={() => cycleVariant()}
+>
+    Cycle
+</motion.button>
+```
+
+## Jumping to a specific index
+
+Pass a number to jump directly to that index instead of advancing one step.
+Subsequent `cycle()` calls advance from the new position:
+
+```svelte
+<script>
+    import { useCycle } from '@humanspeak/svelte-motion'
+
+    const [value, cycle] = useCycle('a', 'b', 'c', 'd')
+
+    cycle(2) // value is now 'c'
+    cycle() // value is now 'd'
+    cycle() // value wraps to 'a'
+</script>
+```
+
+## API Reference
+
+### Parameters
+
+- **...items** `T[]` &mdash; one or more values to cycle through. Must include
+  at least one item.
+
+### Returns
+
+A `[Readable<T>, Cycle]` tuple:
+
+- **value** `Readable<T>` &mdash; the current item, starting at `items[0]`.
+- **cycle** `(next?: number) => void` &mdash; advance to the next item, or jump
+  to the value at index `next` when supplied.
+
+## See also
+
+- [Variants](/docs/variants) &mdash; declarative animation states that pair
+  naturally with `useCycle`.
+- [AnimatePresence](/docs/animate-presence) &mdash; coordinate enter/exit
+  animations as cycled state changes.
+
+---
+
+Based on [Motion's useCycle](https://motion.dev/docs/react-use-cycle) API.
