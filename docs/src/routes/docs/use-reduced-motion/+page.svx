@@ -1,0 +1,153 @@
+---
+title: 'useReducedMotion'
+description: "Reactive Svelte store for the user's prefers-reduced-motion accessibility preference."
+---
+
+<script>
+  import { useReducedMotion } from '@humanspeak/svelte-motion';
+  import Example from '$lib/components/general/Example.svelte';
+  import UseReducedMotionExample from '$lib/examples/UseReducedMotionExample.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'useReducedMotion | Docs | Svelte Motion'
+      seo.description = "Detect the user's prefers-reduced-motion setting in Svelte. useReducedMotion returns a reactive readable store that updates live when the OS preference changes."
+      seo.ogTitle = 'useReducedMotion'
+      seo.ogTagline = "Honor the user's reduced-motion preference"
+      seo.ogFeatures = ['Accessibility', 'Reactive Store', 'Live Media-Query Updates', 'SSR Safe']
+      seo.ogSlug = 'docs-use-reduced-motion'
+  }
+</script>
+
+# useReducedMotion
+
+`useReducedMotion` returns a Svelte readable store that reflects the user's
+`prefers-reduced-motion` accessibility setting. The store updates live when the
+media query changes, so components can disable or simplify animations the moment
+the user toggles the OS preference.
+
+```svelte
+<script>
+    import { useReducedMotion } from '@humanspeak/svelte-motion'
+
+    const reduced = useReducedMotion()
+</script>
+
+<div style:transform={$reduced ? 'none' : 'rotate(45deg)'}>
+    Respects the user's preference
+</div>
+```
+
+## Why it matters
+
+Some users disable motion at the OS level because animations cause vestibular
+discomfort, distraction, or other accessibility issues. `useReducedMotion`
+gives your components a single source of truth so they can opt out of motion
+gracefully rather than ignoring the user's setting.
+
+<Example isSmall exampleUrl="/examples/use-reduced-motion">
+  <UseReducedMotionExample />
+</Example>
+
+## Usage
+
+The hook returns a `Readable<boolean>` &mdash; subscribe with `$` like any
+Svelte store:
+
+```svelte
+<script lang="ts">
+    import { useReducedMotion } from '@humanspeak/svelte-motion'
+
+    const reduced = useReducedMotion()
+</script>
+
+{#if $reduced}
+    <p>Animations have been disabled to respect your preference.</p>
+{:else}
+    <FancyAnimatedHero />
+{/if}
+```
+
+### Skipping motion in `motion` components
+
+Combine with `motion` to swap an animated transition for an instant change when
+reduced motion is requested:
+
+```svelte
+<script lang="ts">
+    import { motion, useReducedMotion } from '@humanspeak/svelte-motion'
+
+    const reduced = useReducedMotion()
+</script>
+
+<motion.div
+    animate={{ x: 100 }}
+    transition={$reduced ? { duration: 0 } : { type: 'spring', stiffness: 200 }}
+/>
+```
+
+### With variants
+
+When you build variants, fall back to a "no motion" variant for users who opt
+out:
+
+```svelte
+<script lang="ts">
+    import { motion, useReducedMotion } from '@humanspeak/svelte-motion'
+
+    const reduced = useReducedMotion()
+
+    const variants = {
+        hidden: { opacity: 0, y: 20 },
+        visible: { opacity: 1, y: 0 }
+    }
+
+    const reducedVariants = {
+        hidden: { opacity: 0 },
+        visible: { opacity: 1 }
+    }
+</script>
+
+<motion.div
+    variants={$reduced ? reducedVariants : variants}
+    initial="hidden"
+    animate="visible"
+/>
+```
+
+## How it works
+
+- Subscribes to `window.matchMedia('(prefers-reduced-motion: reduce)')`.
+- Uses `MediaQueryList` `change` events; falls back to the legacy `addListener`
+  API for Safari &lt; 14.
+- Removes the listener automatically when the last subscriber unsubscribes.
+- Returns `false` in SSR or environments without `matchMedia`, so it is safe
+  to call during server rendering.
+
+## API Reference
+
+### Returns
+
+`Readable<boolean>` &mdash; `true` when the user has requested reduced motion,
+otherwise `false`.
+
+## Testing the preference
+
+You don't have to change OS settings to verify your reduced-motion code paths:
+
+- **Chrome / Edge DevTools:** open DevTools → ⋯ → More tools → Rendering →
+  _Emulate CSS media feature `prefers-reduced-motion`_ → `reduce`.
+- **Firefox:** set `ui.prefersReducedMotion` to `1` in `about:config`.
+- **Playwright:** `test.use({ reducedMotion: 'reduce' })` or
+  `await page.emulateMedia({ reducedMotion: 'reduce' })` in a test.
+
+## See also
+
+- [useTime](/docs/use-time) - Drive animations from a reactive time store
+- [useAnimationFrame](/docs/use-animation-frame) - Frame-by-frame control
+- [WCAG 2.3.3 Animation from Interactions](https://www.w3.org/WAI/WCAG21/Understanding/animation-from-interactions.html)
+
+---
+
+Based on [Motion's useReducedMotion](https://motion.dev/docs/react-use-reduced-motion) API.

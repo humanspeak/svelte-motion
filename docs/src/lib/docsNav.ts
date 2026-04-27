@@ -1,5 +1,6 @@
 import type { NavSection } from '@humanspeak/docs-kit'
 import {
+    Accessibility,
     Activity,
     ArrowUpDown,
     Box,
@@ -62,7 +63,14 @@ export const docsSections: NavSection[] = [
     {
         title: 'Hooks',
         icon: Clock,
-        items: [{ title: 'useAnimationFrame', href: '/docs/use-animation-frame', icon: Clock }]
+        items: [
+            { title: 'useAnimationFrame', href: '/docs/use-animation-frame', icon: Clock },
+            {
+                title: 'useReducedMotion',
+                href: '/docs/use-reduced-motion',
+                icon: Accessibility
+            }
+        ]
     },
     {
         title: 'Utilities',
