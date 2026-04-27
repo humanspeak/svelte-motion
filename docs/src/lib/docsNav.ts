@@ -69,6 +69,11 @@ export const docsSections: NavSection[] = [
                 title: 'useReducedMotion',
                 href: '/docs/use-reduced-motion',
                 icon: Accessibility
+            },
+            {
+                title: 'useReducedMotionConfig',
+                href: '/docs/use-reduced-motion-config',
+                icon: Accessibility
             }
         ]
     },

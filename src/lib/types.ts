@@ -352,9 +352,28 @@ export type MotionProps = {
  *   - delay: Time to wait before starting the animation
  *   - repeat: Number of times to repeat the animation
  */
+/**
+ * Reduced-motion policy for {@link MotionConfigProps.reducedMotion}.
+ *
+ * - `'never'` (default): Animations run as authored, regardless of OS preference.
+ * - `'always'`: Transform animations (x, y, scale, rotate, skew, translate) are
+ *   skipped. Other properties such as `opacity` and `color` still animate.
+ * - `'user'`: Honors the OS-level `prefers-reduced-motion: reduce` setting —
+ *   behaves like `'always'` when the user has opted in, otherwise `'never'`.
+ *
+ * @see https://motion.dev/docs/react-reduced-motion
+ */
+export type ReducedMotionConfig = 'user' | 'always' | 'never'
+
 export type MotionConfigProps = {
     /** Animation configuration */
     transition?: MotionTransition
+    /**
+     * Reduced-motion policy applied to descendant motion elements.
+     *
+     * Defaults to `'never'`. See {@link ReducedMotionConfig}.
+     */
+    reducedMotion?: ReducedMotionConfig
 }
 
 /**

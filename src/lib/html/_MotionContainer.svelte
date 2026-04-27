@@ -5,6 +5,10 @@
 
 <script lang="ts">
     import { getMotionConfig } from '$lib/components/motionConfig.context'
+    import {
+        filterReducedMotionKeyframes,
+        useReducedMotionConfig
+    } from '$lib/utils/reducedMotionConfig'
     import type {
         MotionProps,
         MotionTransition,
@@ -50,7 +54,7 @@
         setInitialFalseContext,
         getInitialFalseContext
     } from '$lib/components/variantContext.context'
-    import { writable } from 'svelte/store'
+    import { get, writable } from 'svelte/store'
     import {
         transformSVGPathProperties,
         computeNormalizedSVGInitialAttrs,
@@ -115,6 +119,11 @@
     let isLoaded = $state<'mounting' | 'initial' | 'ready' | 'animated'>('mounting')
     let dataPath = $state<number>(-1)
     const motionConfig = $derived(getMotionConfig())
+    const reducedMotionStore = useReducedMotionConfig()
+    // Seed synchronously so the first render filters keyframes correctly —
+    // otherwise transforms could flash before the subscribe effect runs.
+    let reducedMotion = $state(get(reducedMotionStore))
+    $effect(() => reducedMotionStore.subscribe((value) => (reducedMotion = value)))
 
     // Get presence context to check if we're inside AnimatePresence
     const context = getAnimatePresenceContext()
@@ -219,10 +228,14 @@
     // Reactively update registration when element/exit/transition props change
     $effect(() => {
         if (element && context && resolvedExit) {
+            const filteredExit = filterReducedMotionKeyframes(
+                resolvedExit as Record<string, unknown>,
+                reducedMotion
+            )
             context.registerChild(
                 presenceKey,
                 element,
-                resolvedExit,
+                filteredExit,
                 mergedTransition as unknown as MotionTransition
             )
         }
@@ -350,7 +363,12 @@
     const resolvedExit = $derived(resolveExit(exitProp, variantsProp))
 
     // Extract keyframes from resolved initial, handling initial={false}
-    const initialKeyframes = $derived(getInitialKeyframes(resolvedInitial))
+    const initialKeyframes = $derived(
+        filterReducedMotionKeyframes(
+            getInitialKeyframes(resolvedInitial) as Record<string, unknown>,
+            reducedMotion
+        )
+    )
 
     // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
     const derivedAttrs = $derived<Record<string, unknown>>({
@@ -490,6 +508,13 @@
         payload = transformSVGPathProperties(
             element,
             payload as Record<string, unknown>
+        ) as typeof payload
+
+        // Strip transform keys when reduced-motion is active so the element
+        // stays in place while opacity / color etc. still animate.
+        payload = filterReducedMotionKeyframes(
+            payload as Record<string, unknown>,
+            reducedMotion
         ) as typeof payload
 
         // Ensure dash properties aren't pinned as inline styles
@@ -801,7 +826,10 @@
             try {
                 // 1. Run exit animation if defined
                 if (resolvedExit && element && !keyTransitionStopped) {
-                    const exitKeyframes = { ...(resolvedExit as Record<string, unknown>) }
+                    const exitKeyframes = filterReducedMotionKeyframes(
+                        { ...(resolvedExit as Record<string, unknown>) },
+                        reducedMotion
+                    )
                     // Remove transition from keyframes (it's passed separately)
                     delete exitKeyframes.transition
 

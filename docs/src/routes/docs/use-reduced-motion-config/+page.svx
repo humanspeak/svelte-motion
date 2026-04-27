@@ -1,0 +1,115 @@
+---
+title: 'useReducedMotionConfig'
+description: 'Resolve the active reduced-motion policy from <MotionConfig> and the OS preference.'
+---
+
+<script>
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'useReducedMotionConfig | Docs | Svelte Motion'
+      seo.description = "Combine MotionConfig.reducedMotion with the user's OS preference into a single reactive store."
+      seo.ogTitle = 'useReducedMotionConfig'
+      seo.ogTagline = 'Resolved reduced-motion policy from context + OS pref'
+      seo.ogFeatures = ['Accessibility', 'Reactive Store', 'MotionConfig Aware', 'SSR Safe']
+      seo.ogSlug = 'docs-use-reduced-motion-config'
+  }
+</script>
+
+# useReducedMotionConfig
+
+`useReducedMotionConfig` resolves the active reduced-motion policy for the
+current component subtree by combining the nearest
+`<MotionConfig reducedMotion="...">` ancestor with the OS-level
+`prefers-reduced-motion` setting.
+
+```svelte
+<script>
+    import { useReducedMotionConfig } from '@humanspeak/svelte-motion'
+
+    const reduced = useReducedMotionConfig()
+</script>
+
+{#if !$reduced}
+    <motion.div animate={{ x: 100 }} />
+{/if}
+```
+
+## Why two hooks?
+
+- [`useReducedMotion`](/docs/use-reduced-motion) only reads the OS preference.
+- `useReducedMotionConfig` reads the resolved policy &mdash; it lets a parent
+  `<MotionConfig>` override the OS preference (e.g. force-disable motion in a
+  preview pane regardless of system settings).
+
+## `<MotionConfig reducedMotion>`
+
+The `reducedMotion` prop on `<MotionConfig>` controls how transform animations
+are handled for descendant `motion` elements:
+
+| Value      | Behavior                                                                                  |
+| ---------- | ----------------------------------------------------------------------------------------- |
+| `'never'`  | Default. Animations run as authored.                                                      |
+| `'always'` | Strip transform keys (`x`, `y`, `scale`, `rotate`, `skew`, …). Other props still animate. |
+| `'user'`   | Honor the OS-level `prefers-reduced-motion`. Acts like `'always'` when the user opted in. |
+
+```svelte
+<script>
+    import { motion, MotionConfig } from '@humanspeak/svelte-motion'
+</script>
+
+<MotionConfig reducedMotion="user">
+    <motion.div
+        initial={{ x: -200, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.6 }}
+    >
+        Fades in always; only translates when the user hasn't opted into reduced motion.
+    </motion.div>
+</MotionConfig>
+```
+
+## Custom decisions
+
+Use the hook directly when you want to make per-component decisions that go
+beyond stripping transforms &mdash; for example, swapping a parallax effect for
+a static background:
+
+```svelte
+<script lang="ts">
+    import { useReducedMotionConfig } from '@humanspeak/svelte-motion'
+
+    const reduced = useReducedMotionConfig()
+</script>
+
+{#if $reduced}
+    <StaticHero />
+{:else}
+    <ParallaxHero />
+{/if}
+```
+
+## How it resolves
+
+| Policy      | OS pref `reduce` | OS pref `no-preference` |
+| ----------- | ---------------- | ----------------------- |
+| _no parent_ | `false`          | `false`                 |
+| `'never'`   | `false`          | `false`                 |
+| `'always'`  | `true`           | `true`                  |
+| `'user'`    | `true`           | `false`                 |
+
+## API Reference
+
+### Returns
+
+`Readable<boolean>` &mdash; `true` when descendant motion should be reduced.
+
+## See also
+
+- [`useReducedMotion`](/docs/use-reduced-motion) &mdash; OS preference only
+- [WCAG 2.3.3 Animation from Interactions](https://www.w3.org/WAI/WCAG21/Understanding/animation-from-interactions.html)
+
+---
+
+Based on [Motion's MotionConfig.reducedMotion](https://motion.dev/docs/react-motion-config#reducedmotion) API.
