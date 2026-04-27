@@ -115,6 +115,11 @@ export const load: PageLoad = () => {
             description: 'Interactive useanimationframe animation example using Svelte Motion.',
             sourceUrl: 'https://examples.motion.dev/react/use-animation-frame'
         },
+        'use-reduced-motion': {
+            title: 'useReducedMotion',
+            description: 'Interactive usereducedmotion animation example using Svelte Motion.',
+            sourceUrl: 'https://motion.dev/docs/react-use-reduced-motion'
+        },
         'use-time': {
             title: 'useTime',
             description: 'Interactive usetime animation example using Svelte Motion.',

@@ -241,6 +241,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reduced-motion') + searchParams}
+                    >
+                        useReducedMotion
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/reactive-style') + searchParams}
                     >
                         styleString (Reactive Styles)

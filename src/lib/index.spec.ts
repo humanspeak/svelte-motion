@@ -33,6 +33,7 @@ import {
     stringifyStyleObject,
     transform,
     useAnimationFrame,
+    useReducedMotion,
     useSpring,
     useTime,
     useTransform,
@@ -76,6 +77,7 @@ describe('public API: index.ts', () => {
 
     it('exports utility helpers', () => {
         expect(typeof useAnimationFrame).toBe('function')
+        expect(typeof useReducedMotion).toBe('function')
         expect(typeof useSpring).toBe('function')
         expect(typeof stringifyStyleObject).toBe('function')
         expect(typeof useTime).toBe('function')
