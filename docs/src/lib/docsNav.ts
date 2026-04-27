@@ -15,6 +15,7 @@ import {
     MousePointer,
     Move,
     Play,
+    RefreshCw,
     Signal,
     SlidersHorizontal,
     Timer,
@@ -65,6 +66,7 @@ export const docsSections: NavSection[] = [
         icon: Clock,
         items: [
             { title: 'useAnimationFrame', href: '/docs/use-animation-frame', icon: Clock },
+            { title: 'useCycle', href: '/docs/use-cycle', icon: RefreshCw },
             {
                 title: 'useReducedMotion',
                 href: '/docs/use-reduced-motion',
