@@ -1,5 +1,7 @@
 import { scroll } from 'motion'
 import { readable, writable, type Readable } from 'svelte/store'
+import { createAttachable } from './attachable.js'
+import { type ElementOrGetter } from './dom.js'
 
 /**
  * Axis-level scroll information returned by the `scroll()` callback.
@@ -27,13 +29,6 @@ type ScrollInfo = {
 type ScrollOffset = Array<[number | string, number | string]> | string[]
 
 /**
- * An element reference — either an element directly or a getter function
- * that returns one (useful with Svelte's `bind:this` where the element
- * isn't available until after mount).
- */
-type ElementOrGetter = HTMLElement | (() => HTMLElement | undefined)
-
-/**
  * Options accepted by `useScroll`.
  */
 type UseScrollOptions = {
@@ -56,14 +51,6 @@ type UseScrollReturn = {
     scrollY: Readable<number>
     scrollXProgress: Readable<number>
     scrollYProgress: Readable<number>
-}
-
-/**
- * Resolves an element-or-getter to an HTMLElement (or undefined).
- */
-const resolveElement = (ref?: ElementOrGetter): HTMLElement | undefined => {
-    if (!ref) return undefined
-    return typeof ref === 'function' ? ref() : ref
 }
 
 /**
@@ -114,69 +101,32 @@ export const useScroll = (options?: UseScrollOptions): UseScrollReturn => {
         scrollYProgress: writable(0)
     }
 
-    let cleanup: VoidFunction | undefined
-    let pollRaf = 0
-    let subscriberCount = 0
-
-    const attach = () => {
-        if (cleanup) return
-
-        // Resolve elements — they may not be available yet when using getters
-        const container = resolveElement(options?.container)
-        const target = resolveElement(options?.target)
-
-        // If a getter was provided but returned undefined, the element isn't
-        // mounted yet. Poll on the next frame until it appears.
-        const needsContainer = options?.container && !container
-        const needsTarget = options?.target && !target
-        if (needsContainer || needsTarget) {
-            if (!pollRaf) {
-                pollRaf = requestAnimationFrame(() => {
-                    pollRaf = 0
-                    attach()
-                })
-            }
-            return
-        }
-
-        cleanup = scroll(
-            (_progress: number, info: ScrollInfo) => {
-                stores.scrollX.set(info.x.current)
-                stores.scrollY.set(info.y.current)
-                stores.scrollXProgress.set(info.x.progress)
-                stores.scrollYProgress.set(info.y.progress)
-            },
-            {
-                container,
-                target,
-                offset: options?.offset as never,
-                axis: options?.axis
-            }
-        )
-    }
-
-    const detach = () => {
-        if (subscriberCount <= 0) {
-            if (pollRaf) {
-                cancelAnimationFrame(pollRaf)
-                pollRaf = 0
-            }
-            if (cleanup) {
-                cleanup()
-                cleanup = undefined
-            }
-        }
-    }
+    const attachable = createAttachable({
+        refs: { container: options?.container, target: options?.target },
+        onAttach: ({ container, target }) =>
+            scroll(
+                (_progress: number, info: ScrollInfo) => {
+                    stores.scrollX.set(info.x.current)
+                    stores.scrollY.set(info.y.current)
+                    stores.scrollXProgress.set(info.x.progress)
+                    stores.scrollYProgress.set(info.y.progress)
+                },
+                {
+                    container,
+                    target,
+                    offset: options?.offset as never,
+                    axis: options?.axis
+                }
+            )
+    })
 
     const make = (key: string): Readable<number> =>
         readable(0, (set) => {
-            subscriberCount++
+            const release = attachable.subscribe()
             const unsub = stores[key].subscribe(set)
-            attach()
             return () => {
                 unsub()
-                subscriberCount--
-                detach()
+                release()
             }
         })
 

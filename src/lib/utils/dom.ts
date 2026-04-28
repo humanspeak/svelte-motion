@@ -17,3 +17,20 @@
 export const isDomElement = (v: unknown): v is Element => {
     return !!v && typeof (v as Element).getBoundingClientRect === 'function'
 }
+
+/**
+ * An element reference - either an element directly or a getter function
+ * that returns one. Getters defer resolution past mount, which is useful
+ * with Svelte's `bind:this` where the element isn't available synchronously.
+ */
+export type ElementOrGetter = HTMLElement | (() => HTMLElement | undefined)
+
+/**
+ * Resolves an `ElementOrGetter` to an `HTMLElement`, or `undefined` if not
+ * yet available (e.g. a getter is supplied but the bound element hasn't
+ * mounted).
+ */
+export const resolveElement = (ref?: ElementOrGetter): HTMLElement | undefined => {
+    if (!ref) return undefined
+    return typeof ref === 'function' ? ref() : ref
+}

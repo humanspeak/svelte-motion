@@ -8,6 +8,7 @@ import {
     Code,
     Columns2,
     Compass,
+    Eye,
     Gauge,
     Ghost,
     Hand,
@@ -67,6 +68,7 @@ export const docsSections: NavSection[] = [
         items: [
             { title: 'useAnimationFrame', href: '/docs/use-animation-frame', icon: Clock },
             { title: 'useCycle', href: '/docs/use-cycle', icon: RefreshCw },
+            { title: 'useInView', href: '/docs/use-in-view', icon: Eye },
             {
                 title: 'useReducedMotion',
                 href: '/docs/use-reduced-motion',

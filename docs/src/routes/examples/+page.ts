@@ -120,6 +120,11 @@ export const load: PageLoad = () => {
             description: 'Interactive usecycle animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/docs/react-use-cycle'
         },
+        'use-in-view': {
+            title: 'useInView',
+            description: 'Interactive useinview animation example using Svelte Motion.',
+            sourceUrl: 'https://motion.dev/docs/react-use-in-view'
+        },
         'use-reduced-motion': {
             title: 'useReducedMotion',
             description: 'Interactive usereducedmotion animation example using Svelte Motion.',

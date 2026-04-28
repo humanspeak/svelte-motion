@@ -34,6 +34,7 @@ import {
     transform,
     useAnimationFrame,
     useCycle,
+    useInView,
     useReducedMotion,
     useSpring,
     useTime,
@@ -79,6 +80,7 @@ describe('public API: index.ts', () => {
     it('exports utility helpers', () => {
         expect(typeof useAnimationFrame).toBe('function')
         expect(typeof useCycle).toBe('function')
+        expect(typeof useInView).toBe('function')
         expect(typeof useReducedMotion).toBe('function')
         expect(typeof useSpring).toBe('function')
         expect(typeof stringifyStyleObject).toBe('function')
