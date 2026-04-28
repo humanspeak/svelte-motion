@@ -53,6 +53,26 @@ export type Attachable = {
  * and `useInView` use this to defer observer setup until a subscriber arrives,
  * poll for `bind:this` element resolution, and tear down on the last
  * unsubscribe.
+ *
+ * @param config Attachment configuration: refs to resolve, an `onAttach`
+ *   callback that returns a cleanup function, and an optional `isLatched`
+ *   short-circuit.
+ * @returns An `Attachable` exposing `subscribe()` for use inside Svelte
+ *   `readable(..., start)` callbacks.
+ * @example
+ * ```ts
+ * const attachable = createAttachable({
+ *     refs: { target },
+ *     onAttach: ({ target }) => {
+ *         const stopObserving = startObserver(target!, ...)
+ *         return stopObserving
+ *     }
+ * })
+ * return readable(initial, (set) => {
+ *     const release = attachable.subscribe()
+ *     return release
+ * })
+ * ```
  */
 export const createAttachable = <R extends AttachableRefs>(
     config: AttachableConfig<R>
@@ -60,6 +80,11 @@ export const createAttachable = <R extends AttachableRefs>(
     let cleanup: VoidFunction | undefined
     let pollRaf = 0
     let subscriberCount = 0
+    // When stop() runs synchronously inside onAttach, cleanup hasn't been
+    // assigned yet. Defer the teardown so the just-returned disposer still
+    // gets invoked.
+    let attaching = false
+    let stopRequestedDuringAttach = false
 
     const cancelPoll = () => {
         if (pollRaf) {
@@ -70,9 +95,14 @@ export const createAttachable = <R extends AttachableRefs>(
 
     const stop = () => {
         cancelPoll()
+        if (attaching) {
+            stopRequestedDuringAttach = true
+            return
+        }
         if (cleanup) {
-            cleanup()
+            const fn = cleanup
             cleanup = undefined
+            fn()
         }
     }
 
@@ -97,8 +127,18 @@ export const createAttachable = <R extends AttachableRefs>(
             return
         }
 
-        const result = config.onAttach(els, stop)
+        attaching = true
+        let result: VoidFunction | void
+        try {
+            result = config.onAttach(els, stop)
+        } finally {
+            attaching = false
+        }
         if (typeof result === 'function') cleanup = result
+        if (stopRequestedDuringAttach) {
+            stopRequestedDuringAttach = false
+            stop()
+        }
     }
 
     return {

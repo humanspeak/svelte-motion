@@ -60,7 +60,10 @@ it back:
 <script lang="ts">
     import { useInView } from '@humanspeak/svelte-motion'
 
-    let card
+    let card: HTMLElement | undefined
+    const trackImpression = () => {
+        // send analytics, fetch lazy data, etc.
+    }
     const inView = useInView(() => card, { once: true })
 
     $effect(() => {
@@ -129,8 +132,9 @@ of the viewport.
 
 ## See also
 
-- [whileInView](/docs/animate-presence) &mdash; declarative animation when an
-  element enters the viewport.
+- The `whileInView` motion prop &mdash; declarative animation when a
+  `motion.*` element enters the viewport. Both this hook and `whileInView`
+  share the same `IntersectionObserver` infrastructure under the hood.
 - [useScroll](/docs/use-scroll) &mdash; scroll position stores for scroll-driven
   animations.
 

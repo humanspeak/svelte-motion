@@ -8,20 +8,27 @@ import { readable, writable, type Readable } from 'svelte/store'
 import { createAttachable } from './attachable.js'
 import { type ElementOrGetter } from './dom.js'
 
-const escapeRegExp = (str: string): string => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-const CSS_FUNCTION_RE = /\b(var|calc|min|max|clamp|rgb|rgba|hsl|hsla|url)\s*\(/
+const CSS_FUNCTION_RE = /\b(var|calc|min|max|clamp|rgb|rgba|hsl|hsla|url)\s*\(/i
 
 /**
- * Extract a CSS-function value (var/calc/etc.) for `propName` from an inline
- * style string. Returns `null` for non-function values so the caller can fall
- * back to `getComputedStyle`.
+ * Read an inline CSS-function value (var/calc/url/etc.) for `propName`
+ * directly from the element's style declaration. Returns `null` for missing
+ * or non-function values so the caller can fall back to `getComputedStyle`.
+ *
+ * Uses `style.getPropertyValue` so values like `url(data:image/svg+xml;...)`
+ * with nested semicolons are preserved intact - the browser has already
+ * parsed the declaration, no string scraping required.
+ *
+ * @param el Element whose inline style is read.
+ * @param propName Camel-case JS property name (e.g. `borderColor`).
+ * @returns The inline CSS function value, or `null`.
+ * @example
+ * getInlineCssFunction(node, 'background') // => 'var(--brand)' | null
  */
-const getInlineCssFunction = (inlineStyle: string, propName: string): string | null => {
-    const kebab = escapeRegExp(propName.replace(/([A-Z])/g, '-$1').toLowerCase())
-    const match = inlineStyle.match(new RegExp(`(?:^|;)\\s*${kebab}\\s*:\\s*([^;]+)`, 'i'))
-    if (!match) return null
-    const value = match[1].trim()
+const getInlineCssFunction = (el: HTMLElement, propName: string): string | null => {
+    const kebab = propName.replace(/([A-Z])/g, '-$1').toLowerCase()
+    const value = el.style.getPropertyValue(kebab).trim()
+    if (!value) return null
     return CSS_FUNCTION_RE.test(value) ? value : null
 }
 
@@ -100,7 +107,6 @@ export const computeInViewBaseline = (
     }
 
     const cs = getComputedStyle(el)
-    const inlineStyle = el.getAttribute('style') || ''
 
     for (const key of Object.keys(whileInViewRecord)) {
         if (Object.prototype.hasOwnProperty.call(animateRecord, key)) {
@@ -110,7 +116,7 @@ export const computeInViewBaseline = (
         } else if (key in (neutralTransformDefaults as Record<string, unknown>)) {
             baseline[key] = neutralTransformDefaults[key]
         } else {
-            const inlineValue = getInlineCssFunction(inlineStyle, key)
+            const inlineValue = getInlineCssFunction(el, key)
             if (inlineValue) {
                 baseline[key] = inlineValue
             } else if (key in (cs as unknown as Record<string, unknown>)) {

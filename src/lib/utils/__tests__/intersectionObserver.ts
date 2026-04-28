@@ -5,6 +5,7 @@ export type MockIOEntry = Pick<IntersectionObserverEntry, 'target' | 'isIntersec
 
 export type MockIntersectionObserverInstance = {
     callback: IntersectionObserverCallback
+    init?: IntersectionObserverInit
     elements: Element[]
     observe: ReturnType<typeof vi.fn>
     unobserve: ReturnType<typeof vi.fn>
@@ -32,6 +33,10 @@ export type MockIntersectionObserverHandle = {
  * Build an `IntersectionObserver` test double. Lives under `__tests__/` so
  * it's excluded from the published bundle and can freely import `vitest`.
  *
+ * @returns A `MockIntersectionObserverHandle` exposing `Class` (assign to
+ *   `globalThis.IntersectionObserver`), `instances()` for inspecting
+ *   constructor calls, `reset()` for between-test cleanup, and `fireOn(el,
+ *   isIntersecting)` for driving enter/exit events synchronously.
  * @example
  * ```ts
  * const io = createMockIntersectionObserver()
@@ -45,6 +50,7 @@ export const createMockIntersectionObserver = (): MockIntersectionObserverHandle
 
     class MockIntersectionObserver {
         callback: IntersectionObserverCallback
+        init?: IntersectionObserverInit
         elements: Element[] = []
         observe = vi.fn((el: Element) => {
             this.elements.push(el)
@@ -56,8 +62,9 @@ export const createMockIntersectionObserver = (): MockIntersectionObserverHandle
             this.elements = []
         })
         takeRecords = vi.fn((): IntersectionObserverEntry[] => [])
-        constructor(callback: IntersectionObserverCallback) {
+        constructor(callback: IntersectionObserverCallback, init?: IntersectionObserverInit) {
             this.callback = callback
+            this.init = init
             instances.push(this)
         }
         fire(entries: MockIOEntry[]) {

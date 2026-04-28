@@ -114,4 +114,41 @@ describe('utils/inView - useInView', () => {
         store.subscribe(() => {})()
         expect(io.instances().length).toBe(0)
     })
+
+    it('forwards a custom root element to IntersectionObserver', () => {
+        const target = document.createElement('div')
+        const root = document.createElement('section')
+        const store = useInView(target, { root })
+        const unsub = store.subscribe(() => {})
+
+        expect(io.instances()[0].init?.root).toBe(root)
+        unsub()
+    })
+
+    it('forwards margin to IntersectionObserver as rootMargin', () => {
+        const target = document.createElement('div')
+        const store = useInView(target, { margin: '20px 0px 40px 0px' })
+        const unsub = store.subscribe(() => {})
+
+        expect(io.instances()[0].init?.rootMargin).toBe('20px 0px 40px 0px')
+        unsub()
+    })
+
+    it('translates amount: number to threshold', () => {
+        const target = document.createElement('div')
+        const store = useInView(target, { amount: 0.5 })
+        const unsub = store.subscribe(() => {})
+
+        expect(io.instances()[0].init?.threshold).toBe(0.5)
+        unsub()
+    })
+
+    it('translates amount: "all" to threshold 1', () => {
+        const target = document.createElement('div')
+        const store = useInView(target, { amount: 'all' })
+        const unsub = store.subscribe(() => {})
+
+        expect(io.instances()[0].init?.threshold).toBe(1)
+        unsub()
+    })
 })
