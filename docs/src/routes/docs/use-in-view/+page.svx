@@ -1,0 +1,143 @@
+---
+title: 'useInView'
+description: 'Track whether an element is in the viewport from a Svelte readable store.'
+---
+
+<script>
+  import { useInView } from '@humanspeak/svelte-motion';
+  import Example from '$lib/components/general/Example.svelte';
+  import UseInViewExample from '$lib/examples/UseInViewExample.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'useInView | Docs | Svelte Motion'
+      seo.description = 'Track whether an element is in the viewport with a reactive Svelte store. useInView mirrors framer-motion and pairs naturally with Svelte 5 bind:this.'
+      seo.ogTitle = 'useInView'
+      seo.ogTagline = 'Detect viewport entry from a Svelte store'
+      seo.ogFeatures = ['Reactive Store', 'IntersectionObserver', 'Once Latch', 'SSR Safe']
+      seo.ogSlug = 'docs-use-in-view'
+  }
+</script>
+
+# useInView
+
+`useInView` returns a Svelte readable store that reports whether an element is
+in the viewport. It uses the same `IntersectionObserver` infrastructure as the
+`whileInView` motion prop, so it's a good fit for non-animation side effects:
+analytics impressions, lazy data loads, one-shot reveals, and scroll-driven UI.
+
+```svelte
+<script>
+    import { useInView } from '@humanspeak/svelte-motion'
+
+    let ref
+    const inView = useInView(() => ref)
+</script>
+
+<div bind:this={ref}>
+    {$inView ? 'visible' : 'hidden'}
+</div>
+```
+
+`target` accepts either an `HTMLElement` directly or a getter
+`() => HTMLElement | undefined`. The getter form is the right choice with
+Svelte 5 `bind:this`, because the element binding isn't available until after
+mount &mdash; the hook resolves it lazily and polls on `requestAnimationFrame`
+until it appears.
+
+<Example isSmall exampleUrl="/examples/use-in-view">
+  <UseInViewExample />
+</Example>
+
+## Latching with `once`
+
+Pass `{ once: true }` when you only care about the first viewport entry. The
+store flips to `true` and stops observing &mdash; subsequent scrolls don't flip
+it back:
+
+```svelte
+<script lang="ts">
+    import { useInView } from '@humanspeak/svelte-motion'
+
+    let card: HTMLElement | undefined
+    const trackImpression = () => {
+        // send analytics, fetch lazy data, etc.
+    }
+    const inView = useInView(() => card, { once: true })
+
+    $effect(() => {
+        if ($inView) trackImpression()
+    })
+</script>
+
+<article bind:this={card}>…</article>
+```
+
+## Custom thresholds and roots
+
+`amount` controls how much of the element must be visible to count as
+"in view": `"some"` (default, any pixel), `"all"` (fully visible), or a number
+between `0` and `1`. `margin` is forwarded to `IntersectionObserver`'s
+`rootMargin`, and `root` lets you observe inside a scrollable container instead
+of the viewport.
+
+```svelte
+<script>
+    import { useInView } from '@humanspeak/svelte-motion'
+
+    let scrollContainer
+    let target
+
+    const inView = useInView(() => target, {
+        root: () => scrollContainer,
+        amount: 0.5,
+        margin: '-10% 0%'
+    })
+</script>
+
+<div bind:this={scrollContainer} style="overflow: auto; height: 400px;">
+    <div bind:this={target}>…</div>
+</div>
+```
+
+## How it works
+
+- Subscribes to `motion`'s `inView()` primitive, which is also used by
+  `whileInView` &mdash; one IntersectionObserver implementation, two consumers.
+- Lazy-starts on the first store subscriber and stops when the last unsubscribes.
+- Returns a static `readable(initial)` when `window` or `IntersectionObserver`
+  is unavailable, so server rendering is safe.
+
+## API Reference
+
+### Parameters
+
+- **target** `HTMLElement | (() => HTMLElement | undefined)` &mdash; the element to observe.
+- **options** `UseInViewOptions` (optional)
+
+### `UseInViewOptions`
+
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| `root` | `HTMLElement \| () => HTMLElement` | viewport | Scroll container to observe inside. |
+| `margin` | `string` | `'0px'` | CSS margin around the root bounding box (passed to `rootMargin`). |
+| `amount` | `'some' \| 'all' \| number` | `'some'` | Fraction of the target that must be visible. |
+| `once` | `boolean` | `false` | When `true`, latches `true` on first entry and stops observing. |
+| `initial` | `boolean` | `false` | Value emitted before the first IntersectionObserver callback. |
+
+### Returns
+
+`Readable<boolean>` &mdash; subscribe with `$inView` or `inView.subscribe(cb)`.
+
+## See also
+
+- The `whileInView` motion prop &mdash; declarative animation when a
+  `motion.*` element enters the viewport. Both this hook and `whileInView`
+  share the same `IntersectionObserver` infrastructure under the hood.
+- [useScroll](/docs/use-scroll) &mdash; scroll position stores for scroll-driven
+  animations.
+
+---
+
+Based on [Motion's useInView](https://motion.dev/docs/react-use-in-view) API.
