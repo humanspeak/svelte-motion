@@ -1,0 +1,156 @@
+---
+title: 'useAnimate'
+description: 'Imperative animation with a scoped CSS-selector API.'
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte';
+  import UseAnimateExample from '$lib/examples/UseAnimateExample.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'useAnimate | Docs | Svelte Motion'
+      seo.description = 'Imperative animation in Svelte 5. useAnimate returns a scope attachment and a scoped animate() that resolves CSS selectors against it.'
+      seo.ogTitle = 'useAnimate'
+      seo.ogTagline = 'Imperative animation with scoped selectors'
+      seo.ogFeatures = ['Imperative API', 'Scoped Selectors', 'Sequences', 'Auto Cleanup']
+      seo.ogSlug = 'docs-use-animate'
+  }
+</script>
+
+# useAnimate
+
+`useAnimate` returns a tuple `[scope, animate]` for running animations
+imperatively from Svelte. `scope` is a Svelte 5 attachment you spread onto a
+parent element with `{@attach scope}`. The scoped `animate` accepts the same
+overloads as motion's standalone `animate`, and resolves string selectors
+against `scope.current`.
+
+```svelte
+<script lang="ts">
+    import { stagger, useAnimate } from '@humanspeak/svelte-motion'
+
+    const [scope, animate] = useAnimate()
+
+    const run = () =>
+        animate('li', { opacity: 1, y: 0 }, { delay: stagger(0.1) })
+</script>
+
+<ul {@attach scope}>
+    <li>One</li>
+    <li>Two</li>
+    <li>Three</li>
+</ul>
+
+<button onclick={run}>Animate</button>
+```
+
+<Example isSmall exampleUrl="/examples/use-animate">
+  <UseAnimateExample />
+</Example>
+
+## Sequences
+
+Pass an array of `[target, keyframes, options?]` tuples to compose timed
+animations. The `at` field controls when each segment starts: a number is an
+absolute time, a string like `'-0.2'` offsets relative to the previous segment,
+and `'<'` runs alongside it.
+
+Selectors resolve against `scope.current`, so any element you want to target
+must be a descendant of the element you spread `{@attach scope}` on. To
+choreograph across the list and a sibling, attach the scope to a wrapper that
+contains both:
+
+```svelte
+<script lang="ts">
+    import { stagger, useAnimate } from '@humanspeak/svelte-motion'
+
+    const [scope, animate] = useAnimate()
+
+    const playIntro = () =>
+        animate(
+            [
+                ['li', { opacity: [0, 1], y: [20, 0] }, { delay: stagger(0.08) }],
+                ['button.cta', { scale: [1, 1.05, 1] }, { duration: 0.4, at: '-0.2' }]
+            ],
+            { defaultTransition: { ease: 'easeOut' } }
+        )
+</script>
+
+<div {@attach scope}>
+    <ul>
+        <li>One</li>
+        <li>Two</li>
+    </ul>
+    <button class="cta">Continue</button>
+</div>
+```
+
+## Awaiting completion
+
+The returned controls are `await`-able. Resolve when the entire sequence
+finishes:
+
+```svelte
+<script lang="ts">
+    import { useAnimate } from '@humanspeak/svelte-motion'
+
+    const [scope, animate] = useAnimate()
+
+    const exit = async () => {
+        await animate('li', { opacity: 0, y: -20 }, { duration: 0.3 })
+        // safe to unmount, navigate, fetch the next page, etc.
+    }
+</script>
+```
+
+## Cleanup
+
+The attachment cleanup runs when the parent element detaches. Every animation
+started through the scoped `animate` is stopped and `scope.animations` is
+cleared, so animations don't leak across unmount or HMR boundaries.
+
+## When to reach for `useAnimate`
+
+- Multi-target choreography that's awkward to express declaratively
+  &mdash; sequenced reveals, exit animations gated on user actions, complex
+  staggered effects.
+- Animating elements you don't own as `motion.*` components &mdash; third-party
+  components, portaled DOM, or content rendered by a child.
+
+For state-driven animations on a single element, the declarative
+`<motion.div animate={...}>` API is usually a better fit.
+
+## API Reference
+
+### Returns
+
+`[scope, animate]`
+
+- **`scope`** &mdash; a Svelte 5 attachment (`(node) => cleanup`) with these
+  properties:
+  - `scope.current: HTMLElement | undefined` &mdash; the attached element,
+    populated once `{@attach scope}` fires.
+  - `scope.animations: AnimationPlaybackControlsWithThen[]` &mdash; in-flight
+    animations started through the scoped `animate`. Cleared automatically when
+    the parent detaches.
+- **`animate(target, keyframes, options?)`** &mdash; same overloads as
+  motion's standalone `animate`. Strings are resolved against
+  `scope.current`. Also accepts `[ [target, keyframes, options], ... ]`
+  sequences with optional `SequenceOptions` (see motion docs).
+
+`animate` returns an `AnimationPlaybackControlsWithThen`. It's `await`-able
+and exposes `play`, `pause`, `stop`, `cancel`, `complete`, `time`, `speed`,
+and a `finished` promise.
+
+## See also
+
+- [animate](https://motion.dev/docs/animate) &mdash; the underlying imperative
+  API that powers `useAnimate`.
+- [stagger](https://motion.dev/docs/stagger) &mdash; helper that produces
+  per-element delays for selector-based animations.
+
+---
+
+Based on [Motion's useAnimate](https://motion.dev/docs/react-use-animate) API.

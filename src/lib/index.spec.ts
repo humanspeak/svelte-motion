@@ -32,6 +32,7 @@ import {
     stagger,
     stringifyStyleObject,
     transform,
+    useAnimate,
     useAnimationFrame,
     useCycle,
     useInView,
@@ -78,6 +79,7 @@ describe('public API: index.ts', () => {
     })
 
     it('exports utility helpers', () => {
+        expect(typeof useAnimate).toBe('function')
         expect(typeof useAnimationFrame).toBe('function')
         expect(typeof useCycle).toBe('function')
         expect(typeof useInView).toBe('function')

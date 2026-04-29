@@ -51,6 +51,19 @@ async function loadExampleMetadata(examplePath) {
 }
 
 /**
+ * Format a title for use mid-sentence in the auto-generated description.
+ * Phrases ("Animated Button") get lowercased so the sentence reads naturally.
+ * Identifier-style names ("useAnimate", "AnimatePresence") keep their casing
+ * so the public API name stays correct.
+ *
+ * @param {string} title
+ * @returns {string}
+ */
+function describable(title) {
+    return /\s/.test(title) ? title.toLowerCase() : title
+}
+
+/**
  * Generate example metadata for the examples landing page
  * @param {Object} manifest - The sitemap manifest
  * @returns {Promise<Object>} Examples metadata object
@@ -73,7 +86,7 @@ async function generateExamplesMetadata(manifest) {
             const title = metadata.title
             examples[slug] = {
                 title,
-                description: `Interactive ${title.toLowerCase()} animation example using Svelte Motion.`,
+                description: `Interactive ${describable(title)} animation example using Svelte Motion.`,
                 sourceUrl: metadata.sourceUrl
             }
         } else {
@@ -85,7 +98,7 @@ async function generateExamplesMetadata(manifest) {
 
             examples[slug] = {
                 title,
-                description: `Interactive ${title.toLowerCase()} animation example using Svelte Motion.`,
+                description: `Interactive ${describable(title)} animation example using Svelte Motion.`,
                 sourceUrl: null
             }
         }

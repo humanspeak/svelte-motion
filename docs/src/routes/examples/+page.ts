@@ -6,7 +6,7 @@ export const load: PageLoad = () => {
     const examples = {
         'animate-presence': {
             title: 'AnimatePresence',
-            description: 'Interactive animatepresence animation example using Svelte Motion.',
+            description: 'Interactive AnimatePresence animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/examples/react-exit-animation'
         },
         'animated-button': {
@@ -51,7 +51,7 @@ export const load: PageLoad = () => {
         },
         keyframes: {
             title: 'Keyframes',
-            description: 'Interactive keyframes animation example using Svelte Motion.',
+            description: 'Interactive Keyframes animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/examples/react-keyframes'
         },
         'motion-path': {
@@ -76,12 +76,12 @@ export const load: PageLoad = () => {
         },
         reordering: {
             title: 'Reordering',
-            description: 'Interactive reordering animation example using Svelte Motion.',
+            description: 'Interactive Reordering animation example using Svelte Motion.',
             sourceUrl: 'https://examples.motion.dev/react/reordering'
         },
         rotate: {
             title: 'Rotate',
-            description: 'Interactive rotate animation example using Svelte Motion.',
+            description: 'Interactive Rotate animation example using Svelte Motion.',
             sourceUrl: 'https://examples.motion.dev/react/rotate?utm_source=embed'
         },
         'scroll-progress': {
@@ -97,7 +97,7 @@ export const load: PageLoad = () => {
         },
         'style-string': {
             title: 'styleString',
-            description: 'Interactive stylestring animation example using Svelte Motion.',
+            description: 'Interactive styleString animation example using Svelte Motion.',
             sourceUrl: null
         },
         'tab-select': {
@@ -110,29 +110,34 @@ export const load: PageLoad = () => {
             description: 'Interactive toggle switch animation example using Svelte Motion.',
             sourceUrl: null
         },
+        'use-animate': {
+            title: 'useAnimate',
+            description: 'Interactive useAnimate animation example using Svelte Motion.',
+            sourceUrl: 'https://motion.dev/docs/react-use-animate'
+        },
         'use-animation-frame': {
             title: 'useAnimationFrame',
-            description: 'Interactive useanimationframe animation example using Svelte Motion.',
+            description: 'Interactive useAnimationFrame animation example using Svelte Motion.',
             sourceUrl: 'https://examples.motion.dev/react/use-animation-frame'
         },
         'use-cycle': {
             title: 'useCycle',
-            description: 'Interactive usecycle animation example using Svelte Motion.',
+            description: 'Interactive useCycle animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/docs/react-use-cycle'
         },
         'use-in-view': {
             title: 'useInView',
-            description: 'Interactive useinview animation example using Svelte Motion.',
+            description: 'Interactive useInView animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/docs/react-use-in-view'
         },
         'use-reduced-motion': {
             title: 'useReducedMotion',
-            description: 'Interactive usereducedmotion animation example using Svelte Motion.',
+            description: 'Interactive useReducedMotion animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/docs/react-use-reduced-motion'
         },
         'use-time': {
             title: 'useTime',
-            description: 'Interactive usetime animation example using Svelte Motion.',
+            description: 'Interactive useTime animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/docs/react-use-time'
         },
         'use-time-synced': {
