@@ -19,6 +19,8 @@
         )
 
     const reset = () => {
+        for (const animation of scope.animations) animation.stop()
+        scope.animations.length = 0
         animate('li', { opacity: 1, y: 0 }, { duration: 0 })
         animate('button.target', { scale: 1 }, { duration: 0 })
     }

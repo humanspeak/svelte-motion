@@ -68,7 +68,7 @@ export type AnimationScope<T extends Element = HTMLElement> = ((node: T) => () =
  * <button onclick={run}>Animate</button>
  * ```
  */
-export const useAnimate = <T extends HTMLElement = HTMLElement>(): [
+export const useAnimate = <T extends Element = HTMLElement>(): [
     AnimationScope<T>,
     ReturnType<typeof createScopedAnimate>
 ] => {

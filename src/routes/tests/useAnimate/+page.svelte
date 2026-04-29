@@ -4,8 +4,10 @@
     const [scope, animate] = useAnimate()
 
     let status: 'idle' | 'running' | 'done' = $state('idle')
+    let runToken = 0
 
     const run = async () => {
+        const token = ++runToken
         status = 'running'
         const animation = animate(
             [
@@ -15,10 +17,13 @@
             { defaultTransition: { ease: 'easeOut' } }
         )
         await animation
-        status = 'done'
+        if (token === runToken) status = 'done'
     }
 
     const reset = () => {
+        runToken++
+        for (const animation of scope.animations) animation.stop()
+        scope.animations.length = 0
         animate('li', { opacity: 1, y: 0 }, { duration: 0 })
         animate('button.target', { scale: 1 }, { duration: 0 })
         status = 'idle'
