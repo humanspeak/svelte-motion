@@ -48,3 +48,37 @@ Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: mockMatchMedia
 })
+
+// jsdom doesn't ship the Web Animations API; motion's WAAPI animator calls
+// element.animate() and reads .finished. Stub just enough surface to let
+// scoped animations run synchronously to completion.
+if (!HTMLElement.prototype.animate) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(HTMLElement.prototype as any).animate = vi.fn(() => ({
+        cancel: vi.fn(),
+        commitStyles: vi.fn(),
+        finish: vi.fn(),
+        finished: Promise.resolve(),
+        pause: vi.fn(),
+        play: vi.fn(),
+        playState: 'finished',
+        currentTime: 0,
+        playbackRate: 1,
+        startTime: 0,
+        timeline: null,
+        effect: null,
+        id: '',
+        replaceState: 'active',
+        ready: Promise.resolve(),
+        pending: false,
+        updatePlaybackRate: vi.fn(),
+        persist: vi.fn(),
+        reverse: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+        oncancel: null,
+        onfinish: null,
+        onremove: null
+    }))
+}

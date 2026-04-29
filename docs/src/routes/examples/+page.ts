@@ -110,6 +110,11 @@ export const load: PageLoad = () => {
             description: 'Interactive toggle switch animation example using Svelte Motion.',
             sourceUrl: null
         },
+        'use-animate': {
+            title: 'useAnimate',
+            description: 'Interactive useanimate animation example using Svelte Motion.',
+            sourceUrl: 'https://motion.dev/docs/react-use-animate'
+        },
         'use-animation-frame': {
             title: 'useAnimationFrame',
             description: 'Interactive useanimationframe animation example using Svelte Motion.',

@@ -46,6 +46,8 @@ export type {
     ReducedMotionConfig,
     Variants
 } from '$lib/types'
+export { useAnimate } from '$lib/utils/animate.svelte'
+export type { AnimationScope } from '$lib/utils/animate.svelte'
 export { useAnimationFrame } from '$lib/utils/animationFrame'
 export { useCycle } from '$lib/utils/cycle'
 export type { Cycle, CycleState } from '$lib/utils/cycle'
