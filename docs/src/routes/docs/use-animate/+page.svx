@@ -57,6 +57,11 @@ animations. The `at` field controls when each segment starts: a number is an
 absolute time, a string like `'-0.2'` offsets relative to the previous segment,
 and `'<'` runs alongside it.
 
+Selectors resolve against `scope.current`, so any element you want to target
+must be a descendant of the element you spread `{@attach scope}` on. To
+choreograph across the list and a sibling, attach the scope to a wrapper that
+contains both:
+
 ```svelte
 <script lang="ts">
     import { stagger, useAnimate } from '@humanspeak/svelte-motion'
@@ -72,6 +77,14 @@ and `'<'` runs alongside it.
             { defaultTransition: { ease: 'easeOut' } }
         )
 </script>
+
+<div {@attach scope}>
+    <ul>
+        <li>One</li>
+        <li>Two</li>
+    </ul>
+    <button class="cta">Continue</button>
+</div>
 ```
 
 ## Awaiting completion

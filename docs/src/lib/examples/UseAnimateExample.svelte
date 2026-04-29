@@ -30,19 +30,28 @@
         <button type="button" class="secondary" onclick={reset}>Reset</button>
     </div>
 
-    <ul {@attach scope}>
-        {#each items as item (item)}
-            <li>{item}</li>
-        {/each}
-    </ul>
+    <div {@attach scope} class="stage">
+        <ul>
+            {#each items as item (item)}
+                <li>{item}</li>
+            {/each}
+        </ul>
 
-    <button type="button" class="target">Target button</button>
+        <button type="button" class="target">Target button</button>
+    </div>
 </div>
 
 <style>
     .controls {
         display: flex;
         gap: 8px;
+    }
+
+    .stage {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        align-items: center;
     }
 
     button {

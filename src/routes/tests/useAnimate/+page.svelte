@@ -10,11 +10,7 @@
         const animation = animate(
             [
                 ['li', { opacity: [0, 1], y: [20, 0] }, { delay: stagger(0.08), duration: 0.4 }],
-                [
-                    'button.target',
-                    { scale: [1, 1.1, 1] },
-                    { duration: 0.4, at: '-0.2', ease: 'easeOut' }
-                ]
+                ['button.target', { scale: 1.15 }, { duration: 0.4, at: '-0.2', ease: 'easeOut' }]
             ],
             { defaultTransition: { ease: 'easeOut' } }
         )
@@ -37,8 +33,9 @@
     <header>
         <h1>useAnimate</h1>
         <p>
-            Imperative animation with a scoped CSS-selector API. The scope action attaches to the
-            list, and <code>animate('li', …)</code> resolves selectors against it.
+            Imperative animation with a scoped CSS-selector API. The scope attaches to the wrapper
+            that contains both the list and the target button, so <code>animate('li', …)</code> and
+            <code>animate('button.target', …)</code> both resolve against it.
         </p>
     </header>
 
@@ -50,14 +47,16 @@
         <span class="status" data-testid="status">{status}</span>
     </section>
 
-    <ul {@attach scope} data-testid="list">
-        <li data-testid="item-1">Item one</li>
-        <li data-testid="item-2">Item two</li>
-        <li data-testid="item-3">Item three</li>
-        <li data-testid="item-4">Item four</li>
-    </ul>
+    <div {@attach scope} class="stage" data-testid="stage">
+        <ul data-testid="list">
+            <li data-testid="item-1">Item one</li>
+            <li data-testid="item-2">Item two</li>
+            <li data-testid="item-3">Item three</li>
+            <li data-testid="item-4">Item four</li>
+        </ul>
 
-    <button type="button" class="target" data-testid="target">Target button</button>
+        <button type="button" class="target" data-testid="target">Target button</button>
+    </div>
 </div>
 
 <style>
@@ -74,6 +73,12 @@
         display: flex;
         align-items: center;
         gap: 8px;
+    }
+
+    .stage {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
     }
 
     button {
