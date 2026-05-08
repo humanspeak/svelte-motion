@@ -2,7 +2,7 @@ import type { AnimatePresenceMode, MotionExit, MotionTransition } from '$lib/typ
 import { mergeTransitions } from '$lib/utils/animation'
 import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
-import { getContext, onDestroy, setContext } from 'svelte'
+import { getContext, setContext } from 'svelte'
 
 /**
  * Context key for `AnimatePresence`.
@@ -100,6 +100,19 @@ export type AnimatePresenceContext = {
     updateChildAnimatedStyle: (key: string, opacity: string, transform: string) => void
     /** Unregister a child. If it has an exit, clone and animate it out. */
     unregisterChild: (key: string) => void
+    /**
+     * @internal Used by `PresenceChild` to participate in the same exit
+     * accounting as the clone-based motion-element exit path. Increments the
+     * in-flight exit counter and applies mode='wait' enter blocking. Not
+     * intended for direct consumer use.
+     */
+    notifyExitStart: () => void
+    /**
+     * @internal Pairs with `notifyExitStart`. Decrements the in-flight exit
+     * counter, fires `onExitComplete` once it reaches zero, and unblocks
+     * pending enters in mode='wait'. Not intended for direct consumer use.
+     */
+    notifyExitComplete: () => void
 }
 
 /**
@@ -288,6 +301,34 @@ export const createAnimatePresenceContext = (context: {
     let inFlightExits = 0
 
     /**
+     * Begin tracking an exit. Increments `inFlightExits` and, in `mode='wait'`,
+     * blocks new enter animations until `finishExit()` reports the count back
+     * to zero. Shared by the clone-based exit (`unregisterChild`) and the
+     * `PresenceChild` user-driven exit.
+     */
+    const startExit = () => {
+        if (mode === 'wait') {
+            enterBlocked = true
+        }
+        inFlightExits += 1
+    }
+
+    /**
+     * Mark an exit as finished. Decrements `inFlightExits` and, when it
+     * reaches zero, fires `onExitComplete` and unblocks pending enters.
+     */
+    const finishExit = () => {
+        inFlightExits -= 1
+        if (inFlightExits === 0) {
+            context.onExitComplete?.()
+            if (mode === 'wait' && enterBlocked) {
+                enterBlocked = false
+                notifyEnterUnblocked()
+            }
+        }
+    }
+
+    /**
      * Register a child element and snapshot its initial rect/styles.
      */
     const registerChild = (
@@ -382,12 +423,6 @@ export const createAnimatePresenceContext = (context: {
             pwLog('[presence] unregisterChild - no exit animation, removing immediately')
             children.delete(key)
             return
-        }
-
-        // For mode='wait': block new enters while exit is in progress
-        if (mode === 'wait') {
-            enterBlocked = true
-            pwLog('[presence] mode=wait: blocking enters during exit')
         }
 
         const rect = child.lastRect
@@ -539,8 +574,8 @@ export const createAnimatePresenceContext = (context: {
         // before this exit animation completes
         const exitingElement = child.element
 
-        // Start exit and track in-flight count
-        inFlightExits += 1
+        // Start exit and track in-flight count (handles wait-mode blocking)
+        startExit()
 
         requestAnimationFrame(() => {
             animate(clone, exitKeyframes as unknown as DOMKeyframesDefinition, finalTransition)
@@ -587,19 +622,7 @@ export const createAnimatePresenceContext = (context: {
                         clonesInDOM: document.querySelectorAll('[data-clone="true"]').length
                     })
 
-                    inFlightExits -= 1
-
-                    if (inFlightExits === 0) {
-                        pwLog('[presence] all exits complete, calling onExitComplete')
-                        context.onExitComplete?.()
-
-                        // For mode='wait': unblock enters now that all exits are complete
-                        if (mode === 'wait' && enterBlocked) {
-                            enterBlocked = false
-                            pwLog('[presence] mode=wait: unblocking enters, notifying callbacks')
-                            notifyEnterUnblocked()
-                        }
-                    }
+                    finishExit()
                 })
         })
     }
@@ -614,7 +637,9 @@ export const createAnimatePresenceContext = (context: {
         registerChild,
         updateChildState,
         updateChildAnimatedStyle,
-        unregisterChild
+        unregisterChild,
+        notifyExitStart: startExit,
+        notifyExitComplete: finishExit
     }
 }
 
@@ -684,47 +709,44 @@ export const setPresenceDepth = (depth: number): void => {
 }
 
 /**
- * Hook used by motion elements to participate in presence.
- * Registers the element and ensures its exit animation runs on teardown.
+ * Per-`PresenceChild` Svelte context payload. Read by the `useIsPresent` and
+ * `usePresence` hooks (and consulted by motion elements so they can opt out of
+ * the outer `AnimatePresence` clone path when a `PresenceChild` is driving
+ * the exit themselves).
  *
- * Note: Svelte lifecycle wrapper - ignored for coverage.
+ * `isPresent` is exposed as a getter so consumers see live updates as the
+ * wrapper toggles between mounted, exiting, and re-entered states.
  */
-/* c8 ignore start */
-/**
- * Hook used by motion elements to participate in presence.
- *
- * Registers the element with the presence context and guarantees that the
- * exit animation is scheduled on teardown.
- *
- * @param key Unique identifier for the presence child.
- * @param element The DOM element to track.
- * @param exit The exit keyframes definition.
- * @param mergedTransition The element's merged transition for precedence.
- */
-export const usePresence = (
-    key: string,
-    element: HTMLElement | null,
-    exit: MotionExit,
-    mergedTransition?: MotionTransition
-): void => {
-    const context = getAnimatePresenceContext()
-    pwLog('[presence] usePresence called', {
-        key,
-        hasElement: !!element,
-        hasContext: !!context,
-        hasExit: !!exit,
-        exit
-    })
-    if (element && context && exit) {
-        context.registerChild(key, element, exit, mergedTransition)
-        onDestroy(() => {
-            pwLog('[presence] onDestroy triggered', { key })
-            context.unregisterChild(key)
-        })
-    } else {
-        pwLog('[presence] usePresence - skipping registration', {
-            reason: !element ? 'no element' : !context ? 'no context' : 'no exit'
-        })
-    }
+export type PresenceChildContext = {
+    /** Reactive flag — `true` while present, `false` once the exit hold begins. */
+    readonly isPresent: boolean
+    /**
+     * Signal that the consumer's exit work is complete. Triggers actual
+     * unmount and decrements the parent `AnimatePresenceContext` exit count.
+     * Idempotent and versioned (calls from a canceled exit cycle are no-ops).
+     */
+    safeToRemove: () => void
 }
-/* c8 ignore end */
+
+const PRESENCE_CHILD_CONTEXT = Symbol('presence-child-context')
+
+/**
+ * Get the nearest `PresenceChild` context from Svelte component context, or
+ * `undefined` if the caller is not wrapped in one.
+ *
+ * Note: Trivial wrapper - ignored for coverage.
+ */
+/* c8 ignore next 3 */
+export const getPresenceChildContext = (): PresenceChildContext | undefined => {
+    return getContext(PRESENCE_CHILD_CONTEXT)
+}
+
+/**
+ * Install a `PresenceChild` context for descendants.
+ *
+ * Note: Trivial wrapper - ignored for coverage.
+ */
+/* c8 ignore next 3 */
+export const setPresenceChildContext = (context: PresenceChildContext): void => {
+    setContext(PRESENCE_CHILD_CONTEXT, context)
+}

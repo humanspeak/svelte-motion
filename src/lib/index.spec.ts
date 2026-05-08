@@ -25,6 +25,7 @@ import {
     motion,
     MotionConfig,
     pipe,
+    PresenceChild,
     press,
     progress,
     resize,
@@ -36,6 +37,8 @@ import {
     useAnimationFrame,
     useCycle,
     useInView,
+    useIsPresent,
+    usePresence,
     useReducedMotion,
     useSpring,
     useTime,
@@ -68,6 +71,10 @@ describe('public API: index.ts', () => {
         expect(typeof AnimatePresence).toBe('function')
     })
 
+    it('exports PresenceChild component', () => {
+        expect(typeof PresenceChild).toBe('function')
+    })
+
     it('exports createDragControls factory', () => {
         expect(typeof createDragControls).toBe('function')
         const controls = createDragControls()
@@ -83,6 +90,8 @@ describe('public API: index.ts', () => {
         expect(typeof useAnimationFrame).toBe('function')
         expect(typeof useCycle).toBe('function')
         expect(typeof useInView).toBe('function')
+        expect(typeof useIsPresent).toBe('function')
+        expect(typeof usePresence).toBe('function')
         expect(typeof useReducedMotion).toBe('function')
         expect(typeof useSpring).toBe('function')
         expect(typeof stringifyStyleObject).toBe('function')

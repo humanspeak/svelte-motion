@@ -130,6 +130,11 @@ export const load: PageLoad = () => {
             description: 'Interactive useInView animation example using Svelte Motion.',
             sourceUrl: 'https://motion.dev/docs/react-use-in-view'
         },
+        'use-presence': {
+            title: 'usePresence',
+            description: 'Interactive usePresence animation example using Svelte Motion.',
+            sourceUrl: 'https://motion.dev/docs/react-use-presence'
+        },
         'use-reduced-motion': {
             title: 'useReducedMotion',
             description: 'Interactive useReducedMotion animation example using Svelte Motion.',

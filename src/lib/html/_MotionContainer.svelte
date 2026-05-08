@@ -42,6 +42,7 @@
     import { isNativelyFocusable } from '$lib/utils/a11y'
     import {
         getAnimatePresenceContext,
+        getPresenceChildContext,
         getPresenceDepth,
         setPresenceDepth
     } from '$lib/utils/presence'
@@ -127,6 +128,12 @@
 
     // Get presence context to check if we're inside AnimatePresence
     const context = getAnimatePresenceContext()
+    // Inside a <PresenceChild>, the wrapper drives the exit. Skip the
+    // clone-based exit registration on this element so we don't double-fire
+    // (custom exit, then clone of a node the wrapper already let go).
+    // Enter-side coordination (shouldAnimateEnter, mode='wait' blocking)
+    // remains active so the element still slots into the outer presence flow.
+    const inPresenceChild = !!getPresenceChildContext()
 
     // Get layoutId registry (provided by AnimatePresence or a parent LayoutGroup)
     const layoutIdRegistry = getLayoutIdRegistry()
@@ -168,9 +175,8 @@
     )
 
     // Register onDestroy at component level (guaranteed to work in Svelte 5)
-    // usePresence() cannot be called inside $effect because it uses getContext() and onDestroy(),
-    // which must be called during component initialization.
-    if (context) {
+    // — getContext()/onDestroy() must run during component initialization.
+    if (context && !inPresenceChild) {
         onDestroy(() => {
             pwLog('[presence] onDestroy triggered', { key: presenceKey })
             context.unregisterChild(presenceKey)
@@ -181,8 +187,9 @@
     // from the correct visual state. Without this, interrupting an enter animation
     // causes the exit to snap (the element is disconnected before onDestroy, so
     // getAnimations()/commitStyles() can't work at clone time).
+    // Skipped inside <PresenceChild>: the wrapper drives exit, no clone path.
     $effect(() => {
-        if (!(element && context)) return
+        if (!(element && context) || inPresenceChild) return
         let rafId: number
         const capture = () => {
             if (element && element.isConnected && element.getAnimations().length > 0) {
@@ -227,7 +234,7 @@
 
     // Reactively update registration when element/exit/transition props change
     $effect(() => {
-        if (element && context && resolvedExit) {
+        if (element && context && !inPresenceChild && resolvedExit) {
             const filteredExit = filterReducedMotionKeyframes(
                 resolvedExit as Record<string, unknown>,
                 reducedMotion
@@ -241,9 +248,10 @@
         }
     })
 
-    // Update presence context with current state when element is ready and has size
+    // Update presence context with current state when element is ready and has size.
+    // Skipped inside <PresenceChild> — the rect/style snapshot only feeds the clone path.
     $effect(() => {
-        if (!(context && element && isLoaded === 'ready')) return
+        if (!(context && element && isLoaded === 'ready') || inPresenceChild) return
 
         let lastWidth = 0
         let lastHeight = 0
