@@ -1,5 +1,6 @@
 import AnimatePresence from '$lib/components/AnimatePresence.svelte'
 import MotionConfig from '$lib/components/MotionConfig.svelte'
+import PresenceChild from '$lib/components/PresenceChild.svelte'
 
 export { motion } from '$lib/motion'
 
@@ -62,6 +63,8 @@ export { useReducedMotion } from '$lib/utils/reducedMotion'
 export { useReducedMotionConfig } from '$lib/utils/reducedMotionConfig'
 export { useScroll } from '$lib/utils/scroll'
 export { useSpring } from '$lib/utils/spring'
+export { useIsPresent, usePresence } from '$lib/utils/usePresence'
+export type { UsePresenceState } from '$lib/utils/usePresence'
 export { useVelocity } from '$lib/utils/velocity'
 /**
  * @deprecated Use `styleString` instead for reactive styles with automatic unit handling.
@@ -70,7 +73,7 @@ export { stringifyStyleObject } from '$lib/utils/styleObject'
 export { styleString } from '$lib/utils/styleObject.svelte'
 export { useTime } from '$lib/utils/time'
 export { useTransform } from '$lib/utils/transform'
-export { AnimatePresence, MotionConfig }
+export { AnimatePresence, MotionConfig, PresenceChild }
 
 // Named component exports — tree-shakeable alternative to the `motion` object
 export { default as MotionA } from '$lib/html/A.svelte'

@@ -265,6 +265,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/use-presence') + searchParams}
+                    >
+                        usePresence
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/reduced-motion') + searchParams}
                     >
                         useReducedMotion

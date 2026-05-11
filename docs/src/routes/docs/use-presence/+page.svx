@@ -1,0 +1,186 @@
+---
+title: 'usePresence'
+description: 'Custom exit animations driven from the child component.'
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte';
+  import UsePresenceExample from '$lib/examples/UsePresenceExample.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'usePresence | Docs | Svelte Motion'
+      seo.description = 'Drive your own exit animation inside AnimatePresence. PresenceChild holds the component rendered until safeToRemove() fires.'
+      seo.ogTitle = 'usePresence'
+      seo.ogTagline = 'Custom exit animations from the child'
+      seo.ogFeatures = ['Custom Exit', 'PresenceChild', 'safeToRemove', 'AnimatePresence']
+      seo.ogSlug = 'docs-use-presence'
+  }
+</script>
+
+# usePresence
+
+`usePresence` and `useIsPresent` let a component branch on whether
+`<AnimatePresence>` is keeping it alive for an exit phase. The wrapper
+(`<PresenceChild>`) holds the child rendered while `isPresent` is `false`,
+and the child runs its own exit animation — CSS transition, canvas effect,
+GSAP, anything — and calls `safeToRemove()` when finished.
+
+This is the path to take when the built-in `motion.*` `exit` prop isn't
+enough — for example, animating a third-party component, fading text via
+CSS classes, or coordinating an exit with non-DOM work.
+
+```svelte
+<script lang="ts">
+    import { AnimatePresence, PresenceChild, usePresence } from '@humanspeak/svelte-motion'
+
+    let visible = $state(true)
+</script>
+
+<button onclick={() => (visible = !visible)}>Toggle</button>
+
+<AnimatePresence>
+    <PresenceChild present={visible}>
+        <Card />
+    </PresenceChild>
+</AnimatePresence>
+```
+
+Inside `<Card>`:
+
+```svelte
+<script lang="ts">
+    import { usePresence } from '@humanspeak/svelte-motion'
+
+    const presence = $derived(usePresence())
+    const isPresent = $derived(presence[0])
+    let node: HTMLElement | undefined = $state()
+
+    $effect(() => {
+        const [present, safeToRemove] = presence
+        if (present || !node || !safeToRemove) return
+        const el = node
+        const onEnd = (e: TransitionEvent) => {
+            if (e.target !== el) return
+            safeToRemove()
+        }
+        el.addEventListener('transitionend', onEnd, { once: true })
+        return () => el.removeEventListener('transitionend', onEnd)
+    })
+</script>
+
+<div bind:this={node} class="card" class:exiting={!isPresent}>…</div>
+
+<style>
+    .card { transition: opacity 300ms, transform 300ms; }
+    .card.exiting { opacity: 0; transform: translateY(-12px); }
+</style>
+```
+
+<Example isSmall exampleUrl="/examples/use-presence">
+  <UsePresenceExample />
+</Example>
+
+## API divergence from React
+
+In framer-motion, `usePresence` works directly inside `<AnimatePresence>` —
+React's render tree gives the library control over when children unmount.
+Svelte's `{#if}` teardown is synchronous from the user's side and not
+interceptable, so you opt-in via the `<PresenceChild>` wrapper. Bind
+`present` to the same condition that would normally gate the children:
+
+```svelte
+<!-- React (framer-motion) -->
+<AnimatePresence>
+    {visible && <Card />}
+</AnimatePresence>
+
+<!-- Svelte equivalent -->
+<AnimatePresence>
+    <PresenceChild present={visible}>
+        <Card />
+    </PresenceChild>
+</AnimatePresence>
+```
+
+## `useIsPresent`
+
+Returns just the `isPresent` boolean. Useful when you only need to render
+different content during exit, no `safeToRemove` needed:
+
+```svelte
+<script lang="ts">
+    import { useIsPresent } from '@humanspeak/svelte-motion'
+    const isPresent = $derived(useIsPresent())
+</script>
+
+<div data-state={isPresent ? 'live' : 'exiting'}>…</div>
+```
+
+When called outside any `PresenceChild`, `useIsPresent()` returns `true` and
+`usePresence()` returns `[true, null]`.
+
+## How `safeToRemove` behaves
+
+- **Idempotent.** Calling it twice is a no-op after the first.
+- **Versioned.** Re-entering (`present` flipping back to `true`) before
+  `safeToRemove` fires cancels the exit; the previously-handed-out callback
+  becomes a no-op so a stale `transitionend` handler can't tear down a
+  now-present component.
+- **Required.** If you call `usePresence()`, you must eventually call
+  `safeToRemove`. Otherwise the wrapper holds children forever and
+  `<AnimatePresence>`'s `onExitComplete` never fires.
+
+## Mixing with `motion.*` `exit`
+
+Inside `<PresenceChild>`, the wrapper drives the exit. Any `motion.*`
+descendants automatically opt out of the outer `<AnimatePresence>` clone
+path — their `exit` props are ignored. Pick one approach per element:
+
+- Use `motion.*` with `exit={...}` for a declarative motion-driven exit, no
+  `<PresenceChild>` needed.
+- Use `<PresenceChild>` with a child that calls `safeToRemove` for a custom
+  exit you fully control.
+
+## Known limitations
+
+- **`mode='popLayout'`**: the wrapper holds the child in document flow during
+  exit, so `popLayout` semantics (sibling reflow as the exiting element
+  leaves layout immediately) are not implemented for `<PresenceChild>`.
+  `mode='sync'` (default) and `mode='wait'` work as expected — the wrapper
+  participates in the same `inFlightExits` accounting as the clone path.
+- **Nested `<AnimatePresence>` inside a held `<PresenceChild>`**: while
+  the wrapper is holding, descendants don't see exit signals because the
+  Svelte tree is still mounted. Once you call `safeToRemove`, normal
+  unmount fires, and any nested motion children's `exit` runs at that point.
+
+## API Reference
+
+### `<PresenceChild>` props
+
+| Prop | Type | Default | Description |
+| ---- | ---- | ------- | ----------- |
+| `present` | `boolean` | `true` | When this flips `true → false`, the wrapper holds children rendered with `isPresent=false` until `safeToRemove` fires. |
+| `children` | `Snippet` | — | Snippet rendered while `present` is true or while the wrapper is holding. |
+
+### `useIsPresent(): boolean`
+
+Returns whether the calling component is currently present. `true` outside
+of any `<PresenceChild>`.
+
+### `usePresence(): [true, null] | [false, () => void]`
+
+Returns the framer-motion-style tuple. `[true, null]` while present (or
+outside any `<PresenceChild>`); `[false, () => void]` once the wrapper
+enters its exit hold.
+
+## See also
+
+- [AnimatePresence](/docs/animate-presence) — the parent component.
+- [`motion.*` `exit` prop](https://motion.dev/docs/react-motion-component#exit) —
+  declarative alternative when a built-in transform/style animation is enough.
+
+---
+
+Based on [Motion's usePresence](https://motion.dev/docs/react-use-presence) API.
