@@ -1,5 +1,10 @@
 import PresenceHarness from '$lib/components/__tests__/PresenceHarness.svelte'
 import PresenceProbe from '$lib/components/__tests__/PresenceProbe.svelte'
+import StalePresenceHarness from '$lib/components/__tests__/StalePresenceHarness.svelte'
+import {
+    getCapturedSafeToRemove,
+    resetCapturedSafeToRemove
+} from '$lib/components/__tests__/StalePresenceProbe.svelte'
 import { render, screen } from '@testing-library/svelte'
 import { tick } from 'svelte'
 import { describe, expect, it } from 'vitest'
@@ -56,6 +61,44 @@ describe('utils/usePresence', () => {
             await tick()
             // Second click on a detached node should not throw or re-fire.
             expect(() => node.click()).not.toThrow()
+            expect(screen.queryByTestId('probe')).toBeNull()
+        })
+
+        it('a captured safeToRemove from a canceled exit does NOT complete a later exit', async () => {
+            // Regression for the case where a consumer captures the callback
+            // (setTimeout, external library, async work) during cycle A, exit
+            // A is canceled by re-entry, cycle B starts, and the stale
+            // callback fires while phase is 'holding' again. The stale call
+            // must no-op, leaving cycle B in flight.
+            resetCapturedSafeToRemove()
+            const { rerender } = render(StalePresenceHarness, { props: { present: true } })
+
+            // Cycle A starts; probe captures cycle A's callback.
+            await rerender({ present: false })
+            await tick()
+            const staleFromA = getCapturedSafeToRemove()
+            expect(staleFromA).toBeInstanceOf(Function)
+
+            // Re-enter cancels cycle A.
+            await rerender({ present: true })
+            await tick()
+
+            // Cycle B starts; probe captures cycle B's callback.
+            await rerender({ present: false })
+            await tick()
+            const freshFromB = getCapturedSafeToRemove()
+            expect(freshFromB).toBeInstanceOf(Function)
+            expect(freshFromB).not.toBe(staleFromA)
+
+            // Invoke the stale callback from A. It must NOT complete B.
+            staleFromA?.()
+            await tick()
+            expect(screen.queryByTestId('probe')).not.toBeNull()
+            expect(screen.getByTestId('probe').getAttribute('data-is-present')).toBe('false')
+
+            // The fresh callback from B still works and completes the exit.
+            freshFromB?.()
+            await tick()
             expect(screen.queryByTestId('probe')).toBeNull()
         })
 

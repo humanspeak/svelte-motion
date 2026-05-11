@@ -52,22 +52,38 @@
     // capture there.
     let prevPresent: boolean | undefined = undefined
 
+    // Each exit start mints a fresh `safeToRemove` closure bound to the cycle
+    // it was minted for. Re-entry / completion invalidates older closures so a
+    // captured-then-late-fired callback (setTimeout, external lib, stray
+    // listener after cleanup) from cycle A cannot complete cycle B.
+    let currentSafeToRemove: () => void = noopSafeToRemove
+
+    function noopSafeToRemove() {}
+
+    function mintSafeToRemove(): () => void {
+        // Closure compares against its own identity (`self`) to detect
+        // whether it's still the active cycle's callback. After re-entry or
+        // completion, `currentSafeToRemove` no longer points at `self`, so
+        // this branch no-ops — a stale capture cannot complete a later exit.
+        const self: () => void = () => {
+            if (currentSafeToRemove !== self || phase !== 'holding') return
+            phase = 'completed'
+            currentSafeToRemove = noopSafeToRemove
+            animatePresence?.notifyExitComplete()
+        }
+        return self
+    }
+
     const isPresent = $derived(present && phase === 'idle')
 
     setPresenceChildContext({
         get isPresent() {
             return isPresent
         },
-        safeToRemove
+        get safeToRemove() {
+            return currentSafeToRemove
+        }
     })
-
-    function safeToRemove() {
-        // Idempotent + versioned. A stale callback from a canceled exit
-        // (re-entry before this fires) sees phase != 'holding' and no-ops.
-        if (phase !== 'holding') return
-        phase = 'completed'
-        animatePresence?.notifyExitComplete()
-    }
 
     // $effect.pre runs before DOM updates so the phase transition lands in
     // the same render pass as the `present` prop flip — otherwise the {#if}
@@ -86,10 +102,14 @@
         }
         if (prevPresent && !current && phase === 'idle') {
             phase = 'holding'
+            currentSafeToRemove = mintSafeToRemove()
             animatePresence?.notifyExitStart()
         } else if (!prevPresent && current && phase === 'holding') {
-            // Re-entry mid-hold cancels the exit accounting.
+            // Re-entry mid-hold cancels the exit accounting. Replacing the
+            // slot invalidates the cycle's `safeToRemove` for any consumer
+            // that captured it.
             phase = 'idle'
+            currentSafeToRemove = noopSafeToRemove
             animatePresence?.notifyExitComplete()
         } else if (!prevPresent && current && phase === 'completed') {
             // Re-mounted after a previous exit fully completed.

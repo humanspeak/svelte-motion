@@ -301,10 +301,29 @@ export const createAnimatePresenceContext = (context: {
     let inFlightExits = 0
 
     /**
-     * Begin tracking an exit. Increments `inFlightExits` and, in `mode='wait'`,
-     * blocks new enter animations until `finishExit()` reports the count back
-     * to zero. Shared by the clone-based exit (`unregisterChild`) and the
-     * `PresenceChild` user-driven exit.
+     * Begin tracking an exit.
+     *
+     * Increments the `inFlightExits` counter and, in `mode='wait'`, raises the
+     * `enterBlocked` flag so sibling motion-element enters defer until every
+     * exit reports back via {@link finishExit}. Shared by the clone-based exit
+     * path in {@link unregisterChild} and the user-driven `PresenceChild` hold.
+     *
+     * Must be paired with exactly one {@link finishExit} call per invocation.
+     *
+     * @returns void
+     * @example
+     * ```ts
+     * // unregisterChild (clone path)
+     * startExit()
+     * requestAnimationFrame(() => {
+     *   animate(clone, exitKeyframes, transition).finished.finally(finishExit)
+     * })
+     *
+     * // PresenceChild (user-driven path) — exposed as `notifyExitStart`
+     * presenceContext.notifyExitStart()
+     * // ... later, on transitionend or user signal ...
+     * presenceContext.notifyExitComplete()
+     * ```
      */
     const startExit = () => {
         if (mode === 'wait') {
@@ -314,8 +333,23 @@ export const createAnimatePresenceContext = (context: {
     }
 
     /**
-     * Mark an exit as finished. Decrements `inFlightExits` and, when it
-     * reaches zero, fires `onExitComplete` and unblocks pending enters.
+     * Mark an exit as finished.
+     *
+     * Decrements the `inFlightExits` counter. When the count reaches zero,
+     * fires the consumer's `onExitComplete` callback and, in `mode='wait'`,
+     * lowers `enterBlocked` plus notifies any deferred-enter callbacks
+     * registered via {@link onEnterUnblocked}.
+     *
+     * Must be called exactly once per matching {@link startExit}; double-fires
+     * underflow the counter and can permanently mis-route subsequent exits.
+     *
+     * @returns void
+     * @example
+     * ```ts
+     * startExit()
+     * // ... exit work ...
+     * finishExit() // fires onExitComplete if the last exit, unblocks waiters
+     * ```
      */
     const finishExit = () => {
         inFlightExits -= 1

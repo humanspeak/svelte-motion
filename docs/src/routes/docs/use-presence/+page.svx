@@ -61,7 +61,10 @@ Inside `<Card>`:
         const [present, safeToRemove] = presence
         if (present || !node || !safeToRemove) return
         const el = node
-        const onEnd = () => safeToRemove()
+        const onEnd = (e: TransitionEvent) => {
+            if (e.target !== el) return
+            safeToRemove()
+        }
         el.addEventListener('transitionend', onEnd, { once: true })
         return () => el.removeEventListener('transitionend', onEnd)
     })
