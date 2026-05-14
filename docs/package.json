@@ -8,7 +8,7 @@
         "cf-typegen": "wrangler types src/worker-configuration.d.ts",
         "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
         "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-        "deploy": "pnpm run build && wrangler deploy",
+        "deploy": "pnpm run build && tsx ./scripts/deploy.ts",
         "dev": "vite dev",
         "format": "prettier --write .",
         "generate-social": "tsx ./scripts/generate-social-cards.ts",
