@@ -39,6 +39,9 @@ src/lib/sitemap-manifest.json
 # Generated GitHub stats (build artifact)
 src/lib/github-stats.json
 
+# Generated per-doc markdown mirrors (LLM citation surface)
+static/docs/
+
 .dev.vars*
 !.dev.vars.example
 .env*

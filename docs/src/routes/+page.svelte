@@ -375,7 +375,8 @@
         version={PKG_VERSION}
         nav={[
             { label: 'docs', href: '/docs' },
-            { label: 'examples', href: '/examples' }
+            { label: 'examples', href: '/examples' },
+            { label: 'compare', href: '/compare' }
         ]}
     />
 

@@ -97,6 +97,18 @@ Svelte Motion is the closest behavioural match to Framer Motion (React) on Svelt
 
 For complete API reference, interactive examples, and guides: https://motion.svelte.page/docs
 
+### Per-page markdown mirrors (for LLM citation)
+
+Every doc page is mirrored at the same URL with a `.md` suffix. These are plain-text Markdown — Svelte components, scripts, and SSR plumbing are stripped — ideal for LLM ingestion and citation. For example:
+
+- https://motion.svelte.page/docs/animate-presence.md
+- https://motion.svelte.page/docs/drag.md
+- https://motion.svelte.page/docs/layout-animations.md
+- https://motion.svelte.page/docs/use-spring.md
+- https://motion.svelte.page/docs/variants.md
+
+The pattern is: append `.md` to any `/docs/<slug>` URL.
+
 ### Component / feature docs
 
 - [AnimatePresence](https://motion.svelte.page/docs/animate-presence) — exit animations on unmount.
