@@ -576,6 +576,25 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                     } as DOMKeyframesDefinition,
                     (mergedTransition ?? {}) as AnimationOptions
                 )
+                // Register a cancel hook so a new pointerdown (or
+                // controls.stop()) can interrupt the snap-to-origin
+                // animation. Without this, the prior animate() controls
+                // continue running on x/y and fight the new drag.
+                stopInertia = () => {
+                    pwLog('❌ snapToOrigin cancelled')
+                    ;(controls as unknown as { stop?: () => void }).stop?.()
+                    // Sync applied to wherever the snap had reached so the
+                    // next drag's origin is correct.
+                    const cs = getComputedStyle(el)
+                    const t = cs.transform
+                    const m = t.match(/matrix\(([^)]+)\)/)
+                    if (m) {
+                        const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
+                        if (applyX && typeof parts[4] === 'number') applied.x = parts[4]
+                        if (applyY && typeof parts[5] === 'number') applied.y = parts[5]
+                    }
+                    stopInertia = null
+                }
                 Promise.resolve((controls as unknown as { finished?: Promise<void> }).finished)
                     .then(() => {
                         // Sync internal applied transform so next drag uses the correct origin
@@ -585,6 +604,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                             el: EL_ID,
                             applied
                         })
+                        if (stopInertia) stopInertia = null
                     })
                     .catch(() => {})
                     .finally(() => opts.callbacks?.onTransitionEnd?.())
@@ -781,6 +801,24 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 { ...(applyX ? { x } : {}), ...(applyY ? { y } : {}) } as DOMKeyframesDefinition,
                 settleTransition
             )
+            // Register a cancel hook so a re-grab interrupts the settle
+            // animation cleanly, syncing `applied` to wherever the card
+            // had reached at the moment of cancellation. Without this,
+            // the prior animate() controls kept running on x/y and
+            // fought the new drag.
+            stopInertia = () => {
+                pwLog('❌ settle (no momentum) cancelled')
+                ;(controls as unknown as { stop?: () => void }).stop?.()
+                const cs = getComputedStyle(el)
+                const t = cs.transform
+                const m = t.match(/matrix\(([^)]+)\)/)
+                if (m) {
+                    const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
+                    if (applyX && typeof parts[4] === 'number') applied.x = parts[4]
+                    if (applyY && typeof parts[5] === 'number') applied.y = parts[5]
+                }
+                stopInertia = null
+            }
             // Fire transition end once settled
             Promise.resolve((controls as unknown as { finished?: Promise<void> }).finished)
                 .then(() => {
@@ -791,6 +829,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                         el: EL_ID,
                         applied
                     })
+                    if (stopInertia) stopInertia = null
                 })
                 .catch(() => {})
                 .finally(() => opts.callbacks?.onTransitionEnd?.())
