@@ -98,64 +98,54 @@ test.describe('drag/brutalist-stage', () => {
         expect(after.ty).toBeLessThanOrEqual(BOTTOM + 1)
     })
 
-    // [KNOWN BUG — motion-dom]
-    // With dragMomentum: true (svelte-motion's default), a card that is
-    // already past a constraint at release with non-zero velocity continues
-    // moving further past the constraint for ~50–120ms before the bounce
-    // spring catches it. Probe at release: tx ≈ -308 (elastic-clamped);
-    // peak post-release: tx ≈ -325 (17px further past the constraint).
-    // The card does eventually settle to tx = -200 by ~700ms (covered by
-    // the two tests above), but the brief outward overshoot is the
-    // "card visibly outside the box just after I let go" behaviour.
-    //
-    // Marked test.fail() so CI stays green while the bug is captured.
-    // When motion-dom fixes the post-release direction-of-motion, this
-    // test will unexpectedly pass and flag the .fail() for removal.
-    test.fail(
-        'post-release motion never moves further from origin than release position',
-        async ({ page }) => {
-            // This test catches the momentum-overshoot behavior: when the
-            // card is past a constraint at release with non-zero velocity,
-            // it should NOT travel further past the constraint before the
-            // bounce spring catches it. The expected motion post-release is
-            // monotonically toward the origin.
-            await page.goto(STAGE_PATH)
-            const card = page.getByTestId('drag-card')
-            await card.waitFor({ state: 'visible' })
-            await disableRotate(page)
+    // Regression for the post-release momentum-past-constraint bug fixed
+    // in src/lib/utils/inertia.ts: when the value is already out-of-bounds
+    // at release with non-zero velocity, only the velocity component
+    // *toward* the boundary is carried into the boundary spring; any
+    // velocity that would pull the value further past the constraint is
+    // dropped. Previously the spring received the full release velocity
+    // and took ~50–120 ms to decelerate the outward component, during
+    // which the value travelled further past the constraint — visually
+    // 'the card escapes the dragConstraints box just after I let go'.
+    test('post-release motion never moves further from origin than release position', async ({
+        page
+    }) => {
+        // Card past the left constraint at release, with leftward velocity:
+        // the boundary spring should engage from the release position and
+        // motion should be monotonically back toward the origin. No frame
+        // post-release may have |translateX| exceeding the release |tx|.
+        await page.goto(STAGE_PATH)
+        const card = page.getByTestId('drag-card')
+        await card.waitFor({ state: 'visible' })
+        await disableRotate(page)
 
-            const start = await card.boundingBox()
-            if (!start) throw new Error('no card bbox')
-            const cx = start.x + start.width / 2
-            const cy = start.y + start.height / 2
+        const start = await card.boundingBox()
+        if (!start) throw new Error('no card bbox')
+        const cx = start.x + start.width / 2
+        const cy = start.y + start.height / 2
 
-            await page.mouse.move(cx, cy)
-            await page.mouse.down()
-            for (let i = 1; i <= 20; i++) {
-                await page.mouse.move(cx - i * 40, cy, { steps: 1 })
-            }
-
-            // Sample translateX exactly at release, then again at +50ms.
-            // releaseTx is the elastic-clamped overdrag position.
-            const releaseT = await readTranslate(page)
-            if (!releaseT) throw new Error('no release transform')
-            await page.mouse.up()
-
-            const samples: number[] = []
-            for (const wait of [16, 32, 50, 80, 120]) {
-                await page.waitForTimeout(wait)
-                const t = await readTranslate(page)
-                if (t) samples.push(t.tx)
-            }
-
-            // The card is past the left constraint, so translateX is negative.
-            // After release, |translateX| should never EXCEED |releaseTx| at any
-            // sample point — momentum should not carry the card further past
-            // the constraint before the bounce spring engages.
-            const releaseAbs = Math.abs(releaseT.tx)
-            const maxAbsAfter = Math.max(...samples.map((tx) => Math.abs(tx)))
-            // Tolerance of 2px for sub-frame jitter / sub-pixel rounding.
-            expect(maxAbsAfter).toBeLessThanOrEqual(releaseAbs + 2)
+        await page.mouse.move(cx, cy)
+        await page.mouse.down()
+        for (let i = 1; i <= 20; i++) {
+            await page.mouse.move(cx - i * 40, cy, { steps: 1 })
         }
-    )
+
+        // Sample translateX exactly at release, then over 16-120 ms after.
+        // releaseTx is the elastic-clamped overdrag position.
+        const releaseT = await readTranslate(page)
+        if (!releaseT) throw new Error('no release transform')
+        await page.mouse.up()
+
+        const samples: number[] = []
+        for (const wait of [16, 32, 50, 80, 120]) {
+            await page.waitForTimeout(wait)
+            const t = await readTranslate(page)
+            if (t) samples.push(t.tx)
+        }
+
+        const releaseAbs = Math.abs(releaseT.tx)
+        const maxAbsAfter = Math.max(...samples.map((tx) => Math.abs(tx)))
+        // Tolerance of 2 px for sub-frame jitter / sub-pixel rounding.
+        expect(maxAbsAfter).toBeLessThanOrEqual(releaseAbs + 2)
+    })
 })
