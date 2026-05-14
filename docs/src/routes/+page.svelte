@@ -151,6 +151,12 @@
     }
 
     // ── Variants orchestration demo (FIG-004) ────────────────────────
+    // svelte-motion propagates the parent's variant state to children
+    // (children with `variants={...}` and no explicit `animate` follow
+    // the parent), but the parent's transition.staggerChildren orchestrator
+    // is not honoured — so we drive the cascade with a per-child
+    // `transition.delay = i * staggerMs / 1000`, same pattern the lib's
+    // own VariantsPropagationExample uses.
     type VariantState = 'rest' | 'play'
     let variantState = $state<VariantState>('rest')
     let staggerMs = $state(60)
@@ -167,21 +173,18 @@
     }
 
     const variantChildren = Array.from({ length: 12 }, (_, i) => i)
-    const parentVariants = $derived({
-        rest: {
-            transition: { staggerChildren: 0, when: 'afterChildren' }
-        },
-        play: {
-            transition: {
-                staggerChildren: staggerMs / 1000,
-                staggerDirection: directionForward ? 1 : -1,
-                delayChildren: 0.05
-            }
-        }
-    })
+    const CHILD_COUNT = variantChildren.length
+    const childDelay = (i: number) =>
+        ((directionForward ? i : CHILD_COUNT - 1 - i) * staggerMs) / 1000
+
+    // We drive the cascade with transform only — svelte-motion does not
+    // reliably apply variant inline styles before the first state change,
+    // so opacity would show as 1 at mount even when 'rest' has opacity 0.
+    // Transforms read off the CSS baseline (matrix(none)) so the cascade
+    // reads correctly on every transition.
     const childVariants = {
-        rest: { opacity: 0.2, y: 0, scale: 1 },
-        play: { opacity: 1, y: -18, scale: 1.06 }
+        rest: { y: 0, scale: 1, rotate: 0 },
+        play: { y: -22, scale: 1.12, rotate: -3 }
     }
 
     // ── Comparison matrix ────────────────────────────────────────────
@@ -573,8 +576,14 @@
                 <div class="head">
                     <span class="tab on">variants.svelte</span>
                     <span class="grow"></span>
-                    <label class="slider-lbl"
-                        >stagger
+                    <button class="ctrl" type="button" onclick={resetVariants}>⟲ reset</button>
+                    <button class="ctrl primary" type="button" onclick={playVariants}>
+                        {variantState === 'rest' ? '▶ play' : '■ stop'}
+                    </button>
+                </div>
+                <div class="strip">
+                    <label class="strip-lbl">
+                        <span class="strip-k">stagger</span>
                         <input
                             type="range"
                             min="0"
@@ -583,33 +592,42 @@
                             bind:value={staggerMs}
                             aria-label="Stagger milliseconds"
                         />
-                        <span class="v">{staggerMs}ms</span></label
+                        <span class="strip-v">{staggerMs}ms</span>
+                    </label>
+                    <button
+                        class="strip-toggle"
+                        type="button"
+                        onclick={toggleDirection}
+                        aria-label="Toggle stagger direction"
                     >
-                    <button class="ctrl" type="button" onclick={toggleDirection}
-                        >dir {directionForward ? '→' : '←'}</button
-                    >
-                    <button class="ctrl" type="button" onclick={resetVariants}>⟲ reset</button>
-                    <button class="ctrl primary" type="button" onclick={playVariants}>
-                        {variantState === 'rest' ? '▶ play' : '■ stop'}
+                        <span class="strip-k">direction</span>
+                        <span class="strip-v">{directionForward ? '01 → 12' : '12 → 01'}</span>
                     </button>
+                    <span class="strip-spacer"></span>
+                    <span class="strip-status">
+                        <span class="strip-k">state</span>
+                        <span class="strip-v accent">{variantState}</span>
+                    </span>
                 </div>
                 <div class="body">
-                    <motion.div
-                        class="vgrid"
-                        variants={parentVariants}
-                        initial="rest"
-                        animate={variantState}
-                    >
+                    <div class="vgrid">
                         {#each variantChildren as i (i)}
                             <motion.div
-                                class="vcell"
+                                class="vcell {variantState === 'play' ? 'lifted' : ''}"
                                 variants={childVariants}
-                                transition={{ type: 'spring', stiffness: 360, damping: 22 }}
+                                initial="rest"
+                                animate={variantState}
+                                transition={{
+                                    type: 'spring',
+                                    stiffness: 360,
+                                    damping: 22,
+                                    delay: childDelay(i)
+                                }}
                             >
                                 <span class="vnum">{String(i + 1).padStart(2, '0')}</span>
                             </motion.div>
                         {/each}
-                    </motion.div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -1285,7 +1303,6 @@
         background: var(--brut-bg-2);
         align-items: center;
         gap: 12px;
-        flex-wrap: wrap;
     }
     .brut-lab .panel .head .tab {
         padding: 0 12px;
@@ -1296,22 +1313,6 @@
     }
     .brut-lab .panel .head .grow {
         flex: 1;
-    }
-    .brut-lab .panel .head .slider-lbl {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 10.5px;
-        letter-spacing: 0.1em;
-        color: var(--brut-ink-3);
-        text-transform: uppercase;
-    }
-    .brut-lab .panel .head .slider-lbl input[type='range'] {
-        accent-color: var(--brut-accent);
-        width: 90px;
-    }
-    .brut-lab .panel .head .slider-lbl .v {
-        color: var(--brut-ink);
     }
     .brut-lab .panel .head .ctrl {
         background: transparent;
@@ -1335,10 +1336,61 @@
     .brut-lab .panel .head .ctrl.primary:hover {
         filter: brightness(0.95);
     }
+    /* Secondary controls strip below the head — keeps the head minimal
+       like svelte-markdown's playground while exposing the live knobs. */
+    .brut-lab .panel .strip {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 6px 14px;
+        border-bottom: 1px solid var(--brut-rule);
+        font-size: 11px;
+        background: var(--brut-bg);
+        flex-wrap: wrap;
+    }
+    .brut-lab .panel .strip .strip-lbl,
+    .brut-lab .panel .strip .strip-toggle,
+    .brut-lab .panel .strip .strip-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .brut-lab .panel .strip .strip-k {
+        color: var(--brut-ink-3);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-size: 10px;
+    }
+    .brut-lab .panel .strip .strip-v {
+        color: var(--brut-ink);
+        font-variant-numeric: tabular-nums;
+    }
+    .brut-lab .panel .strip .strip-v.accent {
+        color: var(--brut-accent);
+    }
+    .brut-lab .panel .strip input[type='range'] {
+        accent-color: var(--brut-accent);
+        width: 120px;
+    }
+    .brut-lab .panel .strip .strip-toggle {
+        background: transparent;
+        border: 1px solid var(--brut-rule);
+        padding: 3px 10px;
+        cursor: pointer;
+        font-family: inherit;
+        color: var(--brut-ink-2);
+    }
+    .brut-lab .panel .strip .strip-toggle:hover {
+        border-color: var(--brut-accent);
+        color: var(--brut-ink);
+    }
+    .brut-lab .panel .strip .strip-spacer {
+        flex: 1;
+    }
     .brut-lab .panel .body {
         padding: 28px 22px 36px;
     }
-    .brut-lab .panel :global(.vgrid) {
+    .brut-lab .panel .body .vgrid {
         display: grid;
         grid-template-columns: repeat(6, 1fr);
         gap: 10px;
@@ -1352,11 +1404,32 @@
         justify-content: center;
         font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
         color: var(--brut-ink);
-        will-change: transform, opacity;
+        will-change: transform;
+        position: relative;
+    }
+    .brut-lab .panel :global(.vcell::after) {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border: 1px solid transparent;
+        pointer-events: none;
+        transition: border-color 0.2s;
+    }
+    /* When a cell is lifted (scaled > 1 means it's in 'play' state), give
+       it the accent border so the staggered cascade visibly lights up the
+       grid as it propagates. We can't read motion-value state from CSS
+       directly, so we tie the highlight to the 'lifted' class flipped
+       by the same state machinery. */
+    .brut-lab .panel :global(.vcell.lifted::after) {
+        border-color: var(--brut-accent);
+    }
+    .brut-lab .panel :global(.vcell.lifted .vnum) {
+        color: var(--brut-accent);
     }
     .brut-lab .panel :global(.vcell .vnum) {
         font-size: 13px;
         color: var(--brut-ink-2);
+        transition: color 0.18s;
     }
 
     /* ── Compare table ────────────────────────────────────────────── */
