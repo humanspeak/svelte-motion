@@ -4,9 +4,7 @@
         AnimatePresence,
         MotionButton,
         MotionSpan,
-        useMotionValue,
-        useMotionValueEvent,
-        useTransform
+        type DragInfo
     } from '@humanspeak/svelte-motion'
     import { HeaderV2, FooterV2, getBreadcrumbContext, getSeoContext } from '@humanspeak/docs-kit'
     import { docsConfig } from '$lib/docs-config'
@@ -109,43 +107,31 @@
     ]
 
     // ── Drag demo (FIG-002) ──────────────────────────────────────────
-    // A live drag interaction with spring physics. Telemetry footer
-    // shows current x / y / rotation so the demo doubles as documentation
-    // for the motion-value primitives.
-    const dragX = useMotionValue(0)
-    const dragY = useMotionValue(0)
-    // Rotate the card slightly with horizontal drag — leans into the
-    // motion to feel weighty without using useTransform downstream.
-    const dragRotate = useTransform(dragX, [-200, 0, 200], [-12, 0, 12])
+    // Live drag with a visible dragConstraints frame (400 × 240 box
+    // around the card origin). We read x / y from the onDrag callback's
+    // info.offset (the lib writes transform: translate(...) directly to
+    // the element rather than exposing internal motion values), and
+    // derive rotation in $state, applied via the CSS `rotate` property
+    // (independent of the translate transform — browsers composite them).
     let dragXRead = $state(0)
     let dragYRead = $state(0)
-    let dragRotRead = $state(0)
     let dragIsActive = $state(false)
     let dragPeakX = $state(0)
     let dragPeakY = $state(0)
+    const dragRotRead = $derived(
+        Math.round(Math.max(-12, Math.min(12, (dragXRead / 200) * 12)) * 10) / 10
+    )
 
-    $effect(() => {
-        const unsubX = useMotionValueEvent(dragX, 'change', (v) => {
-            dragXRead = Math.round(v)
-            if (Math.abs(v) > Math.abs(dragPeakX)) dragPeakX = Math.round(v)
-        })
-        const unsubY = useMotionValueEvent(dragY, 'change', (v) => {
-            dragYRead = Math.round(v)
-            if (Math.abs(v) > Math.abs(dragPeakY)) dragPeakY = Math.round(v)
-        })
-        const unsubR = useMotionValueEvent(dragRotate, 'change', (v) => {
-            dragRotRead = Math.round(v * 10) / 10
-        })
-        return () => {
-            unsubX()
-            unsubY()
-            unsubR()
-        }
-    })
+    const onCardDrag = (_event: PointerEvent, info: DragInfo) => {
+        const x = info.offset.x
+        const y = info.offset.y
+        dragXRead = Math.round(x)
+        dragYRead = Math.round(y)
+        if (Math.abs(x) > Math.abs(dragPeakX)) dragPeakX = Math.round(x)
+        if (Math.abs(y) > Math.abs(dragPeakY)) dragPeakY = Math.round(y)
+    }
 
-    const resetDrag = () => {
-        dragX.set(0)
-        dragY.set(0)
+    const clearDragPeaks = () => {
         dragPeakX = 0
         dragPeakY = 0
     }
@@ -508,10 +494,21 @@
                     <span class="live">
                         {#if dragIsActive}● ACTIVE{:else}○ IDLE{/if}
                     </span>
-                    <button class="ctrl" type="button" onclick={resetDrag}>↻ reset</button>
+                    <button class="ctrl" type="button" onclick={clearDragPeaks}
+                        >↻ clear peaks</button
+                    >
                 </div>
                 <div class="stage">
                     <div class="hint">drag me</div>
+                    <!-- Visible dragConstraints frame: the card's origin (its
+                         centre) is held within this 400 × 240 box. -->
+                    <div class="constraints-box" aria-hidden="true">
+                        <span class="cb-tl">−200, −120</span>
+                        <span class="cb-tr">+200, −120</span>
+                        <span class="cb-bl">−200, +120</span>
+                        <span class="cb-br">+200, +120</span>
+                        <span class="cb-label">dragConstraints · 400 × 240</span>
+                    </div>
                     <motion.div
                         class="drag-card"
                         drag
@@ -521,10 +518,16 @@
                         whileHover={{ scale: 1.02 }}
                         whileDrag={{ scale: 1.05, cursor: 'grabbing' }}
                         onDragStart={() => (dragIsActive = true)}
+                        onDrag={onCardDrag}
                         onDragEnd={() => (dragIsActive = false)}
-                        style="x: {dragX}; y: {dragY}; rotate: {dragRotate};"
+                        style="rotate: {dragRotRead}deg"
                     >
-                        <span class="dc-label">motion.div</span>
+                        <!-- `&#46;` to keep the literal substring `motion.div`
+                             out of source — the svelte-motion vite plugin
+                             regex-replaces every `motion.div` in the file
+                             (including text content) with the compiled
+                             component name. -->
+                        <span class="dc-label">motion&#46;div</span>
                         <span class="dc-spec">drag · dragConstraints · dragElastic</span>
                     </motion.div>
                 </div>
@@ -1138,7 +1141,7 @@
     }
     .brut-demo .panel .stage {
         position: relative;
-        height: 360px;
+        height: 420px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1151,11 +1154,55 @@
     }
     .brut-demo .panel .stage .hint {
         position: absolute;
-        top: 14px;
-        left: 18px;
+        bottom: 12px;
+        left: 14px;
         font-size: 10.5px;
         letter-spacing: 0.14em;
         color: var(--brut-ink-3);
+    }
+    /* Visible constraint frame — same dimensions as the dragConstraints
+       passed to motion.div (400 × 240 box centred on the card origin). */
+    .brut-demo .panel .stage .constraints-box {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 400px;
+        height: 240px;
+        transform: translate(-50%, -50%);
+        border: 1px dashed var(--brut-rule-2);
+        pointer-events: none;
+    }
+    .brut-demo .panel .stage .constraints-box span {
+        position: absolute;
+        font-size: 9.5px;
+        letter-spacing: 0.12em;
+        color: var(--brut-ink-3);
+        font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+        white-space: nowrap;
+    }
+    .brut-demo .panel .stage .constraints-box .cb-tl {
+        top: -16px;
+        left: -2px;
+    }
+    .brut-demo .panel .stage .constraints-box .cb-tr {
+        top: -16px;
+        right: -2px;
+    }
+    .brut-demo .panel .stage .constraints-box .cb-bl {
+        bottom: -16px;
+        left: -2px;
+    }
+    .brut-demo .panel .stage .constraints-box .cb-br {
+        bottom: -16px;
+        right: -2px;
+    }
+    .brut-demo .panel .stage .constraints-box .cb-label {
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 10px;
+        color: var(--brut-ink-3);
+        opacity: 0.55;
     }
     .brut-demo .panel :global(.drag-card) {
         width: 200px;
