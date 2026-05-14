@@ -477,7 +477,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             dragging
         })
         if (!dragging) return
-        finishDrag(e)
+        // Pointer was preempted (gesture-nav, palm rejection, scroll
+        // takeover). User did not release intentionally — skip the
+        // inertia/momentum path and force a no-momentum settle so the
+        // card clamps back into constraints without flinging.
+        finishDrag(e, true)
     }
 
     /**
@@ -485,7 +489,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
      * - If momentum is enabled, decay towards a clamped target with exponential easing
      * - Otherwise, animate back to a clamped position (or origin), then sync `applied`
      */
-    const finishDrag = (e: PointerEvent) => {
+    const finishDrag = (e: PointerEvent, cancelled = false) => {
         dragging = false
 
         // Recompute release velocity from the history, dropping any sample
@@ -566,8 +570,10 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         window.removeEventListener('pointerup', onPointerUp as EventListener)
         window.removeEventListener('pointercancel', onPointerCancel as EventListener)
 
-        // Momentum/inertia with boundary handoff: inertia until crossing, then spring to boundary
-        if (momentum) {
+        // Momentum/inertia with boundary handoff: inertia until crossing, then spring to boundary.
+        // Pointer-cancel forces a no-momentum settle (clamp into constraints, no fling) since the
+        // gesture was preempted rather than intentionally released.
+        if (momentum && !cancelled) {
             pwLog('🚀 STARTING MOMENTUM', {
                 velocityX: velocity.x,
                 velocityY: velocity.y,
