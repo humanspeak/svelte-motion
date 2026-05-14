@@ -757,12 +757,22 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         endWhileDrag()
     }
 
-    // Wire dragControls
+    // Wire dragControls. The third argument is the cancel hook for in-flight
+    // release inertia — without it, controls.stop()/.cancel() were silently
+    // no-ops while the spring-back animation was running, because the
+    // closure in createDragControls had cancelInertia=null. We pass an arrow
+    // that reads the *current* stopInertia at call time (it's re-assigned
+    // each finishDrag) so the latest in-flight animation is the one that
+    // gets cancelled.
     if (opts.controls) {
         const internal = opts.controls as unknown as {
-            _bind?: (el: HTMLElement, starter: (e: PointerEvent, snap?: boolean) => void) => void
+            _bind?: (
+                el: HTMLElement,
+                starter: (e: PointerEvent, snap?: boolean) => void,
+                cancelInertia?: () => void
+            ) => void
         }
-        internal._bind?.(el, beginDrag)
+        internal._bind?.(el, beginDrag, () => stopInertia?.())
         pwLog('[drag] controls bound', { el: EL_ID })
     }
 
