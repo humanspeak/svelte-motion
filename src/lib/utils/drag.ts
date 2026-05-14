@@ -495,7 +495,15 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         // releasing, `velocity` would still reflect the pre-pause motion
         // and momentum would fling the card. Matches motion-dom's
         // reference (MAX_VELOCITY_DELTA = 30ms).
+        //
+        // A second guard `MIN_VELOCITY_INTERVAL_MS` requires the samples
+        // used for velocity to span at least 5 ms. A tap with one tiny
+        // pointermove right after pointerdown (sub-millisecond apart)
+        // would otherwise produce a high spurious velocity from dividing
+        // a 1-3 px move by a 0-1 ms dt. With this guard, single-frame
+        // drags yield zero release velocity, matching motion's reference.
         const MAX_VELOCITY_DELTA_MS = 30
+        const MIN_VELOCITY_INTERVAL_MS = 5
         if (history.length >= 2) {
             const newest = history[history.length - 1]
             const ageNow = now() - newest.t
@@ -518,10 +526,16 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                     velocity = { x: 0, y: 0 }
                 } else {
                     const oldest = history[oldestIdx]
-                    const dtMs = Math.max(1, newest.t - oldest.t)
-                    velocity = {
-                        x: ((newest.x - oldest.x) / dtMs) * 1000,
-                        y: ((newest.y - oldest.y) / dtMs) * 1000
+                    const dtMs = newest.t - oldest.t
+                    if (dtMs < MIN_VELOCITY_INTERVAL_MS) {
+                        // Samples too close together — a single-frame tap
+                        // doesn't have enough resolution to infer velocity.
+                        velocity = { x: 0, y: 0 }
+                    } else {
+                        velocity = {
+                            x: ((newest.x - oldest.x) / dtMs) * 1000,
+                            y: ((newest.y - oldest.y) / dtMs) * 1000
+                        }
                     }
                 }
             }
