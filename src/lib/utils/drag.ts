@@ -501,11 +501,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         // reference (MAX_VELOCITY_DELTA = 30ms).
         //
         // A second guard `MIN_VELOCITY_INTERVAL_MS` requires the samples
-        // used for velocity to span at least 5 ms. A tap with one tiny
-        // pointermove right after pointerdown (sub-millisecond apart)
-        // would otherwise produce a high spurious velocity from dividing
-        // a 1-3 px move by a 0-1 ms dt. With this guard, single-frame
-        // drags yield zero release velocity, matching motion's reference.
+        // used for velocity to span at least 5 ms. Without this guard,
+        // a tap with one tiny pointermove right after pointerdown
+        // (sub-millisecond apart) divides a 1-3 px move by a 0-1 ms dt
+        // and produces a spurious high velocity from what was almost a
+        // pure click.
         const MAX_VELOCITY_DELTA_MS = 30
         const MIN_VELOCITY_INTERVAL_MS = 5
         if (history.length >= 2) {
@@ -525,15 +525,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                     }
                 }
                 if (oldestIdx === history.length - 1) {
-                    // Only one sample within the window — insufficient for
-                    // a velocity reading.
                     velocity = { x: 0, y: 0 }
                 } else {
                     const oldest = history[oldestIdx]
                     const dtMs = newest.t - oldest.t
                     if (dtMs < MIN_VELOCITY_INTERVAL_MS) {
-                        // Samples too close together — a single-frame tap
-                        // doesn't have enough resolution to infer velocity.
                         velocity = { x: 0, y: 0 }
                     } else {
                         velocity = {
@@ -763,12 +759,12 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             stopInertia = () => {
                 pwLog('❌ MOMENTUM CANCELLED')
                 running = false
-                // Sync applied to the current visual position so the next drag starts correctly
-                // Use the last computed values from the steppers if available
-                const finalX = stepX ? stepX(now() - startTs).value : applied.x
-                const finalY = stepY ? stepY(now() - startTs).value : applied.y
-                if (axis === true || axis === 'x') applied.x = finalX
-                if (axis === true || axis === 'y') applied.y = finalY
+                // `applied` is already in sync with the last frame rendered
+                // by the rAF loop (setXY updates it on every frame). We
+                // intentionally do NOT call stepX/stepY again here —
+                // they're stateful (mutate lastT/springX/springV) and an
+                // extra call advances them past the visible state, leaving
+                // applied slightly out of sync with what the user sees.
                 pwLog('[drag] inertia cancelled → sync applied', {
                     el: EL_ID,
                     applied: { x: applied.x, y: applied.y }
