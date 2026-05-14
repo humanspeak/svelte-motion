@@ -673,6 +673,16 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             const applyX = (axis === true || axis === 'x') && lockAxis !== 'y'
             const applyY = (axis === true || axis === 'y') && lockAxis !== 'x'
 
+            // KNOWN LIMITATION (audit #5): `minX/maxX/minY/maxY` are computed
+            // once at handoff time. If the constraint *container* (when
+            // `opts.constraints` is an HTMLElement) resizes or its layout
+            // shifts during the inertia/spring animation, the stepper's
+            // bounds go stale and the card snaps to the original boundary
+            // rather than the now-current one. Pixel constraints are
+            // unaffected (their bounds are fixed). Fixing this needs a
+            // ResizeObserver on the container plus mid-flight stepper
+            // rebuild, deferred until a real user case appears.
+
             const stepX = applyX
                 ? createInertiaToBoundary(
                       { value: applied.x, velocity: velocity.x },
