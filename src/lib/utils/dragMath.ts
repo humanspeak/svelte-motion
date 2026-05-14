@@ -52,3 +52,24 @@ export const applyConstraints = (
     }
     return point
 }
+
+/**
+ * Parse a CSS `matrix(a, b, c, d, tx, ty)` string into translate components.
+ *
+ * Used to read the rendered translate after Motion writes inline transforms
+ * during drag-cancel hooks.
+ *
+ * @param transform The computed `transform` style — typically `'none'` or
+ *   `'matrix(1, 0, 0, 1, 10, 20)'`. `matrix3d(...)` is not supported.
+ * @returns The 2D translate components `{ tx, ty }`. Defaults to
+ *   `{ tx: 0, ty: 0 }` for `'none'` or any non-matching input.
+ * @example
+ *   parseMatrixTranslate('matrix(1, 0, 0, 1, 10, 20)') // → { tx: 10, ty: 20 }
+ *   parseMatrixTranslate('none')                       // → { tx: 0, ty: 0 }
+ */
+export const parseMatrixTranslate = (transform: string): { tx: number; ty: number } => {
+    const m = transform.match(/matrix\(([^)]+)\)/)
+    if (!m) return { tx: 0, ty: 0 }
+    const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
+    return { tx: parts[4] ?? 0, ty: parts[5] ?? 0 }
+}

@@ -121,12 +121,13 @@ export const createInertiaToBoundary = (
     let springV = 0
     let boundaryTarget: number | null = null
 
-    // If starting OOB, skip inertia
+    // Starting OOB: skip inertia and engage the spring. Drop the
+    // away-from-boundary velocity component so the spring's first frames
+    // don't continue moving the value outward.
     if (x < min || x > max) {
         mode = 'spring'
-        // Set spring start at current value and carry current velocity
         springX = x
-        springV = v
+        springV = x < min ? Math.max(0, v) : Math.min(0, v)
         boundaryTarget = x < min ? min : max
     }
 
