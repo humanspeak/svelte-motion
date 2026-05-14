@@ -522,12 +522,7 @@
                         onDragEnd={() => (dragIsActive = false)}
                         style="rotate: {dragRotRead}deg"
                     >
-                        <!-- `&#46;` to keep the literal substring `motion.div`
-                             out of source — the svelte-motion vite plugin
-                             regex-replaces every `motion.div` in the file
-                             (including text content) with the compiled
-                             component name. -->
-                        <span class="dc-label">motion&#46;div</span>
+                        <span class="dc-label">motion.div</span>
                         <span class="dc-spec">drag · dragConstraints · dragElastic</span>
                     </motion.div>
                 </div>

@@ -342,18 +342,27 @@ export const svelteMotionOptimize = (): Plugin => ({
         for (const [tag, localName] of tagToLocal) {
             const openRe = new RegExp(`<motion\\.${escapeRegExp(tag)}(?=[\\s/>])`, 'g')
             const closeRe = new RegExp(`</motion\\.${escapeRegExp(tag)}\\s*>`, 'g')
-            const scriptRe = new RegExp(`\\bmotion\\.${escapeRegExp(tag)}\\b`, 'g')
 
             transformed = transformed.replace(openRe, `<${localName}`)
             transformed = transformed.replace(closeRe, `</${localName}>`)
-
-            // Also replace script-block references (e.g., const Component = motion.div)
-            // But only outside of the import statement we already handled
-            const importEndIdx = transformed.indexOf(localName) + localName.length
-            const beforeImport = transformed.slice(0, importEndIdx)
-            const afterImport = transformed.slice(importEndIdx)
-            transformed = beforeImport + afterImport.replace(scriptRe, localName)
         }
+
+        // Replace `motion.TAG` JS references (e.g. `const Component = motion.div`)
+        // inside <script> blocks only. Earlier versions ran this regex over the
+        // entire post-import file, which clobbered literal `motion.div` substrings
+        // that appeared in template text or markup (e.g. <span>motion.div</span>).
+        // Scope the rewrite to script blocks so markup content is preserved.
+        transformed = transformed.replace(
+            /(<script\b[^>]*>)([\s\S]*?)(<\/script>)/g,
+            (_full, open: string, content: string, close: string) => {
+                let updated = content
+                for (const [tag, localName] of tagToLocal) {
+                    const scriptRe = new RegExp(`\\bmotion\\.${escapeRegExp(tag)}\\b`, 'g')
+                    updated = updated.replace(scriptRe, localName)
+                }
+                return open + updated + close
+            }
+        )
 
         return {
             code: transformed,
