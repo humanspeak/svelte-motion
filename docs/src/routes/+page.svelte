@@ -523,7 +523,11 @@
                         style="rotate: {dragRotRead}deg"
                     >
                         <span class="dc-label">motion.div</span>
-                        <span class="dc-spec">drag · dragConstraints · dragElastic</span>
+                        <ul class="dc-props">
+                            <li>drag</li>
+                            <li>dragConstraints</li>
+                            <li>dragElastic</li>
+                        </ul>
                     </motion.div>
                 </div>
                 <div class="footer">
@@ -1200,8 +1204,9 @@
         opacity: 0.55;
     }
     .brut-demo .panel :global(.drag-card) {
-        width: 200px;
+        width: 280px;
         height: 132px;
+        padding: 14px 18px;
         background: var(--brut-bg);
         border: 1px solid var(--brut-accent);
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
@@ -1210,23 +1215,45 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 8px;
+        gap: 12px;
         user-select: none;
         will-change: transform;
+        box-sizing: border-box;
     }
     :global(html.dark) .brut-demo .panel :global(.drag-card) {
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     }
     .brut-demo .panel :global(.drag-card .dc-label) {
         font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
-        font-size: 16px;
+        font-size: 17px;
         color: var(--brut-ink);
         letter-spacing: -0.02em;
+        line-height: 1;
     }
-    .brut-demo .panel :global(.drag-card .dc-spec) {
-        font-size: 10.5px;
-        color: var(--brut-ink-3);
-        letter-spacing: 0.08em;
+    /* Prop chips — small bordered cells for each drag-related prop. Sits
+       below the title and reads as a structured spec rather than a
+       bullet-separated string that overflows the card. */
+    .brut-demo .panel :global(.drag-card .dc-props) {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 4px;
+        max-width: 100%;
+    }
+    .brut-demo .panel :global(.drag-card .dc-props li) {
+        font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 9.5px;
+        line-height: 1;
+        letter-spacing: 0.04em;
+        padding: 4px 6px;
+        border: 1px solid var(--brut-rule);
+        color: var(--brut-ink-2);
+        background: var(--brut-bg-2);
+        white-space: nowrap;
     }
     .brut-demo .panel .footer {
         display: grid;
