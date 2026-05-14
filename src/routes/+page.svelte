@@ -170,6 +170,14 @@
                         Drag: Snap To Origin
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/brutalist-stage') + searchParams}
+                    >
+                        Drag: Brutalist Stage (docs FIG-002 repro)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
