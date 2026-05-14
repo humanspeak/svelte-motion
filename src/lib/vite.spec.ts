@@ -260,6 +260,47 @@ describe('svelteMotionOptimize', () => {
         )
     })
 
+    it('rewrites script member expressions but preserves string literals and comments', () => {
+        const code = `<script>
+    import { motion } from '@humanspeak/svelte-motion'
+    const C = motion.div
+    const label = "use motion.div in docs"
+    const tpl = \`motion.div in template\`
+    // motion.div should stay in comments
+    /* motion.div should stay in block comments too */
+</script>
+
+<C />`
+
+        const result = transform(code)
+        expect(result).not.toBeNull()
+        expect(result).toContain('const C = SvelteMotionDiv')
+        expect(result).toContain('"use motion.div in docs"')
+        expect(result).toContain('`motion.div in template`')
+        expect(result).toContain('// motion.div should stay in comments')
+        expect(result).toContain('/* motion.div should stay in block comments too */')
+    })
+
+    it('preserves literals/comments inside TS scripts (lexer fallback path)', () => {
+        // <script lang="ts"> bodies typically fail acorn's JS parser
+        // because of TS-only syntax; the lexer fallback must still avoid
+        // rewriting string/comment occurrences of motion.div.
+        const code = `<script lang="ts">
+    import { motion } from '@humanspeak/svelte-motion'
+    const C: typeof motion.div = motion.div
+    const label: string = "use motion.div in docs"
+    // motion.div should stay in comments
+</script>
+
+<C />`
+
+        const result = transform(code)
+        expect(result).not.toBeNull()
+        expect(result).toContain('= SvelteMotionDiv')
+        expect(result).toContain('"use motion.div in docs"')
+        expect(result).toContain('// motion.div should stay in comments')
+    })
+
     it('generates single import for duplicate tag usage', () => {
         const code = `<script>
     import { motion } from '@humanspeak/svelte-motion'

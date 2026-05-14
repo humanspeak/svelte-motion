@@ -147,8 +147,23 @@ const MIN_VELOCITY_INTERVAL_MS = 5
 /**
  * Compute the release velocity for momentum from a pointer-history window.
  *
- * Returns 0 if the newest sample is stale, the window has fewer than two
- * samples, or the oldest-newest span is too short to infer (sub-frame).
+ * Mirrors motion-dom: walks back from the newest sample, including only
+ * samples within `MAX_VELOCITY_DELTA_MS` (30 ms) of newest, then divides
+ * the displacement by the elapsed time. Returns 0 if the newest sample is
+ * stale, the window has fewer than two samples, or the oldest-newest span
+ * is shorter than `MIN_VELOCITY_INTERVAL_MS` (5 ms — sub-frame).
+ *
+ * @param history Recent pointer samples ordered oldest → newest. Each
+ *   sample is `{ x, y, t }` where `t` is `performance.now()` ms.
+ * @param nowMs Current `performance.now()` ms — used to discard a stale
+ *   newest sample (finger lifted after a pause).
+ * @returns Inferred release velocity in pixels per second on each axis.
+ * @example
+ *   const v = computeReleaseVelocity(
+ *       [{ x: 0, y: 0, t: 1000 }, { x: 20, y: 0, t: 1020 }],
+ *       1020
+ *   )
+ *   // v ≈ { x: 1000, y: 0 } — 20 px over 20 ms → 1000 px/s
  */
 const computeReleaseVelocity = (
     history: ReadonlyArray<{ x: number; y: number; t: number }>,
@@ -711,15 +726,19 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 if ((rx.done || !stepX) && (ry.done || !stepY)) {
                     pwLog('✅ REST REACHED', {
                         frameCount,
-                        finalX: rx.value,
-                        finalY: ry.value,
+                        finalX: nextX,
+                        finalY: nextY,
                         timeConstantMs,
                         restDelta,
                         restSpeed
                     })
-                    // Ensure applied is synced to final values (setXY should have done this, but be explicit)
-                    const finalX = stepX ? rx.value : applied.x
-                    const finalY = stepY ? ry.value : applied.y
+                    // Sync `applied` from the post-clamp frame values
+                    // (nextX/nextY), not the raw stepper output. When
+                    // element-ref constraints clamped this frame, raw
+                    // rx.value sits outside the visible bounds and would
+                    // desync the next-drag origin from the rendered transform.
+                    const finalX = stepX ? nextX : applied.x
+                    const finalY = stepY ? nextY : applied.y
                     if (axis === true || axis === 'x') applied.x = finalX
                     if (axis === true || axis === 'y') applied.y = finalY
                     running = false

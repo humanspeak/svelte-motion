@@ -368,7 +368,7 @@
     {@html softwareJsonLd}
 </svelte:head>
 
-<div class="brut-wrap flex min-h-svh flex-col">
+<div id="top" class="brut-wrap flex min-h-svh flex-col">
     <HeaderV2
         config={docsConfig}
         {favicon}
@@ -480,8 +480,8 @@
                 <div class="k">FIG-002 / DRAG</div>
                 <h2>drag with <span>spring physics</span>.</h2>
                 <p>
-                    Drop drag onto any motion tag and read its motion values live. useTransform maps
-                    horizontal velocity to rotation — no manual math.
+                    Drop drag onto any motion tag and read its motion values live. This demo derives
+                    rotation from horizontal drag offset in component state.
                 </p>
             </div>
             <div class="panel">

@@ -1,3 +1,4 @@
+import { Parser, type Node } from 'acorn'
 import type { Plugin } from 'vite'
 
 /**
@@ -347,21 +348,18 @@ export const svelteMotionOptimize = (): Plugin => ({
             transformed = transformed.replace(closeRe, `</${localName}>`)
         }
 
-        // Replace `motion.TAG` JS references (e.g. `const Component = motion.div`)
-        // inside <script> blocks only. Earlier versions ran this regex over the
-        // entire post-import file, which clobbered literal `motion.div` substrings
-        // that appeared in template text or markup (e.g. <span>motion.div</span>).
-        // Scope the rewrite to script blocks so markup content is preserved.
+        // Rewrite `motion.TAG` JS references (e.g. `const Component = motion.div`)
+        // inside <script> blocks only. A naive regex over the script body would
+        // also clobber the same substring in string literals (`"motion.div"`)
+        // and comments (`// motion.div`). Parse the script as JS instead and
+        // only rewrite real `motion.<tag>` MemberExpressions. For scripts that
+        // fail to parse as plain JS (e.g. `<script lang="ts">`), fall back to a
+        // string/comment-aware lexer that achieves the same correctness without
+        // needing a TS parser.
         transformed = transformed.replace(
             /(<script\b[^>]*>)([\s\S]*?)(<\/script>)/g,
-            (_full, open: string, content: string, close: string) => {
-                let updated = content
-                for (const [tag, localName] of tagToLocal) {
-                    const scriptRe = new RegExp(`\\bmotion\\.${escapeRegExp(tag)}\\b`, 'g')
-                    updated = updated.replace(scriptRe, localName)
-                }
-                return open + updated + close
-            }
+            (_full, open: string, content: string, close: string) =>
+                open + rewriteMotionRefsInScript(content, tagToLocal) + close
         )
 
         return {
@@ -378,3 +376,192 @@ export const svelteMotionOptimize = (): Plugin => ({
  * @returns The escaped string safe for use in a RegExp.
  */
 const escapeRegExp = (str: string): string => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * Rewrite `motion.<tag>` member-expression references inside a `<script>`
+ * body to the matching `SvelteMotionTag` local. Preserves string literals
+ * and comments — they look like `motion.div` to a regex but must not be
+ * rewritten.
+ *
+ * Strategy: parse the body as JS with acorn and splice only real
+ * MemberExpression matches. If parsing fails (TypeScript, JSX, etc.) fall
+ * back to a string/comment-aware lexer that skips literals and comments.
+ *
+ * @param content - Raw script body (between `<script ...>` and `</script>`).
+ * @param tagToLocal - Map of lowercase tag → local component identifier.
+ * @returns The rewritten body, ready to splice back into the source.
+ */
+const rewriteMotionRefsInScript = (content: string, tagToLocal: Map<string, string>): string => {
+    try {
+        return rewriteViaAst(content, tagToLocal)
+    } catch {
+        return rewriteViaLexer(content, tagToLocal)
+    }
+}
+
+interface AcornIdentifier extends Node {
+    type: 'Identifier'
+    name: string
+}
+
+interface AcornMemberExpression extends Node {
+    type: 'MemberExpression'
+    object: Node
+    property: Node
+    computed: boolean
+}
+
+const isIdentifier = (n: Node | undefined | null): n is AcornIdentifier =>
+    !!n && n.type === 'Identifier'
+
+const isMemberExpression = (n: Node | undefined | null): n is AcornMemberExpression =>
+    !!n && n.type === 'MemberExpression'
+
+/**
+ * Walk an acorn AST and collect every `motion.<tag>` MemberExpression range
+ * we should rewrite. Splice from end to start so earlier indices stay valid.
+ */
+const rewriteViaAst = (content: string, tagToLocal: Map<string, string>): string => {
+    const ast = Parser.parse(content, {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+        allowImportExportEverywhere: true,
+        allowReturnOutsideFunction: true,
+        allowAwaitOutsideFunction: true,
+        allowHashBang: true
+    }) as Node
+
+    const edits: Array<{ start: number; end: number; replacement: string }> = []
+
+    const visit = (node: Node | null | undefined) => {
+        if (!node || typeof node !== 'object' || typeof (node as Node).type !== 'string') return
+        if (
+            isMemberExpression(node) &&
+            !node.computed &&
+            isIdentifier(node.object) &&
+            node.object.name === 'motion' &&
+            isIdentifier(node.property)
+        ) {
+            const localName = tagToLocal.get(node.property.name)
+            if (localName) {
+                edits.push({ start: node.start, end: node.end, replacement: localName })
+                return
+            }
+        }
+        for (const key of Object.keys(node) as Array<keyof Node>) {
+            if (key === 'type' || key === 'start' || key === 'end' || key === 'loc') continue
+            const value = (node as unknown as Record<string, unknown>)[key as string]
+            if (Array.isArray(value)) value.forEach((v) => visit(v as Node))
+            else if (value && typeof value === 'object') visit(value as Node)
+        }
+    }
+    visit(ast)
+
+    if (edits.length === 0) return content
+    edits.sort((a, b) => b.start - a.start)
+    let out = content
+    for (const edit of edits) {
+        out = out.slice(0, edit.start) + edit.replacement + out.slice(edit.end)
+    }
+    return out
+}
+
+/**
+ * Fallback for scripts acorn can't parse (TS, JSX). Walks the source
+ * character-by-character, skipping string literals (`'`, `"`, backtick incl.
+ * `${…}` substitutions) and line/block comments, then applies a `motion.<tag>`
+ * regex to the remaining "code" regions. Less precise than AST but covers
+ * the same correctness contract for literal/comment preservation.
+ */
+const rewriteViaLexer = (content: string, tagToLocal: Map<string, string>): string => {
+    const len = content.length
+    const out: string[] = []
+    let i = 0
+
+    const isIdStart = (ch: string) => /[A-Za-z_$]/.test(ch)
+    const isIdPart = (ch: string) => /[A-Za-z0-9_$-]/.test(ch)
+
+    while (i < len) {
+        const ch = content[i]
+        const next = content[i + 1]
+
+        // Line comment
+        if (ch === '/' && next === '/') {
+            const end = content.indexOf('\n', i)
+            const stop = end === -1 ? len : end
+            out.push(content.slice(i, stop))
+            i = stop
+            continue
+        }
+        // Block comment
+        if (ch === '/' && next === '*') {
+            const end = content.indexOf('*/', i + 2)
+            const stop = end === -1 ? len : end + 2
+            out.push(content.slice(i, stop))
+            i = stop
+            continue
+        }
+        // String literals (single/double)
+        if (ch === '"' || ch === "'") {
+            const quote = ch
+            let j = i + 1
+            while (j < len) {
+                if (content[j] === '\\') {
+                    j += 2
+                    continue
+                }
+                if (content[j] === quote) {
+                    j++
+                    break
+                }
+                j++
+            }
+            out.push(content.slice(i, j))
+            i = j
+            continue
+        }
+        // Template literal — naive: skip to matching backtick, no `${…}` parsing
+        // is needed for our use case (we only need to NOT rewrite the literal
+        // text; substitutions still look like code but `motion.<tag>` inside
+        // a template substitution is vanishingly rare and acorn would normally
+        // handle it).
+        if (ch === '`') {
+            let j = i + 1
+            while (j < len) {
+                if (content[j] === '\\') {
+                    j += 2
+                    continue
+                }
+                if (content[j] === '`') {
+                    j++
+                    break
+                }
+                j++
+            }
+            out.push(content.slice(i, j))
+            i = j
+            continue
+        }
+        // Possible `motion.<tag>` identifier — require word boundary on left
+        if (
+            (i === 0 || !isIdPart(content[i - 1])) &&
+            isIdStart(ch) &&
+            content.slice(i, i + 7) === 'motion.'
+        ) {
+            let j = i + 7
+            const tagStart = j
+            while (j < len && isIdPart(content[j])) j++
+            const tag = content.slice(tagStart, j)
+            const localName = tagToLocal.get(tag)
+            if (localName && (j === len || !isIdPart(content[j]))) {
+                out.push(localName)
+                i = j
+                continue
+            }
+        }
+        out.push(ch)
+        i++
+    }
+
+    return out.join('')
+}

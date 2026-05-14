@@ -124,6 +124,7 @@
         }
     },
     "dependencies": {
+        "acorn": "^8.16.0",
         "motion": "^12.38.0",
         "motion-dom": "^12.38.0"
     },

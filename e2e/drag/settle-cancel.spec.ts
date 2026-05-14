@@ -44,6 +44,11 @@ test.describe('drag/settle-cancel', () => {
         if (!midRect) throw new Error('no mid bbox')
         const midCx = midRect.x + midRect.width / 2
         const midTranslate = await readTranslateX(page, '[data-testid="snap-card"]')
+        // Guard: if the snap finished early or never started, both reads
+        // below would match and the test would pass without exercising
+        // the cancel path. Require midTranslate to actually be mid-animation.
+        expect(midTranslate).toBeGreaterThan(10)
+        expect(midTranslate).toBeLessThan(190)
 
         // Re-grab without moving, hold 250 ms.
         await page.mouse.move(midCx, cy)
@@ -90,6 +95,11 @@ test.describe('drag/settle-cancel', () => {
         if (!midRect) throw new Error('no mid bbox')
         const midCx = midRect.x + midRect.width / 2
         const midTranslate = await readTranslateX(page, '[data-testid="settle-card"]')
+        // Guard: settle animation must still be in flight when we re-grab,
+        // otherwise this test would pass without exercising the cancel path.
+        // Range is (constraint +120, elastic overdrag ceiling).
+        expect(midTranslate).toBeGreaterThan(130)
+        expect(midTranslate).toBeLessThan(390)
 
         // Re-grab without moving. Hold for 250 ms.
         await page.mouse.move(midCx, cy)

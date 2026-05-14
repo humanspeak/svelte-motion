@@ -184,8 +184,10 @@ test.describe('drag/brutalist-stage', () => {
         await page.mouse.up()
 
         const samples: number[] = []
-        for (const wait of [16, 32, 50, 80, 120]) {
-            await page.waitForTimeout(wait)
+        let elapsed = 0
+        for (const atMs of [16, 32, 50, 80, 120]) {
+            await page.waitForTimeout(atMs - elapsed)
+            elapsed = atMs
             const t = await readTranslate(page)
             if (t) samples.push(t.tx)
         }
