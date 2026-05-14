@@ -39,6 +39,10 @@
     }
 
     // ── Package + library stats ──────────────────────────────────────
+    // Package stats are fetched from the npm registry at request time by
+    // `+page.server.ts` (cached for ~1 hour at the edge and in memory).
+    // Renderer / hook / tag counts come from library exports directly,
+    // so those stay live automatically.
     const PKG_NAME = $derived(packageStats.name)
     const PKG_VERSION = $derived(packageStats.version)
     const TARBALL_KB = $derived(
