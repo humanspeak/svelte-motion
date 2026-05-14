@@ -487,13 +487,56 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
      */
     const finishDrag = (e: PointerEvent) => {
         dragging = false
+
+        // Recompute release velocity from the history, dropping any sample
+        // older than MAX_VELOCITY_DELTA_MS before the newest. `velocity` is
+        // otherwise only updated inside onPointerMove, so when the user
+        // holds the pointer stationary for several hundred ms before
+        // releasing, `velocity` would still reflect the pre-pause motion
+        // and momentum would fling the card. Matches motion-dom's
+        // reference (MAX_VELOCITY_DELTA = 30ms).
+        const MAX_VELOCITY_DELTA_MS = 30
+        if (history.length >= 2) {
+            const newest = history[history.length - 1]
+            const ageNow = now() - newest.t
+            if (ageNow > MAX_VELOCITY_DELTA_MS) {
+                // Newest sample is itself stale (user paused since last move).
+                velocity = { x: 0, y: 0 }
+            } else {
+                // Find the oldest sample within the window before newest.
+                let oldestIdx = history.length - 1
+                for (let i = history.length - 2; i >= 0; i--) {
+                    if (newest.t - history[i].t <= MAX_VELOCITY_DELTA_MS) {
+                        oldestIdx = i
+                    } else {
+                        break
+                    }
+                }
+                if (oldestIdx === history.length - 1) {
+                    // Only one sample within the window — insufficient for
+                    // a velocity reading.
+                    velocity = { x: 0, y: 0 }
+                } else {
+                    const oldest = history[oldestIdx]
+                    const dtMs = Math.max(1, newest.t - oldest.t)
+                    velocity = {
+                        x: ((newest.x - oldest.x) / dtMs) * 1000,
+                        y: ((newest.y - oldest.y) / dtMs) * 1000
+                    }
+                }
+            }
+        } else {
+            velocity = { x: 0, y: 0 }
+        }
+
         pwLog('[drag] finish', {
             el: EL_ID,
             lastPoint,
             startPoint,
             origin,
             applied,
-            momentum
+            momentum,
+            velocity
         })
         try {
             if ('releasePointerCapture' in el && typeof e.pointerId === 'number')
