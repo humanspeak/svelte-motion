@@ -18,18 +18,7 @@ const RIGHT = 200
 const TOP = -120
 const BOTTOM = 120
 
-const readTranslate = async (page: import('@playwright/test').Page) => {
-    return page.evaluate(() => {
-        const el = document.querySelector('[data-testid="drag-card"]') as HTMLElement | null
-        if (!el) return null
-        const t = window.getComputedStyle(el).transform
-        // matrix(a, b, c, d, tx, ty)
-        const m = t.match(/matrix\(([^)]+)\)/)
-        if (!m) return { tx: 0, ty: 0 }
-        const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
-        return { tx: parts[4] ?? 0, ty: parts[5] ?? 0 }
-    })
-}
+import { readTranslate } from '../_helpers/transform'
 
 const disableRotate = async (page: import('@playwright/test').Page) => {
     const rotateToggle = page.locator('.knobs input[type="checkbox"]').first()

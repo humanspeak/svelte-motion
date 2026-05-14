@@ -52,3 +52,16 @@ export const applyConstraints = (
     }
     return point
 }
+
+/**
+ * Parse a CSS `matrix(a, b, c, d, tx, ty)` string into translate components.
+ *
+ * Returns `{ tx: 0, ty: 0 }` for `'none'` or any input that doesn't match.
+ * Used to read the rendered translate after Motion writes inline transforms.
+ */
+export const parseMatrixTranslate = (transform: string): { tx: number; ty: number } => {
+    const m = transform.match(/matrix\(([^)]+)\)/)
+    if (!m) return { tx: 0, ty: 0 }
+    const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
+    return { tx: parts[4] ?? 0, ty: parts[5] ?? 0 }
+}

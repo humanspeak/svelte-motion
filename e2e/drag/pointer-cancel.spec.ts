@@ -1,30 +1,14 @@
 import { expect, test } from '@playwright/test'
+import { readTranslateX } from '../_helpers/transform'
 
 /**
- * Regression for pointercancel running the full momentum / inertia path.
+ * Regression for pointercancel taking the momentum path. After the fix,
+ * cancel forces a no-momentum settle so the card clamps into constraints
+ * without flinging.
  *
- * `pointercancel` fires when the OS preempts a drag (gesture-nav, palm
- * rejection, scroll takeover). The user didn't release intentionally;
- * the gesture was interrupted. Running momentum in that case flings
- * the card unexpectedly. After the fix, finishDrag treats cancel as a
- * forced no-momentum settle — the card clamps back into constraints
- * without any inertia.
- *
- * Playwright doesn't have a first-class `pointercancel` synth, so we
- * dispatch one directly via the DOM.
+ * Playwright has no first-class `pointercancel` synth, so we dispatch one
+ * directly via the DOM.
  */
-
-const readTranslateX = async (page: import('@playwright/test').Page) => {
-    return page.evaluate(() => {
-        const el = document.querySelector('[data-testid="drag-card"]') as HTMLElement | null
-        if (!el) return null
-        const t = window.getComputedStyle(el).transform
-        const m = t.match(/matrix\(([^)]+)\)/)
-        if (!m) return 0
-        const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
-        return parts[4] ?? 0
-    })
-}
 
 test.describe('drag/pointer-cancel', () => {
     test('pointercancel mid-drag clamps without fling', async ({ page }) => {
@@ -70,7 +54,6 @@ test.describe('drag/pointer-cancel', () => {
         // inertia means no overshoot past the boundary either.
         await page.waitForTimeout(400)
         const afterCancel = await readTranslateX(page)
-        if (afterCancel === null) throw new Error('no transform')
         // Allow 1 px sub-pixel tolerance — animation settles exactly on
         // the constraint edge.
         expect(afterCancel).toBeGreaterThanOrEqual(-101)

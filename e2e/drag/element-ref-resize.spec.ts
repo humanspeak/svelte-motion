@@ -13,23 +13,13 @@ import { expect, test } from '@playwright/test'
  * ref constraints and clamps the stepper output to the latest bounds.
  */
 
-const readCardRect = async (page: import('@playwright/test').Page) => {
-    return page.evaluate(() => {
-        const el = document.querySelector('[data-testid="drag-card"]') as HTMLElement | null
+const readRect = (page: import('@playwright/test').Page, selector: string) =>
+    page.evaluate((sel) => {
+        const el = document.querySelector(sel) as HTMLElement | null
         if (!el) return null
         const r = el.getBoundingClientRect()
         return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }
-    })
-}
-
-const readContainerRect = async (page: import('@playwright/test').Page) => {
-    return page.evaluate(() => {
-        const el = document.querySelector('[data-testid="container"]') as HTMLElement | null
-        if (!el) return null
-        const r = el.getBoundingClientRect()
-        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }
-    })
-}
+    }, selector)
 
 test.describe('drag/element-ref-resize', () => {
     test('container resize mid-inertia keeps card inside new bounds', async ({ page }) => {
@@ -37,7 +27,7 @@ test.describe('drag/element-ref-resize', () => {
         const card = page.getByTestId('drag-card')
         await card.waitFor({ state: 'visible' })
 
-        const start = await readCardRect(page)
+        const start = await readRect(page, '[data-testid="drag-card"]')
         if (!start) throw new Error('no card rect')
 
         const cx = start.left + (start.right - start.left) / 2
@@ -64,8 +54,8 @@ test.describe('drag/element-ref-resize', () => {
         // post-resize clamp/spring to settle.
         await page.waitForTimeout(900)
 
-        const finalCard = await readCardRect(page)
-        const finalContainer = await readContainerRect(page)
+        const finalCard = await readRect(page, '[data-testid="drag-card"]')
+        const finalContainer = await readRect(page, '[data-testid="container"]')
         if (!finalCard || !finalContainer) throw new Error('no rect')
 
         // The card right edge must not extend past the container right

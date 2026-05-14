@@ -1,5 +1,5 @@
 import type { DragAxis, DragConstraints, DragControls, DragInfo, MotionWhileDrag } from '$lib/types'
-import { pwLog, pwWarn } from '$lib/utils/log'
+import { isPlaywrightEnv, pwLog, pwWarn } from '$lib/utils/log'
 /**
  * Drag utilities
  *
@@ -17,7 +17,10 @@ import { pwLog, pwWarn } from '$lib/utils/log'
  * - For nested drags, set `propagation` as needed to avoid parent-child contention.
  */
 import { isDomElement } from '$lib/utils/dom'
-import { applyConstraints as applyFloatConstraints } from '$lib/utils/dragMath'
+import {
+    applyConstraints as applyFloatConstraints,
+    parseMatrixTranslate
+} from '$lib/utils/dragMath'
 import { deriveBoundaryPhysics } from '$lib/utils/dragParams'
 import { computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
 import { createInertiaToBoundary } from '$lib/utils/inertia'
@@ -137,6 +140,38 @@ export const applyElastic = (value: number, min: number, max: number, elastic: n
 /** Prefer high-resolution time in browser; fall back for SSR/tests. */
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
 
+/** Sample windows for release-velocity inference (matches motion-dom values). */
+const MAX_VELOCITY_DELTA_MS = 30
+const MIN_VELOCITY_INTERVAL_MS = 5
+
+/**
+ * Compute the release velocity for momentum from a pointer-history window.
+ *
+ * Returns 0 if the newest sample is stale, the window has fewer than two
+ * samples, or the oldest-newest span is too short to infer (sub-frame).
+ */
+const computeReleaseVelocity = (
+    history: ReadonlyArray<{ x: number; y: number; t: number }>,
+    nowMs: number
+): { x: number; y: number } => {
+    if (history.length < 2) return { x: 0, y: 0 }
+    const newest = history[history.length - 1]
+    if (nowMs - newest.t > MAX_VELOCITY_DELTA_MS) return { x: 0, y: 0 }
+    let oldestIdx = history.length - 1
+    for (let i = history.length - 2; i >= 0; i--) {
+        if (newest.t - history[i].t > MAX_VELOCITY_DELTA_MS) break
+        oldestIdx = i
+    }
+    if (oldestIdx === history.length - 1) return { x: 0, y: 0 }
+    const oldest = history[oldestIdx]
+    const dtMs = newest.t - oldest.t
+    if (dtMs < MIN_VELOCITY_INTERVAL_MS) return { x: 0, y: 0 }
+    return {
+        x: ((newest.x - oldest.x) / dtMs) * 1000,
+        y: ((newest.y - oldest.y) / dtMs) * 1000
+    }
+}
+
 /**
  * Attach a drag gesture to an element.
  *
@@ -237,29 +272,25 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         if ('x' in payload) applied.x = x
         if ('y' in payload) applied.y = y
 
-        // Verify it's actually applied; if not, retry once (Playwright visibility only)
-        const cs = getComputedStyle(el)
-        let actualTransform = cs.transform
-        if (actualTransform === 'none' || !actualTransform.includes('matrix')) {
-            pwWarn('⚠️ setXY transform missing; retrying write', {
-                x,
-                y,
-                transform: actualTransform
-            })
-            animate(
-                el,
-                ('x' in payload || 'y' in payload ? payload : { x, y }) as DOMKeyframesDefinition,
-                {
-                    duration: 0
-                }
-            )
-            actualTransform = getComputedStyle(el).transform
+        // Playwright-only sanity check: confirm the transform actually
+        // landed on the element and retry once if not. Forces a style
+        // recalc via getComputedStyle, so we gate it behind the same
+        // playwright env flag pwLog uses so it never fires in prod.
+        if (isPlaywrightEnv()) {
+            let actualTransform = getComputedStyle(el).transform
             if (actualTransform === 'none' || !actualTransform.includes('matrix')) {
-                pwWarn('⚠️ setXY second attempt still missing transform', {
-                    x,
-                    y,
-                    transform: actualTransform
-                })
+                pwWarn('⚠️ setXY transform missing; retrying write', { x, y })
+                animate(
+                    el,
+                    ('x' in payload || 'y' in payload
+                        ? payload
+                        : { x, y }) as DOMKeyframesDefinition,
+                    { duration: 0 }
+                )
+                actualTransform = getComputedStyle(el).transform
+                if (actualTransform === 'none' || !actualTransform.includes('matrix')) {
+                    pwWarn('⚠️ setXY second attempt still missing transform', { x, y })
+                }
             }
         }
     }
@@ -492,56 +523,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
     const finishDrag = (e: PointerEvent, cancelled = false) => {
         dragging = false
 
-        // Recompute release velocity from the history, dropping any sample
-        // older than MAX_VELOCITY_DELTA_MS before the newest. `velocity` is
-        // otherwise only updated inside onPointerMove, so when the user
-        // holds the pointer stationary for several hundred ms before
-        // releasing, `velocity` would still reflect the pre-pause motion
-        // and momentum would fling the card. Matches motion-dom's
-        // reference (MAX_VELOCITY_DELTA = 30ms).
-        //
-        // A second guard `MIN_VELOCITY_INTERVAL_MS` requires the samples
-        // used for velocity to span at least 5 ms. Without this guard,
-        // a tap with one tiny pointermove right after pointerdown
-        // (sub-millisecond apart) divides a 1-3 px move by a 0-1 ms dt
-        // and produces a spurious high velocity from what was almost a
-        // pure click.
-        const MAX_VELOCITY_DELTA_MS = 30
-        const MIN_VELOCITY_INTERVAL_MS = 5
-        if (history.length >= 2) {
-            const newest = history[history.length - 1]
-            const ageNow = now() - newest.t
-            if (ageNow > MAX_VELOCITY_DELTA_MS) {
-                // Newest sample is itself stale (user paused since last move).
-                velocity = { x: 0, y: 0 }
-            } else {
-                // Find the oldest sample within the window before newest.
-                let oldestIdx = history.length - 1
-                for (let i = history.length - 2; i >= 0; i--) {
-                    if (newest.t - history[i].t <= MAX_VELOCITY_DELTA_MS) {
-                        oldestIdx = i
-                    } else {
-                        break
-                    }
-                }
-                if (oldestIdx === history.length - 1) {
-                    velocity = { x: 0, y: 0 }
-                } else {
-                    const oldest = history[oldestIdx]
-                    const dtMs = newest.t - oldest.t
-                    if (dtMs < MIN_VELOCITY_INTERVAL_MS) {
-                        velocity = { x: 0, y: 0 }
-                    } else {
-                        velocity = {
-                            x: ((newest.x - oldest.x) / dtMs) * 1000,
-                            y: ((newest.y - oldest.y) / dtMs) * 1000
-                        }
-                    }
-                }
-            }
-        } else {
-            velocity = { x: 0, y: 0 }
-        }
+        velocity = computeReleaseVelocity(history, now())
 
         pwLog('[drag] finish', {
             el: EL_ID,
@@ -592,23 +574,14 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                     } as DOMKeyframesDefinition,
                     (mergedTransition ?? {}) as AnimationOptions
                 )
-                // Register a cancel hook so a new pointerdown (or
-                // controls.stop()) can interrupt the snap-to-origin
-                // animation. Without this, the prior animate() controls
-                // continue running on x/y and fight the new drag.
+                // Cancel hook so re-grab / controls.stop() interrupts the snap.
                 stopInertia = () => {
                     pwLog('❌ snapToOrigin cancelled')
                     ;(controls as unknown as { stop?: () => void }).stop?.()
-                    // Sync applied to wherever the snap had reached so the
-                    // next drag's origin is correct.
-                    const cs = getComputedStyle(el)
-                    const t = cs.transform
-                    const m = t.match(/matrix\(([^)]+)\)/)
-                    if (m) {
-                        const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
-                        if (applyX && typeof parts[4] === 'number') applied.x = parts[4]
-                        if (applyY && typeof parts[5] === 'number') applied.y = parts[5]
-                    }
+                    // Sync applied to wherever the snap reached so the next drag origin is correct.
+                    const { tx, ty } = parseMatrixTranslate(getComputedStyle(el).transform)
+                    if (applyX) applied.x = tx
+                    if (applyY) applied.y = ty
                     stopInertia = null
                 }
                 Promise.resolve((controls as unknown as { finished?: Promise<void> }).finished)
@@ -627,20 +600,10 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 return
             }
 
-            // If no constraints, disable boundary springs by setting finite but very wide bounds.
-            // Otherwise anchor the constraint min/max to `constraintsBase` — the absolute
-            // pixel-constraint origin (set in beginDrag at applied=0 for pixel constraints, or
-            // recomputed from the element ref each drag for element constraints). This is the
-            // SAME anchor that pointermove uses for elastic clamping (line 437-440), so the
-            // boundary the inertia handoff snaps back to matches the boundary the user could
-            // pull past during drag. Previously this used `origin` (= applied at drag start),
-            // which drifted each drag — when the user released past a constraint, subsequent
-            // drags treated the new position as origin, shifting min/max so the lib saw the
-            // card as "within constraints" and ran pure friction inertia past the absolute
-            // boundary forever. The card visibly escaped the dashed dragConstraints frame and
-            // never snapped back. Regression covered by
-            // e2e/drag/brutalist-stage.spec.ts → 'second drag from past-boundary still
-            // settles within absolute constraints'.
+            // Boundary min/max anchor to `constraintsBase` (the absolute
+            // pixel-constraint origin) so the inertia handoff snaps to the
+            // same edge pointermove's elastic clamping uses — not to a
+            // per-drag-shifted `origin` that would drift across drags.
             const noConstraints = !constraints
             const huge = 1e6
             const minX = noConstraints
@@ -838,22 +801,13 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 { ...(applyX ? { x } : {}), ...(applyY ? { y } : {}) } as DOMKeyframesDefinition,
                 settleTransition
             )
-            // Register a cancel hook so a re-grab interrupts the settle
-            // animation cleanly, syncing `applied` to wherever the card
-            // had reached at the moment of cancellation. Without this,
-            // the prior animate() controls kept running on x/y and
-            // fought the new drag.
+            // Cancel hook so re-grab interrupts the settle animation cleanly.
             stopInertia = () => {
                 pwLog('❌ settle (no momentum) cancelled')
                 ;(controls as unknown as { stop?: () => void }).stop?.()
-                const cs = getComputedStyle(el)
-                const t = cs.transform
-                const m = t.match(/matrix\(([^)]+)\)/)
-                if (m) {
-                    const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
-                    if (applyX && typeof parts[4] === 'number') applied.x = parts[4]
-                    if (applyY && typeof parts[5] === 'number') applied.y = parts[5]
-                }
+                const { tx, ty } = parseMatrixTranslate(getComputedStyle(el).transform)
+                if (applyX) applied.x = tx
+                if (applyY) applied.y = ty
                 stopInertia = null
             }
             // Fire transition end once settled
@@ -876,13 +830,9 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         endWhileDrag()
     }
 
-    // Wire dragControls. The third argument is the cancel hook for in-flight
-    // release inertia — without it, controls.stop()/.cancel() were silently
-    // no-ops while the spring-back animation was running, because the
-    // closure in createDragControls had cancelInertia=null. We pass an arrow
-    // that reads the *current* stopInertia at call time (it's re-assigned
-    // each finishDrag) so the latest in-flight animation is the one that
-    // gets cancelled.
+    // Wire dragControls. The cancelInertia thunk reads the *current*
+    // stopInertia at call time so the latest in-flight animation is
+    // targeted (stopInertia is re-assigned per finishDrag).
     if (opts.controls) {
         const internal = opts.controls as unknown as {
             _bind?: (

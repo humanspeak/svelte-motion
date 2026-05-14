@@ -15,17 +15,7 @@ import { expect, test } from '@playwright/test'
  * pointer position (within elastic), not drift back toward 0 / clamp.
  */
 
-const readTranslateX = async (page: import('@playwright/test').Page, selector: string) => {
-    return page.evaluate((sel) => {
-        const el = document.querySelector(sel) as HTMLElement | null
-        if (!el) return null
-        const t = window.getComputedStyle(el).transform
-        const m = t.match(/matrix\(([^)]+)\)/)
-        if (!m) return 0
-        const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
-        return parts[4] ?? 0
-    }, selector)
-}
+import { readTranslateX } from '../_helpers/transform'
 
 test.describe('drag/settle-cancel', () => {
     test('snapToOrigin animation freezes when user re-grabs without moving', async ({ page }) => {
@@ -54,14 +44,12 @@ test.describe('drag/settle-cancel', () => {
         if (!midRect) throw new Error('no mid bbox')
         const midCx = midRect.x + midRect.width / 2
         const midTranslate = await readTranslateX(page, '[data-testid="snap-card"]')
-        if (midTranslate === null) throw new Error('no mid transform')
 
         // Re-grab without moving, hold 250 ms.
         await page.mouse.move(midCx, cy)
         await page.mouse.down()
         await page.waitForTimeout(250)
         const heldTranslate = await readTranslateX(page, '[data-testid="snap-card"]')
-        if (heldTranslate === null) throw new Error('no held transform')
         await page.mouse.up()
 
         // With cancel: translate barely changes. Without cancel: card
@@ -102,14 +90,12 @@ test.describe('drag/settle-cancel', () => {
         if (!midRect) throw new Error('no mid bbox')
         const midCx = midRect.x + midRect.width / 2
         const midTranslate = await readTranslateX(page, '[data-testid="settle-card"]')
-        if (midTranslate === null) throw new Error('no mid transform')
 
         // Re-grab without moving. Hold for 250 ms.
         await page.mouse.move(midCx, cy)
         await page.mouse.down()
         await page.waitForTimeout(250)
         const heldTranslate = await readTranslateX(page, '[data-testid="settle-card"]')
-        if (heldTranslate === null) throw new Error('no held transform')
         await page.mouse.up()
 
         // With cancel: translate barely changes during the hold (within a

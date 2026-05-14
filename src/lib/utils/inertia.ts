@@ -121,30 +121,13 @@ export const createInertiaToBoundary = (
     let springV = 0
     let boundaryTarget: number | null = null
 
-    // If starting OOB, skip inertia
+    // Starting OOB: skip inertia and engage the spring. Drop the
+    // away-from-boundary velocity component so the spring's first frames
+    // don't continue moving the value outward.
     if (x < min || x > max) {
         mode = 'spring'
-        // Set spring start at current value and carry current velocity, but
-        // only retain the component directed *toward* the boundary. Any
-        // velocity that would carry the value further past the constraint
-        // is dropped so the spring engages from the release position and
-        // the only motion is back toward the boundary.
-        //
-        // Previously the full release velocity was kept, which let the
-        // spring's first frames continue moving the value outward for
-        // ~50–120 ms before the restoring force dominated — visually
-        // 'the card escapes the dragConstraints box just after I let go'.
-        // Regression covered by
-        // e2e/drag/brutalist-stage.spec.ts → 'post-release motion never
-        // moves further from origin than release position'.
         springX = x
-        if (x < min) {
-            // Value past the lower bound; only positive (toward-boundary) velocity is retained.
-            springV = Math.max(0, v)
-        } else {
-            // Value past the upper bound; only negative (toward-boundary) velocity is retained.
-            springV = Math.min(0, v)
-        }
+        springV = x < min ? Math.max(0, v) : Math.min(0, v)
         boundaryTarget = x < min ? min : max
     }
 

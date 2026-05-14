@@ -14,18 +14,10 @@ import { expect, test } from '@playwright/test'
  * to lock that contract in.
  */
 
-const readScale = async (page: import('@playwright/test').Page) => {
-    return page.evaluate(() => {
-        const el = document.querySelector('[data-testid="drag-card"]') as HTMLElement | null
-        if (!el) return null
-        const t = window.getComputedStyle(el).transform
-        const m = t.match(/matrix\(([^)]+)\)/)
-        if (!m) return 1
-        const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
-        // matrix(a, b, c, d, tx, ty) — uniform scale → a == d
-        return parts[0] ?? 1
-    })
-}
+import { readTransform } from '../_helpers/transform'
+
+const readScale = async (page: import('@playwright/test').Page) =>
+    (await readTransform(page, '[data-testid="drag-card"]')).a
 
 test.describe('drag/whileDrag restore', () => {
     test('re-grab mid-restore still settles scale to 1.0', async ({ page }) => {
@@ -49,7 +41,6 @@ test.describe('drag/whileDrag restore', () => {
         // partway between 1.05 and 1.0.
         await page.waitForTimeout(150)
         const midScale = await readScale(page)
-        if (midScale === null) throw new Error('no transform')
         expect(midScale).toBeGreaterThan(1.001)
         expect(midScale).toBeLessThan(1.05)
 
@@ -66,7 +57,6 @@ test.describe('drag/whileDrag restore', () => {
         // Allow the second restore to fully complete.
         await page.waitForTimeout(600)
         const finalScale = await readScale(page)
-        if (finalScale === null) throw new Error('no transform')
         // Final scale must be exactly 1.0 — not stuck at the transient
         // mid-restore baseline.
         expect(Math.abs(finalScale - 1)).toBeLessThan(0.005)
