@@ -98,6 +98,64 @@ test.describe('drag/brutalist-stage', () => {
         expect(after.ty).toBeLessThanOrEqual(BOTTOM + 1)
     })
 
+    test('second drag from past-boundary still settles within absolute constraints', async ({
+        page
+    }) => {
+        // The actual user-facing bug: after one hard drag past +200, on
+        // *subsequent* drags the lib used to re-anchor the constraint
+        // origin to the current applied position, which let the card walk
+        // off-screen across multiple drags. Fix moved the momentum-branch
+        // min/max from `origin.x` to `constraintsBase.x` so the boundary
+        // is absolute, matching the pointermove-time elastic clamp.
+        await page.goto(STAGE_PATH)
+        const card = page.getByTestId('drag-card')
+        await card.waitFor({ state: 'visible' })
+        await disableRotate(page)
+
+        const start = await card.boundingBox()
+        if (!start) throw new Error('no card bbox')
+
+        // First drag: hard right past +200.
+        const cx1 = start.x + start.width / 2
+        const cy1 = start.y + start.height / 2
+        await page.mouse.move(cx1, cy1)
+        await page.mouse.down()
+        for (let i = 1; i <= 20; i++) {
+            await page.mouse.move(cx1 + i * 40, cy1, { steps: 1 })
+        }
+        await page.mouse.up()
+        await page.waitForTimeout(1500)
+
+        const afterFirst = await readTranslate(page)
+        if (!afterFirst) throw new Error('no transform')
+        expect(afterFirst.tx).toBeGreaterThanOrEqual(LEFT - 1)
+        expect(afterFirst.tx).toBeLessThanOrEqual(RIGHT + 1)
+
+        // Second drag: from the current resting position, hard right again.
+        // Before the fix this drag would re-anchor the constraint to the
+        // current applied position, letting the card walk further past +200
+        // with no spring snap-back.
+        const next = await card.boundingBox()
+        if (!next) throw new Error('no bbox 2')
+        const cx2 = next.x + next.width / 2
+        const cy2 = next.y + next.height / 2
+        await page.mouse.move(cx2, cy2)
+        await page.mouse.down()
+        for (let i = 1; i <= 20; i++) {
+            await page.mouse.move(cx2 + i * 40, cy2, { steps: 1 })
+        }
+        await page.mouse.up()
+        await page.waitForTimeout(1500)
+
+        const afterSecond = await readTranslate(page)
+        if (!afterSecond) throw new Error('no transform 2')
+        // Absolute constraint must still hold after the second drag.
+        expect(afterSecond.tx).toBeGreaterThanOrEqual(LEFT - 1)
+        expect(afterSecond.tx).toBeLessThanOrEqual(RIGHT + 1)
+        expect(afterSecond.ty).toBeGreaterThanOrEqual(TOP - 1)
+        expect(afterSecond.ty).toBeLessThanOrEqual(BOTTOM + 1)
+    })
+
     // Regression for the post-release momentum-past-constraint bug fixed
     // in src/lib/utils/inertia.ts: when the value is already out-of-bounds
     // at release with non-zero velocity, only the velocity component

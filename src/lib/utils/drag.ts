@@ -548,21 +548,34 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 return
             }
 
-            // If no constraints, disable boundary springs by setting finite but very wide bounds
+            // If no constraints, disable boundary springs by setting finite but very wide bounds.
+            // Otherwise anchor the constraint min/max to `constraintsBase` — the absolute
+            // pixel-constraint origin (set in beginDrag at applied=0 for pixel constraints, or
+            // recomputed from the element ref each drag for element constraints). This is the
+            // SAME anchor that pointermove uses for elastic clamping (line 437-440), so the
+            // boundary the inertia handoff snaps back to matches the boundary the user could
+            // pull past during drag. Previously this used `origin` (= applied at drag start),
+            // which drifted each drag — when the user released past a constraint, subsequent
+            // drags treated the new position as origin, shifting min/max so the lib saw the
+            // card as "within constraints" and ran pure friction inertia past the absolute
+            // boundary forever. The card visibly escaped the dashed dragConstraints frame and
+            // never snapped back. Regression covered by
+            // e2e/drag/brutalist-stage.spec.ts → 'second drag from past-boundary still
+            // settles within absolute constraints'.
             const noConstraints = !constraints
             const huge = 1e6
             const minX = noConstraints
                 ? applied.x - huge
-                : origin.x + (constraints?.left ?? -Infinity)
+                : constraintsBase.x + (constraints?.left ?? -Infinity)
             const maxX = noConstraints
                 ? applied.x + huge
-                : origin.x + (constraints?.right ?? Infinity)
+                : constraintsBase.x + (constraints?.right ?? Infinity)
             const minY = noConstraints
                 ? applied.y - huge
-                : origin.y + (constraints?.top ?? -Infinity)
+                : constraintsBase.y + (constraints?.top ?? -Infinity)
             const maxY = noConstraints
                 ? applied.y + huge
-                : origin.y + (constraints?.bottom ?? Infinity)
+                : constraintsBase.y + (constraints?.bottom ?? Infinity)
 
             const { timeConstantMs, restDelta, restSpeed, bounceStiffness, bounceDamping } =
                 deriveBoundaryPhysics(elastic, opts.transition)
