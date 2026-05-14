@@ -66,6 +66,41 @@
         })}</${'script'}>`
     })
 
+    // FAQPage JSON-LD — emitted only on the /docs root so the four canonical
+    // disambiguation Qs ride the highest-authority doc URL. Per SEO.md P2:
+    // FAQ rich results lift CTR 15–30% at typical positions; LLMs preferentially
+    // cite Q&A-structured content for "which library should I use" prompts.
+    const faqJsonLd = $derived.by(() => {
+        if (page.url.pathname !== '/docs') return ''
+        const faqs: { q: string; a: string }[] = [
+            {
+                q: 'Is @humanspeak/svelte-motion the same as the legacy svelte-motion package on npm?',
+                a: 'No. The legacy svelte-motion package on npm is a separate, unmaintained project. @humanspeak/svelte-motion is an actively maintained library built for Svelte 5 with runes, and is API-compatible with the React framer-motion API.'
+            },
+            {
+                q: 'Does Svelte Motion work in Svelte 4?',
+                a: 'No. Svelte Motion requires Svelte 5 because it relies on runes ($state, $derived, $effect) and Svelte 5’s component model. For Svelte 4 projects, the svelte/transition and svelte/animate built-ins are the closest in-tree options.'
+            },
+            {
+                q: 'How does Svelte Motion compare to GSAP, Motion One, and svelte/transition?',
+                a: 'Svelte Motion is the only Svelte 5 library that matches Framer Motion’s declarative API: motion.<tag> components, AnimatePresence exit animations, gestures (hover, tap, drag, focus, in-view), variants, FLIP layout and shared layout, spring physics, and scroll-linked motion values. GSAP and Motion One (motion.dev) are imperative and framework-agnostic — powerful, but you build the declarative layer yourself. svelte/transition is built-in and great for simple enter/exit, but has no gestures, no layout animation, and no shared layout.'
+            },
+            {
+                q: 'Is the API really compatible with React Framer Motion?',
+                a: 'Yes for component code. Prop names and semantics match Framer Motion: initial, animate, exit, transition, variants, whileHover, whileTap, whileFocus, whileInView, drag (with dragConstraints / dragElastic / dragMomentum), layout, layoutId, and AnimatePresence with mode="sync" | "wait" | "popLayout". Hooks (useAnimate, useScroll, useSpring, useTransform, useMotionValue, useInView, useCycle, useReducedMotion, etc.) keep their names and behaviour, adapted for Svelte 5 runes.'
+            }
+        ]
+        return `<${'script'} type="application/ld+json">${JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            mainEntity: faqs.map(({ q, a }) => ({
+                '@type': 'Question',
+                name: q,
+                acceptedAnswer: { '@type': 'Answer', text: a }
+            }))
+        })}</${'script'}>`
+    })
+
     /**
      * Extract headings from content for table of contents
      * Generates descriptive, slugified IDs for better URL anchors using github-slugger
@@ -136,6 +171,10 @@
     {#if techArticleJsonLd}
         <!-- eslint-disable-next-line svelte/no-at-html-tags -- static JSON-LD, no user input -->
         {@html techArticleJsonLd}
+    {/if}
+    {#if faqJsonLd}
+        <!-- eslint-disable-next-line svelte/no-at-html-tags -- static JSON-LD, no user input -->
+        {@html faqJsonLd}
     {/if}
 </svelte:head>
 

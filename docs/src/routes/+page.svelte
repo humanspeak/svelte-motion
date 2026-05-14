@@ -411,16 +411,23 @@
             </aside>
             <div class="hero-body">
                 <h1>
-                    <span>svelte</span><span class="slash">/</span><span>motion</span><span
-                        class="end">.</span
+                    <span class="mark" aria-hidden="true">
+                        <span>svelte</span><span class="slash">/</span><span>motion</span><span
+                            class="end">.</span
+                        >
+                    </span>
+                    <span class="sr-only"
+                        >Svelte Motion — a Framer Motion-compatible animation library for Svelte 5</span
                     >
                 </h1>
                 <p class="sub">
                     <b>Framer Motion for Svelte 5.</b> Declarative <code>motion.&lt;tag&gt;</code>
                     components with AnimatePresence exit animations, gestures (hover, tap, drag, focus,
                     in-view), variants, FLIP layout animations, shared-layout transitions, spring physics,
-                    and scroll-linked motion values. The drop-in <b>Framer Motion alternative</b> for
-                    Svelte and SvelteKit.
+                    and scroll-linked motion values. The drop-in <b>Framer Motion alternative</b>
+                    for Svelte and SvelteKit — and an alternative to <b>Motion One</b>, <b>GSAP</b>,
+                    and
+                    <code>svelte/transition</code> for declarative gestures, layout, and exit animations.
                 </p>
                 <div class="cta-row">
                     <a class="pri" href="/docs">get started ↗</a>
