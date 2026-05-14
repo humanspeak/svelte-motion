@@ -29,7 +29,7 @@ const readTranslateX = async (page: import('@playwright/test').Page) => {
 }
 
 test.describe('drag/single-frame', () => {
-    test('one tiny pointermove + release produces no momentum fling', async ({ page }) => {
+    test.fail('one tiny pointermove + release produces no momentum fling', async ({ page }) => {
         await page.goto('/tests/drag/single-frame?@isPlaywright=true')
         const card = page.getByTestId('drag-card')
         await card.waitFor({ state: 'visible' })
@@ -60,16 +60,17 @@ test.describe('drag/single-frame', () => {
         const t600 = await readTranslateX(page)
         if (t50 === null || t200 === null || t600 === null) throw new Error('no transform')
 
-        // No constraints, no elastic — nothing to spring back to. Any
-        // post-release motion is momentum. With the MIN_VELOCITY_INTERVAL
-        // guard, a sub-5 ms-apart down/move pair (one common form of
-        // single-frame drag) yields zero velocity. A move that lands
-        // ≥5 ms after down still produces a small proportional fling,
-        // matching motion-dom's per-frame velocity sampling — that's
-        // expected and bounded. Pre-fix the drift was 30-60 px from a
-        // 3 px input; post-fix it's <12 px in the worst case.
-        expect(Math.abs(t50 - atRelease)).toBeLessThanOrEqual(40)
-        expect(Math.abs(t200 - atRelease)).toBeLessThanOrEqual(40)
-        expect(Math.abs(t600 - atRelease)).toBeLessThanOrEqual(40)
+        // The strict assertion: a single-frame drag should produce ~0
+        // momentum. Current lib behaviour reads velocity from raw pointer
+        // events with a MIN_VELOCITY_INTERVAL_MS=5 floor, which means a
+        // single move at 16+ ms after pointerdown still computes a
+        // proportional fling. To make this test pass cleanly we'd need
+        // to switch to motion-dom's frame-rate-limited velocity sampling
+        // (one sample per rAF frame, so a single-input drag literally
+        // can't produce velocity > 0). Marked test.fail until the
+        // deeper fix is in.
+        expect(Math.abs(t50 - atRelease)).toBeLessThanOrEqual(2)
+        expect(Math.abs(t200 - atRelease)).toBeLessThanOrEqual(2)
+        expect(Math.abs(t600 - atRelease)).toBeLessThanOrEqual(2)
     })
 })

@@ -16,17 +16,36 @@
      * rotation off, change elastic/stiffness/damping, and toggle
      * dragMomentum — narrowing the suspect bag.
      */
-    import { motion, type DragInfo } from '$lib'
+    import { motion } from '$lib'
+    import { onDestroy } from 'svelte'
 
     // ── Drag state ────────────────────────────────────────────────────
+    // Telemetry tracks the card's *rendered* translate (not info.offset,
+    // which is the raw pointer offset and diverges wildly from where the
+    // card actually sits once elastic clamping kicks in). We sample
+    // getComputedStyle every rAF so the readouts mirror what the user
+    // sees — including during the post-release spring-back (when onDrag
+    // is silent).
     let x = $state(0)
     let y = $state(0)
     let peakX = $state(0)
     let peakY = $state(0)
     let active = $state(false)
-    let frames = $state(0)
-    let releasedAt = $state<number | null>(null)
+    let landingX = $state<number | null>(null) // translate at release
+    let landingY = $state<number | null>(null)
+    let restingX = $state<number | null>(null) // translate after settle
+    let restingY = $state<number | null>(null)
     let postReleaseFrames = $state(0)
+    let settleFrames = $state<number | null>(null) // frames until settled
+    let cardEl: HTMLElement | null = $state(null)
+
+    // Locate the actual rendered card element via querySelector — bind:this
+    // on a `motion.div` would bind the Svelte component instance, not the
+    // DOM node we need for readMatrix.
+    $effect(() => {
+        if (typeof document === 'undefined') return
+        cardEl = document.querySelector<HTMLElement>('[data-testid="drag-card"]')
+    })
 
     // ── Knobs ─────────────────────────────────────────────────────────
     let rotateEnabled = $state(true)
@@ -46,22 +65,81 @@
         bounceDamping: damping
     })
 
-    const onDrag = (_e: PointerEvent, info: DragInfo) => {
-        x = Math.round(info.offset.x)
-        y = Math.round(info.offset.y)
-        if (Math.abs(x) > Math.abs(peakX)) peakX = x
-        if (Math.abs(y) > Math.abs(peakY)) peakY = y
-        frames++
-        if (releasedAt !== null) postReleaseFrames++
+    // ── Rendered-transform sampler ────────────────────────────────────
+    // rAF loop reads the actual matrix(...) on the card each frame so
+    // telemetry shows where the card *really* is, not the raw pointer
+    // offset. Also counts post-release frames and detects "settled"
+    // (translate stable for N consecutive frames after release).
+    let rafHandle = 0
+    let stableCount = 0
+    const STABLE_FRAMES_TO_SETTLE = 8
+    let lastTx = 0
+    let lastTy = 0
+
+    const readMatrix = (el: HTMLElement): { tx: number; ty: number } => {
+        const t = window.getComputedStyle(el).transform
+        const m = t.match(/matrix\(([^)]+)\)/)
+        if (!m) return { tx: 0, ty: 0 }
+        const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
+        return { tx: parts[4] ?? 0, ty: parts[5] ?? 0 }
     }
+
+    const tick = () => {
+        if (cardEl) {
+            const { tx, ty } = readMatrix(cardEl)
+            x = Math.round(tx)
+            y = Math.round(ty)
+            if (Math.abs(x) > Math.abs(peakX)) peakX = x
+            if (Math.abs(y) > Math.abs(peakY)) peakY = y
+
+            // Post-release accounting: tick frames + detect settle by
+            // comparing this frame's translate to last frame's.
+            if (!active && landingX !== null && settleFrames === null) {
+                postReleaseFrames++
+                const dx = Math.abs(tx - lastTx)
+                const dy = Math.abs(ty - lastTy)
+                if (dx < 0.5 && dy < 0.5) {
+                    stableCount++
+                    if (stableCount >= STABLE_FRAMES_TO_SETTLE) {
+                        settleFrames = postReleaseFrames - STABLE_FRAMES_TO_SETTLE
+                        restingX = Math.round(tx)
+                        restingY = Math.round(ty)
+                    }
+                } else {
+                    stableCount = 0
+                }
+            }
+            lastTx = tx
+            lastTy = ty
+        }
+        rafHandle = requestAnimationFrame(tick)
+    }
+    if (typeof window !== 'undefined') {
+        rafHandle = requestAnimationFrame(tick)
+    }
+    onDestroy(() => {
+        if (typeof window !== 'undefined' && rafHandle) cancelAnimationFrame(rafHandle)
+    })
+
     const onDragStart = () => {
         active = true
-        releasedAt = null
+        landingX = null
+        landingY = null
+        restingX = null
+        restingY = null
         postReleaseFrames = 0
+        settleFrames = null
+        stableCount = 0
     }
     const onDragEnd = () => {
         active = false
-        releasedAt = performance.now()
+        // Snapshot the card's translate AT release (next rAF reads from
+        // here as the baseline for settle detection).
+        if (cardEl) {
+            const { tx, ty } = readMatrix(cardEl)
+            landingX = Math.round(tx)
+            landingY = Math.round(ty)
+        }
     }
 
     const reset = () => {
@@ -69,9 +147,13 @@
         y = 0
         peakX = 0
         peakY = 0
-        frames = 0
+        landingX = null
+        landingY = null
+        restingX = null
+        restingY = null
         postReleaseFrames = 0
-        releasedAt = null
+        settleFrames = null
+        stableCount = 0
     }
 </script>
 
@@ -94,7 +176,26 @@
             <div><span class="k">rotate</span> · <span class="v">{rotateStr}°</span></div>
             <div><span class="k">peak x</span> · <span class="v">{peakX}px</span></div>
             <div><span class="k">peak y</span> · <span class="v">{peakY}px</span></div>
-            <div><span class="k">frames</span> · <span class="v">{frames}</span></div>
+            <div>
+                <span class="k">landing x</span> ·
+                <span class="v">{landingX === null ? '—' : `${landingX}px`}</span>
+            </div>
+            <div>
+                <span class="k">landing y</span> ·
+                <span class="v">{landingY === null ? '—' : `${landingY}px`}</span>
+            </div>
+            <div>
+                <span class="k">resting x</span> ·
+                <span class="v">{restingX === null ? '—' : `${restingX}px`}</span>
+            </div>
+            <div>
+                <span class="k">resting y</span> ·
+                <span class="v">{restingY === null ? '—' : `${restingY}px`}</span>
+            </div>
+            <div>
+                <span class="k">settle frames</span> ·
+                <span class="v">{settleFrames === null ? '—' : settleFrames}</span>
+            </div>
             <div>
                 <span class="k">post-release frames</span> ·
                 <span class="v">{postReleaseFrames}</span>
@@ -132,7 +233,6 @@
                 whileHover={{ scale: 1.02 }}
                 whileDrag={{ scale: 1.05, cursor: 'grabbing' }}
                 {onDragStart}
-                {onDrag}
                 {onDragEnd}
                 data-testid="drag-card"
                 style="rotate: {rotateClamped}deg"

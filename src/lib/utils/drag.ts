@@ -675,15 +675,10 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
             const applyX = (axis === true || axis === 'x') && lockAxis !== 'y'
             const applyY = (axis === true || axis === 'y') && lockAxis !== 'x'
 
-            // KNOWN LIMITATION (audit #5): `minX/maxX/minY/maxY` are computed
-            // once at handoff time. If the constraint *container* (when
-            // `opts.constraints` is an HTMLElement) resizes or its layout
-            // shifts during the inertia/spring animation, the stepper's
-            // bounds go stale and the card snaps to the original boundary
-            // rather than the now-current one. Pixel constraints are
-            // unaffected (their bounds are fixed). Fixing this needs a
-            // ResizeObserver on the container plus mid-flight stepper
-            // rebuild, deferred until a real user case appears.
+            // Element-ref constraints can resize / reflow during inertia.
+            // Pixel constraints never change once set. We re-resolve only
+            // for element-ref each frame in the rAF loop below.
+            const isElementRefConstraint = isDomElement(opts.constraints as unknown)
 
             const stepX = applyX
                 ? createInertiaToBoundary(
@@ -716,10 +711,26 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 const rx = stepX ? stepX(t) : { value: applied.x, done: true }
                 const ry = stepY ? stepY(t) : { value: applied.y, done: true }
 
-                // Preserve non-animated axis exactly; don't write y during x-only drags, or vice versa
-                const nextX = rx.value
-                const nextY =
+                // Element-ref constraints may have resized / reflowed since
+                // the steppers were built. Re-resolve and clamp the output
+                // so the card never lands outside the now-current container
+                // even if its boundary moved mid-spring. Pixel constraints
+                // don't move so we skip the work.
+                let nextX = rx.value
+                let nextY =
                     (axis === true || axis === 'y') && lockAxis !== 'x' ? ry.value : applied.y
+                if (isElementRefConstraint) {
+                    const freshConstraints = resolveConstraints(el, opts.constraints)
+                    if (freshConstraints) {
+                        constraintsBase = { x: applied.x, y: applied.y }
+                        const freshMinX = constraintsBase.x + (freshConstraints.left ?? -Infinity)
+                        const freshMaxX = constraintsBase.x + (freshConstraints.right ?? Infinity)
+                        const freshMinY = constraintsBase.y + (freshConstraints.top ?? -Infinity)
+                        const freshMaxY = constraintsBase.y + (freshConstraints.bottom ?? Infinity)
+                        if (applyX) nextX = Math.max(freshMinX, Math.min(freshMaxX, nextX))
+                        if (applyY) nextY = Math.max(freshMinY, Math.min(freshMaxY, nextY))
+                    }
+                }
                 setXY(nextX, nextY)
 
                 if (frameCount <= 3 || frameCount % 10 === 0) {
