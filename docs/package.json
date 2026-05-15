@@ -28,7 +28,7 @@
     "dependencies": {
         "@fontsource-variable/inter": "^5.2.8",
         "@fontsource-variable/jetbrains-mono": "^5.2.8",
-        "@humanspeak/docs-kit": "github:humanspeak/docs-kit#2026.5.12",
+        "@humanspeak/docs-kit": "github:humanspeak/docs-kit#2026.5.17",
         "@humanspeak/svelte-motion": "workspace:*",
         "@inlang/paraglide-js": "^2.18.0",
         "@lucide/svelte": "^1.16.0",
@@ -41,7 +41,7 @@
         "@eslint/js": "^10.0.1",
         "@sveltejs/adapter-auto": "^7.0.1",
         "@sveltejs/adapter-cloudflare": "^7.2.8",
-        "@sveltejs/kit": "^2.59.1",
+        "@sveltejs/kit": "^2.60.1",
         "@sveltejs/vite-plugin-svelte": "^7.1.2",
         "@tailwindcss/typography": "^0.5.19",
         "@tailwindcss/vite": "^4.3.0",
@@ -49,7 +49,7 @@
         "@vitest/browser": "^4.1.6",
         "chokidar-cli": "^3.0.0",
         "clsx": "^2.1.1",
-        "eslint": "^10.3.0",
+        "eslint": "^10.4.0",
         "eslint-config-prettier": "10.1.8",
         "eslint-plugin-import": "2.32.0",
         "eslint-plugin-svelte": "3.17.1",
@@ -63,7 +63,7 @@
         "prettier-plugin-svelte": "^3.5.2",
         "prettier-plugin-tailwindcss": "^0.8.0",
         "shiki": "^4.0.2",
-        "svelte": "^5.55.5",
+        "svelte": "^5.55.7",
         "svelte-check": "^4.4.8",
         "tailwind-merge": "^3.6.0",
         "tailwind-variants": "^3.2.2",
@@ -75,7 +75,7 @@
         "vite-plugin-devtools-json": "^1.0.0",
         "vitest": "^4.1.6",
         "vitest-browser-svelte": "^2.1.1",
-        "wrangler": "^4.91.0"
+        "wrangler": "^4.92.0"
     },
     "volta": {
         "node": "24.15.0"
