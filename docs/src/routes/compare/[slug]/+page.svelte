@@ -1,8 +1,9 @@
 <script lang="ts">
-    import ComparisonPage from '$lib/components/general/ComparisonPage.svelte'
-    import type { PageData } from './$types'
+    import { ComparisonPageV2, type CompareSlugLoadData } from '@humanspeak/docs-kit'
+    import { competitors, ours } from '$lib/compare-data'
 
-    const { data }: { data: PageData } = $props()
+    const { data }: { data: CompareSlugLoadData } = $props()
+    const others = $derived(competitors.filter((c) => c.slug !== data.competitor.slug))
 </script>
 
-<ComparisonPage competitor={data.competitor} />
+<ComparisonPageV2 competitor={data.competitor} {others} {ours} getStartedHref="/docs" />
