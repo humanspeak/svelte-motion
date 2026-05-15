@@ -224,13 +224,13 @@
         </aside>
 
         <!-- Main content area -->
-        <main class="flex-1">
-            <div class="flex">
+        <main class="min-w-0 flex-1">
+            <div class="flex min-w-0">
                 <!-- Content -->
                 <article
                     bind:this={contentElement}
                     use:enhanceCodeBlocks
-                    class="flex-1 px-4 py-8 sm:px-6 lg:px-8"
+                    class="min-w-0 flex-1 px-4 py-8 sm:px-6 lg:px-8"
                 >
                     <div
                         class="prose-v2 prose max-w-none text-text-primary prose-slate dark:prose-invert prose-headings:scroll-mt-20"
