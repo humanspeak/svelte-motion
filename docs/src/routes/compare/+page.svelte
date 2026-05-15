@@ -82,7 +82,6 @@
             <div class="cta-row">
                 <a class="pri" href="/docs">get started ↗</a>
                 <a href="/examples">examples</a>
-                <a href="https://github.com/humanspeak/svelte-motion">github</a>
             </div>
         </div>
         <div class="corner bl">FIG-001</div>

@@ -434,7 +434,6 @@
                     <a class="pri" href="/docs">get started ↗</a>
                     <a href="/docs/animate-presence">api reference</a>
                     <a href="/examples">examples</a>
-                    <a href="https://github.com/humanspeak/svelte-motion">github</a>
                     <MotionButton
                         class="inst"
                         type="button"

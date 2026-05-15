@@ -313,7 +313,6 @@
                     <a class="pri" href="/docs">get started ↗</a>
                     <a href="/examples">all examples</a>
                     <a href="/compare/framer-motion">vs framer motion</a>
-                    <a href="https://github.com/humanspeak/svelte-motion">github</a>
                 </div>
             </div>
             <div class="corner bl">FIG-001</div>
