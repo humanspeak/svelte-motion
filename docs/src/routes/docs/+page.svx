@@ -10,6 +10,7 @@ description: "Svelte Motion is a Svelte animation library for building smooth, p
   import AnimatedButton from '$lib/examples/AnimatedButton.svelte'
   import HoverAndTap from '$lib/examples/HoverAndTap.svelte'
   import WhileInViewExample from '$lib/examples/WhileInViewExample.svelte'
+  import BrutDocHero from '$lib/components/general/BrutDocHero.svelte'
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()
@@ -23,7 +24,20 @@ description: "Svelte Motion is a Svelte animation library for building smooth, p
   }
 </script>
 
-# Get started with Svelte Motion
+<BrutDocHero
+  figNo="FIG-DOC-001"
+  figLabel="GET STARTED"
+  slug="docs"
+  title="get"
+  accent="started"
+  tagline="Svelte Motion is a Framer Motion–compatible animation library for Svelte 5. Build smooth, production-grade UI animations — gestures, AnimatePresence exit, FLIP layout, variants, spring physics, scroll-linked motion values — with a familiar declarative API."
+  ctas={[
+    { href: '#install', label: 'install ↗', primary: true },
+    { href: '/examples', label: 'examples' },
+    { href: '/compare/framer-motion', label: 'vs framer motion' }
+  ]}
+  sheet="SHEET 01 / 01"
+/>
 
 **Svelte Motion** is a Svelte animation library for building smooth, production-grade UI animations. You can start with simple prop-based animations before growing to layout, gesture and scroll animations.
 

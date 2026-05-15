@@ -2,17 +2,33 @@
     import { page } from '$app/state'
     import { afterNavigate } from '$app/navigation'
     import GithubSlugger from 'github-slugger'
-    import Header from '$lib/components/general/Header.svelte'
-    import Footer from '$lib/components/general/Footer.svelte'
-    import { Sidebar, getBreadcrumbContext, enhanceCodeBlocks } from '@humanspeak/docs-kit'
+    import {
+        HeaderV2,
+        FooterV2,
+        Sidebar,
+        getBreadcrumbContext,
+        enhanceCodeBlocks
+    } from '@humanspeak/docs-kit'
     import { docsConfig } from '$lib/docs-config'
+    import favicon from '$lib/assets/logo.svg'
     import { docsSections, motionLoveAndRespect } from '$lib/docsNav'
     import TableOfContents from './TableOfContents.svelte'
     import sitemapManifest from '$lib/sitemap-manifest.json'
+    import rootPkg from '../../../../package.json'
+    import '@fontsource-variable/inter/index.css'
+    import '@fontsource-variable/jetbrains-mono/index.css'
 
     const BASE_URL = 'https://motion.svelte.page'
+    const PKG_VERSION = rootPkg.version
 
     const { children, data } = $props()
+
+    /** Pretty slug for the brut strip — "/docs" → "index", "/docs/use-spring" → "use-spring". */
+    const docSlug = $derived.by(() => {
+        const path = page.url.pathname.replace(/\/+$/, '')
+        if (path === '/docs' || path === '') return 'index'
+        return path.replace('/docs/', '')
+    })
 
     let contentElement: HTMLElement | undefined = $state(undefined)
     let headings: { id: string; text: string; level: number; element: HTMLElement }[] = $state([])
@@ -179,7 +195,33 @@
 </svelte:head>
 
 <div class="flex min-h-screen flex-col justify-between bg-background">
-    <Header />
+    <HeaderV2
+        config={docsConfig}
+        {favicon}
+        version={PKG_VERSION}
+        nav={[
+            { label: 'docs', href: '/docs' },
+            { label: 'examples', href: '/examples' },
+            { label: 'compare', href: '/compare' }
+        ]}
+    />
+
+    <!-- ── Brut DOC strip ─────────────────────────────────────────
+         Slim mono strip ties the docs reading experience to the
+         brut marketing surfaces (homepage, /compare, /svelte-animations)
+         without disrupting prose readability below.
+    -->
+    <div class="brut-strip" aria-hidden="true">
+        <div class="brut-strip-inner">
+            <span class="brut-k">FIG-DOC</span>
+            <span class="brut-sep">·</span>
+            <span class="brut-k">slug</span>
+            <span class="brut-sep">·</span>
+            <span class="brut-v">{docSlug}</span>
+            <span class="brut-grow"></span>
+            <span class="brut-k accent">// reference</span>
+        </div>
+    </div>
 
     <div class="flex flex-1">
         <!-- Left sidebar - Navigation -->
@@ -220,5 +262,64 @@
             </div>
         </main>
     </div>
-    <Footer />
+    <FooterV2 version={PKG_VERSION} />
 </div>
+
+<style>
+    /* ── Brut strip tokens (mirror brut sections elsewhere) ─────── */
+    .brut-strip {
+        border-bottom: 1px solid #d6dedb;
+        background: #eef4f1;
+        font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 10.5px;
+        letter-spacing: 0.14em;
+        color: #9a9a9a;
+    }
+    :global(html.dark) .brut-strip {
+        border-bottom-color: #1c2422;
+        background: #0d1110;
+        color: #5a5a5a;
+    }
+    .brut-strip-inner {
+        max-width: none;
+        padding: 7px 24px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        text-transform: uppercase;
+    }
+    .brut-strip .brut-k {
+        color: #9a9a9a;
+    }
+    :global(html.dark) .brut-strip .brut-k {
+        color: #5a5a5a;
+    }
+    .brut-strip .brut-v {
+        color: #0a0a0a;
+        text-transform: lowercase;
+        letter-spacing: 0;
+    }
+    :global(html.dark) .brut-strip .brut-v {
+        color: #ededed;
+    }
+    .brut-strip .brut-sep {
+        color: #bbc4c0;
+    }
+    :global(html.dark) .brut-strip .brut-sep {
+        color: #2a332f;
+    }
+    .brut-strip .brut-grow {
+        flex: 1;
+    }
+    .brut-strip .brut-k.accent {
+        color: #247768;
+    }
+    :global(html.dark) .brut-strip .brut-k.accent {
+        color: #54dbbc;
+    }
+    @media (max-width: 720px) {
+        .brut-strip-inner {
+            padding: 7px 16px;
+        }
+    }
+</style>
