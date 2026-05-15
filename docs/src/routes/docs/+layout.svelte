@@ -233,7 +233,7 @@
                     class="flex-1 px-4 py-8 sm:px-6 lg:px-8"
                 >
                     <div
-                        class="prose max-w-none text-text-primary prose-slate dark:prose-invert prose-headings:scroll-mt-20"
+                        class="prose-v2 prose max-w-none text-text-primary prose-slate dark:prose-invert prose-headings:scroll-mt-20"
                     >
                         {@render children()}
                     </div>
