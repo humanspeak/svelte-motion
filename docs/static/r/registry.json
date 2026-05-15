@@ -1,15 +1,15 @@
 {
-    "$schema": "https://shadcn-svelte.com/schema/registry.json",
-    "name": "svelte-motion",
-    "homepage": "https://motion.svelte.page",
-    "items": [
-        {
-            "name": "animated-button",
-            "type": "registry:ui"
-        },
-        {
-            "name": "animated-tabs",
-            "type": "registry:ui"
-        }
-    ]
+  "$schema": "https://shadcn-svelte.com/schema/registry.json",
+  "name": "svelte-motion",
+  "homepage": "https://motion.svelte.page",
+  "items": [
+    {
+      "name": "animated-button",
+      "type": "registry:ui"
+    },
+    {
+      "name": "animated-tabs",
+      "type": "registry:ui"
+    }
+  ]
 }
