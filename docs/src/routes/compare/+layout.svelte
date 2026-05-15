@@ -17,8 +17,14 @@
     const breadcrumbs = getBreadcrumbContext()
 
     function buildCrumbs(pathname: string) {
-        if (pathname === '/compare') return [{ title: 'Compare' }]
-        const slug = pathname.replace('/compare/', '')
+        // Split + filter so both `/compare` and `/compare/` collapse to
+        // the index, and `/compare/<slug>` / `/compare/<slug>/` both yield
+        // the same slug for the comparison lookup.
+        const segments = pathname.split('/').filter(Boolean)
+        if (segments.length <= 1 || segments[0] !== 'compare') {
+            return [{ title: 'Compare' }]
+        }
+        const slug = segments[1]
         const c = getCompetitor(slug)
         const name = c?.name ?? slug
         return [{ title: 'Compare', href: '/compare' }, { title: `vs ${name}` }]

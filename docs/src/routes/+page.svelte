@@ -674,7 +674,15 @@
                             {@const lay = formatCell(row.layout)}
                             {@const spr = formatCell(row.spring)}
                             <tr class={i === 0 ? 'us-row' : ''}>
-                                <td class={i === 0 ? 'us' : ''}>{row.name}{i === 0 ? ' ●' : ''}</td>
+                                <td class={i === 0 ? 'us' : ''}>
+                                    {#if row.slug}
+                                        <a class="comp-link" href="/compare/{row.slug}"
+                                            >{row.name}</a
+                                        >
+                                    {:else}
+                                        {row.name}
+                                    {/if}{i === 0 ? ' ●' : ''}
+                                </td>
                                 <td class={i === 0 ? 'us' : ''}>{row.framework}</td>
                                 <td class={decl.cls}>{decl.text}</td>
                                 <td class={exit.cls}>{exit.text}</td>
@@ -1542,6 +1550,20 @@
     }
     .brut-comp table tr.us-row:hover {
         background: var(--brut-accent-soft);
+    }
+    /* Competitor names that have a /compare/<slug> page deep-link into it.
+       Underline-on-hover keeps the table reading as a matrix at rest. */
+    .brut-comp table .comp-link {
+        color: inherit;
+        text-decoration: none;
+        border-bottom: 1px solid var(--brut-rule-2);
+        transition:
+            color 0.15s,
+            border-color 0.15s;
+    }
+    .brut-comp table .comp-link:hover {
+        color: var(--brut-accent);
+        border-bottom-color: var(--brut-accent);
     }
     .brut-comp .lede-p {
         font-family: 'Inter Variable', 'Inter', system-ui, sans-serif;

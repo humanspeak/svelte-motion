@@ -10,11 +10,14 @@
 // Run via `pnpm doc-mirrors` or automatically through the `build` script.
 
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
-import { join, resolve as resolvePath } from 'node:path'
+import { sep as PATH_SEP, join, resolve as resolvePath } from 'node:path'
 
 const ROOT = resolvePath(process.cwd(), 'src', 'routes', 'docs')
 const OUT_DIR = resolvePath(process.cwd(), 'static', 'docs')
 const SITE_URL = 'https://motion.svelte.page'
+
+/** Normalise an OS-native path to posix slashes for slug/route derivation. */
+const toPosix = (p) => (PATH_SEP === '/' ? p : p.split(PATH_SEP).join('/'))
 
 /** Recursively find every `+page.svx` under /docs. */
 async function findSvxFiles(dir, out = []) {
@@ -32,18 +35,21 @@ async function findSvxFiles(dir, out = []) {
 
 /** Map a `+page.svx` path to its public route slug. */
 function toSlug(file) {
-    const rel = file.replace(ROOT, '').replace(/\/?\+page\.svx$/i, '')
+    // Posix-normalised so the path-separator math is the same on every host.
+    const rel = toPosix(file.replace(ROOT, '')).replace(/\/?\+page\.svx$/i, '')
     if (rel === '' || rel === '/') return '_index'
     return rel.replace(/^\/+/, '').replace(/\//g, '-')
 }
 
 /** Parse YAML-ish frontmatter (title + description). Minimal — no full YAML. */
 function parseFrontmatter(src) {
-    const match = src.match(/^---\n([\s\S]*?)\n---\n?/)
+    // `\r?\n` makes the regex CRLF-safe so Windows-edited .svx files don't
+    // silently skip metadata extraction.
+    const match = src.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/)
     if (!match) return { rest: src, fm: {} }
     const body = match[1]
     const fm = {}
-    for (const line of body.split('\n')) {
+    for (const line of body.split(/\r?\n/)) {
         const m = line.match(/^(\w+):\s*(.*?)\s*$/)
         if (!m) continue
         let value = m[2]
@@ -161,8 +167,8 @@ async function processFile(file) {
     const routePath =
         slug === '_index'
             ? '/docs'
-            : `/docs/${file
-                  .replace(ROOT, '')
+            : `/docs/${toPosix(file)
+                  .replace(toPosix(ROOT), '')
                   .replace(/\/?\+page\.svx$/i, '')
                   .replace(/^\/+/, '')}`
     const outName = slug === '_index' ? 'index.md' : `${slug}.md`
