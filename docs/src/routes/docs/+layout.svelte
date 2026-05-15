@@ -5,14 +5,15 @@
     import {
         HeaderV2,
         FooterV2,
-        Sidebar,
+        SidebarV2,
+        TableOfContentsV2,
+        DocSlugStrip,
         getBreadcrumbContext,
         enhanceCodeBlocks
     } from '@humanspeak/docs-kit'
     import { docsConfig } from '$lib/docs-config'
     import favicon from '$lib/assets/logo.svg'
     import { docsSections, motionLoveAndRespect } from '$lib/docsNav'
-    import TableOfContents from './TableOfContents.svelte'
     import sitemapManifest from '$lib/sitemap-manifest.json'
     import rootPkg from '../../../../package.json'
     import '@fontsource-variable/inter/index.css'
@@ -206,29 +207,14 @@
         ]}
     />
 
-    <!-- ── Brut DOC strip ─────────────────────────────────────────
-         Slim mono strip ties the docs reading experience to the
-         brut marketing surfaces (homepage, /compare, /svelte-animations)
-         without disrupting prose readability below.
-    -->
-    <div class="brut-strip" aria-hidden="true">
-        <div class="brut-strip-inner">
-            <span class="brut-k">FIG-DOC</span>
-            <span class="brut-sep">·</span>
-            <span class="brut-k">slug</span>
-            <span class="brut-sep">·</span>
-            <span class="brut-v">{docSlug}</span>
-            <span class="brut-grow"></span>
-            <span class="brut-k accent">// reference</span>
-        </div>
-    </div>
+    <DocSlugStrip slug={docSlug} />
 
     <div class="flex flex-1">
         <!-- Left sidebar - Navigation -->
         <aside
             class="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar-background/95 shadow-sm lg:sticky lg:top-0 lg:block lg:h-screen lg:overflow-y-auto"
         >
-            <Sidebar
+            <SidebarV2
                 config={docsConfig}
                 sections={docsSections}
                 currentPath={page.url.pathname}
@@ -257,69 +243,10 @@
                 <aside
                     class="hidden w-56 shrink-0 border-l border-sidebar-border bg-sidebar-background/95 shadow-sm xl:sticky xl:top-0 xl:block xl:h-screen xl:overflow-y-auto"
                 >
-                    <TableOfContents {headings} />
+                    <TableOfContentsV2 {headings} />
                 </aside>
             </div>
         </main>
     </div>
     <FooterV2 version={PKG_VERSION} />
 </div>
-
-<style>
-    /* ── Brut strip tokens (mirror brut sections elsewhere) ─────── */
-    .brut-strip {
-        border-bottom: 1px solid #d6dedb;
-        background: #eef4f1;
-        font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
-        font-size: 10.5px;
-        letter-spacing: 0.14em;
-        color: #9a9a9a;
-    }
-    :global(html.dark) .brut-strip {
-        border-bottom-color: #1c2422;
-        background: #0d1110;
-        color: #5a5a5a;
-    }
-    .brut-strip-inner {
-        max-width: none;
-        padding: 7px 24px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        text-transform: uppercase;
-    }
-    .brut-strip .brut-k {
-        color: #9a9a9a;
-    }
-    :global(html.dark) .brut-strip .brut-k {
-        color: #5a5a5a;
-    }
-    .brut-strip .brut-v {
-        color: #0a0a0a;
-        text-transform: lowercase;
-        letter-spacing: 0;
-    }
-    :global(html.dark) .brut-strip .brut-v {
-        color: #ededed;
-    }
-    .brut-strip .brut-sep {
-        color: #bbc4c0;
-    }
-    :global(html.dark) .brut-strip .brut-sep {
-        color: #2a332f;
-    }
-    .brut-strip .brut-grow {
-        flex: 1;
-    }
-    .brut-strip .brut-k.accent {
-        color: #247768;
-    }
-    :global(html.dark) .brut-strip .brut-k.accent {
-        color: #54dbbc;
-    }
-    @media (max-width: 720px) {
-        .brut-strip-inner {
-            padding: 7px 16px;
-        }
-    }
-</style>
