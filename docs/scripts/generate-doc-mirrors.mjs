@@ -10,7 +10,7 @@
 // Run via `pnpm doc-mirrors` or automatically through the `build` script.
 
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve as resolvePath } from 'node:path'
+import { join, resolve as resolvePath } from 'node:path'
 
 const ROOT = resolvePath(process.cwd(), 'src', 'routes', 'docs')
 const OUT_DIR = resolvePath(process.cwd(), 'static', 'docs')
@@ -154,33 +154,33 @@ function buildMarkdown({ slug, fm, body, routePath }) {
     return headerLines.join('\n') + '\n' + cleanedBody
 }
 
+async function processFile(file) {
+    const slug = toSlug(file)
+    const raw = await readFile(file, 'utf8')
+    const { fm, rest } = parseFrontmatter(raw)
+    const routePath =
+        slug === '_index'
+            ? '/docs'
+            : `/docs/${file
+                  .replace(ROOT, '')
+                  .replace(/\/?\+page\.svx$/i, '')
+                  .replace(/^\/+/, '')}`
+    const outName = slug === '_index' ? 'index.md' : `${slug}.md`
+    const outPath = join(OUT_DIR, outName)
+    await writeFile(outPath, buildMarkdown({ slug, fm, body: rest, routePath }), 'utf8')
+}
+
 async function main() {
     const files = await findSvxFiles(ROOT)
 
     // Wipe then recreate to avoid stale slugs lingering after a doc removal.
+    // Slugs are flat (no nested dirs), so the per-iteration mkdir is unneeded.
     await rm(OUT_DIR, { recursive: true, force: true })
     await mkdir(OUT_DIR, { recursive: true })
 
-    let written = 0
-    for (const file of files) {
-        const slug = toSlug(file)
-        const raw = await readFile(file, 'utf8')
-        const { fm, rest } = parseFrontmatter(raw)
-        const routePath =
-            slug === '_index'
-                ? '/docs'
-                : `/docs/${file
-                      .replace(ROOT, '')
-                      .replace(/\/?\+page\.svx$/i, '')
-                      .replace(/^\/+/, '')}`
-        const outName = slug === '_index' ? 'index.md' : `${slug}.md`
-        const outPath = join(OUT_DIR, outName)
-        await mkdir(dirname(outPath), { recursive: true })
-        await writeFile(outPath, buildMarkdown({ slug, fm, body: rest, routePath }), 'utf8')
-        written++
-    }
+    await Promise.all(files.map(processFile))
 
-    console.log(`Wrote ${written} doc mirror(s) to ${OUT_DIR}`)
+    console.log(`Wrote ${files.length} doc mirror(s) to ${OUT_DIR}`)
 }
 
 main().catch((err) => {

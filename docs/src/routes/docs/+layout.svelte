@@ -1,7 +1,6 @@
 <script lang="ts">
     import { page } from '$app/state'
     import { afterNavigate } from '$app/navigation'
-    import GithubSlugger from 'github-slugger'
     import {
         HeaderV2,
         FooterV2,
@@ -9,7 +8,9 @@
         TableOfContentsV2,
         DocSlugStrip,
         getBreadcrumbContext,
-        enhanceCodeBlocks
+        enhanceCodeBlocks,
+        extractHeadings,
+        type TocHeading
     } from '@humanspeak/docs-kit'
     import { docsConfig } from '$lib/docs-config'
     import favicon from '$lib/assets/logo.svg'
@@ -32,26 +33,21 @@
     })
 
     let contentElement: HTMLElement | undefined = $state(undefined)
-    let headings: { id: string; text: string; level: number; element: HTMLElement }[] = $state([])
+    let headings: TocHeading[] = $state([])
 
-    // Create breadcrumb store and context
+    // Breadcrumb context. Top-level assignment populates the context during
+    // SSR (so HeaderV2 and BreadcrumbJsonLd see the crumbs in the server
+    // HTML). The $effect catches client-side navigation between sibling
+    // docs pages where the layout doesn't remount.
     const breadcrumbs = getBreadcrumbContext()
-
-    // Top-level assignment runs during SSR
     if (breadcrumbs) {
         const initialTitle = (page.data?.title as string | undefined) || 'Get Started'
         breadcrumbs.breadcrumbs = [{ title: 'Docs', href: '/docs' }, { title: initialTitle }]
     }
-
-    // $effect updates breadcrumbs on client-side navigation
     $effect(() => {
-        if (breadcrumbs) {
-            const pageTitle = page.data?.title as string | undefined
-            breadcrumbs.breadcrumbs = [
-                { title: 'Docs', href: '/docs' },
-                { title: pageTitle || 'Get Started' }
-            ]
-        }
+        if (!breadcrumbs) return
+        const pageTitle = (page.data?.title as string | undefined) || 'Get Started'
+        breadcrumbs.breadcrumbs = [{ title: 'Docs', href: '/docs' }, { title: pageTitle }]
     })
 
     const techArticleJsonLd = $derived.by(() => {
@@ -118,69 +114,22 @@
         })}</${'script'}>`
     })
 
-    /**
-     * Extract headings from content for table of contents
-     * Generates descriptive, slugified IDs for better URL anchors using github-slugger
-     */
-    function extractHeadings() {
-        if (!contentElement) return
-
-        const headingElements = contentElement.querySelectorAll('h1, h2, h3, h4, h5, h6')
-        const slugger = new GithubSlugger()
-
-        headings = Array.from(headingElements).map((el, index) => {
-            const text = el.textContent?.trim() || ''
-            const level = parseInt(el.tagName.charAt(1))
-
-            // Use existing ID if present, otherwise generate slug
-            let id = el.id
-            if (!id) {
-                // Generate slug from text using github-slugger (handles uniqueness automatically)
-                id = text ? slugger.slug(text) : `heading-${index}`
-            }
-
-            // Assign ID to the element if it doesn't have one
-            if (!el.id) {
-                el.id = id
-            }
-
-            return {
-                id,
-                text,
-                level,
-                element: el as HTMLElement
-            }
-        })
+    // Headings extraction. The MutationObserver from earlier versions fired
+    // on every motion animation inside the prose subtree (any style/class
+    // change bubbled through `childList: true, subtree: true`), running a
+    // full querySelectorAll + slugger pass per frame. afterNavigate + the
+    // initial $effect cover every real re-extraction case (route change
+    // swaps the entire content tree).
+    const refreshHeadings = () => {
+        if (contentElement) headings = extractHeadings(contentElement)
     }
 
-    // Re-extract headings when navigating between pages
-    afterNavigate(() => {
-        // Single rAF for initial navigation tick
-        requestAnimationFrame(() => {
-            extractHeadings()
-        })
+    $effect(() => {
+        if (contentElement) refreshHeadings()
     })
 
-    // Setup MutationObserver to watch for DOM changes and initial extraction
-    $effect(() => {
-        if (!contentElement) return
-
-        // Initial extraction
-        extractHeadings()
-
-        // Watch for DOM mutations (new content loaded via navigation)
-        const observer = new MutationObserver(() => {
-            extractHeadings()
-        })
-
-        observer.observe(contentElement, {
-            childList: true,
-            subtree: true
-        })
-
-        return () => {
-            observer.disconnect()
-        }
+    afterNavigate(() => {
+        requestAnimationFrame(refreshHeadings)
     })
 </script>
 
