@@ -28,7 +28,7 @@ export const docsSections: NavSection[] = [
     {
         title: 'Get started',
         icon: Play,
-        items: [{ title: 'Get started', href: '/docs', icon: Play }]
+        items: [{ title: 'Get started', href: '/docs', icon: Play, exact: true }]
     },
     {
         title: 'Components',
