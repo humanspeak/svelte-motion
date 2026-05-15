@@ -306,40 +306,15 @@
 </main>
 
 <style>
-    /* ── Brutalist tokens (shared with home page) ─────────────────── */
+    /* Core brutalist tokens come from @humanspeak/docs-kit/styles/brutalist.css
+       (imported via app.css). The `--brut-bad*` tokens below are
+       component-specific — they tint the "limitations" rail on the
+       comparison matrix and aren't part of the shared palette. */
     .brut {
-        --brut-bg: #f8fcfb;
-        --brut-bg-2: #eef4f1;
-        --brut-ink: #0a0a0a;
-        --brut-ink-2: #525252;
-        --brut-ink-3: #9a9a9a;
-        --brut-rule: #d6dedb;
-        --brut-rule-2: #bbc4c0;
-        --brut-accent: #247768;
-        --brut-accent-hover: #1b5a4e;
-        --brut-accent-ink: #f8fcfb;
-        --brut-accent-soft: rgba(36, 119, 104, 0.1);
         --brut-bad: #b8443c;
         --brut-bad-soft: rgba(184, 68, 60, 0.08);
-
-        background: var(--brut-bg);
-        color: var(--brut-ink);
-        font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
-        font-size: 13px;
-        letter-spacing: 0;
     }
     :global(html.dark) .brut {
-        --brut-bg: #06090a;
-        --brut-bg-2: #0d1110;
-        --brut-ink: #ededed;
-        --brut-ink-2: #9a9a9a;
-        --brut-ink-3: #5a5a5a;
-        --brut-rule: #1c2422;
-        --brut-rule-2: #2a332f;
-        --brut-accent: #54dbbc;
-        --brut-accent-hover: #7fe9d1;
-        --brut-accent-ink: #06090a;
-        --brut-accent-soft: rgba(84, 219, 188, 0.14);
         --brut-bad: #f5736b;
         --brut-bad-soft: rgba(245, 115, 107, 0.12);
     }

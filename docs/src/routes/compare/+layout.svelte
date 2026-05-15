@@ -35,6 +35,8 @@
     })
 </script>
 
+<!-- `.brut-wrap` background + token swap come from docs-kit's
+     brutalist.css (imported via app.css); no inline overrides needed. -->
 <div class="brut-wrap flex min-h-svh flex-col">
     <HeaderV2
         config={docsConfig}
@@ -51,12 +53,3 @@
     </MotionConfig>
     <FooterV2 version={PKG_VERSION} />
 </div>
-
-<style>
-    .brut-wrap {
-        background: #f8fcfb;
-    }
-    :global(html.dark) .brut-wrap {
-        background: #06090a;
-    }
-</style>
