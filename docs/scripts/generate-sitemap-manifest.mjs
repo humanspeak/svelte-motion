@@ -64,6 +64,21 @@ function describable(title) {
 }
 
 /**
+ * Build the example description sentence, deduplicating the trailing
+ * "animation" token when the title already ends in it. Without this,
+ * a slug like "shared-layout-animation" produces the awkward
+ * "Interactive shared layout animation animation example…".
+ *
+ * @param {string} title
+ * @returns {string}
+ */
+function describeExample(title) {
+    const phrase = describable(title)
+    const stem = /\banimation\b\s*$/i.test(phrase) ? phrase : `${phrase} animation`
+    return `Interactive ${stem} example using Svelte Motion.`
+}
+
+/**
  * Generate example metadata for the examples landing page
  * @param {Object} manifest - The sitemap manifest
  * @returns {Promise<Object>} Examples metadata object
@@ -86,7 +101,7 @@ async function generateExamplesMetadata(manifest) {
             const title = metadata.title
             examples[slug] = {
                 title,
-                description: `Interactive ${describable(title)} animation example using Svelte Motion.`,
+                description: describeExample(title),
                 sourceUrl: metadata.sourceUrl
             }
         } else {
@@ -98,7 +113,7 @@ async function generateExamplesMetadata(manifest) {
 
             examples[slug] = {
                 title,
-                description: `Interactive ${describable(title)} animation example using Svelte Motion.`,
+                description: describeExample(title),
                 sourceUrl: null
             }
         }

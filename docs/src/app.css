@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 @source '../node_modules/@humanspeak/docs-kit/dist';
 @import '@humanspeak/docs-kit/styles/base.css';
+@import '@humanspeak/docs-kit/styles/brutalist.css';
+@import '@humanspeak/docs-kit/styles/prose-v2.css';
 @plugin '@tailwindcss/typography';
 
 /* ── Project-specific tokens ── */
@@ -91,58 +93,9 @@
     @apply mr-6 inline-block w-4 text-right text-muted-foreground/50;
 }
 
-/* ── Project-specific: code-block-header style overrides ── */
-/* svelte-motion uses a fade+scale copy button animation instead of
-   the docs-kit default show/hide. These override prose.css styles. */
-.prose .shiki-container.code-enhanced {
-    @apply relative;
-}
-
-.prose .shiki-container.code-enhanced pre.shiki {
-    @apply pt-2;
-}
-
-.prose .code-block-header {
-    @apply flex items-center justify-between border-b border-border px-3 py-1.5;
-    background: var(--color-code-background);
-}
-
-.prose .code-block-lang {
-    @apply text-xs font-medium text-muted-foreground;
-}
-
-.prose .code-block-copy {
-    @apply relative flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-muted-foreground;
-    transition:
-        background-color 0.2s,
-        color 0.2s;
-}
-
-.prose .code-block-copy:hover {
-    @apply bg-muted text-foreground;
-}
-
-/* Copy icon swap animation */
-.prose .code-block-copy .icon-copy,
-.prose .code-block-copy .icon-check {
-    position: absolute;
-    transition:
-        opacity 0.2s ease,
-        transform 0.2s ease;
-}
-
-.prose .code-block-copy .icon-check {
-    opacity: 0;
-    transform: scale(0.5);
-    color: var(--color-success);
-}
-
-.prose .code-block-copy.copied .icon-copy {
-    opacity: 0;
-    transform: scale(0.5);
-}
-
-.prose .code-block-copy.copied .icon-check {
-    opacity: 1;
-    transform: scale(1);
-}
+/* Code-block header + copy button styling now lives entirely in
+   docs-kit's prose-v2.css (imported above). The bfb95407 commit in
+   docs-kit also wires `animate` / `hover` / `press` from svelte-motion
+   into the copy button, so the prior project-specific CSS transitions
+   on .icon-copy / .icon-check are obsolete — keeping them here would
+   override the motion-driven cross-fade. */

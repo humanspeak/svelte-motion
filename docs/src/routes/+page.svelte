@@ -375,7 +375,8 @@
         version={PKG_VERSION}
         nav={[
             { label: 'docs', href: '/docs' },
-            { label: 'examples', href: '/examples' }
+            { label: 'examples', href: '/examples' },
+            { label: 'compare', href: '/compare' }
         ]}
     />
 
@@ -411,22 +412,28 @@
             </aside>
             <div class="hero-body">
                 <h1>
-                    <span>svelte</span><span class="slash">/</span><span>motion</span><span
-                        class="end">.</span
+                    <span class="mark" aria-hidden="true">
+                        <span>svelte</span><span class="slash">/</span><span>motion</span><span
+                            class="end">.</span
+                        >
+                    </span>
+                    <span class="sr-only"
+                        >Svelte Motion — a Framer Motion-compatible animation library for Svelte 5</span
                     >
                 </h1>
                 <p class="sub">
                     <b>Framer Motion for Svelte 5.</b> Declarative <code>motion.&lt;tag&gt;</code>
                     components with AnimatePresence exit animations, gestures (hover, tap, drag, focus,
                     in-view), variants, FLIP layout animations, shared-layout transitions, spring physics,
-                    and scroll-linked motion values. The drop-in <b>Framer Motion alternative</b> for
-                    Svelte and SvelteKit.
+                    and scroll-linked motion values. The drop-in <b>Framer Motion alternative</b>
+                    for Svelte and SvelteKit — and an alternative to <b>Motion One</b>, <b>GSAP</b>,
+                    and
+                    <code>svelte/transition</code> for declarative gestures, layout, and exit animations.
                 </p>
                 <div class="cta-row">
                     <a class="pri" href="/docs">get started ↗</a>
                     <a href="/docs/animate-presence">api reference</a>
                     <a href="/examples">examples</a>
-                    <a href="https://github.com/humanspeak/svelte-motion">github</a>
                     <MotionButton
                         class="inst"
                         type="button"
@@ -667,7 +674,15 @@
                             {@const lay = formatCell(row.layout)}
                             {@const spr = formatCell(row.spring)}
                             <tr class={i === 0 ? 'us-row' : ''}>
-                                <td class={i === 0 ? 'us' : ''}>{row.name}{i === 0 ? ' ●' : ''}</td>
+                                <td class={i === 0 ? 'us' : ''}>
+                                    {#if row.slug}
+                                        <a class="comp-link" href="/compare/{row.slug}"
+                                            >{row.name}</a
+                                        >
+                                    {:else}
+                                        {row.name}
+                                    {/if}{i === 0 ? ' ●' : ''}
+                                </td>
                                 <td class={i === 0 ? 'us' : ''}>{row.framework}</td>
                                 <td class={decl.cls}>{decl.text}</td>
                                 <td class={exit.cls}>{exit.text}</td>
@@ -756,46 +771,8 @@
 </div>
 
 <style>
-    /* ── Brutalist Mono palette + tokens ──────────────────────────── */
-    .brut-wrap {
-        background: var(--brut-bg);
-    }
-    .brut {
-        --brut-bg: #f8fcfb;
-        --brut-bg-2: #eef4f1;
-        --brut-ink: #0a0a0a;
-        --brut-ink-2: #525252;
-        --brut-ink-3: #9a9a9a;
-        --brut-rule: #d6dedb;
-        --brut-rule-2: #bbc4c0;
-        --brut-accent: #247768;
-        --brut-accent-hover: #1b5a4e;
-        --brut-accent-ink: #f8fcfb;
-        --brut-accent-soft: rgba(36, 119, 104, 0.1);
-
-        background: var(--brut-bg);
-        color: var(--brut-ink);
-        font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
-        font-size: 13px;
-        letter-spacing: 0;
-    }
-    :global(html.dark) .brut,
-    :global(html.dark) .brut-wrap {
-        --brut-bg: #06090a;
-        --brut-bg-2: #0d1110;
-        --brut-ink: #ededed;
-        --brut-ink-2: #9a9a9a;
-        --brut-ink-3: #5a5a5a;
-        --brut-rule: #1c2422;
-        --brut-rule-2: #2a332f;
-        --brut-accent: #54dbbc;
-        --brut-accent-hover: #7fe9d1;
-        --brut-accent-ink: #06090a;
-        --brut-accent-soft: rgba(84, 219, 188, 0.14);
-    }
-    :global(html.dark) .brut-wrap {
-        background: var(--brut-bg);
-    }
+    /* Brutalist tokens + .brut / .brut-wrap base styles live in
+       @humanspeak/docs-kit/styles/brutalist.css (imported via app.css). */
 
     /* ── Coordinate strip ─────────────────────────────────────────── */
     .brut-coord {
@@ -1573,6 +1550,20 @@
     }
     .brut-comp table tr.us-row:hover {
         background: var(--brut-accent-soft);
+    }
+    /* Competitor names that have a /compare/<slug> page deep-link into it.
+       Underline-on-hover keeps the table reading as a matrix at rest. */
+    .brut-comp table .comp-link {
+        color: inherit;
+        text-decoration: none;
+        border-bottom: 1px solid var(--brut-rule-2);
+        transition:
+            color 0.15s,
+            border-color 0.15s;
+    }
+    .brut-comp table .comp-link:hover {
+        color: var(--brut-accent);
+        border-bottom-color: var(--brut-accent);
     }
     .brut-comp .lede-p {
         font-family: 'Inter Variable', 'Inter', system-ui, sans-serif;
