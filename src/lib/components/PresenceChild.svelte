@@ -91,27 +91,32 @@
     // which (a) breaks any CSS transition the consumer relies on for exit and
     // (b) makes `bind:this` references go stale.
     $effect.pre(() => {
-        // Read `present` reactively first; assignments to module locals
-        // happen inside the branches below.
+        // Read both reactive sources (`present` prop + `phase` $state)
+        // unconditionally at the top so the effect's dependency set is
+        // identical on every run. Under svelte 5.55.7, conditionally
+        // reading `phase` inside the branches below caused the effect to
+        // intermittently skip re-runs after `present` flipped through
+        // false → true → false — so cycle B never fired its mint and a
+        // stale consumer-captured `safeToRemove` from cycle A was the
+        // only callback available (#345).
         const current = present
-        // First run: just record the steady state. Don't fire any exit/enter
-        // signal — there's no transition to react to yet.
+        const currentPhase = phase
         if (prevPresent === undefined) {
             prevPresent = current
             return
         }
-        if (prevPresent && !current && phase === 'idle') {
+        if (prevPresent && !current && currentPhase === 'idle') {
             phase = 'holding'
             currentSafeToRemove = mintSafeToRemove()
             animatePresence?.notifyExitStart()
-        } else if (!prevPresent && current && phase === 'holding') {
+        } else if (!prevPresent && current && currentPhase === 'holding') {
             // Re-entry mid-hold cancels the exit accounting. Replacing the
             // slot invalidates the cycle's `safeToRemove` for any consumer
             // that captured it.
             phase = 'idle'
             currentSafeToRemove = noopSafeToRemove
             animatePresence?.notifyExitComplete()
-        } else if (!prevPresent && current && phase === 'completed') {
+        } else if (!prevPresent && current && currentPhase === 'completed') {
             // Re-mounted after a previous exit fully completed.
             phase = 'idle'
         }
