@@ -125,8 +125,8 @@
     },
     "dependencies": {
         "acorn": "^8.16.0",
-        "motion": "^12.38.0",
-        "motion-dom": "^12.38.0"
+        "motion": "^12.39.0",
+        "motion-dom": "^12.39.0"
     },
     "devDependencies": {
         "@changesets/cli": "^2.31.0",
@@ -144,7 +144,7 @@
         "@tailwindcss/vite": "^4.3.0",
         "@testing-library/jest-dom": "^6.9.1",
         "@testing-library/svelte": "^5.3.1",
-        "@types/node": "^25.8.0",
+        "@types/node": "^25.9.0",
         "@vitest/coverage-v8": "^4.1.6",
         "eslint": "^10.4.0",
         "eslint-config-prettier": "10.1.8",
@@ -172,7 +172,7 @@
         "tailwind-variants": "^3.2.2",
         "tailwindcss": "^4.3.0",
         "tailwindcss-animate": "^1.0.7",
-        "tsx": "^4.22.0",
+        "tsx": "^4.22.2",
         "typescript": "^6.0.3",
         "typescript-eslint": "^8.59.3",
         "vite": "^8.0.13",
