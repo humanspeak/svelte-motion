@@ -28,7 +28,7 @@
     "dependencies": {
         "@fontsource-variable/inter": "^5.2.8",
         "@fontsource-variable/jetbrains-mono": "^5.2.8",
-        "@humanspeak/docs-kit": "github:humanspeak/docs-kit#2026.5.23",
+        "@humanspeak/docs-kit": "github:humanspeak/docs-kit#2026.5.24",
         "@humanspeak/svelte-motion": "workspace:*",
         "@inlang/paraglide-js": "^2.18.0",
         "@lucide/svelte": "^1.16.0",
@@ -68,7 +68,7 @@
         "tailwind-merge": "^3.6.0",
         "tailwind-variants": "^3.2.2",
         "tailwindcss": "^4.3.0",
-        "tsx": "^4.22.0",
+        "tsx": "^4.22.2",
         "typescript": "^6.0.3",
         "typescript-eslint": "^8.59.3",
         "vite": "^8.0.13",
