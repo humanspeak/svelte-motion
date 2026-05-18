@@ -161,13 +161,17 @@ Keyboard accessible (Enter/Space).
 <motion.div
     initial={{ opacity: 0, y: 40 }}
     whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, amount: 0.5, margin: '-50px' }}
     transition={{ duration: 0.6 }}
     onInViewStart={() => console.log('entered viewport')}
     onInViewEnd={() => console.log('left viewport')}
 />
 ```
 
-Uses IntersectionObserver internally.
+Uses IntersectionObserver internally. Configure it with the `viewport`
+prop: `once` (fire once and latch), `amount` (`number` 0-1 / `'some'` /
+`'all'`), `margin` (CSS margin string applied to the IO root box), and
+`root` (custom IO root — defaults to the viewport).
 
 ---
 

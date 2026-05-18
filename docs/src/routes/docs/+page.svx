@@ -195,6 +195,21 @@ You can also use lifecycle callbacks:
 />
 ```
 
+Configure the underlying IntersectionObserver with the `viewport` prop:
+
+```svelte
+<motion.div
+  initial={{ opacity: 0, y: 50 }}
+  whileInView={{ opacity: 1, y: 0 }}
+  viewport={{ once: true, amount: 0.5, margin: '-50px' }}
+/>
+```
+
+- `once: true` — fire entry once, latch, never animate back
+- `amount` — `number` (0-1), `'some'` (any pixel), or `'all'` (fully visible)
+- `margin` — CSS margin string applied to the IntersectionObserver root box
+- `root` — custom IntersectionObserver root (defaults to the viewport)
+
 For scroll-linked animations (where values track scroll position), use utilities like `useTime`/`useTransform`:
 
 ```svelte
