@@ -87,6 +87,7 @@
         whileHover: whileHoverProp,
         whileFocus: whileFocusProp,
         whileInView: whileInViewProp,
+        viewport: viewportProp,
         whileDrag: whileDragProp,
         onHoverStart: onHoverStartProp,
         onHoverEnd: onHoverEndProp,
@@ -781,7 +782,8 @@
             {
                 initial: (resolvedInitial ?? {}) as Record<string, unknown>,
                 animate: (resolvedAnimate ?? {}) as Record<string, unknown>
-            }
+            },
+            viewportProp
         )
     })
 
