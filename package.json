@@ -1,6 +1,6 @@
 {
     "name": "@humanspeak/svelte-motion",
-    "version": "0.4.2",
+    "version": "0.4.3",
     "description": "Framer Motion for Svelte 5. Declarative motion.<tag> components with AnimatePresence exit animations, gestures (hover, tap, drag, focus, in-view), variants, FLIP layout animations, shared-layout transitions, spring physics, and scroll-linked motion values. The drop-in Framer Motion alternative for Svelte and SvelteKit.",
     "keywords": [
         "svelte",
