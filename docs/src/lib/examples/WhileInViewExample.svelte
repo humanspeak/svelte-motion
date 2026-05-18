@@ -34,10 +34,10 @@
                 duration: 0.8
             }
         }}
-        viewport={{ once: true, amount: 0.5 }}
+        viewport={{ once: true, amount: 0.5, margin: '-50px' }}
         style="display: flex; align-items: center; justify-content: center; padding: 2rem; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 12px; color: white; font-weight: 600; text-align: center; font-size: 1.25rem;"
     >
-        I animate once — viewport=&lbrace; once: true, amount: 0.5 &rbrace;
+        I animate once — viewport=&lbrace; once: true, amount: 0.5, margin: '-50px' &rbrace;
     </motion.div>
     <div class="spacer-bottom"></div>
     <p class="scroll-hint">Scroll back up — only the first card re-animates</p>

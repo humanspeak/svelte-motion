@@ -195,6 +195,12 @@ describe('utils/inView - attachWhileInView viewport options', () => {
         expect(io.instances()[0].init?.threshold).toBe(1)
     })
 
+    it('forwards amount: "some" as threshold 0', () => {
+        const el = document.createElement('div')
+        attachWhileInView(el, { opacity: 1 }, {}, undefined, undefined, { amount: 'some' })
+        expect(io.instances()[0].init?.threshold).toBe(0)
+    })
+
     it('latches on first entry when once: true — no exit animation, no re-entry', async () => {
         const el = document.createElement('div')
         const onStart = vi.fn()

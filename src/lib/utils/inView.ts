@@ -5,6 +5,7 @@ import {
     type DOMKeyframesDefinition
 } from 'motion'
 import { readable, writable, type Readable } from 'svelte/store'
+import type { MotionViewport } from '../types.js'
 import { createAttachable } from './attachable.js'
 import { type ElementOrGetter } from './dom.js'
 
@@ -128,21 +129,6 @@ export const computeInViewBaseline = (
 }
 
 /**
- * Viewport options for `attachWhileInView`. Mirrors framer-motion's
- * `viewport` prop on motion components.
- */
-export type AttachWhileInViewOptions = {
-    /** Fire only once; subsequent re-entries are no-ops (no exit animation either). */
-    once?: boolean
-    /** IntersectionObserver root. Defaults to the document viewport. */
-    root?: Element | Document
-    /** CSS margin string applied to the root box (e.g. `"100px 0px"`). */
-    margin?: string
-    /** Fraction (0-1) or `"some"` / `"all"` of the target that must be visible. */
-    amount?: 'some' | 'all' | number
-}
-
-/**
  * Attach whileInView interactions to an element via motion's `inView` primitive.
  *
  * On entry, animates to `whileInView` state (using the nested `transition` if
@@ -183,7 +169,7 @@ export const attachWhileInView = (
         onAnimationComplete?: (definition: DOMKeyframesDefinition | undefined) => void
     },
     baselineSources?: { initial?: Record<string, unknown>; animate?: Record<string, unknown> },
-    viewport?: AttachWhileInViewOptions
+    viewport?: MotionViewport
 ): (() => void) => {
     if (!whileInView) return () => {}
 
