@@ -5,6 +5,7 @@ import {
     type DOMKeyframesDefinition
 } from 'motion'
 import { readable, writable, type Readable } from 'svelte/store'
+import type { MotionViewport } from '../types.js'
 import { createAttachable } from './attachable.js'
 import { type ElementOrGetter } from './dom.js'
 
@@ -142,6 +143,7 @@ export const computeInViewBaseline = (
  * @param mergedTransition Root/component merged transition.
  * @param callbacks Optional lifecycle callbacks for in-view start/end and animation completion.
  * @param baselineSources Optional sources used to compute baseline.
+ * @param viewport Optional IntersectionObserver options. `amount` defaults to `0` (any pixel visible).
  * @returns Cleanup function to stop observing.
  * @example
  * const cleanup = attachWhileInView(
@@ -152,7 +154,8 @@ export const computeInViewBaseline = (
  *     onStart: () => console.log('Entered viewport'),
  *     onEnd: () => console.log('Left viewport')
  *   },
- *   { initial: { opacity: 0, y: 50 } }
+ *   { initial: { opacity: 0, y: 50 } },
+ *   { once: true, amount: 0.5 }
  * )
  * // Later: cleanup() to stop observing
  */
@@ -165,13 +168,17 @@ export const attachWhileInView = (
         onEnd?: () => void
         onAnimationComplete?: (definition: DOMKeyframesDefinition | undefined) => void
     },
-    baselineSources?: { initial?: Record<string, unknown>; animate?: Record<string, unknown> }
+    baselineSources?: { initial?: Record<string, unknown>; animate?: Record<string, unknown> },
+    viewport?: MotionViewport
 ): (() => void) => {
     if (!whileInView) return () => {}
 
-    return motionInView(
+    let latched = false
+
+    const stop = motionInView(
         el,
         () => {
+            if (latched) return
             const inViewBaseline = computeInViewBaseline(el, {
                 initial: baselineSources?.initial,
                 animate: baselineSources?.animate,
@@ -192,6 +199,15 @@ export const attachWhileInView = (
                     /* animation cancelled — skip completion callback */
                 })
 
+            if (viewport?.once) {
+                // Latch on first entry. Don't return an exit handler so the
+                // element holds its in-view state and we never animate back.
+                // Stop observing entirely after the entry handler returns.
+                latched = true
+                queueMicrotask(stop)
+                return
+            }
+
             return () => {
                 if (Object.keys(inViewBaseline).length > 0) {
                     animate(
@@ -203,8 +219,16 @@ export const attachWhileInView = (
                 callbacks?.onEnd?.()
             }
         },
-        { amount: 0 }
+        {
+            root: viewport?.root,
+            // framer-motion types `margin` as a CSS-shorthand template literal;
+            // we expose plain `string` so consumers can pass any computed value.
+            margin: viewport?.margin as never,
+            amount: viewport?.amount ?? 0
+        }
     )
+
+    return stop
 }
 
 /**

@@ -151,6 +151,30 @@ export type MotionWhileInView =
     | undefined
 
 /**
+ * IntersectionObserver configuration for `whileInView`. Mirrors framer-motion's
+ * `viewport` prop. Same shape as `UseInViewOptions` minus `initial` (which is
+ * only meaningful for the hook's pre-mount return value).
+ *
+ * @example
+ * ```svelte
+ * <motion.div
+ *   whileInView={{ opacity: 1, y: 0 }}
+ *   viewport={{ once: true, amount: 0.5 }}
+ * />
+ * ```
+ */
+export type MotionViewport = {
+    /** When `true`, fire only once on first entry. Subsequent re-entries no-op. */
+    once?: boolean
+    /** Element to use as the IntersectionObserver root. Defaults to the viewport. */
+    root?: Element | Document
+    /** CSS margin string applied to the root bounding box (e.g. `"100px 0px"`). */
+    margin?: string
+    /** Fraction (0-1) or `"some"` / `"all"` of the target that must be visible. */
+    amount?: 'some' | 'all' | number
+}
+
+/**
  * Animation transition configuration for hover interactions.
  * Overrides the global transition when provided.
  */
@@ -268,6 +292,8 @@ export type MotionProps = {
     whileDrag?: MotionWhileDrag
     /** In-view interaction animation - animates when element enters viewport */
     whileInView?: MotionWhileInView
+    /** IntersectionObserver options for `whileInView` (once / root / margin / amount) */
+    viewport?: MotionViewport
     /** Called right before a main animate transition starts */
     onAnimationStart?: MotionAnimationStart
     /** Called after a main animate transition completes */

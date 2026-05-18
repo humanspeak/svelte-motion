@@ -1,7 +1,15 @@
 import { get } from 'svelte/store'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockIntersectionObserver } from './__tests__/intersectionObserver.js'
-import { useInView } from './inView.js'
+import { attachWhileInView, useInView } from './inView.js'
+
+vi.mock(import('motion'), async (importOriginal) => {
+    const actual = await importOriginal()
+    return {
+        ...actual,
+        animate: vi.fn(() => ({ finished: Promise.resolve() })) as never
+    }
+})
 
 let io: ReturnType<typeof createMockIntersectionObserver>
 
@@ -150,5 +158,87 @@ describe('utils/inView - useInView', () => {
 
         expect(io.instances()[0].init?.threshold).toBe(1)
         unsub()
+    })
+})
+
+describe('utils/inView - attachWhileInView viewport options', () => {
+    it('defaults to threshold 0 (any pixel visible) when no viewport is passed', () => {
+        const el = document.createElement('div')
+        attachWhileInView(el, { opacity: 1 }, {})
+        expect(io.instances()[0].init?.threshold).toBe(0)
+    })
+
+    it('forwards root to IntersectionObserver', () => {
+        const el = document.createElement('div')
+        const root = document.createElement('section')
+        attachWhileInView(el, { opacity: 1 }, {}, undefined, undefined, { root })
+        expect(io.instances()[0].init?.root).toBe(root)
+    })
+
+    it('forwards margin as rootMargin', () => {
+        const el = document.createElement('div')
+        attachWhileInView(el, { opacity: 1 }, {}, undefined, undefined, {
+            margin: '100px 0px'
+        })
+        expect(io.instances()[0].init?.rootMargin).toBe('100px 0px')
+    })
+
+    it('forwards amount: number as threshold', () => {
+        const el = document.createElement('div')
+        attachWhileInView(el, { opacity: 1 }, {}, undefined, undefined, { amount: 0.5 })
+        expect(io.instances()[0].init?.threshold).toBe(0.5)
+    })
+
+    it('forwards amount: "all" as threshold 1', () => {
+        const el = document.createElement('div')
+        attachWhileInView(el, { opacity: 1 }, {}, undefined, undefined, { amount: 'all' })
+        expect(io.instances()[0].init?.threshold).toBe(1)
+    })
+
+    it('forwards amount: "some" as threshold 0', () => {
+        const el = document.createElement('div')
+        attachWhileInView(el, { opacity: 1 }, {}, undefined, undefined, { amount: 'some' })
+        expect(io.instances()[0].init?.threshold).toBe(0)
+    })
+
+    it('latches on first entry when once: true — no exit animation, no re-entry', async () => {
+        const el = document.createElement('div')
+        const onStart = vi.fn()
+        const onEnd = vi.fn()
+        attachWhileInView(el, { opacity: 1 }, {}, { onStart, onEnd }, undefined, { once: true })
+
+        io.fireOn(el, true)
+        expect(onStart).toHaveBeenCalledTimes(1)
+
+        // Latched: a subsequent enter event must not re-fire onStart.
+        io.fireOn(el, true)
+        expect(onStart).toHaveBeenCalledTimes(1)
+
+        // Latched: an exit event must not fire onEnd (no exit animation when once).
+        io.fireOn(el, false)
+        expect(onEnd).not.toHaveBeenCalled()
+    })
+
+    it('without once, calls onStart on enter and onEnd on exit each cycle', () => {
+        const el = document.createElement('div')
+        const onStart = vi.fn()
+        const onEnd = vi.fn()
+        attachWhileInView(el, { opacity: 1 }, {}, { onStart, onEnd })
+
+        io.fireOn(el, true)
+        io.fireOn(el, false)
+        io.fireOn(el, true)
+        io.fireOn(el, false)
+
+        expect(onStart).toHaveBeenCalledTimes(2)
+        expect(onEnd).toHaveBeenCalledTimes(2)
+    })
+
+    it('returns a noop cleanup when whileInView is undefined (no observer created)', () => {
+        const el = document.createElement('div')
+        const before = io.instances().length
+        const cleanup = attachWhileInView(el, undefined, {})
+        expect(io.instances().length).toBe(before)
+        expect(() => cleanup()).not.toThrow()
     })
 })
