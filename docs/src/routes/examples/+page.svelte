@@ -102,7 +102,7 @@
     items={examples.map((example, i) => ({
         href: example.route,
         id: `№ ${pad2(i + 1)} / ${pad2(examples.length)}`,
-        title: `${example.title.toLowerCase()}.`,
+        title: `${example.slug}.`,
         line: example.description
     }))}
     footer={{
