@@ -11,6 +11,10 @@
     const sizeRest = '120px'
     const sizeExpanded = '220px'
 
+    // Slow tween so the user has time to drag the scrollbar mid-animation
+    // and actually see the difference between the two panels.
+    const slowTransition = { duration: 1.8, ease: 'easeInOut' as const }
+
     function toggle() {
         expanded = !expanded
     }
@@ -67,10 +71,10 @@
                     background: 'var(--color-background, #fff)'
                 }))}
             >
-                <div style="height: 240px;"></div>
+                <div style="height: 60px;"></div>
                 <motion.div
                     layout
-                    transition={{ type: 'spring', stiffness: 220, damping: 26 }}
+                    transition={slowTransition}
                     style={styleString(() => ({
                         width: expanded ? sizeExpanded : sizeRest,
                         height: expanded ? sizeExpanded : sizeRest,
@@ -79,7 +83,7 @@
                         margin: '0 auto'
                     }))}
                 ></motion.div>
-                <div style="height: 240px;"></div>
+                <div style="height: 360px;"></div>
             </div>
         </article>
 
@@ -102,10 +106,10 @@
                     background: 'var(--color-background, #fff)'
                 }))}
             >
-                <div style="height: 240px;"></div>
+                <div style="height: 60px;"></div>
                 <motion.div
                     layout
-                    transition={{ type: 'spring', stiffness: 220, damping: 26 }}
+                    transition={slowTransition}
                     style={styleString(() => ({
                         width: expanded ? sizeExpanded : sizeRest,
                         height: expanded ? sizeExpanded : sizeRest,
@@ -114,20 +118,31 @@
                         margin: '0 auto'
                     }))}
                 ></motion.div>
-                <div style="height: 240px;"></div>
+                <div style="height: 360px;"></div>
             </motion.div>
         </article>
     </div>
 
-    <p
+    <ol
         style={styleString(() => ({
             margin: 0,
-            fontSize: '0.78rem',
+            paddingLeft: '1.1rem',
+            fontSize: '0.82rem',
             color: 'var(--color-text-muted)',
-            fontFamily: 'JetBrains Mono Variable, ui-monospace, monospace',
-            letterSpacing: '0.02em'
+            lineHeight: 1.55
         }))}
     >
-        // click expand, then scroll either panel mid-animation
-    </p>
+        <li>
+            Click <strong>expand box</strong> (animation runs over 1.8 s — plenty of time).
+        </li>
+        <li>
+            <em>While the boxes are still animating</em>, drag the scrollbar of either panel down by
+            ~80 px.
+        </li>
+        <li>
+            Left panel — the red box jumps / drifts as the FLIP transform fights the scroll. Right
+            panel — the teal box keeps animating smoothly to its new size and stays anchored to its
+            place in the scrolled-content coordinate space.
+        </li>
+    </ol>
 </div>
