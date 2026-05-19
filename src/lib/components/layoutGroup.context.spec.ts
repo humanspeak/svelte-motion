@@ -77,4 +77,16 @@ describe('layoutGroup.context — Svelte context', () => {
         const probe = screen.getByTestId('layout-group-probe')
         expect(probe.getAttribute('data-id')).toBe('standalone')
     })
+
+    it('nested <LayoutGroup inherit="id"> chains the parent id (drop-in framer-motion compat)', () => {
+        // In framer-motion, `inherit="id"` inherits the id but breaks the
+        // internal projection-tree group. We don't have a projection-tree
+        // group, so `inherit="id"` and `inherit={true}` behave identically
+        // — accepted purely so copy-pasted framer-motion examples work.
+        render(LayoutGroupProbeHarness, {
+            props: { outer: 'outer', inner: 'inner', inherit: 'id' }
+        })
+        const probe = screen.getByTestId('layout-group-probe')
+        expect(probe.getAttribute('data-id')).toBe('outer-inner')
+    })
 })

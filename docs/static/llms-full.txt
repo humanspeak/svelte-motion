@@ -368,7 +368,7 @@ surrounding group and start a fresh scope (useful for embedded widgets).
 | Prop | Type | Description |
 |---|---|---|
 | `id` | `string?` | Stable identifier for this group's scope. |
-| `inherit` | `boolean` (default `true`) | When `true`, chain onto the parent group's id. When `false`, ignore any outer group. |
+| `inherit` | `boolean \| 'id'` (default `true`) | When `true` (or `'id'`), chain onto the parent group's id. When `false`, ignore any outer group. `'id'` is accepted for drop-in framer-motion compatibility and behaves the same as `true`. |
 
 ---
 

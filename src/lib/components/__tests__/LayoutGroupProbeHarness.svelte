@@ -9,7 +9,7 @@
     }: {
         outer?: string
         inner?: string
-        inherit?: boolean
+        inherit?: boolean | 'id'
     } = $props()
 </script>
 

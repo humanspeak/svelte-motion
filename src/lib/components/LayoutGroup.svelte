@@ -24,6 +24,12 @@
      *     (still useful for `inherit={false}` to break out of an outer
      *     group's scope, e.g. an embedded widget).
      * @prop inherit `true` (default) — chain onto the parent group's id.
+     *     `'id'` — same as `true` in this implementation; accepted for
+     *     drop-in compatibility with framer-motion examples. In
+     *     framer-motion, `'id'` inherits the id but breaks the internal
+     *     projection-tree group. We don't have a projection-tree group
+     *     (our snapshot/consume registry doesn't need sibling
+     *     coordination), so `'id'` and `true` behave identically.
      *     `false` — start a fresh scope, ignoring any outer LayoutGroup.
      * @prop children Slot rendered inside the group context.
      *
@@ -45,7 +51,7 @@
         children
     }: {
         id?: string
-        inherit?: boolean
+        inherit?: boolean | 'id'
         children?: Snippet
     } = $props()
 
@@ -54,7 +60,8 @@
     // fixed for this subtree's lifetime. The warning would only matter if we
     // wanted descendants to react to prop changes, which we explicitly don't.
     // svelte-ignore state_referenced_locally
-    const effectiveId = inherit ? chainLayoutGroupId(getLayoutGroupContext(), id) : id
+    const shouldInheritId = inherit === true || inherit === 'id'
+    const effectiveId = shouldInheritId ? chainLayoutGroupId(getLayoutGroupContext(), id) : id
     setLayoutGroupContext(effectiveId)
 </script>
 
