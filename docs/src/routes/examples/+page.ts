@@ -120,7 +120,7 @@ const EXAMPLES: Record<string, ExampleEntry> = {
     },
     'use-time-synced': {
         title: 'useTime (Synced)',
-        description: 'Interactive usetime (synced) animation example using Svelte Motion.'
+        description: 'Interactive useTime (synced) animation example using Svelte Motion.'
     },
     'variants-basic': {
         title: 'Variants Basic',

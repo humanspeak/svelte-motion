@@ -672,6 +672,12 @@
 
     // Track the last variant key we ran to avoid re-running on mount
     let lastRanVariantKey = $state<string | undefined>(undefined)
+    // Companion to `lastRanVariantKey`: the JSON-serialized resolved
+    // keyframes for that variant. Lets us detect when a function-form
+    // variant produces new keyframes (because `custom` changed) while
+    // the variant key stayed the same — otherwise the animate effect
+    // would short-circuit and the element would never re-animate.
+    let lastRanResolvedJson = $state<string | undefined>(undefined)
     let mountedWithInitialFalse = $state(false)
     // Track if the initial->animate transition has already been triggered by main effect
     let initialAnimationTriggered = $state(false)
@@ -949,8 +955,14 @@
             return
         }
         if (typeof animateProp === 'string') {
-            if (lastRanVariantKey !== animateProp) {
+            // Compare BOTH the variant key and the resolved keyframes JSON.
+            // For static variants the JSON is constant per key; for
+            // function-form variants the JSON changes when `custom`
+            // changes, which we must treat as a new animation target.
+            const resolvedJson = resolvedAnimate ? JSON.stringify(resolvedAnimate) : undefined
+            if (lastRanVariantKey !== animateProp || lastRanResolvedJson !== resolvedJson) {
                 lastRanVariantKey = animateProp
+                lastRanResolvedJson = resolvedJson
                 runAnimation()
             }
         } else if (animateProp) {
@@ -989,8 +1001,10 @@
             mountedWithInitialFalse = false
         }
         if (typeof currentAnimateKey === 'string') {
-            if (lastRanVariantKey !== currentAnimateKey) {
+            const resolvedJson = resolvedAnimate ? JSON.stringify(resolvedAnimate) : undefined
+            if (lastRanVariantKey !== currentAnimateKey || lastRanResolvedJson !== resolvedJson) {
                 lastRanVariantKey = currentAnimateKey
+                lastRanResolvedJson = resolvedJson
                 runAnimation()
             }
         } else {
@@ -1022,6 +1036,9 @@
                 mountedWithInitialFalse = true
                 if (typeof currentAnimateKey === 'string') {
                     lastRanVariantKey = currentAnimateKey
+                    lastRanResolvedJson = resolvedAnimate
+                        ? JSON.stringify(resolvedAnimate)
+                        : undefined
                 }
                 dataPath = 5
                 isLoaded = 'ready'
@@ -1114,6 +1131,9 @@
                     snapshot = transformSVGPathProperties(element!, snapshot)
                     animate(element!, snapshot as DOMKeyframesDefinition, { duration: 0 })
                     lastRanVariantKey = currentAnimateKey
+                    lastRanResolvedJson = resolvedAnimate
+                        ? JSON.stringify(resolvedAnimate)
+                        : undefined
                 } else {
                     runAnimation()
                 }
