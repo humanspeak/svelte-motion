@@ -90,6 +90,24 @@ The most common use case is a tab indicator that slides between tabs:
 <SharedLayoutAnimationExample />
 </Example>
 
+## Inside scroll containers — `layoutScroll`
+
+By default, FLIP measures elements using `getBoundingClientRect()`, which returns viewport-relative coordinates. If a `motion.div` with `layout` lives inside an `overflow: scroll` container and the user scrolls during the animation, the scroll offset shows up as an unwanted translate — the box visibly drifts.
+
+The fix is to mark the scroll container with `layoutScroll`. Descendant `layout` animations then measure rects in that container's coordinate space, so a mid-animation scroll cancels out instead of leaking into the FLIP delta.
+
+```svelte
+<motion.div layoutScroll style="overflow: auto; height: 320px;">
+    <motion.div layout>Resize me — scroll the container mid-animation</motion.div>
+</motion.div>
+```
+
+Apply `layoutScroll` on the same `motion.*` element that owns the scrolling — the same element you'd set `overflow: scroll` (or `auto`) on. Nested `layoutScroll` containers stack: a `layout` descendant accounts for the scroll offset of every `layoutScroll` ancestor in its path, so you can wrap a scrollable list inside a scrollable panel and both contribute to the FLIP measurement.
+
+| Prop | Type | Description |
+|---|---|---|
+| `layoutScroll` | `boolean` | Mark this element as a scroll container so descendant `layout` measurements account for its scroll offset. Nested `layoutScroll` ancestors stack. |
+
 ## API reference
 
 ### `layout`

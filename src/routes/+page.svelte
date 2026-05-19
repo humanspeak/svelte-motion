@@ -220,6 +220,22 @@
                         layoutId (shared layout)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/scroll') + searchParams}
+                    >
+                        layoutScroll — single container
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/nested-scroll') + searchParams}
+                    >
+                        layoutScroll — nested containers
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

@@ -28,6 +28,128 @@ describe('utils/layout', () => {
         expect(el.style.transform).toBe(prev)
     })
 
+    it('measureRect: ignores scrollContainers when none is passed', () => {
+        const el = document.createElement('div')
+        const spy = vi
+            .spyOn(el, 'getBoundingClientRect')
+            .mockReturnValue(new DOMRect(10, 20, 100, 50))
+        const rect = measureRect(el)
+        expect(rect.left).toBe(10)
+        expect(rect.top).toBe(20)
+        expect(rect.width).toBe(100)
+        expect(rect.height).toBe(50)
+        spy.mockRestore()
+    })
+
+    it('measureRect: ignores scrollContainers when an empty array is passed', () => {
+        const el = document.createElement('div')
+        const spy = vi
+            .spyOn(el, 'getBoundingClientRect')
+            .mockReturnValue(new DOMRect(10, 20, 100, 50))
+        const rect = measureRect(el, [])
+        expect(rect.left).toBe(10)
+        expect(rect.top).toBe(20)
+        spy.mockRestore()
+    })
+
+    it('measureRect: adds a single scroll container offset to the returned rect', () => {
+        const el = document.createElement('div')
+        const scroller = document.createElement('div')
+        scroller.scrollTop = 80
+        scroller.scrollLeft = 30
+        const spy = vi
+            .spyOn(el, 'getBoundingClientRect')
+            .mockReturnValue(new DOMRect(10, 20, 100, 50))
+        const rect = measureRect(el, [scroller])
+        // Rect is re-expressed in the scroll container's coordinate space:
+        // viewport-relative + container's scroll offset.
+        expect(rect.left).toBe(40)
+        expect(rect.top).toBe(100)
+        expect(rect.width).toBe(100)
+        expect(rect.height).toBe(50)
+        spy.mockRestore()
+    })
+
+    it('measureRect: sums offsets from a chain of nested scroll containers', () => {
+        // Regression for #353 — two nested `layoutScroll` containers must
+        // both contribute their scroll offsets so the FLIP delta cancels
+        // out movement from either.
+        const el = document.createElement('div')
+        const outer = document.createElement('div')
+        const inner = document.createElement('div')
+        outer.scrollTop = 30
+        outer.scrollLeft = 0
+        inner.scrollTop = 50
+        inner.scrollLeft = 25
+        const spy = vi
+            .spyOn(el, 'getBoundingClientRect')
+            .mockReturnValue(new DOMRect(10, 20, 100, 50))
+        // Chain ordering matches what _MotionContainer publishes: closest
+        // (inner) first, then outer. Order doesn't affect the sum.
+        const rect = measureRect(el, [inner, outer])
+        expect(rect.left).toBe(10 + 25 + 0) // 35
+        expect(rect.top).toBe(20 + 50 + 30) // 100
+        expect(rect.width).toBe(100)
+        expect(rect.height).toBe(50)
+        spy.mockRestore()
+    })
+
+    it('measureRect + computeFlipTransforms: zero delta when only scroll changes', () => {
+        // Regression for layoutScroll: if the user scrolls the container
+        // between two measurements but the element doesn't actually move
+        // in the container's coordinate space, the FLIP delta must be zero.
+        const el = document.createElement('div')
+        const scroller = document.createElement('div')
+        const getRect = vi.spyOn(el, 'getBoundingClientRect')
+
+        // Frame 1: scrollTop=0, element's viewport-relative top=100
+        scroller.scrollTop = 0
+        getRect.mockReturnValueOnce(new DOMRect(0, 100, 200, 80))
+        const before = measureRect(el, [scroller])
+
+        // Frame 2: user scrolled down 50px; viewport-relative top is now 50
+        // but in container space it's the same (100 + 0 vs 50 + 50).
+        scroller.scrollTop = 50
+        getRect.mockReturnValueOnce(new DOMRect(0, 50, 200, 80))
+        const after = measureRect(el, [scroller])
+
+        const transforms = computeFlipTransforms(before, after, true)
+        expect(transforms.dx).toBe(0)
+        expect(transforms.dy).toBe(0)
+        expect(transforms.shouldTranslate).toBe(false)
+
+        getRect.mockRestore()
+    })
+
+    it('measureRect + computeFlipTransforms: zero delta when nested containers both scroll', () => {
+        // Regression for #353 — the outer scroll-change also has to cancel
+        // out in the FLIP delta, not just the closest container's.
+        const el = document.createElement('div')
+        const outer = document.createElement('div')
+        const inner = document.createElement('div')
+        const getRect = vi.spyOn(el, 'getBoundingClientRect')
+
+        // Frame 1: both containers at scrollTop=0; element viewport top=200
+        outer.scrollTop = 0
+        inner.scrollTop = 0
+        getRect.mockReturnValueOnce(new DOMRect(0, 200, 200, 80))
+        const before = measureRect(el, [inner, outer])
+
+        // Frame 2: outer scrolled 20, inner scrolled 30. Element viewport
+        // top is now 200 - 50 = 150 (both scrolls reduce its viewport
+        // position). In combined scroll space, it's unchanged: 150 + 50 = 200.
+        outer.scrollTop = 20
+        inner.scrollTop = 30
+        getRect.mockReturnValueOnce(new DOMRect(0, 150, 200, 80))
+        const after = measureRect(el, [inner, outer])
+
+        const transforms = computeFlipTransforms(before, after, true)
+        expect(transforms.dy).toBe(0)
+        expect(transforms.shouldTranslate).toBe(false)
+
+        getRect.mockRestore()
+    })
+
     it('computeFlipTransforms: flags translate/scale appropriately', () => {
         const prev = { left: 0, top: 0, width: 100, height: 100 } as unknown as DOMRect
         const next = { left: 10, top: 5, width: 200, height: 80 } as unknown as DOMRect

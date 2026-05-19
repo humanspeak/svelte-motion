@@ -6,14 +6,48 @@ import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'mot
  * Temporarily clears `transform` to avoid skewing measurements, restoring it
  * immediately after reading the rect.
  *
+ * When `scrollContainers` are provided, the returned rect is shifted by the
+ * **sum** of each container's `scrollLeft` / `scrollTop`. FLIP deltas
+ * computed from two such measures stay correct even when the user scrolls
+ * any of the containers between measurements — including a nested
+ * `layoutScroll` inside another `layoutScroll`. Mirrors framer-motion's
+ * `removeElementScroll`, which walks every ancestor in the path.
+ *
+ * Pass an empty array (or omit) for viewport-relative behaviour.
+ *
  * @param el Element to measure.
- * @return DOMRect snapshot of the element.
+ * @param scrollContainers Optional ancestor chain with `layoutScroll` enabled.
+ * @returns DOMRect snapshot of the element.
+ *
+ * @example
+ * ```ts
+ * // No scroll containers — viewport-relative rect.
+ * const rect = measureRect(node)
+ *
+ * // Single ancestor scroll container (one `layoutScroll`).
+ * const rect = measureRect(node, [scrollPanel])
+ *
+ * // Nested `layoutScroll` ancestors — sums offsets from every container.
+ * const rect = measureRect(node, [innerScroll, outerScroll])
+ * ```
  */
-export const measureRect = (el: HTMLElement): DOMRect => {
+export const measureRect = (el: HTMLElement, scrollContainers?: HTMLElement[]): DOMRect => {
     const prev = el.style.transform
     try {
         el.style.transform = 'none'
-        return el.getBoundingClientRect()
+        const rect = el.getBoundingClientRect()
+        if (!scrollContainers || scrollContainers.length === 0) return rect
+        // Re-express the rect in the *combined* scroll-container coordinate
+        // space so a subsequent scroll on any of them doesn't show up as
+        // movement. DOMRect's left/top are read-only, so allocate a fresh
+        // one with the summed offsets applied.
+        let offsetLeft = 0
+        let offsetTop = 0
+        for (const container of scrollContainers) {
+            offsetLeft += container.scrollLeft
+            offsetTop += container.scrollTop
+        }
+        return new DOMRect(rect.left + offsetLeft, rect.top + offsetTop, rect.width, rect.height)
     } finally {
         el.style.transform = prev
     }

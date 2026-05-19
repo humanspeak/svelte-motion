@@ -65,6 +65,10 @@
         SVG_NAMESPACE
     } from '$lib/utils/svg'
     import { getLayoutIdRegistry } from '$lib/utils/layoutId'
+    import {
+        getLayoutScrollContainerRef,
+        setLayoutScrollContainer
+    } from '$lib/components/layoutScroll.context'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -118,6 +122,7 @@
         dragControls: dragControlsProp,
         layout: layoutProp,
         layoutId: layoutIdProp,
+        layoutScroll: layoutScrollProp,
         ref: element = $bindable(null),
         ...rest
     }: Props = $props()
@@ -141,6 +146,30 @@
 
     // Get layoutId registry (provided by AnimatePresence or a parent LayoutGroup)
     const layoutIdRegistry = getLayoutIdRegistry()
+
+    // Capture the ancestor `layoutScroll` chain BEFORE we potentially shadow
+    // the context with ourselves below — this element's own FLIP measurements
+    // must resolve against the *ancestors*' scroll containers, not against
+    // itself.
+    //
+    // We walk the full chain (not just the nearest) so a `layoutScroll`
+    // outside another `layoutScroll` still contributes to descendant
+    // measurements — matches framer-motion's `removeElementScroll` walking
+    // `this.path`.
+    const ancestorScrollContainerRef = getLayoutScrollContainerRef()
+    if (layoutScrollProp) {
+        // Publish [...ancestorChain, ownElement]. The chain is collected
+        // lazily because element refs bind after mount.
+        setLayoutScrollContainer(() => {
+            const inherited = ancestorScrollContainerRef?.() ?? []
+            return element ? [...inherited, element] : inherited
+        })
+    }
+    const resolveLayoutScrollAncestors = (): HTMLElement[] => {
+        const refs = ancestorScrollContainerRef?.() ?? []
+        // Filter out unbound refs (HTMLElement | null | undefined → HTMLElement[]).
+        return refs.filter((el): el is HTMLElement => Boolean(el))
+    }
 
     // Get current presence depth (0 = direct child of AnimatePresence, undefined = not in AnimatePresence)
     const presenceDepth = getPresenceDepth()
@@ -213,11 +242,14 @@
     $effect(() => {
         if (!(element && layoutIdProp && layoutIdRegistry)) return
 
-        // Capture rect on every frame while mounted
+        // Capture rect on every frame while mounted. Re-express in the
+        // nearest layoutScroll ancestor's coordinate space so the FLIP-from
+        // rect stored at unmount stays correct even if the scroll container
+        // moved between the snapshot and the next element's mount.
         let rafId: number
         const captureRect = () => {
             if (element) {
-                layoutIdLastRect = element.getBoundingClientRect()
+                layoutIdLastRect = measureRect(element, resolveLayoutScrollAncestors())
             }
             rafId = requestAnimationFrame(captureRect)
         }
@@ -701,17 +733,18 @@
         if (!(element && layoutProp && isLoaded === 'ready')) return
 
         // Initialize last rect on first ready frame
-        lastRect = measureRect(element!)
+        lastRect = measureRect(element!, resolveLayoutScrollAncestors())
         // Hint compositor for smoother FLIP transforms
         setCompositorHints(element!, true)
 
         let rafId: number | null = null
         const runFlip = () => {
+            const scrollContainers = resolveLayoutScrollAncestors()
             if (!lastRect) {
-                lastRect = measureRect(element!)
+                lastRect = measureRect(element!, scrollContainers)
                 return
             }
-            const next = measureRect(element!)
+            const next = measureRect(element!, scrollContainers)
             const transforms = computeFlipTransforms(lastRect, next, layoutProp ?? false)
             runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
             lastRect = next
@@ -745,7 +778,7 @@
         const prev = layoutIdRegistry.consume(layoutIdProp)
         if (!prev) return // First appearance, no animation needed
 
-        const next = measureRect(element)
+        const next = measureRect(element, resolveLayoutScrollAncestors())
         const transforms = computeFlipTransforms(prev.rect, next, true)
 
         setCompositorHints(element, true)

@@ -368,6 +368,22 @@ export type MotionProps = {
     layout?: boolean | 'position'
     /** Shared layout animation identifier. Elements with matching layoutId animate between positions. */
     layoutId?: string
+    /**
+     * Mark this element as a scroll container so descendant `layout` animations
+     * measure rects in this container's coordinate space. Without it, scrolling
+     * mid-animation makes the FLIP transform fight the scroll and the layout
+     * animation drifts.
+     *
+     * Apply on the same element as `overflow: scroll` / `overflow: auto`.
+     *
+     * @example
+     * ```svelte
+     * <motion.div layoutScroll style="overflow: auto">
+     *   <motion.div layout />
+     * </motion.div>
+     * ```
+     */
+    layoutScroll?: boolean
     /** Ref to the element */
     ref?: HTMLElement | null
     /** Enable drag gestures. true for both axes, or lock to 'x'/'y'. */

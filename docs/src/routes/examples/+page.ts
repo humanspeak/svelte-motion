@@ -46,6 +46,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Keyframes',
         description: 'Interactive Keyframes animation example using Svelte Motion.'
     },
+    'layout-scroll': {
+        title: 'layoutScroll',
+        description:
+            'Keep FLIP layout animations anchored when the parent container scrolls mid-animation.'
+    },
     'motion-path': {
         title: 'Motion Path',
         description: 'Interactive motion path animation example using Svelte Motion.'
