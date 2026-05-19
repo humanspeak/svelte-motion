@@ -322,6 +322,23 @@ Animate between different elements that share a `layoutId`:
 {/each}
 ```
 
+### Inside scroll containers — `layoutScroll`
+
+By default FLIP measures viewport-relative rects, so scrolling a parent
+container mid-animation makes the layout animation drift. Mark the
+scroll container with `layoutScroll` so descendant `layout` measurements
+happen in container coordinates and stay anchored.
+
+```svelte
+<motion.div layoutScroll style="overflow: auto; height: 320px;">
+    <motion.div layout>resize me, then scroll the container</motion.div>
+</motion.div>
+```
+
+Apply `layoutScroll` on the same `motion.*` element that owns the
+scrolling. Descendants walk up the Svelte context to find the nearest
+`layoutScroll` ancestor.
+
 ---
 
 ## MotionConfig

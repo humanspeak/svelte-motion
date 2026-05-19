@@ -28,6 +28,64 @@ describe('utils/layout', () => {
         expect(el.style.transform).toBe(prev)
     })
 
+    it('measureRect: ignores scrollContainer when none is passed', () => {
+        const el = document.createElement('div')
+        const spy = vi
+            .spyOn(el, 'getBoundingClientRect')
+            .mockReturnValue(new DOMRect(10, 20, 100, 50))
+        const rect = measureRect(el)
+        expect(rect.left).toBe(10)
+        expect(rect.top).toBe(20)
+        expect(rect.width).toBe(100)
+        expect(rect.height).toBe(50)
+        spy.mockRestore()
+    })
+
+    it('measureRect: adds the scroll container offset to the returned rect', () => {
+        const el = document.createElement('div')
+        const scroller = document.createElement('div')
+        scroller.scrollTop = 80
+        scroller.scrollLeft = 30
+        const spy = vi
+            .spyOn(el, 'getBoundingClientRect')
+            .mockReturnValue(new DOMRect(10, 20, 100, 50))
+        const rect = measureRect(el, scroller)
+        // Rect is re-expressed in the scroll container's coordinate space:
+        // viewport-relative + container's scroll offset.
+        expect(rect.left).toBe(40)
+        expect(rect.top).toBe(100)
+        expect(rect.width).toBe(100)
+        expect(rect.height).toBe(50)
+        spy.mockRestore()
+    })
+
+    it('measureRect + computeFlipTransforms: zero delta when only scroll changes', () => {
+        // Regression for layoutScroll: if the user scrolls the container
+        // between two measurements but the element doesn't actually move
+        // in the container's coordinate space, the FLIP delta must be zero.
+        const el = document.createElement('div')
+        const scroller = document.createElement('div')
+        const getRect = vi.spyOn(el, 'getBoundingClientRect')
+
+        // Frame 1: scrollTop=0, element's viewport-relative top=100
+        scroller.scrollTop = 0
+        getRect.mockReturnValueOnce(new DOMRect(0, 100, 200, 80))
+        const before = measureRect(el, scroller)
+
+        // Frame 2: user scrolled down 50px; viewport-relative top is now 50
+        // but in container space it's the same (100 + 0 vs 50 + 50).
+        scroller.scrollTop = 50
+        getRect.mockReturnValueOnce(new DOMRect(0, 50, 200, 80))
+        const after = measureRect(el, scroller)
+
+        const transforms = computeFlipTransforms(before, after, true)
+        expect(transforms.dx).toBe(0)
+        expect(transforms.dy).toBe(0)
+        expect(transforms.shouldTranslate).toBe(false)
+
+        getRect.mockRestore()
+    })
+
     it('computeFlipTransforms: flags translate/scale appropriately', () => {
         const prev = { left: 0, top: 0, width: 100, height: 100 } as unknown as DOMRect
         const next = { left: 10, top: 5, width: 200, height: 80 } as unknown as DOMRect
