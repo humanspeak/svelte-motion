@@ -42,7 +42,7 @@ npm install @humanspeak/svelte-motion
 - **Drag**: full drag gesture API with constraints, momentum, elastic, snap-to-origin, axis lock, and `createDragControls()` for imperative control.
 - **Variants**: named animation states with parent-child propagation. Function-form variants `(custom) => keyframes` receive the `custom` prop for per-instance values (staggered lists, indexed offsets).
 - **Layout animation**: FLIP-based `layout` and `layout="position"` props.
-- **Shared layout**: `layoutId` for animating between elements across the DOM.
+- **Shared layout**: `layoutId` for animating between elements across the DOM. Wrap regions in `<LayoutGroup id>` to scope shared-layout animations to a subtree so identical `layoutId` values in sibling regions don't cross-animate. Mark scroll containers with `layoutScroll` to keep FLIP measurements anchored when the user scrolls mid-animation.
 - **Spring physics**: `useSpring` for natural motion.
 - **Scroll animations**: `useScroll` for scroll-linked animations (with `useTransform`).
 - **Reactive motion values**: `useMotionValue`, `useMotionValueEvent`, `useMotionTemplate`, `useTransform`, `useVelocity`, `useTime`.

@@ -69,6 +69,7 @@
         getLayoutScrollContainerRef,
         setLayoutScrollContainer
     } from '$lib/components/layoutScroll.context'
+    import { getLayoutGroupContext, scopeLayoutId } from '$lib/components/layoutGroup.context'
 
     type Props = MotionProps & {
         children?: Snippet
@@ -146,6 +147,15 @@
 
     // Get layoutId registry (provided by AnimatePresence or a parent LayoutGroup)
     const layoutIdRegistry = getLayoutIdRegistry()
+
+    // Scope layoutId by the surrounding <LayoutGroup>, so identical
+    // layoutId values in two sibling groups don't cross-animate (#311).
+    // Undefined when no group is in scope — descendants behave exactly
+    // as before relative to the global registry.
+    const layoutGroupId = getLayoutGroupContext()
+    const scopedLayoutId = $derived(
+        layoutIdProp ? scopeLayoutId(layoutGroupId, layoutIdProp) : undefined
+    )
 
     // Capture the ancestor `layoutScroll` chain BEFORE we potentially shadow
     // the context with ourselves below — this element's own FLIP measurements
@@ -258,9 +268,9 @@
         // On cleanup (before DOM removal), push last-known rect to registry
         return () => {
             cancelAnimationFrame(rafId)
-            if (layoutIdLastRect && layoutIdProp) {
+            if (layoutIdLastRect && scopedLayoutId) {
                 layoutIdRegistry.snapshot(
-                    layoutIdProp,
+                    scopedLayoutId,
                     layoutIdLastRect,
                     (mergedTransition ?? {}) as AnimationOptions
                 )
@@ -773,9 +783,9 @@
     // Shared layout animation via layoutId.
     // On mount, consume the previous snapshot and FLIP from its position.
     $effect(() => {
-        if (!(element && layoutIdProp && layoutIdRegistry && isLoaded === 'ready')) return
+        if (!(element && scopedLayoutId && layoutIdRegistry && isLoaded === 'ready')) return
 
-        const prev = layoutIdRegistry.consume(layoutIdProp)
+        const prev = layoutIdRegistry.consume(scopedLayoutId)
         if (!prev) return // First appearance, no animation needed
 
         const next = measureRect(element, resolveLayoutScrollAncestors())

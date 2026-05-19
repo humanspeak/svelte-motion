@@ -236,6 +236,14 @@
                         layoutScroll — nested containers
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/group') + searchParams}
+                    >
+                        LayoutGroup — scoped layoutId
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
