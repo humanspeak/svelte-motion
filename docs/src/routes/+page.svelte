@@ -696,10 +696,74 @@
             </div>
         </section>
 
-        <!-- ── FIG-006 · EXAMPLES ──────────────────────────────────── -->
+        <!-- ── FIG-006 · AI-READY DOCS ─────────────────────────────── -->
+        <section class="brut-ai" id="ai-ready">
+            <div class="lede">
+                <div class="k">FIG-006 / AI-READY</div>
+                <h2>built for <span>ai-assisted</span> code.</h2>
+                <p>
+                    Point Cursor, Claude Code, or any LLM at the manifests below and they know the
+                    full Svelte Motion API — types, props, hooks, AnimatePresence semantics.
+                    Migration prompts from Framer Motion just work.
+                </p>
+            </div>
+            <div class="ai-panel">
+                <div class="ai-head">
+                    <span class="ai-tab on">llms.txt</span>
+                    <span class="ai-tab">llms-full.txt</span>
+                    <span class="grow"></span>
+                    <span class="ai-meta">/llmstxt.org</span>
+                </div>
+                <div class="ai-grid">
+                    <a class="ai-cell" href="/llms.txt" target="_blank" rel="noopener">
+                        <div class="ai-cell-k">01 · index</div>
+                        <h3>
+                            <code>/llms.txt</code>
+                        </h3>
+                        <p>
+                            Compact map. Project blurb, feature list, type catalogue, doc URLs. Drop
+                            into any agent for ground-truth lookup.
+                        </p>
+                        <div class="ai-cell-foot">~3 kB · open ↗</div>
+                    </a>
+                    <a class="ai-cell" href="/llms-full.txt" target="_blank" rel="noopener">
+                        <div class="ai-cell-k">02 · full</div>
+                        <h3>
+                            <code>/llms-full.txt</code>
+                        </h3>
+                        <p>
+                            Full reference. Every prop, hook, variant pattern, drag option, exit
+                            mode — with code snippets. Optimised for LLM context windows.
+                        </p>
+                        <div class="ai-cell-foot">~16 kB · open ↗</div>
+                    </a>
+                    <a class="ai-cell" href="/docs" target="_blank" rel="noopener">
+                        <div class="ai-cell-k">03 · per-page mirrors</div>
+                        <h3>
+                            <code>/docs/&lt;slug&gt;.md</code>
+                        </h3>
+                        <p>
+                            Every doc page mirrored as raw markdown. Append <code>.md</code> to any doc
+                            URL to fetch the source the chatbot can quote verbatim.
+                        </p>
+                        <div class="ai-cell-foot">36 docs · open ↗</div>
+                    </a>
+                </div>
+                <div class="ai-prompt">
+                    <span class="ai-prompt-k">// example prompt</span>
+                    <code
+                        >Use https://motion.svelte.page/llms.txt as the source for Svelte Motion
+                        APIs. Rewrite this Framer Motion
+                        <em>&lt;motion.div&gt;</em> snippet for Svelte 5 with the same prop names.</code
+                    >
+                </div>
+            </div>
+        </section>
+
+        <!-- ── FIG-007 · EXAMPLES ──────────────────────────────────── -->
         <section class="brut-ex">
             <div class="lede">
-                <div class="k">FIG-006 / EXAMPLES</div>
+                <div class="k">FIG-007 / EXAMPLES</div>
                 <h2>explore <span>interactive examples</span>.</h2>
                 <p>
                     AnimatePresence, shared layout, hover &amp; tap, variants, scroll-progress, path
@@ -1048,14 +1112,16 @@
     /* ── Section lede (shared by demo / feat / lab) ───────────────── */
     .brut-demo .lede,
     .brut-feat .lede,
-    .brut-lab .lede {
+    .brut-lab .lede,
+    .brut-ai .lede {
         font-size: 10.5px;
         color: var(--brut-ink-3);
         letter-spacing: 0.14em;
     }
     .brut-demo .lede h2,
     .brut-feat .lede h2,
-    .brut-lab .lede h2 {
+    .brut-lab .lede h2,
+    .brut-ai .lede h2 {
         font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
         font-size: 28px;
         color: var(--brut-ink);
@@ -1066,11 +1132,13 @@
     }
     .brut-demo .lede h2 span,
     .brut-feat .lede h2 span,
-    .brut-lab .lede h2 span {
+    .brut-lab .lede h2 span,
+    .brut-ai .lede h2 span {
         color: var(--brut-accent);
     }
     .brut-demo .lede p,
-    .brut-lab .lede p {
+    .brut-lab .lede p,
+    .brut-ai .lede p {
         font-family: 'Inter Variable', 'Inter', system-ui, sans-serif;
         color: var(--brut-ink-2);
         margin: 12px 0 0;
@@ -1574,6 +1642,138 @@
         max-width: 720px;
     }
 
+    /* ── AI-ready docs section ────────────────────────────────────── */
+    .brut-ai {
+        padding: 28px 24px;
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        gap: 24px;
+        border-bottom: 1px solid var(--brut-rule);
+    }
+    .brut-ai .ai-panel {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--brut-rule);
+        background: var(--brut-bg);
+    }
+    .brut-ai .ai-head {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        border-bottom: 1px solid var(--brut-rule);
+        background: var(--brut-bg-2);
+        font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        color: var(--brut-ink-3);
+        text-transform: uppercase;
+    }
+    .brut-ai .ai-tab {
+        padding: 9px 14px;
+        border-right: 1px solid var(--brut-rule);
+    }
+    .brut-ai .ai-tab.on {
+        background: var(--brut-bg);
+        color: var(--brut-ink);
+    }
+    .brut-ai .grow {
+        flex: 1;
+    }
+    .brut-ai .ai-meta {
+        padding: 9px 14px;
+        border-left: 1px solid var(--brut-rule);
+    }
+    .brut-ai .ai-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+    }
+    .brut-ai .ai-cell {
+        position: relative;
+        padding: 20px 22px 56px;
+        min-height: 200px;
+        border-right: 1px solid var(--brut-rule);
+        color: var(--brut-ink);
+        text-decoration: none;
+        transition: background-color 0.15s;
+    }
+    .brut-ai .ai-cell:last-child {
+        border-right: 0;
+    }
+    .brut-ai .ai-cell:hover {
+        background: color-mix(in oklab, var(--brut-accent) 6%, transparent);
+    }
+    .brut-ai .ai-cell-k {
+        font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 10.5px;
+        color: var(--brut-ink-3);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+    }
+    .brut-ai .ai-cell h3 {
+        font-family: 'Inter Variable', 'Inter', system-ui, sans-serif;
+        font-size: 22px;
+        font-weight: 500;
+        letter-spacing: -0.02em;
+        margin: 22px 0 10px;
+        color: var(--brut-ink);
+    }
+    .brut-ai .ai-cell h3 code {
+        font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+        background: transparent;
+        padding: 0;
+        font-size: 0.85em;
+        color: var(--brut-accent);
+    }
+    .brut-ai .ai-cell p {
+        font-size: 13.5px;
+        line-height: 1.55;
+        color: var(--brut-ink-2);
+        margin: 0;
+    }
+    .brut-ai .ai-cell p code {
+        font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+        background: var(--brut-bg-2);
+        padding: 1px 4px;
+        border-radius: 2px;
+        font-size: 0.92em;
+    }
+    .brut-ai .ai-cell-foot {
+        position: absolute;
+        left: 22px;
+        bottom: 18px;
+        font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px;
+        color: var(--brut-ink-3);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+    .brut-ai .ai-prompt {
+        padding: 16px 22px;
+        border-top: 1px solid var(--brut-rule);
+        background: var(--brut-bg-2);
+        font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--brut-ink-2);
+    }
+    .brut-ai .ai-prompt-k {
+        display: block;
+        font-size: 10.5px;
+        color: var(--brut-ink-3);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+    .brut-ai .ai-prompt code {
+        background: transparent;
+        padding: 0;
+        color: var(--brut-ink);
+    }
+    .brut-ai .ai-prompt em {
+        color: var(--brut-accent);
+        font-style: normal;
+    }
+
     /* ── Examples grid ────────────────────────────────────────────── */
     .brut-ex {
         padding: 28px 24px;
@@ -1773,10 +1973,21 @@
         .brut-ex .grid {
             grid-template-columns: repeat(2, 1fr);
         }
+        .brut-ai .ai-grid {
+            grid-template-columns: 1fr;
+        }
+        .brut-ai .ai-cell {
+            border-right: 0;
+            border-bottom: 1px solid var(--brut-rule);
+        }
+        .brut-ai .ai-cell:last-child {
+            border-bottom: 0;
+        }
         .brut-lab .panel :global(.vgrid) {
             grid-template-columns: repeat(4, 1fr);
         }
-        .brut-ex {
+        .brut-ex,
+        .brut-ai {
             grid-template-columns: 1fr;
         }
     }
@@ -1788,6 +1999,7 @@
         .brut-demo,
         .brut-feat,
         .brut-lab,
+        .brut-ai,
         .brut-ex {
             grid-template-columns: 1fr;
             padding-left: 16px;
