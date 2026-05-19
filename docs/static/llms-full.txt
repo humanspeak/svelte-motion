@@ -258,6 +258,35 @@ Named animation states with parent-child propagation.
 - Variant strings passed to `animate` propagate to children through context
 - Children inherit the parent's active variant key automatically
 
+### Dynamic (function-form) variants + `custom` prop
+
+A variant entry can be a `(custom) => keyframes` factory. The motion
+component's `custom` prop is forwarded into the factory each time the
+variant is resolved (initial / animate / exit). Children without their
+own `custom` prop inherit the nearest motion ancestor's value.
+
+```svelte
+<script lang="ts">
+    import { motion, type Variants } from '@humanspeak/svelte-motion'
+
+    const variants: Variants = {
+        hidden: { opacity: 0, x: -100 },
+        visible: (i) => ({
+            opacity: 1,
+            x: 0,
+            transition: { delay: (i as number) * 0.1 }
+        })
+    }
+    const items = ['Alpha', 'Beta', 'Gamma', 'Delta']
+</script>
+
+{#each items as item, i}
+    <motion.li custom={i} {variants} initial="hidden" animate="visible">
+        {item}
+    </motion.li>
+{/each}
+```
+
 ---
 
 ## Layout animation

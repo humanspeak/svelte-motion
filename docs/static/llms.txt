@@ -40,7 +40,7 @@ npm install @humanspeak/svelte-motion
 - **`AnimatePresence`** for mount/unmount exit animations with `mode="sync" | "wait" | "popLayout"`.
 - **Gestures**: `whileHover`, `whileTap`, `whileFocus`, `whileInView`.
 - **Drag**: full drag gesture API with constraints, momentum, elastic, snap-to-origin, axis lock, and `createDragControls()` for imperative control.
-- **Variants**: named animation states with parent-child propagation.
+- **Variants**: named animation states with parent-child propagation. Function-form variants `(custom) => keyframes` receive the `custom` prop for per-instance values (staggered lists, indexed offsets).
 - **Layout animation**: FLIP-based `layout` and `layout="position"` props.
 - **Shared layout**: `layoutId` for animating between elements across the DOM.
 - **Spring physics**: `useSpring` for natural motion.

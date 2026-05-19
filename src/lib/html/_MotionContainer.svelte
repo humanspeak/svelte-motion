@@ -53,7 +53,9 @@
         setVariantContext,
         getVariantContext,
         setInitialFalseContext,
-        getInitialFalseContext
+        getInitialFalseContext,
+        setCustomContext,
+        getCustomContext
     } from '$lib/components/variantContext.context'
     import { get, writable } from 'svelte/store'
     import {
@@ -75,6 +77,7 @@
         tag = 'div',
         key: keyProp,
         variants: variantsProp,
+        custom: customProp,
         initial: initialProp,
         animate: animateProp,
         exit: exitProp,
@@ -360,6 +363,32 @@
     // Provide context immediately during initialization so children can inherit
     setVariantContext(localVariantStore)
 
+    // Custom-value inheritance. Children with no `custom` prop adopt the
+    // nearest motion ancestor's value. Reactive via a writable store so a
+    // parent updating `custom` re-fires descendants' variant resolution.
+    const parentCustomStore = getCustomContext()
+    let inheritedCustom: unknown = undefined
+    if (parentCustomStore) {
+        parentCustomStore.subscribe((v) => (inheritedCustom = v))()
+    }
+    const initialCustomValue = customProp !== undefined ? customProp : inheritedCustom
+    const localCustomStore = writable<unknown>(initialCustomValue)
+    setCustomContext(localCustomStore)
+
+    let parentInheritedCustom = $state<unknown>(inheritedCustom)
+    $effect(() => {
+        if (!parentCustomStore) {
+            parentInheritedCustom = undefined
+            return
+        }
+        const unsubscribe = parentCustomStore.subscribe((v) => (parentInheritedCustom = v))
+        return () => unsubscribe()
+    })
+    const effectiveCustom = $derived(customProp !== undefined ? customProp : parentInheritedCustom)
+    $effect(() => {
+        localCustomStore.set(effectiveCustom)
+    })
+
     $effect(() => {
         if (!variantsProp) return localVariantStore.set(undefined)
         if (typeof animateProp === 'string') return localVariantStore.set(animateProp)
@@ -367,9 +396,13 @@
         localVariantStore.set(undefined)
     })
 
-    const resolvedInitial = $derived(resolveInitial(effectiveInitialProp, variantsProp))
-    const resolvedAnimate = $derived(resolveAnimate(effectiveAnimate, variantsProp))
-    const resolvedExit = $derived(resolveExit(exitProp, variantsProp))
+    const resolvedInitial = $derived(
+        resolveInitial(effectiveInitialProp, variantsProp, effectiveCustom)
+    )
+    const resolvedAnimate = $derived(
+        resolveAnimate(effectiveAnimate, variantsProp, effectiveCustom)
+    )
+    const resolvedExit = $derived(resolveExit(exitProp, variantsProp, effectiveCustom))
 
     // Extract keyframes from resolved initial, handling initial={false}
     const initialKeyframes = $derived(

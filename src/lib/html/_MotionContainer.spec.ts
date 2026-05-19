@@ -310,6 +310,40 @@ describe('_MotionContainer', () => {
         vi.unstubAllGlobals()
     })
 
+    it('passes own custom prop into a function-form variant on animate', async () => {
+        animateMock.mockClear()
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+        render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                custom: 3,
+                variants: {
+                    visible: (i: unknown) => ({ x: (i as number) * 50 })
+                },
+                animate: 'visible'
+            }
+        })
+        await flushTimers()
+        const animateDef = animateMock.mock.calls.at(-1)?.[1] as Record<string, unknown>
+        expect(animateDef).toMatchObject({ x: 150 })
+    })
+
+    it('inherits custom from a parent motion component when child has no custom prop', async () => {
+        // Render a nested tree via a tiny wrapper Svelte component so we
+        // exercise the real Svelte context inheritance, not just the
+        // resolver in isolation.
+        const { default: NestedCustomHarness } =
+            await import('$lib/components/__tests__/NestedCustomHarness.svelte')
+        animateMock.mockClear()
+        render(NestedCustomHarness, { props: { parentCustom: 4 } })
+        await flushTimers()
+        // The child resolves `(i) => ({ x: i * 25 })` with custom=4 → x=100.
+        const childCall = animateMock.mock.calls.find(
+            (c) => (c?.[1] as Record<string, unknown>)?.x === 100
+        )
+        expect(childCall).toBeTruthy()
+    })
+
     it('whileHover is gated to hover-capable devices', async () => {
         /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {

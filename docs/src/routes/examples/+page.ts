@@ -154,6 +154,12 @@ export const load: PageLoad = () => {
             description: 'Interactive variants basic animation example using Svelte Motion.',
             sourceUrl: null
         },
+        'variants-dynamic': {
+            title: 'Variants Dynamic (custom)',
+            description:
+                'Per-instance variants — function-form factories receive the custom prop, driving staggered index-based delays.',
+            sourceUrl: 'https://motion.dev/docs/react-motion-component#variants'
+        },
         'variants-propagation': {
             title: 'Variants Propagation',
             description: 'Interactive variants propagation animation example using Svelte Motion.',

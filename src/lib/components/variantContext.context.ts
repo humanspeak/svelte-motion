@@ -3,6 +3,7 @@ import type { Writable } from 'svelte/store'
 
 const VARIANT_CONTEXT_KEY = Symbol('variant-context')
 const INITIAL_FALSE_CONTEXT_KEY = Symbol('initial-false-context')
+const CUSTOM_CONTEXT_KEY = Symbol('custom-context')
 
 /**
  * Provide a writable store for the current variant key so children can
@@ -40,4 +41,30 @@ export const setInitialFalseContext = (value: boolean): void => {
  */
 export const getInitialFalseContext = (): boolean => {
     return getContext<boolean>(INITIAL_FALSE_CONTEXT_KEY) ?? false
+}
+
+/**
+ * Provide a writable store carrying the current motion component's
+ * `custom` value so descendant motion components without their own
+ * `custom` prop can inherit it — and re-resolve their variants when the
+ * parent's `custom` changes.
+ *
+ * Mirrors framer-motion's variant-tree custom propagation. A store
+ * (rather than a snapshot) lets descendants react to changes the parent
+ * makes after mount.
+ *
+ * @param store Writable store holding the current component's effective `custom`.
+ */
+export const setCustomContext = (store: Writable<unknown>): void => {
+    setContext<Writable<unknown>>(CUSTOM_CONTEXT_KEY, store)
+}
+
+/**
+ * Read the nearest ancestor's `custom` store (if any).
+ *
+ * @returns The ancestor's writable store, or `undefined` when no motion
+ *     ancestor has set one.
+ */
+export const getCustomContext = (): Writable<unknown> | undefined => {
+    return getContext<Writable<unknown> | undefined>(CUSTOM_CONTEXT_KEY)
 }
