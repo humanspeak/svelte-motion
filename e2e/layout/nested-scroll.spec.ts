@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readTransform } from '../_helpers/transform'
 
 /**
  * Regression for #353 — nested `layoutScroll` containers must sum offsets,
@@ -18,7 +19,9 @@ test.describe('layout/nested-scroll', () => {
         const toggle = page.getByTestId('toggle')
         await box.waitFor({ state: 'visible' })
 
-        // Reset outer scroll
+        const before = await box.boundingBox()
+        if (!before) throw new Error('no initial boundingBox')
+
         await outer.evaluate((el) => {
             el.scrollTop = 0
         })
@@ -31,20 +34,32 @@ test.describe('layout/nested-scroll', () => {
             el.scrollTop = 80
         })
 
-        // Wait for the 1.8s tween to settle.
-        await page.waitForTimeout(2000)
+        // Poll until the 1.8s tween settles. Box must reach its expanded
+        // size with no residual translate from the FLIP delta — the outer
+        // scroll was accounted for in both measurements.
+        await expect
+            .poll(
+                async () => {
+                    const t = await readTransform(page, '[data-testid="box"]')
+                    const rect = await box.boundingBox()
+                    return {
+                        translateAtRest: Math.abs(t.tx) < 0.5 && Math.abs(t.ty) < 0.5,
+                        scaleAtRest: Math.abs(t.a - 1) < 0.01 && Math.abs(t.d - 1) < 0.01,
+                        widthGrew: (rect?.width ?? 0) > before.width + 20
+                    }
+                },
+                { timeout: 4000, message: 'nested box did not settle with identity transform' }
+            )
+            .toEqual({ translateAtRest: true, scaleAtRest: true, widthGrew: true })
 
-        // After settle, the FLIP delta should be zero (transform clears)
-        // because the outer scroll was accounted for in both measurements.
-        const transform = await box.evaluate((el) => (el as HTMLElement).style.transform || '')
-        const drift = Number(transform.match(/translateY\(([-\d.]+)px\)/)?.[1] ?? '0')
-        expect(Math.abs(drift)).toBeLessThan(1)
+        const settled = await readTransform(page, '[data-testid="box"]')
+        expect(Math.abs(settled.tx)).toBeLessThan(0.5)
+        expect(Math.abs(settled.ty)).toBeLessThan(0.5)
 
-        // Sanity: box reached its expanded size.
-        const rect = await box.boundingBox()
-        if (!rect) throw new Error('no boundingBox')
-        expect(rect.width).toBeGreaterThan(200)
-        expect(rect.height).toBeGreaterThan(200)
+        const after = await box.boundingBox()
+        if (!after) throw new Error('no final boundingBox')
+        expect(after.width).toBeGreaterThan(200)
+        expect(after.height).toBeGreaterThan(200)
     })
 
     test('regression page renders both containers + box', async ({ page }) => {

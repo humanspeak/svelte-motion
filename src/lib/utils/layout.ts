@@ -17,7 +17,19 @@ import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'mot
  *
  * @param el Element to measure.
  * @param scrollContainers Optional ancestor chain with `layoutScroll` enabled.
- * @return DOMRect snapshot of the element.
+ * @returns DOMRect snapshot of the element.
+ *
+ * @example
+ * ```ts
+ * // No scroll containers — viewport-relative rect.
+ * const rect = measureRect(node)
+ *
+ * // Single ancestor scroll container (one `layoutScroll`).
+ * const rect = measureRect(node, [scrollPanel])
+ *
+ * // Nested `layoutScroll` ancestors — sums offsets from every container.
+ * const rect = measureRect(node, [innerScroll, outerScroll])
+ * ```
  */
 export const measureRect = (el: HTMLElement, scrollContainers?: HTMLElement[]): DOMRect => {
     const prev = el.style.transform

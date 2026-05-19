@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readTransform } from '../_helpers/transform'
 
 /**
  * Regression test for the `layoutScroll` prop.
@@ -9,12 +10,6 @@ import { expect, test } from '@playwright/test'
  * rects and the scroll offset shows up as drift in the animation;
  * with `layoutScroll`, measurements happen in container coordinates
  * and the animation stays anchored.
- *
- * We assert that after the animation settles, the `layoutScroll` box
- * is at its expected final position (no leftover translate), while
- * the non-`layoutScroll` box may show a small artefact. We're not
- * trying to pin down the exact drift value — that varies with timing
- * — only to assert the `layoutScroll` path ends clean.
  */
 test.describe('layout/scroll', () => {
     test('layoutScroll container keeps animations anchored across scroll', async ({ page }) => {
@@ -25,6 +20,10 @@ test.describe('layout/scroll', () => {
         const toggle = page.getByTestId('toggle')
 
         await boxWith.waitFor({ state: 'visible' })
+
+        // Capture initial size so we can later assert the box actually grew.
+        const before = await boxWith.boundingBox()
+        if (!before) throw new Error('no initial boundingBox')
 
         // Scroll both containers to a known position before the animation.
         await scrollWith.evaluate((el) => {
@@ -45,25 +44,43 @@ test.describe('layout/scroll', () => {
             el.scrollTop = 60
         })
 
-        // Let the spring settle.
-        await page.waitForTimeout(800)
+        // Poll until the spring settles. `[data-testid="box-with"]` reaches
+        // its expanded size when both the layout step and the FLIP "back to
+        // identity" finished — we wait until the box has both grown AND has
+        // a near-identity translate/scale.
+        await expect
+            .poll(
+                async () => {
+                    const t = await readTransform(page, '[data-testid="box-with"]')
+                    const rect = await boxWith.boundingBox()
+                    return {
+                        translateAtRest: Math.abs(t.tx) < 0.5 && Math.abs(t.ty) < 0.5,
+                        scaleAtRest: Math.abs(t.a - 1) < 0.01 && Math.abs(t.d - 1) < 0.01,
+                        widthGrew: (rect?.width ?? 0) > before.width + 20
+                    }
+                },
+                {
+                    timeout: 3000,
+                    message: 'box-with did not settle to its new size with identity transform'
+                }
+            )
+            .toEqual({ translateAtRest: true, scaleAtRest: true, widthGrew: true })
 
-        // After settle, the layoutScroll box must have no residual transform —
-        // the resize completed cleanly without scroll-induced drift.
-        const finalTransform = await boxWith.evaluate(
-            (el) => (el as HTMLElement).style.transform || ''
-        )
-        // An empty string or "none" both mean "no translate applied" (drift=0);
-        // a partial translate string means we kept some movement and need to
-        // verify it's within sub-pixel rounding.
-        const drift = Number(finalTransform.match(/translateX\(([-\d.]+)px\)/)?.[1] ?? '0')
-        expect(Math.abs(drift)).toBeLessThan(1)
+        // After settle, the layoutScroll box has no residual translate — the
+        // resize completed cleanly without scroll-induced drift. The poll
+        // above already enforced this, but assert one more time for
+        // documentation in the spec output.
+        const settled = await readTransform(page, '[data-testid="box-with"]')
+        expect(Math.abs(settled.tx)).toBeLessThan(0.5)
+        expect(Math.abs(settled.ty)).toBeLessThan(0.5)
 
-        // Sanity: the box still exists at the expected expanded size (~240).
-        const box = await boxWith.boundingBox()
-        if (!box) throw new Error('no boundingBox')
-        expect(box.width).toBeGreaterThan(200)
-        expect(box.height).toBeGreaterThan(200)
+        // Confirm the box actually reached its expanded size (~240 in the
+        // regression page). Anything well above the initial 120 confirms
+        // the layout animation produced the expected end state.
+        const after = await boxWith.boundingBox()
+        if (!after) throw new Error('no final boundingBox')
+        expect(after.width).toBeGreaterThan(200)
+        expect(after.height).toBeGreaterThan(200)
     })
 
     test('regression page renders both panels with their boxes', async ({ page }) => {
