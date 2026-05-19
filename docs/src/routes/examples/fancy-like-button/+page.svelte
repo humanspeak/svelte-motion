@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import FancyLikeButtonExample from '$lib/examples/FancyLikeButtonExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -25,6 +23,6 @@
     }
 </script>
 
-<Example title="Fancy Like Button" sourceUrl={data.sourceUrl ?? undefined}>
+<Example title="Fancy Like Button" file="FancyLikeButtonExample.svelte">
     <FancyLikeButtonExample />
 </Example>

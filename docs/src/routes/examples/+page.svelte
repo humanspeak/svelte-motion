@@ -8,7 +8,6 @@
     type ExampleData = {
         title: string
         description: string
-        sourceUrl: string | null
     }
 
     type ExamplesData = Record<string, ExampleData>

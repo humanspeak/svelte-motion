@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import SharedLayoutAnimationExample from '$lib/examples/SharedLayoutAnimationExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -25,6 +23,6 @@
     }
 </script>
 
-<Example title="Shared Layout Animation" sourceUrl={data.sourceUrl ?? undefined}>
+<Example title="Shared Layout Animation" file="SharedLayoutAnimationExample.svelte">
     <SharedLayoutAnimationExample />
 </Example>

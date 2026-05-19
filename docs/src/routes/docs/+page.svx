@@ -269,6 +269,37 @@ Transition precedence for exit timing (merged):
 - component `transition` (merged with any `MotionConfig` defaults)
 - fallback `{ duration: 0.35 }`
 
+## Variants
+
+Variants let you give names to animation states and reference them by string. Pair them with the `custom` prop for per-instance values — common for staggered lists where each child needs its own offset.
+
+```svelte
+<script>
+  import { motion } from '@humanspeak/svelte-motion'
+
+  const variants = {
+    hidden:  { opacity: 0, x: -100 },
+    visible: (i) => ({
+      opacity: 1,
+      x: 0,
+      transition: { delay: i * 0.1 }
+    })
+  }
+
+  const items = ['Alpha', 'Beta', 'Gamma', 'Delta']
+</script>
+
+{#each items as item, i}
+  <motion.li custom={i} {variants} initial="hidden" animate="visible">
+    {item}
+  </motion.li>
+{/each}
+```
+
+- A variant entry can be a static keyframes object **or** a `(custom) => keyframes` factory.
+- `custom` is forwarded to the factory each time the variant is resolved (initial, animate, or exit).
+- Children with no `custom` prop inherit the nearest motion ancestor's value — matching Framer Motion's variant-tree propagation.
+
 ## Learn next
 
 That's a quick overview of Svelte Motion's basic features. Next, explore animation patterns, layout, and gestures—or dive straight into our examples.

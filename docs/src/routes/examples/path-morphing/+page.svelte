@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import PathMorphingExample from '$lib/examples/PathMorphingExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -25,6 +23,6 @@
     }
 </script>
 
-<Example title="Path Morphing" sourceUrl={data.sourceUrl ?? undefined}>
+<Example title="Path Morphing" file="PathMorphingExample.svelte">
     <PathMorphingExample />
 </Example>

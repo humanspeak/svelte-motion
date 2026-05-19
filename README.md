@@ -214,6 +214,29 @@ Supported drag props:
 
 - String variant keys are resolved from `variants`.
 - Variant state inherits through context.
+- A variant entry can be a `(custom) => keyframes` factory. The `custom` prop is forwarded — useful for staggered lists where each child needs its own offset or delay. Children without `custom` inherit the nearest motion ancestor's value.
+
+```svelte
+<script lang="ts">
+    import { motion, type Variants } from '@humanspeak/svelte-motion'
+
+    const variants: Variants = {
+        hidden: { opacity: 0, x: -100 },
+        visible: (i) => ({
+            opacity: 1,
+            x: 0,
+            transition: { delay: (i as number) * 0.1 }
+        })
+    }
+    const items = ['Alpha', 'Beta', 'Gamma', 'Delta']
+</script>
+
+{#each items as item, i}
+    <motion.li custom={i} {variants} initial="hidden" animate="visible">
+        {item}
+    </motion.li>
+{/each}
+```
 
 ## Layout animation
 

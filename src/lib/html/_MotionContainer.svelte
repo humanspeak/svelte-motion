@@ -53,7 +53,9 @@
         setVariantContext,
         getVariantContext,
         setInitialFalseContext,
-        getInitialFalseContext
+        getInitialFalseContext,
+        setCustomContext,
+        getCustomContext
     } from '$lib/components/variantContext.context'
     import { get, writable } from 'svelte/store'
     import {
@@ -75,6 +77,7 @@
         tag = 'div',
         key: keyProp,
         variants: variantsProp,
+        custom: customProp,
         initial: initialProp,
         animate: animateProp,
         exit: exitProp,
@@ -360,6 +363,32 @@
     // Provide context immediately during initialization so children can inherit
     setVariantContext(localVariantStore)
 
+    // Custom-value inheritance. Children with no `custom` prop adopt the
+    // nearest motion ancestor's value. Reactive via a writable store so a
+    // parent updating `custom` re-fires descendants' variant resolution.
+    const parentCustomStore = getCustomContext()
+    let inheritedCustom: unknown = undefined
+    if (parentCustomStore) {
+        parentCustomStore.subscribe((v) => (inheritedCustom = v))()
+    }
+    const initialCustomValue = customProp !== undefined ? customProp : inheritedCustom
+    const localCustomStore = writable<unknown>(initialCustomValue)
+    setCustomContext(localCustomStore)
+
+    let parentInheritedCustom = $state<unknown>(inheritedCustom)
+    $effect(() => {
+        if (!parentCustomStore) {
+            parentInheritedCustom = undefined
+            return
+        }
+        const unsubscribe = parentCustomStore.subscribe((v) => (parentInheritedCustom = v))
+        return () => unsubscribe()
+    })
+    const effectiveCustom = $derived(customProp !== undefined ? customProp : parentInheritedCustom)
+    $effect(() => {
+        localCustomStore.set(effectiveCustom)
+    })
+
     $effect(() => {
         if (!variantsProp) return localVariantStore.set(undefined)
         if (typeof animateProp === 'string') return localVariantStore.set(animateProp)
@@ -367,9 +396,13 @@
         localVariantStore.set(undefined)
     })
 
-    const resolvedInitial = $derived(resolveInitial(effectiveInitialProp, variantsProp))
-    const resolvedAnimate = $derived(resolveAnimate(effectiveAnimate, variantsProp))
-    const resolvedExit = $derived(resolveExit(exitProp, variantsProp))
+    const resolvedInitial = $derived(
+        resolveInitial(effectiveInitialProp, variantsProp, effectiveCustom)
+    )
+    const resolvedAnimate = $derived(
+        resolveAnimate(effectiveAnimate, variantsProp, effectiveCustom)
+    )
+    const resolvedExit = $derived(resolveExit(exitProp, variantsProp, effectiveCustom))
 
     // Extract keyframes from resolved initial, handling initial={false}
     const initialKeyframes = $derived(
@@ -639,6 +672,12 @@
 
     // Track the last variant key we ran to avoid re-running on mount
     let lastRanVariantKey = $state<string | undefined>(undefined)
+    // Companion to `lastRanVariantKey`: the JSON-serialized resolved
+    // keyframes for that variant. Lets us detect when a function-form
+    // variant produces new keyframes (because `custom` changed) while
+    // the variant key stayed the same — otherwise the animate effect
+    // would short-circuit and the element would never re-animate.
+    let lastRanResolvedJson = $state<string | undefined>(undefined)
     let mountedWithInitialFalse = $state(false)
     // Track if the initial->animate transition has already been triggered by main effect
     let initialAnimationTriggered = $state(false)
@@ -916,8 +955,14 @@
             return
         }
         if (typeof animateProp === 'string') {
-            if (lastRanVariantKey !== animateProp) {
+            // Compare BOTH the variant key and the resolved keyframes JSON.
+            // For static variants the JSON is constant per key; for
+            // function-form variants the JSON changes when `custom`
+            // changes, which we must treat as a new animation target.
+            const resolvedJson = resolvedAnimate ? JSON.stringify(resolvedAnimate) : undefined
+            if (lastRanVariantKey !== animateProp || lastRanResolvedJson !== resolvedJson) {
                 lastRanVariantKey = animateProp
+                lastRanResolvedJson = resolvedJson
                 runAnimation()
             }
         } else if (animateProp) {
@@ -956,8 +1001,10 @@
             mountedWithInitialFalse = false
         }
         if (typeof currentAnimateKey === 'string') {
-            if (lastRanVariantKey !== currentAnimateKey) {
+            const resolvedJson = resolvedAnimate ? JSON.stringify(resolvedAnimate) : undefined
+            if (lastRanVariantKey !== currentAnimateKey || lastRanResolvedJson !== resolvedJson) {
                 lastRanVariantKey = currentAnimateKey
+                lastRanResolvedJson = resolvedJson
                 runAnimation()
             }
         } else {
@@ -989,6 +1036,9 @@
                 mountedWithInitialFalse = true
                 if (typeof currentAnimateKey === 'string') {
                     lastRanVariantKey = currentAnimateKey
+                    lastRanResolvedJson = resolvedAnimate
+                        ? JSON.stringify(resolvedAnimate)
+                        : undefined
                 }
                 dataPath = 5
                 isLoaded = 'ready'
@@ -1081,6 +1131,9 @@
                     snapshot = transformSVGPathProperties(element!, snapshot)
                     animate(element!, snapshot as DOMKeyframesDefinition, { duration: 0 })
                     lastRanVariantKey = currentAnimateKey
+                    lastRanResolvedJson = resolvedAnimate
+                        ? JSON.stringify(resolvedAnimate)
+                        : undefined
                 } else {
                     runAnimation()
                 }

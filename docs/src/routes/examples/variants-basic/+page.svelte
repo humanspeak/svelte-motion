@@ -24,6 +24,6 @@
     }
 </script>
 
-<Example title="Variants Basic">
+<Example title="Variants Basic" file="VariantsBasicExample.svelte">
     <VariantsBasicExample />
 </Example>

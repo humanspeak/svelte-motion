@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import UseAnimationFrameExample from '$lib/examples/UseAnimationFrameExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -24,6 +22,6 @@
     }
 </script>
 
-<Example title="useAnimationFrame" sourceUrl={data.sourceUrl}>
+<Example title="useAnimationFrame" file="UseAnimationFrameExample.svelte">
     <UseAnimationFrameExample />
 </Example>

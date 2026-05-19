@@ -2,7 +2,35 @@ import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
 import type { Snippet } from 'svelte'
 
 /**
+ * A variant value: either a static keyframes object, or a factory function
+ * that receives the consumer-provided `custom` value and returns keyframes.
+ *
+ * Dynamic (function-form) variants let a single variants object emit
+ * per-instance keyframes — common for staggered lists where each child
+ * needs its own offset or delay.
+ *
+ * @example
+ * ```svelte
+ * <motion.div
+ *   custom={index}
+ *   variants={{
+ *     visible: (i) => ({ opacity: 1, x: i * 50 }),
+ *     hidden:  { opacity: 0 }
+ *   }}
+ *   animate="visible"
+ * />
+ * ```
+ */
+export type Variant =
+    | DOMKeyframesDefinition
+    | ((custom: unknown) => DOMKeyframesDefinition)
+    | undefined
+
+/**
  * Variants define named animation states that can be referenced by string keys.
+ *
+ * Each entry can be a static keyframes object or a `(custom) => keyframes`
+ * factory function (see {@link Variant}).
  *
  * @example
  * ```svelte
@@ -16,7 +44,7 @@ import type { Snippet } from 'svelte'
  * <motion.div variants={variants} animate="open" />
  * ```
  */
-export type Variants = Record<string, DOMKeyframesDefinition | undefined>
+export type Variants = Record<string, Variant>
 
 /**
  * Initial animation properties for a motion component.
@@ -274,6 +302,12 @@ export type MotionProps = {
     key?: string
     /** Variants define named animation states */
     variants?: Variants
+    /**
+     * Value passed into function-form variants. Children without their own
+     * `custom` prop inherit this from the nearest motion ancestor — matching
+     * framer-motion's variant-tree custom propagation.
+     */
+    custom?: unknown
     /** Initial state of the animation (object or variant key) */
     initial?: MotionInitial
     /** Target state of the animation (object or variant key) */

@@ -23,6 +23,6 @@
     }
 </script>
 
-<Example title="Animated Button">
+<Example title="Animated Button" file="AnimatedButton.svelte">
     <AnimatedButton />
 </Example>

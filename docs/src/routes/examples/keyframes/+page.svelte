@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import KeyframesExample from '$lib/examples/KeyframesExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -22,6 +20,6 @@
     }
 </script>
 
-<Example title="Keyframes" sourceUrl={data.sourceUrl ?? undefined}>
+<Example title="Keyframes" file="KeyframesExample.svelte">
     <KeyframesExample />
 </Example>

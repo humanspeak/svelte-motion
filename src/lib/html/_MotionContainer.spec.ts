@@ -310,6 +310,66 @@ describe('_MotionContainer', () => {
         vi.unstubAllGlobals()
     })
 
+    it('passes own custom prop into a function-form variant on animate', async () => {
+        animateMock.mockClear()
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+        render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                custom: 3,
+                variants: {
+                    visible: (i: unknown) => ({ x: (i as number) * 50 })
+                },
+                animate: 'visible'
+            }
+        })
+        await flushTimers()
+        const animateDef = animateMock.mock.calls.at(-1)?.[1] as Record<string, unknown>
+        expect(animateDef).toMatchObject({ x: 150 })
+    })
+
+    it('inherits custom from a parent motion component when child has no custom prop', async () => {
+        // Render a nested tree via a tiny wrapper Svelte component so we
+        // exercise the real Svelte context inheritance, not just the
+        // resolver in isolation.
+        const { default: NestedCustomHarness } =
+            await import('$lib/components/__tests__/NestedCustomHarness.svelte')
+        animateMock.mockClear()
+        render(NestedCustomHarness, { props: { parentCustom: 4 } })
+        await flushTimers()
+        // The child resolves `(i) => ({ x: i * 25 })` with custom=4 → x=100.
+        const childCall = animateMock.mock.calls.find(
+            (c) => (c?.[1] as Record<string, unknown>)?.x === 100
+        )
+        expect(childCall).toBeTruthy()
+    })
+
+    it('re-animates the child when the parent updates `custom` after mount', async () => {
+        // Regression for the ready-state animate effect gating only on
+        // `lastRanVariantKey`. The child here animates to the same
+        // variant key ("visible") across both renders — only the resolved
+        // keyframes change because `custom` does. Before the fix the
+        // gating short-circuited and no new animate call was made.
+        const { default: NestedCustomHarness } =
+            await import('$lib/components/__tests__/NestedCustomHarness.svelte')
+        animateMock.mockClear()
+        const result = render(NestedCustomHarness, { props: { parentCustom: 4 } })
+        await flushTimers()
+        // Initial: child resolves to x=100.
+        expect(
+            animateMock.mock.calls.some((c) => (c?.[1] as Record<string, unknown>)?.x === 100)
+        ).toBe(true)
+
+        animateMock.mockClear()
+        await result.rerender({ parentCustom: 5 })
+        await flushTimers()
+        // After parent's custom flips 4 → 5, the child must re-animate
+        // to x=125. If the gating ignores `custom`, this call never lands.
+        expect(
+            animateMock.mock.calls.some((c) => (c?.[1] as Record<string, unknown>)?.x === 125)
+        ).toBe(true)
+    })
+
     it('whileHover is gated to hover-capable devices', async () => {
         /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {

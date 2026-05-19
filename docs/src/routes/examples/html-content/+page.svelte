@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import HTMLContent from '$lib/examples/HTMLContent.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -25,6 +23,6 @@
     }
 </script>
 
-<Example title="HTML Content" sourceUrl={data.sourceUrl}>
+<Example title="HTML Content" file="HTMLContent.svelte">
     <HTMLContent />
 </Example>

@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import UseTimeSyncedExample from '$lib/examples/UseTimeSyncedExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -25,6 +23,6 @@
     }
 </script>
 
-<Example title="useTime (Synced)" sourceUrl={data.sourceUrl}>
+<Example title="useTime (Synced)" file="UseTimeSyncedExample.svelte">
     <UseTimeSyncedExample />
 </Example>
