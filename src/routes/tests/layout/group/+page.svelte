@@ -8,12 +8,6 @@
     // must NOT pull the underline from the left strip across the page —
     // each group keeps its own animation scope.
     //
-    // A third strip (bottom) has no <LayoutGroup> wrapping it. With a stray
-    // `layoutId="underline"` in a third location, the un-grouped strip
-    // would historically reach into whichever sibling unmounted most
-    // recently. The LayoutGroup-wrapped strips above prove the isolation
-    // works.
-    //
     // Playwright e2e drives the two grouped strips and asserts the
     // un-bridged-x property (Δleft well under page width).
 

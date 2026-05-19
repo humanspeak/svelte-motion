@@ -75,6 +75,9 @@ test.describe('layout/group', () => {
                 const offset = Math.abs(underline.x - bBox.x)
                 if (offset > maxOffsetFromB) maxOffsetFromB = offset
             }
+            // Deliberate sample — ~2.5 frames at 60 fps per step, 12 steps spans
+            // the 400 ms FLIP. expect.poll wouldn't help here: we need the max
+            // observed offset across the animation, not eventual settle.
             await page.waitForTimeout(40)
         }
 
