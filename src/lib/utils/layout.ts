@@ -6,28 +6,36 @@ import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'mot
  * Temporarily clears `transform` to avoid skewing measurements, restoring it
  * immediately after reading the rect.
  *
- * When `scrollContainer` is provided, the returned rect is shifted into that
- * container's scroll coordinate space (i.e. its `scrollLeft` / `scrollTop`
- * are added to `left` / `top`). FLIP deltas computed from two such measures
- * stay correct even when the user scrolls the container between measurements.
+ * When `scrollContainers` are provided, the returned rect is shifted by the
+ * **sum** of each container's `scrollLeft` / `scrollTop`. FLIP deltas
+ * computed from two such measures stay correct even when the user scrolls
+ * any of the containers between measurements — including a nested
+ * `layoutScroll` inside another `layoutScroll`. Mirrors framer-motion's
+ * `removeElementScroll`, which walks every ancestor in the path.
  *
- * Without a `scrollContainer`, behaviour is unchanged: viewport-relative rect.
+ * Pass an empty array (or omit) for viewport-relative behaviour.
  *
  * @param el Element to measure.
- * @param scrollContainer Optional ancestor with `layoutScroll` enabled.
+ * @param scrollContainers Optional ancestor chain with `layoutScroll` enabled.
  * @return DOMRect snapshot of the element.
  */
-export const measureRect = (el: HTMLElement, scrollContainer?: HTMLElement): DOMRect => {
+export const measureRect = (el: HTMLElement, scrollContainers?: HTMLElement[]): DOMRect => {
     const prev = el.style.transform
     try {
         el.style.transform = 'none'
         const rect = el.getBoundingClientRect()
-        if (!scrollContainer) return rect
-        // Re-express the rect in scroll-container coordinates so a subsequent
-        // scroll between measurements doesn't show up as movement. We can't
-        // assign to a DOMRect's left/top, so allocate a fresh DOMRect.
-        const { scrollLeft, scrollTop } = scrollContainer
-        return new DOMRect(rect.left + scrollLeft, rect.top + scrollTop, rect.width, rect.height)
+        if (!scrollContainers || scrollContainers.length === 0) return rect
+        // Re-express the rect in the *combined* scroll-container coordinate
+        // space so a subsequent scroll on any of them doesn't show up as
+        // movement. DOMRect's left/top are read-only, so allocate a fresh
+        // one with the summed offsets applied.
+        let offsetLeft = 0
+        let offsetTop = 0
+        for (const container of scrollContainers) {
+            offsetLeft += container.scrollLeft
+            offsetTop += container.scrollTop
+        }
+        return new DOMRect(rect.left + offsetLeft, rect.top + offsetTop, rect.width, rect.height)
     } finally {
         el.style.transform = prev
     }

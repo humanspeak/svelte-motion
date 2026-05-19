@@ -336,8 +336,8 @@ happen in container coordinates and stay anchored.
 ```
 
 Apply `layoutScroll` on the same `motion.*` element that owns the
-scrolling. Descendants walk up the Svelte context to find the nearest
-`layoutScroll` ancestor.
+scrolling. Nested `layoutScroll` ancestors stack: a `layout` descendant
+accounts for every `layoutScroll` ancestor's scroll offset.
 
 ---
 
