@@ -46,6 +46,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Keyframes',
         description: 'Interactive Keyframes animation example using Svelte Motion.'
     },
+    'layout-group': {
+        title: 'LayoutGroup',
+        description:
+            'Scope shared-layout animations to a subtree so sibling regions reusing the same layoutId animate independently.'
+    },
     'layout-scroll': {
         title: 'layoutScroll',
         description:

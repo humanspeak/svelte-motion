@@ -108,6 +108,34 @@ Apply `layoutScroll` on the same `motion.*` element that owns the scrolling — 
 |---|---|---|
 | `layoutScroll` | `boolean` | Mark this element as a scroll container so descendant `layout` measurements account for its scroll offset. Nested `layoutScroll` ancestors stack. |
 
+## Scoping shared animations — `<LayoutGroup>`
+
+If two regions of your UI reuse the same `layoutId` values (think two tab strips both using `layoutId="underline"`, or several Kanban columns each with a `layoutId="indicator"`), they'd cross-animate by default — the global registry doesn't know which instance is which, and an unmount in one region can be picked up by a mount in another.
+
+Wrap each region in `<LayoutGroup id="…">` to scope the registry to that subtree:
+
+```svelte
+<script>
+    import { AnimatePresence, LayoutGroup, motion } from '@humanspeak/svelte-motion'
+</script>
+
+<LayoutGroup id="strip-a">
+    <Tabs />
+</LayoutGroup>
+
+<LayoutGroup id="strip-b">
+    <Tabs />
+    <!-- same layoutId values inside — but independent of strip-a -->
+</LayoutGroup>
+```
+
+Nested groups chain by default (`inherit={true}`), so a `<LayoutGroup id="inner">` inside a `<LayoutGroup id="outer">` yields an effective id of `"outer-inner"`. Pass `inherit={false}` to start a fresh scope that ignores any surrounding group — useful for embedded widgets that should not be affected by ambient grouping.
+
+| Prop | Type | Description |
+|---|---|---|
+| `id` | `string?` | Stable identifier for this group. Combined with any surrounding LayoutGroup's id when `inherit` is `true`. |
+| `inherit` | `boolean \| 'id'` (default `true`) | When `true` (or `'id'`), chain onto the parent group's id. When `false`, ignore any outer group and start a fresh scope. `'id'` is accepted for drop-in compatibility with framer-motion examples; it behaves the same as `true` here. |
+
 ## API reference
 
 ### `layout`
@@ -130,3 +158,4 @@ Apply `layoutScroll` on the same `motion.*` element that owns the scrolling — 
 
 - [AnimatePresence](/docs/animate-presence) — Coordinate enter/exit animations
 - [Shared Layout Animation example](/examples/shared-layout-animation) — Full interactive demo
+- [LayoutGroup example](/examples/layout-group) — Two sibling tab strips reusing the same `layoutId` without crossing over

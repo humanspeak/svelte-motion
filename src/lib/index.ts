@@ -1,4 +1,5 @@
 import AnimatePresence from '$lib/components/AnimatePresence.svelte'
+import LayoutGroup from '$lib/components/LayoutGroup.svelte'
 import MotionConfig from '$lib/components/MotionConfig.svelte'
 import PresenceChild from '$lib/components/PresenceChild.svelte'
 
@@ -73,7 +74,7 @@ export { stringifyStyleObject } from '$lib/utils/styleObject'
 export { styleString } from '$lib/utils/styleObject.svelte'
 export { useTime } from '$lib/utils/time'
 export { useTransform } from '$lib/utils/transform'
-export { AnimatePresence, MotionConfig, PresenceChild }
+export { AnimatePresence, LayoutGroup, MotionConfig, PresenceChild }
 
 // Named component exports — tree-shakeable alternative to the `motion` object
 export { default as MotionA } from '$lib/html/A.svelte'

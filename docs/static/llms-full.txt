@@ -339,6 +339,37 @@ Apply `layoutScroll` on the same `motion.*` element that owns the
 scrolling. Nested `layoutScroll` ancestors stack: a `layout` descendant
 accounts for every `layoutScroll` ancestor's scroll offset.
 
+### Scoping shared animations — `<LayoutGroup>`
+
+When two regions of your UI reuse the same `layoutId` values (e.g. two
+tab strips each with a `layoutId="underline"`), they would cross-animate
+by default — the global registry doesn't distinguish them. Wrap each
+region in `<LayoutGroup id="…">` to scope the registry:
+
+```svelte
+<script>
+    import { AnimatePresence, LayoutGroup, motion } from '@humanspeak/svelte-motion'
+</script>
+
+<LayoutGroup id="strip-a">
+    <Tabs />
+</LayoutGroup>
+
+<LayoutGroup id="strip-b">
+    <Tabs />
+</LayoutGroup>
+```
+
+Nested `<LayoutGroup>`s chain by default — a `<LayoutGroup id="inner">`
+inside `<LayoutGroup id="outer">` yields the effective id
+`"outer-inner"`. Pass `inherit={false}` on a nested group to ignore any
+surrounding group and start a fresh scope (useful for embedded widgets).
+
+| Prop | Type | Description |
+|---|---|---|
+| `id` | `string?` | Stable identifier for this group's scope. |
+| `inherit` | `boolean \| 'id'` (default `true`) | When `true` (or `'id'`), chain onto the parent group's id. When `false`, ignore any outer group. `'id'` is accepted for drop-in framer-motion compatibility and behaves the same as `true`. |
+
 ---
 
 ## MotionConfig
