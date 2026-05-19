@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import ConicGradientExample from '$lib/examples/ConicGradientExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -24,6 +22,6 @@
     }
 </script>
 
-<Example title="Conic Gradient" sourceUrl={data.sourceUrl}>
+<Example title="Conic Gradient" file="ConicGradientExample.svelte">
     <ConicGradientExample />
 </Example>

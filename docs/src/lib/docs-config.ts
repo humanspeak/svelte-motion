@@ -23,3 +23,14 @@ export const docsConfig: DocsKitConfig = {
     defaultFeatures: ['AnimatePresence', 'Spring Physics', 'Gestures & Drag', 'Layout Animation'],
     fallbackStars: 200
 }
+
+const REPO_BLOB = `https://github.com/${docsConfig.repo}/blob/main`
+const EXAMPLES_DIR = 'docs/src/lib/examples'
+
+/**
+ * Build the GitHub URL for an example component shipped with the docs site.
+ *
+ * @param file Filename inside `docs/src/lib/examples/` (e.g. `HoverAndTap.svelte`).
+ * @returns Absolute URL to the file on the `main` branch.
+ */
+export const exampleSourceUrl = (file: string): string => `${REPO_BLOB}/${EXAMPLES_DIR}/${file}`

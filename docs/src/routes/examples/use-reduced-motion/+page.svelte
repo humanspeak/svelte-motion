@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import UseReducedMotionExample from '$lib/examples/UseReducedMotionExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -24,6 +22,6 @@
     }
 </script>
 
-<Example title="useReducedMotion" sourceUrl={data.sourceUrl}>
+<Example title="useReducedMotion" file="UseReducedMotionExample.svelte">
     <UseReducedMotionExample />
 </Example>

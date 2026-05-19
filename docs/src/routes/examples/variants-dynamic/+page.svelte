@@ -23,6 +23,6 @@
     }
 </script>
 
-<Example title="Variants Dynamic — custom prop">
+<Example title="Variants Dynamic — custom prop" file="VariantsDynamicExample.svelte">
     <VariantsDynamicExample />
 </Example>

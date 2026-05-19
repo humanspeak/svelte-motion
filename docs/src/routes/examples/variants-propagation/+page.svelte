@@ -24,6 +24,6 @@
     }
 </script>
 
-<Example title="Variants Propagation">
+<Example title="Variants Propagation" file="VariantsPropagationExample.svelte">
     <VariantsPropagationExample />
 </Example>

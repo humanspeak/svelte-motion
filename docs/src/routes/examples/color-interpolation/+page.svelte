@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import ColorInterpolationExample from '$lib/examples/ColorInterpolationExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -29,6 +27,6 @@
     }
 </script>
 
-<Example title="Color Interpolation" sourceUrl={data.sourceUrl}>
+<Example title="Color Interpolation" file="ColorInterpolationExample.svelte">
     <ColorInterpolationExample />
 </Example>

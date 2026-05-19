@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import UseCycleExample from '$lib/examples/UseCycleExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -21,6 +19,6 @@
     }
 </script>
 
-<Example title="useCycle" sourceUrl={data.sourceUrl}>
+<Example title="useCycle" file="UseCycleExample.svelte">
     <UseCycleExample />
 </Example>

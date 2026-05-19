@@ -24,6 +24,6 @@
     }
 </script>
 
-<Example title="styleString">
+<Example title="styleString" file="StyleStringExample.svelte">
     <StyleStringExample />
 </Example>

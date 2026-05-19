@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import ScrollProgressExample from '$lib/examples/ScrollProgressExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -25,6 +23,6 @@
     }
 </script>
 
-<Example title="Scroll Progress" sourceUrl={data.sourceUrl ?? undefined}>
+<Example title="Scroll Progress" file="ScrollProgressExample.svelte">
     <ScrollProgressExample />
 </Example>

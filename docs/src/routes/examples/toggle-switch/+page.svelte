@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import ToggleSwitchExample from '$lib/examples/ToggleSwitchExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -24,6 +22,6 @@
     }
 </script>
 
-<Example title="Toggle Switch" sourceUrl={data.sourceUrl ?? undefined}>
+<Example title="Toggle Switch" file="ToggleSwitchExample.svelte">
     <ToggleSwitchExample />
 </Example>

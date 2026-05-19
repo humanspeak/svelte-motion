@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import WhileInViewExample from '$lib/examples/WhileInViewExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -25,6 +23,6 @@
     }
 </script>
 
-<Example title="While In View" sourceUrl={data.sourceUrl ?? undefined}>
+<Example title="While In View" file="WhileInViewExample.svelte">
     <WhileInViewExample />
 </Example>

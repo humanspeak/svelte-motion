@@ -24,9 +24,6 @@
     }
 </script>
 
-<Example
-    title="Characters Remaining"
-    sourceUrl="https://examples.motion.dev/react/characters-remaining"
->
+<Example title="Characters Remaining" file="CharactersRemainingExample.svelte">
     <CharactersRemainingExample />
 </Example>

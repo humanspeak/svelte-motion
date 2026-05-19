@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import MultiStateBadgeExample from '$lib/examples/MultiStateBadgeExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -30,6 +28,6 @@
     }
 </script>
 
-<Example title="Multi-State Badge" sourceUrl={data.sourceUrl ?? undefined}>
+<Example title="Multi-State Badge" file="MultiStateBadgeExample.svelte">
     <MultiStateBadgeExample />
 </Example>

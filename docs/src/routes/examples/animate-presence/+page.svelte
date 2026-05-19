@@ -29,6 +29,6 @@
     }
 </script>
 
-<Example title="AnimatePresence">
+<Example title="AnimatePresence" file="AnimatePresenceExample.svelte">
     <AnimatePresenceExample />
 </Example>

@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import UseInViewExample from '$lib/examples/UseInViewExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -21,6 +19,6 @@
     }
 </script>
 
-<Example title="useInView" sourceUrl={data.sourceUrl}>
+<Example title="useInView" file="UseInViewExample.svelte">
     <UseInViewExample />
 </Example>

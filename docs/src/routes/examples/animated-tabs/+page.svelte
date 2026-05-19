@@ -24,6 +24,6 @@
     }
 </script>
 
-<Example title="Animated Tabs">
+<Example title="Animated Tabs" file="AnimatedTabsExample.svelte">
     <AnimatedTabsExample />
 </Example>

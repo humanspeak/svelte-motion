@@ -1,5 +1,6 @@
 <script lang="ts">
     import { motion } from '@humanspeak/svelte-motion'
+    import { exampleSourceUrl } from '$lib/docs-config'
     import { cn } from '$lib/shadcn/utils'
     import * as m from '$msgs'
     import type { Snippet } from 'svelte'
@@ -8,18 +9,19 @@
     type ExampleProps = {
         children: Snippet
         isSmall?: boolean
-        sourceUrl?: string
+        /**
+         * Filename inside `docs/src/lib/examples/` (e.g. `HoverAndTap.svelte`).
+         * The Source button links to this file on GitHub `main`, so users
+         * can read the actual Svelte source for the demo they're viewing.
+         */
+        file?: string
         exampleUrl?: string
         title?: string
     }
 
-    const { children, isSmall = false, sourceUrl, exampleUrl, title }: ExampleProps = $props()
+    const { children, isSmall = false, file, exampleUrl, title }: ExampleProps = $props()
 
-    const sourceHost = $derived.by(() => {
-        if (!sourceUrl) return ''
-        const host = new URL(sourceUrl).hostname.replace(/^www\./i, '').replace(/^examples\./i, '')
-        return host.charAt(0).toUpperCase() + host.slice(1)
-    })
+    const sourceUrl = $derived(file ? exampleSourceUrl(file) : undefined)
 
     let refreshId = $state(0)
     const refreshMotion = () => {
@@ -68,7 +70,7 @@
                     whileHover={{ scale: 1.1 }}
                     class="inline-flex items-center justify-center rounded-md border border-border-muted px-2 py-1 text-sm text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
                 >
-                    {sourceHost}
+                    Source
                 </motion.button>
             {/if}
             <motion.button

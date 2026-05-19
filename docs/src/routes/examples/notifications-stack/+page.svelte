@@ -24,6 +24,6 @@
     }
 </script>
 
-<Example title="Notifications Stack">
+<Example title="Notifications Stack" file="NotificationsStackExample.svelte">
     <NotificationsStackExample />
 </Example>

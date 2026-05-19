@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import TabSelectExample from '$lib/examples/TabSelectExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -25,6 +23,6 @@
     }
 </script>
 
-<Example title="Tab Select" sourceUrl={data.sourceUrl ?? undefined}>
+<Example title="Tab Select" file="TabSelectExample.svelte">
     <TabSelectExample />
 </Example>

@@ -3,8 +3,6 @@
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import Example from '$lib/components/general/Example.svelte'
     import UsePresenceExample from '$lib/examples/UsePresenceExample.svelte'
-
-    const { data } = $props()
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -24,6 +22,6 @@
     }
 </script>
 
-<Example title="usePresence" sourceUrl={data.sourceUrl}>
+<Example title="usePresence" file="UsePresenceExample.svelte">
     <UsePresenceExample />
 </Example>
