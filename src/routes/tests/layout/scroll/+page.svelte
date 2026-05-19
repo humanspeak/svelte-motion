@@ -20,8 +20,14 @@
         expanded = !expanded
     }
 
-    let sizeRest = '120px'
-    let sizeExpanded = '240px'
+    const sizeRest = '120px'
+    const sizeExpanded = '240px'
+
+    // Svelte's scope hash is added to native elements but not to `motion.*`
+    // components, so a shared `.scroll` class wouldn't apply to both
+    // panels. Inline the style on both panels for parity instead.
+    const scrollPanelStyle =
+        'overflow: auto; height: 320px; border: 1px solid #bbb; border-radius: 8px; background: #fafafa; position: relative;'
 </script>
 
 <svelte:head>
@@ -54,7 +60,7 @@
                 without <code>layoutScroll</code>
                 <span class="bad">drifts on scroll</span>
             </h2>
-            <div class="scroll" data-testid="scroll-without">
+            <div style={scrollPanelStyle} data-testid="scroll-without">
                 <div class="pad-top"></div>
                 <motion.div
                     data-testid="box-without"
@@ -73,11 +79,7 @@
                 with <code>layoutScroll</code>
                 <span class="good">stays anchored</span>
             </h2>
-            <motion.div
-                layoutScroll
-                data-testid="scroll-with"
-                style="overflow: auto; height: 320px; border: 1px solid #bbb; border-radius: 8px; background: #fafafa; position: relative;"
-            >
+            <motion.div layoutScroll data-testid="scroll-with" style={scrollPanelStyle}>
                 <div class="pad-top"></div>
                 <motion.div
                     data-testid="box-with"
@@ -155,14 +157,6 @@
     .good {
         color: #047857;
         background: #d1fae5;
-    }
-    .scroll {
-        overflow: auto;
-        height: 320px;
-        border: 1px solid #bbb;
-        border-radius: 8px;
-        background: #fafafa;
-        position: relative;
     }
     .pad-top {
         height: 360px;

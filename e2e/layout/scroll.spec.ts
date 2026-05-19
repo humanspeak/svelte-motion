@@ -53,12 +53,11 @@ test.describe('layout/scroll', () => {
         const finalTransform = await boxWith.evaluate(
             (el) => (el as HTMLElement).style.transform || ''
         )
-        // Expect either an empty string (no transform applied), the literal
-        // "none", or a near-zero translate within sub-pixel rounding.
-        const drift = finalTransform.match(/translateX\(([-\d.]+)px\)/)?.[1]
-        if (drift !== undefined) {
-            expect(Math.abs(Number(drift))).toBeLessThan(1)
-        }
+        // An empty string or "none" both mean "no translate applied" (drift=0);
+        // a partial translate string means we kept some movement and need to
+        // verify it's within sub-pixel rounding.
+        const drift = Number(finalTransform.match(/translateX\(([-\d.]+)px\)/)?.[1] ?? '0')
+        expect(Math.abs(drift)).toBeLessThan(1)
 
         // Sanity: the box still exists at the expected expanded size (~240).
         const box = await boxWith.boundingBox()

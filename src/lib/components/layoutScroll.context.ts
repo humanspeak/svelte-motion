@@ -2,14 +2,12 @@ import { getContext, setContext } from 'svelte'
 
 /**
  * Deferred references to the chain of `layoutScroll` ancestors for the
- * current subtree. Element refs are bound after mount, so we pass thunks;
- * descendants invoke them at measurement time.
+ * current subtree. Returned as a thunk because element refs are bound
+ * after mount; consumers invoke at measurement time.
  *
- * The chain is **bottom-up**: the closest ancestor first, then its
- * `layoutScroll` ancestor, and so on. Order doesn't matter for offset
- * summing — they're all combined — but the array is the chain so a
- * future feature (per-container `wasRoot` semantics, etc.) can iterate
- * in a defined direction.
+ * Order is closest-first. Order doesn't matter for the current scroll-
+ * offset sum, but is preserved so future per-container semantics (e.g.
+ * a `scroll.wasRoot` marker like framer-motion) can iterate deterministically.
  */
 export type LayoutScrollContainerRef = () => Array<HTMLElement | null | undefined>
 

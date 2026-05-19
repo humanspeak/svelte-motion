@@ -37,10 +37,8 @@ test.describe('layout/nested-scroll', () => {
         // After settle, the FLIP delta should be zero (transform clears)
         // because the outer scroll was accounted for in both measurements.
         const transform = await box.evaluate((el) => (el as HTMLElement).style.transform || '')
-        const drift = transform.match(/translateY\(([-\d.]+)px\)/)?.[1]
-        if (drift !== undefined) {
-            expect(Math.abs(Number(drift))).toBeLessThan(1)
-        }
+        const drift = Number(transform.match(/translateY\(([-\d.]+)px\)/)?.[1] ?? '0')
+        expect(Math.abs(drift)).toBeLessThan(1)
 
         // Sanity: box reached its expanded size.
         const rect = await box.boundingBox()
