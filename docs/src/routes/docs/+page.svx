@@ -7,7 +7,7 @@ description: "Svelte Motion is a Svelte animation library for building smooth, p
   import { motion, AnimatePresence } from '@humanspeak/svelte-motion';
   import Example from '$lib/components/general/Example.svelte'
   import Rotate from '$lib/examples/Rotate.svelte'
-  import AnimatedButton from '$lib/examples/AnimatedButton.svelte'
+  import AnimatedButton from '$lib/examples/animated-button/demos/Default.svelte'
   import HoverAndTap from '$lib/examples/HoverAndTap.svelte'
   import WhileInViewExample from '$lib/examples/WhileInViewExample.svelte'
   import { DocHeroCard, getSeoContext } from '@humanspeak/docs-kit'
