@@ -36,18 +36,18 @@ npm install @humanspeak/svelte-motion
 
 Goal: Framer Motion API parity for Svelte where common React examples can be translated with minimal changes.
 
-| Capability                                                | Status                          |
-| --------------------------------------------------------- | ------------------------------- |
-| `initial` / `animate` / `transition`                      | Supported                       |
-| `variants` (string keys + inheritance)                    | Supported                       |
-| `whileHover` / `whileTap` / `whileFocus` / `whileInView`  | Supported                       |
-| Drag (`drag`, constraints, momentum, controls, callbacks) | Supported                       |
-| `AnimatePresence` (`initial`, `mode`, `onExitComplete`)   | Supported                       |
-| Layout (`layout`, `layout="position"`)                    | Supported (single-element FLIP) |
-| Shared layout (`layoutId`, `LayoutGroup`, `layoutScroll`) | Supported                       |
-| Pan gesture API (`whilePan`, `onPan*`)                    | Not yet supported               |
-| `MotionConfig` parity beyond `transition`                 | Partial                         |
-| `reducedMotion`, `features`, `transformPagePoint`         | Not yet supported               |
+| Capability                                                             | Status                                     |
+| ---------------------------------------------------------------------- | ------------------------------------------ |
+| `initial` / `animate` / `transition`                                   | Supported                                  |
+| `variants` (string keys + inheritance, function-form `custom`)         | Supported                                  |
+| `whileHover` / `whileTap` / `whileFocus` / `whileDrag` / `whileInView` | Supported (inline + variant keys / arrays) |
+| Drag (`drag`, constraints, momentum, controls, callbacks)              | Supported                                  |
+| `AnimatePresence` (`initial`, `mode`, `onExitComplete`)                | Supported                                  |
+| Layout (`layout`, `layout="position"`)                                 | Supported (single-element FLIP)            |
+| Shared layout (`layoutId`, `LayoutGroup`, `layoutScroll`)              | Supported                                  |
+| Pan gesture API (`whilePan`, `onPan*`)                                 | Not yet supported                          |
+| `MotionConfig` parity beyond `transition`                              | Partial                                    |
+| `reducedMotion`, `features`, `transformPagePoint`                      | Not yet supported                          |
 
 ## Supported elements
 

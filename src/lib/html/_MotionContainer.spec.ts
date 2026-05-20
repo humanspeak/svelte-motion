@@ -1,5 +1,5 @@
 import { fireEvent, render } from '@testing-library/svelte'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock 'motion' before importing the Svelte component (hoisted)
 vi.mock('motion', () => {
@@ -28,6 +28,14 @@ beforeEach(() => {
         setTimeout(() => cb(0), 0)
         return 0 as unknown as number
     })
+})
+
+// Restore stubbed globals (e.g. `matchMedia` from whileHover tests)
+// here rather than at the bottom of each test body — if an assertion
+// throws mid-test, the per-test cleanup would be skipped and patched
+// globals would leak into later tests in this file.
+afterEach(() => {
+    vi.unstubAllGlobals()
 })
 
 async function flushTimers() {
@@ -117,6 +125,134 @@ describe('_MotionContainer', () => {
         expect(resetDef).toMatchObject({ scale: 1.1, backgroundColor: '#000' })
     })
 
+    it('whileHover accepts a variant key string and resolves it against `variants` (#349)', async () => {
+        // Enable true-hover environment so the whileHover effect attaches.
+        vi.stubGlobal('matchMedia', ((query: string) => {
+            const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
+            return {
+                matches,
+                media: query,
+                onchange: null,
+                addEventListener() {},
+                removeEventListener() {},
+                addListener() {},
+                removeListener() {},
+                dispatchEvent() {
+                    return false
+                }
+            } as unknown as MediaQueryList
+        }) as unknown as typeof window.matchMedia)
+
+        const variants = { hover: { scale: 1.2 } }
+
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+        const { container } = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                initial: { scale: 1 },
+                animate: { scale: 1.1 },
+                variants,
+                whileHover: 'hover'
+            }
+        })
+
+        await flushTimers()
+        const el = container.firstElementChild as HTMLElement
+
+        // Enter: the resolved variant ('hover' → { scale: 1.2 }) should
+        // flow into the animate call exactly as if it were inline.
+        await fireEvent.pointerEnter(el)
+        await flushTimers()
+
+        const enterCall = animateMock.mock.calls.at(-1)
+        expect(enterCall?.[1]).toMatchObject({ scale: 1.2 })
+    })
+
+    it('whileHover accepts an array of variant keys, merging later-wins (#349)', async () => {
+        vi.stubGlobal('matchMedia', ((query: string) => {
+            const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
+            return {
+                matches,
+                media: query,
+                onchange: null,
+                addEventListener() {},
+                removeEventListener() {},
+                addListener() {},
+                removeListener() {},
+                dispatchEvent() {
+                    return false
+                }
+            } as unknown as MediaQueryList
+        }) as unknown as typeof window.matchMedia)
+
+        // Two variants colliding on `color` — `muted` is later in the
+        // array, so its color wins. `hover`'s `scale` is preserved.
+        const variants = {
+            hover: { scale: 1.2, color: 'red' },
+            muted: { color: 'gray' }
+        }
+
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+        const { container } = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                initial: { scale: 1, color: 'black' },
+                animate: { scale: 1 },
+                variants,
+                whileHover: ['hover', 'muted']
+            }
+        })
+
+        await flushTimers()
+        const el = container.firstElementChild as HTMLElement
+
+        await fireEvent.pointerEnter(el)
+        await flushTimers()
+
+        const enterCall = animateMock.mock.calls.at(-1)
+        expect(enterCall?.[1]).toMatchObject({ scale: 1.2, color: 'gray' })
+    })
+
+    it('whileHover with unknown variant key is treated as no-op (#349)', async () => {
+        // String key that misses against `variants` → resolver returns
+        // undefined → `isNotEmpty` gate skips attach. The hover path
+        // never installs listeners, so no animate call follows
+        // pointerEnter.
+        vi.stubGlobal('matchMedia', ((query: string) => {
+            const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
+            return {
+                matches,
+                media: query,
+                onchange: null,
+                addEventListener() {},
+                removeEventListener() {},
+                addListener() {},
+                removeListener() {},
+                dispatchEvent() {
+                    return false
+                }
+            } as unknown as MediaQueryList
+        }) as unknown as typeof window.matchMedia)
+
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+        const { container } = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                variants: { hover: { scale: 1.2 } },
+                whileHover: 'missing'
+            }
+        })
+
+        await flushTimers()
+        const el = container.firstElementChild as HTMLElement
+        animateMock.mockClear()
+
+        await fireEvent.pointerEnter(el)
+        await flushTimers()
+
+        expect(animateMock.mock.calls.length).toBe(0)
+    })
+
     it('re-runs animate when animate prop changes', async () => {
         /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const result = render(MotionContainer as unknown as any, {
@@ -196,7 +332,6 @@ describe('_MotionContainer', () => {
         expect(el.style.transformOrigin).toBe('')
 
         rectSpy.mockRestore()
-        vi.unstubAllGlobals()
     })
 
     it('applies translate-only when layout="position" (no scale)', async () => {
@@ -249,7 +384,6 @@ describe('_MotionContainer', () => {
         expect(roInstances.length).toBeGreaterThan(0)
 
         rectSpy.mockRestore()
-        vi.unstubAllGlobals()
     })
 
     it('whileHover animates on enter/leave, uses nested transition, and fires callbacks', async () => {
@@ -306,8 +440,6 @@ describe('_MotionContainer', () => {
         expect(lastCall?.[1]).toMatchObject({ scale: 1.1 })
         expect(lastCall?.[2]).toMatchObject({ duration: 0.25 })
         expect(onHoverEnd).toHaveBeenCalledTimes(1)
-
-        vi.unstubAllGlobals()
     })
 
     it('passes own custom prop into a function-form variant on animate', async () => {

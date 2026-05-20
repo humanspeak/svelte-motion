@@ -257,6 +257,29 @@ Named animation states with parent-child propagation.
 
 - Variant strings passed to `animate` propagate to children through context
 - Children inherit the parent's active variant key automatically
+- `initial`, `animate`, `exit`, `whileHover`, `whileTap`, `whileFocus`, `whileDrag`, and `whileInView` all accept a single variant key string or an array of keys (later entries override earlier ones on key collisions)
+
+### Variant keys on gesture props
+
+Reuse a named variant across gestures by passing the key directly:
+
+```svelte
+<script lang="ts">
+    import { motion, type Variants } from '@humanspeak/svelte-motion'
+
+    const card: Variants = {
+        hovered: { scale: 1.05 },
+        pressed: { scale: 0.95 },
+        tinted: { backgroundColor: '#22c55e' }
+    }
+</script>
+
+<!-- Single key -->
+<motion.div variants={card} whileHover="hovered" whileTap="pressed" />
+
+<!-- Array — left-to-right merge, later wins on collisions -->
+<motion.div variants={card} whileHover={['hovered', 'tinted']} />
+```
 
 ### Dynamic (function-form) variants + `custom` prop
 

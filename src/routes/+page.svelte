@@ -72,6 +72,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/while-string-variants') + searchParams}
+                    >
+                        whileX — variant string keys
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/keyframes') + searchParams}
                     >
                         Keyframes (shape + scale)

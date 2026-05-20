@@ -1,6 +1,13 @@
 import type { Variants } from '$lib/types'
 import { describe, expect, it } from 'vitest'
-import { resolveAnimate, resolveExit, resolveInitial, resolveVariant } from './variants.js'
+import {
+    resolveAnimate,
+    resolveExit,
+    resolveInitial,
+    resolveVariant,
+    resolveVariantList,
+    resolveWhile
+} from './variants.js'
 
 describe('utils/variants - resolveVariant', () => {
     it('returns the static keyframes object for an object-form variant', () => {
@@ -40,6 +47,19 @@ describe('utils/variants - resolveVariant', () => {
         }
         expect(resolveVariant(variants, 'visible', 0)).toEqual({ x: 0 })
     })
+
+    it('does not resolve inherited / prototype keys like "toString" or "constructor"', () => {
+        // Without the `hasOwnProperty` guard, `variants['toString']`
+        // would walk up to `Function.prototype.toString` and leak a
+        // function into the merge path — a real bug for users who name
+        // a variant after a built-in. (#349 CR)
+        const variants: Variants = { real: { opacity: 1 } }
+        expect(resolveVariant(variants, 'toString')).toBeUndefined()
+        expect(resolveVariant(variants, 'constructor')).toBeUndefined()
+        expect(resolveVariant(variants, 'hasOwnProperty')).toBeUndefined()
+        // The real key still resolves.
+        expect(resolveVariant(variants, 'real')).toEqual({ opacity: 1 })
+    })
 })
 
 describe('utils/variants - resolveInitial', () => {
@@ -66,6 +86,17 @@ describe('utils/variants - resolveInitial', () => {
         }
         expect(resolveInitial('hidden', variants, 2)).toEqual({ x: -200 })
     })
+
+    it('resolves an array-form initial via resolveVariantList (later wins)', () => {
+        const variants: Variants = {
+            hidden: { opacity: 0, scale: 0.5 },
+            small: { scale: 0.8 }
+        }
+        expect(resolveInitial(['hidden', 'small'], variants)).toEqual({
+            opacity: 0,
+            scale: 0.8
+        })
+    })
 })
 
 describe('utils/variants - resolveAnimate', () => {
@@ -87,6 +118,17 @@ describe('utils/variants - resolveAnimate', () => {
 
     it('returns undefined when animate is undefined', () => {
         expect(resolveAnimate(undefined, undefined)).toBeUndefined()
+    })
+
+    it('resolves an array-form animate via resolveVariantList (later wins)', () => {
+        const variants: Variants = {
+            visible: { opacity: 1, x: 0 },
+            shifted: { x: 100 }
+        }
+        expect(resolveAnimate(['visible', 'shifted'], variants)).toEqual({
+            opacity: 1,
+            x: 100
+        })
     })
 })
 
@@ -110,5 +152,144 @@ describe('utils/variants - resolveExit', () => {
 
     it('returns undefined when exit is undefined', () => {
         expect(resolveExit(undefined, undefined)).toBeUndefined()
+    })
+
+    it('resolves an array of variant keys by merging keyframes left-to-right', () => {
+        const variants: Variants = {
+            hidden: { opacity: 0, scale: 0.5 },
+            small: { scale: 0.8 }
+        }
+        // `small` is later in the array → its `scale` wins; `opacity`
+        // from `hidden` is preserved.
+        expect(resolveExit(['hidden', 'small'], variants)).toEqual({
+            opacity: 0,
+            scale: 0.8
+        })
+    })
+})
+
+describe('utils/variants - resolveVariantList', () => {
+    it('returns undefined when keys is undefined', () => {
+        expect(resolveVariantList({ a: { x: 1 } }, undefined)).toBeUndefined()
+    })
+
+    it('returns undefined for an empty array', () => {
+        expect(resolveVariantList({ a: { x: 1 } }, [])).toBeUndefined()
+    })
+
+    it('delegates to resolveVariant for a single string', () => {
+        const variants: Variants = { hover: { scale: 1.1 } }
+        expect(resolveVariantList(variants, 'hover')).toEqual({ scale: 1.1 })
+    })
+
+    it('merges multiple variant keys left-to-right, later wins on collisions', () => {
+        const variants: Variants = {
+            hover: { scale: 1.1, color: 'blue' },
+            active: { scale: 1.2 }
+        }
+        expect(resolveVariantList(variants, ['hover', 'active'])).toEqual({
+            scale: 1.2,
+            color: 'blue'
+        })
+    })
+
+    it('skips missing keys without breaking the chain', () => {
+        const variants: Variants = { hover: { scale: 1.1 } }
+        expect(resolveVariantList(variants, ['missing', 'hover'])).toEqual({ scale: 1.1 })
+        expect(resolveVariantList(variants, ['hover', 'missing'])).toEqual({ scale: 1.1 })
+    })
+
+    it('returns undefined when every key in the array misses', () => {
+        const variants: Variants = { hover: { scale: 1.1 } }
+        expect(resolveVariantList(variants, ['none', 'missing'])).toBeUndefined()
+    })
+
+    it('forwards custom to function-form entries per-key', () => {
+        const variants: Variants = {
+            base: (i) => ({ x: (i as number) * 10 }) as never,
+            delta: (i) => ({ y: (i as number) * 5 }) as never
+        }
+        expect(resolveVariantList(variants, ['base', 'delta'], 4)).toEqual({
+            x: 40,
+            y: 20
+        })
+    })
+
+    it('rejects non-plain-object entries (arrays, class instances) from the merge', () => {
+        // A function-form variant could misbehave and return an array
+        // or class instance. Spreading those would corrupt the merge
+        // (array indices as keys, methods leaking in). Skip them.
+        class CustomShape {
+            constructor(public x: number) {}
+        }
+        // Cast to `Variants` — the `Variant` factory signature expects
+        // plain keyframes; we are deliberately misusing it to verify
+        // the runtime guard catches what TypeScript would normally
+        // forbid.
+        const variants = {
+            badArray: () => [1, 2, 3],
+            badInstance: () => new CustomShape(5),
+            good: { opacity: 1 }
+        } as unknown as Variants
+
+        // Arrays alone → undefined (nothing valid merged)
+        expect(resolveVariantList(variants, ['badArray'])).toBeUndefined()
+        // Class instances alone → undefined
+        expect(resolveVariantList(variants, ['badInstance'])).toBeUndefined()
+        // Mixed: the good entry still applies, bad entries skipped
+        expect(resolveVariantList(variants, ['badArray', 'good', 'badInstance'])).toEqual({
+            opacity: 1
+        })
+    })
+
+    it('accepts Object.create(null) entries from the merge (prototype === null)', () => {
+        // Sanity check: a function-form variant building keyframes via
+        // `Object.create(null)` is still a plain map. Don't reject it.
+        const variants = {
+            nullProto: () => {
+                const obj = Object.create(null)
+                obj.scale = 1.5
+                return obj
+            }
+        } as unknown as Variants
+        expect(resolveVariantList(variants, ['nullProto'])).toEqual({ scale: 1.5 })
+    })
+})
+
+describe('utils/variants - resolveWhile', () => {
+    it('passes through inline keyframes unchanged', () => {
+        expect(resolveWhile({ scale: 1.1 }, undefined)).toEqual({ scale: 1.1 })
+    })
+
+    it('resolves a single variant key', () => {
+        const variants: Variants = { hover: { scale: 1.05 } }
+        expect(resolveWhile('hover', variants)).toEqual({ scale: 1.05 })
+    })
+
+    it('resolves an array of variant keys with later-wins merging', () => {
+        const variants: Variants = {
+            hover: { scale: 1.1 },
+            active: { scale: 1.2, color: 'red' }
+        }
+        expect(resolveWhile(['hover', 'active'], variants)).toEqual({
+            scale: 1.2,
+            color: 'red'
+        })
+    })
+
+    it('returns undefined when value is undefined', () => {
+        expect(resolveWhile(undefined, undefined)).toBeUndefined()
+    })
+
+    it('returns undefined when the variant key misses', () => {
+        const variants: Variants = { hover: { scale: 1.1 } }
+        expect(resolveWhile('missing', variants)).toBeUndefined()
+    })
+
+    it('forwards custom to function-form variants', () => {
+        const variants: Variants = {
+            hover: (i) => ({ scale: 1 + (i as number) * 0.1 }) as never
+        }
+        expect(resolveWhile('hover', variants, 3)).toEqual({ scale: 1.3 })
     })
 })

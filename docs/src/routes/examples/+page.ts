@@ -141,6 +141,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'Per-instance variants — function-form factories receive the custom prop, driving staggered index-based delays.'
     },
+    'variants-while-hover': {
+        title: 'Variants on whileHover',
+        description:
+            'Pass a variant key (or array) to whileHover, whileTap, whileFocus, whileDrag, or whileInView to reuse named states across gestures.'
+    },
     'variants-propagation': {
         title: 'Variants Propagation',
         description: 'Interactive variants propagation animation example using Svelte Motion.'

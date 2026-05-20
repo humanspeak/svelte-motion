@@ -65,7 +65,7 @@ export type Variants = Record<string, Variant>
  * <motion.div variants={myVariants} initial="hidden" animate="visible" />
  * ```
  */
-export type MotionInitial = DOMKeyframesDefinition | string | false | undefined
+export type MotionInitial = DOMKeyframesDefinition | string | string[] | false | undefined
 
 /**
  * Target animation properties for a motion component.
@@ -81,7 +81,7 @@ export type MotionInitial = DOMKeyframesDefinition | string | false | undefined
  * <motion.div variants={myVariants} animate="visible" />
  * ```
  */
-export type MotionAnimate = DOMKeyframesDefinition | string | undefined
+export type MotionAnimate = DOMKeyframesDefinition | string | string[] | undefined
 
 /**
  * Exit animation properties for a motion component when unmounted.
@@ -101,6 +101,7 @@ export type MotionExit =
     | (Record<string, unknown> & { transition?: AnimationOptions })
     | DOMKeyframesDefinition
     | string
+    | string[]
     | undefined
 
 /**
@@ -123,59 +124,98 @@ export type MotionTransition = AnimationOptions | undefined
 
 /**
  * Animation properties for tap/click interactions.
+ *
+ * Accepts inline keyframes, a variant key, or an array of variant keys
+ * (later entries override earlier ones on key collisions).
+ *
  * @example
  * ```svelte
  * <motion.button whileTap={{ scale: 0.95 }} />
+ *
+ * <!-- Variant key -->
+ * <motion.button variants={{ pressed: { scale: 0.95 } }} whileTap="pressed" />
+ *
+ * <!-- Array — later wins on conflicts -->
+ * <motion.button whileTap={["pressed", "muted"]} />
  * ```
  */
-export type MotionWhileTap = DOMKeyframesDefinition | undefined
+export type MotionWhileTap =
+    | (Record<string, unknown> & { transition?: AnimationOptions })
+    | DOMKeyframesDefinition
+    | string
+    | string[]
+    | undefined
 
 /**
  * Animation properties for hover interactions.
+ *
+ * Accepts inline keyframes, a variant key, or an array of variant keys.
+ *
  * @example
  * ```svelte
  * <motion.div whileHover={{ scale: 1.05 }} />
+ *
+ * <!-- Variant key -->
+ * <motion.div variants={{ hover: { scale: 1.05 } }} whileHover="hover" />
  * ```
  */
 export type MotionWhileHover =
     | (Record<string, unknown> & { transition?: AnimationOptions })
     | DOMKeyframesDefinition
+    | string
+    | string[]
     | undefined
 
 /**
  * Animation properties for focus interactions.
+ *
+ * Accepts inline keyframes, a variant key, or an array of variant keys.
+ *
  * @example
  * ```svelte
  * <motion.button whileFocus={{ scale: 1.05 }} />
+ * <motion.button variants={{ active: { outline: '2px solid blue' } }} whileFocus="active" />
  * ```
  */
 export type MotionWhileFocus =
     | (Record<string, unknown> & { transition?: AnimationOptions })
     | DOMKeyframesDefinition
+    | string
+    | string[]
     | undefined
 
 /**
  * Animation properties for drag interactions.
  * When a drag gesture starts, the element animates to this state; when it ends,
  * it animates back to its baseline (from animate/initial), restoring only the changed keys.
+ *
+ * Accepts inline keyframes, a variant key, or an array of variant keys.
  */
 export type MotionWhileDrag =
     | (Record<string, unknown> & { transition?: AnimationOptions })
     | DOMKeyframesDefinition
+    | string
+    | string[]
     | undefined
 
 /**
  * Animation properties for in-view interactions.
  * When the element enters the viewport, it animates to this state; when it leaves,
  * it animates back to its baseline (from animate/initial), restoring only the changed keys.
+ *
+ * Accepts inline keyframes, a variant key, or an array of variant keys.
+ *
  * @example
  * ```svelte
  * <motion.div whileInView={{ opacity: 1, y: 0 }} />
+ * <motion.div variants={{ inView: { opacity: 1 } }} whileInView="inView" />
  * ```
  */
 export type MotionWhileInView =
     | (Record<string, unknown> & { transition?: AnimationOptions })
     | DOMKeyframesDefinition
+    | string
+    | string[]
     | undefined
 
 /**
