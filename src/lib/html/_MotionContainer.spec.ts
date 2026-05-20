@@ -1,5 +1,5 @@
 import { fireEvent, render } from '@testing-library/svelte'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock 'motion' before importing the Svelte component (hoisted)
 vi.mock('motion', () => {
@@ -28,6 +28,14 @@ beforeEach(() => {
         setTimeout(() => cb(0), 0)
         return 0 as unknown as number
     })
+})
+
+// Restore stubbed globals (e.g. `matchMedia` from whileHover tests)
+// here rather than at the bottom of each test body — if an assertion
+// throws mid-test, the per-test cleanup would be skipped and patched
+// globals would leak into later tests in this file.
+afterEach(() => {
+    vi.unstubAllGlobals()
 })
 
 async function flushTimers() {
@@ -158,8 +166,6 @@ describe('_MotionContainer', () => {
 
         const enterCall = animateMock.mock.calls.at(-1)
         expect(enterCall?.[1]).toMatchObject({ scale: 1.2 })
-
-        vi.unstubAllGlobals()
     })
 
     it('whileHover accepts an array of variant keys, merging later-wins (#349)', async () => {
@@ -205,8 +211,6 @@ describe('_MotionContainer', () => {
 
         const enterCall = animateMock.mock.calls.at(-1)
         expect(enterCall?.[1]).toMatchObject({ scale: 1.2, color: 'gray' })
-
-        vi.unstubAllGlobals()
     })
 
     it('whileHover with unknown variant key is treated as no-op (#349)', async () => {
@@ -247,7 +251,6 @@ describe('_MotionContainer', () => {
         await flushTimers()
 
         expect(animateMock.mock.calls.length).toBe(0)
-        vi.unstubAllGlobals()
     })
 
     it('re-runs animate when animate prop changes', async () => {
@@ -329,7 +332,6 @@ describe('_MotionContainer', () => {
         expect(el.style.transformOrigin).toBe('')
 
         rectSpy.mockRestore()
-        vi.unstubAllGlobals()
     })
 
     it('applies translate-only when layout="position" (no scale)', async () => {
@@ -382,7 +384,6 @@ describe('_MotionContainer', () => {
         expect(roInstances.length).toBeGreaterThan(0)
 
         rectSpy.mockRestore()
-        vi.unstubAllGlobals()
     })
 
     it('whileHover animates on enter/leave, uses nested transition, and fires callbacks', async () => {
@@ -439,8 +440,6 @@ describe('_MotionContainer', () => {
         expect(lastCall?.[1]).toMatchObject({ scale: 1.1 })
         expect(lastCall?.[2]).toMatchObject({ duration: 0.25 })
         expect(onHoverEnd).toHaveBeenCalledTimes(1)
-
-        vi.unstubAllGlobals()
     })
 
     it('passes own custom prop into a function-form variant on animate', async () => {

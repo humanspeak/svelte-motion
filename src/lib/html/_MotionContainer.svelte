@@ -470,7 +470,12 @@
     // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
     const derivedAttrs = $derived<Record<string, unknown>>({
         ...(rest as Record<string, unknown>),
-        ...(whileTapProp &&
+        // Gate on the *resolved* whileTap, not the raw prop. With
+        // variant-label support a truthy-but-unresolved value (unknown
+        // key, empty array) would otherwise add `tabindex=0` for an
+        // element that never actually receives a tap gesture — an
+        // unintended tab stop. (#349 CR feedback)
+        ...(isNotEmpty(resolvedWhileTap) &&
         !isNativelyFocusable(tag, rest as Record<string, unknown>) &&
         ((rest as Record<string, unknown>)?.tabindex ??
             (rest as Record<string, unknown>)?.tabIndex ??

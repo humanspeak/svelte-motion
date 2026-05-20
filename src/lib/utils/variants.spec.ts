@@ -47,6 +47,19 @@ describe('utils/variants - resolveVariant', () => {
         }
         expect(resolveVariant(variants, 'visible', 0)).toEqual({ x: 0 })
     })
+
+    it('does not resolve inherited / prototype keys like "toString" or "constructor"', () => {
+        // Without the `hasOwnProperty` guard, `variants['toString']`
+        // would walk up to `Function.prototype.toString` and leak a
+        // function into the merge path — a real bug for users who name
+        // a variant after a built-in. (#349 CR)
+        const variants: Variants = { real: { opacity: 1 } }
+        expect(resolveVariant(variants, 'toString')).toBeUndefined()
+        expect(resolveVariant(variants, 'constructor')).toBeUndefined()
+        expect(resolveVariant(variants, 'hasOwnProperty')).toBeUndefined()
+        // The real key still resolves.
+        expect(resolveVariant(variants, 'real')).toEqual({ opacity: 1 })
+    })
 })
 
 describe('utils/variants - resolveInitial', () => {
@@ -73,6 +86,17 @@ describe('utils/variants - resolveInitial', () => {
         }
         expect(resolveInitial('hidden', variants, 2)).toEqual({ x: -200 })
     })
+
+    it('resolves an array-form initial via resolveVariantList (later wins)', () => {
+        const variants: Variants = {
+            hidden: { opacity: 0, scale: 0.5 },
+            small: { scale: 0.8 }
+        }
+        expect(resolveInitial(['hidden', 'small'], variants)).toEqual({
+            opacity: 0,
+            scale: 0.8
+        })
+    })
 })
 
 describe('utils/variants - resolveAnimate', () => {
@@ -94,6 +118,17 @@ describe('utils/variants - resolveAnimate', () => {
 
     it('returns undefined when animate is undefined', () => {
         expect(resolveAnimate(undefined, undefined)).toBeUndefined()
+    })
+
+    it('resolves an array-form animate via resolveVariantList (later wins)', () => {
+        const variants: Variants = {
+            visible: { opacity: 1, x: 0 },
+            shifted: { x: 100 }
+        }
+        expect(resolveAnimate(['visible', 'shifted'], variants)).toEqual({
+            opacity: 1,
+            x: 100
+        })
     })
 })
 

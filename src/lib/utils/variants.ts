@@ -43,6 +43,11 @@ export const resolveVariant = (
     custom?: unknown
 ): DOMKeyframesDefinition | undefined => {
     if (!variants || !key) return undefined
+    // Guard against built-in / inherited keys like 'toString' or
+    // 'constructor' — without this, `whileHover="toString"` would
+    // resolve to `Function.prototype.toString` and leak a function into
+    // the merge path.
+    if (!Object.prototype.hasOwnProperty.call(variants, key)) return undefined
     const entry = variants[key]
     if (typeof entry === 'function') return entry(custom)
     return entry
@@ -86,8 +91,13 @@ export const resolveVariantList = (
     let merged: Record<string, unknown> | undefined
     for (const key of keys) {
         const entry = resolveVariant(variants, key, custom)
-        if (!entry) continue
-        merged = merged ? { ...merged, ...(entry as Record<string, unknown>) } : { ...entry }
+        // Defensive: skip anything that isn't a plain object — a
+        // function-form variant could return a non-object (e.g. a user
+        // accidentally returning a string), and we don't want that to
+        // poison the merged result.
+        if (!entry || typeof entry !== 'object') continue
+        const obj = entry as Record<string, unknown>
+        merged = merged ? { ...merged, ...obj } : { ...obj }
     }
     return merged as DOMKeyframesDefinition | undefined
 }
@@ -128,13 +138,24 @@ export const resolveInitial = (
 /**
  * Resolves the animate prop to keyframes, handling variant keys.
  *
- * When `animate` is a string, looks it up in the variants object (invoking
- * dynamic variants with `custom`). Otherwise returns the keyframes directly.
+ * When `animate` is a string (or array of strings), looks it up in the
+ * variants object (invoking dynamic variants with `custom`). Otherwise
+ * returns the keyframes directly.
  *
- * @param animate - The animate prop value (keyframes, variant key, or undefined).
+ * @param animate - The animate prop value (keyframes, variant key, array
+ *     of variant keys, or undefined).
  * @param variants - The variants object for resolving string keys.
  * @param custom - Forwarded to function-form variants.
  * @returns Keyframes definition or undefined.
+ *
+ * @example
+ * ```ts
+ * const variants = { visible: { opacity: 1 }, shifted: { x: 100 } }
+ * resolveAnimate('visible', variants)              // { opacity: 1 }
+ * resolveAnimate(['visible', 'shifted'], variants) // { opacity: 1, x: 100 }
+ * resolveAnimate({ scale: 1.2 }, variants)         // { scale: 1.2 }  (pass-through)
+ * resolveAnimate(undefined, variants)              // undefined
+ * ```
  */
 export const resolveAnimate = (
     animate: MotionAnimate,
@@ -150,14 +171,25 @@ export const resolveAnimate = (
 /**
  * Resolves the exit prop to keyframes, handling variant keys.
  *
- * When `exit` is a string, looks it up in the variants object (invoking
- * dynamic variants with `custom`). Otherwise returns the keyframes directly.
- * Used by AnimatePresence for exit animations.
+ * When `exit` is a string (or array of strings), looks it up in the
+ * variants object (invoking dynamic variants with `custom`). Otherwise
+ * returns the keyframes directly. Used by AnimatePresence for exit
+ * animations.
  *
- * @param exit - The exit prop value (keyframes, variant key, or undefined).
+ * @param exit - The exit prop value (keyframes, variant key, array of
+ *     variant keys, or undefined).
  * @param variants - The variants object for resolving string keys.
  * @param custom - Forwarded to function-form variants.
  * @returns Keyframes definition or undefined.
+ *
+ * @example
+ * ```ts
+ * const variants = { hidden: { opacity: 0 }, small: { scale: 0.8 } }
+ * resolveExit('hidden', variants)              // { opacity: 0 }
+ * resolveExit(['hidden', 'small'], variants)   // { opacity: 0, scale: 0.8 }
+ * resolveExit({ y: -20 }, variants)            // { y: -20 }
+ * resolveExit(undefined, variants)             // undefined
+ * ```
  */
 export const resolveExit = (
     exit: MotionExit,
