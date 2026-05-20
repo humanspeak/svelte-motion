@@ -1,8 +1,12 @@
 <script lang="ts">
+    import { CodeReferenceV2, ExampleV2 } from '@humanspeak/docs-kit'
+    import { Accessibility, Keyboard, MousePointer2 } from '@lucide/svelte'
+    import type { Snippet } from 'svelte'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import Example from '$lib/components/general/Example.svelte'
-    import WhileFocusExample from '$lib/examples/WhileFocusExample.svelte'
+    import WhileFocusDefault from '$lib/examples/while-focus/demos/Default.svelte'
+    import demoManifest from '$lib/demo-manifest.json'
+
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -21,8 +25,105 @@
         seo.ogFeatures = ['whileFocus', 'Accessibility', 'Keyboard Focus', 'Visual Feedback']
         seo.ogSlug = 'examples-while-focus'
     }
+
+    const SOURCE_URL =
+        'https://github.com/humanspeak/svelte-motion/blob/main/docs/src/lib/examples/'
+
+    type Section = {
+        figId: string
+        tag: string
+        title: { prefix?: string; accent: string; end?: string }
+        description: string
+        snippet: Snippet
+        codeSnippet?: Snippet
+        notes?: Snippet
+        mode?: 'live' | 'static'
+        barCells?: { k: string; v: string }[]
+        sourceUrl?: string
+    }
+
+    type ManifestEntry = {
+        code: string
+        lang: string
+        html?: { light: string; dark: string }
+    }
+    const manifest = demoManifest as Record<string, ManifestEntry>
+
+    const sections: Section[] = [
+        {
+            figId: 'FIG-001',
+            tag: 'FOCUS',
+            title: { prefix: 'while ', accent: 'focused', end: '.' },
+            description:
+                'Tab through the three elements below — `whileFocus` animates them while they hold focus and reverses on blur. Works on natively focusable elements (button, input) and anything with `tabindex`.',
+            snippet: defaultSection,
+            codeSnippet: defaultCode,
+            notes: defaultNotes,
+            barCells: [{ k: 'pattern', v: 'focus-driven' }],
+            sourceUrl: `${SOURCE_URL}while-focus/demos/Default.svelte`
+        }
+    ]
+
+    const pad2 = (n: number) => String(n).padStart(2, '0')
 </script>
 
-<Example title="While Focus" file="WhileFocusExample.svelte">
-    <WhileFocusExample />
-</Example>
+{#snippet defaultSection()}
+    <WhileFocusDefault />
+{/snippet}
+{#snippet defaultNotes()}
+    <ul>
+        <li>
+            <Keyboard />
+            <span>
+                <code>whileFocus</code> fires for both keyboard focus (Tab) and click focus. Same
+                animation shape as <code>whileHover</code> — pass keyframes (or a variant key) and the
+                value lasts as long as the element holds focus.
+            </span>
+        </li>
+        <li>
+            <MousePointer2 />
+            <span>
+                The card uses <code>tabindex="0"</code> to opt into the focus chain — any element can
+                be focusable, not just buttons and inputs. Useful for custom UI surfaces.
+            </span>
+        </li>
+        <li>
+            <Accessibility />
+            <span>
+                Pair <code>onFocusStart</code> / <code>onFocusEnd</code> callbacks with your own state
+                if you need to react beyond the visual animation (e.g. announce to screen readers, fetch
+                preview data).
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet defaultCode()}
+    <CodeReferenceV2
+        samples={[
+            {
+                id: 'while-focus-default',
+                label: 'Default.svelte',
+                ...manifest['while-focus/demos/Default.svelte']
+            }
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#each sections as section, i (section.figId)}
+    <ExampleV2
+        figId={section.figId}
+        tag={section.tag}
+        title={section.title}
+        description={section.description}
+        mode={section.mode ?? 'live'}
+        sheetLabel="SHEET {pad2(i + 1)} / {pad2(sections.length)}"
+        barCells={section.barCells}
+        sourceUrl={section.sourceUrl}
+        codeSnippet={section.codeSnippet}
+        codeLabel="show code"
+        notes={section.notes}
+    >
+        {@render section.snippet()}
+    </ExampleV2>
+{/each}
