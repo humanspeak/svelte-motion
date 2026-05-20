@@ -3,16 +3,22 @@
     import { onMount } from 'svelte'
     import UsePresenceCard from './UsePresenceCard.svelte'
 
+    // Custom exit driven from the child: `<PresenceChild present={…}>` holds the
+    // card rendered after `present` flips to `false`. Inside the card, `usePresence`
+    // returns `[false, safeToRemove]` once the hold begins — the card runs its own
+    // CSS transition and calls `safeToRemove()` on `transitionend` so the wrapper
+    // releases it.
     let visible = $state(true)
     let exitsCompleted = $state(0)
 
-    // Defer the AnimatePresence subtree until after hydration so the SSR pass
-    // doesn't try to register presence children without a window.
+    // Defer the AnimatePresence subtree until after hydration — SSR doesn't have a
+    // window to register presence children against.
     let mounted = $state(false)
     onMount(() => (mounted = true))
 </script>
 
-<div class="flex min-h-[420px] flex-col items-center justify-center gap-4 p-8">
+<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
+<div class="humanspeak-demo-shell">
     <div class="controls">
         <button type="button" class="primary" onclick={() => (visible = !visible)}>
             {visible ? 'Hide' : 'Show'}
@@ -32,6 +38,16 @@
 </div>
 
 <style>
+    .humanspeak-demo-shell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        padding: 2rem;
+        min-height: 420px;
+    }
+
     .controls {
         display: flex;
         align-items: center;
