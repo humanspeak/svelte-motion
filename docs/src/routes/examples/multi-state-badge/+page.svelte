@@ -1,8 +1,12 @@
 <script lang="ts">
+    import { CodeReferenceV2, ExampleV2 } from '@humanspeak/docs-kit'
+    import { Activity, Repeat, Sparkles } from '@lucide/svelte'
+    import type { Snippet } from 'svelte'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import Example from '$lib/components/general/Example.svelte'
-    import MultiStateBadgeExample from '$lib/examples/MultiStateBadgeExample.svelte'
+    import MultiStateBadgeDefault from '$lib/examples/multi-state-badge/demos/Default.svelte'
+    import demoManifest from '$lib/demo-manifest.json'
+
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -26,8 +30,107 @@
         ]
         seo.ogSlug = 'examples-multi-state-badge'
     }
+
+    const SOURCE_URL =
+        'https://github.com/humanspeak/svelte-motion/blob/main/docs/src/lib/examples/'
+
+    type Section = {
+        figId: string
+        tag: string
+        title: { prefix?: string; accent: string; end?: string }
+        description: string
+        snippet: Snippet
+        codeSnippet?: Snippet
+        notes?: Snippet
+        mode?: 'live' | 'static'
+        barCells?: { k: string; v: string }[]
+        sourceUrl?: string
+    }
+
+    type ManifestEntry = {
+        code: string
+        lang: string
+        html?: { light: string; dark: string }
+    }
+    const manifest = demoManifest as Record<string, ManifestEntry>
+
+    const sections: Section[] = [
+        {
+            figId: 'FIG-001',
+            tag: 'ANIMATE-PRESENCE',
+            title: { prefix: 'multi-state ', accent: 'badge', end: '.' },
+            description:
+                'A badge that cycles `idle → processing → success → error → idle`. Click to advance. Each state swap exits and enters its icon + label inside `AnimatePresence`, with blur + scale carrying the transitions.',
+            snippet: defaultSection,
+            codeSnippet: defaultCode,
+            notes: defaultNotes,
+            barCells: [{ k: 'pattern', v: 'state-cycle' }],
+            sourceUrl: `${SOURCE_URL}multi-state-badge/demos/Default.svelte`
+        }
+    ]
+
+    const pad2 = (n: number) => String(n).padStart(2, '0')
 </script>
 
-<Example title="Multi-State Badge" file="MultiStateBadgeExample.svelte">
-    <MultiStateBadgeExample />
-</Example>
+{#snippet defaultSection()}
+    <MultiStateBadgeDefault />
+{/snippet}
+{#snippet defaultNotes()}
+    <ul>
+        <li>
+            <Repeat />
+            <span>
+                The badge holds an enum state (<code>idle</code>, <code>processing</code>,
+                <code>success</code>, <code>error</code>) — clicking advances to the next via
+                <code>getNextState()</code>. State change drives every animation downstream.
+            </span>
+        </li>
+        <li>
+            <Sparkles />
+            <span>
+                Icon + label both live inside <code>AnimatePresence</code> keyed by state. Exit blurs
+                and shrinks the outgoing content; enter blurs and grows the incoming content. Layout stays
+                put because the badge chrome wraps the presence.
+            </span>
+        </li>
+        <li>
+            <Activity />
+            <span>
+                The composition lives in
+                <code>$lib/examples/multi-state-badge/Badge.svelte</code> alongside icon helpers. The
+                demo file is a thin wrapper that owns the state cycle — the animation lives in the badge
+                components.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet defaultCode()}
+    <CodeReferenceV2
+        samples={[
+            {
+                id: 'multi-state-badge-default',
+                label: 'Default.svelte',
+                ...manifest['multi-state-badge/demos/Default.svelte']
+            }
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#each sections as section, i (section.figId)}
+    <ExampleV2
+        figId={section.figId}
+        tag={section.tag}
+        title={section.title}
+        description={section.description}
+        mode={section.mode ?? 'live'}
+        sheetLabel="SHEET {pad2(i + 1)} / {pad2(sections.length)}"
+        barCells={section.barCells}
+        sourceUrl={section.sourceUrl}
+        codeSnippet={section.codeSnippet}
+        codeLabel="show code"
+        notes={section.notes}
+    >
+        {@render section.snippet()}
+    </ExampleV2>
+{/each}
