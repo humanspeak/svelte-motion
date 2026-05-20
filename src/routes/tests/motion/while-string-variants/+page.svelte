@@ -26,6 +26,28 @@
 
 <svelte:head>
     <title>whileX string variants · regression test</title>
+    <style>
+        /* The root layout locks page scroll for most demos. The whileInView
+           card needs real page scroll so the IntersectionObserver fires when
+           the box scrolls into the viewport — un-lock for this route only.
+           Pattern lifted from /tests/motion/while-in-view. */
+        html,
+        body {
+            height: auto !important;
+            overflow: auto !important;
+        }
+        body > .container,
+        body > div > .container,
+        #sandbox,
+        .test-layout {
+            display: block !important;
+            height: auto !important;
+            min-height: auto !important;
+            align-items: stretch !important;
+            justify-content: flex-start !important;
+            overflow: visible !important;
+        }
+    </style>
 </svelte:head>
 
 <div class="page" data-testid="while-string-variants-page">
@@ -91,20 +113,25 @@
                 tab to me
             </motion.button>
         </article>
+    </section>
 
-        <article>
-            <h2>whileInView — single string</h2>
-            <div style="height: 60vh; padding-bottom: 40vh;"></div>
-            <motion.div
-                data-testid="box-while-inview-string"
-                variants={tabVariants}
-                initial={{ opacity: 0, y: 40 }}
-                whileInView="visible"
-                style="{baseBox} background: #a855f7;"
-            >
-                scroll to me
-            </motion.div>
-        </article>
+    <section class="inview-section">
+        <h2>whileInView — single string</h2>
+        <p class="inview-hint">
+            Scroll down — the purple box below uses <code>whileInView="visible"</code> and fades up when
+            it enters the viewport.
+        </p>
+        <div class="inview-spacer"></div>
+        <motion.div
+            data-testid="box-while-inview-string"
+            variants={tabVariants}
+            initial={{ opacity: 0, y: 40 }}
+            whileInView="visible"
+            style="{baseBox} background: #a855f7;"
+        >
+            scroll to me
+        </motion.div>
+        <div class="inview-tail"></div>
     </section>
 </div>
 
@@ -151,5 +178,22 @@
         flex-direction: column;
         align-items: center;
         background: #fafafa;
+    }
+    .inview-section {
+        margin-top: 48px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    .inview-hint {
+        max-width: 480px;
+        margin: 0 0 1.5rem;
+    }
+    .inview-spacer {
+        height: 80vh;
+    }
+    .inview-tail {
+        height: 40vh;
     }
 </style>
