@@ -1,8 +1,12 @@
 <script lang="ts">
+    import { CodeReferenceV2, ExampleV2 } from '@humanspeak/docs-kit'
+    import { Compass, PenTool, Repeat } from '@lucide/svelte'
+    import type { Snippet } from 'svelte'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import Example from '$lib/components/general/Example.svelte'
-    import MotionPath from '$lib/examples/MotionPath.svelte'
+    import MotionPathDefault from '$lib/examples/motion-path/demos/Default.svelte'
+    import demoManifest from '$lib/demo-manifest.json'
+
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -21,8 +25,107 @@
         seo.ogFeatures = ['SVG Path', 'Offset Distance', 'Path Following', 'Trajectory']
         seo.ogSlug = 'examples-motion-path'
     }
+
+    const SOURCE_URL =
+        'https://github.com/humanspeak/svelte-motion/blob/main/docs/src/lib/examples/'
+
+    type Section = {
+        figId: string
+        tag: string
+        title: { prefix?: string; accent: string; end?: string }
+        description: string
+        snippet: Snippet
+        codeSnippet?: Snippet
+        notes?: Snippet
+        mode?: 'live' | 'static'
+        barCells?: { k: string; v: string }[]
+        sourceUrl?: string
+    }
+
+    type ManifestEntry = {
+        code: string
+        lang: string
+        html?: { light: string; dark: string }
+    }
+    const manifest = demoManifest as Record<string, ManifestEntry>
+
+    const sections: Section[] = [
+        {
+            figId: 'FIG-001',
+            tag: 'SVG',
+            title: { prefix: 'riding an ', accent: 'svg path', end: '.' },
+            description:
+                'One SVG path drives two tracks at once — `motion.path` draws itself by tweening `pathLength`, and a `motion.div` rides the same curve via CSS `offset-path` + `offsetDistance`.',
+            snippet: defaultSection,
+            codeSnippet: defaultCode,
+            notes: defaultNotes,
+            barCells: [{ k: 'pattern', v: 'pathLength + offsetDistance' }],
+            sourceUrl: `${SOURCE_URL}motion-path/demos/Default.svelte`
+        }
+    ]
+
+    const pad2 = (n: number) => String(n).padStart(2, '0')
 </script>
 
-<Example title="Motion Path" file="MotionPath.svelte">
-    <MotionPath />
-</Example>
+{#snippet defaultSection()}
+    <MotionPathDefault />
+{/snippet}
+{#snippet defaultNotes()}
+    <ul>
+        <li>
+            <PenTool />
+            <span>
+                <code>motion.path</code> tweens its <code>pathLength</code> from 0 to 1 — SVG renders
+                the path with a dash array sized to the current value, so the line appears to draw itself
+                stroke-by-stroke.
+            </span>
+        </li>
+        <li>
+            <Compass />
+            <span>
+                The box uses CSS <code>offset-path: path(…)</code> with the same path string. Motion
+                tweens <code>offsetDistance</code> from 0% to 100%, which translates and rotates the element
+                along the curve — no manual coordinate calc.
+            </span>
+        </li>
+        <li>
+            <Repeat />
+            <span>
+                One <code>transition</code> object drives both tracks (<code>duration: 4</code>,
+                <code>repeat: Infinity</code>,
+                <code>repeatType: 'reverse'</code>) so the stroke and the box stay in lockstep
+                forward and back.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet defaultCode()}
+    <CodeReferenceV2
+        samples={[
+            {
+                id: 'motion-path-default',
+                label: 'Default.svelte',
+                ...manifest['motion-path/demos/Default.svelte']
+            }
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#each sections as section, i (section.figId)}
+    <ExampleV2
+        figId={section.figId}
+        tag={section.tag}
+        title={section.title}
+        description={section.description}
+        mode={section.mode ?? 'live'}
+        sheetLabel="SHEET {pad2(i + 1)} / {pad2(sections.length)}"
+        barCells={section.barCells}
+        sourceUrl={section.sourceUrl}
+        codeSnippet={section.codeSnippet}
+        codeLabel="show code"
+        notes={section.notes}
+    >
+        {@render section.snippet()}
+    </ExampleV2>
+{/each}
