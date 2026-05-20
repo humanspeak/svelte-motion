@@ -12,6 +12,8 @@
         "dev": "vite dev",
         "doc-mirrors": "node ./scripts/generate-doc-mirrors.mjs",
         "doc-mirrors:watch": "chokidar 'src/routes/docs/**/+page.svx' -c 'node ./scripts/generate-doc-mirrors.mjs' --initial --silent",
+        "examples-catalog:sync": "node ./scripts/sync-examples-catalog.mjs",
+        "examples-catalog:watch": "chokidar 'src/routes/examples/**/+page.ts' --ignore 'src/routes/examples/+page.ts' -c 'node ./scripts/sync-examples-catalog.mjs' --initial --silent",
         "format": "prettier --write .",
         "generate-social": "tsx ./scripts/generate-social-cards.ts",
         "lint": "prettier --check . && eslint .",
@@ -19,8 +21,6 @@
         "preview": "pnpm run build && wrangler dev",
         "registry:generate": "node ./scripts/generate-registry.mjs",
         "registry:watch": "chokidar 'src/lib/shadcn/ui/**/*.svelte' 'src/lib/shadcn/ui/**/*.ts' -c 'node ./scripts/generate-registry.mjs' --initial --silent",
-        "sitemap:manifest": "node ./scripts/generate-sitemap-manifest.mjs",
-        "sitemap:watch": "chokidar 'src/routes/**/*.svelte' 'src/routes/**/*.svx' 'src/routes/**/*.md' --ignore 'src/routes/examples/+page.ts' -c 'node ./scripts/generate-sitemap-manifest.mjs' --initial --silent",
         "social:watch": "chokidar 'scripts/generate-social-cards.ts' 'src/routes/**/+page.svelte' 'src/routes/**/+page.svx' -c 'tsx ./scripts/generate-social-cards.ts' --initial --silent",
         "test": "npm run test:unit -- --run",
         "test:unit": "vitest"

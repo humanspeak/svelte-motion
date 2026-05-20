@@ -1,16 +1,26 @@
-import { readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve as resolvePath } from 'node:path'
+
+/**
+ * Sync the examples catalog object in `src/routes/examples/+page.ts` from
+ * each individual `src/routes/examples/<slug>/+page.ts`'s `load()` return.
+ *
+ * Each example's `+page.ts` is the source of truth for its `title` and
+ * (optional) `sourceUrl`; the catalog file just mirrors them into a
+ * static record consumed by the examples landing page. Without this
+ * sync a new example wouldn't surface in the catalog until someone
+ * remembered to update the record by hand.
+ *
+ * Previously this script also emitted `src/lib/sitemap-manifest.json`.
+ * That half now runs through docs-kit's `sitemapManifestPlugin` (wired
+ * in `vite.config.ts`) and fires automatically on every `vite build`
+ * and dev server boot — so this script is now exclusively about the
+ * catalog rewrite.
+ */
 
 const ROOT = resolvePath(process.cwd(), 'src', 'routes')
 
-/** Convert a +page file path to a route path */
-function toRoutePath(file) {
-    let p = file.replace(ROOT, '')
-    p = p.replace(/\/\+page\.(svelte|svx|md)$/i, '')
-    return p === '' ? '/' : p
-}
-
-/** Recursively find +page files */
+/** Recursively find `+page.{svelte,svx,md}` files under a directory. */
 async function findPageFiles(dir, out = []) {
     const entries = await readdir(dir, { withFileTypes: true })
     for (const e of entries) {
@@ -24,17 +34,23 @@ async function findPageFiles(dir, out = []) {
     return out
 }
 
+/** Convert a `+page` file path to a route path. */
+function toRoutePath(file) {
+    let p = file.replace(ROOT, '')
+    p = p.replace(/\/\+page\.(svelte|svx|md)$/i, '')
+    return p === '' ? '/' : p
+}
+
 /**
- * Load example metadata from individual +page.ts files
- * @param {string} examplePath - Path to the example directory
- * @returns {Promise<Object|null>} Example metadata or null if not found
+ * Load example metadata from an individual `+page.ts`.
+ * @param {string} examplePath Absolute path to the example directory.
+ * @returns {Promise<{ title: string, sourceUrl: string | null } | null>}
  */
 async function loadExampleMetadata(examplePath) {
     try {
         const pageTs = join(examplePath, '+page.ts')
         const content = await readFile(pageTs, 'utf8')
 
-        // Extract title from the load function return
         const titleMatch = content.match(/title:\s*['"`]([^'"`]+)['"`]/)
         const sourceUrlMatch = content.match(/sourceUrl:\s*['"`]([^'"`]+)['"`]/)
 
@@ -45,16 +61,17 @@ async function loadExampleMetadata(examplePath) {
             }
         }
     } catch {
-        // File doesn't exist or can't be read, that's okay
+        // File doesn't exist or can't be read — fall through to the
+        // slug-based fallback.
     }
     return null
 }
 
 /**
- * Format a title for use mid-sentence in the auto-generated description.
- * Phrases ("Animated Button") get lowercased so the sentence reads naturally.
- * Identifier-style names ("useAnimate", "AnimatePresence") keep their casing
- * so the public API name stays correct.
+ * Lowercase multi-word phrases ("Animated Button" → "animated button")
+ * so they read naturally mid-sentence; preserve identifier-style names
+ * ("useAnimate", "AnimatePresence") so the public API names stay
+ * correct.
  *
  * @param {string} title
  * @returns {string}
@@ -64,9 +81,9 @@ function describable(title) {
 }
 
 /**
- * Build the example description sentence, deduplicating the trailing
- * "animation" token when the title already ends in it. Without this,
- * a slug like "shared-layout-animation" produces the awkward
+ * Build the catalog description string. Deduplicates the trailing
+ * "animation" token when the title already ends in one — without this
+ * a slug like `shared-layout-animation` would produce the awkward
  * "Interactive shared layout animation animation example…".
  *
  * @param {string} title
@@ -79,38 +96,29 @@ function describeExample(title) {
 }
 
 /**
- * Generate example metadata for the examples landing page
- * @param {Object} manifest - The sitemap manifest
- * @returns {Promise<Object>} Examples metadata object
+ * Walk every `/examples/<slug>/` directory and build the catalog record.
+ * @returns {Promise<Record<string, { title: string, description: string, sourceUrl: string | null }>>}
  */
-async function generateExamplesMetadata(manifest) {
-    const exampleRoutes = Object.keys(manifest)
-        .filter((route) => route.startsWith('/examples/') && route !== '/examples')
-        .sort()
-
+async function generateExamplesMetadata(exampleRoutes) {
     const examples = {}
 
     for (const route of exampleRoutes) {
         const slug = route.replace('/examples/', '')
         const examplePath = join(ROOT, 'examples', slug)
-
-        // Try to load metadata from the example's +page.ts file
         const metadata = await loadExampleMetadata(examplePath)
 
         if (metadata) {
-            const title = metadata.title
             examples[slug] = {
-                title,
-                description: describeExample(title),
+                title: metadata.title,
+                description: describeExample(metadata.title),
                 sourceUrl: metadata.sourceUrl
             }
         } else {
-            // Fallback: generate from slug
+            // Fallback: derive the title from the slug.
             const title = slug
                 .split('-')
                 .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
                 .join(' ')
-
             examples[slug] = {
                 title,
                 description: describeExample(title),
@@ -123,20 +131,19 @@ async function generateExamplesMetadata(manifest) {
 }
 
 /**
- * Update the examples +page.ts file with the latest example metadata
- * @param {Object} examples - Examples metadata object
+ * Rewrite the `const examples = { … }` block in
+ * `src/routes/examples/+page.ts` from the freshly-generated catalog.
+ * @param {Record<string, object>} examples
  */
 async function updateExamplesPageTs(examples) {
     const examplesPageTs = resolvePath(process.cwd(), 'src', 'routes', 'examples', '+page.ts')
 
     try {
         let content = await readFile(examplesPageTs, 'utf8')
-
-        // Find the examples object in the file and replace it
-        // More robust regex that matches the entire examples object declaration
         const examplesObjectRegex = /const examples\s*=\s*\{[\s\S]*?\n\s*\}(?=\s*\n\s*return)/
 
-        // Format as prettier-compatible JS (single quotes, no trailing commas, no semis)
+        // Format values as prettier-compatible JS (single quotes, no
+        // trailing commas, no semicolons).
         const formatValue = (v) => (v === null ? 'null' : `'${v.replace(/'/g, "\\'")}'`)
         const lines = Object.entries(examples).map(([slug, meta]) => {
             const props = [
@@ -144,7 +151,7 @@ async function updateExamplesPageTs(examples) {
                 `            description: ${formatValue(meta.description)}`,
                 `            sourceUrl: ${formatValue(meta.sourceUrl)}`
             ]
-            // Quote keys that aren't valid identifiers (contain hyphens)
+            // Quote keys that aren't valid identifiers (contain hyphens).
             const key = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(slug) ? slug : `'${slug}'`
             return `        ${key}: {\n${props.join(',\n')}\n        }`
         })
@@ -164,22 +171,12 @@ async function updateExamplesPageTs(examples) {
 
 async function main() {
     const files = await findPageFiles(ROOT)
-    const manifest = {}
-    for (const file of files) {
-        const s = await stat(file)
-        const route = toRoutePath(file)
-        // Exclude non-public routes
-        if (route.startsWith('/social-cards')) continue
-        // Non-recursive lastmod: use the +page file's mtime only
-        manifest[route] = new Date(s.mtimeMs).toISOString().slice(0, 10)
-    }
+    const exampleRoutes = files
+        .map(toRoutePath)
+        .filter((route) => route.startsWith('/examples/') && route !== '/examples')
+        .sort()
 
-    const dest = resolvePath(process.cwd(), 'src', 'lib', 'sitemap-manifest.json')
-    await writeFile(dest, JSON.stringify(manifest, null, 2) + '\n', 'utf8')
-    console.log(`Sitemap manifest written to ${dest}`)
-
-    // Generate and update examples metadata
-    const examples = await generateExamplesMetadata(manifest)
+    const examples = await generateExamplesMetadata(exampleRoutes)
     await updateExamplesPageTs(examples)
 }
 
