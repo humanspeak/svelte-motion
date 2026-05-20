@@ -1,34 +1,48 @@
 <script lang="ts">
     import { motion, useScroll, useSpring } from '@humanspeak/svelte-motion'
 
+    // Scroll-driven progress bar fed by `useScroll` and softened by `useSpring`.
+    // The bar's `transform: scaleX(progress)` reads a 0→1 motion value computed
+    // from the container's scroll position, so the bar grows as you scroll.
     let containerEl: HTMLElement | undefined = $state(undefined)
 
-    // Pass a getter so useScroll resolves the element after mount
+    // Pass a getter so useScroll resolves the element after mount.
     const { scrollYProgress } = useScroll({ container: () => containerEl })
     const scaleX = useSpring(scrollYProgress)
 
     const colors = ['#ff0088', '#dd00ff', '#0088ff', '#00cc88', '#ffaa00']
 </script>
 
-<div class="wrapper">
-    <div class="progress-bar" style="transform: scaleX({$scaleX});"></div>
+<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
+<div class="humanspeak-demo-shell">
+    <div class="wrapper">
+        <div class="progress-bar" style="transform: scaleX({$scaleX});"></div>
 
-    <div class="scroll-area" bind:this={containerEl}>
-        {#each colors as color, i (color)}
-            <motion.div
-                class="card"
-                style="background: {color}"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.1 }}
-            >
-                <span class="card-number">{i + 1}</span>
-            </motion.div>
-        {/each}
+        <div class="scroll-area" bind:this={containerEl}>
+            {#each colors as color, i (color)}
+                <motion.div
+                    class="card"
+                    style="background: {color}"
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.1 }}
+                >
+                    <span class="card-number">{i + 1}</span>
+                </motion.div>
+            {/each}
+        </div>
     </div>
 </div>
 
 <style>
+    .humanspeak-demo-shell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        min-height: 400px;
+    }
+
     .wrapper {
         width: 100%;
         max-width: 400px;
@@ -82,7 +96,7 @@
     }
 
     /* :global() required because .card is on a motion.div component —
-	   Svelte doesn't add the scoping hash to component class props */
+       Svelte doesn't add the scoping hash to component class props */
     .scroll-area :global(.card) {
         flex-shrink: 0;
         height: 150px;
