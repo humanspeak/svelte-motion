@@ -5,7 +5,7 @@ description: Animate components when they are added to or removed from the DOM
 
 <script>
   import Example from '$lib/components/general/Example.svelte'
-  import AnimatePresenceExample from '$lib/examples/AnimatePresenceExample.svelte'
+  import AnimatePresenceExample from '$lib/examples/animate-presence/demos/Default.svelte'
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()
