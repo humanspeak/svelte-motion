@@ -1,3 +1,4 @@
+import { sitemapManifestPlugin } from '@humanspeak/docs-kit/vite'
 import { svelteMotionOptimize } from '@humanspeak/svelte-motion/vite'
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
 import { sveltekit } from '@sveltejs/kit/vite'
@@ -11,6 +12,14 @@ import devtoolsJson from 'vite-plugin-devtools-json'
 
 export default defineConfig({
     plugins: [
+        // Emits `src/lib/sitemap-manifest.json` (consumed by
+        // `src/routes/sitemap.xml/+server.ts`) on both `vite build` and the
+        // dev server's `buildStart` hook. Replaces the sitemap half of the
+        // legacy `generate-sitemap-manifest.mjs` script; the trimmed script
+        // (`sync-examples-catalog.mjs`) now owns only the
+        // `examples/+page.ts` metadata sync. `blogDir: false` disables
+        // docs-kit's default blog-folder scan — we don't have a blog.
+        sitemapManifestPlugin({ blogDir: false }),
         svelteMotionOptimize(),
         tailwindcss(),
         sveltekit(),
