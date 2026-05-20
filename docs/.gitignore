@@ -36,6 +36,9 @@ static/twitter-default.png
 # Generated sitemap manifest
 src/lib/sitemap-manifest.json
 
+# Generated demo manifest (docs-kit's demoManifestPlugin output)
+src/lib/demo-manifest.json
+
 # Generated GitHub stats (build artifact)
 src/lib/github-stats.json
 

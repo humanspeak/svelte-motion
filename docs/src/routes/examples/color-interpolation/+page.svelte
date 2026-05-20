@@ -1,8 +1,12 @@
 <script lang="ts">
+    import { CodeReferenceV2, ExampleV2 } from '@humanspeak/docs-kit'
+    import { Palette, Route, Sparkles } from '@lucide/svelte'
+    import type { Snippet } from 'svelte'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import Example from '$lib/components/general/Example.svelte'
-    import ColorInterpolationExample from '$lib/examples/ColorInterpolationExample.svelte'
+    import ColorInterpolationDefault from '$lib/examples/color-interpolation/demos/Default.svelte'
+    import demoManifest from '$lib/demo-manifest.json'
+
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -25,8 +29,105 @@
         ]
         seo.ogSlug = 'examples-color-interpolation'
     }
+
+    const SOURCE_URL =
+        'https://github.com/humanspeak/svelte-motion/blob/main/docs/src/lib/examples/'
+
+    type Section = {
+        figId: string
+        tag: string
+        title: { prefix?: string; accent: string; end?: string }
+        description: string
+        snippet: Snippet
+        codeSnippet?: Snippet
+        notes?: Snippet
+        mode?: 'live' | 'static'
+        barCells?: { k: string; v: string }[]
+        sourceUrl?: string
+    }
+
+    type ManifestEntry = {
+        code: string
+        lang: string
+        html?: { light: string; dark: string }
+    }
+    const manifest = demoManifest as Record<string, ManifestEntry>
+
+    const sections: Section[] = [
+        {
+            figId: 'FIG-001',
+            tag: 'COLOR',
+            title: { prefix: 'rgb vs ', accent: 'hsl', end: '.' },
+            description:
+                'The browser`s Web Animations API and motion`s `animate()` interpolate colours differently. Watch them side by side: the left swatch sweeps through hue (HSL), the right takes a straight line in RGB space.',
+            snippet: defaultSection,
+            codeSnippet: defaultCode,
+            notes: defaultNotes,
+            barCells: [{ k: 'pattern', v: 'interpolation comparison' }],
+            sourceUrl: `${SOURCE_URL}color-interpolation/demos/Default.svelte`
+        }
+    ]
+
+    const pad2 = (n: number) => String(n).padStart(2, '0')
 </script>
 
-<Example title="Color Interpolation" file="ColorInterpolationExample.svelte">
-    <ColorInterpolationExample />
-</Example>
+{#snippet defaultSection()}
+    <ColorInterpolationDefault />
+{/snippet}
+{#snippet defaultNotes()}
+    <ul>
+        <li>
+            <Route />
+            <span>
+                Same start (<code>#ff0088</code>) and end (<code>#0d63f8</code>) colour for both
+                swatches — only the interpolation path differs.
+            </span>
+        </li>
+        <li>
+            <Palette />
+            <span>
+                The left swatch (WAAPI) sweeps through HSL space, so the midpoint takes a detour
+                through orange / green / cyan before reaching blue. The right swatch (motion) walks
+                straight through RGB space — magenta dims, blue brightens, no hue detour.
+            </span>
+        </li>
+        <li>
+            <Sparkles />
+            <span>
+                Pure motion call: <code>animate(element, &#123;backgroundColor: […]&#125;, …)</code>
+                binds an imperative animation lifecycle to the element. The returned controls let you
+                <code>cancel()</code> on cleanup so the animation doesn't outlive the component.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet defaultCode()}
+    <CodeReferenceV2
+        samples={[
+            {
+                id: 'color-interpolation-default',
+                label: 'Default.svelte',
+                ...manifest['color-interpolation/demos/Default.svelte']
+            }
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#each sections as section, i (section.figId)}
+    <ExampleV2
+        figId={section.figId}
+        tag={section.tag}
+        title={section.title}
+        description={section.description}
+        mode={section.mode ?? 'live'}
+        sheetLabel="SHEET {pad2(i + 1)} / {pad2(sections.length)}"
+        barCells={section.barCells}
+        sourceUrl={section.sourceUrl}
+        codeSnippet={section.codeSnippet}
+        codeLabel="show code"
+        notes={section.notes}
+    >
+        {@render section.snippet()}
+    </ExampleV2>
+{/each}

@@ -1,8 +1,12 @@
 <script lang="ts">
+    import { CodeReferenceV2, ExampleV2 } from '@humanspeak/docs-kit'
+    import { Hand, Heart, SlidersHorizontal } from '@lucide/svelte'
+    import type { Snippet } from 'svelte'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import Example from '$lib/components/general/Example.svelte'
-    import FancyLikeButtonExample from '$lib/examples/FancyLikeButtonExample.svelte'
+    import FancyLikeButtonDefault from '$lib/examples/fancy-like-button/demos/Default.svelte'
+    import demoManifest from '$lib/demo-manifest.json'
+
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -21,8 +25,110 @@
         seo.ogFeatures = ['Particle Burst', 'Press & Hold', 'Heart Animation', 'Spring Physics']
         seo.ogSlug = 'examples-fancy-like-button'
     }
+
+    const SOURCE_URL =
+        'https://github.com/humanspeak/svelte-motion/blob/main/docs/src/lib/examples/'
+
+    type Section = {
+        figId: string
+        tag: string
+        title: { prefix?: string; accent: string; end?: string }
+        description: string
+        snippet: Snippet
+        codeSnippet?: Snippet
+        notes?: Snippet
+        mode?: 'live' | 'static'
+        barCells?: { k: string; v: string }[]
+        sourceUrl?: string
+    }
+
+    type ManifestEntry = {
+        code: string
+        lang: string
+        html?: { light: string; dark: string }
+    }
+    const manifest = demoManifest as Record<string, ManifestEntry>
+
+    const sections: Section[] = [
+        {
+            figId: 'FIG-001',
+            tag: 'GESTURE',
+            title: { prefix: 'fancy ', accent: 'like button', end: '.' },
+            description:
+                'Press and hold the heart to spawn a stream of bursting hearts and circles. Each particle animates `x` / `y` / `opacity` with its own timing — many small motion components composed for one rich gesture.',
+            snippet: defaultSection,
+            codeSnippet: defaultCode,
+            notes: defaultNotes,
+            barCells: [{ k: 'pattern', v: 'press-hold-burst' }],
+            sourceUrl: `${SOURCE_URL}fancy-like-button/demos/Default.svelte`
+        }
+    ]
+
+    const pad2 = (n: number) => String(n).padStart(2, '0')
 </script>
 
-<Example title="Fancy Like Button" file="FancyLikeButtonExample.svelte">
-    <FancyLikeButtonExample />
-</Example>
+{#snippet defaultSection()}
+    <FancyLikeButtonDefault />
+{/snippet}
+{#snippet defaultNotes()}
+    <ul>
+        <li>
+            <Hand />
+            <span>
+                Pointer + keyboard handling lives in a single Svelte action (<code
+                    >likeInteraction</code
+                >) so the gesture surface stays accessible —
+                <code>pointerdown</code> starts spawning, <code>pointerup</code> /
+                <code>pointercancel</code> stop it, and Enter / Space mirror the same toggle for keyboard
+                users.
+            </span>
+        </li>
+        <li>
+            <Heart />
+            <span>
+                Each burst pushes a heart and 15 circle entries into reactive
+                <code>$state</code> arrays. Every motion entry animates from the button's centre to
+                a random offset, then drops out of the array via a <code>setTimeout</code>
+                cleanup once its animation has settled.
+            </span>
+        </li>
+        <li>
+            <SlidersHorizontal />
+            <span>
+                The <code>transition</code> prop accepts per-key objects — independent timings for
+                <code>x</code>, <code>y</code>, and <code>opacity</code> let the particles drift sideways
+                quickly, rise more slowly, and fade out last for the layered feel.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet defaultCode()}
+    <CodeReferenceV2
+        samples={[
+            {
+                id: 'fancy-like-button-default',
+                label: 'Default.svelte',
+                ...manifest['fancy-like-button/demos/Default.svelte']
+            }
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#each sections as section, i (section.figId)}
+    <ExampleV2
+        figId={section.figId}
+        tag={section.tag}
+        title={section.title}
+        description={section.description}
+        mode={section.mode ?? 'live'}
+        sheetLabel="SHEET {pad2(i + 1)} / {pad2(sections.length)}"
+        barCells={section.barCells}
+        sourceUrl={section.sourceUrl}
+        codeSnippet={section.codeSnippet}
+        codeLabel="show code"
+        notes={section.notes}
+    >
+        {@render section.snippet()}
+    </ExampleV2>
+{/each}

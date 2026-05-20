@@ -1,4 +1,4 @@
-import { sitemapManifestPlugin } from '@humanspeak/docs-kit/vite'
+import { demoManifestPlugin, sitemapManifestPlugin } from '@humanspeak/docs-kit/vite'
 import { svelteMotionOptimize } from '@humanspeak/svelte-motion/vite'
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
 import { sveltekit } from '@sveltejs/kit/vite'
@@ -20,6 +20,24 @@ export default defineConfig({
         // `examples/+page.ts` metadata sync. `blogDir: false` disables
         // docs-kit's default blog-folder scan — we don't have a blog.
         sitemapManifestPlugin({ blogDir: false }),
+        // Scans `src/lib/examples/<slug>/demos/*.svelte`, pre-highlights each
+        // demo's source with Shiki (light + dark), and emits
+        // `src/lib/demo-manifest.json`. Pages import the manifest as a
+        // virtual JSON module and feed individual entries through
+        // `CodeReferenceV2` so the rendered preview and the displayed code
+        // come from the same single source of truth — edit a demo, the
+        // page reloads and the code panel updates in lockstep.
+        //
+        // `stripComments` + `stripWrappers` let us keep an in-file
+        // positioning shell (the `.humanspeak-demo-shell` wrapper that
+        // centers the motion card inside docs-kit's `.dk-ex-body`) plus
+        // maintainer notes tagged `/* HUMANSPEAK */` — without leaking
+        // either into the published code panel. The disk file stays
+        // runnable; the manifest carries only the lesson.
+        demoManifestPlugin({
+            stripComments: ['HUMANSPEAK'],
+            stripWrappers: ['humanspeak-demo-shell']
+        }),
         svelteMotionOptimize(),
         tailwindcss(),
         sveltekit(),

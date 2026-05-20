@@ -1,8 +1,12 @@
 <script lang="ts">
+    import { CodeReferenceV2, ExampleV2 } from '@humanspeak/docs-kit'
+    import { ArrowDownUp, Sparkles, Zap } from '@lucide/svelte'
+    import type { Snippet } from 'svelte'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import Example from '$lib/components/general/Example.svelte'
-    import ToggleSwitchExample from '$lib/examples/ToggleSwitchExample.svelte'
+    import ToggleSwitchDefault from '$lib/examples/toggle-switch/demos/Default.svelte'
+    import demoManifest from '$lib/demo-manifest.json'
+
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -20,8 +24,106 @@
         seo.ogFeatures = ['Layout Animation', 'Spring Physics', 'Gesture Driven', 'State Toggle']
         seo.ogSlug = 'examples-toggle-switch'
     }
+
+    const SOURCE_URL =
+        'https://github.com/humanspeak/svelte-motion/blob/main/docs/src/lib/examples/'
+
+    type Section = {
+        figId: string
+        tag: string
+        title: { prefix?: string; accent: string; end?: string }
+        description: string
+        snippet: Snippet
+        codeSnippet?: Snippet
+        notes?: Snippet
+        mode?: 'live' | 'static'
+        barCells?: { k: string; v: string }[]
+        sourceUrl?: string
+    }
+
+    type ManifestEntry = {
+        code: string
+        lang: string
+        html?: { light: string; dark: string }
+    }
+    const manifest = demoManifest as Record<string, ManifestEntry>
+
+    const sections: Section[] = [
+        {
+            figId: 'FIG-001',
+            tag: 'LAYOUT',
+            title: { prefix: 'toggle ', accent: 'switch', end: '.' },
+            description:
+                'A single `layout` prop turns a CSS flex flip into a smooth FLIP animation. Each direction picks its own transition — snappy spring on the way up, playful bounce on the way down.',
+            snippet: defaultSection,
+            codeSnippet: defaultCode,
+            notes: defaultNotes,
+            barCells: [{ k: 'pattern', v: 'flip-toggle' }],
+            sourceUrl: `${SOURCE_URL}toggle-switch/demos/Default.svelte`
+        }
+    ]
+
+    const pad2 = (n: number) => String(n).padStart(2, '0')
 </script>
 
-<Example title="Toggle Switch" file="ToggleSwitchExample.svelte">
-    <ToggleSwitchExample />
-</Example>
+{#snippet defaultSection()}
+    <ToggleSwitchDefault />
+{/snippet}
+{#snippet defaultNotes()}
+    <ul>
+        <li>
+            <ArrowDownUp />
+            <span>
+                Flipping <code>align-items</code> between <code>flex-end</code> and
+                <code>flex-start</code> reflows the ball — adding <code>layout</code> on the
+                <code>motion.div</code> turns the resulting CSS reflow into a measured FLIP animation.
+            </span>
+        </li>
+        <li>
+            <Zap />
+            <span>
+                Transitions are per-direction. <code>spring</code> with high stiffness on the way up
+                gives a confident snap; a custom <code>bounceEase</code> on the way down lets the ball
+                settle playfully.
+            </span>
+        </li>
+        <li>
+            <Sparkles />
+            <span>
+                The transition value is typed as <code>MotionTransition</code> — passing a custom
+                easing function (anything <code>(t: number) =&gt; number</code>) works just as well
+                as the built-in keywords.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet defaultCode()}
+    <CodeReferenceV2
+        samples={[
+            {
+                id: 'toggle-switch-default',
+                label: 'Default.svelte',
+                ...manifest['toggle-switch/demos/Default.svelte']
+            }
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#each sections as section, i (section.figId)}
+    <ExampleV2
+        figId={section.figId}
+        tag={section.tag}
+        title={section.title}
+        description={section.description}
+        mode={section.mode ?? 'live'}
+        sheetLabel="SHEET {pad2(i + 1)} / {pad2(sections.length)}"
+        barCells={section.barCells}
+        sourceUrl={section.sourceUrl}
+        codeSnippet={section.codeSnippet}
+        codeLabel="show code"
+        notes={section.notes}
+    >
+        {@render section.snippet()}
+    </ExampleV2>
+{/each}
