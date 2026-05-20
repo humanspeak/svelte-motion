@@ -214,6 +214,46 @@ describe('utils/variants - resolveVariantList', () => {
             y: 20
         })
     })
+
+    it('rejects non-plain-object entries (arrays, class instances) from the merge', () => {
+        // A function-form variant could misbehave and return an array
+        // or class instance. Spreading those would corrupt the merge
+        // (array indices as keys, methods leaking in). Skip them.
+        class CustomShape {
+            constructor(public x: number) {}
+        }
+        // Cast to `Variants` — the `Variant` factory signature expects
+        // plain keyframes; we are deliberately misusing it to verify
+        // the runtime guard catches what TypeScript would normally
+        // forbid.
+        const variants = {
+            badArray: () => [1, 2, 3],
+            badInstance: () => new CustomShape(5),
+            good: { opacity: 1 }
+        } as unknown as Variants
+
+        // Arrays alone → undefined (nothing valid merged)
+        expect(resolveVariantList(variants, ['badArray'])).toBeUndefined()
+        // Class instances alone → undefined
+        expect(resolveVariantList(variants, ['badInstance'])).toBeUndefined()
+        // Mixed: the good entry still applies, bad entries skipped
+        expect(resolveVariantList(variants, ['badArray', 'good', 'badInstance'])).toEqual({
+            opacity: 1
+        })
+    })
+
+    it('accepts Object.create(null) entries from the merge (prototype === null)', () => {
+        // Sanity check: a function-form variant building keyframes via
+        // `Object.create(null)` is still a plain map. Don't reject it.
+        const variants = {
+            nullProto: () => {
+                const obj = Object.create(null)
+                obj.scale = 1.5
+                return obj
+            }
+        } as unknown as Variants
+        expect(resolveVariantList(variants, ['nullProto'])).toEqual({ scale: 1.5 })
+    })
 })
 
 describe('utils/variants - resolveWhile', () => {

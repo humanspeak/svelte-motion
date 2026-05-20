@@ -91,11 +91,15 @@ export const resolveVariantList = (
     let merged: Record<string, unknown> | undefined
     for (const key of keys) {
         const entry = resolveVariant(variants, key, custom)
-        // Defensive: skip anything that isn't a plain object — a
-        // function-form variant could return a non-object (e.g. a user
-        // accidentally returning a string), and we don't want that to
-        // poison the merged result.
-        if (!entry || typeof entry !== 'object') continue
+        // Defensive: only merge plain keyframe objects. A function-form
+        // variant could return something else (array, class instance,
+        // string) under a misuse, and spreading those would corrupt the
+        // merged result. Reject arrays explicitly and require the
+        // prototype to be `Object.prototype` (or `null` for objects
+        // created via `Object.create(null)`).
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue
+        const proto = Object.getPrototypeOf(entry)
+        if (proto !== Object.prototype && proto !== null) continue
         const obj = entry as Record<string, unknown>
         merged = merged ? { ...merged, ...obj } : { ...obj }
     }
