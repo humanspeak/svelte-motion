@@ -48,7 +48,7 @@
     } from '$lib/utils/presence'
     import { getInitialKeyframes } from '$lib/utils/initial'
     import { attachDrag } from '$lib/utils/drag'
-    import { resolveInitial, resolveAnimate, resolveExit } from '$lib/utils/variants'
+    import { resolveInitial, resolveAnimate, resolveExit, resolveWhile } from '$lib/utils/variants'
     import {
         setVariantContext,
         getVariantContext,
@@ -446,6 +446,19 @@
     )
     const resolvedExit = $derived(resolveExit(exitProp, variantsProp, effectiveCustom))
 
+    // Resolve `whileX` props against `variants` so each gesture's attach
+    // helper receives a plain keyframes object regardless of whether the
+    // consumer wrote inline keyframes, a variant key, or an array of
+    // variant keys. Mirrors framer-motion's `whileHover` etc. surface
+    // (#349).
+    const resolvedWhileTap = $derived(resolveWhile(whileTapProp, variantsProp, effectiveCustom))
+    const resolvedWhileHover = $derived(resolveWhile(whileHoverProp, variantsProp, effectiveCustom))
+    const resolvedWhileFocus = $derived(resolveWhile(whileFocusProp, variantsProp, effectiveCustom))
+    const resolvedWhileDrag = $derived(resolveWhile(whileDragProp, variantsProp, effectiveCustom))
+    const resolvedWhileInView = $derived(
+        resolveWhile(whileInViewProp, variantsProp, effectiveCustom)
+    )
+
     // Extract keyframes from resolved initial, handling initial={false}
     const initialKeyframes = $derived(
         filterReducedMotionKeyframes(
@@ -541,7 +554,7 @@
             directionLock: !!dragDirectionLockProp,
             listener: dragListenerProp !== false,
             controls,
-            whileDrag: whileDragProp as MotionWhileDrag,
+            whileDrag: resolvedWhileDrag as MotionWhileDrag,
             mergedTransition: (mergedTransition ?? {}) as AnimationOptions,
             callbacks: {
                 onStart: onDragStartProp as (e: PointerEvent, info: DragInfo) => void,
@@ -801,18 +814,18 @@
 
     // whileTap handling via motion-dom's press()
     $effect(() => {
-        if (!(element && isLoaded === 'ready' && isNotEmpty(whileTapProp))) return
+        if (!(element && isLoaded === 'ready' && isNotEmpty(resolvedWhileTap))) return
         return attachWhileTap(
             element!,
-            (whileTapProp ?? {}) as Record<string, unknown>,
+            (resolvedWhileTap ?? {}) as Record<string, unknown>,
             (resolvedInitial ?? {}) as Record<string, unknown>,
             (resolvedAnimate ?? {}) as Record<string, unknown>,
             {
                 onTapStart: onTapStartProp,
                 onTap: onTapProp,
                 onTapCancel: onTapCancelProp,
-                hoverDef: isNotEmpty(whileHoverProp ?? {})
-                    ? ((whileHoverProp ?? {}) as Record<string, unknown>)
+                hoverDef: isNotEmpty(resolvedWhileHover ?? {})
+                    ? ((resolvedWhileHover ?? {}) as Record<string, unknown>)
                     : undefined,
                 hoverFallbackTransition: (mergedTransition ?? {}) as AnimationOptions
             }
@@ -821,10 +834,10 @@
 
     // whileHover handling, gated to true-hover devices to avoid sticky states on touch
     $effect(() => {
-        if (!(element && isLoaded === 'ready' && isNotEmpty(whileHoverProp))) return
+        if (!(element && isLoaded === 'ready' && isNotEmpty(resolvedWhileHover))) return
         return attachWhileHover(
             element!,
-            (whileHoverProp ?? {}) as Record<string, unknown>,
+            (resolvedWhileHover ?? {}) as Record<string, unknown>,
             (mergedTransition ?? {}) as AnimationOptions,
             { onStart: onHoverStartProp, onEnd: onHoverEndProp },
             {
@@ -836,10 +849,10 @@
 
     // whileFocus handling for keyboard focus interactions
     $effect(() => {
-        if (!(element && isLoaded === 'ready' && isNotEmpty(whileFocusProp))) return
+        if (!(element && isLoaded === 'ready' && isNotEmpty(resolvedWhileFocus))) return
         return attachWhileFocus(
             element!,
-            (whileFocusProp ?? {}) as Record<string, unknown>,
+            (resolvedWhileFocus ?? {}) as Record<string, unknown>,
             (mergedTransition ?? {}) as AnimationOptions,
             { onStart: onFocusStartProp, onEnd: onFocusEndProp },
             {
@@ -851,10 +864,10 @@
 
     // whileInView handling for viewport intersection
     $effect(() => {
-        if (!(element && isLoaded === 'ready' && isNotEmpty(whileInViewProp))) return
+        if (!(element && isLoaded === 'ready' && isNotEmpty(resolvedWhileInView))) return
         return attachWhileInView(
             element!,
-            (whileInViewProp ?? {}) as Record<string, unknown>,
+            (resolvedWhileInView ?? {}) as Record<string, unknown>,
             (mergedTransition ?? {}) as AnimationOptions,
             {
                 onStart: onInViewStartProp,

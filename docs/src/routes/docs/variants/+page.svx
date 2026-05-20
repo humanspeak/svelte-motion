@@ -331,9 +331,10 @@ A `Variants` object is a dictionary mapping variant names (strings) to animation
 Variants can be passed to any motion component via the `variants` prop:
 
 - `variants`: Object containing named animation states
-- `initial`: Initial variant name (string)
-- `animate`: Target variant name (string)
-- `exit`: Exit variant name (string)
+- `initial`: Initial variant name (string or `string[]`)
+- `animate`: Target variant name (string or `string[]`)
+- `exit`: Exit variant name (string or `string[]`)
+- `whileHover` / `whileTap` / `whileFocus` / `whileDrag` / `whileInView`: variant name (string or `string[]`)
 
 ```svelte
 <motion.div
@@ -343,6 +344,36 @@ Variants can be passed to any motion component via the `variants` prop:
     exit="hidden"
 />
 ```
+
+### Variant keys on gesture props
+
+Pass a variant name to any `whileX` prop to reuse a named state across gestures — handy when the same animation target shows up in multiple places (a single `hover` variant can drive `whileHover` on every card in a list, for example).
+
+```svelte
+<script lang="ts">
+    import { motion, type Variants } from '@humanspeak/svelte-motion'
+
+    const cardVariants: Variants = {
+        hovered: { scale: 1.05 },
+        pressed: { scale: 0.95 }
+    }
+</script>
+
+<motion.div variants={cardVariants} whileHover="hovered" whileTap="pressed">
+    hover or tap
+</motion.div>
+```
+
+You can also pass an **array of variant keys** to combine multiple states. The keys merge left-to-right — later entries override earlier ones on key collisions.
+
+```svelte
+<motion.div
+    variants={cardVariants}
+    whileHover={["hovered", "tinted"]}
+/>
+```
+
+If a key is missing from `variants`, it's silently skipped — useful for conditional layering.
 
 ## Related
 

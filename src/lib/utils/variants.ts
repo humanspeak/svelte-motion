@@ -1,4 +1,14 @@
-import type { MotionAnimate, MotionExit, MotionInitial, Variants } from '$lib/types'
+import type {
+    MotionAnimate,
+    MotionExit,
+    MotionInitial,
+    MotionWhileDrag,
+    MotionWhileFocus,
+    MotionWhileHover,
+    MotionWhileInView,
+    MotionWhileTap,
+    Variants
+} from '$lib/types'
 import type { DOMKeyframesDefinition } from 'motion'
 
 /**
@@ -39,6 +49,50 @@ export const resolveVariant = (
 }
 
 /**
+ * Resolves a single variant key or an ordered list of keys to merged
+ * keyframes. Matches framer-motion's `VariantLabels = string | string[]`
+ * surface: later keys in the list override earlier ones on key
+ * collisions (`Object.assign` semantics).
+ *
+ * Missing keys are skipped. An empty list, an empty string, or an
+ * undefined argument all resolve to `undefined`.
+ *
+ * @param variants - The variants object containing named animation states.
+ * @param keys - A single variant key or an array of variant keys.
+ * @param custom - Forwarded to function-form variants (per-entry).
+ * @returns Merged keyframes definition, or `undefined` when nothing resolved.
+ *
+ * @example
+ * ```ts
+ * const variants = {
+ *   hover:  { scale: 1.1 },
+ *   active: { scale: 1.2, color: 'red' }
+ * }
+ * resolveVariantList(variants, 'hover')             // { scale: 1.1 }
+ * resolveVariantList(variants, ['hover', 'active']) // { scale: 1.2, color: 'red' }
+ * resolveVariantList(variants, ['hover', 'missing']) // { scale: 1.1 }
+ * resolveVariantList(variants, [])                   // undefined
+ * ```
+ */
+export const resolveVariantList = (
+    variants: Variants | undefined,
+    keys: string | string[] | undefined,
+    custom?: unknown
+): DOMKeyframesDefinition | undefined => {
+    if (keys === undefined) return undefined
+    if (typeof keys === 'string') return resolveVariant(variants, keys, custom)
+    if (keys.length === 0) return undefined
+
+    let merged: Record<string, unknown> | undefined
+    for (const key of keys) {
+        const entry = resolveVariant(variants, key, custom)
+        if (!entry) continue
+        merged = merged ? { ...merged, ...(entry as Record<string, unknown>) } : { ...entry }
+    }
+    return merged as DOMKeyframesDefinition | undefined
+}
+
+/**
  * Resolves the initial prop to keyframes, handling variant keys and `initial={false}`.
  *
  * When `initial` is a string, looks it up in the variants object (invoking
@@ -66,7 +120,8 @@ export const resolveInitial = (
 ): DOMKeyframesDefinition | false | undefined => {
     if (initial === false) return false
     if (initial === undefined) return undefined
-    if (typeof initial === 'string') return resolveVariant(variants, initial, custom)
+    if (typeof initial === 'string' || Array.isArray(initial))
+        return resolveVariantList(variants, initial, custom)
     return initial as DOMKeyframesDefinition
 }
 
@@ -87,7 +142,8 @@ export const resolveAnimate = (
     custom?: unknown
 ): DOMKeyframesDefinition | undefined => {
     if (animate === undefined) return undefined
-    if (typeof animate === 'string') return resolveVariant(variants, animate, custom)
+    if (typeof animate === 'string' || Array.isArray(animate))
+        return resolveVariantList(variants, animate, custom)
     return animate as DOMKeyframesDefinition
 }
 
@@ -109,6 +165,47 @@ export const resolveExit = (
     custom?: unknown
 ): DOMKeyframesDefinition | undefined => {
     if (exit === undefined) return undefined
-    if (typeof exit === 'string') return resolveVariant(variants, exit, custom)
+    if (typeof exit === 'string' || Array.isArray(exit))
+        return resolveVariantList(variants, exit, custom)
     return exit as DOMKeyframesDefinition
+}
+
+/**
+ * Resolves a `whileX` prop (hover, tap, focus, drag, in-view) to
+ * keyframes. Mirrors `resolveAnimate` — pass-through for inline
+ * keyframes, look up variant keys via `resolveVariantList` (single
+ * string or array of strings, merged left-to-right).
+ *
+ * Used by `_MotionContainer.svelte` to feed the gesture attach helpers
+ * a consistent keyframes object regardless of whether the consumer
+ * wrote inline keyframes or a variant reference.
+ *
+ * @param value - The whileX prop value.
+ * @param variants - The variants object for resolving string keys.
+ * @param custom - Forwarded to function-form variants.
+ * @returns Keyframes definition or `undefined` when nothing applies.
+ *
+ * @example
+ * ```ts
+ * const variants = { hover: { scale: 1.1 }, active: { color: 'red' } }
+ * resolveWhile('hover', variants)            // { scale: 1.1 }
+ * resolveWhile(['hover', 'active'], variants) // { scale: 1.1, color: 'red' }
+ * resolveWhile({ scale: 1.2 }, variants)     // { scale: 1.2 }  (pass-through)
+ * resolveWhile(undefined, variants)          // undefined
+ * ```
+ */
+export const resolveWhile = (
+    value:
+        | MotionWhileTap
+        | MotionWhileHover
+        | MotionWhileFocus
+        | MotionWhileDrag
+        | MotionWhileInView,
+    variants: Variants | undefined,
+    custom?: unknown
+): DOMKeyframesDefinition | undefined => {
+    if (value === undefined) return undefined
+    if (typeof value === 'string' || Array.isArray(value))
+        return resolveVariantList(variants, value, custom)
+    return value as DOMKeyframesDefinition
 }
