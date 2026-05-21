@@ -7,7 +7,7 @@ description: "A reactive store that ticks once per animation frame with elapsed 
   import { useTime } from '@humanspeak/svelte-motion';
   import Example from '$lib/components/general/Example.svelte';
   import UseTimeExample from '$lib/examples/use-time/demos/Default.svelte';
-  import UseTimeSyncedExample from '$lib/examples/UseTimeSyncedExample.svelte';
+  import UseTimeSyncedExample from '$lib/examples/use-time-synced/demos/Default.svelte';
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()

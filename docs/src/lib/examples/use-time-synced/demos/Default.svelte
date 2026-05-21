@@ -1,13 +1,15 @@
 <script lang="ts">
     import { useTime } from '@humanspeak/svelte-motion'
-    import { derived } from 'svelte/store'
     import { Link } from '@lucide/svelte'
+    import { derived } from 'svelte/store'
 
-    // All elements use the same shared timeline
+    // `useTime(key)` returns the *same* motion value for any caller that
+    // passes the same key. Two components calling `useTime('synced')`
+    // share one clock — perfect when you want independent UI to stay in
+    // phase without hoisting state.
     const time = useTime('synced-timeline')
     const time2 = useTime('synced-timeline')
 
-    // Create different animations from the same timeline
     const rotate1 = derived(time, (t) => (t / 10) % 360)
     const rotate2 = derived(time2, (t) => (t / 10) % 360)
 
@@ -17,10 +19,9 @@
     const hue = derived(time, (t) => (t / 30) % 360)
 </script>
 
-<div class="flex min-h-[450px] flex-col items-center justify-center gap-12 p-8">
-    <!-- Three synchronized elements -->
+<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
+<div class="humanspeak-demo-shell">
     <div class="synced-container">
-        <!-- Element 1 -->
         <div class="element-wrapper">
             <div
                 class="sync-element element-1"
@@ -34,7 +35,6 @@
             </div>
         </div>
 
-        <!-- Element 2 -->
         <div class="element-wrapper">
             <div
                 class="sync-element element-2"
@@ -49,7 +49,6 @@
         </div>
     </div>
 
-    <!-- Sync indicator -->
     <div class="sync-info">
         <div class="sync-badge">
             <Link size={14} />
@@ -70,6 +69,16 @@
 </div>
 
 <style>
+    .humanspeak-demo-shell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3rem;
+        padding: 2rem;
+        min-height: 450px;
+    }
+
     .synced-container {
         display: flex;
         gap: 40px;
