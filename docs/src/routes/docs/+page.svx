@@ -9,7 +9,7 @@ description: "Svelte Motion is a Svelte animation library for building smooth, p
   import Rotate from '$lib/examples/rotate/demos/Default.svelte'
   import AnimatedButton from '$lib/examples/animated-button/demos/Default.svelte'
   import HoverAndTap from '$lib/examples/hover-and-tap/demos/Default.svelte'
-  import WhileInViewExample from '$lib/examples/WhileInViewExample.svelte'
+  import WhileInViewExample from '$lib/examples/while-in-view/demos/Default.svelte'
   import { DocHeroCard, getSeoContext } from '@humanspeak/docs-kit'
 
   const seo = getSeoContext()
