@@ -6,7 +6,7 @@ description: 'Cycle through a series of values to drive variants, properties, or
 <script>
   import { useCycle } from '@humanspeak/svelte-motion';
   import Example from '$lib/components/general/Example.svelte';
-  import UseCycleExample from '$lib/examples/UseCycleExample.svelte';
+  import UseCycleExample from '$lib/examples/use-cycle/demos/Default.svelte';
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()

@@ -1,38 +1,23 @@
 <script lang="ts">
     import { motion, useCycle } from '@humanspeak/svelte-motion'
 
+    // `useCycle(...labels)` returns `[current, cycle]` — `cycle()` advances
+    // through the labels in order, `cycle(i)` jumps to a specific index.
+    // Pair it with a `variants` map keyed by the same labels and you have
+    // a tiny state machine with declarative animation per state.
     const variants = {
-        rest: {
-            x: 0,
-            rotate: 0,
-            scale: 1,
-            backgroundColor: '#667eea'
-        },
-        nudge: {
-            x: 90,
-            rotate: 8,
-            scale: 1.05,
-            backgroundColor: '#7c3aed'
-        },
-        flip: {
-            x: 90,
-            rotate: 188,
-            scale: 1.1,
-            backgroundColor: '#db2777'
-        },
-        spin: {
-            x: 0,
-            rotate: 540,
-            scale: 1,
-            backgroundColor: '#f59e0b'
-        }
+        rest: { x: 0, rotate: 0, scale: 1, backgroundColor: '#667eea' },
+        nudge: { x: 90, rotate: 8, scale: 1.05, backgroundColor: '#7c3aed' },
+        flip: { x: 90, rotate: 188, scale: 1.1, backgroundColor: '#db2777' },
+        spin: { x: 0, rotate: 540, scale: 1, backgroundColor: '#f59e0b' }
     } as const
 
     const labels = ['rest', 'nudge', 'flip', 'spin'] as const
     const [variant, cycle] = useCycle<keyof typeof variants>(...labels)
 </script>
 
-<div class="flex min-h-[420px] flex-col items-center justify-center gap-8 p-8">
+<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
+<div class="humanspeak-demo-shell">
     <div class="track">
         <motion.div
             class="cycle-card"
@@ -44,7 +29,7 @@
         </motion.div>
     </div>
 
-    <div class="flex flex-wrap items-center justify-center gap-2">
+    <div class="controls">
         <button type="button" class="primary" onclick={() => cycle()}>cycle()</button>
         {#each labels as label, i (label)}
             <button
@@ -60,6 +45,16 @@
 </div>
 
 <style>
+    .humanspeak-demo-shell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2rem;
+        padding: 2rem;
+        min-height: 420px;
+    }
+
     .track {
         width: 280px;
         display: flex;
@@ -79,6 +74,14 @@
         text-transform: capitalize;
         box-shadow: 0 12px 32px rgba(15, 15, 35, 0.35);
         will-change: transform;
+    }
+
+    .controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
     }
 
     .primary,
