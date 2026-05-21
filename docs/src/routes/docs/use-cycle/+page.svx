@@ -12,36 +12,41 @@ description: 'Cycle through a series of values to drive variants, properties, or
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'useCycle | Docs | Svelte Motion'
-      seo.description = 'Cycle through a series of values - perfect for toggling animation variants in Svelte. useCycle returns a reactive store and a cycle function.'
+      seo.description = 'Cycle through a series of values - perfect for toggling animation variants in Svelte. useCycle returns a $state-backed object with .current and .cycle.'
       seo.ogTitle = 'useCycle'
       seo.ogTagline = 'Cycle through animation states'
-      seo.ogFeatures = ['Variants', 'State Toggle', 'Reactive Store', 'SSR Safe']
+      seo.ogFeatures = ['Variants', 'State Toggle', 'Svelte 5 Runes', 'SSR Safe']
       seo.ogSlug = 'docs-use-cycle'
   }
 </script>
 
 # useCycle
 
-`useCycle` cycles through a series of values. It is the Svelte equivalent of
-Framer Motion's `useCycle` hook and pairs naturally with `motion` variants or
-any prop you want to toggle on user interaction.
+`useCycle` cycles through a series of values. It pairs naturally with `motion` variants or any prop you want to toggle on user interaction.
 
 ```svelte
 <script>
     import { motion, useCycle } from '@humanspeak/svelte-motion'
 
-    const [x, cycleX] = useCycle(0, 50, 100)
+    const x = useCycle(0, 50, 100)
 </script>
 
-<motion.div animate={{ x: $x }} onclick={() => cycleX()} />
+<motion.div animate={{ x: x.current }} onclick={() => x.cycle()} />
 ```
 
-`useCycle` returns a `[value, cycle]` tuple:
+`useCycle` returns a `{ current, cycle }` object:
 
-- `value` is a Svelte `Readable<T>` &mdash; subscribe with `$value`.
-- `cycle()` advances to the next item, wrapping back to the first when it
-  passes the end.
+- `current` is a Svelte 5 reactive getter backed by `$state` — read it in templates, `$derived`, or `$effect` and it tracks automatically.
+- `cycle()` advances to the next item, wrapping back to the first when it passes the end.
 - `cycle(i)` jumps directly to the value at index `i`.
+
+> **Three deliberate divergences from React framer-motion's `useCycle`:**
+>
+> 1. **Return shape** — React returns `[value, cycle]`. Under Svelte 5 runes, destructuring a `$state`-backed value snapshots it and loses reactivity, so we return an object whose getter preserves tracking.
+> 2. **Out-of-range reads always clamp** instead of returning `items[i]` undefined — see [API Reference → Notes](#notes) below.
+> 3. **`cycle(next)` requires an integer index** and throws on `NaN`, `Infinity`, or fractional values. React would silently make `.current` resolve to `undefined`; we surface the bug at write time.
+>
+> Otherwise 1:1 with React, including same-index no-op bail-out and `wrap(0, length, index + 1)` advance semantics.
 
 <Example isSmall exampleUrl="/examples/use-cycle">
   <UseCycleExample />
@@ -49,9 +54,7 @@ any prop you want to toggle on user interaction.
 
 ## Cycling through variants
 
-The most common use is toggling between named variants on a `motion`
-component. Pass the variant names to `useCycle` and bind the current name to
-the `animate` prop:
+The most common use is toggling between named variants on a `motion` component. Pass the variant names to `useCycle` and bind `.current` to the `animate` prop:
 
 ```svelte
 <script lang="ts">
@@ -63,18 +66,14 @@ the `animate` prop:
         flip: { x: 80, rotate: 188 }
     }
 
-    const [variant, cycleVariant] = useCycle<keyof typeof variants>(
-        'rest',
-        'nudge',
-        'flip'
-    )
+    const variant = useCycle<keyof typeof variants>('rest', 'nudge', 'flip')
 </script>
 
 <motion.button
     {variants}
-    animate={$variant}
+    animate={variant.current}
     transition={{ type: 'spring', stiffness: 220, damping: 18 }}
-    onclick={() => cycleVariant()}
+    onclick={() => variant.cycle()}
 >
     Cycle
 </motion.button>
@@ -82,42 +81,87 @@ the `animate` prop:
 
 ## Jumping to a specific index
 
-Pass a number to jump directly to that index instead of advancing one step.
-Subsequent `cycle()` calls advance from the new position:
+Pass a number to jump directly to that index instead of advancing one step. Subsequent `cycle()` calls advance from the new position:
 
 ```svelte
 <script>
     import { useCycle } from '@humanspeak/svelte-motion'
 
-    const [value, cycle] = useCycle('a', 'b', 'c', 'd')
+    const x = useCycle('a', 'b', 'c', 'd')
 
-    cycle(2) // value is now 'c'
-    cycle() // value is now 'd'
-    cycle() // value wraps to 'a'
+    x.cycle(2)   // x.current is now 'c'
+    x.cycle()    // x.current is now 'd'
+    x.cycle()    // x.current wraps to 'a'
 </script>
 ```
+
+## Cycling through object items
+
+`useCycle` preserves referential identity when cycling through objects, so animation targets, variant definitions, and other complex values stay stable:
+
+```svelte
+<script>
+    import { motion, useCycle } from '@humanspeak/svelte-motion'
+
+    const target = useCycle(
+        { x: 0, scale: 1 },
+        { x: 100, scale: 1.2 },
+        { x: 0, scale: 0.8 }
+    )
+</script>
+
+<motion.div animate={target.current} onclick={() => target.cycle()} />
+```
+
+## Reactive items
+
+The varargs form captures `items` once at call time. If your list of items can change — for example, it comes from a prop, a `$state`, or a `$derived` — pass a getter function instead. The cycle re-reads through the getter on every access, so list changes propagate automatically:
+
+```svelte
+<script lang="ts">
+    import { motion, useCycle } from '@humanspeak/svelte-motion'
+
+    let { labels }: { labels: string[] } = $props()
+    const variant = useCycle(() => labels)
+</script>
+
+<motion.div animate={variant.current} onclick={() => variant.cycle()} />
+```
+
+This mirrors React framer-motion's behavior where `useCycle(...items)` re-binds on every render: when `items` changes, the cycle picks up the new list while keeping the same internal index. If the new list is shorter than the current index, `.current` clamps to the last valid item rather than returning `undefined`.
+
+> The getter form is detected when `useCycle` is called with a single function argument. To cycle through a single function value (uncommon), use `useCycle(() => [fn])` — but a single-item cycle is a no-op anyway, so this rarely matters.
 
 ## API Reference
 
 ### Parameters
 
-- **...items** `T[]` &mdash; one or more values to cycle through. Must include
-  at least one item.
+Two call forms:
+
+- **Varargs** — `useCycle(...items: T[])` — captures items at construction time. Matches React framer-motion's signature.
+- **Reactive getter** — `useCycle(getItems: () => readonly T[])` — re-reads items on every access so reactive sources propagate.
+
+Must resolve to at least one item or `useCycle` throws.
 
 ### Returns
 
-A `[Readable<T>, Cycle]` tuple:
+A `CycleState<T>` object:
 
-- **value** `Readable<T>` &mdash; the current item, starting at `items[0]`.
-- **cycle** `(next?: number) => void` &mdash; advance to the next item, or jump
-  to the value at index `next` when supplied.
+- **`current`** `T` (getter) — the current item, starting at `items[0]`. Tracks reactively via `$state`. Clamps to the last valid index if items shrink underneath.
+- **`cycle(next?: number)`** — advance to the next item, or jump to the value at index `next` when supplied. No-ops if the resolved index is unchanged.
+
+### Notes
+
+- Out-of-range indexes are stored as-given by `cycle(i)` but `.current` always clamps on read — `x.cycle(99)` on a 3-item cycle yields `items[2]`, `x.cycle(-5)` yields `items[0]`. This is a defensive divergence from React framer-motion (which returns `items[i]`, possibly undefined) so `.current` always honors its `T` type. Subsequent `cycle()` advances are relative to the *stored* (unclamped) index, so `cycle(99); cycle()` on a 3-item cycle wraps via `wrap(0, 3, 100) = 1`.
+- If the reactive getter form's items list empties mid-cycle, `.current` throws (`useCycle items getter returned an empty list`). The public type is `T`, so silently returning `undefined` there would be a lie — surfacing the bug loudly is the better trade.
+- `cycle(next)` throws (`useCycle index must be a finite integer`) when `next` is `NaN`, `Infinity`, or a fractional number. Those slip past the read-time clamp (NaN comparisons return false for both `< 0` and `>= length`) and would otherwise silently make `.current` resolve to `undefined`.
+- Same-index calls are no-ops and don't trigger downstream reactivity, matching React `useState`'s `Object.is` bail-out.
+- File name is `cycle.svelte.ts` because the hook uses `$state` at module scope; if you reach into the source, the `.svelte.ts` extension is required for runes to compile.
 
 ## See also
 
-- [Variants](/docs/variants) &mdash; declarative animation states that pair
-  naturally with `useCycle`.
-- [AnimatePresence](/docs/animate-presence) &mdash; coordinate enter/exit
-  animations as cycled state changes.
+- [Variants](/docs/variants) — declarative animation states that pair naturally with `useCycle`.
+- [AnimatePresence](/docs/animate-presence) — coordinate enter/exit animations as cycled state changes.
 
 ---
 

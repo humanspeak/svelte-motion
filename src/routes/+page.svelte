@@ -334,6 +334,14 @@
                         styleString (Reactive Styles)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/use-spring') + searchParams}
+                    >
+                        useSpring
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

@@ -19,7 +19,7 @@
 <div class="dk-demo-shell">
     <div class="wrapper">
         <nav>
-            <ul>
+            <ul role="tablist">
                 {#each allIngredients as ingredient, i (ingredient.label)}
                     <motion.li
                         animate={{
@@ -29,10 +29,15 @@
                                     : 'transparent'
                         }}
                         class="tab"
-                        role="tab"
-                        aria-selected={i === selectedTab}
+                        role="presentation"
                     >
-                        <button class="tab-button" onclick={() => (selectedTab = i)}>
+                        <button
+                            class="tab-button"
+                            type="button"
+                            role="tab"
+                            aria-selected={i === selectedTab}
+                            onclick={() => (selectedTab = i)}
+                        >
                             {ingredient.icon}
                             {ingredient.label}
                         </button>

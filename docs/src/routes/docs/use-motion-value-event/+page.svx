@@ -67,7 +67,7 @@ Pass a readable store, the event type `'change'`, and a callback:
 </script>
 
 <div
-  style="transform: scale({$scale})"
+  style="transform: scale({scale.current})"
   onpointerenter={() => scale.set(2)}
   onpointerleave={() => scale.set(1)}
 >

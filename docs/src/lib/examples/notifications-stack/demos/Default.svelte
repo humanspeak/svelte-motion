@@ -128,6 +128,10 @@
         <!-- trunk-ignore(eslint/@typescript-eslint/no-unused-vars) -->
         {#each Array.from({ length: N_NOTIFICATIONS }) as _, i (i)}
             <motion.div
+                role="button"
+                tabindex="0"
+                aria-pressed={isOpen}
+                aria-label="Toggle notification stack"
                 variants={getNotificationVariants(i)}
                 transition={{
                     type: 'spring',
@@ -137,6 +141,12 @@
                 }}
                 style={getNotificationStyle(i)}
                 onclick={() => (isOpen = !isOpen)}
+                onkeydown={(e: KeyboardEvent) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        isOpen = !isOpen
+                    }
+                }}
             >
                 Note {i + 1}
             </motion.div>
