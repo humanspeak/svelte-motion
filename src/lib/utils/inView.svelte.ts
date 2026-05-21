@@ -32,7 +32,29 @@ const getInlineCssFunction = (el: HTMLElement, propName: string): string | null 
 }
 
 /**
- * Split a whileInView definition into keyframes and an optional nested transition.
+ * Split a `whileInView` definition into the visual keyframes and an
+ * optional nested `transition`. Mirrors the shape framer-motion uses
+ * where a single object carries both the target values and their
+ * timing config.
+ *
+ * Defensive against `undefined` / `null` input: `def ?? {}` ensures
+ * destructuring never throws, and the returned `keyframes` is then an
+ * empty record.
+ *
+ * @param def `whileInView` record possibly carrying a nested
+ *   `transition` config. May be `null` / `undefined` defensively (the
+ *   spread normalises to `{}`).
+ * @returns Object with the keyframes (everything *except* `transition`)
+ *   and the extracted `transition` (or `undefined` if none was nested).
+ *
+ * @example
+ * ```ts
+ * splitInViewDefinition({ opacity: 1, y: 0, transition: { duration: 0.5 } })
+ * // → { keyframes: { opacity: 1, y: 0 }, transition: { duration: 0.5 } }
+ *
+ * splitInViewDefinition({ opacity: 1 })
+ * // → { keyframes: { opacity: 1 }, transition: undefined }
+ * ```
  */
 export const splitInViewDefinition = (
     def: Record<string, unknown>
@@ -45,10 +67,48 @@ export const splitInViewDefinition = (
 }
 
 /**
- * Compute the baseline values to restore to when element leaves viewport.
+ * Compute the baseline values to restore to when an element leaves the
+ * viewport — only for the keys named in `whileInView`. Any key the
+ * element is not animating into stays as it was.
  *
- * Preference order per key: `animate` → `initial` → neutral transform defaults
- * → computed style value if present.
+ * For each key in `whileInView`, resolve a baseline by walking sources
+ * in this preference order:
+ *
+ * 1. `animate[key]` — the user's declared resting state
+ * 2. `initial[key]` — the pre-animation state
+ * 3. Neutral transform defaults (e.g. `x: 0`, `scale: 1`, `opacity: 1`)
+ *    when the key is a known transform property
+ * 4. Inline CSS function value (`var(...)`, `calc(...)`, `url(...)`)
+ *    read off `style.getPropertyValue` — handles cases where nested
+ *    semicolons (e.g. `url(data:...;base64,...)`) would break a
+ *    string-scrape
+ * 5. `getComputedStyle(el)[key]` — last resort
+ *
+ * The walk is per-key, so different baseline keys may be sourced from
+ * different layers.
+ *
+ * @param el Element whose computed style is read as the final fallback.
+ *   Must be a real DOM node (the function reads inline style and
+ *   `getComputedStyle`).
+ * @param opts Layered animation definitions:
+ * @param opts.initial Optional `initial` record from the component.
+ * @param opts.animate Optional `animate` record from the component.
+ * @param opts.whileInView The `whileInView` record — its keys drive
+ *   which baseline entries get computed. Nested `transition` is
+ *   stripped before walking.
+ * @returns A new record containing one entry per key found in
+ *   `opts.whileInView`. May be empty if `whileInView` is empty.
+ *
+ * @example
+ * ```ts
+ * computeInViewBaseline(element, {
+ *   initial: { opacity: 0, y: 50 },
+ *   animate: { opacity: 1, y: 0 },
+ *   whileInView: { opacity: 1, scale: 1.1 }
+ * })
+ * // → { opacity: 1, scale: 1 }
+ * //   opacity sourced from animate; scale falls to the neutral default.
+ * ```
  */
 export const computeInViewBaseline = (
     el: HTMLElement,
@@ -104,8 +164,62 @@ export const computeInViewBaseline = (
 }
 
 /**
- * Attach whileInView interactions to an element via motion's `inView` primitive.
- * (unchanged from the pre-runes implementation; this stays a pure helper.)
+ * Wire a `whileInView` interaction onto an element using motion's
+ * `inView` primitive. On viewport entry the element animates to the
+ * supplied keyframes; on exit it animates back to a baseline computed
+ * via {@link computeInViewBaseline}.
+ *
+ * Used internally by `motion.<tag>` components to power the
+ * `whileInView` prop, and exposed for callers that want the same
+ * declarative behavior without going through a motion component.
+ *
+ * When `viewport.once` is `true`, the element latches on first entry
+ * — no exit animation runs, and the IntersectionObserver is detached
+ * via a `queueMicrotask(stop)` after the entry handler returns.
+ *
+ * @param el Target element to observe and animate.
+ * @param whileInView Keyframes to apply on entry. May carry a nested
+ *   `transition` config (extracted via {@link splitInViewDefinition}).
+ *   If `undefined`, the function returns a no-op cleanup without
+ *   creating an observer.
+ * @param mergedTransition Default transition used both when
+ *   `whileInView` has no nested `transition` and for the exit
+ *   animation back to baseline.
+ * @param callbacks Optional lifecycle hooks:
+ *   - `onStart` — fires on viewport entry, before the entry animation.
+ *   - `onEnd` — fires on viewport exit, after the baseline restore
+ *     animation kicks off. Not called when `viewport.once` is `true`.
+ *   - `onAnimationComplete` — fires when the entry animation
+ *     resolves; passed the keyframes that ran.
+ * @param baselineSources Sources for {@link computeInViewBaseline}'s
+ *   per-key walk:
+ *   - `initial` — the component's `initial` record.
+ *   - `animate` — the component's `animate` record.
+ * @param viewport IntersectionObserver options:
+ *   - `root` — scroll container (default page).
+ *   - `margin` — `rootMargin` string.
+ *   - `amount` — fraction visible required (defaults to `0` here so
+ *     any pixel counts).
+ *   - `once` — latch on first entry; skip exit animation.
+ * @returns A cleanup function that detaches the IntersectionObserver
+ *   on call. Safe to invoke after a `once` latch has already fired.
+ *
+ * @example
+ * ```ts
+ * const cleanup = attachWhileInView(
+ *   element,
+ *   { opacity: 1, y: 0, transition: { duration: 0.5 } },
+ *   { duration: 0.3 },
+ *   {
+ *     onStart: () => trackImpression(),
+ *     onEnd: () => console.log('left viewport')
+ *   },
+ *   { initial: { opacity: 0, y: 50 } },
+ *   { once: true, amount: 0.5 }
+ * )
+ * // Later — typically component teardown:
+ * cleanup()
+ * ```
  */
 export const attachWhileInView = (
     el: HTMLElement,

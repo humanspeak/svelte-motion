@@ -109,7 +109,7 @@ a static background:
 A `ReducedMotionState` object:
 
 - **`current`** `boolean` (getter) — `true` when descendant motion should be reduced (resolved policy + OS preference). Reactive via `$state` so reads inside templates, `$derived`, and `$effect` track changes to either source automatically.
-- **`subscribe(run)`** — Svelte readable store contract. Fires on every OS-preference change; mid-tree `<MotionConfig reducedMotion={...}>` changes are picked up by `.current` reads inside reactive scopes but won't fire the legacy `subscribe` callback. Kept for compat with hooks that still consume Svelte readables.
+- **`subscribe(run)`** — Svelte readable store contract. Fires on every OS-preference change AND on every mid-tree `<MotionConfig reducedMotion={...}>` policy reassignment, so legacy store consumers see both sources. Kept for compat with hooks that still consume Svelte readables.
 
 ## See also
 

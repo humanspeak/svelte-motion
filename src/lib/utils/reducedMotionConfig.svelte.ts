@@ -33,11 +33,38 @@ const TRANSFORM_KEYS = new Set([
 ])
 
 /**
- * Returns a copy of `keyframes` with transform-related keys removed when
- * `reduced` is `true`. Returns `keyframes` unchanged otherwise.
+ * Returns a copy of `keyframes` with transform-related keys
+ * (`x`, `y`, `scale`, `rotate`, `skew`, `translate*`, etc.) removed
+ * when `reduced` is `true`. Returns `keyframes` unchanged otherwise.
  *
  * The `transition` key is preserved so per-key transitions still flow
- * through to the animation engine.
+ * through to the animation engine; only the visual *targets* are
+ * stripped, not the timing config.
+ *
+ * @template T Keyframes record (or `undefined`).
+ * @param keyframes Source keyframes record — may be `undefined`, in
+ *   which case the same `undefined` is returned regardless of
+ *   `reduced`.
+ * @param reduced When `true`, strip transform keys; when `false`,
+ *   return `keyframes` unchanged (by reference).
+ * @returns The original `keyframes` when `reduced` is `false` (same
+ *   reference); otherwise a new record with transform keys filtered
+ *   out and other keys preserved.
+ *
+ * @example
+ * ```ts
+ * filterReducedMotionKeyframes(
+ *   { x: 100, scale: 1.2, opacity: 0.5 },
+ *   true
+ * )
+ * // → { opacity: 0.5 }
+ *
+ * filterReducedMotionKeyframes(
+ *   { x: 100, opacity: 0.5, transition: { duration: 0.3 } },
+ *   true
+ * )
+ * // → { opacity: 0.5, transition: { duration: 0.3 } }
+ * ```
  */
 export const filterReducedMotionKeyframes = <T extends Record<string, unknown> | undefined>(
     keyframes: T,
@@ -109,18 +136,16 @@ export const useReducedMotionConfig = (): ReducedMotionState => {
     // Async path: `<MotionConfig reducedMotion>` is exposed via a
     // property getter over the config component's prop, so reading it
     // inside `$effect` tracks reassignments and fires the same `set` —
-    // closing the gap the legacy `derived()`-based impl had.
+    // closing the gap the legacy `derived()`-based impl had. Returning
+    // `osUnsub` installs it as the effect's cleanup, so the OS
+    // subscription is released on unmount.
     $effect(() => {
         // Void the read so the lint unused-expression rule doesn't fire
         // on a deliberate dependency touch.
         void motionConfig?.reducedMotion
         set(resolve())
+        return osUnsub
     })
-
-    // Tear down the OS subscription when the surrounding scope unmounts.
-    // Returning `osUnsub` from `$effect`'s body installs it as the
-    // cleanup; the body itself reads no signals so the effect runs once.
-    $effect(() => osUnsub)
 
     return state
 }

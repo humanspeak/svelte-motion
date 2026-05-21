@@ -26,7 +26,16 @@ export type BooleanSnapshot = {
  * means callers don't need their own change-detection guard.
  *
  * @param initial Starting value for the `current` cell.
- * @returns A `[state, set]` tuple.
+ * @returns A `[state, set]` tuple where `state` is the publicly-shared
+ *   `{ current, subscribe }` and `set` is the internal updater the hook
+ *   uses to push values from its event source.
+ *
+ * @example
+ * ```ts
+ * const [state, set] = createBooleanSnapshot(media.matches)
+ * media.addEventListener('change', (e) => set(e.matches))
+ * return state // { current, subscribe }
+ * ```
  */
 export const createBooleanSnapshot = (
     initial: boolean
