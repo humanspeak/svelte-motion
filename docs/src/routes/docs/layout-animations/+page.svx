@@ -4,7 +4,7 @@ description: Animate elements between positions with layout and layoutId for smo
 ---
 
 <script>
-    import SharedLayoutAnimationExample from '$lib/examples/SharedLayoutAnimationExample.svelte'
+    import SharedLayoutAnimationExample from '$lib/examples/shared-layout-animation/demos/Default.svelte'
     import Example from '$lib/components/general/Example.svelte'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
