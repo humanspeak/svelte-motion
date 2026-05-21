@@ -22,6 +22,9 @@ lint:
           paths:
               - '**/worker-configuration.d.ts'
               - convex/_generated/**
+              # shadcn-style registry blobs — generated/curated externally;
+              # don't let the formatter rewrite their indent on every run.
+              - docs/static/r/**
         - linters: [osv-scanner]
           paths:
               - '**/pnpm-lock.yaml'
