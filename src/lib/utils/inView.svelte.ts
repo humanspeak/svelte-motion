@@ -4,7 +4,7 @@ import {
     type AnimationOptions,
     type DOMKeyframesDefinition
 } from 'motion'
-import { readable, writable, type Readable } from 'svelte/store'
+import { SvelteSet } from 'svelte/reactivity'
 import type { MotionViewport } from '../types.js'
 import { createAttachable } from './attachable.js'
 import { type ElementOrGetter } from './dom.js'
@@ -23,8 +23,6 @@ const CSS_FUNCTION_RE = /\b(var|calc|min|max|clamp|rgb|rgba|hsl|hsla|url)\s*\(/i
  * @param el Element whose inline style is read.
  * @param propName Camel-case JS property name (e.g. `borderColor`).
  * @returns The inline CSS function value, or `null`.
- * @example
- * getInlineCssFunction(node, 'background') // => 'var(--brand)' | null
  */
 const getInlineCssFunction = (el: HTMLElement, propName: string): string | null => {
     const kebab = propName.replace(/([A-Z])/g, '-$1').toLowerCase()
@@ -35,18 +33,6 @@ const getInlineCssFunction = (el: HTMLElement, propName: string): string | null 
 
 /**
  * Split a whileInView definition into keyframes and an optional nested transition.
- *
- * @param def While-in-view record that may include a nested `transition`.
- * @returns Object with `keyframes` (no `transition`) and optional `transition`.
- * @example
- * // With transition
- * splitInViewDefinition({ opacity: 1, y: 0, transition: { duration: 0.5 } })
- * // => { keyframes: { opacity: 1, y: 0 }, transition: { duration: 0.5 } }
- *
- * @example
- * // Without transition
- * splitInViewDefinition({ opacity: 1, scale: 1 })
- * // => { keyframes: { opacity: 1, scale: 1 }, transition: undefined }
  */
 export const splitInViewDefinition = (
     def: Record<string, unknown>
@@ -63,17 +49,6 @@ export const splitInViewDefinition = (
  *
  * Preference order per key: `animate` → `initial` → neutral transform defaults
  * → computed style value if present.
- *
- * @param el Target element.
- * @param opts Source records for baseline computation.
- * @returns Minimal baseline record to restore when element leaves viewport.
- * @example
- * computeInViewBaseline(element, {
- *   initial: { opacity: 0, y: 50 },
- *   animate: { opacity: 1, y: 0 },
- *   whileInView: { opacity: 1, scale: 1.1 }
- * })
- * // => { opacity: 1, scale: 1 } (scale defaults to 1, opacity from animate)
  */
 export const computeInViewBaseline = (
     el: HTMLElement,
@@ -130,34 +105,7 @@ export const computeInViewBaseline = (
 
 /**
  * Attach whileInView interactions to an element via motion's `inView` primitive.
- *
- * On entry, animates to `whileInView` state (using the nested `transition` if
- * provided). On exit, restores the changed keys to a baseline computed from
- * `initial` / `animate` / neutral transform defaults / inline styles.
- *
- * Delegates to motion's `inView` so the IntersectionObserver implementation
- * is shared with the public `useInView` hook.
- *
- * @param el Target element.
- * @param whileInView While-in-view definition.
- * @param mergedTransition Root/component merged transition.
- * @param callbacks Optional lifecycle callbacks for in-view start/end and animation completion.
- * @param baselineSources Optional sources used to compute baseline.
- * @param viewport Optional IntersectionObserver options. `amount` defaults to `0` (any pixel visible).
- * @returns Cleanup function to stop observing.
- * @example
- * const cleanup = attachWhileInView(
- *   element,
- *   { opacity: 1, y: 0, transition: { duration: 0.5 } },
- *   { duration: 0.3 },
- *   {
- *     onStart: () => console.log('Entered viewport'),
- *     onEnd: () => console.log('Left viewport')
- *   },
- *   { initial: { opacity: 0, y: 50 } },
- *   { once: true, amount: 0.5 }
- * )
- * // Later: cleanup() to stop observing
+ * (unchanged from the pre-runes implementation; this stays a pure helper.)
  */
 export const attachWhileInView = (
     el: HTMLElement,
@@ -200,9 +148,6 @@ export const attachWhileInView = (
                 })
 
             if (viewport?.once) {
-                // Latch on first entry. Don't return an exit handler so the
-                // element holds its in-view state and we never animate back.
-                // Stop observing entirely after the entry handler returns.
                 latched = true
                 queueMicrotask(stop)
                 return
@@ -221,8 +166,6 @@ export const attachWhileInView = (
         },
         {
             root: viewport?.root,
-            // framer-motion types `margin` as a CSS-shorthand template literal;
-            // we expose plain `string` so consumers can pass any computed value.
             margin: viewport?.margin as never,
             amount: viewport?.amount ?? 0
         }
@@ -241,30 +184,46 @@ export type UseInViewOptions = {
     margin?: string
     /** Fraction (0-1) or `"some"` / `"all"` of the target that must be visible. */
     amount?: 'some' | 'all' | number
-    /** When `true`, the store latches to `true` on first entry and never flips back. */
+    /** When `true`, the state latches to `true` on first entry and never flips back. */
     once?: boolean
     /** Initial value emitted before the first IntersectionObserver callback. */
     initial?: boolean
 }
 
 /**
- * Returns a Svelte readable store that tracks whether `target` is in the
- * viewport. Mirrors Framer Motion's `useInView` so the same options
- * (`root`, `margin`, `amount`, `once`, `initial`) work as in React.
+ * State returned by {@link useInView}: a `$state`-backed `.current` boolean
+ * plus a `.subscribe()` shim for Svelte readable-store consumers.
+ */
+export type InViewState = {
+    /** Reactive read in Svelte 5 templates / `$derived` / `$effect`. */
+    readonly current: boolean
+    /** Svelte readable store contract — emits synchronously on subscribe. */
+    subscribe: (run: (value: boolean) => void) => () => void
+}
+
+/**
+ * Returns an `InViewState` that tracks whether `target` is in the viewport.
+ * Mirrors framer-motion's `useInView` adapted for Svelte 5 runes.
  *
- * `target` (and `options.root`) accept either an `HTMLElement` directly or a
- * getter `() => HTMLElement | undefined`. With Svelte's `bind:this`, the
+ * `target` (and `options.root`) accept either an `HTMLElement` directly or
+ * a getter `() => HTMLElement | undefined`. With Svelte's `bind:this` the
  * element isn't available until after mount, so element resolution is
- * deferred until the first subscriber arrives; if the element isn't ready,
- * the hook polls on `requestAnimationFrame` until it is.
+ * deferred — if the element isn't ready, the hook polls on
+ * `requestAnimationFrame` until it is.
  *
- * SSR-safe: returns a static `readable(initial)` when `window` or
- * `IntersectionObserver` is unavailable.
+ * Lifecycle: the IntersectionObserver is bound to the surrounding reactive
+ * scope via `$effect`. The observer attaches at mount and detaches at
+ * unmount, regardless of how many consumers are reading `.current` or
+ * `.subscribe()`. This is a deliberate divergence from the previous
+ * store-based impl, which attached lazily on first subscribe.
+ *
+ * SSR-safe: returns a static `{ current: options.initial ?? false }` when
+ * `window` or `IntersectionObserver` is unavailable.
  *
  * @param target - Element (or getter) to observe.
  * @param options - Optional `UseInViewOptions` (`root`, `margin`, `amount`,
  *   `once`, `initial`).
- * @returns A `Readable<boolean>` that flips to `true` while `target` is in view.
+ * @returns A `InViewState` reflecting the target's viewport intersection.
  * @see https://motion.dev/docs/react-use-in-view
  *
  * @example
@@ -276,31 +235,37 @@ export type UseInViewOptions = {
  *   const inView = useInView(() => ref, { once: true })
  *
  *   $effect(() => {
- *     if ($inView) trackImpression()
+ *     if (inView.current) trackImpression()
  *   })
  * </script>
  *
- * <div bind:this={ref}>{$inView ? 'visible' : 'hidden'}</div>
+ * <div bind:this={ref}>{inView.current ? 'visible' : 'hidden'}</div>
  * ```
  */
-export const useInView = (
-    target: ElementOrGetter,
-    options: UseInViewOptions = {}
-): Readable<boolean> => {
+export const useInView = (target: ElementOrGetter, options: UseInViewOptions = {}): InViewState => {
     const initial = options.initial ?? false
+
     if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') {
-        return readable(initial)
+        return {
+            get current() {
+                return initial
+            },
+            subscribe(run) {
+                run(initial)
+                return () => undefined
+            }
+        }
     }
 
-    const store = writable<boolean>(initial)
-    let current = initial
+    let current = $state(initial)
+    const subscribers = new SvelteSet<(value: boolean) => void>()
+    let latched = false
+
     const update = (next: boolean) => {
         if (next === current) return
         current = next
-        store.set(next)
+        for (const sub of subscribers) sub(next)
     }
-
-    let latched = false
 
     const attachable = createAttachable({
         refs: { target, root: options.root },
@@ -330,12 +295,18 @@ export const useInView = (
             )
     })
 
-    return readable(initial, (set) => {
-        const release = attachable.subscribe()
-        const unsub = store.subscribe(set)
-        return () => {
-            unsub()
-            release()
+    $effect(() => attachable.subscribe())
+
+    return {
+        get current() {
+            return current
+        },
+        subscribe(run) {
+            subscribers.add(run)
+            run(current)
+            return () => {
+                subscribers.delete(run)
+            }
         }
-    })
+    }
 }

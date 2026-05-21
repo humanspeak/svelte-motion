@@ -1,13 +1,13 @@
 <script lang="ts">
     import { useReducedMotion } from '@humanspeak/svelte-motion'
 
-    // `useReducedMotion()` returns a reactive store backed by the
-    // `(prefers-reduced-motion: reduce)` media query. Use it to gate
-    // any non-essential animation — combine with an in-page override
-    // so users can opt in/out independently of OS settings.
+    // `useReducedMotion()` returns a `$state`-backed `{ current }` object
+    // wired to the `(prefers-reduced-motion: reduce)` media query. Use it
+    // to gate any non-essential animation — combine with an in-page
+    // override so users can opt in/out independently of OS settings.
     const reduced = useReducedMotion()
     let forceReduced = $state(false)
-    const effective = $derived($reduced || forceReduced)
+    const effective = $derived(reduced.current || forceReduced)
 </script>
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
@@ -20,7 +20,7 @@
 
     <div class="info">
         <p>
-            OS preference: <strong>{$reduced ? 'reduce' : 'no-preference'}</strong>
+            OS preference: <strong>{reduced.current ? 'reduce' : 'no-preference'}</strong>
         </p>
         <label class="flex items-center gap-2">
             <input type="checkbox" bind:checked={forceReduced} />

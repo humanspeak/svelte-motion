@@ -20,12 +20,12 @@
 <div class="dk-demo-shell">
     <p class="text-sm text-muted-foreground">Scroll the panel below.</p>
     <div bind:this={scrollContainer} class="frame">
-        <div bind:this={topEl} class="card top" data-in-view={$topInView}>
-            top: <strong>{$topInView ? 'visible' : 'hidden'}</strong>
+        <div bind:this={topEl} class="card top" data-in-view={topInView.current}>
+            top: <strong>{topInView.current ? 'visible' : 'hidden'}</strong>
         </div>
         <div class="filler">↓ scroll ↓</div>
-        <div bind:this={bottomEl} class="card bottom" data-in-view={$bottomInView}>
-            bottom (once): <strong>{$bottomInView ? 'latched' : 'pending'}</strong>
+        <div bind:this={bottomEl} class="card bottom" data-in-view={bottomInView.current}>
+            bottom (once): <strong>{bottomInView.current ? 'latched' : 'pending'}</strong>
         </div>
     </div>
 </div>

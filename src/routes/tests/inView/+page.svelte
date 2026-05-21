@@ -43,8 +43,8 @@
 
     <section class="test-section">
         <h2>Top box (visible on load)</h2>
-        <div bind:this={topEl} class="box" data-testid="top-box" data-in-view={$topInView}>
-            in-view: <strong>{$topInView}</strong>
+        <div bind:this={topEl} class="box" data-testid="top-box" data-in-view={topInView.current}>
+            in-view: <strong>{topInView.current}</strong>
         </div>
     </section>
 
@@ -52,8 +52,13 @@
 
     <section class="test-section">
         <h2>Bottom box (toggles on scroll)</h2>
-        <div bind:this={bottomEl} class="box" data-testid="bottom-box" data-in-view={$bottomInView}>
-            in-view: <strong>{$bottomInView}</strong>
+        <div
+            bind:this={bottomEl}
+            class="box"
+            data-testid="bottom-box"
+            data-in-view={bottomInView.current}
+        >
+            in-view: <strong>{bottomInView.current}</strong>
         </div>
     </section>
 
@@ -61,8 +66,13 @@
 
     <section class="test-section">
         <h2>Once box (latches on first entry)</h2>
-        <div bind:this={onceEl} class="box" data-testid="once-box" data-in-view={$onceInView}>
-            in-view: <strong>{$onceInView}</strong>
+        <div
+            bind:this={onceEl}
+            class="box"
+            data-testid="once-box"
+            data-in-view={onceInView.current}
+        >
+            in-view: <strong>{onceInView.current}</strong>
         </div>
     </section>
 

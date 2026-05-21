@@ -3,7 +3,7 @@
 
     const reduced = useReducedMotion()
     let forceReduced = $state(false)
-    const effective = $derived($reduced || forceReduced)
+    const effective = $derived(reduced.current || forceReduced)
 </script>
 
 <div class="flex min-h-screen w-full flex-col items-center justify-center gap-8 p-8">
@@ -21,14 +21,16 @@
         class:spin={!effective}
         data-testid="reduced-motion-box"
         data-reduced-motion={effective}
-        data-os-reduced-motion={$reduced}
+        data-os-reduced-motion={reduced.current}
         aria-label={effective ? 'Animation disabled' : 'Animation enabled'}
     ></div>
 
     <div class="flex flex-col items-center gap-2">
         <p class="text-sm text-gray-600">
             OS preference (`prefers-reduced-motion`):
-            <strong data-testid="os-preference">{$reduced ? 'reduce' : 'no-preference'}</strong>
+            <strong data-testid="os-preference"
+                >{reduced.current ? 'reduce' : 'no-preference'}</strong
+            >
         </p>
         <label class="flex items-center gap-2 text-sm text-gray-600">
             <input type="checkbox" data-testid="force-reduced-toggle" bind:checked={forceReduced} />
