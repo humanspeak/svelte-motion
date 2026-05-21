@@ -38,7 +38,7 @@
             tag: 'HOOK',
             title: { prefix: 'cycling ', accent: 'variants', end: '.' },
             description:
-                '`useCycle(...labels)` returns a `{ current, cycle }` object. Read `state.current` to drive `animate=`, call `state.cycle()` to advance, or `state.cycle(i)` to jump to a specific label. Pair it with a `variants` map and motion handles the transitions.',
+                '`useCycle(...labels)` returns a `{ current, cycle }` object. Read `variant.current` to drive `animate=`, call `variant.cycle()` to advance, or `variant.cycle(i)` to jump to a specific label. Pair it with a `variants` map and motion handles the transitions.',
             snippet: defaultSection,
             codeSnippet: defaultCode,
             notes: defaultNotes,

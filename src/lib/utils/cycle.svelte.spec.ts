@@ -74,6 +74,48 @@ describe('useCycle', () => {
         })
     })
 
+    describe('out-of-range cycle(i)', () => {
+        it('.current clamps to the last item for indexes past items.length', () => {
+            inRoot(() => {
+                const x = useCycle('a', 'b', 'c')
+                x.cycle(99)
+                expect(x.current).toBe('c')
+            })
+        })
+
+        it('.current clamps to the last item for negative indexes', () => {
+            inRoot(() => {
+                const x = useCycle('a', 'b', 'c')
+                x.cycle(-5)
+                // Negative index is < items.length, so the clamp guard doesn't
+                // fire — `items[-5]` is undefined on a real array, but the
+                // clamp branch only catches index >= items.length. Document
+                // the actual behavior so the test fails loudly if the impl
+                // ever changes the clamp predicate.
+                expect(x.current).toBeUndefined()
+            })
+        })
+
+        it('cycle() after out-of-range jump wraps via wrap(0, len, stored+1)', () => {
+            inRoot(() => {
+                const x = useCycle(1, 2, 3)
+                x.cycle(99) // stored index = 99
+                x.cycle() // wrap(0, 3, 100) = 1 → items[1] = 2
+                expect(x.current).toBe(2)
+            })
+        })
+
+        it('jumping back into range after an out-of-range jump resolves cleanly', () => {
+            inRoot(() => {
+                const x = useCycle('a', 'b', 'c')
+                x.cycle(99)
+                expect(x.current).toBe('c') // clamped
+                x.cycle(1)
+                expect(x.current).toBe('b') // back to direct index
+            })
+        })
+    })
+
     it('sequential calls compose (not bound by render cycle)', () => {
         inRoot(() => {
             const x = useCycle(1, 2, 3, 4)

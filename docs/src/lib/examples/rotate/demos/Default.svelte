@@ -10,7 +10,7 @@
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
     {#key replayId}
-        <motion.ul
+        <motion.div
             class="size-24 rounded-md bg-pink-400"
             animate={{ rotate: 360 }}
             transition={{ duration: 1 }}

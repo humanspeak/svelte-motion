@@ -177,6 +177,8 @@ Springs additionally expose motion-dom event types via `.on(...)`:
 
 ```svelte
 <script>
+  import { useSpring } from '@humanspeak/svelte-motion'
+
   const x = useSpring(0)
 
   x.on('animationStart', () => console.log('spring started'))

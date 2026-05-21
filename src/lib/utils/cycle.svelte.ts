@@ -37,14 +37,18 @@ export type CycleItemsGetter<T> = () => readonly T[]
  * - `state.current` is reactive — read it in templates / `$derived` / `$effect`
  *   and it tracks both index changes and (in the getter form) item changes.
  * - `state.cycle()` advances to the next item (wrapping at the end).
- * - `state.cycle(i)` jumps to index `i`. Out-of-range indexes pass through
- *   to `items[i]` (which may be `undefined`) — same as React framer-motion.
+ * - `state.cycle(i)` jumps to index `i`. The index is stored as-given; `.current`
+ *   then clamps on read so out-of-range indexes resolve to the last valid item
+ *   instead of `undefined`. This is a defensive divergence from React
+ *   framer-motion (which returns `items[i]`, possibly undefined) — needed so
+ *   the reactive-getter form stays safe when items shrink underneath the cycle.
  * - Calls that resolve to the current index are no-ops, matching React
  *   `useState`'s `Object.is` bail-out.
  *
  * Diverges from React's `[value, cycle]` tuple return because destructuring
  * a `$state`-backed value under Svelte 5 runes snapshots it and loses
- * reactivity. The semantics are otherwise 1:1.
+ * reactivity. Out-of-range read semantics are the other intentional
+ * divergence — see above. Otherwise 1:1 with React.
  *
  * Ambiguity: `useCycle(fn)` with a single function value is treated as the
  * reactive overload, not as a single-item cycle. To cycle through one

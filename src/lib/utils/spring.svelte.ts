@@ -110,10 +110,13 @@ export function useSpring(
     source: MotionValue<string>,
     options?: UseSpringOptions
 ): SpringMotionValue<string>
-export function useSpring(
-    source: Readable<number | string>,
+// Generic readable overload preserves the concrete T from the source so callers
+// passing `Readable<number>` get `SpringMotionValue<number>` back (not the
+// number|string union the resolved-impl signature returns).
+export function useSpring<T extends number | string>(
+    source: Readable<T>,
     options?: UseSpringOptions
-): SpringMotionValue<number> | SpringMotionValue<string>
+): SpringMotionValue<T>
 export function useSpring(
     source: number | string | MotionValue<number> | MotionValue<string> | Readable<number | string>,
     options: UseSpringOptions = {}

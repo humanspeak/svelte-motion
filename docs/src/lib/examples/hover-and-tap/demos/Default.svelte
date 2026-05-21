@@ -9,6 +9,8 @@
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
     <motion.button
+        type="button"
+        aria-label="Hover or tap to scale"
         class="text-text-primary-muted h-[100px] w-[100px] rounded-md border border-border bg-green-500 px-4 py-2"
         whileHover={{ scale: 1.2 }}
         whileTap={{ scale: 0.8 }}

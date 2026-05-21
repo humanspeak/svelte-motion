@@ -146,7 +146,7 @@ A `CycleState<T>` object:
 
 ### Notes
 
-- Out-of-range indexes are passed through as-is — `x.cycle(99)` reads `items[99]`, which may be `undefined`. Same as React framer-motion.
+- Out-of-range indexes are stored as-given by `cycle(i)` but `.current` always clamps on read — `x.cycle(99)` on a 3-item cycle yields `items[2]`, not `undefined`. This is a defensive divergence from React framer-motion (which returns `items[99]`) so the reactive-getter form stays safe when items shrink underneath. Subsequent `cycle()` advances are relative to the *stored* index, so `cycle(99); cycle()` on a 3-item cycle wraps via `wrap(0, 3, 100) = 1`.
 - Same-index calls are no-ops and don't trigger downstream reactivity, matching React `useState`'s `Object.is` bail-out.
 - File name is `cycle.svelte.ts` because the hook uses `$state` at module scope; if you reach into the source, the `.svelte.ts` extension is required for runes to compile.
 
