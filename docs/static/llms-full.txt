@@ -591,17 +591,40 @@ Track whether an element is in the viewport (IntersectionObserver under the hood
 
 ### useCycle
 
-Cycle through a list of animation states with an imperative `cycle()` function.
+Cycle through a list of animation states. Returns a `$state`-backed
+`{ current, cycle }` object — read `state.current` in templates and call
+`state.cycle()` to advance (or `state.cycle(i)` to jump).
+
+Two call forms:
 
 ```svelte
 <script lang="ts">
     import { useCycle, motion } from '@humanspeak/svelte-motion'
 
-    const [state, cycle] = useCycle('rest', 'hover', 'tap')
+    // Static varargs — matches React framer-motion's signature
+    const state = useCycle('rest', 'hover', 'tap')
+
+    // Reactive getter — items are re-read on every access, so a
+    // $state / $derived / prop source propagates list changes into
+    // the cycle while keeping the same internal index.
+    let { labels }: { labels: string[] } = $props()
+    const variant = useCycle(() => labels)
 </script>
 
-<motion.button animate={$state} onclick={() => cycle()}>Next state</motion.button>
+<motion.button animate={state.current} onclick={() => state.cycle()}>
+    Next state
+</motion.button>
 ```
+
+`.current` clamps to the last valid index when items shrink underneath
+the cycle. The getter form is detected when `useCycle` is called with a
+single function argument; cycling through a single function value needs
+`useCycle(() => [fn])` (but single-item cycles are no-ops anyway).
+
+> Diverges from React framer-motion's `[value, cycle]` tuple because
+> destructuring a `$state`-backed value snapshots it and loses reactivity
+> under Svelte 5 runes. Semantics are otherwise 1:1, including reactive
+> items via the getter form.
 
 ### usePresence / useIsPresent
 

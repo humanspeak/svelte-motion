@@ -20,10 +20,10 @@
     if (seo) {
         seo.title = 'useCycle | Examples | Svelte Motion'
         seo.description =
-            'Cycle through animation variants in Svelte. useCycle returns a reactive store and a cycle function for toggling motion states.'
+            'Cycle through animation variants in Svelte. useCycle returns a $state-backed { current, cycle } object for toggling motion states with Svelte 5 runes.'
         seo.ogTitle = 'useCycle'
         seo.ogTagline = 'Cycle through animation states'
-        seo.ogFeatures = ['Variants', 'State Toggle', 'Reactive Store', 'SSR Safe']
+        seo.ogFeatures = ['Variants', 'State Toggle', 'Svelte 5 Runes', 'SSR Safe']
         seo.ogSlug = 'examples-use-cycle'
     }
 
@@ -38,7 +38,7 @@
             tag: 'HOOK',
             title: { prefix: 'cycling ', accent: 'variants', end: '.' },
             description:
-                '`useCycle(...labels)` returns `[current, cycle]`. `cycle()` advances by one; `cycle(i)` jumps. Pair it with a `variants` map keyed by the same labels and motion handles the transitions for free.',
+                '`useCycle(...labels)` returns a `{ current, cycle }` object. Read `state.current` to drive `animate=`, call `state.cycle()` to advance, or `state.cycle(i)` to jump to a specific label. Pair it with a `variants` map and motion handles the transitions.',
             snippet: defaultSection,
             codeSnippet: defaultCode,
             notes: defaultNotes,
@@ -65,15 +65,16 @@
             <span>
                 <code>cycle(i)</code> jumps directly to the label at index <code>i</code>. Useful
                 for tab-bar-style controls where each button maps to a specific state — no need for
-                a separate selected-index <code>$state</code>.
+                a separate selected-index <code>$state</code> cell.
             </span>
         </li>
         <li>
             <ListChecks />
             <span>
-                The motion target reads <code>animate={'{$variant}'}</code> (a string label), so
-                motion resolves it via <code>variants</code>. Pure declarative: state lives in the
-                cycle store, animations live in the variants map.
+                The motion target reads
+                <code>animate={'{variant.current}'}</code> (a string label), so motion resolves it
+                via <code>variants</code>. Pure declarative: state lives in the cycle object,
+                animations live in the variants map.
             </span>
         </li>
     </ul>
