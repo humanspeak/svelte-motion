@@ -625,6 +625,9 @@ honors its `T` type. Subsequent `cycle()` advances are relative to the
 stored (unclamped) index, so `cycle(99); cycle()` wraps via
 `wrap(0, len, 100)`. If the reactive getter empties mid-cycle,
 `.current` throws rather than silently returning `undefined`.
+`cycle(next)` itself throws on non-integer indexes (`NaN`, `1.5`,
+`Infinity`) since those slip past the read-time clamp and would
+otherwise leak `undefined` through a `T`-typed read.
 
 The getter form is detected when `useCycle` is called with a single
 function argument; cycling through a single function value needs

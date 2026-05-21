@@ -153,6 +153,7 @@ A `CycleState<T>` object:
 
 - Out-of-range indexes are stored as-given by `cycle(i)` but `.current` always clamps on read — `x.cycle(99)` on a 3-item cycle yields `items[2]`, `x.cycle(-5)` yields `items[0]`. This is a defensive divergence from React framer-motion (which returns `items[i]`, possibly undefined) so `.current` always honors its `T` type. Subsequent `cycle()` advances are relative to the *stored* (unclamped) index, so `cycle(99); cycle()` on a 3-item cycle wraps via `wrap(0, 3, 100) = 1`.
 - If the reactive getter form's items list empties mid-cycle, `.current` throws (`useCycle items getter returned an empty list`). The public type is `T`, so silently returning `undefined` there would be a lie — surfacing the bug loudly is the better trade.
+- `cycle(next)` throws (`useCycle index must be a finite integer`) when `next` is `NaN`, `Infinity`, or a fractional number. Those slip past the read-time clamp (NaN comparisons return false for both `< 0` and `>= length`) and would otherwise silently make `.current` resolve to `undefined`.
 - Same-index calls are no-ops and don't trigger downstream reactivity, matching React `useState`'s `Object.is` bail-out.
 - File name is `cycle.svelte.ts` because the hook uses `$state` at module scope; if you reach into the source, the `.svelte.ts` extension is required for runes to compile.
 

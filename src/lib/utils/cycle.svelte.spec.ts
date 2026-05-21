@@ -100,6 +100,21 @@ describe('useCycle', () => {
             })
         })
 
+        it('throws on non-integer indexes (NaN, fractional, Infinity)', () => {
+            inRoot(() => {
+                const x = useCycle('a', 'b', 'c')
+                // NaN, 1.5, and Infinity all slip past the clamp predicate
+                // (NaN comparisons are false, fractional indexes return
+                // `undefined` from `items[i]`, Infinity isn't an integer),
+                // so reject them at write time.
+                expect(() => x.cycle(Number.NaN)).toThrow(/finite integer/)
+                expect(() => x.cycle(1.5)).toThrow(/finite integer/)
+                expect(() => x.cycle(Number.POSITIVE_INFINITY)).toThrow(/finite integer/)
+                // Original index unchanged after the throws.
+                expect(x.current).toBe('a')
+            })
+        })
+
         it('jumping back into range after an out-of-range jump resolves cleanly', () => {
             inRoot(() => {
                 const x = useCycle('a', 'b', 'c')

@@ -86,6 +86,17 @@ export type CycleItemsGetter<T> = () => readonly T[]
  *
  * <motion.div animate={variant.current} onclick={() => variant.cycle()} />
  * ```
+ *
+ * @param itemsGetter Function returning the current items list; re-invoked
+ *   on every `.current` read so reactive sources propagate. Use this form
+ *   when items can change between mount and unmount. (Reactive overload.)
+ * @param items One or more values to cycle through. Captured once at call
+ *   time and fixed for the cycle's lifetime. (Varargs overload.)
+ * @returns A `CycleState<T>` with a reactive `.current` getter and a
+ *   `cycle(next?: number)` advance/jump function. `.current` always
+ *   honors its `T` type by clamping out-of-range indexes; `.cycle()`
+ *   throws on non-integer (`NaN`, `1.5`, `Infinity`) indexes and on a
+ *   reactive getter that empties mid-cycle.
  */
 export function useCycle<T>(itemsGetter: CycleItemsGetter<T>): CycleState<T>
 export function useCycle<T>(...items: T[]): CycleState<T>
@@ -120,6 +131,14 @@ export function useCycle<T>(...args: [CycleItemsGetter<T>] | T[]): CycleState<T>
         cycle: (next?: number) => {
             const items = getItems()
             if (items.length === 0) return
+            // Reject non-finite / non-integer indexes up-front: `NaN` slips
+            // past the read-time clamp (NaN comparisons return false for
+            // both `< 0` and `>= length`) and would silently make `.current`
+            // resolve to `undefined`, breaking the `T` contract. Throw
+            // loudly to surface the consumer bug at write-time.
+            if (typeof next === 'number' && !Number.isInteger(next)) {
+                throw new Error('useCycle index must be a finite integer')
+            }
             const target = typeof next === 'number' ? next : wrap(0, items.length, index + 1)
             if (target === index) return
             index = target
