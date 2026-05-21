@@ -1,6 +1,9 @@
 <script lang="ts">
     import { useAnimationFrame } from '@humanspeak/svelte-motion'
 
+    // `useAnimationFrame(cb)` calls `cb(time, delta)` every animation frame
+    // and hands back a cleanup. Wrap it in `$effect` so Svelte runs and
+    // tears down the loop in sync with the component's lifecycle.
     let cubeRef: HTMLDivElement
 
     $effect(() => {
@@ -15,7 +18,8 @@
     })
 </script>
 
-<div class="flex min-h-[500px] items-center justify-center p-8">
+<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
+<div class="humanspeak-demo-shell">
     <div class="container">
         <div class="cube" bind:this={cubeRef}>
             <div class="side front"></div>
@@ -29,6 +33,14 @@
 </div>
 
 <style>
+    .humanspeak-demo-shell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        min-height: 500px;
+    }
+
     .container {
         perspective: 1000px;
         width: 250px;
