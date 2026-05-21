@@ -6,7 +6,7 @@ description: "Reactive Svelte store for the user's prefers-reduced-motion access
 <script>
   import { useReducedMotion } from '@humanspeak/svelte-motion';
   import Example from '$lib/components/general/Example.svelte';
-  import UseReducedMotionExample from '$lib/examples/UseReducedMotionExample.svelte';
+  import UseReducedMotionExample from '$lib/examples/use-reduced-motion/demos/Default.svelte';
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()
