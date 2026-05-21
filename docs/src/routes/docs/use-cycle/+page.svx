@@ -40,10 +40,11 @@ description: 'Cycle through a series of values to drive variants, properties, or
 - `cycle()` advances to the next item, wrapping back to the first when it passes the end.
 - `cycle(i)` jumps directly to the value at index `i`.
 
-> **Two deliberate divergences from React framer-motion's `useCycle`:**
+> **Three deliberate divergences from React framer-motion's `useCycle`:**
 >
 > 1. **Return shape** — React returns `[value, cycle]`. Under Svelte 5 runes, destructuring a `$state`-backed value snapshots it and loses reactivity, so we return an object whose getter preserves tracking.
 > 2. **Out-of-range reads always clamp** instead of returning `items[i]` undefined — see [API Reference → Notes](#notes) below.
+> 3. **`cycle(next)` requires an integer index** and throws on `NaN`, `Infinity`, or fractional values. React would silently make `.current` resolve to `undefined`; we surface the bug at write time.
 >
 > Otherwise 1:1 with React, including same-index no-op bail-out and `wrap(0, length, index + 1)` advance semantics.
 

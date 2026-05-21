@@ -94,9 +94,10 @@ export type CycleItemsGetter<T> = () => readonly T[]
  *   time and fixed for the cycle's lifetime. (Varargs overload.)
  * @returns A `CycleState<T>` with a reactive `.current` getter and a
  *   `cycle(next?: number)` advance/jump function. `.current` always
- *   honors its `T` type by clamping out-of-range indexes; `.cycle()`
- *   throws on non-integer (`NaN`, `1.5`, `Infinity`) indexes and on a
- *   reactive getter that empties mid-cycle.
+ *   honors its `T` type by clamping out-of-range indexes; it throws
+ *   if a reactive getter empties the items list mid-cycle.
+ *   `.cycle()` throws on non-integer (`NaN`, `1.5`, `Infinity`)
+ *   indexes and returns early as a no-op on empty items.
  */
 export function useCycle<T>(itemsGetter: CycleItemsGetter<T>): CycleState<T>
 export function useCycle<T>(...items: T[]): CycleState<T>
