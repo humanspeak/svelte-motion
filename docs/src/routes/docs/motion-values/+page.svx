@@ -53,16 +53,16 @@ This library is mid-migration toward returning real `MotionValue`s with `.curren
 | Hook                       | Returns                                | Read pattern                |
 | -------------------------- | -------------------------------------- | --------------------------- |
 | `useSpring`                | `MotionValue` + `.current` + `.subscribe` shim | **`spring.current`** (preferred) or `$spring` |
-| `useMotionValue`           | Svelte readable + `.set` / `.get`      | `$mv`                       |
+| `useMotionValue`           | `MotionValue` + `.current` + `.subscribe` shim | **`mv.current`** (preferred) or `$mv` |
 | `useScroll`                | `{ scrollX, scrollY, … }` of readables | `$scrollY`                  |
 | `useTransform`             | Svelte readable                        | `$transformed`              |
 | `useTime`                  | Svelte readable                        | `$time`                     |
 | `useVelocity`              | Svelte readable                        | `$velocity`                 |
 | `useMotionTemplate`        | Svelte readable                        | `$composed`                 |
 
-The Tier 2 hooks (`useMotionValue`, `useScroll`, `useTransform`, `useTime`, `useVelocity`, `useMotionTemplate`) will migrate together so composition stays coherent. Until then, the `.subscribe()` shim on `useSpring`'s output keeps everything interoperable — pass a spring to `useVelocity` or `useTransform` and the old store-consumer path still works.
+The remaining Tier 2 hooks (`useScroll`, `useTransform`, `useTime`, `useVelocity`, `useMotionTemplate`) will migrate together so composition stays coherent. Until then, the `.subscribe()` shim on `useSpring` and `useMotionValue` keeps everything interoperable — pass either to `useVelocity` or `useTransform` and the old store-consumer path still works.
 
-For new code today: use `.current` on springs, and `$store` on everything else.
+For new code today: use `.current` on springs and motion values, and `$store` on everything else.
 
 ### Composition
 
@@ -85,7 +85,7 @@ Motion values become powerful when you chain them. The output of one feeds into 
 </div>
 ```
 
-`x.current` reads the spring; `$opacity` and `$backgroundColor` read `useTransform`'s output, which is still a Svelte store until that hook migrates.
+`x.current` reads the spring; `$opacity` and `$backgroundColor` read `useTransform`'s output, which is still a Svelte store until that hook migrates. `useMotionValue` would read the same way as the spring — `.current` in templates and `$derived` / `$effect`, or `mv.get()` in imperative code.
 
 ## Usage
 
@@ -109,7 +109,13 @@ For a value without spring physics, use `useMotionValue`:
 
   const x = useMotionValue(0)
 </script>
+
+<div style="transform: translateX({x.current}px)">
+  Current value: {x.current}
+</div>
 ```
+
+`useMotionValue` returns the same shape as `useSpring` — a real motion-dom `MotionValue` with a `.current` getter for reactive reads and a `.subscribe` shim for store-style consumers. The difference is that writes via `.set(v)` are immediate (no animation), since there's no spring physics or follow source.
 
 A plain Svelte `writable` also works for values that don't need velocity tracking:
 
@@ -123,7 +129,7 @@ A plain Svelte `writable` also works for values that don't need velocity trackin
 
 ### Reading values
 
-For springs, use `.current` in reactive scopes (templates, `$derived`, `$effect`):
+For springs and motion values, use `.current` in reactive scopes (templates, `$derived`, `$effect`):
 
 ```svelte
 <div style="transform: translateX({x.current}px)">
@@ -131,7 +137,7 @@ For springs, use `.current` in reactive scopes (templates, `$derived`, `$effect`
 </div>
 ```
 
-For springs in imperative code (event handlers, callbacks), use `.get()`:
+In imperative code (event handlers, callbacks), use `.get()`:
 
 ```svelte
 <script>
@@ -141,7 +147,7 @@ For springs in imperative code (event handlers, callbacks), use `.get()`:
 </script>
 ```
 
-The Svelte 4–style `$x` syntax also works on springs via the `.subscribe()` shim — use it when migrating existing code or composing with hooks that still return stores.
+The Svelte 4–style `$x` syntax also works on both via the `.subscribe()` shim — use it when migrating existing code or composing with hooks that still return stores.
 
 For motion values that haven't migrated yet (`useScroll`, `useTime`, etc.), `$store` is the only reactive read path.
 
@@ -151,7 +157,7 @@ Springs and motion values support imperative writes:
 
 ```svelte
 <script>
-  x.set(200)  // animates toward 200 (with spring physics on a useSpring)
+  x.set(200)  // animates toward 200 with spring physics on useSpring; immediate on useMotionValue
   x.jump(200) // instantly sets to 200 (no animation, useSpring only)
 </script>
 ```
@@ -207,20 +213,20 @@ Chain motion values to build rich animations from simple building blocks:
 
 ## API
 
-Springs implement the motion-dom `MotionValue` interface plus a Svelte 5 reactive surface:
+Springs and `useMotionValue` both implement the motion-dom `MotionValue` interface plus a Svelte 5 reactive surface:
 
 | Member                  | Description                                                            |
 | ----------------------- | ---------------------------------------------------------------------- |
 | `current`               | Svelte 5 reactive getter — use in templates / `$derived` / `$effect`.   |
 | `get()`                 | Imperative current-value read.                                          |
-| `set(value)`            | Animate toward a new target with spring physics.                        |
-| `jump(value)`           | Set immediately without animation.                                      |
+| `set(value)`            | Update the value. `useSpring` animates with spring physics; `useMotionValue` writes immediately. |
+| `jump(value)`           | Set immediately without animation. `useSpring` only.                    |
 | `on(event, cb)`         | Subscribe to `'change'`, `'animationStart'`, `'animationComplete'`, etc.|
 | `getVelocity()`         | Current velocity of the value.                                          |
-| `subscribe(run)`        | Svelte readable store contract (powers `$spring` template syntax).      |
+| `subscribe(run)`        | Svelte readable store contract (powers `$mv` template syntax).          |
 | `destroy()`             | Tear down the motion value early (normally automatic).                  |
 
-Other motion-value-producing hooks (`useMotionValue`, `useScroll`, etc.) currently implement Svelte's `Readable` interface only. That will change as each migrates.
+The remaining motion-value-producing hooks (`useScroll`, `useTransform`, `useTime`, `useVelocity`, `useMotionTemplate`) currently implement Svelte's `Readable` interface only. That will change as each migrates.
 
 ## See also
 
