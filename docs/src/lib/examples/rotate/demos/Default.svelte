@@ -7,8 +7,8 @@
     let replayId = $state(0)
 </script>
 
-<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
-<div class="humanspeak-demo-shell">
+<!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
+<div class="dk-demo-shell">
     {#key replayId}
         <motion.ul
             class="size-24 rounded-md bg-pink-400"
@@ -21,7 +21,7 @@
 </div>
 
 <style>
-    .humanspeak-demo-shell {
+    .dk-demo-shell {
         display: flex;
         flex-direction: column;
         align-items: center;

@@ -36,8 +36,8 @@
     }
 </script>
 
-<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
-<div class="humanspeak-demo-shell">
+<!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
+<div class="dk-demo-shell">
     <div
         class="gradient-wrapper"
         bind:this={el}
@@ -53,7 +53,7 @@
 </div>
 
 <style>
-    .humanspeak-demo-shell {
+    .dk-demo-shell {
         display: flex;
         align-items: center;
         justify-content: center;

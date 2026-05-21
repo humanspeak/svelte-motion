@@ -20,8 +20,8 @@
     const items = ['Item 1', 'Item 2', 'Item 3', 'Item 4']
 </script>
 
-<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
-<div class="humanspeak-demo-shell">
+<!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
+<div class="dk-demo-shell">
     <div class="stage">
         <button class="toggle" type="button" onclick={() => (isVisible = !isVisible)}>
             {isVisible ? 'Hide' : 'Show'} Items
@@ -64,7 +64,7 @@
 </div>
 
 <style>
-    .humanspeak-demo-shell {
+    .dk-demo-shell {
         display: flex;
         align-items: center;
         justify-content: center;

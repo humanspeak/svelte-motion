@@ -8,8 +8,8 @@
     let isVisible = $state(true)
 </script>
 
-<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
-<div class="humanspeak-demo-shell">
+<!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
+<div class="dk-demo-shell">
     <!-- Fixed height container prevents the button from moving as the box enters/exits. -->
     <div class="stage">
         <AnimatePresence>
@@ -63,7 +63,7 @@
 </div>
 
 <style>
-    .humanspeak-demo-shell {
+    .dk-demo-shell {
         display: flex;
         flex-direction: column;
         align-items: center;

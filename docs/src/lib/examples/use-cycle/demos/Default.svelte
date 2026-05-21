@@ -16,8 +16,8 @@
     const [variant, cycle] = useCycle<keyof typeof variants>(...labels)
 </script>
 
-<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
-<div class="humanspeak-demo-shell">
+<!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
+<div class="dk-demo-shell">
     <div class="track">
         <motion.div
             class="cycle-card"
@@ -45,7 +45,7 @@
 </div>
 
 <style>
-    .humanspeak-demo-shell {
+    .dk-demo-shell {
         display: flex;
         flex-direction: column;
         align-items: center;

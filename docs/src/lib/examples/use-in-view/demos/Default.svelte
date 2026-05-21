@@ -16,8 +16,8 @@
     })
 </script>
 
-<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
-<div class="humanspeak-demo-shell">
+<!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
+<div class="dk-demo-shell">
     <p class="text-sm text-muted-foreground">Scroll the panel below.</p>
     <div bind:this={scrollContainer} class="frame">
         <div bind:this={topEl} class="card top" data-in-view={$topInView}>
@@ -31,7 +31,7 @@
 </div>
 
 <style>
-    .humanspeak-demo-shell {
+    .dk-demo-shell {
         display: flex;
         flex-direction: column;
         align-items: center;

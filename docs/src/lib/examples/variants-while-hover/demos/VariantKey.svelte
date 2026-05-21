@@ -10,9 +10,9 @@
     }
 </script>
 
-<!-- HUMANSPEAK: positioning shell — see InlineForm.svelte's note for the
+<!-- dk-strip: positioning shell — see InlineForm.svelte's note for the
      full why; stripped from the published manifest. -->
-<div class="humanspeak-demo-shell">
+<div class="dk-demo-shell">
     <motion.div
         variants={cardVariants}
         whileHover="hovered"
@@ -38,7 +38,7 @@
 </div>
 
 <style>
-    .humanspeak-demo-shell {
+    .dk-demo-shell {
         display: flex;
         align-items: center;
         justify-content: center;

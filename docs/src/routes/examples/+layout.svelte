@@ -42,24 +42,3 @@
         </MotionConfig>
     </div>
 </ExampleLayoutV2>
-
-<style>
-    /*
-     * docs-kit's `.dk-ex-body` defaults to `flex-grow: 0`, which leaves
-     * the footer strip floating mid-panel whenever the lede column is
-     * taller than the demo body (notes column + description vs a small
-     * interactive demo card). svelte-markdown's demos are content-heavy
-     * enough — full markdown renders — that the body fills naturally
-     * and the issue doesn't surface. Our motion demos are intrinsically
-     * sized cards, so we force the body to claim the remaining panel
-     * height; the footer then anchors to the panel bottom and the
-     * demo's `min-height` shell centers the card.
-     *
-     * TODO(docs-kit): file an upstream issue — `.dk-ex-body` should
-     * probably be `flex: 1` by default since the panel chrome relies on
-     * the footer being anchored to the bottom.
-     */
-    :global(.dk-ex-body) {
-        flex: 1 1 auto;
-    }
-</style>

@@ -17,8 +17,8 @@
     onMount(() => (mounted = true))
 </script>
 
-<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
-<div class="humanspeak-demo-shell">
+<!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
+<div class="dk-demo-shell">
     <div class="controls">
         <button type="button" class="primary" onclick={() => (visible = !visible)}>
             {visible ? 'Hide' : 'Show'}
@@ -38,7 +38,7 @@
 </div>
 
 <style>
-    .humanspeak-demo-shell {
+    .dk-demo-shell {
         display: flex;
         flex-direction: column;
         align-items: center;

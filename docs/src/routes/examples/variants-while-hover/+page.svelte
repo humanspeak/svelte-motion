@@ -1,7 +1,12 @@
 <script lang="ts">
-    import { CodeReferenceV2, ExampleV2 } from '@humanspeak/docs-kit'
+    import {
+        CodeReferenceV2,
+        type DemoManifestEntry,
+        ExampleV2,
+        type ExampleSection,
+        formatSheetLabel
+    } from '@humanspeak/docs-kit'
     import { Code2, KeyRound, Layers, Repeat2 } from '@lucide/svelte'
-    import type { Snippet } from 'svelte'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import InlineForm from '$lib/examples/variants-while-hover/demos/InlineForm.svelte'
@@ -41,27 +46,10 @@
     // column and references the demo file in the manifest — the demo
     // component is mounted as the body, and the manifest entry is fed
     // through CodeReferenceV2 as the toggleable code panel.
-    type Section = {
-        figId: string
-        tag: string
-        title: { prefix?: string; accent: string; end?: string }
-        description: string
-        snippet: Snippet
-        codeSnippet?: Snippet
-        notes?: Snippet
-        mode?: 'live' | 'static'
-        barCells?: { k: string; v: string }[]
-        sourceUrl?: string
-    }
 
-    type ManifestEntry = {
-        code: string
-        lang: string
-        html?: { light: string; dark: string }
-    }
-    const manifest = demoManifest as Record<string, ManifestEntry>
+    const manifest = demoManifest as Record<string, DemoManifestEntry>
 
-    const sections: Section[] = [
+    const sections: ExampleSection[] = [
         {
             figId: 'FIG-001',
             tag: 'INLINE',
@@ -87,8 +75,6 @@
             sourceUrl: `${SOURCE_URL}variants-while-hover/demos/VariantKey.svelte`
         }
     ]
-
-    const pad2 = (n: number) => String(n).padStart(2, '0')
 </script>
 
 {#snippet inlineFormSection()}
@@ -167,7 +153,7 @@
         title={section.title}
         description={section.description}
         mode={section.mode ?? 'live'}
-        sheetLabel="SHEET {pad2(i + 1)} / {pad2(sections.length)}"
+        sheetLabel={formatSheetLabel(i, sections.length)}
         barCells={section.barCells}
         sourceUrl={section.sourceUrl}
         codeSnippet={section.codeSnippet}

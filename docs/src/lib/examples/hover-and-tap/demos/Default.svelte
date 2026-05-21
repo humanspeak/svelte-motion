@@ -6,8 +6,8 @@
     // Releasing the gesture animates back to the resting `animate` state.
 </script>
 
-<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
-<div class="humanspeak-demo-shell">
+<!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
+<div class="dk-demo-shell">
     <motion.button
         class="text-text-primary-muted h-[100px] w-[100px] rounded-md border border-border bg-green-500 px-4 py-2"
         whileHover={{ scale: 1.2 }}
@@ -17,7 +17,7 @@
 </div>
 
 <style>
-    .humanspeak-demo-shell {
+    .dk-demo-shell {
         display: flex;
         flex-direction: column;
         align-items: center;

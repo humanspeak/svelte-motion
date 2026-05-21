@@ -19,13 +19,13 @@
     })
 </script>
 
-<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
-<div class="humanspeak-demo-shell">
+<!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
+<div class="dk-demo-shell">
     <motion.pre style="font-size: 64px; color: #8df0cc;">{count}</motion.pre>
 </div>
 
 <style>
-    .humanspeak-demo-shell {
+    .dk-demo-shell {
         display: flex;
         align-items: center;
         justify-content: center;

@@ -2,10 +2,10 @@
     import * as Tabs from '$lib/shadcn/ui/tabs'
 </script>
 
-<!-- HUMANSPEAK: positioning shell — centers the tabs inside `.dk-ex-body`
+<!-- dk-strip: positioning shell — centers the tabs inside `.dk-ex-body`
      and pushes the footer strip to the panel bottom. Stripped from the
      published manifest by `demoManifestPlugin`. -->
-<div class="humanspeak-demo-shell">
+<div class="dk-demo-shell">
     <div class="w-full max-w-md">
         <Tabs.Root value="account">
             <Tabs.List>
@@ -67,7 +67,7 @@
 </div>
 
 <style>
-    .humanspeak-demo-shell {
+    .dk-demo-shell {
         display: flex;
         align-items: center;
         justify-content: center;

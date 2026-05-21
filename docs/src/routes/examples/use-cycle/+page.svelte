@@ -1,7 +1,12 @@
 <script lang="ts">
-    import { CodeReferenceV2, ExampleV2 } from '@humanspeak/docs-kit'
+    import {
+        CodeReferenceV2,
+        type DemoManifestEntry,
+        ExampleV2,
+        type ExampleSection,
+        formatSheetLabel
+    } from '@humanspeak/docs-kit'
     import { Hash, ListChecks, Repeat } from '@lucide/svelte'
-    import type { Snippet } from 'svelte'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import UseCycleDefault from '$lib/examples/use-cycle/demos/Default.svelte'
@@ -25,27 +30,9 @@
     const SOURCE_URL =
         'https://github.com/humanspeak/svelte-motion/blob/main/docs/src/lib/examples/'
 
-    type Section = {
-        figId: string
-        tag: string
-        title: { prefix?: string; accent: string; end?: string }
-        description: string
-        snippet: Snippet
-        codeSnippet?: Snippet
-        notes?: Snippet
-        mode?: 'live' | 'static'
-        barCells?: { k: string; v: string }[]
-        sourceUrl?: string
-    }
+    const manifest = demoManifest as Record<string, DemoManifestEntry>
 
-    type ManifestEntry = {
-        code: string
-        lang: string
-        html?: { light: string; dark: string }
-    }
-    const manifest = demoManifest as Record<string, ManifestEntry>
-
-    const sections: Section[] = [
+    const sections: ExampleSection[] = [
         {
             figId: 'FIG-001',
             tag: 'HOOK',
@@ -59,8 +46,6 @@
             sourceUrl: `${SOURCE_URL}use-cycle/demos/Default.svelte`
         }
     ]
-
-    const pad2 = (n: number) => String(n).padStart(2, '0')
 </script>
 
 {#snippet defaultSection()}
@@ -113,7 +98,7 @@
         title={section.title}
         description={section.description}
         mode={section.mode ?? 'live'}
-        sheetLabel="SHEET {pad2(i + 1)} / {pad2(sections.length)}"
+        sheetLabel={formatSheetLabel(i, sections.length)}
         barCells={section.barCells}
         sourceUrl={section.sourceUrl}
         codeSnippet={section.codeSnippet}

@@ -7,8 +7,8 @@
     // or omit the option for a re-runs-on-every-entry feel.
 </script>
 
-<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
-<div class="humanspeak-demo-shell">
+<!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
+<div class="dk-demo-shell">
     <div class="scroll-container">
         <p class="scroll-hint">Scroll down to see the animations</p>
         <div class="spacer"></div>
@@ -45,7 +45,7 @@
 </div>
 
 <style>
-    .humanspeak-demo-shell {
+    .dk-demo-shell {
         display: flex;
         align-items: center;
         justify-content: center;

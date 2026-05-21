@@ -13,8 +13,8 @@
     const colors = ['#ff0088', '#dd00ff', '#0088ff', '#00cc88', '#ffaa00']
 </script>
 
-<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
-<div class="humanspeak-demo-shell">
+<!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
+<div class="dk-demo-shell">
     <div class="wrapper">
         <div class="progress-bar" style="transform: scaleX({$scaleX});"></div>
 
@@ -35,7 +35,7 @@
 </div>
 
 <style>
-    .humanspeak-demo-shell {
+    .dk-demo-shell {
         display: flex;
         align-items: center;
         justify-content: center;
