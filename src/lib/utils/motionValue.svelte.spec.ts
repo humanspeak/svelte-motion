@@ -2,7 +2,7 @@ import { isMotionValue } from 'motion-dom'
 import { get } from 'svelte/store'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { useMotionValue } from './motionValue.svelte.js'
-import { useTransform } from './transform.js'
+import { useTransform } from './transform.svelte.js'
 
 /**
  * `useMotionValue` now wraps motion-dom's `MotionValue` with the shared

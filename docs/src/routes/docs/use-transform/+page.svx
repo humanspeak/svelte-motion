@@ -1,6 +1,6 @@
 ---
 title: "useTransform"
-description: "Create a derived store that maps a numeric source across ranges or computes values from other stores."
+description: "Create a MotionValue that maps another motion value across input/output ranges or computes from dependencies."
 ---
 
 <script>
@@ -11,20 +11,22 @@ description: "Create a derived store that maps a numeric source across ranges or
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'useTransform | Docs | Svelte Motion'
-      seo.description = 'Create a derived store that maps numeric values across input/output ranges or computes from other stores with Svelte Motion useTransform.'
+      seo.description = 'Create a MotionValue that maps numeric values across input/output ranges or computes from dependencies. Reactive .current reads in Svelte 5.'
       seo.ogTitle = 'useTransform'
       seo.ogTagline = 'Map one motion value range to another'
-      seo.ogFeatures = ['Range Mapping', 'Derived Values', 'Input/Output', 'Multi-Store']
+      seo.ogFeatures = ['Range Mapping', 'MotionValue', '.current Reads', 'Multi-Source']
       seo.ogSlug = 'docs-use-transform'
   }
 </script>
 
 # useTransform
 
-`useTransform` creates a Svelte `Readable` store derived from other values. It supports two forms:
+`useTransform` creates a `MotionValue` derived from another motion value (or any Svelte readable). It supports two forms:
 
 - Mapping form: Map a numeric source across input/output ranges with options like `clamp`, `ease`, and `mixer`.
-- Function form: Recompute from a function whenever dependency stores change.
+- Function form: Recompute from a function whenever dependency motion values or stores change.
+
+The returned value is a real motion-dom `MotionValue` augmented with a `$state`-backed `.current` getter and a Svelte readable `.subscribe` shim — read it via `transformed.current` in templates, `$transformed` for store-style consumers, or `transformed.get()` in imperative code.
 
 ```svelte
 <script lang="ts">
@@ -37,7 +39,7 @@ description: "Create a derived store that maps a numeric source across ranges or
   const rotate = useTransform(time, [0, 4000], [0, 360], { clamp: false })
 </script>
 
-<div style="transform: rotate({$rotate}deg)">Rotating</div>
+<div style="transform: rotate({rotate.current}deg)">Rotating</div>
 ```
 
 <Example isSmall exampleUrl="/examples/html-content">
@@ -105,22 +107,23 @@ For non-numeric outputs, pass a `mixer(from, to)` that returns an interpolator `
 
 ### Function form
 
-Compute a value from dependency stores. The function can reference deps using Svelte's `$store` syntax.
+Compute a value from dependency motion values or stores. The function can read each dep via its `.current` (motion value) or `$store` syntax (Svelte store).
 
 ```svelte
 <script lang="ts">
-  import { useTransform } from '@humanspeak/svelte-motion'
-  import { writable } from 'svelte/store'
+  import { useMotionValue, useTransform } from '@humanspeak/svelte-motion'
 
-  const a = writable(2)
-  const b = writable(3)
+  const a = useMotionValue(2)
+  const b = useMotionValue(3)
 
   // Recomputes whenever a or b change
-  const total = useTransform(() => $a + $b, [a, b])
+  const total = useTransform(() => a.get() + b.get(), [a, b])
 </script>
 
-<span>Total: {$total}</span>
+<span>Total: {total.current}</span>
 ```
+
+Dependencies may be a mix of `MotionValue`s (from `useMotionValue`, `useSpring`, `useScroll`, etc.) and plain Svelte readables — both expose `.subscribe`, which is what triggers recomputes.
 
 ## How it works
 
@@ -137,35 +140,39 @@ Compute a value from dependency stores. The function can reference deps using Sv
 ```ts
 // Mapping form
 useTransform(source, input, output, options?)
-  source: Readable<number>   // numeric source store
-  input:  number[]           // input stops
-  output: T[]                // output stops (same length as input)
-  options.clamp:  boolean    // clamp to active segment (default true)
-  options.ease:   Function | Function[]  // easing per segment
-  options.mixer:  (from, to) => (t) => value  // custom mixer
-  Returns: Readable<T>
+  source: MotionValue<number> | Readable<number>   // numeric source
+  input:  number[]                                  // input stops
+  output: T[]                                       // output stops (same length as input)
+  options.clamp:  boolean                           // clamp to active segment (default true)
+  options.ease:   Function | Function[]             // easing per segment
+  options.mixer:  (from, to) => (t) => value        // custom mixer
+  Returns: AugmentedMotionValue<T>
 
 // Function form
 useTransform(compute, deps)
-  compute: () => T           // compute function
-  deps:    Readable[]        // dependency stores
-  Returns: Readable<T>
+  compute: () => T                                  // compute function
+  deps:    Array<MotionValue | Readable>            // dependencies
+  Returns: AugmentedMotionValue<T>
 ```
 
 ### Parameters
 
-- `source` `Readable<number>`: Numeric source store (mapping form).
+- `source` `MotionValue<number> | Readable<number>`: Numeric source (mapping form).
 - `input` `number[]`: Input stops (length must match `output`).
 - `output` `T[]`: Output stops (same length as `input`).
 - `options.clamp` `boolean` (default `true`): Clamp to active segment.
 - `options.ease` `((t: number) => number) | Array<...>`: Easing per segment or single easing.
 - `options.mixer` `(from, to) => (t) => any`: Custom mixer for non-numeric outputs.
 - `compute` `() => T`: Compute function (function form).
-- `deps` `Readable[]`: Dependency stores whose updates trigger recompute (function form).
+- `deps` `Array<MotionValue | Readable>`: Dependencies whose emits trigger recompute (function form).
 
 ### Returns
 
-`Readable<T>` — A Svelte readable store with the transformed value.
+An `AugmentedMotionValue<T>` — a real motion-dom `MotionValue` (so it composes with `useTransform`, `useSpring`, `animate()`, etc.) plus:
+
+- `.current` — Svelte 5 reactive getter for templates / `$derived` / `$effect`.
+- `.subscribe(run)` — Svelte readable store contract (powers `$transformed` template syntax).
+- All other `MotionValue` methods from motion-dom (`get`, `getVelocity`, `on`, etc.).
 
 ## When to use
 

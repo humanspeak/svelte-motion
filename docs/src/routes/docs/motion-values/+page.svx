@@ -54,15 +54,15 @@ This library is mid-migration toward returning real `MotionValue`s with `.curren
 | -------------------------- | -------------------------------------- | --------------------------- |
 | `useSpring`                | `MotionValue` + `.current` + `.subscribe` shim | **`spring.current`** (preferred) or `$spring` |
 | `useMotionValue`           | `MotionValue` + `.current` + `.subscribe` shim | **`mv.current`** (preferred) or `$mv` |
+| `useTransform`             | `MotionValue` + `.current` + `.subscribe` shim | **`transformed.current`** (preferred) or `$transformed` |
 | `useScroll`                | `{ scrollX, scrollY, … }` of readables | `$scrollY`                  |
-| `useTransform`             | Svelte readable                        | `$transformed`              |
 | `useTime`                  | Svelte readable                        | `$time`                     |
 | `useVelocity`              | Svelte readable                        | `$velocity`                 |
 | `useMotionTemplate`        | Svelte readable                        | `$composed`                 |
 
-The remaining Tier 2 hooks (`useScroll`, `useTransform`, `useTime`, `useVelocity`, `useMotionTemplate`) will migrate together so composition stays coherent. Until then, the `.subscribe()` shim on `useSpring` and `useMotionValue` keeps everything interoperable — pass either to `useVelocity` or `useTransform` and the old store-consumer path still works.
+The remaining Tier 2 hooks (`useScroll`, `useTime`, `useVelocity`, `useMotionTemplate`) will migrate together so composition stays coherent. Until then, the `.subscribe()` shim on `useSpring`, `useMotionValue`, and `useTransform` keeps everything interoperable — pass any of them to `useVelocity` or chain `useTransform` calls and the old store-consumer path still works.
 
-For new code today: use `.current` on springs and motion values, and `$store` on everything else.
+For new code today: use `.current` on springs, motion values, and transforms, and `$store` on everything else.
 
 ### Composition
 
@@ -78,14 +78,14 @@ Motion values become powerful when you chain them. The output of one feeds into 
 </script>
 
 <div
-  style="transform: translateX({x.current}px); opacity: {$opacity}; background: {$backgroundColor}"
+  style="transform: translateX({x.current}px); opacity: {opacity.current}; background: {backgroundColor.current}"
   onpointermove={(e) => x.set(e.clientX)}
 >
   Composed motion values
 </div>
 ```
 
-`x.current` reads the spring; `$opacity` and `$backgroundColor` read `useTransform`'s output, which is still a Svelte store until that hook migrates. `useMotionValue` would read the same way as the spring — `.current` in templates and `$derived` / `$effect`, or `mv.get()` in imperative code.
+All three reads use `.current` because `useSpring`, `useMotionValue`, and `useTransform` now return augmented motion values. For hooks that haven't migrated yet (`useScroll`, `useTime`, `useVelocity`, `useMotionTemplate`), `$store` syntax is still the reactive read.
 
 ## Usage
 

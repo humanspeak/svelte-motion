@@ -76,7 +76,8 @@ export { useVelocity } from '$lib/utils/velocity'
 export { stringifyStyleObject } from '$lib/utils/styleObject'
 export { styleString } from '$lib/utils/styleObject.svelte'
 export { useTime } from '$lib/utils/time'
-export { useTransform } from '$lib/utils/transform'
+export { useTransform } from '$lib/utils/transform.svelte'
+export type { TransformOptions, TransformSource } from '$lib/utils/transform.svelte'
 export { AnimatePresence, LayoutGroup, MotionConfig, PresenceChild }
 
 // Named component exports — tree-shakeable alternative to the `motion` object

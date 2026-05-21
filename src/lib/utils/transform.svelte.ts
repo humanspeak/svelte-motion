@@ -1,5 +1,13 @@
 // Utilities for building and validating transform strings
 
+import { motionValue } from 'motion-dom'
+import { type Readable } from 'svelte/store'
+import {
+    augmentMotionValue,
+    sampleSource,
+    type AugmentedMotionValue
+} from './augmentMotionValue.svelte.js'
+
 export type TransformValues = Partial<{
     x: number
     y: number
@@ -87,8 +95,6 @@ const round = (n: number): number => {
     return Math.round(n * 1e6) / 1e6
 }
 
-import { derived, readable, type Readable } from 'svelte/store'
-
 /**
  * Options for range-mapping transform.
  *
@@ -160,39 +166,26 @@ const findSegment = (input: number[], x: number): number => {
 }
 
 /**
- * Creates a derived Svelte store that transforms values.
- *
- * Two supported forms (API parity with Motion's useTransform):
- * - Mapping form: Map a numeric source across input/output ranges.
- *   Example: `useTransform(src, [0, 100], [0, 1], { clamp: true })`
- * - Function form: Recompute from a function based on dependency stores.
- *   Example: `useTransform(() => compute(), [depA, depB])`
- *
- * @template T
- * @param {Readable<number>|(() => T)} sourceOrCompute Numeric source store (mapping form), or compute function (function form).
- * @param {number[]|Readable<unknown>[]} inputOrDeps Input stops (mapping) or dependency stores (function form).
- * @param {T[]=} output Output stops (mapping form only). Must match input length.
- * @param {TransformOptions=} options Mapping options (mapping form only).
- * @returns {Readable<T>} A derived Svelte readable store.
- * @see https://motion.dev/docs/react-use-transform?platform=react
+ * A source for {@link useTransform}'s mapping form: a motion-dom `MotionValue`
+ * (via `useMotionValue`, `useSpring`, or any other Tier 2 hook) or a Svelte
+ * readable store. Both expose `.subscribe(run)` with the same contract, so
+ * `useTransform` consumes them interchangeably.
  */
-export const useTransform = <T = number>(
-    sourceOrCompute: Readable<number> | (() => T),
-    inputOrDeps: number[] | Readable<unknown>[],
-    output?: T[],
-    options: TransformOptions = {}
-): Readable<T> => {
-    // Function form: (compute, deps)
-    if (typeof sourceOrCompute === 'function') {
-        const compute = sourceOrCompute as () => T
-        const deps = inputOrDeps as Readable<unknown>[]
-        if (!deps || deps.length === 0) return readable(compute())
-        return derived(deps, () => compute())
-    }
-    // Mapping form: (source, input, output, options)
-    const source = sourceOrCompute as Readable<number>
-    const input = inputOrDeps as number[]
-    const out = (output ?? []) as T[]
+export type TransformSource<T> =
+    | (Readable<T> & { get?: () => T })
+    | AugmentedMotionValue<T>
+    | Readable<T>
+
+/**
+ * Builds a single-segment mapper for the mapping form. Encapsulates clamp,
+ * ease, mixer selection, and the linear-progress math. Used per change of
+ * the source.
+ */
+const buildMapper = <T>(
+    input: number[],
+    out: T[],
+    options: TransformOptions
+): ((x: number) => T) => {
     const { clamp = true, ease, mixer } = options
     if (input.length !== out.length) {
         throw new Error(
@@ -204,7 +197,7 @@ export const useTransform = <T = number>(
         : ease
           ? new Array(Math.max(0, out.length - 1)).fill(ease)
           : []
-    return derived(source, (x) => {
+    return (x: number): T => {
         if (input.length === 0) return out[0] as T
         if (input.length === 1) return out[0] as T
         const seg = findSegment(input, x)
@@ -229,8 +222,104 @@ export const useTransform = <T = number>(
         const mix = mixer
             ? mixer(o0, o1)
             : typeof o0 === 'number' && typeof o1 === 'number'
-              ? linearMix(o0, o1)
+              ? linearMix(o0 as number, o1 as number)
               : (_t: number) => (p < 0.5 ? o0 : o1) // trunk-ignore(eslint/@typescript-eslint/no-unused-vars)
         return mix(p) as T
+    }
+}
+
+/**
+ * Creates a motion-dom `MotionValue<T>` whose value is derived from another
+ * motion value (or Svelte readable) via a range mapping or a compute function.
+ *
+ * Two supported forms (API parity with framer-motion's `useTransform`):
+ *
+ * - **Mapping form** — `useTransform(source, input, output, options)`. Maps a
+ *   numeric source's value across `input → output` stops with clamp, easing,
+ *   and a pluggable mixer for non-numeric outputs.
+ * - **Function form** — `useTransform(() => compute, deps)`. Recomputes from
+ *   a function on every emit of any dep (either a `MotionValue` or a Svelte
+ *   readable).
+ *
+ * Returns an {@link AugmentedMotionValue} — a real motion-dom `MotionValue`
+ * (so it composes with `useTransform`, `useSpring`, `animate()`, etc.) plus
+ * a Svelte 5 reactive `.current` getter and a `.subscribe` shim. The internal
+ * subscription to the source / deps is established eagerly so `.current`
+ * stays live even when nothing else is consuming the value.
+ *
+ * Lifecycle: must be called during component initialization. All source
+ * subscriptions are released and the underlying `MotionValue` destroyed when
+ * the surrounding `$effect` scope tears down.
+ *
+ * @template T Output value type.
+ * @returns {AugmentedMotionValue<T>} A `MotionValue<T>` with `.current` and `.subscribe`.
+ * @see https://motion.dev/docs/react-use-transform
+ */
+export function useTransform<T = number>(
+    source: TransformSource<number>,
+    input: number[],
+    output: T[],
+    options?: TransformOptions
+): AugmentedMotionValue<T>
+export function useTransform<T = number>(
+    compute: () => T,
+    deps: Array<TransformSource<unknown>>
+): AugmentedMotionValue<T>
+export function useTransform<T = number>(
+    sourceOrCompute: TransformSource<number> | (() => T),
+    inputOrDeps: number[] | Array<TransformSource<unknown>>,
+    output?: T[],
+    options: TransformOptions = {}
+): AugmentedMotionValue<T> {
+    // Function form: (compute, deps)
+    if (typeof sourceOrCompute === 'function') {
+        const compute = sourceOrCompute as () => T
+        const deps = (inputOrDeps as Array<TransformSource<unknown>>) ?? []
+        const value = motionValue<T>(compute())
+        const unsubs: VoidFunction[] = []
+        let initialEmitsRemaining = deps.length
+        for (const dep of deps) {
+            const unsub = dep.subscribe(() => {
+                // Svelte readable contract emits synchronously on subscribe.
+                // We've already seeded `value` via compute() above, so skip
+                // each dep's initial emit to avoid N+1 redundant computes
+                // before any external change happens.
+                if (initialEmitsRemaining > 0) {
+                    initialEmitsRemaining--
+                    return
+                }
+                value.set(compute())
+            })
+            unsubs.push(unsub)
+        }
+        const dispose = () => {
+            for (const off of unsubs) off()
+        }
+        $effect(() => () => value.destroy())
+        return augmentMotionValue(value, dispose)
+    }
+
+    // Mapping form: (source, input, output, options)
+    const source = sourceOrCompute as TransformSource<number>
+    const input = inputOrDeps as number[]
+    const out = (output ?? []) as T[]
+    const map = buildMapper(input, out, options)
+
+    const initial = map(sampleSource(source))
+    const value = motionValue<T>(initial)
+
+    let seenInitial = false
+    const unsub = source.subscribe((x) => {
+        // Skip the readable's synchronous initial emit — value is already
+        // seeded from sampleSource. Subsequent emits feed through map().
+        if (!seenInitial) {
+            seenInitial = true
+            return
+        }
+        value.set(map(x))
     })
+
+    const dispose = () => unsub()
+    $effect(() => () => value.destroy())
+    return augmentMotionValue(value, dispose)
 }
