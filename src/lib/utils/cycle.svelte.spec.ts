@@ -83,16 +83,11 @@ describe('useCycle', () => {
             })
         })
 
-        it('.current clamps to the last item for negative indexes', () => {
+        it('.current clamps negative indexes to the first item', () => {
             inRoot(() => {
                 const x = useCycle('a', 'b', 'c')
                 x.cycle(-5)
-                // Negative index is < items.length, so the clamp guard doesn't
-                // fire — `items[-5]` is undefined on a real array, but the
-                // clamp branch only catches index >= items.length. Document
-                // the actual behavior so the test fails loudly if the impl
-                // ever changes the clamp predicate.
-                expect(x.current).toBeUndefined()
+                expect(x.current).toBe('a')
             })
         })
 
@@ -240,6 +235,16 @@ describe('useCycle', () => {
 
         it('throws when the initial items list is empty', () => {
             expect(() => useCycle(() => [])).toThrow(/at least one item/)
+        })
+
+        it('.current throws if the reactive getter empties mid-cycle', () => {
+            inRoot(() => {
+                let items = $state<string[]>(['a', 'b'])
+                const x = useCycle(() => items)
+                expect(x.current).toBe('a')
+                items = []
+                expect(() => x.current).toThrow(/empty list/)
+            })
         })
     })
 })

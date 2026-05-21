@@ -40,7 +40,12 @@ description: 'Cycle through a series of values to drive variants, properties, or
 - `cycle()` advances to the next item, wrapping back to the first when it passes the end.
 - `cycle(i)` jumps directly to the value at index `i`.
 
-> **Diverges from React framer-motion's tuple return:** React's `useCycle` returns `[value, cycle]`. Under Svelte 5 runes, destructuring a `$state`-backed value snapshots it and loses reactivity, so we return an object whose getter preserves tracking. The behavior is otherwise 1:1.
+> **Two deliberate divergences from React framer-motion's `useCycle`:**
+>
+> 1. **Return shape** — React returns `[value, cycle]`. Under Svelte 5 runes, destructuring a `$state`-backed value snapshots it and loses reactivity, so we return an object whose getter preserves tracking.
+> 2. **Out-of-range reads always clamp** instead of returning `items[i]` undefined — see [API Reference → Notes](#notes) below.
+>
+> Otherwise 1:1 with React, including same-index no-op bail-out and `wrap(0, length, index + 1)` advance semantics.
 
 <Example isSmall exampleUrl="/examples/use-cycle">
   <UseCycleExample />
@@ -146,7 +151,8 @@ A `CycleState<T>` object:
 
 ### Notes
 
-- Out-of-range indexes are stored as-given by `cycle(i)` but `.current` always clamps on read — `x.cycle(99)` on a 3-item cycle yields `items[2]`, not `undefined`. This is a defensive divergence from React framer-motion (which returns `items[99]`) so the reactive-getter form stays safe when items shrink underneath. Subsequent `cycle()` advances are relative to the *stored* index, so `cycle(99); cycle()` on a 3-item cycle wraps via `wrap(0, 3, 100) = 1`.
+- Out-of-range indexes are stored as-given by `cycle(i)` but `.current` always clamps on read — `x.cycle(99)` on a 3-item cycle yields `items[2]`, `x.cycle(-5)` yields `items[0]`. This is a defensive divergence from React framer-motion (which returns `items[i]`, possibly undefined) so `.current` always honors its `T` type. Subsequent `cycle()` advances are relative to the *stored* (unclamped) index, so `cycle(99); cycle()` on a 3-item cycle wraps via `wrap(0, 3, 100) = 1`.
+- If the reactive getter form's items list empties mid-cycle, `.current` throws (`useCycle items getter returned an empty list`). The public type is `T`, so silently returning `undefined` there would be a lie — surfacing the bug loudly is the better trade.
 - Same-index calls are no-ops and don't trigger downstream reactivity, matching React `useState`'s `Object.is` bail-out.
 - File name is `cycle.svelte.ts` because the hook uses `$state` at module scope; if you reach into the source, the `.svelte.ts` extension is required for runes to compile.
 

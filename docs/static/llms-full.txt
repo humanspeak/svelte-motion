@@ -616,12 +616,15 @@ Two call forms:
 </motion.button>
 ```
 
-`.current` always clamps on read to the last valid index, both when
-items shrink underneath the cycle (reactive-getter form) and when
-`cycle(i)` is called with an out-of-range index. This is a defensive
-divergence from React framer-motion (which returns `items[i]`, possibly
-undefined). Subsequent `cycle()` advances are relative to the stored
-(unclamped) index, so `cycle(99); cycle()` wraps via `wrap(0, len, 100)`.
+`.current` always clamps on read to the nearest valid edge — negative
+indexes go to `items[0]`, overflow goes to `items[length - 1]`, and a
+reactive-getter list that shrinks underneath the cycle is treated the
+same way. This is a defensive divergence from React framer-motion
+(which returns `items[i]`, possibly undefined) so `.current` always
+honors its `T` type. Subsequent `cycle()` advances are relative to the
+stored (unclamped) index, so `cycle(99); cycle()` wraps via
+`wrap(0, len, 100)`. If the reactive getter empties mid-cycle,
+`.current` throws rather than silently returning `undefined`.
 
 The getter form is detected when `useCycle` is called with a single
 function argument; cycling through a single function value needs

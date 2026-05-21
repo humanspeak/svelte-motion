@@ -37,18 +37,27 @@ export type CycleItemsGetter<T> = () => readonly T[]
  * - `state.current` is reactive — read it in templates / `$derived` / `$effect`
  *   and it tracks both index changes and (in the getter form) item changes.
  * - `state.cycle()` advances to the next item (wrapping at the end).
- * - `state.cycle(i)` jumps to index `i`. The index is stored as-given; `.current`
- *   then clamps on read so out-of-range indexes resolve to the last valid item
+ * - `state.cycle(i)` jumps to index `i`. The index is stored as-given;
+ *   `.current` then clamps on read so any out-of-range index — negative,
+ *   overflow, or items shrinking underneath the reactive-getter form —
+ *   resolves to the nearest valid edge (`items[0]` or `items[length - 1]`)
  *   instead of `undefined`. This is a defensive divergence from React
- *   framer-motion (which returns `items[i]`, possibly undefined) — needed so
- *   the reactive-getter form stays safe when items shrink underneath the cycle.
+ *   framer-motion (which returns `items[i]`, possibly undefined) so the
+ *   reactive form stays safe and `.current` always honors its `T` type.
+ *   If the reactive getter ever returns an empty list, `.current` throws.
  * - Calls that resolve to the current index are no-ops, matching React
  *   `useState`'s `Object.is` bail-out.
  *
- * Diverges from React's `[value, cycle]` tuple return because destructuring
- * a `$state`-backed value under Svelte 5 runes snapshots it and loses
- * reactivity. Out-of-range read semantics are the other intentional
- * divergence — see above. Otherwise 1:1 with React.
+ * Two deliberate divergences from React's `useCycle`:
+ *
+ * 1. Return shape — React's `[value, cycle]` tuple can't survive
+ *    destructuring under Svelte 5 runes (snapshots the value, loses
+ *    reactivity), so we return `{ current, cycle }`.
+ * 2. Out-of-range reads always clamp (see above) instead of returning
+ *    `items[i]` undefined.
+ *
+ * Otherwise 1:1 with React, including same-index no-op bail-out and
+ * the `wrap(0, length, index + 1)` advance semantics.
  *
  * Ambiguity: `useCycle(fn)` with a single function value is treated as the
  * reactive overload, not as a single-item cycle. To cycle through one
@@ -95,9 +104,17 @@ export function useCycle<T>(...args: [CycleItemsGetter<T>] | T[]): CycleState<T>
     return {
         get current() {
             const items = getItems()
-            // Clamp on read so items shrinking under us doesn't return
-            // undefined when index is still valid in the new range.
-            const safeIndex = index >= items.length ? items.length - 1 : index
+            // Reactive-getter form: if the consumer's source emptied
+            // mid-cycle the public type can no longer be honored. Throw
+            // loudly so the bug surfaces immediately rather than leaking
+            // `undefined` through a `T`-typed read.
+            if (items.length === 0) {
+                throw new Error('useCycle items getter returned an empty list')
+            }
+            // Clamp on read so out-of-range indexes (from `cycle(-5)` or
+            // `cycle(99)`, or items shrinking under us in the getter form)
+            // resolve to the nearest valid edge instead of `undefined`.
+            const safeIndex = index < 0 ? 0 : index >= items.length ? items.length - 1 : index
             return items[safeIndex] as T
         },
         cycle: (next?: number) => {
