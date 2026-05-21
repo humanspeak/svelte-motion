@@ -1,6 +1,6 @@
 ---
 title: 'useInView'
-description: 'Track whether an element is in the viewport from a Svelte readable store.'
+description: 'Track whether an element is in the viewport via a $state-backed { current } snapshot.'
 ---
 
 <script>
@@ -12,10 +12,10 @@ description: 'Track whether an element is in the viewport from a Svelte readable
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'useInView | Docs | Svelte Motion'
-      seo.description = 'Track whether an element is in the viewport with a reactive Svelte store. useInView mirrors framer-motion and pairs naturally with Svelte 5 bind:this.'
+      seo.description = 'Track whether an element is in the viewport with a $state-backed { current } snapshot. useInView mirrors framer-motion and pairs naturally with Svelte 5 bind:this.'
       seo.ogTitle = 'useInView'
-      seo.ogTagline = 'Detect viewport entry from a Svelte store'
-      seo.ogFeatures = ['Reactive Store', 'IntersectionObserver', 'Once Latch', 'SSR Safe']
+      seo.ogTagline = 'Detect viewport entry via a reactive snapshot'
+      seo.ogFeatures = ['Svelte 5 Runes', 'IntersectionObserver', 'Once Latch', 'SSR Safe']
       seo.ogSlug = 'docs-use-in-view'
   }
 </script>

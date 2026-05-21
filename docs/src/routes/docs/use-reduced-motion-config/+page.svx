@@ -25,7 +25,7 @@ description: 'Resolve the active reduced-motion policy from <MotionConfig> and t
 
 ```svelte
 <script>
-    import { useReducedMotionConfig } from '@humanspeak/svelte-motion'
+    import { motion, useReducedMotionConfig } from '@humanspeak/svelte-motion'
 
     const reduced = useReducedMotionConfig()
 </script>
