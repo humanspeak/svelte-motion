@@ -2,9 +2,11 @@
     import { useTime } from '@humanspeak/svelte-motion'
     import { derived } from 'svelte/store'
 
+    // `useTime()` returns a motion value that ticks ms since the hook
+    // mounted. Derive whatever you need from it (svelte/store `derived`
+    // or `useTransform`) — every derived store updates each frame.
     const time = useTime()
 
-    // Create multiple derived animations from the same timeline
     const x = derived(time, (t) => Math.sin(t / 1000) * 80)
     const y = derived(time, (t) => Math.cos(t / 1200) * 60)
     const rotate = derived(time, (t) => (t / 15) % 360)
@@ -12,7 +14,8 @@
     const hue = derived(time, (t) => (t / 20) % 360)
 </script>
 
-<div class="flex min-h-[400px] items-center justify-center p-8">
+<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
+<div class="humanspeak-demo-shell">
     <div class="scene">
         <div
             class="orb"
@@ -25,7 +28,6 @@
             <div class="inner-glow"></div>
         </div>
 
-        <!-- Time display -->
         <div class="time-display">
             {Math.floor($time / 1000)}s
         </div>
@@ -33,6 +35,14 @@
 </div>
 
 <style>
+    .humanspeak-demo-shell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        min-height: 400px;
+    }
+
     .scene {
         position: relative;
         width: 300px;
