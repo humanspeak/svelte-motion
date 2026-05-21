@@ -44,6 +44,18 @@
             </button>
         </header>
 
+        {#snippet trackPanel(boxId: string, boxClass: string, boxStyle: string, boxLabel: string)}
+            <div class="track">
+                <div class="track-rail"></div>
+                {#each targets as t, i (t)}
+                    <span class="stop" style="left: {t}px;" class:active={cursor === i}>{t}</span>
+                {/each}
+                <motion.div data-testid={boxId} class="box {boxClass}" style={boxStyle}>
+                    {boxLabel}
+                </motion.div>
+            </div>
+        {/snippet}
+
         <!-- Panel 1: .current API -->
         <section>
             <div class="panel-head">
@@ -56,23 +68,12 @@
             <p class="hint">
                 Reactive read backed by <code>$state</code>. No <code>$</code> prefix, no subscribe.
             </p>
-            <div class="track">
-                <div class="track-rail"></div>
-                {#each targets as t (t)}
-                    <span
-                        class="stop"
-                        style="left: {t}px;"
-                        class:active={cursor === targets.indexOf(t)}>{t}</span
-                    >
-                {/each}
-                <motion.div
-                    data-testid="x-box"
-                    class="box blue"
-                    style="transform: translateX({x.current}px);"
-                >
-                    .current
-                </motion.div>
-            </div>
+            {@render trackPanel(
+                'x-box',
+                'blue',
+                `transform: translateX(${x.current}px);`,
+                '.current'
+            )}
         </section>
 
         <!-- Panel 2: legacy subscribe shim -->
@@ -86,23 +87,12 @@
                 Legacy <code>$store</code> syntax keeps working via the <code>.subscribe()</code> shim.
                 Same value, different read path.
             </p>
-            <div class="track">
-                <div class="track-rail"></div>
-                {#each targets as t (t)}
-                    <span
-                        class="stop"
-                        style="left: {t}px;"
-                        class:active={cursor === targets.indexOf(t)}>{t}</span
-                    >
-                {/each}
-                <motion.div
-                    data-testid="y-box"
-                    class="box pink"
-                    style="transform: translateX({$y}px); filter: {$blur};"
-                >
-                    $store
-                </motion.div>
-            </div>
+            {@render trackPanel(
+                'y-box',
+                'pink',
+                `transform: translateX(${$y}px); filter: ${$blur};`,
+                '$store'
+            )}
             <p class="hint">
                 Bonus: this box's <code>filter: {$blur}</code> is driven by
                 <code>useTransform(() =&gt; …, [y])</code> — proves the function-form

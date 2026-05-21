@@ -128,7 +128,7 @@ export function useSpring(
         const ssrValue = motionValue<T>(initial)
         ssrValue.set = () => undefined
         ssrValue.jump = () => undefined
-        return augmentForSvelte(ssrValue, initial, () => undefined) as unknown as
+        return augmentForSvelte(ssrValue, () => undefined) as unknown as
             | SpringMotionValue<number>
             | SpringMotionValue<string>
     }
@@ -164,28 +164,17 @@ export function useSpring(
     const value = motionValue<T>(initial)
     const stopFollow = attachFollow(value, followSource, { type: 'spring', ...options })
 
-    // Side-cleanup for our augmentations: stop the follow, unsubscribe from
-    // the upstream Svelte readable, destroy the bridge MV. The public MV's
-    // own destroy is routed through `augmentForSvelte`'s override below, so
-    // either entry path (manual `.destroy()` or `$effect` teardown calling
-    // `value.destroy()`) hits the same teardown sequence exactly once.
-    let disposed = false
+    // Side-cleanup for our augmentations. Single-shot guard lives in the
+    // augmented `value.destroy` (the only caller), so no flag here.
     const dispose = () => {
-        if (disposed) return
-        disposed = true
         stopFollow?.()
         cleanupReadableBridge?.()
         svelteBridge?.destroy()
     }
 
-    // Bind cleanup to the surrounding reactive scope (component lifecycle in
-    // practice). `$effect` must be in a reactive context — useSpring is
-    // meant to be called from a `<script>` block, where this is guaranteed.
-    $effect(() => {
-        return () => value.destroy()
-    })
+    $effect(() => () => value.destroy())
 
-    return augmentForSvelte(value, initial, dispose) as unknown as
+    return augmentForSvelte(value, dispose) as unknown as
         | SpringMotionValue<number>
         | SpringMotionValue<string>
 }
@@ -201,31 +190,24 @@ const readInitial = (source: unknown): number | string => {
 }
 
 /**
- * Layer Svelte-friendly affordances onto a motion-dom MotionValue:
- *
- * - `.current` — `$state`-backed reactive read kept in sync via `on('change')`.
- * - `.subscribe(run)` — Svelte readable store contract.
- *
- * Mutates the MotionValue in place and returns it cast to `SpringMotionValue`.
- * Calling `dispose` from the lifecycle hook tears everything down including
- * the change listener.
+ * Layer Svelte-friendly affordances onto a motion-dom MotionValue: a
+ * `$state`-tracked `.current` accessor (routing motion-dom's internal
+ * `this.current = v` writes through `$state` so templates and `$derived` /
+ * `$effect` re-run) and a Svelte readable store `.subscribe(run)` shim.
  */
 const augmentForSvelte = <T extends number | string>(
     value: MotionValue<T>,
-    initial: T,
     dispose: VoidFunction
 ): SpringMotionValue<T> => {
-    // Replace motion-dom's plain `current` data property with an
-    // accessor backed by a Svelte 5 `$state` cell. The setter is critical:
-    // motion-dom's internal `setCurrent` does `this.current = v`, which now
-    // hits our setter and routes the write into `$state` so templates and
-    // `$derived` / `$effect` re-run automatically. The getter returns the
-    // tracked value so reads inside reactive scopes track it.
-    let current = $state(initial)
+    let current = $state(value.get() as T)
     Object.defineProperty(value, 'current', {
         get: () => current,
+        // Same-value writes are no-ops: motion-dom's `updateAndNotify` calls
+        // `setCurrent(v)` before its own change check, so spring frames at
+        // rest still hit this setter; skipping equal writes avoids gratuitous
+        // accessor work even though $state would itself dedupe.
         set: (v: T) => {
-            current = v
+            if (v !== current) current = v
         },
         enumerable: true,
         configurable: true
