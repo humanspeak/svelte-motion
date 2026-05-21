@@ -36,7 +36,7 @@ description: "Create scroll-linked animations like progress indicators and paral
 <div
   style="position: fixed; top: 0; left: 0; right: 0; height: 5px;
          background: #ff0088; transform-origin: left;
-         transform: scaleX({$scaleX});"
+         transform: scaleX({scaleX.current});"
 />
 ```
 
@@ -74,7 +74,7 @@ By default, `useScroll` tracks the page scroll position:
 <div
   style="position: fixed; top: 0; left: 0; right: 0; height: 5px;
          background: #ff0088; transform-origin: left;
-         transform: scaleX({$scaleX});"
+         transform: scaleX({scaleX.current});"
 />
 ```
 

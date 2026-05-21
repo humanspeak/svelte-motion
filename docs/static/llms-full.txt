@@ -416,12 +416,13 @@ Provide default transition values for all descendants.
 
 ### useSpring
 
-Create a spring-animated reactive value.
+Create a spring-animated motion value. Returns a real motion-dom `MotionValue` (composes with `animate()`, `useTransform`, etc.) with a Svelte 5 `.current` reactive getter and a `.subscribe()` shim for legacy `$store` syntax.
 
 ```svelte
 <script lang="ts">
     import { useSpring, motion } from '@humanspeak/svelte-motion'
 
+    // Defaults match motion-dom / React framer-motion: stiffness 100, damping 10, mass 1
     const x = useSpring(0, { stiffness: 300, damping: 20 })
 
     function handleMove(e: MouseEvent) {
@@ -429,8 +430,14 @@ Create a spring-animated reactive value.
     }
 </script>
 
+<!-- Svelte 5 idiomatic — recommended -->
+<motion.div style:x={x.current} />
+
+<!-- Legacy auto-subscribe via .subscribe() shim — still works -->
 <motion.div style:x={$x} />
 ```
+
+Accepts a number, unit string (`"0deg"`), another `MotionValue`, or a Svelte `Readable` (compat for `useScroll` / `useTime` until they migrate). Supports the full `SpringOptions` surface (stiffness, damping, mass, duration, visualDuration, bounce, velocity, restDelta, restSpeed) plus `skipInitialAnimation` for scroll-restoration. Emits `animationStart` / `animationComplete` events via `.on(...)`.
 
 ### useScroll
 

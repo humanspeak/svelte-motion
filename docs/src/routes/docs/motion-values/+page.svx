@@ -1,6 +1,6 @@
 ---
 title: "Motion values"
-description: "An overview of motion values — reactive stores that drive animations outside the render cycle."
+description: "An overview of motion values — reactive primitives that drive animations outside the render cycle."
 ---
 
 <script>
@@ -9,17 +9,19 @@ description: "An overview of motion values — reactive stores that drive animat
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'Motion values | Docs | Svelte Motion'
-      seo.description = 'An overview of motion values — reactive Svelte stores that drive animations outside the render cycle.'
+      seo.description = 'An overview of motion values — reactive primitives that drive animations outside the render cycle. Reactive .current reads, velocity tracking, and composable chains.'
       seo.ogTitle = 'Motion Values'
       seo.ogTagline = 'Reactive values that drive animations outside the render cycle'
-      seo.ogFeatures = ['Reactive Stores', 'Velocity Tracking', 'Composable', 'Render-Free']
+      seo.ogFeatures = ['Reactive Reads', 'Velocity Tracking', 'Composable', 'Render-Free']
       seo.ogSlug = 'docs-motion-values'
   }
 </script>
 
 # Motion values overview
 
-Motion values are reactive stores that track the state and velocity of animating values. In Svelte Motion they are standard Svelte readable stores — you subscribe with the `$` prefix and compose them with `derived`, `useTransform`, and `useSpring`.
+Motion values are reactive primitives that track the state and velocity of animating values. They're updated and read **outside** Svelte's reactive render cycle, so animations can run at full frame rate without triggering component re-renders.
+
+In `@humanspeak/svelte-motion`, motion values created via `useSpring` are real motion-dom `MotionValue` objects (with the same composition rules as React framer-motion) augmented with a Svelte 5 reactive `.current` getter:
 
 ```svelte
 <script>
@@ -29,7 +31,7 @@ Motion values are reactive stores that track the state and velocity of animating
 </script>
 
 <div
-  style="transform: translateX({$x}px)"
+  style="transform: translateX({x.current}px)"
   onpointerdown={() => x.set(100)}
 >
   Spring animated
@@ -38,10 +40,29 @@ Motion values are reactive stores that track the state and velocity of animating
 
 Motion values:
 
+- Have a **`.current`** getter backed by `$state` for native Svelte 5 reads in templates, `$derived`, and `$effect`
 - Can be updated and read **outside** Svelte's reactive render cycle
 - Track **velocity** automatically so springs and transforms stay smooth
-- Can be **composed** — pass one store into another to build animation chains
-- Are **SSR-safe** — on the server they return static stores with no timers
+- Can be **composed** — pass one into another to build animation chains
+- Are **SSR-safe** — on the server they return static values with no timers
+
+## Migration in progress
+
+This library is mid-migration toward returning real `MotionValue`s with `.current` from every motion-value-producing hook. The state of play:
+
+| Hook                       | Returns                                | Read pattern                |
+| -------------------------- | -------------------------------------- | --------------------------- |
+| `useSpring`                | `MotionValue` + `.current` + `.subscribe` shim | **`spring.current`** (preferred) or `$spring` |
+| `useMotionValue`           | Svelte readable + `.set` / `.get`      | `$mv`                       |
+| `useScroll`                | `{ scrollX, scrollY, … }` of readables | `$scrollY`                  |
+| `useTransform`             | Svelte readable                        | `$transformed`              |
+| `useTime`                  | Svelte readable                        | `$time`                     |
+| `useVelocity`              | Svelte readable                        | `$velocity`                 |
+| `useMotionTemplate`        | Svelte readable                        | `$composed`                 |
+
+The Tier 2 hooks (`useMotionValue`, `useScroll`, `useTransform`, `useTime`, `useVelocity`, `useMotionTemplate`) will migrate together so composition stays coherent. Until then, the `.subscribe()` shim on `useSpring`'s output keeps everything interoperable — pass a spring to `useVelocity` or `useTransform` and the old store-consumer path still works.
+
+For new code today: use `.current` on springs, and `$store` on everything else.
 
 ### Composition
 
@@ -57,16 +78,18 @@ Motion values become powerful when you chain them. The output of one feeds into 
 </script>
 
 <div
-  style="transform: translateX({$x}px); opacity: {$opacity}; background: {$backgroundColor}"
+  style="transform: translateX({x.current}px); opacity: {$opacity}; background: {$backgroundColor}"
   onpointermove={(e) => x.set(e.clientX)}
 >
   Composed motion values
 </div>
 ```
 
+`x.current` reads the spring; `$opacity` and `$backgroundColor` read `useTransform`'s output, which is still a Svelte store until that hook migrates.
+
 ## Usage
 
-### Creating motion value stores
+### Creating motion values
 
 The simplest way to create a motion value is with `useSpring`:
 
@@ -78,7 +101,17 @@ The simplest way to create a motion value is with `useSpring`:
 </script>
 ```
 
-You can also use a plain Svelte `writable` store whenever you need a value without spring physics:
+For a value without spring physics, use `useMotionValue`:
+
+```svelte
+<script>
+  import { useMotionValue } from '@humanspeak/svelte-motion'
+
+  const x = useMotionValue(0)
+</script>
+```
+
+A plain Svelte `writable` also works for values that don't need velocity tracking:
 
 ```svelte
 <script>
@@ -90,28 +123,42 @@ You can also use a plain Svelte `writable` store whenever you need a value witho
 
 ### Reading values
 
-Use the `$` prefix to read the current value reactively:
+For springs, use `.current` in reactive scopes (templates, `$derived`, `$effect`):
 
 ```svelte
-<div style="transform: translateX({$x}px)">
-  Current value: {$x}
+<div style="transform: translateX({x.current}px)">
+  Current value: {x.current}
 </div>
 ```
 
-### Setting values
-
-Call `.set()` on stores that support it (e.g. `useSpring`):
+For springs in imperative code (event handlers, callbacks), use `.get()`:
 
 ```svelte
 <script>
-  x.set(200)  // animates toward 200
-  x.jump(200) // instantly sets to 200
+  function logPosition() {
+    console.log(x.get())
+  }
+</script>
+```
+
+The Svelte 4–style `$x` syntax also works on springs via the `.subscribe()` shim — use it when migrating existing code or composing with hooks that still return stores.
+
+For motion values that haven't migrated yet (`useScroll`, `useTime`, etc.), `$store` is the only reactive read path.
+
+### Setting values
+
+Springs and motion values support imperative writes:
+
+```svelte
+<script>
+  x.set(200)  // animates toward 200 (with spring physics on a useSpring)
+  x.jump(200) // instantly sets to 200 (no animation, useSpring only)
 </script>
 ```
 
 ### Events
 
-Subscribe to value changes with `useMotionValueEvent` or directly with `store.subscribe()`:
+Subscribe to value changes with `useMotionValueEvent`:
 
 ```svelte
 <script>
@@ -126,14 +173,25 @@ Subscribe to value changes with `useMotionValueEvent` or directly with `store.su
 </script>
 ```
 
+Springs additionally expose motion-dom event types via `.on(...)`:
+
+```svelte
+<script>
+  const x = useSpring(0)
+
+  x.on('animationStart', () => console.log('spring started'))
+  x.on('animationComplete', () => console.log('spring settled'))
+</script>
+```
+
 ### Composition
 
-Chain stores to build rich animations from simple building blocks:
+Chain motion values to build rich animations from simple building blocks:
 
-- **[useTransform](/docs/use-transform)** — map a store's output range to a new range
-- **[useSpring](/docs/use-spring)** — add spring physics to any store
-- **[useVelocity](/docs/use-velocity)** — derive velocity from any store
-- **[useMotionTemplate](/docs/use-motion-template)** — build CSS strings from multiple stores
+- **[useTransform](/docs/use-transform)** — map a motion value's output range to a new range
+- **[useSpring](/docs/use-spring)** — add spring physics to any motion value or store
+- **[useVelocity](/docs/use-velocity)** — derive velocity from any motion value
+- **[useMotionTemplate](/docs/use-motion-template)** — build CSS strings from multiple motion values
 
 ```svelte
 <script>
@@ -147,28 +205,30 @@ Chain stores to build rich animations from simple building blocks:
 
 ## API
 
-All motion value stores implement Svelte's `Readable` interface:
+Springs implement the motion-dom `MotionValue` interface plus a Svelte 5 reactive surface:
 
-| Method | Description |
-|--------|-------------|
-| `subscribe(callback)` | Subscribe to value changes. Returns an unsubscribe function. |
+| Member                  | Description                                                            |
+| ----------------------- | ---------------------------------------------------------------------- |
+| `current`               | Svelte 5 reactive getter — use in templates / `$derived` / `$effect`.   |
+| `get()`                 | Imperative current-value read.                                          |
+| `set(value)`            | Animate toward a new target with spring physics.                        |
+| `jump(value)`           | Set immediately without animation.                                      |
+| `on(event, cb)`         | Subscribe to `'change'`, `'animationStart'`, `'animationComplete'`, etc.|
+| `getVelocity()`         | Current velocity of the value.                                          |
+| `subscribe(run)`        | Svelte readable store contract (powers `$spring` template syntax).      |
+| `destroy()`             | Tear down the motion value early (normally automatic).                  |
 
-Stores created by `useSpring` also expose:
-
-| Method | Description |
-|--------|-------------|
-| `set(value)` | Animate toward a new target value. |
-| `jump(value)` | Immediately set the value without animation. |
+Other motion-value-producing hooks (`useMotionValue`, `useScroll`, etc.) currently implement Svelte's `Readable` interface only. That will change as each migrates.
 
 ## See also
 
-- [useMotionTemplate](/docs/use-motion-template) — compose CSS strings from motion value stores
-- [useMotionValueEvent](/docs/use-motion-value-event) — subscribe to store change events with cleanup
-- [useScroll](/docs/use-scroll) — create scroll-linked motion value stores
-- [useSpring](/docs/use-spring) — spring-animated motion value store
-- [useTime](/docs/use-time) — time-based motion value store
-- [useTransform](/docs/use-transform) — map and transform motion value stores
-- [useVelocity](/docs/use-velocity) — derive velocity from a motion value store
+- [useMotionTemplate](/docs/use-motion-template) — compose CSS strings from motion values
+- [useMotionValueEvent](/docs/use-motion-value-event) — subscribe to change events with cleanup
+- [useScroll](/docs/use-scroll) — create scroll-linked motion values
+- [useSpring](/docs/use-spring) — spring-animated motion value
+- [useTime](/docs/use-time) — time-based motion value
+- [useTransform](/docs/use-transform) — map and transform motion values
+- [useVelocity](/docs/use-velocity) — derive velocity from a motion value
 
 ---
 
