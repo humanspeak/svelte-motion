@@ -1,6 +1,6 @@
 ---
 title: 'useInView'
-description: 'Track whether an element is in the viewport from a Svelte readable store.'
+description: 'Track whether an element is in the viewport via a $state-backed { current } snapshot.'
 ---
 
 <script>
@@ -12,20 +12,17 @@ description: 'Track whether an element is in the viewport from a Svelte readable
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'useInView | Docs | Svelte Motion'
-      seo.description = 'Track whether an element is in the viewport with a reactive Svelte store. useInView mirrors framer-motion and pairs naturally with Svelte 5 bind:this.'
+      seo.description = 'Track whether an element is in the viewport with a $state-backed { current } snapshot. useInView mirrors framer-motion and pairs naturally with Svelte 5 bind:this.'
       seo.ogTitle = 'useInView'
-      seo.ogTagline = 'Detect viewport entry from a Svelte store'
-      seo.ogFeatures = ['Reactive Store', 'IntersectionObserver', 'Once Latch', 'SSR Safe']
+      seo.ogTagline = 'Detect viewport entry via a reactive snapshot'
+      seo.ogFeatures = ['Svelte 5 Runes', 'IntersectionObserver', 'Once Latch', 'SSR Safe']
       seo.ogSlug = 'docs-use-in-view'
   }
 </script>
 
 # useInView
 
-`useInView` returns a Svelte readable store that reports whether an element is
-in the viewport. It uses the same `IntersectionObserver` infrastructure as the
-`whileInView` motion prop, so it's a good fit for non-animation side effects:
-analytics impressions, lazy data loads, one-shot reveals, and scroll-driven UI.
+`useInView` returns a `$state`-backed `{ current }` object reporting whether an element is in the viewport. It uses the same `IntersectionObserver` infrastructure as the `whileInView` motion prop, so it's a good fit for non-animation side effects: analytics impressions, lazy data loads, one-shot reveals, and scroll-driven UI.
 
 ```svelte
 <script>
@@ -36,9 +33,11 @@ analytics impressions, lazy data loads, one-shot reveals, and scroll-driven UI.
 </script>
 
 <div bind:this={ref}>
-    {$inView ? 'visible' : 'hidden'}
+    {inView.current ? 'visible' : 'hidden'}
 </div>
 ```
+
+> Diverges from React framer-motion's plain `boolean` return for the same reason as `useCycle`: a `$state`-backed value must live on an object so reads inside getters preserve tracking under Svelte 5 runes.
 
 `target` accepts either an `HTMLElement` directly or a getter
 `() => HTMLElement | undefined`. The getter form is the right choice with
@@ -52,9 +51,7 @@ until it appears.
 
 ## Latching with `once`
 
-Pass `{ once: true }` when you only care about the first viewport entry. The
-store flips to `true` and stops observing &mdash; subsequent scrolls don't flip
-it back:
+Pass `{ once: true }` when you only care about the first viewport entry. `.current` flips to `true` and the observer stops — subsequent scrolls don't flip it back:
 
 ```svelte
 <script lang="ts">
@@ -67,7 +64,7 @@ it back:
     const inView = useInView(() => card, { once: true })
 
     $effect(() => {
-        if ($inView) trackImpression()
+        if (inView.current) trackImpression()
     })
 </script>
 
@@ -103,17 +100,15 @@ of the viewport.
 
 ## How it works
 
-- Subscribes to `motion`'s `inView()` primitive, which is also used by
-  `whileInView` &mdash; one IntersectionObserver implementation, two consumers.
-- Lazy-starts on the first store subscriber and stops when the last unsubscribes.
-- Returns a static `readable(initial)` when `window` or `IntersectionObserver`
-  is unavailable, so server rendering is safe.
+- Subscribes to `motion`'s `inView()` primitive, which is also used by `whileInView` — one IntersectionObserver implementation, two consumers.
+- The observer is bound to the component's lifecycle via `$effect`: it attaches at mount, detaches at unmount. Subscriber counts no longer drive lifecycle (unlike the pre-runes impl).
+- Returns a static `{ current: options.initial ?? false }` when `window` or `IntersectionObserver` is unavailable, so server rendering is safe.
 
 ## API Reference
 
 ### Parameters
 
-- **target** `HTMLElement | (() => HTMLElement | undefined)` &mdash; the element to observe.
+- **target** `HTMLElement | (() => HTMLElement | undefined)` — the element to observe.
 - **options** `UseInViewOptions` (optional)
 
 ### `UseInViewOptions`
@@ -128,7 +123,10 @@ of the viewport.
 
 ### Returns
 
-`Readable<boolean>` &mdash; subscribe with `$inView` or `inView.subscribe(cb)`.
+An `InViewState` object:
+
+- **`current`** `boolean` (getter) — `true` while the target is in view, `false` otherwise. Reactive via `$state`.
+- **`subscribe(run)`** — Svelte readable store contract. Synchronously emits the current value, then re-emits on every change. Kept for compat with hooks that still consume Svelte readables.
 
 ## See also
 

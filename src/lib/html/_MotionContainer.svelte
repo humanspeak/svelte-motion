@@ -8,7 +8,7 @@
     import {
         filterReducedMotionKeyframes,
         useReducedMotionConfig
-    } from '$lib/utils/reducedMotionConfig'
+    } from '$lib/utils/reducedMotionConfig.svelte'
     import type {
         MotionProps,
         MotionTransition,
@@ -29,7 +29,7 @@
     import { attachWhileTap } from '$lib/utils/interaction'
     import { attachWhileHover } from '$lib/utils/hover'
     import { attachWhileFocus } from '$lib/utils/focus'
-    import { attachWhileInView } from '$lib/utils/inView'
+    import { attachWhileInView } from '$lib/utils/inView.svelte'
     import {
         measureRect,
         computeFlipTransforms,
@@ -57,7 +57,7 @@
         setCustomContext,
         getCustomContext
     } from '$lib/components/variantContext.context'
-    import { get, writable } from 'svelte/store'
+    import { writable } from 'svelte/store'
     import {
         transformSVGPathProperties,
         computeNormalizedSVGInitialAttrs,
@@ -130,11 +130,11 @@
     let isLoaded = $state<'mounting' | 'initial' | 'ready' | 'animated'>('mounting')
     let dataPath = $state<number>(-1)
     const motionConfig = $derived(getMotionConfig())
-    const reducedMotionStore = useReducedMotionConfig()
-    // Seed synchronously so the first render filters keyframes correctly —
-    // otherwise transforms could flash before the subscribe effect runs.
-    let reducedMotion = $state(get(reducedMotionStore))
-    $effect(() => reducedMotionStore.subscribe((value) => (reducedMotion = value)))
+    const reducedMotionState = useReducedMotionConfig()
+    // `.current` is $state-backed inside reducedMotionState; tracking it via
+    // $derived makes `reducedMotion` re-evaluate whenever the OS preference
+    // or `<MotionConfig reducedMotion>` policy changes.
+    const reducedMotion = $derived(reducedMotionState.current)
 
     // Get presence context to check if we're inside AnimatePresence
     const context = getAnimatePresenceContext()

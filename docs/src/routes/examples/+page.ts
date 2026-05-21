@@ -124,6 +124,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'useReducedMotion',
         description: 'Interactive useReducedMotion animation example using Svelte Motion.'
     },
+    'use-reduced-motion-config': {
+        title: 'useReducedMotionConfig',
+        description:
+            'Resolve the active reduced-motion policy by combining a parent <MotionConfig> override with the OS preference.'
+    },
     'use-time': {
         title: 'useTime',
         description: 'Interactive useTime animation example using Svelte Motion.'

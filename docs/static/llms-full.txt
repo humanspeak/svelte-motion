@@ -577,17 +577,31 @@ Imperative, scoped animations. Returns `[scope, animate]` — call `animate(targ
 
 ### useInView
 
-Track whether an element is in the viewport (IntersectionObserver under the hood).
+Track whether an element is in the viewport (IntersectionObserver under
+the hood). Returns a `$state`-backed `{ current }` object plus a
+`.subscribe()` shim for legacy Svelte store consumers.
 
 ```svelte
 <script lang="ts">
     import { useInView } from '@humanspeak/svelte-motion'
 
-    const { ref, inView } = useInView({ amount: 0.5, once: false })
+    let ref: HTMLElement | undefined = $state()
+    const inView = useInView(() => ref, { amount: 0.5, once: false })
 </script>
 
-<section use:ref class:visible={$inView}>...</section>
+<section bind:this={ref} class:visible={inView.current}>...</section>
 ```
+
+`target` accepts either an `HTMLElement` or a getter
+`() => HTMLElement | undefined` (the getter form is the right choice with
+Svelte's `bind:this`, which resolves after mount). Options: `root`,
+`margin`, `amount`, `once`, `initial`. Set `once: true` to latch `true`
+on the first viewport entry and stop observing. The IntersectionObserver
+is bound to the surrounding reactive scope — attached at mount, detached
+at unmount.
+
+> Diverges from React framer-motion's plain `boolean` return so the
+> `$state`-backed value can preserve tracking through getters.
 
 ### useCycle
 
@@ -661,9 +675,11 @@ Coordinate custom exit animations inside an `AnimatePresence`. `useIsPresent()` 
 </script>
 ```
 
-### useReducedMotion / useReducedMotionConfig
+### useReducedMotion
 
-Respect the user's `prefers-reduced-motion` setting, or override it app-wide.
+Read the user's OS-level `prefers-reduced-motion` setting. Returns a
+`$state`-backed `{ current }` object plus a `.subscribe()` shim for
+legacy Svelte store consumers.
 
 ```svelte
 <script lang="ts">
@@ -672,17 +688,44 @@ Respect the user's `prefers-reduced-motion` setting, or override it app-wide.
     const reduced = useReducedMotion()
 </script>
 
-<motion.div animate={$reduced ? { opacity: 1 } : { opacity: 1, scale: 1.05 }} />
+<motion.div animate={reduced.current ? { opacity: 1 } : { opacity: 1, scale: 1.05 }} />
 ```
+
+SSR-safe: returns a static `{ current: false }` when `window` or
+`matchMedia` is unavailable. The `matchMedia` listener is bound to the
+surrounding reactive scope — attached at mount, detached at unmount.
+
+### useReducedMotionConfig
+
+Resolves the active reduced-motion policy for the current component
+subtree by combining the nearest `<MotionConfig reducedMotion>` ancestor
+with the OS preference:
+
+- `'always'` → always `true`
+- `'never'` (or no `<MotionConfig>` ancestor) → always `false`
+- `'user'` → mirrors the OS preference (`false` in SSR)
 
 ```svelte
 <script lang="ts">
-    import { useReducedMotionConfig, MotionConfig } from '@humanspeak/svelte-motion'
+    import { motion, MotionConfig, useReducedMotionConfig } from '@humanspeak/svelte-motion'
 
-    // force reduced motion app-wide (useful for tests / kiosk displays)
-    useReducedMotionConfig('always')
+    const reduced = useReducedMotionConfig()
 </script>
+
+<MotionConfig reducedMotion="user">
+    <motion.div
+        initial={{ x: -200, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={reduced.current ? { duration: 0 } : { type: 'spring' }}
+    />
+</MotionConfig>
 ```
+
+The hook reads from `MotionConfig` context; you set the policy via the
+`<MotionConfig reducedMotion="...">` prop, not as an argument to the hook.
+`.current` updates reactively when either the OS preference or the
+ancestor `<MotionConfig>` policy changes; the `.subscribe()` shim fires
+on both sources too.
 
 ---
 

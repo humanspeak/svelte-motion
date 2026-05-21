@@ -1,6 +1,6 @@
 ---
 title: 'useReducedMotion'
-description: "Reactive Svelte store for the user's prefers-reduced-motion accessibility preference."
+description: "Reactive Svelte 5 hook for the user's prefers-reduced-motion accessibility preference."
 ---
 
 <script>
@@ -12,20 +12,17 @@ description: "Reactive Svelte store for the user's prefers-reduced-motion access
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'useReducedMotion | Docs | Svelte Motion'
-      seo.description = "Detect the user's prefers-reduced-motion setting in Svelte. useReducedMotion returns a reactive readable store that updates live when the OS preference changes."
+      seo.description = "Detect the user's prefers-reduced-motion setting in Svelte. useReducedMotion returns a $state-backed { current } object that updates live when the OS preference changes."
       seo.ogTitle = 'useReducedMotion'
       seo.ogTagline = "Honor the user's reduced-motion preference"
-      seo.ogFeatures = ['Accessibility', 'Reactive Store', 'Live Media-Query Updates', 'SSR Safe']
+      seo.ogFeatures = ['Accessibility', 'Svelte 5 Runes', 'Live Media-Query Updates', 'SSR Safe']
       seo.ogSlug = 'docs-use-reduced-motion'
   }
 </script>
 
 # useReducedMotion
 
-`useReducedMotion` returns a Svelte readable store that reflects the user's
-`prefers-reduced-motion` accessibility setting. The store updates live when the
-media query changes, so components can disable or simplify animations the moment
-the user toggles the OS preference.
+`useReducedMotion` returns a `$state`-backed `{ current }` object that reflects the user's `prefers-reduced-motion` accessibility setting. `.current` updates live when the media query changes, so components can disable or simplify animations the moment the user toggles the OS preference.
 
 ```svelte
 <script>
@@ -34,17 +31,16 @@ the user toggles the OS preference.
     const reduced = useReducedMotion()
 </script>
 
-<div style:transform={$reduced ? 'none' : 'rotate(45deg)'}>
+<div style:transform={reduced.current ? 'none' : 'rotate(45deg)'}>
     Respects the user's preference
 </div>
 ```
 
+> Diverges from React framer-motion's plain `boolean | null` return for the same reason as `useCycle`: a `$state`-backed value must live on an object so reads inside getters preserve tracking under Svelte 5 runes.
+
 ## Why it matters
 
-Some users disable motion at the OS level because animations cause vestibular
-discomfort, distraction, or other accessibility issues. `useReducedMotion`
-gives your components a single source of truth so they can opt out of motion
-gracefully rather than ignoring the user's setting.
+Some users disable motion at the OS level because animations cause vestibular discomfort, distraction, or other accessibility issues. `useReducedMotion` gives your components a single source of truth so they can opt out of motion gracefully rather than ignoring the user's setting.
 
 <Example isSmall exampleUrl="/examples/use-reduced-motion">
   <UseReducedMotionExample />
@@ -52,8 +48,7 @@ gracefully rather than ignoring the user's setting.
 
 ## Usage
 
-The hook returns a `Readable<boolean>` &mdash; subscribe with `$` like any
-Svelte store:
+Read `reduced.current` directly in templates, `$derived`, and `$effect` — it's reactive via `$state`:
 
 ```svelte
 <script lang="ts">
@@ -62,7 +57,7 @@ Svelte store:
     const reduced = useReducedMotion()
 </script>
 
-{#if $reduced}
+{#if reduced.current}
     <p>Animations have been disabled to respect your preference.</p>
 {:else}
     <FancyAnimatedHero />
@@ -71,8 +66,7 @@ Svelte store:
 
 ### Skipping motion in `motion` components
 
-Combine with `motion` to swap an animated transition for an instant change when
-reduced motion is requested:
+Combine with `motion` to swap an animated transition for an instant change when reduced motion is requested:
 
 ```svelte
 <script lang="ts">
@@ -83,14 +77,13 @@ reduced motion is requested:
 
 <motion.div
     animate={{ x: 100 }}
-    transition={$reduced ? { duration: 0 } : { type: 'spring', stiffness: 200 }}
+    transition={reduced.current ? { duration: 0 } : { type: 'spring', stiffness: 200 }}
 />
 ```
 
 ### With variants
 
-When you build variants, fall back to a "no motion" variant for users who opt
-out:
+When you build variants, fall back to a "no motion" variant for users who opt out:
 
 ```svelte
 <script lang="ts">
@@ -110,7 +103,7 @@ out:
 </script>
 
 <motion.div
-    variants={$reduced ? reducedVariants : variants}
+    variants={reduced.current ? reducedVariants : variants}
     initial="hidden"
     animate="visible"
 />
@@ -118,19 +111,19 @@ out:
 
 ## How it works
 
-- Subscribes to `window.matchMedia('(prefers-reduced-motion: reduce)')`.
-- Uses `MediaQueryList` `change` events; falls back to the legacy `addListener`
-  API for Safari &lt; 14.
-- Removes the listener automatically when the last subscriber unsubscribes.
-- Returns `false` in SSR or environments without `matchMedia`, so it is safe
-  to call during server rendering.
+- Subscribes to `window.matchMedia('(prefers-reduced-motion: reduce)')` via `$effect`.
+- Uses `MediaQueryList` `change` events; falls back to the legacy `addListener` API for Safari &lt; 14.
+- Listener is bound to the surrounding reactive scope (the component's lifecycle) — detached automatically on unmount.
+- Returns a static `{ current: false }` in SSR or environments without `matchMedia`, so it is safe to call during server rendering.
 
 ## API Reference
 
 ### Returns
 
-`Readable<boolean>` &mdash; `true` when the user has requested reduced motion,
-otherwise `false`.
+A `ReducedMotionState` object:
+
+- **`current`** `boolean` (getter) — `true` when the user has requested reduced motion, otherwise `false`. Reactive via `$state`.
+- **`subscribe(run)`** — Svelte readable store contract. Synchronously emits the current value, then re-emits on every change. Kept for compat with hooks that still consume Svelte readables; prefer `.current` for new code.
 
 ## Testing the preference
 

@@ -4,37 +4,40 @@ description: 'Resolve the active reduced-motion policy from <MotionConfig> and t
 ---
 
 <script>
+  import Example from '$lib/components/general/Example.svelte';
+  import UseReducedMotionConfigExample from '$lib/examples/use-reduced-motion-config/demos/Default.svelte';
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'useReducedMotionConfig | Docs | Svelte Motion'
-      seo.description = "Combine MotionConfig.reducedMotion with the user's OS preference into a single reactive store."
+      seo.description = "Combine MotionConfig.reducedMotion with the user's OS preference. Reactive { current } + .subscribe shim via Svelte 5 runes."
       seo.ogTitle = 'useReducedMotionConfig'
       seo.ogTagline = 'Resolved reduced-motion policy from context + OS pref'
-      seo.ogFeatures = ['Accessibility', 'Reactive Store', 'MotionConfig Aware', 'SSR Safe']
+      seo.ogFeatures = ['Accessibility', 'Svelte 5 Runes', 'MotionConfig Aware', 'SSR Safe']
       seo.ogSlug = 'docs-use-reduced-motion-config'
   }
 </script>
 
 # useReducedMotionConfig
 
-`useReducedMotionConfig` resolves the active reduced-motion policy for the
-current component subtree by combining the nearest
-`<MotionConfig reducedMotion="...">` ancestor with the OS-level
-`prefers-reduced-motion` setting.
+`useReducedMotionConfig` resolves the active reduced-motion policy for the current component subtree by combining the nearest `<MotionConfig reducedMotion="...">` ancestor with the OS-level `prefers-reduced-motion` setting.
 
 ```svelte
 <script>
-    import { useReducedMotionConfig } from '@humanspeak/svelte-motion'
+    import { motion, useReducedMotionConfig } from '@humanspeak/svelte-motion'
 
     const reduced = useReducedMotionConfig()
 </script>
 
-{#if !$reduced}
+{#if !reduced.current}
     <motion.div animate={{ x: 100 }} />
 {/if}
 ```
+
+<Example isSmall exampleUrl="/examples/use-reduced-motion-config">
+  <UseReducedMotionConfigExample />
+</Example>
 
 ## Why two hooks?
 
@@ -83,7 +86,7 @@ a static background:
     const reduced = useReducedMotionConfig()
 </script>
 
-{#if $reduced}
+{#if reduced.current}
     <StaticHero />
 {:else}
     <ParallaxHero />
@@ -103,7 +106,10 @@ a static background:
 
 ### Returns
 
-`Readable<boolean>` &mdash; `true` when descendant motion should be reduced.
+A `ReducedMotionState` object:
+
+- **`current`** `boolean` (getter) — `true` when descendant motion should be reduced (resolved policy + OS preference). Reactive via `$state` so reads inside templates, `$derived`, and `$effect` track changes to either source automatically.
+- **`subscribe(run)`** — Svelte readable store contract. Fires on every OS-preference change AND on every mid-tree `<MotionConfig reducedMotion={...}>` policy reassignment, so legacy store consumers see both sources. Kept for compat with hooks that still consume Svelte readables.
 
 ## See also
 

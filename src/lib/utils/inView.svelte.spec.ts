@@ -1,7 +1,7 @@
-import { get } from 'svelte/store'
+import { flushSync } from 'svelte'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockIntersectionObserver } from './__tests__/intersectionObserver.js'
-import { attachWhileInView, useInView } from './inView.js'
+import { attachWhileInView, useInView } from './inView.svelte.js'
 
 vi.mock(import('motion'), async (importOriginal) => {
     const actual = await importOriginal()
@@ -23,61 +23,87 @@ afterEach(() => {
     vi.restoreAllMocks()
 })
 
-describe('utils/inView - useInView', () => {
-    it('starts at the initial value (default false)', () => {
-        const store = useInView(document.createElement('div'))
-        expect(get(store)).toBe(false)
+describe('useInView', () => {
+    let cleanups: VoidFunction[]
+
+    beforeEach(() => {
+        cleanups = []
+    })
+
+    afterEach(() => {
+        for (const fn of cleanups) fn()
+    })
+
+    const inRoot = <T>(fn: () => T): { result: T; unmount: VoidFunction } => {
+        let result: T
+        const stop = $effect.root(() => {
+            result = fn()
+        })
+        cleanups.push(stop)
+        return { result: result!, unmount: stop }
+    }
+
+    it('.current starts at the initial value (default false)', () => {
+        const { result: state } = inRoot(() => useInView(document.createElement('div')))
+        expect(state.current).toBe(false)
     })
 
     it('honors initial: true before the first IntersectionObserver callback', () => {
-        const store = useInView(document.createElement('div'), { initial: true })
-        expect(get(store)).toBe(true)
+        const { result: state } = inRoot(() =>
+            useInView(document.createElement('div'), { initial: true })
+        )
+        expect(state.current).toBe(true)
     })
 
-    it('flips to true on enter and back to false on exit', () => {
+    it('.current flips to true on enter and back to false on exit', () => {
         const el = document.createElement('div')
-        const store = useInView(el)
+        const { result: state } = inRoot(() => useInView(el))
+        flushSync()
         const seen: boolean[] = []
-        const unsub = store.subscribe((v) => seen.push(v))
-
+        const off = state.subscribe((v) => seen.push(v))
         io.fireOn(el, true)
         io.fireOn(el, false)
-
+        off()
         expect(seen).toEqual([false, true, false])
-        unsub()
     })
 
     it('latches on first enter when once: true and stops observing', () => {
         const el = document.createElement('div')
-        const store = useInView(el, { once: true })
-        const unsub = store.subscribe(() => {})
-
+        const { result: state } = inRoot(() => useInView(el, { once: true }))
+        flushSync()
         io.fireOn(el, true)
-        expect(get(store)).toBe(true)
-
+        expect(state.current).toBe(true)
         const obs = io.instances()[0]
-        // motion's inView calls observer.unobserve when no onEnd is returned
         expect(obs.unobserve).toHaveBeenCalledWith(el)
-
-        // Subsequent intersection events are no-ops; the store stays true.
+        // Subsequent events are no-ops; the state stays true.
         io.fireOn(el, false)
-        expect(get(store)).toBe(true)
-        unsub()
+        expect(state.current).toBe(true)
     })
 
-    it('shares one observer subscription across multiple subscribers', () => {
+    it('shares one observer across multiple .subscribe callers', () => {
         const el = document.createElement('div')
-        const store = useInView(el)
-
-        const unsubA = store.subscribe(() => {})
-        const unsubB = store.subscribe(() => {})
-
+        const { result: state } = inRoot(() => useInView(el))
+        flushSync()
+        const offA = state.subscribe(() => {})
+        const offB = state.subscribe(() => {})
         expect(io.instances().length).toBe(1)
-
+        // Individual unsubs don't tear down the observer — lifecycle is
+        // tied to the component scope, not subscriber refcount.
+        offA()
+        offB()
         const obs = io.instances()[0]
-        unsubA()
         expect(obs.disconnect).not.toHaveBeenCalled()
-        unsubB()
+    })
+
+    it('disconnects the observer on unmount', () => {
+        const el = document.createElement('div')
+        const { result: state, unmount } = inRoot(() => useInView(el))
+        flushSync()
+        const off = state.subscribe(() => {})
+        expect(io.instances().length).toBe(1)
+        off()
+        unmount()
+        const obs = io.instances()[0]
         expect(obs.disconnect).toHaveBeenCalledTimes(1)
     })
 
@@ -94,8 +120,8 @@ describe('utils/inView - useInView', () => {
 
         const el = document.createElement('div')
         const ref: { current?: HTMLElement } = {}
-        const store = useInView(() => ref.current)
-        const unsub = store.subscribe(() => {})
+        inRoot(() => useInView(() => ref.current))
+        flushSync()
 
         expect(io.instances().length).toBe(0)
         expect(rafCallbacks.length).toBe(1)
@@ -104,64 +130,57 @@ describe('utils/inView - useInView', () => {
         rafCallbacks[0]?.(performance.now())
 
         expect(io.instances().length).toBe(1)
-        unsub()
     })
 
-    it('falls back to a static readable when IntersectionObserver is unavailable', () => {
+    it('falls back to static state when IntersectionObserver is unavailable', () => {
         vi.stubGlobal('IntersectionObserver', undefined)
-        const store = useInView(document.createElement('div'), { initial: true })
-        expect(get(store)).toBe(true)
-        store.subscribe(() => {})()
+        const { result: state } = inRoot(() =>
+            useInView(document.createElement('div'), { initial: true })
+        )
+        expect(state.current).toBe(true)
+        state.subscribe(() => {})()
         expect(io.instances().length).toBe(0)
     })
 
-    it('is SSR-safe (no window)', () => {
+    it('SSR-safe (no window)', () => {
         vi.stubGlobal('window', undefined)
-        const store = useInView(document.createElement('div'))
-        expect(get(store)).toBe(false)
-        store.subscribe(() => {})()
+        const { result: state } = inRoot(() => useInView(document.createElement('div')))
+        expect(state.current).toBe(false)
+        state.subscribe(() => {})()
         expect(io.instances().length).toBe(0)
     })
 
     it('forwards a custom root element to IntersectionObserver', () => {
         const target = document.createElement('div')
         const root = document.createElement('section')
-        const store = useInView(target, { root })
-        const unsub = store.subscribe(() => {})
-
+        inRoot(() => useInView(target, { root }))
+        flushSync()
         expect(io.instances()[0].init?.root).toBe(root)
-        unsub()
     })
 
     it('forwards margin to IntersectionObserver as rootMargin', () => {
         const target = document.createElement('div')
-        const store = useInView(target, { margin: '20px 0px 40px 0px' })
-        const unsub = store.subscribe(() => {})
-
+        inRoot(() => useInView(target, { margin: '20px 0px 40px 0px' }))
+        flushSync()
         expect(io.instances()[0].init?.rootMargin).toBe('20px 0px 40px 0px')
-        unsub()
     })
 
     it('translates amount: number to threshold', () => {
         const target = document.createElement('div')
-        const store = useInView(target, { amount: 0.5 })
-        const unsub = store.subscribe(() => {})
-
+        inRoot(() => useInView(target, { amount: 0.5 }))
+        flushSync()
         expect(io.instances()[0].init?.threshold).toBe(0.5)
-        unsub()
     })
 
     it('translates amount: "all" to threshold 1', () => {
         const target = document.createElement('div')
-        const store = useInView(target, { amount: 'all' })
-        const unsub = store.subscribe(() => {})
-
+        inRoot(() => useInView(target, { amount: 'all' }))
+        flushSync()
         expect(io.instances()[0].init?.threshold).toBe(1)
-        unsub()
     })
 })
 
-describe('utils/inView - attachWhileInView viewport options', () => {
+describe('attachWhileInView viewport options', () => {
     it('defaults to threshold 0 (any pixel visible) when no viewport is passed', () => {
         const el = document.createElement('div')
         attachWhileInView(el, { opacity: 1 }, {})
@@ -209,12 +228,8 @@ describe('utils/inView - attachWhileInView viewport options', () => {
 
         io.fireOn(el, true)
         expect(onStart).toHaveBeenCalledTimes(1)
-
-        // Latched: a subsequent enter event must not re-fire onStart.
         io.fireOn(el, true)
         expect(onStart).toHaveBeenCalledTimes(1)
-
-        // Latched: an exit event must not fire onEnd (no exit animation when once).
         io.fireOn(el, false)
         expect(onEnd).not.toHaveBeenCalled()
     })
