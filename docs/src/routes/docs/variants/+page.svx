@@ -4,7 +4,7 @@ description: Define reusable animation states and orchestrate complex animations
 ---
 
 <script>
-    import VariantsBasicExample from '$lib/examples/VariantsBasicExample.svelte'
+    import VariantsBasicExample from '$lib/examples/variants-basic/demos/Default.svelte'
     import Example from '$lib/components/general/Example.svelte'
     import VariantsPropagationExample from '$lib/examples/VariantsPropagationExample.svelte'
     import NotificationsStackExample from '$lib/examples/notifications-stack/demos/Default.svelte'
