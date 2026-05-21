@@ -5,7 +5,7 @@ description: 'Imperative animation with a scoped CSS-selector API.'
 
 <script>
   import Example from '$lib/components/general/Example.svelte';
-  import UseAnimateExample from '$lib/examples/UseAnimateExample.svelte';
+  import UseAnimateExample from '$lib/examples/use-animate/demos/Default.svelte';
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()

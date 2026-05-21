@@ -80,8 +80,8 @@
     })
 </script>
 
-<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
-<div class="humanspeak-demo-shell">
+<!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
+<div class="dk-demo-shell">
     <svg width="400" height="400">
         <g transform="translate(10 10) scale(17 17)">
             <path d={$path} fill={$fill} />
@@ -90,7 +90,7 @@
 </div>
 
 <style>
-    .humanspeak-demo-shell {
+    .dk-demo-shell {
         display: flex;
         align-items: center;
         justify-content: center;

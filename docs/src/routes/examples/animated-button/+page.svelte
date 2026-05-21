@@ -1,8 +1,16 @@
 <script lang="ts">
+    import {
+        CodeReferenceV2,
+        type DemoManifestEntry,
+        ExampleV2,
+        type ExampleSection,
+        formatSheetLabel
+    } from '@humanspeak/docs-kit'
+    import { Hourglass, MousePointerClick, Sparkles } from '@lucide/svelte'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import Example from '$lib/components/general/Example.svelte'
-    import AnimatedButton from '$lib/examples/AnimatedButton.svelte'
+    import AnimatedButtonDefault from '$lib/examples/animated-button/demos/Default.svelte'
+    import demoManifest from '$lib/demo-manifest.json'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
@@ -21,8 +29,86 @@
         seo.ogFeatures = ['Spring Press', 'Hover Lift', 'Smooth Transitions', 'Interactive UI']
         seo.ogSlug = 'examples-animated-button'
     }
+
+    const SOURCE_URL =
+        'https://github.com/humanspeak/svelte-motion/blob/main/docs/src/lib/examples/'
+
+    const manifest = demoManifest as Record<string, DemoManifestEntry>
+
+    const sections: ExampleSection[] = [
+        {
+            figId: 'FIG-001',
+            tag: 'ANIMATE',
+            title: { prefix: 'mount + ', accent: 'animate', end: '.' },
+            description:
+                'The simplest motion lesson: declare `initial`, `animate`, and a `transition`. Motion tweens between them as the element enters. Replay to remount.',
+            snippet: defaultSection,
+            codeSnippet: defaultCode,
+            notes: defaultNotes,
+            barCells: [{ k: 'pattern', v: 'mount tween' }],
+            sourceUrl: `${SOURCE_URL}animated-button/demos/Default.svelte`
+        }
+    ]
 </script>
 
-<Example title="Animated Button" file="AnimatedButton.svelte">
-    <AnimatedButton />
-</Example>
+{#snippet defaultSection()}
+    <AnimatedButtonDefault />
+{/snippet}
+{#snippet defaultNotes()}
+    <ul>
+        <li>
+            <Sparkles />
+            <span>
+                <code>initial</code> sets the values on mount;
+                <code>animate</code> is the target. Motion tweens between them when the component enters
+                the DOM — no manual lifecycle wiring required.
+            </span>
+        </li>
+        <li>
+            <Hourglass />
+            <span>
+                <code>transition</code> controls the duration, easing, and type. Here it's a 600ms
+                linear tween — swap in <code>type: 'spring'</code> for physics-based motion, or set
+                <code>duration: 0</code> to skip the tween entirely.
+            </span>
+        </li>
+        <li>
+            <MousePointerClick />
+            <span>
+                The <em>Replay</em> button bumps a key on a <code>&#123;#key&#125;</code> block — Svelte
+                tears the button down and re-mounts it, so motion runs the entrance tween again. Same
+                trick works for any single-shot animation.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet defaultCode()}
+    <CodeReferenceV2
+        samples={[
+            {
+                id: 'animated-button-default',
+                label: 'Default.svelte',
+                ...manifest['animated-button/demos/Default.svelte']
+            }
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#each sections as section, i (section.figId)}
+    <ExampleV2
+        figId={section.figId}
+        tag={section.tag}
+        title={section.title}
+        description={section.description}
+        mode={section.mode ?? 'live'}
+        sheetLabel={formatSheetLabel(i, sections.length)}
+        barCells={section.barCells}
+        sourceUrl={section.sourceUrl}
+        codeSnippet={section.codeSnippet}
+        codeLabel="show code"
+        notes={section.notes}
+    >
+        {@render section.snippet()}
+    </ExampleV2>
+{/each}

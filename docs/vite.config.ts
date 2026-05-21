@@ -28,16 +28,12 @@ export default defineConfig({
         // come from the same single source of truth — edit a demo, the
         // page reloads and the code panel updates in lockstep.
         //
-        // `stripComments` + `stripWrappers` let us keep an in-file
-        // positioning shell (the `.humanspeak-demo-shell` wrapper that
-        // centers the motion card inside docs-kit's `.dk-ex-body`) plus
-        // maintainer notes tagged `/* HUMANSPEAK */` — without leaking
-        // either into the published code panel. The disk file stays
-        // runnable; the manifest carries only the lesson.
-        demoManifestPlugin({
-            stripComments: ['HUMANSPEAK'],
-            stripWrappers: ['humanspeak-demo-shell']
-        }),
+        // No options needed: docs-kit's default `stripWrappers` includes
+        // `dk-demo-shell` and default `stripComments` includes `dk-strip`,
+        // so demos can declare a positioning shell + maintainer comments
+        // that stay out of the published code panel without per-site
+        // wiring.
+        demoManifestPlugin(),
         svelteMotionOptimize(),
         tailwindcss(),
         sveltekit(),

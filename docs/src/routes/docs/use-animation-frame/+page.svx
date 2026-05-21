@@ -6,7 +6,7 @@ description: "Run a callback on every animation frame for smooth, time-based ani
 <script>
   import { useAnimationFrame } from '@humanspeak/svelte-motion';
   import Example from '$lib/components/general/Example.svelte';
-  import UseAnimationFrameExample from '$lib/examples/UseAnimationFrameExample.svelte';
+  import UseAnimationFrameExample from '$lib/examples/use-animation-frame/demos/Default.svelte';
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()

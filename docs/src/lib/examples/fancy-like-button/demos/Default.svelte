@@ -124,8 +124,8 @@
     }
 </script>
 
-<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
-<div class="humanspeak-demo-shell">
+<!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
+<div class="dk-demo-shell">
     <div class="relative flex" use:likeInteraction>
         <motion.button
             class={`size-6 ${buttonBg} z-30 m-1 flex items-center justify-center rounded-full select-none`}
@@ -201,7 +201,7 @@
 </div>
 
 <style>
-    .humanspeak-demo-shell {
+    .dk-demo-shell {
         display: flex;
         align-items: center;
         justify-content: center;

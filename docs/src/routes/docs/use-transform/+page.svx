@@ -5,7 +5,7 @@ description: "Create a derived store that maps a numeric source across ranges or
 
 <script>
   import Example from '$lib/components/general/Example.svelte';
-  import HTMLContent from '$lib/examples/HTMLContent.svelte';
+  import HTMLContent from '$lib/examples/html-content/demos/Default.svelte';
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()
