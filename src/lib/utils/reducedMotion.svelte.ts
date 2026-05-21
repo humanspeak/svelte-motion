@@ -1,17 +1,11 @@
-import { SvelteSet } from 'svelte/reactivity'
+import { createBooleanSnapshot, type BooleanSnapshot } from '$lib/utils/booleanSnapshot.svelte.js'
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
 
 /**
- * State returned by {@link useReducedMotion}: a `$state`-backed `.current`
- * boolean plus a `.subscribe()` shim for Svelte readable-store consumers.
+ * State returned by {@link useReducedMotion}.
  */
-export type ReducedMotionState = {
-    /** Reactive read in Svelte 5 templates / `$derived` / `$effect`. */
-    readonly current: boolean
-    /** Svelte readable store contract — emits synchronously on subscribe. */
-    subscribe: (run: (value: boolean) => void) => () => void
-}
+export type ReducedMotionState = BooleanSnapshot
 
 /**
  * Returns a `{ current, subscribe }` object that reflects the user's
@@ -62,21 +56,13 @@ export const useReducedMotion = (): ReducedMotionState => {
         return staticState(false)
     }
 
-    let current = $state(media.matches)
-    const subscribers = new SvelteSet<(value: boolean) => void>()
-
-    const setCurrent = (value: boolean) => {
-        if (value === current) return
-        current = value
-        for (const sub of subscribers) sub(value)
-    }
-
-    const handler = (event: MediaQueryListEvent) => setCurrent(event.matches)
+    const [state, set] = createBooleanSnapshot(media.matches)
+    const handler = (event: MediaQueryListEvent) => set(event.matches)
 
     $effect(() => {
-        // Re-read on (re-)mount in case the OS preference changed while
+        // Resync on (re-)mount in case the OS preference changed while
         // the component was torn down between effect runs.
-        setCurrent(media.matches)
+        set(media.matches)
         if (typeof media.addEventListener === 'function') {
             media.addEventListener('change', handler)
             return () => media.removeEventListener('change', handler)
@@ -86,18 +72,7 @@ export const useReducedMotion = (): ReducedMotionState => {
         return () => media.removeListener(handler)
     })
 
-    return {
-        get current() {
-            return current
-        },
-        subscribe(run) {
-            subscribers.add(run)
-            run(current)
-            return () => {
-                subscribers.delete(run)
-            }
-        }
-    }
+    return state
 }
 
 /**

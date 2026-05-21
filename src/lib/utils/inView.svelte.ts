@@ -4,9 +4,9 @@ import {
     type AnimationOptions,
     type DOMKeyframesDefinition
 } from 'motion'
-import { SvelteSet } from 'svelte/reactivity'
 import type { MotionViewport } from '../types.js'
 import { createAttachable } from './attachable.js'
+import { createBooleanSnapshot, type BooleanSnapshot } from './booleanSnapshot.svelte.js'
 import { type ElementOrGetter } from './dom.js'
 
 const CSS_FUNCTION_RE = /\b(var|calc|min|max|clamp|rgb|rgba|hsl|hsla|url)\s*\(/i
@@ -191,15 +191,9 @@ export type UseInViewOptions = {
 }
 
 /**
- * State returned by {@link useInView}: a `$state`-backed `.current` boolean
- * plus a `.subscribe()` shim for Svelte readable-store consumers.
+ * State returned by {@link useInView}.
  */
-export type InViewState = {
-    /** Reactive read in Svelte 5 templates / `$derived` / `$effect`. */
-    readonly current: boolean
-    /** Svelte readable store contract — emits synchronously on subscribe. */
-    subscribe: (run: (value: boolean) => void) => () => void
-}
+export type InViewState = BooleanSnapshot
 
 /**
  * Returns an `InViewState` that tracks whether `target` is in the viewport.
@@ -257,15 +251,8 @@ export const useInView = (target: ElementOrGetter, options: UseInViewOptions = {
         }
     }
 
-    let current = $state(initial)
-    const subscribers = new SvelteSet<(value: boolean) => void>()
+    const [state, set] = createBooleanSnapshot(initial)
     let latched = false
-
-    const update = (next: boolean) => {
-        if (next === current) return
-        current = next
-        for (const sub of subscribers) sub(next)
-    }
 
     const attachable = createAttachable({
         refs: { target, root: options.root },
@@ -274,7 +261,7 @@ export const useInView = (target: ElementOrGetter, options: UseInViewOptions = {
             motionInView(
                 el!,
                 () => {
-                    update(true)
+                    set(true)
                     if (options.once) {
                         // Detach inside the entry callback; motion's inView
                         // handles re-entry safely via observer.unobserve.
@@ -282,7 +269,7 @@ export const useInView = (target: ElementOrGetter, options: UseInViewOptions = {
                         stop()
                         return
                     }
-                    return () => update(false)
+                    return () => set(false)
                 },
                 {
                     root: root as Element | Document | undefined,
@@ -297,16 +284,5 @@ export const useInView = (target: ElementOrGetter, options: UseInViewOptions = {
 
     $effect(() => attachable.subscribe())
 
-    return {
-        get current() {
-            return current
-        },
-        subscribe(run) {
-            subscribers.add(run)
-            run(current)
-            return () => {
-                subscribers.delete(run)
-            }
-        }
-    }
+    return state
 }

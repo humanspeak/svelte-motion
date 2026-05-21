@@ -1,12 +1,17 @@
 <script lang="ts">
-    import { MotionConfig, useReducedMotionConfig } from '@humanspeak/svelte-motion'
+    import {
+        MotionConfig,
+        useReducedMotionConfig,
+        type ReducedMotionConfig
+    } from '@humanspeak/svelte-motion'
 
     // `useReducedMotionConfig()` returns the resolved policy — combining the
     // nearest <MotionConfig reducedMotion="..."> ancestor with the OS-level
     // `prefers-reduced-motion` setting. Use it when a *parent* wants to
     // override what the OS says (e.g. a kiosk app that disables motion
     // regardless of the user's preference).
-    let policy = $state<'never' | 'always' | 'user'>('user')
+    const POLICIES = ['never', 'user', 'always'] as const satisfies readonly ReducedMotionConfig[]
+    let policy = $state<ReducedMotionConfig>('user')
     const reduced = useReducedMotionConfig()
 </script>
 
@@ -25,9 +30,9 @@
             Resolved policy:
             <strong>{reduced.current ? 'reduce' : 'no-preference'}</strong>
         </p>
-        <fieldset>
+        <fieldset aria-label="MotionConfig reducedMotion policy">
             <legend>Set <code>&lt;MotionConfig reducedMotion=&quot;...&quot;&gt;</code></legend>
-            {#each ['never', 'user', 'always'] as option (option)}
+            {#each POLICIES as option (option)}
                 <label>
                     <input type="radio" name="policy" value={option} bind:group={policy} />
                     {option}

@@ -1,6 +1,6 @@
 import { getMotionConfig } from '$lib/components/motionConfig.context.js'
+import { createBooleanSnapshot } from '$lib/utils/booleanSnapshot.svelte.js'
 import { useReducedMotion, type ReducedMotionState } from '$lib/utils/reducedMotion.svelte.js'
-import { SvelteSet } from 'svelte/reactivity'
 
 /**
  * CSS / motion property keys that move or rotate an element via `transform`.
@@ -67,9 +67,11 @@ export const filterReducedMotionKeyframes = <T extends Record<string, unknown> |
  * - `.current` re-evaluates inside any reactive scope that reads it
  *   (templates, `$derived`, `$effect`) when either the OS preference *or*
  *   a parent `<MotionConfig reducedMotion={...}>` policy reassigns.
- * - `.subscribe(run)` callbacks are driven by a `$effect` that tracks both
- *   sources, so legacy store consumers see policy changes too — a fix vs.
- *   the prior `derived()`-based impl, which only re-fired on OS changes.
+ * - `.subscribe(run)` callbacks are driven by both the OS path
+ *   (sync via `osReduced.subscribe`) and a `$effect` tracking the
+ *   `motionConfig.reducedMotion` prop. Legacy store consumers see policy
+ *   changes too — a fix vs. the prior `derived()`-based impl, which only
+ *   re-fired on OS changes.
  *
  * @returns A `ReducedMotionState` reflecting the merged policy + OS setting.
  * @see https://motion.dev/docs/react-reduced-motion
@@ -97,54 +99,28 @@ export const useReducedMotionConfig = (): ReducedMotionState => {
         return osReduced.current
     }
 
-    const subscribers = new SvelteSet<(value: boolean) => void>()
-    let lastEmitted = resolve()
+    const [state, set] = createBooleanSnapshot(resolve())
 
-    const dispatch = (value: boolean) => {
-        if (value === lastEmitted) return
-        lastEmitted = value
-        for (const sub of subscribers) sub(value)
-    }
+    // Sync path: `osReduced.subscribe` fires the run callback on every OS
+    // preference change (and once synchronously on subscribe). The
+    // snapshot's same-value dedupe absorbs that initial duplicate emit.
+    const osUnsub = osReduced.subscribe(() => set(resolve()))
 
-    // Synchronous path for OS-preference changes. `osReduced.subscribe`
-    // emits synchronously the same tick the OS preference flips, matching
-    // the prior `derived()`-based behavior. Skip the synchronous initial
-    // emit — `lastEmitted` was already seeded by the `resolve()` call above,
-    // and subscribers receive the initial value through `subscribe()` below.
-    let osInitialized = false
-    const osUnsub = osReduced.subscribe(() => {
-        if (!osInitialized) {
-            osInitialized = true
-            return
-        }
-        dispatch(resolve())
-    })
-
-    // Async path for `<MotionConfig reducedMotion>` policy changes. The
-    // config component exposes `reducedMotion` via a property getter over
-    // its Svelte prop, so reading it inside `$effect` tracks reassignments
-    // and fires the same `dispatch` — closing the gap the legacy
-    // `derived()` impl had.
+    // Async path: `<MotionConfig reducedMotion>` is exposed via a
+    // property getter over the config component's prop, so reading it
+    // inside `$effect` tracks reassignments and fires the same `set` —
+    // closing the gap the legacy `derived()`-based impl had.
     $effect(() => {
-        // Read the policy as a tracked dependency; void it so the lint
-        // unused-expression rule doesn't fire on a deliberate touch.
+        // Void the read so the lint unused-expression rule doesn't fire
+        // on a deliberate dependency touch.
         void motionConfig?.reducedMotion
-        dispatch(resolve())
+        set(resolve())
     })
 
     // Tear down the OS subscription when the surrounding scope unmounts.
+    // Returning `osUnsub` from `$effect`'s body installs it as the
+    // cleanup; the body itself reads no signals so the effect runs once.
     $effect(() => osUnsub)
 
-    return {
-        get current() {
-            return resolve()
-        },
-        subscribe(run) {
-            subscribers.add(run)
-            run(lastEmitted)
-            return () => {
-                subscribers.delete(run)
-            }
-        }
-    }
+    return state
 }

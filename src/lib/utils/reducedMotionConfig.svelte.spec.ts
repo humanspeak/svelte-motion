@@ -34,7 +34,8 @@ const createMediaQueryList = (initialMatches: boolean) => {
             mql.matches = matches
             const event = { matches } as MediaQueryListEvent
             for (const listener of listeners) listener(event)
-        }
+        },
+        listenerCount: () => listeners.size
     }
 }
 
@@ -148,6 +149,32 @@ describe('useReducedMotionConfig', () => {
         mockedGetMotionConfig.mockReturnValue({ reducedMotion: 'user' })
         const state = inRoot(() => useReducedMotionConfig())
         expect(state.current).toBe(false)
+    })
+
+    it('releases the inner useReducedMotion subscription on unmount', () => {
+        const { mql, listenerCount } = createMediaQueryList(false)
+        vi.stubGlobal(
+            'matchMedia',
+            vi.fn(() => mql)
+        )
+        mockedGetMotionConfig.mockReturnValue({ reducedMotion: 'user' })
+
+        // Capture the inner $effect.root cleanup so we can fire the
+        // teardown explicitly mid-test (the shared `inRoot` helper hides
+        // the unmount handle behind a beforeEach cleanup list).
+        const unmount = $effect.root(() => {
+            useReducedMotionConfig()
+        })
+        cleanups.push(unmount)
+        flushSync()
+        // One listener on the underlying MediaQueryList — added by the
+        // inner useReducedMotion when the outer scope mounted.
+        expect(listenerCount()).toBe(1)
+        unmount()
+        // After unmount, the osUnsub cleanup runs, removing the subscriber
+        // entry from useReducedMotion's set, which in turn lets its own
+        // $effect cleanup detach the media listener.
+        expect(listenerCount()).toBe(0)
     })
 
     it('.subscribe fires when the MotionConfig policy changes (not only on OS changes)', () => {
