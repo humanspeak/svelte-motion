@@ -1,6 +1,10 @@
 <script lang="ts">
     import { stagger, useAnimate } from '@humanspeak/svelte-motion'
 
+    // `useAnimate` returns `[scope, animate]`. The scope attaches to a DOM
+    // subtree via `{@attach scope}` and the imperative `animate` calls
+    // resolve CSS selectors inside it. Sequence steps (and stagger across
+    // matched elements) without writing any motion components.
     const [scope, animate] = useAnimate()
 
     const items = ['Stagger', 'Sequence', 'Compose', 'Done'] as const
@@ -26,7 +30,8 @@
     }
 </script>
 
-<div class="flex min-h-[420px] flex-col items-center justify-center gap-4 p-8">
+<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
+<div class="humanspeak-demo-shell">
     <div class="controls">
         <button type="button" class="primary" onclick={run}>Animate</button>
         <button type="button" class="secondary" onclick={reset}>Reset</button>
@@ -44,6 +49,16 @@
 </div>
 
 <style>
+    .humanspeak-demo-shell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        padding: 2rem;
+        min-height: 420px;
+    }
+
     .controls {
         display: flex;
         gap: 8px;

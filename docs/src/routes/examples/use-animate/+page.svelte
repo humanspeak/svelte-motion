@@ -1,8 +1,12 @@
 <script lang="ts">
+    import { CodeReferenceV2, ExampleV2 } from '@humanspeak/docs-kit'
+    import { Crosshair, ListOrdered, Wand2 } from '@lucide/svelte'
+    import type { Snippet } from 'svelte'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import Example from '$lib/components/general/Example.svelte'
-    import UseAnimateExample from '$lib/examples/UseAnimateExample.svelte'
+    import UseAnimateDefault from '$lib/examples/use-animate/demos/Default.svelte'
+    import demoManifest from '$lib/demo-manifest.json'
+
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -20,8 +24,107 @@
         seo.ogFeatures = ['Imperative API', 'Scoped Selectors', 'Sequences', 'Auto Cleanup']
         seo.ogSlug = 'examples-use-animate'
     }
+
+    const SOURCE_URL =
+        'https://github.com/humanspeak/svelte-motion/blob/main/docs/src/lib/examples/'
+
+    type Section = {
+        figId: string
+        tag: string
+        title: { prefix?: string; accent: string; end?: string }
+        description: string
+        snippet: Snippet
+        codeSnippet?: Snippet
+        notes?: Snippet
+        mode?: 'live' | 'static'
+        barCells?: { k: string; v: string }[]
+        sourceUrl?: string
+    }
+
+    type ManifestEntry = {
+        code: string
+        lang: string
+        html?: { light: string; dark: string }
+    }
+    const manifest = demoManifest as Record<string, ManifestEntry>
+
+    const sections: Section[] = [
+        {
+            figId: 'FIG-001',
+            tag: 'HOOK',
+            title: { prefix: 'imperative ', accent: 'useAnimate', end: '.' },
+            description:
+                '`useAnimate` returns `[scope, animate]`. Attach the scope to a subtree, then call `animate(selector, props, options)` — sequences, staggers, and selector-driven targets without any `motion.*` components.',
+            snippet: defaultSection,
+            codeSnippet: defaultCode,
+            notes: defaultNotes,
+            barCells: [{ k: 'pattern', v: 'scope + animate(selector)' }],
+            sourceUrl: `${SOURCE_URL}use-animate/demos/Default.svelte`
+        }
+    ]
+
+    const pad2 = (n: number) => String(n).padStart(2, '0')
 </script>
 
-<Example title="useAnimate" file="UseAnimateExample.svelte">
-    <UseAnimateExample />
-</Example>
+{#snippet defaultSection()}
+    <UseAnimateDefault />
+{/snippet}
+{#snippet defaultNotes()}
+    <ul>
+        <li>
+            <Crosshair />
+            <span>
+                Attach the scope to any node with <code>{'{@attach scope}'}</code>. Now selectors in
+                <code>animate('li', …)</code> resolve only within that subtree — the same selector elsewhere
+                on the page is ignored. Auto cleanup on destroy.
+            </span>
+        </li>
+        <li>
+            <ListOrdered />
+            <span>
+                Pass <code>animate</code> an array of <code>[selector, props, options]</code> tuples
+                to sequence them. Each step starts when the previous finishes unless you override
+                with <code>at: '-0.2'</code> (start 200ms before previous ends) or
+                <code>at: 0</code> (parallel).
+            </span>
+        </li>
+        <li>
+            <Wand2 />
+            <span>
+                <code>stagger(0.08)</code> in the delay slot fans the animation across matched
+                elements — first <code>li</code> starts at 0, next at 80ms, and so on. Same hook handles
+                target-specific beats like the button's pop.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet defaultCode()}
+    <CodeReferenceV2
+        samples={[
+            {
+                id: 'use-animate-default',
+                label: 'Default.svelte',
+                ...manifest['use-animate/demos/Default.svelte']
+            }
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#each sections as section, i (section.figId)}
+    <ExampleV2
+        figId={section.figId}
+        tag={section.tag}
+        title={section.title}
+        description={section.description}
+        mode={section.mode ?? 'live'}
+        sheetLabel="SHEET {pad2(i + 1)} / {pad2(sections.length)}"
+        barCells={section.barCells}
+        sourceUrl={section.sourceUrl}
+        codeSnippet={section.codeSnippet}
+        codeLabel="show code"
+        notes={section.notes}
+    >
+        {@render section.snippet()}
+    </ExampleV2>
+{/each}
