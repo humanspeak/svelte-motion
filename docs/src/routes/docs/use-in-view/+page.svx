@@ -6,7 +6,7 @@ description: 'Track whether an element is in the viewport from a Svelte readable
 <script>
   import { useInView } from '@humanspeak/svelte-motion';
   import Example from '$lib/components/general/Example.svelte';
-  import UseInViewExample from '$lib/examples/UseInViewExample.svelte';
+  import UseInViewExample from '$lib/examples/use-in-view/demos/Default.svelte';
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()

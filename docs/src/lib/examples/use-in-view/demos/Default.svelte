@@ -1,6 +1,10 @@
 <script lang="ts">
     import { useInView } from '@humanspeak/svelte-motion'
 
+    // `useInView(getter, options)` watches the resolved element with an
+    // IntersectionObserver and exposes a reactive boolean. `once: true`
+    // latches to `true` the first time it sees the element and never
+    // flips back — perfect for one-shot enter animations.
     let scrollContainer: HTMLDivElement | undefined = $state()
     let topEl: HTMLDivElement | undefined = $state()
     let bottomEl: HTMLDivElement | undefined = $state()
@@ -12,7 +16,8 @@
     })
 </script>
 
-<div class="flex min-h-[420px] flex-col items-center justify-center gap-4 p-8">
+<!-- HUMANSPEAK: docs-kit positioning shell — stripped from the published code. -->
+<div class="humanspeak-demo-shell">
     <p class="text-sm text-muted-foreground">Scroll the panel below.</p>
     <div bind:this={scrollContainer} class="frame">
         <div bind:this={topEl} class="card top" data-in-view={$topInView}>
@@ -26,6 +31,16 @@
 </div>
 
 <style>
+    .humanspeak-demo-shell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        padding: 2rem;
+        min-height: 420px;
+    }
+
     .frame {
         width: 320px;
         height: 280px;
