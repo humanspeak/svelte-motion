@@ -40,3 +40,4 @@ docs/src/lib/sitemap-manifest.json
 .playwright-mcp/
 mprocs.log
 SEO.md
+.claude/scheduled_tasks.lock
