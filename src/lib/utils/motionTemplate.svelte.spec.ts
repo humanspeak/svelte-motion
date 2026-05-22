@@ -1,20 +1,24 @@
-import { isMotionValue } from 'motion-dom'
+import { frame, isMotionValue } from 'motion-dom'
 import { get, writable } from 'svelte/store'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMotionTemplate } from './motionTemplate.svelte.js'
 import { useMotionValue } from './motionValue.svelte.js'
 
 /**
- * `useMotionTemplate` now returns an augmented motion-dom
- * `MotionValue<string>`. These tests cover the public surface (identity,
- * `.current`, `.subscribe`), recompute on input emit, mixed MotionValue +
- * Svelte readable sources, edge cases (no interpolations, single static
- * string), and SSR safety.
+ * `useMotionTemplate` delegates to motion-dom's `transformValue` — input
+ * recomposes propagate on the next render frame, so async tests gate on
+ * `frame.render(...)`.
  */
+const nextFrame = () =>
+    new Promise<void>((resolve) => {
+        frame.render(() => resolve())
+    })
+
 describe('utils/motionTemplate - useMotionTemplate', () => {
     let cleanups: VoidFunction[]
 
     beforeEach(() => {
+        vi.useRealTimers()
         cleanups = []
     })
 
@@ -49,34 +53,37 @@ describe('utils/motionTemplate - useMotionTemplate', () => {
         })
     })
 
-    it('recomposes when a motion-value input emits', () => {
-        inRoot(() => {
+    it('recomposes when a motion-value input emits', async () => {
+        const ctx = inRoot(() => {
             const blur = useMotionValue(0)
             const filter = useMotionTemplate`blur(${blur}px)`
             blur.set(8)
-            expect(filter.current).toBe('blur(8px)')
+            return { blur, filter }
         })
+        await nextFrame()
+        expect(ctx.filter.current).toBe('blur(8px)')
     })
 
-    it('recomposes when a Svelte-readable input emits', () => {
-        inRoot(() => {
-            const w = writable<number>(0)
-            const out = useMotionTemplate`hue(${w})`
-            w.set(120)
-            expect(get(out)).toBe('hue(120)')
-        })
-    })
-
-    it('handles multiple mixed inputs', () => {
-        inRoot(() => {
+    it('handles multiple motion-value inputs', async () => {
+        const ctx = inRoot(() => {
             const x = useMotionValue(10)
-            const y = writable<string>('20%')
-            const out = useMotionTemplate`translate(${x}px, ${y})`
-            expect(out.current).toBe('translate(10px, 20%)')
+            const y = useMotionValue(20)
+            const result = useMotionTemplate`translate(${x}px, ${y}px)`
+            expect(result.current).toBe('translate(10px, 20px)')
             x.set(50)
-            expect(out.current).toBe('translate(50px, 20%)')
-            y.set('30%')
-            expect(out.current).toBe('translate(50px, 30%)')
+            return { x, y, result }
+        })
+        await nextFrame()
+        expect(ctx.result.current).toBe('translate(50px, 20px)')
+        ctx.y.set(30)
+        await nextFrame()
+        expect(ctx.result.current).toBe('translate(50px, 30px)')
+    })
+
+    it('accepts plain number and string literals as slots', () => {
+        inRoot(() => {
+            const out = useMotionTemplate`px(${42})`
+            expect(out.current).toBe('px(42)')
         })
     })
 
@@ -88,7 +95,28 @@ describe('utils/motionTemplate - useMotionTemplate', () => {
         })
     })
 
-    it('SSR fallback: returns a static composed motion value', () => {
+    it('Svelte readable slot is sampled inline (not auto-tracked)', async () => {
+        // Readables don't participate in collectMotionValues, but they ARE
+        // sampled via `get(...)` every time a recompose fires (i.e. when an
+        // adjacent motion value emits). Verify the readable's latest value is
+        // captured.
+        const ctx = inRoot(() => {
+            const x = useMotionValue(0)
+            const w = writable<string>('px')
+            const result = useMotionTemplate`size(${x}${w})`
+            expect(result.current).toBe('size(0px)')
+            // Update both — but only the motion-value emit triggers a
+            // recompose. The readable's new value is sampled during that
+            // recompose.
+            w.set('em')
+            x.set(10)
+            return { x, w, result }
+        })
+        await nextFrame()
+        expect(ctx.result.current).toBe('size(10em)')
+    })
+
+    it('SSR fallback: composes the seed and returns a static motion value', () => {
         vi.stubGlobal('window', undefined)
         const w = writable<number>(7)
         const out = useMotionTemplate`px(${w})`

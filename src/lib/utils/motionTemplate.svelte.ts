@@ -1,57 +1,49 @@
-import { motionValue } from 'motion-dom'
+import { isMotionValue, transformValue } from 'motion-dom'
 import { type Readable } from 'svelte/store'
 import {
     augmentMotionValue,
     sampleSource,
-    subscribeAfterInitial,
     type AugmentedMotionValue
 } from './augmentMotionValue.svelte.js'
 
 /**
  * Input to {@link useMotionTemplate}'s interpolation slots: a motion-dom
- * `MotionValue` (via `useMotionValue`, `useSpring`, `useTransform`, etc.) or
- * a Svelte readable. Both expose `.subscribe(run)` with matching semantics,
- * so the hook consumes them interchangeably.
+ * `MotionValue`, a Svelte readable, or a plain `number` / `string` literal.
+ * Mirrors framer-motion's `useMotionTemplate` signature.
  */
-export type MotionTemplateInput = AugmentedMotionValue<number | string> | Readable<number | string>
-
-/**
- * Computes the composed template string from the static parts and the
- * latest interpolated values. Used both for the initial seed and on every
- * input emit.
- */
-const composeTemplate = (
-    strings: TemplateStringsArray,
-    values: ReadonlyArray<number | string>
-): string => {
-    let result = ''
-    for (let i = 0; i < strings.length; i++) {
-        result += strings[i] ?? ''
-        if (i < values.length) result += String(values[i])
-    }
-    return result
-}
+export type MotionTemplateInput =
+    | AugmentedMotionValue<number | string>
+    | Readable<number | string>
+    | number
+    | string
 
 /**
  * Tagged template literal that builds an augmented `MotionValue<string>`
- * from interpolated motion values (or Svelte readables). Each interpolation
- * slot subscribes to its input; whenever any input emits, the template is
- * recomposed and written to the result.
+ * from interpolated motion values, Svelte readables, and plain literals.
  *
- * Returned value is a real motion-dom `MotionValue` augmented with a
- * `$state`-backed `.current` getter and a Svelte readable `.subscribe`
- * shim — it composes with the rest of the Tier 2 surface and reads
- * reactively in Svelte 5 scopes.
+ * Mirrors framer-motion 1:1: returns a real motion-dom `MotionValue<string>`
+ * (via `transformValue`) that auto-tracks every `MotionValue.get()` called
+ * during template composition. Whenever any tracked input emits, the
+ * composer reruns and writes the new string into the result value.
  *
- * Lifecycle: must be called during component initialization. All input
- * subscriptions and the underlying motion value are torn down when the
- * surrounding `$effect` scope unmounts.
+ * Svelte-readable slots are sampled via `svelte/store`'s `get()` inside the
+ * composer so they re-emit when adjacent motion values trigger a recompute.
+ * Plain `number` / `string` slots are stringified inline.
  *
- * SSR-safe: returns a static motion value composed from the initial input
- * snapshots, with no subscriptions and no `$effect`.
+ * The result is augmented with a `$state`-backed `.current` getter and a
+ * Svelte readable `.subscribe` shim so it composes with the rest of the
+ * Tier 2 surface and reads reactively in Svelte 5 scopes.
+ *
+ * Lifecycle: must be called during component initialization. motion-dom
+ * cleans up the change-subscriptions when the result `MotionValue` is
+ * destroyed; we wire that destroy to the surrounding `$effect`.
+ *
+ * SSR-safe: motion-dom's `transformValue` works without DOM access (no
+ * timers, no listeners). On the server the result is a static augmented
+ * motion value with no `$effect` registered.
  *
  * @param strings Static template string parts (supplied by the tagged-template syntax).
- * @param values Interpolated motion values or Svelte readables.
+ * @param values Interpolated motion values, Svelte readables, or literals.
  * @returns An `AugmentedMotionValue<string>` with the composed template.
  *
  * @example
@@ -73,30 +65,32 @@ export const useMotionTemplate = (
     strings: TemplateStringsArray,
     ...values: MotionTemplateInput[]
 ): AugmentedMotionValue<string> => {
-    const seedSnapshots = values.map((v) => sampleSource(v))
-    const initial = composeTemplate(strings, seedSnapshots)
-    const result = motionValue<string>(initial)
+    const numFragments = strings.length
 
-    // SSR / no inputs: return a static augmented motion value. With no
-    // inputs the template never changes; with no window we skip the
-    // subscription wiring (and the $effect that would otherwise need a
-    // reactive scope).
-    if (values.length === 0 || typeof window === 'undefined') {
-        return augmentMotionValue(result)
+    const buildValue = () => {
+        let output = ''
+        for (let i = 0; i < numFragments; i++) {
+            output += strings[i] ?? ''
+            if (i >= values.length) continue
+            const value = values[i]
+            // motion-dom's collectMotionValues session inside transformValue
+            // auto-discovers MotionValue deps via `.get()`. Readables don't
+            // participate — they're sampled inline via get(); they only
+            // re-emit if some adjacent motion value triggers a recompute.
+            if (isMotionValue(value)) {
+                output += String(value.get())
+            } else if (value && typeof value === 'object' && 'subscribe' in (value as object)) {
+                output += String(sampleSource(value as Readable<number | string>))
+            } else {
+                output += String(value)
+            }
+        }
+        return output
     }
 
-    const latest = [...seedSnapshots] as Array<number | string>
-    const unsubs = values.map((input, idx) =>
-        subscribeAfterInitial(input, (v) => {
-            latest[idx] = v
-            result.set(composeTemplate(strings, latest))
-        })
-    )
-
-    $effect(() => () => {
-        for (const off of unsubs) off()
-        result.destroy()
-    })
-
+    const result = transformValue<string>(buildValue)
+    if (typeof window !== 'undefined') {
+        $effect(() => () => result.destroy())
+    }
     return augmentMotionValue(result)
 }
