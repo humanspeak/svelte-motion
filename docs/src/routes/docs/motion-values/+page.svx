@@ -55,14 +55,14 @@ This library is mid-migration toward returning real `MotionValue`s with `.curren
 | `useSpring`                | `MotionValue` + `.current` + `.subscribe` shim | **`spring.current`** (preferred) or `$spring` |
 | `useMotionValue`           | `MotionValue` + `.current` + `.subscribe` shim | **`mv.current`** (preferred) or `$mv` |
 | `useTransform`             | `MotionValue` + `.current` + `.subscribe` shim | **`transformed.current`** (preferred) or `$transformed` |
-| `useScroll`                | `{ scrollX, scrollY, … }` of readables | `$scrollY`                  |
+| `useScroll`                | `{ scrollX, scrollY, … }` of augmented motion values | **`scrollY.current`** (preferred) or `$scrollY` |
 | `useTime`                  | Svelte readable                        | `$time`                     |
 | `useVelocity`              | Svelte readable                        | `$velocity`                 |
 | `useMotionTemplate`        | Svelte readable                        | `$composed`                 |
 
-The remaining Tier 2 hooks (`useScroll`, `useTime`, `useVelocity`, `useMotionTemplate`) will migrate together so composition stays coherent. Until then, the `.subscribe()` shim on `useSpring`, `useMotionValue`, and `useTransform` keeps everything interoperable — pass any of them to `useVelocity` or chain `useTransform` calls and the old store-consumer path still works.
+The remaining Tier 2 hooks (`useTime`, `useVelocity`, `useMotionTemplate`) will migrate together so composition stays coherent. Until then, the `.subscribe()` shim on `useSpring`, `useMotionValue`, `useTransform`, and `useScroll` keeps everything interoperable — pass any of them to `useVelocity` or chain `useTransform` calls and the old store-consumer path still works.
 
-For new code today: use `.current` on springs, motion values, and transforms, and `$store` on everything else.
+For new code today: use `.current` on springs, motion values, transforms, and scroll values, and `$store` on everything else.
 
 ### Composition
 

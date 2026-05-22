@@ -50,14 +50,16 @@ description: "Create scroll-linked animations like progress indicators and paral
 </script>
 ```
 
-`useScroll` returns four reactive Svelte stores:
+`useScroll` returns four motion values augmented with a `$state`-backed `.current` getter and a Svelte readable `.subscribe` shim:
 
-| Store | Description |
+| Value | Description |
 |-------|-------------|
 | `scrollX` | Horizontal scroll position in pixels |
 | `scrollY` | Vertical scroll position in pixels |
 | `scrollXProgress` | Horizontal scroll progress between `0` and `1` |
 | `scrollYProgress` | Vertical scroll progress between `0` and `1` |
+
+Read them with `scrollY.current` in templates and `$derived` / `$effect`, with `scrollY.get()` in imperative code, or with `$scrollY` for store-style consumers. They compose with `useTransform`, `useSpring`, and every other motion-value-aware hook.
 
 ### Page scroll
 
@@ -99,7 +101,7 @@ Track the scroll position of a specific scrollable element by passing it as the 
   <!-- tall content -->
 </div>
 
-<div>Scroll progress: {$scrollYProgress}</div>
+<div>Scroll progress: {scrollYProgress.current}</div>
 ```
 
 ### Element position
@@ -116,7 +118,7 @@ Track a target element's position as it scrolls within its container (or the vie
 </script>
 
 <div bind:this={targetEl}>
-  <div style="opacity: {$scrollYProgress}">
+  <div style="opacity: {scrollYProgress.current}">
     Fades in as you scroll to this element
   </div>
 </div>
@@ -175,16 +177,16 @@ These properties don't trigger layout or paint, so the browser can animate them 
 
 ```ts
 useScroll(options?: UseScrollOptions): {
-  scrollX: Readable<number>
-  scrollY: Readable<number>
-  scrollXProgress: Readable<number>
-  scrollYProgress: Readable<number>
+  scrollX: AugmentedMotionValue<number>
+  scrollY: AugmentedMotionValue<number>
+  scrollXProgress: AugmentedMotionValue<number>
+  scrollYProgress: AugmentedMotionValue<number>
 }
 ```
 
 ### Returns
 
-An object with four Svelte `Readable<number>` stores.
+An object with four `AugmentedMotionValue<number>`s — real motion-dom `MotionValue`s with `.current` getter, `.subscribe` shim, and all standard motion-value methods (`get`, `getVelocity`, `on`, etc.).
 
 ## See also
 
