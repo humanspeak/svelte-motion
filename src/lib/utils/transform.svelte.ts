@@ -183,6 +183,10 @@ export type TransformOutputMap<O> = { [key: string]: O[] }
  *
  * @see https://motion.dev/docs/react-use-transform
  */
+// Project convention: exported helpers use arrow syntax. `useTransform` is a
+// documented exception — the five-form public API is expressed via
+// TypeScript overload signatures, which require `function` declarations
+// (overload syntax doesn't work on `const` arrow assignments).
 export function useTransform<O>(
     source: TransformSource<number>,
     input: number[],
@@ -260,6 +264,7 @@ export function useTransform<O>(
         const outputMap = outputOrOutputMap as TransformOutputMap<unknown>
         const keys = Object.keys(outputMap)
         const result: { [key: string]: AugmentedMotionValue<O> } = {}
+        const inners: MotionValue<unknown>[] = []
         for (const key of keys) {
             const inner = mapValue<unknown>(
                 numericSource,
@@ -267,10 +272,15 @@ export function useTransform<O>(
                 outputMap[key],
                 options as TransformOptions<unknown> | undefined
             )
-            $effect(() => () => inner.destroy())
+            inners.push(inner)
             result[key] = augmentMotionValue(inner) as unknown as AugmentedMotionValue<O>
         }
-        $effect(() => () => disposeBridge())
+        // One cleanup effect for all per-key MVs plus the shared bridge —
+        // saves N effect nodes vs. registering one per key.
+        $effect(() => () => {
+            for (const inner of inners) inner.destroy()
+            disposeBridge()
+        })
         return result
     }
 

@@ -72,6 +72,9 @@ describe('utils/motionValue - useMotionValue', () => {
             mv.set(2)
             expect(seen).toEqual([0, 1, 2])
             off()
+            // After unsubscribe, subsequent writes must not fire the callback.
+            mv.set(3)
+            expect(seen).toEqual([0, 1, 2])
         })
     })
 

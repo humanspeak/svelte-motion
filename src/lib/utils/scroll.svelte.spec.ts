@@ -1,4 +1,4 @@
-import { isMotionValue, microtask } from 'motion-dom'
+import { isMotionValue } from 'motion-dom'
 import { flushSync } from 'svelte'
 import { get } from 'svelte/store'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -60,10 +60,6 @@ const { useScroll } = await import('./scroll.svelte.js')
 const drainMicrotasks = async (ticks = 4) => {
     for (let i = 0; i < ticks; i++) await Promise.resolve()
 }
-
-// Reference `microtask` so unused-imports doesn't strip it; useful for
-// future tests that need to assert against the batcher directly.
-void microtask
 
 describe('utils/scroll - useScroll', () => {
     let cleanups: VoidFunction[]
@@ -152,8 +148,7 @@ describe('utils/scroll - useScroll', () => {
     it('writes scroll().info into the four motion values', async () => {
         const ctx = inRoot(() => useScroll())
         flushSync()
-        await Promise.resolve()
-        await Promise.resolve()
+        await drainMicrotasks()
         const [cb] = scrollMock.mock.calls[0]!
         cb(0.5, {
             x: { current: 100, progress: 0.5 },

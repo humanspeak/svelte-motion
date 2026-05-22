@@ -22,11 +22,9 @@ const sharedTimelines = new SvelteMap<string, SharedTimeline>()
 
 // Clear shared timelines on HMR dispose to avoid stale entries across hot
 // reloads.
-if (
-    import.meta &&
-    (import.meta as unknown as { hot?: { dispose: (cb: () => void) => void } }).hot
-) {
-    ;(import.meta as unknown as { hot: { dispose: (cb: () => void) => void } }).hot.dispose(() => {
+const hot = (import.meta as unknown as { hot?: { dispose: (cb: () => void) => void } }).hot
+if (hot) {
+    hot.dispose(() => {
         for (const t of sharedTimelines.values()) {
             t.cancel()
             t.base.destroy()

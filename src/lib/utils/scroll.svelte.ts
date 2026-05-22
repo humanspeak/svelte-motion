@@ -34,6 +34,12 @@ type ScrollInfo = {
  * A scroll offset edge defined as a string (e.g. `"start"`, `"end"`,
  * `"center"`) or a number (0–1 progress). Each offset entry is a pair of
  * `[target, container]`.
+ *
+ * Intentionally looser than motion's internal `ScrollOffset` type — that
+ * uses template-literal types (`` `${Edge} ${Edge}` ``) we don't want to
+ * surface to consumers. The runtime call paths through `scroll(...)` cast
+ * `options.offset as never` to bridge the two; safe because every shape our
+ * type allows is structurally a member of motion's union.
  */
 type ScrollOffset = Array<[number | string, number | string]> | string[]
 
