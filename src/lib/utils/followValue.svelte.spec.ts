@@ -1,8 +1,27 @@
-import { isMotionValue, motionValue } from 'motion-dom'
+import { frame, isMotionValue, motionValue } from 'motion-dom'
 import { flushSync } from 'svelte'
 import { get, writable } from 'svelte/store'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useFollowValue } from './followValue.svelte.js'
+
+/** Gate the next assertion on motion-dom's render tick — `attachFollow`
+ *  schedules updates via `frame.update`, so we need to wait for the
+ *  scheduler to flush before reading `.get()`. */
+const nextFrame = () =>
+    new Promise<void>((resolve) => {
+        frame.render(() => resolve())
+    })
+
+/** Poll up to `max` frames until `predicate` is satisfied. Used to wait
+ *  out the subscribe → animation-kickoff hop that lives between
+ *  `source.set(...)` and the follower's first updated value. */
+const waitFor = async (predicate: () => boolean, max = 20): Promise<void> => {
+    for (let i = 0; i < max; i++) {
+        if (predicate()) return
+        await nextFrame()
+    }
+    throw new Error('waitFor: predicate never became truthy')
+}
 
 /**
  * `useFollowValue` is the generalised follow hook that `useSpring` wraps with
@@ -151,15 +170,30 @@ describe('utils/followValue - useFollowValue', () => {
         })
     })
 
-    it('.destroy() tears down listeners and stops following', () => {
-        inRoot(() => {
+    it('.destroy() tears down listeners and stops following', async () => {
+        // Use a zero-duration tween so the follow lands deterministically
+        // on the next render frame. A default spring would update
+        // asynchronously and the post-destroy assertion could pass even
+        // if the follow were still attached, making the test a false
+        // positive (CR #376).
+        const ctx = inRoot(() => {
             const src = motionValue(0)
-            const v = useFollowValue(src)
-            expect(v.get()).toBe(0)
-            v.destroy()
-            src.set(100)
-            // Follow is detached — the result should not move.
-            expect(v.get()).toBe(0)
+            const v = useFollowValue(src, { type: 'tween', duration: 0 })
+            return { src, v }
         })
+        expect(ctx.v.get()).toBe(0)
+
+        // Prove the follow is wired before tearing it down.
+        ctx.src.set(100)
+        await waitFor(() => ctx.v.get() === 100)
+        expect(ctx.v.get()).toBe(100)
+
+        // Tear down and confirm further source changes don't propagate.
+        // Pump a handful of frames so a still-attached animation would
+        // have ample opportunity to update.
+        ctx.v.destroy()
+        ctx.src.set(200)
+        for (let i = 0; i < 5; i++) await nextFrame()
+        expect(ctx.v.get()).toBe(100)
     })
 })
