@@ -51,7 +51,7 @@ reviews:
     path_filters: []
     path_instructions:
         - path: src/lib/utils/**/*.ts
-          instructions: Ensure all exported functions use arrow function syntax (const fn = () => {}). All functions must have comprehensive JSDoc comments with @param, @returns, and @example tags. Verify type safety and check for potential ReDoS vulnerabilities in regex patterns.
+          instructions: Ensure all exported functions use arrow function syntax (const fn = () => {}), with one exception — overloaded functions must use the `function` declaration form because TypeScript forbids arrow syntax for overload signatures. This exception applies to hooks like useFollowValue, useSpring, and useCycle, which carry multiple call signatures. All functions must have comprehensive JSDoc comments with @param, @returns, and @example tags. Verify type safety and check for potential ReDoS vulnerabilities in regex patterns.
         - path: src/lib/**/*.svelte
           instructions: Review Svelte 5 runes usage ($state, $derived, $effect). Ensure proper cleanup in $effect blocks. Check for memory leaks and performance issues. Verify SSR compatibility.
         - path: '**/*.spec.ts'
