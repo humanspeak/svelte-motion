@@ -3,13 +3,16 @@
 import {
     isMotionValue,
     mapValue,
-    motionValue,
     transformValue,
     type MotionValue,
     type TransformOptions
 } from 'motion-dom'
-import { get, type Readable } from 'svelte/store'
-import { augmentMotionValue, type AugmentedMotionValue } from './augmentMotionValue.svelte.js'
+import { type Readable } from 'svelte/store'
+import {
+    augmentMotionValue,
+    bridgeReadableToMotionValue,
+    type AugmentedMotionValue
+} from './augmentMotionValue.svelte.js'
 
 export type TransformValues = Partial<{
     x: number
@@ -118,39 +121,9 @@ export type AnyMotionValue<T> = MotionValue<T> | AugmentedMotionValue<T>
 export type TransformSource<T> = AnyMotionValue<T> | Readable<T>
 
 /**
- * Bridges a `Readable<T>` into a motion-dom `MotionValue<T>` that mirrors the
- * readable's emissions. Returns the bridge value plus a `dispose` cleanup that
- * tears down the subscription and destroys the bridge.
- *
- * The bridge skips the readable's synchronous initial emit (the value is
- * already seeded from `get(source)`) so motion-dom's change-bus doesn't fire
- * a spurious event on attach.
- */
-const bridgeReadable = <T>(
-    source: Readable<T>
-): { value: MotionValue<T>; dispose: VoidFunction } => {
-    const bridge = motionValue<T>(get(source) as T)
-    let seenInitial = false
-    const unsub = source.subscribe((v) => {
-        if (!seenInitial) {
-            seenInitial = true
-            return
-        }
-        bridge.set(v)
-    })
-    return {
-        value: bridge,
-        dispose: () => {
-            unsub()
-            bridge.destroy()
-        }
-    }
-}
-
-/**
  * Normalizes a `TransformSource<T>` into a `MotionValue<T>`. Returns the
- * source as-is for any motion-value input (no bridge), or a fresh bridge
- * `MotionValue` plus a cleanup for `Readable` inputs. The cast at the
+ * source as-is for any motion-value input (no bridge), or a bridge
+ * `MotionValue` + cleanup for `Readable` inputs. The cast at the
  * motion-value branch is safe — both `MotionValue` and `AugmentedMotionValue`
  * are the same instance at runtime.
  */
@@ -160,7 +133,7 @@ const toMotionValue = <T>(
     if (isMotionValue(source)) {
         return { value: source as unknown as MotionValue<T>, dispose: () => undefined }
     }
-    return bridgeReadable(source as Readable<T>)
+    return bridgeReadableToMotionValue<T>(source as Readable<T>)
 }
 
 /**

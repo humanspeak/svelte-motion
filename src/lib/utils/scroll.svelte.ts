@@ -5,10 +5,11 @@ import {
     motionValue,
     supportsScrollTimeline,
     supportsViewTimeline,
+    type AccelerateConfig,
     type AnimationPlaybackControls
 } from 'motion-dom'
 import { augmentMotionValue, type AugmentedMotionValue } from './augmentMotionValue.svelte.js'
-import { resolveElement, type ElementOrGetter } from './dom.js'
+import { isRefPending, resolveElement, type ElementOrGetter } from './dom.js'
 
 /**
  * Axis-level scroll information returned by the `scroll()` callback.
@@ -187,36 +188,14 @@ export type UseScrollReturn = {
 }
 
 /**
- * Tests whether an `ElementOrGetter` is currently unresolved — defined as a
- * getter, but the getter returns falsy. Lets the microtask-defer loop wait
- * for refs to hydrate post-mount.
- */
-const isRefPending = (ref?: ElementOrGetter): boolean => {
-    if (!ref) return false
-    // Direct elements are never "pending" — they were already resolved at
-    // call time.
-    if (typeof ref !== 'function') return false
-    return !ref()
-}
-
-/**
  * Build the AccelerateConfig for a progress motion value driven by a native
  * scroll-timeline / view-timeline animation. Mirrors framer-motion's
  * `makeAccelerateConfig` 1:1: the `factory` defers `scroll()` until refs
  * hydrate via `microtask.read`, then attaches the animation; the `times` /
  * `keyframes` / `ease` / `duration` describe the 0→1 linear mapping.
  */
-const makeAccelerateConfig = (
-    axis: 'x' | 'y',
-    options: UseScrollOptions
-): {
-    factory: (animation: AnimationPlaybackControls) => VoidFunction
-    times: number[]
-    keyframes: number[]
-    ease: (v: number) => number
-    duration: number
-} => ({
-    factory: (animation) => {
+const makeAccelerateConfig = (axis: 'x' | 'y', options: UseScrollOptions): AccelerateConfig => ({
+    factory: (animation: AnimationPlaybackControls) => {
         let cleanup: VoidFunction | undefined
         const start = () => {
             if (isRefPending(options.container) || isRefPending(options.target)) {
@@ -309,23 +288,14 @@ export const useScroll = (options: UseScrollOptions = {}): UseScrollReturn => {
         }
     }
 
-    // WAAPI acceleration for the *Progress motion values when the browser
-    // supports it. The non-progress scrollX/scrollY MVs need pixel offsets
-    // which native timelines don't expose, so they always go through the
-    // JS-driven scroll() callback below.
+    // The *Progress MVs accelerate to the compositor thread when the browser
+    // supports CSS scroll/view-timelines; the non-progress scrollX/scrollY
+    // MVs always need the JS callback for absolute pixel offsets.
     if (canAccelerateScroll(options.target, options.offset)) {
-        ;(
-            scrollXProgress as unknown as { accelerate: ReturnType<typeof makeAccelerateConfig> }
-        ).accelerate = makeAccelerateConfig('x', options)
-        ;(
-            scrollYProgress as unknown as { accelerate: ReturnType<typeof makeAccelerateConfig> }
-        ).accelerate = makeAccelerateConfig('y', options)
+        scrollXProgress.accelerate = makeAccelerateConfig('x', options)
+        scrollYProgress.accelerate = makeAccelerateConfig('y', options)
     }
 
-    // JS-driven scroll() observer. Provides absolute pixel offsets and is
-    // the fallback when no acceleration is supported. Even when the
-    // progress values are accelerated, the non-progress values still need
-    // this path.
     let cleanup: VoidFunction | undefined
     const start = () => {
         if (isRefPending(options.container) || isRefPending(options.target)) {

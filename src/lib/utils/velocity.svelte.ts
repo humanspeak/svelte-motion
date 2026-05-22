@@ -1,6 +1,10 @@
-import { cancelFrame, frame, isMotionValue, motionValue } from 'motion-dom'
+import { cancelFrame, frame, isMotionValue, motionValue, type MotionValue } from 'motion-dom'
 import { type Readable } from 'svelte/store'
-import { augmentMotionValue, type AugmentedMotionValue } from './augmentMotionValue.svelte.js'
+import {
+    augmentMotionValue,
+    bridgeReadableToMotionValue,
+    type AugmentedMotionValue
+} from './augmentMotionValue.svelte.js'
 
 /**
  * Source for {@link useVelocity}: a motion-dom `MotionValue` or a Svelte
@@ -48,18 +52,18 @@ const parseNumeric = (v: number | string): number => {
  * @see https://motion.dev/docs/react-use-velocity
  */
 export const useVelocity = (source: VelocitySource): AugmentedMotionValue<number> => {
-    // Bridge Svelte readables to a MotionValue so motion-dom's getVelocity()
-    // can track per-frame deltas + timestamps natively. MotionValue sources
-    // pass through unchanged.
-    let tracker: ReturnType<typeof motionValue<number>>
-    let unsubBridge: VoidFunction | undefined
+    // Bridge Svelte readables into a MotionValue so motion-dom's getVelocity()
+    // tracks per-frame deltas natively. MotionValue sources pass through
+    // unchanged — caller owns their destroy lifecycle.
+    let tracker: MotionValue<number>
+    let disposeBridge: VoidFunction | undefined
 
     if (isMotionValue(source)) {
-        tracker = source as unknown as ReturnType<typeof motionValue<number>>
+        tracker = source as unknown as MotionValue<number>
     } else if (typeof window !== 'undefined') {
-        const bridge = motionValue<number>(0)
-        unsubBridge = source.subscribe((v) => bridge.set(parseNumeric(v)))
-        tracker = bridge
+        const bridge = bridgeReadableToMotionValue<number | string, number>(source, parseNumeric)
+        tracker = bridge.value
+        disposeBridge = bridge.dispose
     } else {
         tracker = motionValue<number>(0)
     }
@@ -74,25 +78,19 @@ export const useVelocity = (source: VelocitySource): AugmentedMotionValue<number
     const updateVelocity = () => {
         const latest = tracker.getVelocity()
         result.set(latest)
-        // If we still have velocity, schedule another frame to keep tracking
-        // until things settle. motion-dom's frame loop dedupes same-frame
-        // schedules via a Set, so spamming this is safe.
         if (latest) frame.update(updateVelocity)
     }
 
     const unsubChange = tracker.on('change', () => {
-        // false = no keepAlive, true = run at end of current frame if we're
-        // already in one. Matches React framer-motion's useVelocity.
+        // keepAlive: false, immediate: true — run at end of current frame if
+        // we're already in one. Matches React framer-motion's useVelocity.
         frame.update(updateVelocity, false, true)
     })
 
     $effect(() => () => {
         unsubChange()
-        unsubBridge?.()
         cancelFrame(updateVelocity)
-        // Only destroy the bridge tracker (we own it). MotionValue sources
-        // are caller-owned.
-        if (unsubBridge) tracker.destroy()
+        disposeBridge?.()
         result.destroy()
     })
 

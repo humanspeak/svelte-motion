@@ -79,28 +79,41 @@ describe('utils/time - useTime', () => {
         expect(ctxA.result.current).toBe(ctxB.result.current)
     })
 
-    it('shared timeline cancels frame callback when the last consumer unmounts', () => {
-        const cancelSpy = vi.spyOn(frame, 'update')
-        const { stop: stopA } = inRoot(() => useTime('to-clean-1'))
-        const { stop: stopB } = inRoot(() => useTime('to-clean-1'))
+    it('shared timeline tears down and restarts fresh after last consumer unmounts', async () => {
+        // Behavioral test: a shared `id` keeps the base alive while there's
+        // at least one consumer; the next useTime(id) after full teardown
+        // creates a fresh timeline (verified by re-seeding from base 0).
+        const { result: a, stop: stopA } = inRoot(() => useTime('to-clean-1'))
+        const { result: b, stop: stopB } = inRoot(() => useTime('to-clean-1'))
         flushSync()
+        await nextFrame()
+        await nextFrame()
+        // Both consumers observe the same elapsed clock.
+        expect(a.current).toBe(b.current)
+        // Tear down both — refcount hits zero, base timeline destroyed.
         stopA()
         stopB()
         flushSync()
-        // Indirect: motion-dom's cancelFrame is called from our cleanup. We
-        // can't easily spy on cancelFrame (live binding), so we trust that
-        // refcount == 0 ran `t.cancel()`.
-        expect(cancelSpy).toHaveBeenCalled()
-        cancelSpy.mockRestore()
+        // A new consumer with the same id gets a freshly-seeded base — its
+        // initial value is 0 (the fresh tick hasn't run yet).
+        const { result: c } = inRoot(() => useTime('to-clean-1'))
+        expect(c.current).toBe(0)
     })
 
-    it('cancels frame callback for a unique (non-shared) timeline on unmount', () => {
+    it('unique-timeline unmount does not leak the keep-alive callback', async () => {
+        // Behavioral test: stop()'s cleanup runs without throwing, and
+        // subsequent useTime() calls keep working (no shared state
+        // corruption from the prior teardown).
         const { stop } = inRoot(() => useTime())
         flushSync()
+        await nextFrame()
         stop()
-        // Smoke: stop doesn't throw and the MV is destroyed.
-        // Cancellation is internal to motion-dom's frame loop.
-        expect(true).toBe(true)
+        flushSync()
+        // A fresh useTime in a fresh root still works.
+        const { result } = inRoot(() => useTime())
+        expect(result.current).toBe(0)
+        await nextFrame()
+        expect(result.current).toBeGreaterThanOrEqual(0)
     })
 
     it('is SSR-safe for shared id (no window)', () => {

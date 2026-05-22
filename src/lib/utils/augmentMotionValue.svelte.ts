@@ -1,4 +1,4 @@
-import { isMotionValue, type MotionValue } from 'motion-dom'
+import { isMotionValue, motionValue, type MotionValue } from 'motion-dom'
 import { get, type Readable } from 'svelte/store'
 
 /**
@@ -121,4 +121,50 @@ export const augmentMotionValue = <T>(
     })
 
     return value as unknown as AugmentedMotionValue<T>
+}
+
+/**
+ * Bridges a Svelte `Readable<T>` into a motion-dom `MotionValue<T>` that
+ * mirrors the readable's emissions, so motion-dom primitives (`mapValue`,
+ * `transformValue`, `attachFollow`, `getVelocity`, etc.) that only accept
+ * `MotionValue` can track readable-shaped sources.
+ *
+ * The bridge:
+ * 1. Seeds via `get(source)` so the initial value is correct synchronously.
+ * 2. Subscribes to the readable, skipping the *synchronous initial emit*
+ *    (Svelte readables always fire one on subscribe, but the seed already
+ *    has it — without the skip the bridge would double-write on attach).
+ * 3. Optionally coerces each emit through `coerce` — useful for unit-string
+ *    sources (e.g. `"100px"` → `100`).
+ *
+ * Returns the bridge value and a `dispose` that tears down the subscription
+ * and destroys the bridge MV. Callers register `dispose` with their lifecycle
+ * ($effect cleanup or the augmented `destroy`'s `dispose` slot).
+ *
+ * @template TIn The readable's emit type (often `number | string`).
+ * @template TOut The bridge MotionValue's value type (often `number`).
+ * @param source A Svelte readable store.
+ * @param coerce Optional transform applied to each emit (and the initial seed). Identity by default.
+ * @returns A `MotionValue<TOut>` mirroring the readable + a dispose function.
+ */
+export const bridgeReadableToMotionValue = <TIn, TOut = TIn>(
+    source: Readable<TIn>,
+    coerce: (v: TIn) => TOut = (v) => v as unknown as TOut
+): { value: MotionValue<TOut>; dispose: VoidFunction } => {
+    const bridge = motionValue<TOut>(coerce(get(source) as TIn))
+    let seenInitial = false
+    const unsub = source.subscribe((v) => {
+        if (!seenInitial) {
+            seenInitial = true
+            return
+        }
+        bridge.set(coerce(v))
+    })
+    return {
+        value: bridge,
+        dispose: () => {
+            unsub()
+            bridge.destroy()
+        }
+    }
 }
