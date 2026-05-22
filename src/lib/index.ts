@@ -76,7 +76,7 @@ export { useVelocity } from '$lib/utils/velocity'
  */
 export { stringifyStyleObject } from '$lib/utils/styleObject'
 export { styleString } from '$lib/utils/styleObject.svelte'
-export { useTime } from '$lib/utils/time'
+export { useTime } from '$lib/utils/time.svelte'
 export { useTransform } from '$lib/utils/transform.svelte'
 export type { TransformOptions, TransformSource } from '$lib/utils/transform.svelte'
 export { AnimatePresence, LayoutGroup, MotionConfig, PresenceChild }
