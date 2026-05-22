@@ -3,6 +3,7 @@ import { type Readable } from 'svelte/store'
 import {
     augmentMotionValue,
     sampleSource,
+    subscribeAfterInitial,
     type AugmentedMotionValue
 } from './augmentMotionValue.svelte.js'
 
@@ -85,24 +86,12 @@ export const useMotionTemplate = (
     }
 
     const latest = [...seedSnapshots] as Array<number | string>
-    const initialEmitsRemaining = { count: values.length }
-    const unsubs: VoidFunction[] = []
-
-    for (let i = 0; i < values.length; i++) {
-        const idx = i
-        const unsub = values[idx].subscribe((v) => {
+    const unsubs = values.map((input, idx) =>
+        subscribeAfterInitial(input, (v) => {
             latest[idx] = v
-            // Skip each input's synchronous initial subscribe emit — the
-            // result is already seeded from sampleSource(). Subsequent
-            // emits recompute and propagate.
-            if (initialEmitsRemaining.count > 0) {
-                initialEmitsRemaining.count--
-                return
-            }
             result.set(composeTemplate(strings, latest))
         })
-        unsubs.push(unsub)
-    }
+    )
 
     $effect(() => () => {
         for (const off of unsubs) off()

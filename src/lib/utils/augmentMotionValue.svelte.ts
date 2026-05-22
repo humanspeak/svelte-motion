@@ -73,6 +73,10 @@ export const sampleSource = <T>(source: T | MotionValue<T> | Readable<T>): T => 
  * so identity checks (`isMotionValue`, `===`) still work and motion-dom's
  * own machinery (animation, follow, composition) is untouched.
  *
+ * **Call once per MotionValue.** This function mutates the value (rewrites
+ * `current`, `subscribe`, `destroy`). Calling it twice would re-define the
+ * accessors and the first call's `dispose` would be discarded.
+ *
  * @template T The value type — typically `number` or `string`.
  * @param value The motion-dom `MotionValue` to augment.
  * @param dispose Optional cleanup that runs once when `.destroy()` is first called (before motion-dom's internal teardown). Defaults to a no-op.
@@ -117,4 +121,30 @@ export const augmentMotionValue = <T>(
     })
 
     return value as unknown as AugmentedMotionValue<T>
+}
+
+/**
+ * Subscribes to a `Readable` / `AugmentedMotionValue` and ignores the
+ * synchronous initial emit that the Svelte readable contract fires on
+ * subscribe. Used by hooks that pre-seed their result via {@link sampleSource}
+ * and then only want to react to *changes* — skips the otherwise-redundant
+ * initial recompute.
+ *
+ * @template T The value type emitted by the source.
+ * @param source A subscribable source.
+ * @param onChange Invoked on every emit after the initial.
+ * @returns The source's unsubscribe function.
+ */
+export const subscribeAfterInitial = <T>(
+    source: { subscribe: (run: (value: T) => void) => () => void },
+    onChange: (value: T) => void
+): VoidFunction => {
+    let seen = false
+    return source.subscribe((value) => {
+        if (!seen) {
+            seen = true
+            return
+        }
+        onChange(value)
+    })
 }

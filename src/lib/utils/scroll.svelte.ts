@@ -137,12 +137,15 @@ export const useScroll = (options?: UseScrollOptions): UseScrollReturn => {
             )
     })
 
-    $effect(() => attachable.subscribe())
-    $effect(() => () => {
-        scrollX.destroy()
-        scrollY.destroy()
-        scrollXProgress.destroy()
-        scrollYProgress.destroy()
+    $effect(() => {
+        const release = attachable.subscribe()
+        return () => {
+            release()
+            scrollX.destroy()
+            scrollY.destroy()
+            scrollXProgress.destroy()
+            scrollYProgress.destroy()
+        }
     })
 
     return {

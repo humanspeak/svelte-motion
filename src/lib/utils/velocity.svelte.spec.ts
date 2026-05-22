@@ -65,9 +65,11 @@ describe('utils/velocity - useVelocity', () => {
             const src = writable<string>('0px')
             const v = useVelocity(src)
             expect(v.current).toBe(0)
-            // Source updates should not throw on string inputs.
+            // Source updates should parse without throwing; velocity stays
+            // at 0 because the RAF poll hasn't run yet (and we don't tick it
+            // in this test). The point is the unit string was accepted.
             src.set('100px')
-            expect(typeof v.current).toBe('number')
+            expect(v.current).toBe(0)
         })
     })
 

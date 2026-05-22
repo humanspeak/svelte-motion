@@ -5,6 +5,7 @@ import { type Readable } from 'svelte/store'
 import {
     augmentMotionValue,
     sampleSource,
+    subscribeAfterInitial,
     type AugmentedMotionValue
 } from './augmentMotionValue.svelte.js'
 
@@ -34,10 +35,8 @@ const DEFAULTS: Required<TransformValues> = {
  */
 export const buildTransform = (values: TransformValues): string => {
     const v = { ...DEFAULTS, ...values }
-    // If explicit per-axis scales provided, use them; otherwise use uniform scale
     const useAxes = values.scaleX !== undefined || values.scaleY !== undefined
     const parts: string[] = []
-    // Translate first for readability; rely on browser to optimize
     if (v.x !== 0 || v.y !== 0) parts.push(`translate(${round(v.x)}px, ${round(v.y)}px)`)
     if (v.rotate !== 0) parts.push(`rotate(${round(v.rotate)}deg)`)
     if (useAxes) {
@@ -177,6 +176,21 @@ export type TransformSource<T> =
     | Readable<T>
 
 /**
+ * Picks the mixer for a single segment: user-supplied mixer factory wins;
+ * a numeric pair falls back to linear interpolation; mixed-type or
+ * non-numeric endpoints snap from `o0` to `o1` at the segment midpoint. The
+ * snap fallback uses its own `t` parameter (not a closure over outer
+ * `progress`) so callers can safely store and re-invoke the returned mixer.
+ */
+const pickMixer = <T>(o0: T, o1: T, mixer: TransformOptions['mixer']): ((t: number) => T) => {
+    if (mixer) return mixer(o0, o1) as (t: number) => T
+    if (typeof o0 === 'number' && typeof o1 === 'number') {
+        return linearMix(o0, o1) as unknown as (t: number) => T
+    }
+    return (t: number) => (t < 0.5 ? o0 : o1)
+}
+
+/**
  * Builds a single-segment mapper for the mapping form. Encapsulates clamp,
  * ease, mixer selection, and the linear-progress math. Used per change of
  * the source.
@@ -219,11 +233,7 @@ const buildMapper = <T>(
         const progress = i0 === i1 ? 0 : (localClamp(x, i0, i1) - i0) / (i1 - i0)
         const e = easings[seg]
         const p = e ? e(progress) : progress
-        const mix = mixer
-            ? mixer(o0, o1)
-            : typeof o0 === 'number' && typeof o1 === 'number'
-              ? linearMix(o0 as number, o1 as number)
-              : (_t: number) => (p < 0.5 ? o0 : o1) // trunk-ignore(eslint/@typescript-eslint/no-unused-vars)
+        const mix = pickMixer(o0, o1, mixer)
         return mix(p) as T
     }
 }
@@ -276,22 +286,7 @@ export function useTransform<T = number>(
         const compute = sourceOrCompute as () => T
         const deps = (inputOrDeps as Array<TransformSource<unknown>>) ?? []
         const value = motionValue<T>(compute())
-        const unsubs: VoidFunction[] = []
-        let initialEmitsRemaining = deps.length
-        for (const dep of deps) {
-            const unsub = dep.subscribe(() => {
-                // Svelte readable contract emits synchronously on subscribe.
-                // We've already seeded `value` via compute() above, so skip
-                // each dep's initial emit to avoid N+1 redundant computes
-                // before any external change happens.
-                if (initialEmitsRemaining > 0) {
-                    initialEmitsRemaining--
-                    return
-                }
-                value.set(compute())
-            })
-            unsubs.push(unsub)
-        }
+        const unsubs = deps.map((dep) => subscribeAfterInitial(dep, () => value.set(compute())))
         const dispose = () => {
             for (const off of unsubs) off()
         }
@@ -305,21 +300,9 @@ export function useTransform<T = number>(
     const out = (output ?? []) as T[]
     const map = buildMapper(input, out, options)
 
-    const initial = map(sampleSource(source))
-    const value = motionValue<T>(initial)
+    const value = motionValue<T>(map(sampleSource(source)))
+    const unsub = subscribeAfterInitial(source, (x) => value.set(map(x)))
 
-    let seenInitial = false
-    const unsub = source.subscribe((x) => {
-        // Skip the readable's synchronous initial emit — value is already
-        // seeded from sampleSource. Subsequent emits feed through map().
-        if (!seenInitial) {
-            seenInitial = true
-            return
-        }
-        value.set(map(x))
-    })
-
-    const dispose = () => unsub()
     $effect(() => () => value.destroy())
-    return augmentMotionValue(value, dispose)
+    return augmentMotionValue(value, unsub)
 }

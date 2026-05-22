@@ -11,6 +11,13 @@ import { augmentMotionValue, type AugmentedMotionValue } from './augmentMotionVa
 export type VelocitySource = AugmentedMotionValue<number | string> | Readable<number | string>
 
 /**
+ * Threshold (units/second) below which the RAF poll loop snaps velocity to
+ * exactly `0` and stops scheduling frames. Matches framer-motion's settle
+ * point; the next source emit restarts the loop.
+ */
+const SETTLE_THRESHOLD = 0.001
+
+/**
  * Parses a numeric value from a number or unit string (e.g. `"100px"` → `100`).
  */
 const parseNumeric = (v: number | string): number => {
@@ -75,7 +82,7 @@ export const useVelocity = (source: VelocitySource): AugmentedMotionValue<number
 
     const poll = () => {
         const v = tracker.getVelocity()
-        if (Math.abs(v) < 0.001) {
+        if (Math.abs(v) < SETTLE_THRESHOLD) {
             // Movement stopped — snap to 0 and stop polling. The next source
             // emit restarts the loop.
             settled = true
