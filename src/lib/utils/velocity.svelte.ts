@@ -1,21 +1,13 @@
-import { motionValue } from 'motion-dom'
+import { cancelFrame, frame, isMotionValue, motionValue } from 'motion-dom'
 import { type Readable } from 'svelte/store'
 import { augmentMotionValue, type AugmentedMotionValue } from './augmentMotionValue.svelte.js'
 
 /**
- * Source for {@link useVelocity}: a motion-dom `MotionValue` (via
- * `useMotionValue`, `useSpring`, `useScroll`, etc.) or a Svelte readable.
- * Both expose `.subscribe(run)` with matching semantics, so the hook
- * consumes them interchangeably.
+ * Source for {@link useVelocity}: a motion-dom `MotionValue` or a Svelte
+ * readable. Svelte readables are bridged into a `MotionValue` so motion-dom's
+ * native velocity tracking can drive the result.
  */
 export type VelocitySource = AugmentedMotionValue<number | string> | Readable<number | string>
-
-/**
- * Threshold (units/second) below which the RAF poll loop snaps velocity to
- * exactly `0` and stops scheduling frames. Matches framer-motion's settle
- * point; the next source emit restarts the loop.
- */
-const SETTLE_THRESHOLD = 0.001
 
 /**
  * Parses a numeric value from a number or unit string (e.g. `"100px"` → `100`).
@@ -30,85 +22,77 @@ const parseNumeric = (v: number | string): number => {
  * Creates an augmented `MotionValue<number>` whose value tracks the velocity
  * of `source` in units/second.
  *
- * Internally feeds source updates into a motion-dom `MotionValue` (which
- * tracks per-frame deltas and timestamps for free), and polls
- * `getVelocity()` on every animation frame until movement settles below
- * `0.001` units/second — at which point velocity snaps to `0` and the poll
- * loop stops. The next source emit restarts it.
+ * Mirrors React framer-motion 1:1: on every `source` change, schedules an
+ * `updateVelocity` callback in motion-dom's frame loop via
+ * `frame.update(updateVelocity, false, true)`. `updateVelocity` reads
+ * `source.getVelocity()` (motion-dom tracks per-frame deltas + timestamps
+ * for free) and writes it to the result. If velocity is still non-zero,
+ * `updateVelocity` re-schedules itself for the next frame — so the loop
+ * only runs while there's actual motion and snaps to `0` the moment things
+ * settle. Idle CPU is zero.
  *
- * The returned value is a real motion-dom `MotionValue` augmented with a
- * `$state`-backed `.current` getter and a Svelte readable `.subscribe`
- * shim — it composes with `useTransform`, `useSpring`, etc. and reads
- * reactively in Svelte 5 scopes.
+ * Returned value is a real motion-dom `MotionValue` (composes with
+ * `useTransform`, `useSpring`, `useMotionTemplate`, etc.) plus a
+ * `$state`-backed `.current` getter and a `.subscribe` shim.
  *
- * Lifecycle: must be called during component initialization. The source
- * subscription, the velocity-tracking motion value, and the result are all
- * torn down when the surrounding `$effect` scope unmounts.
+ * Lifecycle: must be called during component initialization. The change
+ * subscription, the frame-loop callback, and any Svelte-readable bridge are
+ * all torn down when the surrounding `$effect` unmounts.
  *
- * SSR-safe: returns a static `motionValue(0)` with no source subscription
- * and no RAF loop on the server.
+ * SSR-safe: returns a static augmented motion value with no subscriptions
+ * and no frame loop on the server.
  *
  * @param source A motion value or readable store of numeric or unit-string values.
  * @returns A `MotionValue<number>` with `.current` and `.subscribe`.
  *
- * @example
- * ```svelte
- * <script>
- *   import { useSpring, useTransform, useVelocity } from '@humanspeak/svelte-motion'
- *
- *   const x = useSpring(0)
- *   const xVelocity = useVelocity(x)
- *   const skew = useTransform(xVelocity, [-1000, 0, 1000], [-20, 0, 20])
- * </script>
- * ```
- *
  * @see https://motion.dev/docs/react-use-velocity
  */
 export const useVelocity = (source: VelocitySource): AugmentedMotionValue<number> => {
-    const result = motionValue<number>(0)
+    // Bridge Svelte readables to a MotionValue so motion-dom's getVelocity()
+    // can track per-frame deltas + timestamps natively. MotionValue sources
+    // pass through unchanged.
+    let tracker: ReturnType<typeof motionValue<number>>
+    let unsubBridge: VoidFunction | undefined
 
-    // SSR: no source subscription, no RAF loop. Returns the static augmented
-    // motion value so callers can compose it without branching.
+    if (isMotionValue(source)) {
+        tracker = source as unknown as ReturnType<typeof motionValue<number>>
+    } else if (typeof window !== 'undefined') {
+        const bridge = motionValue<number>(0)
+        unsubBridge = source.subscribe((v) => bridge.set(parseNumeric(v)))
+        tracker = bridge
+    } else {
+        tracker = motionValue<number>(0)
+    }
+
+    const result = motionValue<number>(tracker.getVelocity())
+
+    // SSR: skip the frame-loop wiring entirely and return a static MV.
     if (typeof window === 'undefined') {
         return augmentMotionValue(result)
     }
 
-    // Internal motion-dom MV — tracks per-frame deltas and timestamps so
-    // `getVelocity()` Just Works without reimplementing the math here.
-    const tracker = motionValue<number>(0)
-
-    let raf = 0
-    let settled = true
-
-    const poll = () => {
-        const v = tracker.getVelocity()
-        if (Math.abs(v) < SETTLE_THRESHOLD) {
-            // Movement stopped — snap to 0 and stop polling. The next source
-            // emit restarts the loop.
-            settled = true
-            raf = 0
-            result.set(0)
-            return
-        }
-        result.set(v)
-        raf = requestAnimationFrame(poll)
+    const updateVelocity = () => {
+        const latest = tracker.getVelocity()
+        result.set(latest)
+        // If we still have velocity, schedule another frame to keep tracking
+        // until things settle. motion-dom's frame loop dedupes same-frame
+        // schedules via a Set, so spamming this is safe.
+        if (latest) frame.update(updateVelocity)
     }
 
-    const startPolling = () => {
-        if (!settled) return
-        settled = false
-        raf = requestAnimationFrame(poll)
-    }
-
-    const unsubSource = source.subscribe((v) => {
-        tracker.set(parseNumeric(v))
-        startPolling()
+    const unsubChange = tracker.on('change', () => {
+        // false = no keepAlive, true = run at end of current frame if we're
+        // already in one. Matches React framer-motion's useVelocity.
+        frame.update(updateVelocity, false, true)
     })
 
     $effect(() => () => {
-        unsubSource()
-        if (raf) cancelAnimationFrame(raf)
-        tracker.destroy()
+        unsubChange()
+        unsubBridge?.()
+        cancelFrame(updateVelocity)
+        // Only destroy the bridge tracker (we own it). MotionValue sources
+        // are caller-owned.
+        if (unsubBridge) tracker.destroy()
         result.destroy()
     })
 
