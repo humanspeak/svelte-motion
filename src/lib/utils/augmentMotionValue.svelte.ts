@@ -122,29 +122,3 @@ export const augmentMotionValue = <T>(
 
     return value as unknown as AugmentedMotionValue<T>
 }
-
-/**
- * Subscribes to a `Readable` / `AugmentedMotionValue` and ignores the
- * synchronous initial emit that the Svelte readable contract fires on
- * subscribe. Used by hooks that pre-seed their result via {@link sampleSource}
- * and then only want to react to *changes* — skips the otherwise-redundant
- * initial recompute.
- *
- * @template T The value type emitted by the source.
- * @param source A subscribable source.
- * @param onChange Invoked on every emit after the initial.
- * @returns The source's unsubscribe function.
- */
-export const subscribeAfterInitial = <T>(
-    source: { subscribe: (run: (value: T) => void) => () => void },
-    onChange: (value: T) => void
-): VoidFunction => {
-    let seen = false
-    return source.subscribe((value) => {
-        if (!seen) {
-            seen = true
-            return
-        }
-        onChange(value)
-    })
-}
