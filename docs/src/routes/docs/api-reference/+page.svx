@@ -1,0 +1,207 @@
+---
+title: API Reference
+description: Exported TypeScript types, motion re-exports, SSR behavior, and other surface-area details that don't belong on a per-hook page.
+---
+
+<script>
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'API Reference | Docs | Svelte Motion'
+      seo.description = "Reference for Svelte Motion's exported TypeScript types, motion package re-exports (animate, easing, math utilities), and SSR behavior."
+      seo.ogTitle = 'API Reference'
+      seo.ogTagline = 'Types, re-exports, and SSR behavior'
+      seo.ogFeatures = ['TypeScript Types', 'Motion Re-exports', 'SSR Safe', 'Tree-shakeable']
+      seo.ogSlug = 'docs-api-reference'
+  }
+</script>
+
+# API Reference
+
+Surface-area details that don't live on a per-hook or per-component page: the TypeScript types we export, the imperative `motion` API surface we re-export, and how the library behaves under SSR.
+
+## TypeScript types
+
+`@humanspeak/svelte-motion` ships full TypeScript types. Import any of these directly from the package for prop typing, custom-component wrappers, or generic helpers:
+
+```ts
+import type {
+    // Motion component props
+    Variants,
+    MotionInitial,
+    MotionAnimate,
+    MotionTransition,
+    MotionWhileHover,
+    MotionWhileTap,
+    MotionWhileFocus,
+    MotionWhileInView,
+    MotionWhileDrag,
+
+    // Drag
+    DragAxis,
+    DragConstraints,
+    DragControls,
+    DragInfo,
+    DragTransition,
+
+    // Drag/in-view event handlers
+    MotionOnDirectionLock,
+    MotionOnDragTransitionEnd,
+    MotionOnInViewStart,
+    MotionOnInViewEnd,
+
+    // Motion values
+    MotionValue,
+    RawMotionValue,
+    AugmentedMotionValue,
+    SpringMotionValue,
+    UseSpringOptions,
+
+    // useTransform
+    TransformOptions,
+    TransformSource,
+    TransformOutputMap,
+    SingleTransformer,
+    MultiTransformer,
+
+    // useScroll
+    UseScrollOptions,
+    UseScrollReturn,
+
+    // useVelocity
+    VelocitySource,
+
+    // useMotionTemplate
+    MotionTemplateInput,
+
+    // useCycle
+    Cycle,
+    CycleState,
+
+    // useAnimate
+    AnimationScope,
+
+    // useInView
+    InViewState,
+    UseInViewOptions,
+
+    // useReducedMotion / useReducedMotionConfig
+    ReducedMotionState,
+    ReducedMotionConfig,
+
+    // usePresence
+    UsePresenceState
+} from '@humanspeak/svelte-motion'
+```
+
+Type aliases like `MotionWhileHover` accept the same shape as the corresponding component prop, which makes them useful when wrapping `motion.<tag>` in a custom component:
+
+```svelte
+<script lang="ts">
+    import { motion, type MotionWhileHover, type MotionTransition } from '@humanspeak/svelte-motion'
+
+    interface Props {
+        whileHover?: MotionWhileHover
+        transition?: MotionTransition
+    }
+    let { whileHover, transition }: Props = $props()
+</script>
+
+<motion.button {whileHover} {transition}>
+    <slot />
+</motion.button>
+```
+
+## Re-exports from `motion`
+
+To keep your dependency graph small, Svelte Motion re-exports the low-level imperative API from the `motion` package so you don't need a second runtime dependency.
+
+### Imperative animation
+
+```ts
+import {
+    animate,    // animate elements or motion values to keyframes / values
+    delay,      // schedule a callback after N seconds (frame-aware)
+    hover,      // attach true-hover-gated hover listeners to an element
+    inView,     // attach an IntersectionObserver-driven in-view listener
+    press,      // attach pointer-press listeners
+    resize,     // observe ResizeObserver resize events
+    scroll,     // attach a scroll-progress callback (or accelerate a MotionValue)
+    stagger,    // build a staggered delay function for animate()
+    transform   // build a curried mapper for a numeric input → output range
+} from '@humanspeak/svelte-motion'
+```
+
+Useful when you need to drive an animation programmatically — e.g. `animate(element, { x: 100 })` — outside the `motion.<tag>` component flow.
+
+### Easing functions
+
+```ts
+import {
+    cubicBezier,
+    easeIn, easeInOut, easeOut,
+    backIn, backInOut, backOut,
+    circIn, circInOut, circOut,
+    anticipate
+} from '@humanspeak/svelte-motion'
+```
+
+Pass any of these as `transition={{ ease: easeInOut }}` (function form), or use the string form (`ease: 'easeInOut'`) for the common cases.
+
+### Math utilities
+
+```ts
+import {
+    clamp,        // clamp(min, max, value)
+    distance,     // 1D distance
+    distance2D,   // 2D distance between { x, y } points
+    interpolate,  // build an input→output range interpolator
+    mix,          // mix two values by progress t
+    pipe,         // compose unary fns left-to-right
+    progress,     // build a progress function over a range
+    wrap          // wrap a value into a [min, max] range
+} from '@humanspeak/svelte-motion'
+```
+
+These are the same math helpers motion uses internally — convenient when you're building your own value-mapping pipelines outside `useTransform`.
+
+## SSR behavior
+
+Svelte Motion is server-render safe. Under SSR:
+
+- **Initial visual state** is rendered from `initial` (or, when `initial` is absent, the first keyframe of `animate`).
+- **`initial={false}`** skips the mount animation: the server-rendered DOM matches the `animate` state directly, so there's no flicker between SSR HTML and the first client tick.
+- **Hydration** is designed to avoid the "jump" where the client animates from the SSR state back to `initial` before running `animate`. The motion runtime detects already-mounted DOM and bypasses the entry animation when `initial={false}` is set.
+- **Motion values** created via `useMotionValue`, `useSpring`, `useScroll`, `useTime`, `useVelocity`, and `useMotionTemplate` return static augmented values on the server with no RAF loops, observers, or subscriptions attached. The values still implement `.current` / `.get()` / `.subscribe` so server-rendered templates compile cleanly; mutations and animations kick in once the client mounts.
+- **Gesture props** (`whileHover`, `whileTap`, `whileFocus`, `whileInView`) are inert on the server — they only attach listeners after `$effect` runs in the browser.
+
+The SSR contract is identical to React framer-motion's. If a pattern works there, it works here.
+
+## Tree shaking
+
+Two patterns:
+
+- **`motion.<tag>`** pulls in the full motion-component runtime. Use when you need many tags or want the ergonomic prop API.
+- **Named components** (`MotionDiv`, `MotionSpan`, …) pull in only the tag(s) you import. Use when bundle size matters and you only need one or two motion elements.
+
+See [Tree shaking](/docs/tree-shaking) for the full named-component list and a bundle-size comparison.
+
+## External dependencies
+
+Two runtime dependencies, both pre-1.0-aligned:
+
+- [`motion`](https://www.npmjs.com/package/motion) — the framework-agnostic motion runtime (animation engine, gesture primitives, math utilities)
+- [`motion-dom`](https://www.npmjs.com/package/motion-dom) — DOM-layer primitives (`MotionValue`, frame scheduler, scroll/view-timeline detection)
+
+Both are tracked at `^12.40.0` and bumped in lockstep with React framer-motion releases so behavior stays 1:1.
+
+## See also
+
+- [Tree shaking](/docs/tree-shaking) — per-tag named-component imports
+- [Style string](/docs/style-string) — build CSS style strings with automatic unit handling
+- [Motion values overview](/docs/motion-values) — composable reactive primitives
+
+---
+
+For per-hook and per-component docs, browse the sidebar. The [Motion library docs](https://motion.dev/docs) cover the underlying `motion` and `motion-dom` packages we build on.

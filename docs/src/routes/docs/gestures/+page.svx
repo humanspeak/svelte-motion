@@ -1,0 +1,149 @@
+---
+title: Gestures
+description: Pointer-driven animations on motion components via whileHover, whileTap, whileFocus, and whileInView props.
+---
+
+<script>
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'Gestures | Docs | Svelte Motion'
+      seo.description = 'whileHover, whileTap, whileFocus, and whileInView props on motion components — pointer-driven animations with gesture callbacks, true-hover gating, and IntersectionObserver-backed in-view detection.'
+      seo.ogTitle = 'Gestures'
+      seo.ogTagline = 'Pointer-driven animations as motion-component props'
+      seo.ogFeatures = ['Hover', 'Tap', 'Focus', 'In-view']
+      seo.ogSlug = 'docs-gestures'
+  }
+</script>
+
+# Gestures
+
+Every `motion.<tag>` component accepts four gesture props that animate to a target state for the duration of the gesture and restore on exit. They compose freely with `initial`, `animate`, `exit`, and `transition`.
+
+```svelte
+<motion.button
+    whileHover={{ scale: 1.05 }}
+    whileTap={{ scale: 0.95 }}
+    whileFocus={{ scale: 1.05, borderColor: '#3b82f6' }}
+>
+    Click me
+</motion.button>
+```
+
+| Prop | Triggered by | Notes |
+| --- | --- | --- |
+| `whileHover` | Pointer enters/leaves | True-hover gating (touch devices don't trigger) |
+| `whileTap` | Press start/end on element | Keyboard accessible (Enter/Space) |
+| `whileFocus` | Focus enters/leaves | Pairs with `:focus-visible` for accessibility |
+| `whileInView` | Element enters/leaves viewport | Backed by `IntersectionObserver` |
+
+Each gesture prop has companion lifecycle callbacks (`onHoverStart` / `onHoverEnd`, `onTapStart` / `onTap` / `onTapCancel`, `onFocusStart` / `onFocusEnd`, `onInViewStart` / `onInViewEnd`) for side effects that aren't expressible as style changes (analytics, focus management, etc.).
+
+## `whileHover`
+
+Animate while the pointer is over the element.
+
+```svelte
+<motion.button
+    whileHover={{ scale: 1.05, backgroundColor: '#3b82f6' }}
+    onHoverStart={() => console.log('hover start')}
+    onHoverEnd={() => console.log('hover end')}
+>
+    Hover me
+</motion.button>
+```
+
+**True-hover gating.** `whileHover` uses CSS media queries (`(hover: hover)` and `(pointer: fine)`) to gate the hover state. Touch devices that emit synthetic hover events on tap don't trigger the gesture — the hover animation stays inert on phones and tablets, matching how `:hover` CSS pseudo-class behaves in modern stylesheets.
+
+## `whileTap`
+
+Animate while the element is being pressed.
+
+```svelte
+<motion.button
+    whileTap={{ scale: 0.95 }}
+    onTapStart={() => console.log('press down')}
+    onTap={() => console.log('press complete (no cancel)')}
+    onTapCancel={() => console.log('pointer left before release')}
+>
+    Tap me
+</motion.button>
+```
+
+**Keyboard accessible.** Pressing **Enter** or **Space** on a focused element fires the same tap lifecycle as a pointer press. Combine with `whileFocus` to make tap interactions discoverable for keyboard users.
+
+`onTap` fires only when the press completes on the element. If the pointer drags off before release, `onTapCancel` fires instead.
+
+## `whileFocus`
+
+Animate while the element has keyboard focus.
+
+```svelte
+<motion.input
+    whileFocus={{ scale: 1.02, borderColor: '#3b82f6' }}
+    onFocusStart={() => console.log('focus enter')}
+    onFocusEnd={() => console.log('focus leave')}
+/>
+```
+
+Pairs well with `whileHover` on inputs and buttons so the focus animation matches what hover feels like — important for users who navigate with `Tab` instead of pointer.
+
+## `whileInView`
+
+Animate when the element enters the viewport. Backed by `IntersectionObserver`.
+
+```svelte
+<motion.div
+    initial={{ opacity: 0, y: 40 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, amount: 0.5, margin: '-50px' }}
+    transition={{ duration: 0.6 }}
+    onInViewStart={() => console.log('entered viewport')}
+    onInViewEnd={() => console.log('left viewport')}
+>
+    Fades in on scroll
+</motion.div>
+```
+
+### `viewport` options
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `once` | `boolean` | `false` | Fire on the first enter and latch — the element never reverts to its initial state |
+| `amount` | `number \| 'some' \| 'all'` | `'some'` | Fraction of the element that must be visible (number `0`–`1`) or named threshold |
+| `margin` | `string` | `'0px'` | CSS margin string applied to the IntersectionObserver root box (e.g. `'-50px 0px'`) |
+| `root` | `HTMLElement` | viewport | Custom scroll container — defaults to the page viewport |
+
+**`once: true` for reveal animations** prevents the "scroll up, see it again" effect that's usually unwanted for content-reveal patterns.
+
+## Composing with `transition`
+
+Every gesture prop accepts an optional `transition` inside the target object so a gesture can have its own timing distinct from the component's default `transition`:
+
+```svelte
+<motion.div
+    transition={{ duration: 0.3 }}
+    whileHover={{
+        scale: 1.05,
+        transition: { duration: 0.15 }
+    }}
+    whileTap={{
+        scale: 0.95,
+        transition: { type: 'spring', stiffness: 800 }
+    }}
+/>
+```
+
+This gives quick feedback on hover and a snappy spring on tap while keeping the default for any non-gesture animation.
+
+## Hook variants
+
+For non-component cases (vanilla DOM, custom logic that isn't a `<motion.div>`), each gesture has a hook equivalent:
+
+- [`useInView`](/docs/use-in-view) — `IntersectionObserver`-backed in-view detection without a motion component
+- The other three (`whileHover`, `whileTap`, `whileFocus`) are best used via the motion-component props — there's no dedicated hook because the prop form is the recommended path
+
+---
+
+Based on [Motion's gesture animations](https://motion.dev/docs/react-gestures) API.

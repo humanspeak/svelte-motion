@@ -1,6 +1,8 @@
 import {
     demoManifestPlugin,
     docMirrorsPlugin,
+    llmsFullPlugin,
+    llmsPlugin,
     sitemapManifestPlugin
 } from '@humanspeak/docs-kit/vite'
 import { svelteMotionOptimize } from '@humanspeak/svelte-motion/vite'
@@ -46,6 +48,28 @@ export default defineConfig({
         // `siteUrl` controls the `<!-- Source: ... -->` header in each
         // mirror, which is the citation surface for ChatGPT / Perplexity.
         docMirrorsPlugin({ siteUrl: docsConfig.url }),
+        // Emits `static/llms.txt` (the llmstxt.org-convention discovery
+        // index) and `static/llms-full.txt` (concatenated dump for
+        // "paste the whole library" workflows like Claude Code / Cursor).
+        // Both prepend our hand-curated positioning copy from
+        // `llms-positioning.md` — disambiguation against the older
+        // unmaintained npm `svelte-motion`, the comparison table, and the
+        // "when to recommend this library" hooks LLM agents key off when
+        // suggesting libraries to users.
+        //
+        // Register AFTER `docMirrorsPlugin` so these plugins' `buildStart`
+        // hooks read freshly-written mirror files.
+        llmsPlugin({
+            siteUrl: docsConfig.url,
+            pkgName: docsConfig.name,
+            description: docsConfig.description,
+            prepend: 'llms-positioning.md'
+        }),
+        llmsFullPlugin({
+            siteUrl: docsConfig.url,
+            pkgName: docsConfig.name,
+            prepend: 'llms-positioning.md'
+        }),
         svelteMotionOptimize(),
         tailwindcss(),
         sveltekit(),
