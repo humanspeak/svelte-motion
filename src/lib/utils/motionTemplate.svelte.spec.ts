@@ -1,4 +1,5 @@
 import { frame, isMotionValue } from 'motion-dom'
+import { flushSync } from 'svelte'
 import { get, writable } from 'svelte/store'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMotionTemplate } from './motionTemplate.svelte.js'
@@ -122,5 +123,37 @@ describe('utils/motionTemplate - useMotionTemplate', () => {
         const out = useMotionTemplate`px(${w})`
         expect(isMotionValue(out)).toBe(true)
         expect(out.current).toBe('px(7)')
+    })
+
+    it('stops recomposing after root cleanup', async () => {
+        // Lifecycle guard: once the surrounding $effect root tears down,
+        // motion-dom's destroy() unsubscribes from the input change-bus.
+        // Subsequent input emits must not recompose into the (now-destroyed)
+        // result.
+        let captured!: {
+            x: ReturnType<typeof useMotionValue<number>>
+            out: ReturnType<typeof useMotionTemplate>
+        }
+        const stop = $effect.root(() => {
+            const x = useMotionValue<number>(1)
+            const out = useMotionTemplate`x(${x})`
+            captured = { x, out }
+        })
+        // flushSync ensures the inner $effect(() => () => destroy()) setup
+        // has registered its cleanup callback. Without it, stop() would tear
+        // down a never-mounted scope and the destroy never fires.
+        flushSync()
+        expect(captured.out.current).toBe('x(1)')
+
+        // Tear down the root — runs cleanups, destroys the template MV
+        // (motion-dom's destroy event unsubscribes the change-bus listener
+        // that recomposes the template).
+        stop()
+        flushSync()
+
+        const before = captured.out.current
+        captured.x.set(99)
+        await nextFrame()
+        expect(captured.out.current).toBe(before)
     })
 })

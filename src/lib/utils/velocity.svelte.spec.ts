@@ -64,7 +64,7 @@ describe('utils/velocity - useVelocity', () => {
         })
     })
 
-    it('accepts unit-string sources (parses numeric part)', async () => {
+    it('accepts unit-string Svelte readable sources (parses numeric part)', async () => {
         // The readable bridge calls parseNumeric on every emit. Set a unit
         // string and verify the velocity machinery still resolves (a frame
         // tick passes and the result remains a number).
@@ -76,6 +76,25 @@ describe('utils/velocity - useVelocity', () => {
         })
         await nextFrame()
         expect(typeof ctx.result.v.current).toBe('number')
+    })
+
+    it('accepts unit-string MotionValue sources (bridges via parseNumeric)', async () => {
+        // Regression guard for the MotionValue<string> stuck-at-0 bug:
+        // motion-dom samples `canTrackVelocity` ONCE from the initial value
+        // and would otherwise mark a string source as non-trackable forever.
+        // useVelocity detects string MVs and bridges them through parseNumeric
+        // so the underlying tracker is always numeric.
+        const ctx = inRoot(() => {
+            const src = useMotionValue('0px')
+            const v = useVelocity(src)
+            src.set('100px')
+            return { src, v }
+        })
+        await nextFrame()
+        // Velocity is a number (parsed correctly) — would NaN or stick at 0
+        // if the bridge weren't in place.
+        expect(typeof ctx.result.v.current).toBe('number')
+        expect(Number.isFinite(ctx.result.v.current)).toBe(true)
     })
 
     it('schedules a frame update when the source emits a change', async () => {

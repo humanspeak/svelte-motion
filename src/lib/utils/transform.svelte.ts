@@ -37,6 +37,15 @@ const DEFAULTS: Required<TransformValues> = {
  *
  * @param values Partial map of translate/scale/rotate values.
  * @returns A space-separated CSS `transform` string, or `""` when all values are defaults.
+ *
+ * @example
+ * ```ts
+ * buildTransform({ x: 10, y: 20, scale: 1.5 })
+ * // => "translate(10px, 20px) scale(1.5)"
+ *
+ * buildTransform({ x: 0, y: 0, rotate: 0 }) // all defaults
+ * // => ""
+ * ```
  */
 export const buildTransform = (values: TransformValues): string => {
     const v = { ...DEFAULTS, ...values }
@@ -59,6 +68,14 @@ export const buildTransform = (values: TransformValues): string => {
  * @param values Transform values to validate.
  * @param opts Optional configuration; `maxScale` caps allowable absolute scale (default 8).
  * @returns `true` if all scale values are finite and within bounds.
+ *
+ * @example
+ * ```ts
+ * isSafeTransform({ scale: 2 })                  // true
+ * isSafeTransform({ scale: 100 })                // false (exceeds default maxScale=8)
+ * isSafeTransform({ scale: 100 }, { maxScale: 200 })  // true
+ * isSafeTransform({ scale: NaN })                // false
+ * ```
  */
 export const isSafeTransform = (values: TransformValues, opts?: { maxScale?: number }): boolean => {
     const maxScale = opts?.maxScale ?? 8
@@ -80,6 +97,13 @@ export const isSafeTransform = (values: TransformValues, opts?: { maxScale?: num
  *
  * @param matrix A CSS `matrix(...)` value, `"none"`, `null`, or `undefined`.
  * @returns The `a` component of the matrix (uniform scale), or `null` if unparseable.
+ *
+ * @example
+ * ```ts
+ * parseMatrixScale('matrix(1.5, 0, 0, 1.5, 0, 0)')  // 1.5
+ * parseMatrixScale('none')                          // null
+ * parseMatrixScale(null)                            // null
+ * ```
  */
 export const parseMatrixScale = (matrix: string | null | undefined): number | null => {
     if (!matrix || matrix === 'none') return null
@@ -181,6 +205,47 @@ export type TransformOutputMap<O> = { [key: string]: O[] }
  * subscriptions, the underlying motion value, and any Svelte-readable bridges
  * are torn down when the surrounding `$effect` scope unmounts.
  *
+ * @template O Output value type.
+ * @param sourceOrCompute A motion value / readable (mapping forms), a single
+ *   `MotionValue` (single-transformer form), an array of `MotionValue`s
+ *   (multi-transformer form), or a compute function (compute form).
+ * @param inputOrTransformer Input stops `number[]` (mapping forms) or a
+ *   transformer function (`(latest) => O` / `(latest[]) => O`).
+ * @param outputOrOutputMap Output stops `O[]` (single-output mapping) or an
+ *   output map `{ [key]: O[] }` (multi-output mapping).
+ * @param options Optional `TransformOptions` — `clamp`, `ease`, `mixer`.
+ * @returns An `AugmentedMotionValue<O>` for single-output forms, or an object
+ *   of motion values keyed by `outputMap` for the multi-output form.
+ *
+ * @example
+ * ```svelte
+ * <script lang="ts">
+ *   import { useMotionValue, useTransform } from '@humanspeak/svelte-motion'
+ *
+ *   const x = useMotionValue(0)
+ *
+ *   // Mapping form
+ *   const opacity = useTransform(x, [0, 100], [0, 1])
+ *
+ *   // Single-MV transformer
+ *   const doubled = useTransform(x, (latest) => latest * 2)
+ *
+ *   // Compute form — auto-tracks via collectMotionValues
+ *   const y = useMotionValue(0)
+ *   const sum = useTransform(() => x.get() + y.get())
+ *
+ *   // Multi-output mapping
+ *   const { rotate, scale } = useTransform(x, [0, 100], {
+ *     rotate: [0, 360],
+ *     scale: [1, 2]
+ *   })
+ * </script>
+ *
+ * <div style="opacity: {opacity.current}; transform: rotate({rotate.current}deg) scale({scale.current})">
+ *   {sum.current}
+ * </div>
+ * ```
+ *
  * @see https://motion.dev/docs/react-use-transform
  */
 // Project convention: exported helpers use arrow syntax. `useTransform` is a
@@ -256,8 +321,12 @@ export function useTransform<O>(
     const { value: numericSource, dispose: disposeBridge } = toMotionValue(source)
 
     // Multi-output mapping form: useTransform(source, [range], { key: [out], … }, options).
+    // The `outputOrOutputMap !== null` check is load-bearing — `typeof null`
+    // is `'object'`, so a `null` argument would otherwise enter this branch
+    // and crash at `Object.keys(null)`.
     if (
         outputOrOutputMap !== undefined &&
+        outputOrOutputMap !== null &&
         !Array.isArray(outputOrOutputMap) &&
         typeof outputOrOutputMap === 'object'
     ) {

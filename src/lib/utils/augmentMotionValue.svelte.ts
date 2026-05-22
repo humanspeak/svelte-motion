@@ -30,6 +30,20 @@ export type AugmentedMotionValue<T> = Omit<MotionValue<T>, 'current'> & {
  * instances (which also expose `subscribe`-shaped APIs in some versions).
  * Used by hook factories that accept either a `MotionValue` or a readable
  * store as a source.
+ *
+ * @template T The value type the readable emits.
+ * @param value Any value to test.
+ * @returns Whether the value is a Svelte readable (and not a `MotionValue`).
+ *
+ * @example
+ * ```ts
+ * import { writable } from 'svelte/store'
+ * import { motionValue } from 'motion-dom'
+ *
+ * isSvelteReadable(writable(0))  // true
+ * isSvelteReadable(motionValue(0))  // false (a MotionValue, not a readable)
+ * isSvelteReadable({ subscribe: 'nope' })  // false (subscribe isn't callable)
+ * ```
  */
 export const isSvelteReadable = <T = unknown>(value: unknown): value is Readable<T> => {
     return (
@@ -44,6 +58,17 @@ export const isSvelteReadable = <T = unknown>(value: unknown): value is Readable
  * Synchronously samples a source: returns `T` directly, calls `.get()` on
  * a `MotionValue`, or `svelte/store`'s `get()` on a readable. Used by hook
  * factories to seed an initial value before any subscription is established.
+ *
+ * @template T The value type.
+ * @param source A plain value, a `MotionValue`, or a Svelte readable.
+ * @returns The current value of the source.
+ *
+ * @example
+ * ```ts
+ * sampleSource(42)               // 42
+ * sampleSource(motionValue(7))   // 7
+ * sampleSource(writable(11))     // 11
+ * ```
  */
 export const sampleSource = <T>(source: T | MotionValue<T> | Readable<T>): T => {
     if (isMotionValue(source)) return (source as MotionValue<T>).get()
@@ -81,6 +106,21 @@ export const sampleSource = <T>(source: T | MotionValue<T> | Readable<T>): T => 
  * @param value The motion-dom `MotionValue` to augment.
  * @param dispose Optional cleanup that runs once when `.destroy()` is first called (before motion-dom's internal teardown). Defaults to a no-op.
  * @returns The same `MotionValue` typed as {@link AugmentedMotionValue}.
+ *
+ * @example
+ * ```svelte
+ * <script lang="ts">
+ *   import { motionValue } from 'motion-dom'
+ *   import { augmentMotionValue } from './augmentMotionValue.svelte.js'
+ *
+ *   const mv = motionValue(0)
+ *   const aug = augmentMotionValue(mv, () => console.log('disposed'))
+ *
+ *   $effect(() => () => aug.destroy())
+ * </script>
+ *
+ * <div style="transform: translateX({aug.current}px)">{aug.current}</div>
+ * ```
  */
 export const augmentMotionValue = <T>(
     value: MotionValue<T>,
@@ -146,6 +186,24 @@ export const augmentMotionValue = <T>(
  * @param source A Svelte readable store.
  * @param coerce Optional transform applied to each emit (and the initial seed). Identity by default.
  * @returns A `MotionValue<TOut>` mirroring the readable + a dispose function.
+ *
+ * @example
+ * ```ts
+ * import { writable } from 'svelte/store'
+ *
+ * // Identity bridge — readable<number> → motionValue<number>
+ * const w = writable(0)
+ * const { value: mv, dispose } = bridgeReadableToMotionValue(w)
+ * w.set(50); mv.get() === 50
+ *
+ * // Coerce bridge — readable<string> → motionValue<number>
+ * const w2 = writable('100px')
+ * const bridge = bridgeReadableToMotionValue<string, number>(w2, parseFloat)
+ * bridge.value.get() === 100
+ *
+ * // Always pair with dispose() in your $effect cleanup.
+ * $effect(() => () => dispose())
+ * ```
  */
 export const bridgeReadableToMotionValue = <TIn, TOut = TIn>(
     source: Readable<TIn>,

@@ -52,14 +52,34 @@ const parseNumeric = (v: number | string): number => {
  * @see https://motion.dev/docs/react-use-velocity
  */
 export const useVelocity = (source: VelocitySource): AugmentedMotionValue<number> => {
-    // Bridge Svelte readables into a MotionValue so motion-dom's getVelocity()
-    // tracks per-frame deltas natively. MotionValue sources pass through
-    // unchanged — caller owns their destroy lifecycle.
+    // Bridge non-numeric sources into a MotionValue<number> so motion-dom's
+    // getVelocity() tracks deltas correctly. Two paths feed this:
+    //   1. Svelte readables — always bridged (motion-dom doesn't know how to
+    //      read them).
+    //   2. MotionValue<string> — bridged too, because motion-dom samples
+    //      `canTrackVelocity` ONCE from the initial value via
+    //      `!isNaN(parseFloat(value))`. A string MV that starts non-numeric
+    //      (e.g. `""`) gets stuck at velocity = 0 forever, even if it later
+    //      becomes a unit string like `"100px"`. The bridge runs every emit
+    //      through `parseNumeric` so the tracker MV is always numeric.
     let tracker: MotionValue<number>
     let disposeBridge: VoidFunction | undefined
 
     if (isMotionValue(source)) {
-        tracker = source as unknown as MotionValue<number>
+        const initial = (source as unknown as MotionValue<number | string>).get()
+        if (typeof initial === 'number') {
+            tracker = source as unknown as MotionValue<number>
+        } else {
+            const bridge = motionValue<number>(parseNumeric(initial))
+            const unsub = (source as unknown as MotionValue<number | string>).on('change', (v) => {
+                bridge.set(parseNumeric(v))
+            })
+            tracker = bridge
+            disposeBridge = () => {
+                unsub()
+                bridge.destroy()
+            }
+        }
     } else if (typeof window !== 'undefined') {
         const bridge = bridgeReadableToMotionValue<number | string, number>(source, parseNumeric)
         tracker = bridge.value

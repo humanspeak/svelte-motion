@@ -54,11 +54,15 @@ describe('utils/time - useTime', () => {
 
     it('advances after a frame tick', async () => {
         const ctx = inRoot(() => useTime())
+        // Wait through enough frames that the tick callback has captured a
+        // measurable delta against `performance.now()`. We can't fake the
+        // clock (motion-dom reads performance.now directly and we deliberately
+        // use real timers here), but two real frames is enough for a > 0
+        // assertion in a reasonable test runner.
         await nextFrame()
         await nextFrame()
-        // Two frames in, the keep-alive tick has run at least once and
-        // captured a non-zero delta from the first frame's timestamp.
-        expect(ctx.result.current).toBeGreaterThanOrEqual(0)
+        await nextFrame()
+        expect(ctx.result.current).toBeGreaterThan(0)
     })
 
     it('is SSR-safe (no window)', () => {

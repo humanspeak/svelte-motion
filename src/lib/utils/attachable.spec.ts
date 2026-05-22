@@ -74,6 +74,36 @@ describe('utils/attachable:createAttachable', () => {
         release()
     })
 
+    it('released-before-hydration: late ref resolution never triggers onAttach', async () => {
+        // Regression guard for the microtask-cancel contract: if a subscriber
+        // releases before its ref hydrates, the pending poll must not fire
+        // onAttach when the ref later resolves. This is the inverse of the
+        // dynamic-hydration test — verifies the cancellation path doesn't
+        // leak a late attach.
+        const ref: { current?: HTMLElement } = {}
+        const onAttach = vi.fn(() => undefined as VoidFunction | void)
+        const attachable = createAttachable({
+            refs: { target: () => ref.current },
+            onAttach
+        })
+
+        const release = attachable.subscribe()
+        await drainMicrotasks()
+        expect(onAttach).not.toHaveBeenCalled()
+
+        // Release while ref is still pending — cleanup should cancel the
+        // microtask retry.
+        release()
+
+        // Later, the ref hydrates. The cancelled retry must not fire.
+        ref.current = document.createElement('div')
+        await drainMicrotasks()
+        // Even if a fresh subscriber wakes the loop, the original retry was
+        // cancelled — so we don't see a stale onAttach from the released
+        // subscription.
+        expect(onAttach).not.toHaveBeenCalled()
+    })
+
     it('handles re-entrant stop() during onAttach (synchronous latch)', () => {
         // motion's `inView` once-latch calls stop() synchronously inside the
         // entry callback, before the returned cleanup has been assigned.

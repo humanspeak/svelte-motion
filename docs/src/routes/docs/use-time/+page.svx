@@ -66,9 +66,9 @@ The store value represents elapsed milliseconds, making it perfect for time-base
 
 ## Shared timelines
 
-Pass an `id` string to share the same timeline **across multiple components**. All calls with the same `id` will receive the same store instance, keeping animations perfectly synchronized.
+Pass an `id` string to share the same RAF loop **across multiple components**. Each call returns its **own** motion value — destroying one consumer's value doesn't ripple to others — but they all observe the same underlying timeline, so the values stay perfectly in lockstep. The shared loop runs while at least one consumer is alive and stops the moment the last one unmounts; the next `useTime(id)` call restarts it.
 
-> **Note**: Within a single component, you can simply reuse the same store reference. The `id` parameter is specifically useful for synchronizing animations across different components that don't share scope.
+> **Note**: Within a single component, you can simply reuse the same motion-value reference. The `id` parameter is specifically useful for synchronizing animations across different components that don't share scope.
 
 ```svelte
 <script>
@@ -109,7 +109,7 @@ Even though these are **separate components**, they both receive updates from th
 
 ### Synced timeline example
 
-Here's a complete example demonstrating the power of shared timelines. Notice how two **separate** `useTime()` calls with the same `id` return synchronized stores:
+Here's a complete example demonstrating the power of shared timelines. Notice how two **separate** `useTime()` calls with the same `id` return independent-but-synchronized motion values — different references, identical values every frame:
 
 ```svelte
 <script lang="ts">
@@ -158,7 +158,7 @@ Here's a complete example demonstrating the power of shared timelines. Notice ho
   <UseTimeSyncedExample />
 </Example>
 
-Both elements animate in perfect synchronization even though they use **different store references** (`time` and `time2`). The magic happens because both `useTime('synced-timeline')` calls return the same underlying timeline. Watch the values display - they're always identical! This is especially powerful when these elements live in **separate components** - the `id` parameter ensures they all stay in sync without prop drilling or context.
+Both elements animate in perfect synchronization even though they use **different motion-value references** (`time` and `time2`). The magic happens because both `useTime('synced-timeline')` calls observe the same underlying timeline — independent values, shared frame loop. Watch the values display - they're always identical! This is especially powerful when these elements live in **separate components** - the `id` parameter ensures they all stay in sync without prop drilling or context.
 
 ## How it works
 
