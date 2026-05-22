@@ -69,7 +69,7 @@ export const useVelocity = (source: VelocitySource): AugmentedMotionValue<number
         const initial = (source as unknown as MotionValue<number | string>).get()
         if (typeof initial === 'number') {
             tracker = source as unknown as MotionValue<number>
-        } else {
+        } else if (typeof window !== 'undefined') {
             const bridge = motionValue<number>(parseNumeric(initial))
             const unsub = (source as unknown as MotionValue<number | string>).on('change', (v) => {
                 bridge.set(parseNumeric(v))
@@ -79,6 +79,11 @@ export const useVelocity = (source: VelocitySource): AugmentedMotionValue<number
                 unsub()
                 bridge.destroy()
             }
+        } else {
+            // SSR: parse the initial value but don't subscribe — the change
+            // listener would leak past the early SSR return below (no
+            // $effect runs to call dispose).
+            tracker = motionValue<number>(parseNumeric(initial))
         }
     } else if (typeof window !== 'undefined') {
         const bridge = bridgeReadableToMotionValue<number | string, number>(source, parseNumeric)
