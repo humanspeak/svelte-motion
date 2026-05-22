@@ -61,6 +61,7 @@ export const docsSections: NavSection[] = [
         icon: Signal,
         items: [
             { title: 'Overview', href: '/docs/motion-values', icon: Signal },
+            { title: 'useFollowValue', href: '/docs/use-follow-value', icon: Activity },
             { title: 'useMotionTemplate', href: '/docs/use-motion-template', icon: Code },
             { title: 'useMotionValueEvent', href: '/docs/use-motion-value-event', icon: Zap },
             { title: 'useScroll', href: '/docs/use-scroll', icon: ArrowUpDown },

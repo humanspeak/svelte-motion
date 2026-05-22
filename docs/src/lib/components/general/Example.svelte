@@ -1,159 +1,38 @@
+<!--
+  Thin re-skin layer over docs-kit's `EmbeddedExampleV2`. Existing
+  consumers (~17 doc pages) keep their `<Example file=... exampleUrl=...
+  title=...>` invocation; this wrapper translates those props into the
+  upstream component so all docs pages immediately pick up the brutalist
+  bar styling.
+
+  `isSmall` is retained in the prop type for backward compatibility but
+  is now a no-op — the embedded variant has a single consistent size.
+-->
 <script lang="ts">
-    import { motion } from '@humanspeak/svelte-motion'
+    import { EmbeddedExampleV2 } from '@humanspeak/docs-kit'
     import { exampleSourceUrl } from '$lib/docs-config'
-    import { cn } from '$lib/shadcn/utils'
-    import * as m from '$msgs'
     import type { Snippet } from 'svelte'
-    import { LayoutGrid, ExternalLink, RotateCw } from '@lucide/svelte'
 
     type ExampleProps = {
         children: Snippet
+        /** Deprecated — no longer affects sizing. Kept to avoid breaking
+         *  existing consumers; can be removed in a future cleanup PR. */
         isSmall?: boolean
-        /**
-         * Filename inside `docs/src/lib/examples/` (e.g. `HoverAndTap.svelte`).
-         * The Source button links to this file on GitHub `main`, so users
-         * can read the actual Svelte source for the demo they're viewing.
-         */
+        /** Filename inside `docs/src/lib/examples/` (e.g. `HoverAndTap.svelte`).
+         *  Becomes the `source` link in the bar. */
         file?: string
+        /** Standalone `/examples/...` route this demo also lives at — surfaces
+         *  as the `open` link in the bar. */
         exampleUrl?: string
         title?: string
     }
 
-    const { children, isSmall = false, file, exampleUrl, title }: ExampleProps = $props()
+    const { children, file, exampleUrl, title }: ExampleProps = $props()
 
     const sourceUrl = $derived(file ? exampleSourceUrl(file) : undefined)
-
-    let refreshId = $state(0)
-    const refreshMotion = () => {
-        // motion.reset()
-        refreshId++
-    }
+    const filename = $derived(file ? file.split('/').pop() : undefined)
 </script>
 
-<div
-    class={cn(
-        'isolate flex h-full w-full flex-1 flex-col',
-        isSmall && 'rounded border border-border'
-    )}
->
-    <div class="flex h-12 w-full items-center border-b border-border px-3 py-2">
-        <div class="flex flex-1 items-center gap-2">
-            {#if isSmall}
-                <motion.a
-                    href="/examples"
-                    whileTap={{ scale: 0.9 }}
-                    whileHover={{ scale: 1.1 }}
-                    class="inline-flex items-center justify-center gap-1.5 rounded-md border border-border-muted px-2 py-1 text-sm text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
-                >
-                    <LayoutGrid size={12} />
-                    {m.example_examples()}
-                </motion.a>
-            {/if}
-            {#if exampleUrl}
-                <motion.a
-                    href={exampleUrl}
-                    whileTap={{ scale: 0.9 }}
-                    whileHover={{ scale: 1.1 }}
-                    class="inline-flex items-center justify-center gap-1.5 rounded-md border border-border-muted px-2 py-1 text-sm text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
-                >
-                    <ExternalLink size={12} />
-                    {m.example_open()}
-                </motion.a>
-            {/if}
-        </div>
-        <div class="flex flex-1 items-center justify-center gap-4"></div>
-        <div class="flex flex-1 items-center justify-end gap-4">
-            {#if sourceUrl}
-                <motion.button
-                    onclick={() => window.open(sourceUrl, '_blank')}
-                    whileTap={{ scale: 0.9 }}
-                    whileHover={{ scale: 1.1 }}
-                    class="inline-flex items-center justify-center rounded-md border border-border-muted px-2 py-1 text-sm text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
-                >
-                    Source
-                </motion.button>
-            {/if}
-            <motion.button
-                onclick={refreshMotion}
-                whileTap={{ scale: 0.9 }}
-                whileHover={{ scale: 1.1 }}
-                class="inline-flex size-6 items-center justify-center rounded-full border border-border-muted text-text-muted transition-colors hover:border-border-mid hover:text-text-secondary"
-            >
-                <RotateCw size={12} />
-            </motion.button>
-        </div>
-    </div>
-    <!-- Subtle brand background that never clips content -->
-    <!-- Subtle dotted grid background in brand teal -->
-    <!-- Keep dots within same stacking context so parent background doesn't cover them -->
-    {#if !isSmall}
-        <div
-            class="bg-grid-orange pointer-events-none fixed top-0 right-0 left-0 z-0"
-            style="bottom: 64px;"
-        ></div>
-    {/if}
-    <div class="relative z-10 m-0 flex w-full flex-1 items-center justify-center p-0">
-        {#if title && !isSmall}
-            <h1 class="sr-only">{title}</h1>
-        {/if}
-        <main class="flex h-full w-full max-w-none flex-1 items-center justify-center">
-            {#key refreshId}
-                {@render children()}
-            {/key}
-        </main>
-    </div>
-</div>
-
-<style>
-    /* Dotted grid similar to examples.motion.dev, tinted with brand teal */
-    .bg-grid-orange {
-        /* Light mode default: multiply over light background */
-        mix-blend-mode: multiply;
-        background-image:
-            radial-gradient(
-                color-mix(in srgb, var(--color-brand-600) 20%, transparent) 1.6px,
-                transparent 1.6px
-            ),
-            radial-gradient(
-                color-mix(in srgb, var(--color-brand-600) 10%, transparent) 1.6px,
-                transparent 1.6px
-            );
-        background-position:
-            0 0,
-            12px 12px;
-        background-size: 24px 24px;
-        opacity: 1;
-        /* Fade out upwards over bottom 15% (strongest at bottom) */
-        /* Strongest at bottom, smoothly fades out over ~15% */
-        -webkit-mask-image: linear-gradient(
-            to top,
-            rgba(0, 0, 0, 1) 0%,
-            rgba(0, 0, 0, 1) 5%,
-            rgba(0, 0, 0, 0) 20%
-        );
-        mask-image: linear-gradient(
-            to top,
-            rgba(0, 0, 0, 1) 0%,
-            rgba(0, 0, 0, 1) 5%,
-            rgba(0, 0, 0, 0) 20%
-        );
-        mask-repeat: no-repeat;
-        -webkit-mask-repeat: no-repeat;
-        mask-size: 100% 100%;
-        -webkit-mask-size: 100% 100%;
-    }
-
-    :global(.dark) .bg-grid-orange {
-        /* Dark mode: lighten over dark background */
-        mix-blend-mode: screen;
-        background-image:
-            radial-gradient(
-                color-mix(in srgb, var(--color-brand-500) 18%, transparent) 1.6px,
-                transparent 1.6px
-            ),
-            radial-gradient(
-                color-mix(in srgb, var(--color-brand-500) 10%, transparent) 1.6px,
-                transparent 1.6px
-            );
-    }
-</style>
+<EmbeddedExampleV2 {exampleUrl} {sourceUrl} {filename} label={title}>
+    {@render children()}
+</EmbeddedExampleV2>
