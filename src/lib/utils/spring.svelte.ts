@@ -6,7 +6,13 @@ import {
     type MotionValue,
     type SpringOptions
 } from 'motion-dom'
-import { get, type Readable } from 'svelte/store'
+import { type Readable } from 'svelte/store'
+import {
+    augmentMotionValue,
+    isSvelteReadable,
+    sampleSource,
+    type AugmentedMotionValue
+} from './augmentMotionValue.svelte.js'
 
 /**
  * Spring + follow options for {@link useSpring}.
@@ -34,26 +40,7 @@ export type UseSpringOptions = SpringOptions & Pick<FollowValueOptions, 'skipIni
  *   spring be used with `$spring` template syntax, `get(spring)`, and as a
  *   dependency in `useTransform`'s function form.
  */
-export type SpringMotionValue<T extends number | string> = Omit<MotionValue<T>, 'current'> & {
-    /** Reactive read in Svelte 5 templates / `$derived` / `$effect`. */
-    readonly current: T
-    /** Svelte readable store compatibility. */
-    subscribe: (run: (value: T) => void) => () => void
-}
-
-/**
- * Detects a Svelte readable store. Excludes motion-dom `MotionValue` instances
- * (which also expose `subscribe`-shaped APIs in some versions) so the
- * MotionValue path is preferred.
- */
-const isSvelteReadable = (value: unknown): value is Readable<number | string> => {
-    return (
-        !!value &&
-        typeof value === 'object' &&
-        typeof (value as { subscribe?: unknown }).subscribe === 'function' &&
-        !isMotionValue(value)
-    )
-}
+export type SpringMotionValue<T extends number | string> = AugmentedMotionValue<T>
 
 /**
  * Creates a spring-animated `MotionValue`.
@@ -127,11 +114,11 @@ export function useSpring(
     // best-effort initial value; .set / .jump become no-ops to avoid drifting
     // away from the server-rendered snapshot.
     if (typeof window === 'undefined') {
-        const initial = readInitial(source)
+        const initial = sampleSource(source as T | MotionValue<T> | Readable<T>)
         const ssrValue = motionValue<T>(initial)
         ssrValue.set = () => undefined
         ssrValue.jump = () => undefined
-        return augmentForSvelte(ssrValue, () => undefined) as unknown as
+        return augmentMotionValue(ssrValue) as unknown as
             | SpringMotionValue<number>
             | SpringMotionValue<string>
     }
@@ -143,10 +130,10 @@ export function useSpring(
 
     if (isMotionValue(source)) {
         followSource = source as MotionValue<T>
-    } else if (isSvelteReadable(source)) {
+    } else if (isSvelteReadable<T>(source)) {
         // Bridge a Svelte readable into a MotionValue so attachFollow can
         // track it. Synchronous initial sample comes from svelte/store's get().
-        const initialFromReadable = get(source) as T
+        const initialFromReadable = sampleSource(source as Readable<T>)
         svelteBridge = motionValue<T>(initialFromReadable)
         cleanupReadableBridge = source.subscribe((v) => {
             // The Svelte readable contract calls the subscriber synchronously
@@ -177,64 +164,7 @@ export function useSpring(
 
     $effect(() => () => value.destroy())
 
-    return augmentForSvelte(value, dispose) as unknown as
+    return augmentMotionValue(value, dispose) as unknown as
         | SpringMotionValue<number>
         | SpringMotionValue<string>
-}
-
-/**
- * Pull the synchronous initial value out of any accepted source form.
- */
-const readInitial = (source: unknown): number | string => {
-    if (typeof source === 'number' || typeof source === 'string') return source
-    if (isMotionValue(source)) return source.get() as number | string
-    if (isSvelteReadable(source)) return get(source) as number | string
-    return 0
-}
-
-/**
- * Layer Svelte-friendly affordances onto a motion-dom MotionValue: a
- * `$state`-tracked `.current` accessor (routing motion-dom's internal
- * `this.current = v` writes through `$state` so templates and `$derived` /
- * `$effect` re-run) and a Svelte readable store `.subscribe(run)` shim.
- */
-const augmentForSvelte = <T extends number | string>(
-    value: MotionValue<T>,
-    dispose: VoidFunction
-): SpringMotionValue<T> => {
-    let current = $state(value.get() as T)
-    Object.defineProperty(value, 'current', {
-        get: () => current,
-        // Same-value writes are no-ops: motion-dom's `updateAndNotify` calls
-        // `setCurrent(v)` before its own change check, so spring frames at
-        // rest still hit this setter; skipping equal writes avoids gratuitous
-        // accessor work even though $state would itself dedupe.
-        set: (v: T) => {
-            if (v !== current) current = v
-        },
-        enumerable: true,
-        configurable: true
-    })
-
-    const originalDestroy = value.destroy.bind(value)
-    let destroyed = false
-    value.destroy = () => {
-        if (destroyed) return
-        destroyed = true
-        dispose()
-        originalDestroy()
-    }
-
-    const subscribe = (run: (v: T) => void) => {
-        run(value.get() as T)
-        return value.on('change', run)
-    }
-    Object.defineProperty(value, 'subscribe', {
-        value: subscribe,
-        writable: false,
-        enumerable: false,
-        configurable: true
-    })
-
-    return value as unknown as SpringMotionValue<T>
 }

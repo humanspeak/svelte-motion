@@ -1,6 +1,6 @@
 ---
 title: "useTime"
-description: "A reactive store that ticks once per animation frame with elapsed milliseconds."
+description: "A motion value that ticks once per animation frame with elapsed milliseconds."
 ---
 
 <script>
@@ -13,28 +13,27 @@ description: "A reactive store that ticks once per animation frame with elapsed 
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'useTime | Docs | Svelte Motion'
-      seo.description = 'A reactive Svelte store that ticks once per animation frame with elapsed milliseconds. Drive continuous animations with Svelte Motion useTime.'
+      seo.description = 'A motion-dom MotionValue that ticks once per animation frame with elapsed milliseconds. Reactive .current reads and shared timelines in Svelte 5.'
       seo.ogTitle = 'useTime'
       seo.ogTagline = 'Motion value that updates with elapsed time'
-      seo.ogFeatures = ['Elapsed Time', 'Frame Updates', 'Continuous Motion', 'Reactive Store']
+      seo.ogFeatures = ['Elapsed Time', 'Frame Updates', 'MotionValue', 'Shared Timelines']
       seo.ogSlug = 'docs-use-time'
   }
 </script>
 
 # useTime
 
-`useTime` returns a Svelte readable store that updates once per animation frame with elapsed milliseconds since the store was created.
+`useTime` returns a motion-dom `MotionValue<number>` that updates once per animation frame with elapsed milliseconds since the value was created. It's a real motion value augmented with a `$state`-backed `.current` getter and a Svelte readable `.subscribe` shim — so it composes with `useTransform`, `useSpring`, and the rest of the Tier 2 surface.
 
 ```svelte
 <script>
-  import { useTime } from '@humanspeak/svelte-motion'
-  import { derived } from 'svelte/store'
+  import { useTime, useTransform } from '@humanspeak/svelte-motion'
 
   const time = useTime()
-  const rotate = derived(time, (t) => ((t % 4000) / 4000) * 360)
+  const rotate = useTransform(time, [0, 4000], [0, 360], { clamp: false })
 </script>
 
-<div style="transform: rotate({$rotate}deg)">
+<div style="transform: rotate({rotate.current}deg)">
   Rotating content
 </div>
 ```
@@ -67,9 +66,9 @@ The store value represents elapsed milliseconds, making it perfect for time-base
 
 ## Shared timelines
 
-Pass an `id` string to share the same timeline **across multiple components**. All calls with the same `id` will receive the same store instance, keeping animations perfectly synchronized.
+Pass an `id` string to share the same RAF loop **across multiple components**. Each call returns its **own** motion value — destroying one consumer's value doesn't ripple to others — but they all observe the same underlying timeline, so the values stay perfectly in lockstep. The shared loop runs while at least one consumer is alive and stops the moment the last one unmounts; the next `useTime(id)` call restarts it.
 
-> **Note**: Within a single component, you can simply reuse the same store reference. The `id` parameter is specifically useful for synchronizing animations across different components that don't share scope.
+> **Note**: Within a single component, you can simply reuse the same motion-value reference. The `id` parameter is specifically useful for synchronizing animations across different components that don't share scope.
 
 ```svelte
 <script>
@@ -110,7 +109,7 @@ Even though these are **separate components**, they both receive updates from th
 
 ### Synced timeline example
 
-Here's a complete example demonstrating the power of shared timelines. Notice how two **separate** `useTime()` calls with the same `id` return synchronized stores:
+Here's a complete example demonstrating the power of shared timelines. Notice how two **separate** `useTime()` calls with the same `id` return independent-but-synchronized motion values — different references, identical values every frame:
 
 ```svelte
 <script lang="ts">
@@ -159,34 +158,38 @@ Here's a complete example demonstrating the power of shared timelines. Notice ho
   <UseTimeSyncedExample />
 </Example>
 
-Both elements animate in perfect synchronization even though they use **different store references** (`time` and `time2`). The magic happens because both `useTime('synced-timeline')` calls return the same underlying timeline. Watch the values display - they're always identical! This is especially powerful when these elements live in **separate components** - the `id` parameter ensures they all stay in sync without prop drilling or context.
+Both elements animate in perfect synchronization even though they use **different motion-value references** (`time` and `time2`). The magic happens because both `useTime('synced-timeline')` calls observe the same underlying timeline — independent values, shared frame loop. Watch the values display - they're always identical! This is especially powerful when these elements live in **separate components** - the `id` parameter ensures they all stay in sync without prop drilling or context.
 
 ## How it works
 
-`useTime` leverages Svelte's reactive store system:
+`useTime` wraps motion-dom's `MotionValue` with a per-frame RAF loop:
 
-1. Creates a readable store that updates via `requestAnimationFrame`
-2. Returns elapsed milliseconds since the store was created
-3. With an `id`, returns a shared store instance for synchronization
-4. Automatically cleans up animation frames when all subscribers unsubscribe
+1. Creates a `MotionValue<number>` that writes elapsed milliseconds on every `requestAnimationFrame`
+2. With an `id`, multiple consumers observe the **same** RAF loop — each call still returns an independent motion value (so destroying one doesn't affect others) but they stay in lockstep
+3. The RAF loop attaches at component mount via `$effect` and detaches at unmount — when the last consumer of a shared `id` unmounts, the loop stops; the next `useTime(id)` call restarts it
 
-### Store lifecycle
+### Read patterns
 
 ```svelte
 <script>
   const time = useTime()
 
-  // Subscribe explicitly
-  const unsubscribe = time.subscribe(value => {
-    console.log('Elapsed time:', value, 'ms')
+  // Preferred — reactive in Svelte 5 templates / $derived / $effect
+  $effect(() => {
+    console.log('Elapsed time:', time.current, 'ms')
   })
 
-  // Or use $ prefix for automatic subscription
-  $: console.log('Current time:', $time)
+  // Imperative (event handlers, callbacks)
+  function logNow() {
+    console.log('Now:', time.get(), 'ms')
+  }
+
+  // Legacy $ prefix still works via the .subscribe shim
+  // {$time}
 </script>
 ```
 
-The store automatically starts updating when you subscribe and stops when all subscriptions are removed.
+The RAF loop starts at component mount and stops at unmount — no subscriber tracking required.
 
 ## Performance
 
@@ -194,8 +197,8 @@ The store automatically starts updating when you subscribe and stops when all su
 
 - **Frame-perfect**: Updates at display refresh rate (typically 60 FPS)
 - **Efficient**: Single `requestAnimationFrame` loop per unique timeline
-- **Shared resources**: Multiple subscribers share the same animation frame
-- **Auto-cleanup**: Cancels frames when no subscribers remain
+- **Shared resources**: Multiple consumers of the same `id` share one loop
+- **Auto-cleanup**: Cancels the frame loop on component unmount
 
 ## Common patterns
 
@@ -275,17 +278,13 @@ The store automatically starts updating when you subscribe and stops when all su
 
 ### Returns
 
-A Svelte `Readable<number>` store containing elapsed milliseconds since creation.
+An `AugmentedMotionValue<number>` — a real motion-dom `MotionValue` containing elapsed milliseconds since creation, plus:
 
-### Methods
+- `.current` — Svelte 5 reactive getter (templates, `$derived`, `$effect`).
+- `.subscribe(run)` — Svelte readable store contract (powers `$time` template syntax and `derived(time, …)`).
+- `.get()` / `.on('change', cb)` / all other motion-value methods from motion-dom.
 
-The returned store implements Svelte's `Readable` interface:
-
-```typescript
-interface Readable<T> {
-  subscribe(run: (value: T) => void): () => void
-}
-```
+The motion value's lifecycle is bound to the surrounding `$effect`: the RAF loop starts at mount and stops at unmount. For shared `id` timelines the loop stops only when the last consumer unmounts.
 
 ## When to use
 

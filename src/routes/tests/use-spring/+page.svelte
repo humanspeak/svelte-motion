@@ -7,8 +7,9 @@
     // Path 2: scalar source + legacy $store template syntax via .subscribe shim
     const y = useSpring(0, { stiffness: 220, damping: 18 })
 
-    // Path 3: useTransform consumes the spring via .subscribe shim (function form)
-    const blur = useTransform(() => `blur(${Math.abs($y) / 20}px)`, [y])
+    // Path 3: useTransform consumes the spring via .get() (function form,
+    // auto-tracked through motion-dom's collectMotionValues session)
+    const blur = useTransform(() => `blur(${Math.abs(y.get()) / 20}px)`)
 
     // Path 4: unit-string spring
     const rotate = useSpring('0deg', { stiffness: 120, damping: 14 })
@@ -95,8 +96,8 @@
             )}
             <p class="hint">
                 Bonus: this box's <code>filter: {$blur}</code> is driven by
-                <code>useTransform(() =&gt; …, [y])</code> — proves the function-form
-                <code>useTransform</code> still composes with the new spring.
+                <code>useTransform(() =&gt; … y.get() …)</code> — auto-tracked compute form composes with
+                the spring (no deps array needed).
             </p>
         </section>
 
@@ -130,8 +131,8 @@
                     ✓
                 </li>
                 <li>
-                    <code>useTransform(() =&gt; …, [spring])</code> — function-form composition still
-                    works ✓
+                    <code>useTransform(() =&gt; … spring.get() …)</code> — auto-tracked compute form composes
+                    with the spring ✓
                 </li>
                 <li>
                     <code>useSpring('0deg')</code> — unit-string source preserved through animation ✓

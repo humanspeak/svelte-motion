@@ -3,6 +3,7 @@ import {
     Accessibility,
     Activity,
     ArrowUpDown,
+    BookText,
     Box,
     Clock,
     Code,
@@ -17,6 +18,7 @@ import {
     Move,
     Play,
     RefreshCw,
+    Settings,
     Signal,
     SlidersHorizontal,
     Timer,
@@ -33,7 +35,10 @@ export const docsSections: NavSection[] = [
     {
         title: 'Components',
         icon: Ghost,
-        items: [{ title: 'AnimatePresence', href: '/docs/animate-presence', icon: Ghost }]
+        items: [
+            { title: 'AnimatePresence', href: '/docs/animate-presence', icon: Ghost },
+            { title: 'MotionConfig', href: '/docs/motion-config', icon: Settings }
+        ]
     },
     {
         title: 'Animation',
@@ -46,7 +51,10 @@ export const docsSections: NavSection[] = [
     {
         title: 'Gestures',
         icon: Hand,
-        items: [{ title: 'Drag', href: '/docs/drag', icon: Hand }]
+        items: [
+            { title: 'Gestures (overview)', href: '/docs/gestures', icon: Hand },
+            { title: 'Drag', href: '/docs/drag', icon: Hand }
+        ]
     },
     {
         title: 'Motion values',
@@ -87,6 +95,11 @@ export const docsSections: NavSection[] = [
         title: 'Utilities',
         icon: Wand,
         items: [{ title: 'styleString', href: '/docs/style-string', icon: Wand }]
+    },
+    {
+        title: 'Reference',
+        icon: BookText,
+        items: [{ title: 'API Reference', href: '/docs/api-reference', icon: BookText }]
     },
     {
         title: 'Performance',

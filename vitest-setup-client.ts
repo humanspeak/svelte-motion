@@ -16,3 +16,9 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 // add more mocks here if you need them
+// Note for future authors: this environment installs vitest fake timers by
+// default somewhere upstream (likely `svelteTesting()` from
+// @testing-library/svelte/vite), which freezes motion-dom's frame loop
+// (`rAF` + `setTimeout` both never fire). Specs that need a real frame loop
+// — anything driving motion-dom's `frame.render` / `frame.update` — must
+// call `vi.useRealTimers()` in their own `beforeEach`.

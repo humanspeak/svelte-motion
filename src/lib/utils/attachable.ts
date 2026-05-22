@@ -1,3 +1,4 @@
+import { cancelMicrotask, microtask } from 'motion-dom'
 import { resolveElement, type ElementOrGetter } from './dom.js'
 
 /**
@@ -78,7 +79,7 @@ export const createAttachable = <R extends AttachableRefs>(
     config: AttachableConfig<R>
 ): Attachable => {
     let cleanup: VoidFunction | undefined
-    let pollRaf = 0
+    let pollScheduled = false
     let subscriberCount = 0
     // When stop() runs synchronously inside onAttach, cleanup hasn't been
     // assigned yet. Defer the teardown so the just-returned disposer still
@@ -86,10 +87,15 @@ export const createAttachable = <R extends AttachableRefs>(
     let attaching = false
     let stopRequestedDuringAttach = false
 
+    const pollTick = () => {
+        pollScheduled = false
+        tryAttach()
+    }
+
     const cancelPoll = () => {
-        if (pollRaf) {
-            cancelAnimationFrame(pollRaf)
-            pollRaf = 0
+        if (pollScheduled) {
+            cancelMicrotask(pollTick)
+            pollScheduled = false
         }
     }
 
@@ -118,11 +124,11 @@ export const createAttachable = <R extends AttachableRefs>(
             els[key] = el
         }
         if (needsPoll) {
-            if (!pollRaf) {
-                pollRaf = requestAnimationFrame(() => {
-                    pollRaf = 0
-                    tryAttach()
-                })
+            // Microtask schedule (matches useScroll's pattern) — one frame
+            // faster than rAF for refs that hydrate the same tick.
+            if (!pollScheduled) {
+                pollScheduled = true
+                microtask.read(pollTick)
             }
             return
         }

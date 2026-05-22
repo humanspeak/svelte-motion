@@ -51,31 +51,42 @@ export type {
 export { useAnimate } from '$lib/utils/animate.svelte'
 export type { AnimationScope } from '$lib/utils/animate.svelte'
 export { useAnimationFrame } from '$lib/utils/animationFrame'
+export type { AugmentedMotionValue } from '$lib/utils/augmentMotionValue.svelte'
 export { useCycle } from '$lib/utils/cycle.svelte'
 export type { Cycle, CycleState } from '$lib/utils/cycle.svelte'
 export { createDragControls } from '$lib/utils/dragControls'
 export { useInView } from '$lib/utils/inView.svelte'
 export type { InViewState, UseInViewOptions } from '$lib/utils/inView.svelte'
-export { useMotionTemplate } from '$lib/utils/motionTemplate'
-export { useMotionValue } from '$lib/utils/motionValue'
-export type { MotionValue } from '$lib/utils/motionValue'
+export { useMotionTemplate } from '$lib/utils/motionTemplate.svelte'
+export type { MotionTemplateInput } from '$lib/utils/motionTemplate.svelte'
+export { useMotionValue } from '$lib/utils/motionValue.svelte'
+export type { MotionValue, RawMotionValue } from '$lib/utils/motionValue.svelte'
 export { useMotionValueEvent } from '$lib/utils/motionValueEvent'
 export { useReducedMotion } from '$lib/utils/reducedMotion.svelte'
 export type { ReducedMotionState } from '$lib/utils/reducedMotion.svelte'
 export { useReducedMotionConfig } from '$lib/utils/reducedMotionConfig.svelte'
-export { useScroll } from '$lib/utils/scroll'
+export { useScroll } from '$lib/utils/scroll.svelte'
+export type { UseScrollOptions, UseScrollReturn } from '$lib/utils/scroll.svelte'
 export { useSpring } from '$lib/utils/spring.svelte'
 export type { SpringMotionValue, UseSpringOptions } from '$lib/utils/spring.svelte'
 export { useIsPresent, usePresence } from '$lib/utils/usePresence'
 export type { UsePresenceState } from '$lib/utils/usePresence'
-export { useVelocity } from '$lib/utils/velocity'
+export { useVelocity } from '$lib/utils/velocity.svelte'
+export type { VelocitySource } from '$lib/utils/velocity.svelte'
 /**
  * @deprecated Use `styleString` instead for reactive styles with automatic unit handling.
  */
 export { stringifyStyleObject } from '$lib/utils/styleObject'
 export { styleString } from '$lib/utils/styleObject.svelte'
-export { useTime } from '$lib/utils/time'
-export { useTransform } from '$lib/utils/transform'
+export { useTime } from '$lib/utils/time.svelte'
+export { useTransform } from '$lib/utils/transform.svelte'
+export type {
+    MultiTransformer,
+    SingleTransformer,
+    TransformOptions,
+    TransformOutputMap,
+    TransformSource
+} from '$lib/utils/transform.svelte'
 export { AnimatePresence, LayoutGroup, MotionConfig, PresenceChild }
 
 // Named component exports — tree-shakeable alternative to the `motion` object

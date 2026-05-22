@@ -16,7 +16,7 @@
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
     <div class="wrapper">
-        <div class="progress-bar" style="transform: scaleX({$scaleX});"></div>
+        <div class="progress-bar" style="transform: scaleX({scaleX.current});"></div>
 
         <div class="scroll-area" bind:this={containerEl}>
             {#each colors as color, i (color)}

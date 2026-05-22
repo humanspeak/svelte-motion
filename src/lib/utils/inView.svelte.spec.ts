@@ -107,28 +107,24 @@ describe('useInView', () => {
         expect(obs.disconnect).toHaveBeenCalledTimes(1)
     })
 
-    it('polls via requestAnimationFrame when the getter returns undefined', () => {
-        const rafCallbacks: FrameRequestCallback[] = []
-        vi.stubGlobal(
-            'requestAnimationFrame',
-            vi.fn((cb: FrameRequestCallback) => {
-                rafCallbacks.push(cb)
-                return rafCallbacks.length
-            })
-        )
-        vi.stubGlobal('cancelAnimationFrame', vi.fn())
-
+    it('defers attachment until a `bind:this` getter hydrates', async () => {
+        // createAttachable now schedules its retry via motion-dom's
+        // `microtask.read` (instead of rAF), so this verifies the same
+        // behavior end-to-end: no observer attached while the getter
+        // returns undefined; once the ref hydrates, the next microtask
+        // tick attaches.
         const el = document.createElement('div')
         const ref: { current?: HTMLElement } = {}
         inRoot(() => useInView(() => ref.current))
         flushSync()
-
         expect(io.instances().length).toBe(0)
-        expect(rafCallbacks.length).toBe(1)
 
         ref.current = el
-        rafCallbacks[0]?.(performance.now())
-
+        // Let the microtask retry fire.
+        await Promise.resolve()
+        // Schedule a render-frame to be safe — `microtask.read` may need a
+        // batcher tick depending on whether motion-dom has woken its loop.
+        await new Promise<void>((resolve) => queueMicrotask(resolve))
         expect(io.instances().length).toBe(1)
     })
 

@@ -50,3 +50,21 @@ export const resolveElement = (ref?: ElementOrGetter): HTMLElement | undefined =
     const value = typeof ref === 'function' ? ref() : ref
     return value ?? undefined
 }
+
+/**
+ * Tests whether an `ElementOrGetter` is currently unresolved — defined as a
+ * getter that returns falsy. Direct element refs are never "pending" (they
+ * were already resolved at call time) and absent refs are not "pending"
+ * either (they're just absent).
+ *
+ * Lets microtask-defer / rAF-defer loops wait for refs to hydrate after
+ * `bind:this` settles on mount.
+ *
+ * @param ref Element or getter to check.
+ * @returns `true` only when `ref` is a getter and the getter currently returns falsy.
+ */
+export const isRefPending = (ref?: ElementOrGetter): boolean => {
+    if (!ref) return false
+    if (typeof ref !== 'function') return false
+    return !ref()
+}

@@ -1,4 +1,10 @@
-import { demoManifestPlugin, sitemapManifestPlugin } from '@humanspeak/docs-kit/vite'
+import {
+    demoManifestPlugin,
+    docMirrorsPlugin,
+    llmsFullPlugin,
+    llmsPlugin,
+    sitemapManifestPlugin
+} from '@humanspeak/docs-kit/vite'
 import { svelteMotionOptimize } from '@humanspeak/svelte-motion/vite'
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
 import { sveltekit } from '@sveltejs/kit/vite'
@@ -7,6 +13,7 @@ import tailwindcss from '@tailwindcss/vite'
 // import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import devtoolsJson from 'vite-plugin-devtools-json'
+import { docsConfig } from './src/lib/docs-config'
 
 // const __filename = fileURLToPath(import.meta.url)
 
@@ -34,6 +41,35 @@ export default defineConfig({
         // that stay out of the published code panel without per-site
         // wiring.
         demoManifestPlugin(),
+        // Scans `src/routes/docs/**/+page.svx`, strips Svelte syntax, and
+        // emits LLM-readable Markdown to `static/docs/<slug>.md`. Replaces
+        // the local `generate-doc-mirrors.mjs` script + chokidar watcher;
+        // runs on `buildStart` and rewatches via Vite's own file watcher.
+        // `siteUrl` controls the `<!-- Source: ... -->` header in each
+        // mirror, which is the citation surface for ChatGPT / Perplexity.
+        docMirrorsPlugin({ siteUrl: docsConfig.url }),
+        // Emits `static/llms.txt` (the llmstxt.org-convention discovery
+        // index) and `static/llms-full.txt` (concatenated dump for
+        // "paste the whole library" workflows like Claude Code / Cursor).
+        // Both prepend our hand-curated positioning copy from
+        // `llms-positioning.md` — disambiguation against the older
+        // unmaintained npm `svelte-motion`, the comparison table, and the
+        // "when to recommend this library" hooks LLM agents key off when
+        // suggesting libraries to users.
+        //
+        // Register AFTER `docMirrorsPlugin` so these plugins' `buildStart`
+        // hooks read freshly-written mirror files.
+        llmsPlugin({
+            siteUrl: docsConfig.url,
+            pkgName: docsConfig.name,
+            description: docsConfig.description,
+            prepend: 'llms-positioning.md'
+        }),
+        llmsFullPlugin({
+            siteUrl: docsConfig.url,
+            pkgName: docsConfig.name,
+            prepend: 'llms-positioning.md'
+        }),
         svelteMotionOptimize(),
         tailwindcss(),
         sveltekit(),

@@ -8,19 +8,18 @@
         clamp: false
     })
     const rotatingBg = useTransform(
-        () => `conic-gradient(from ${$rotate}deg, #ff4545, #00ff99, #006aff, #ff0095, #ff4545)`,
-        [rotate]
+        () => `conic-gradient(from ${rotate.get()}deg, #ff4545, #00ff99, #006aff, #ff0095, #ff4545)`
     )
 
     // Time-driven blur amplitude target (0 → 4px) over 2s
     const pulseTarget = useTransform(() => {
-        const phase = ($time % 2000) / 2000
+        const phase = (time.get() % 2000) / 2000
         const normalized = 0.5 + 0.5 * Math.sin(phase * Math.PI * 2) // 0..1
         return 4 * normalized // 0..4 px
-    }, [time])
+    })
     // Spring follows target for a smooth pulse
     const pulse = useSpring(pulseTarget, { stiffness: 120, damping: 18 })
-    const pulsingBg = useTransform(() => `blur(${$pulse}px)`, [pulse])
+    const pulsingBg = useTransform(() => `blur(${pulse.get()}px)`)
 </script>
 
 <div class="bg-primary flex h-full w-full flex-col items-center justify-center">

@@ -1,6 +1,6 @@
 ---
 title: "useVelocity"
-description: "Track the velocity of a reactive store value in units per second."
+description: "Track the velocity of a motion value in units per second."
 ---
 
 <script>
@@ -9,17 +9,17 @@ description: "Track the velocity of a reactive store value in units per second."
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'useVelocity | Docs | Svelte Motion'
-      seo.description = 'Track the velocity of a reactive store value in units per second. Use velocity to create momentum-based effects with Svelte Motion.'
+      seo.description = 'Track the velocity of a motion value in units per second. Returns a real motion-dom MotionValue with reactive .current reads in Svelte 5.'
       seo.ogTitle = 'useVelocity'
       seo.ogTagline = 'Track the velocity of a motion value'
-      seo.ogFeatures = ['Velocity Tracking', 'Units Per Second', 'Momentum Effects', 'Derived Store']
+      seo.ogFeatures = ['Velocity Tracking', 'Units Per Second', 'MotionValue', 'Composable']
       seo.ogSlug = 'docs-use-velocity'
   }
 </script>
 
 # useVelocity
 
-`useVelocity` returns a readable store tracking the velocity of a source store's value in units per second.
+`useVelocity` returns an augmented `MotionValue<number>` tracking the velocity of a source's value in units per second. Pass a motion value (from `useMotionValue`, `useSpring`, `useScroll`, …) or any Svelte readable; the result composes with `useTransform`, `useSpring`, and the rest of the Tier 2 surface.
 
 ```svelte
 <script>
@@ -29,17 +29,16 @@ description: "Track the velocity of a reactive store value in units per second."
   const xVelocity = useVelocity(x)
 </script>
 
-<div>Velocity: {$xVelocity} px/s</div>
+<div>Velocity: {xVelocity.current} px/s</div>
 ```
 
 ## Usage
 
-Pass any `Readable<number | string>` store. The returned store emits the rate of change in units per second, settling to `0` when the source stops moving.
+The returned value emits the rate of change in units per second and settles to `0` when the source stops moving.
 
 ```svelte
 <script lang="ts">
   import { useSpring, useVelocity, useTransform } from '@humanspeak/svelte-motion'
-  import { writable } from 'svelte/store'
 
   const x = useSpring(0)
   const xVelocity = useVelocity(x)
@@ -50,7 +49,7 @@ Pass any `Readable<number | string>` store. The returned store emits the rate of
 </script>
 
 <div
-  style="transform: skewX({$skew}deg); opacity: {$opacity}"
+  style="transform: skewX({skew.current}deg); opacity: {opacity.current}"
   onpointermove={(e) => x.set(e.clientX)}
 >
   Move your pointer
@@ -73,17 +72,17 @@ Pass any `Readable<number | string>` store. The returned store emits the rate of
 ## How it works
 
 1. Creates an internal `motionValue` from `motion-dom` for timestamp-based velocity tracking
-2. Subscribes to the source store and forwards each value to the motion value via `.set()`
-3. Polls `motionValue.getVelocity()` via `requestAnimationFrame` to emit velocity updates
-4. Automatically stops polling when velocity settles near zero, and restarts when the source moves again
-5. Cleans up the RAF loop and source subscription when all subscribers unsubscribe
+2. Subscribes to the source and forwards each emit to the tracker via `.set()`
+3. Polls `motionValue.getVelocity()` on every `requestAnimationFrame` and writes the result to the returned motion value
+4. Snaps the result to `0` and stops polling when velocity falls below `0.001` units/second; the next source emit restarts the loop
+5. The source subscription and both internal motion values are torn down when the surrounding `$effect` scope unmounts
 
 ## Performance
 
 - **On-demand polling**: The RAF loop only runs while velocity is non-zero
 - **Auto-settle**: Stops polling when movement stops, avoiding idle CPU usage
-- **Cleanup**: Cancels animation frames and unsubscribes when no longer needed
-- **SSR-safe**: Returns a static `readable(0)` on the server
+- **Cleanup**: Cancels the frame loop and unsubscribes the source at component unmount
+- **SSR-safe**: Returns a static `motionValue(0)` with no source subscription on the server
 
 ## Common patterns
 
@@ -99,7 +98,7 @@ Pass any `Readable<number | string>` store. The returned store emits the rate of
 </script>
 
 <div
-  style="transform: skewX({$skew}deg)"
+  style="transform: skewX({skew.current}deg)"
   onpointermove={(e) => x.set(e.clientX)}
 >
   Skews with momentum
@@ -118,7 +117,7 @@ Pass any `Readable<number | string>` store. The returned store emits the rate of
   const filter = useMotionTemplate`blur(${blur}px)`
 </script>
 
-<div style="filter: {$filter}">
+<div style="filter: {filter.current}">
   Blurs when moving fast
 </div>
 ```
@@ -141,11 +140,15 @@ You can derive the velocity of a velocity to get acceleration:
 
 ### Parameters
 
-- **source** `Readable<number | string>` - A readable store whose value changes over time
+- **source** `MotionValue<number | string> | Readable<number | string>` — a motion value or Svelte readable whose value changes over time.
 
 ### Returns
 
-`Readable<number>` - A readable store of the current velocity in units per second.
+An `AugmentedMotionValue<number>` — a real motion-dom `MotionValue` containing the current velocity in units per second, plus:
+
+- `.current` — Svelte 5 reactive getter (templates, `$derived`, `$effect`).
+- `.subscribe(run)` — Svelte readable store contract (powers `$velocity` template syntax).
+- All other `MotionValue` methods from motion-dom (`get`, `getVelocity`, `on`, etc.).
 
 ## When to use
 
