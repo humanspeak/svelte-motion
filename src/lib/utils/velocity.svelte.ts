@@ -49,6 +49,29 @@ const parseNumeric = (v: number | string): number => {
  * @param source A motion value or readable store of numeric or unit-string values.
  * @returns A `MotionValue<number>` with `.current` and `.subscribe`.
  *
+ * @example
+ * ```svelte
+ * <script lang="ts">
+ *   import {
+ *     useMotionValue,
+ *     useTransform,
+ *     useVelocity
+ *   } from '@humanspeak/svelte-motion'
+ *
+ *   const x = useMotionValue(0)
+ *   const xVelocity = useVelocity(x)
+ *   // Map velocity to a momentum-driven skew. Skew goes positive when x is
+ *   // accelerating right, negative when accelerating left, and snaps to 0
+ *   // when motion settles.
+ *   const skew = useTransform(xVelocity, [-1000, 0, 1000], [-15, 0, 15])
+ * </script>
+ *
+ * <div
+ *   style="transform: translateX({x.current}px) skewX({skew.current}deg)"
+ *   onpointermove={(e) => x.set(e.clientX)}
+ * />
+ * ```
+ *
  * @see https://motion.dev/docs/react-use-velocity
  */
 export const useVelocity = (source: VelocitySource): AugmentedMotionValue<number> => {
