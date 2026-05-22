@@ -1,4 +1,8 @@
-import { demoManifestPlugin, sitemapManifestPlugin } from '@humanspeak/docs-kit/vite'
+import {
+    demoManifestPlugin,
+    docMirrorsPlugin,
+    sitemapManifestPlugin
+} from '@humanspeak/docs-kit/vite'
 import { svelteMotionOptimize } from '@humanspeak/svelte-motion/vite'
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
 import { sveltekit } from '@sveltejs/kit/vite'
@@ -7,6 +11,7 @@ import tailwindcss from '@tailwindcss/vite'
 // import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import devtoolsJson from 'vite-plugin-devtools-json'
+import { docsConfig } from './src/lib/docs-config'
 
 // const __filename = fileURLToPath(import.meta.url)
 
@@ -34,6 +39,13 @@ export default defineConfig({
         // that stay out of the published code panel without per-site
         // wiring.
         demoManifestPlugin(),
+        // Scans `src/routes/docs/**/+page.svx`, strips Svelte syntax, and
+        // emits LLM-readable Markdown to `static/docs/<slug>.md`. Replaces
+        // the local `generate-doc-mirrors.mjs` script + chokidar watcher;
+        // runs on `buildStart` and rewatches via Vite's own file watcher.
+        // `siteUrl` controls the `<!-- Source: ... -->` header in each
+        // mirror, which is the citation surface for ChatGPT / Perplexity.
+        docMirrorsPlugin({ siteUrl: docsConfig.url }),
         svelteMotionOptimize(),
         tailwindcss(),
         sveltekit(),
