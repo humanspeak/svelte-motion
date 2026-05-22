@@ -1,13 +1,15 @@
 // Utilities for building and validating transform strings
 
-import { motionValue } from 'motion-dom'
-import { type Readable } from 'svelte/store'
 import {
-    augmentMotionValue,
-    sampleSource,
-    subscribeAfterInitial,
-    type AugmentedMotionValue
-} from './augmentMotionValue.svelte.js'
+    isMotionValue,
+    mapValue,
+    motionValue,
+    transformValue,
+    type MotionValue,
+    type TransformOptions
+} from 'motion-dom'
+import { get, type Readable } from 'svelte/store'
+import { augmentMotionValue, type AugmentedMotionValue } from './augmentMotionValue.svelte.js'
 
 export type TransformValues = Partial<{
     x: number
@@ -94,215 +96,222 @@ const round = (n: number): number => {
     return Math.round(n * 1e6) / 1e6
 }
 
-/**
- * Options for range-mapping transform.
- *
- * - clamp: If true, clamps the input to the active segment bounds.
- * - ease: A single easing function or one per segment to shape interpolation.
- * - mixer: Custom mixer factory to interpolate non-numeric outputs.
- *
- * @see https://motion.dev/docs/react-use-transform?platform=react
- */
-export type TransformOptions = {
-    clamp?: boolean
-    ease?: ((t: number) => number) | Array<(t: number) => number>
-    mixer?: (from: unknown, to: unknown) => (t: number) => unknown
-}
+// Re-export motion-dom's TransformOptions so consumers don't have to import
+// from two packages.
+export type { TransformOptions }
 
 /**
- * Creates a linear mixer function for numeric values.
- *
- * @param from Starting numeric value.
- * @param to Ending numeric value.
- * @returns Function that linearly interpolates between from→to for progress t∈[0,1].
- * @private
+ * Any motion-value shape this library accepts as a transform input: the raw
+ * motion-dom `MotionValue<T>` and our augmented `AugmentedMotionValue<T>` are
+ * both runtime-identical (the augmentation is a Svelte 5 retype, not a
+ * subclass), but TypeScript's private-field nominal typing means the two
+ * aren't structurally assignable in public signatures. This alias accepts
+ * both so call sites compile cleanly.
  */
-const linearMix = (from: number, to: number) => (t: number) => from + (to - from) * t
+export type AnyMotionValue<T> = MotionValue<T> | AugmentedMotionValue<T>
 
 /**
- * Clamps a numeric value between two bounds, irrespective of their order.
- *
- * @param val Current value.
- * @param a First bound.
- * @param b Second bound.
- * @returns Value clamped to [min(a,b), max(a,b)].
+ * A source for {@link useTransform}'s mapping form: any motion value or a
+ * Svelte readable store. Svelte readables are bridged into a `MotionValue`
+ * internally so motion-dom's `mapValue` / `transformValue` can track them.
  */
-export const clampBidirectional = (val: number, a: number, b: number): number => {
-    const lower = a < b ? a : b
-    const upper = a < b ? b : a
-    return Math.min(Math.max(val, lower), upper)
-}
+export type TransformSource<T> = AnyMotionValue<T> | Readable<T>
 
 /**
- * Finds the segment index i such that x lies between input[i] and input[i+1].
- * Handles both ascending and descending input ranges.
+ * Bridges a `Readable<T>` into a motion-dom `MotionValue<T>` that mirrors the
+ * readable's emissions. Returns the bridge value plus a `dispose` cleanup that
+ * tears down the subscription and destroys the bridge.
  *
- * @param input Monotonic list of input stops.
- * @param x Current input value.
- * @returns Segment index in range [0, input.length - 2].
- * @private
+ * The bridge skips the readable's synchronous initial emit (the value is
+ * already seeded from `get(source)`) so motion-dom's change-bus doesn't fire
+ * a spurious event on attach.
  */
-const findSegment = (input: number[], x: number): number => {
-    if (input.length < 2) return 0
-    const first = input[0]
-    const second = input[1]
-    const ascending = second > first
-    if (ascending) {
-        if (x <= first) return 0
-        for (let i = 1; i < input.length; i++) {
-            const curr = input[i]
-            if (x <= curr) return i - 1
+const bridgeReadable = <T>(
+    source: Readable<T>
+): { value: MotionValue<T>; dispose: VoidFunction } => {
+    const bridge = motionValue<T>(get(source) as T)
+    let seenInitial = false
+    const unsub = source.subscribe((v) => {
+        if (!seenInitial) {
+            seenInitial = true
+            return
         }
-        return input.length - 2
-    } else {
-        if (x >= first) return 0
-        for (let i = 1; i < input.length; i++) {
-            const curr = input[i]
-            if (x >= curr) return i - 1
+        bridge.set(v)
+    })
+    return {
+        value: bridge,
+        dispose: () => {
+            unsub()
+            bridge.destroy()
         }
-        return input.length - 2
     }
 }
 
 /**
- * A source for {@link useTransform}'s mapping form: a motion-dom `MotionValue`
- * (via `useMotionValue`, `useSpring`, or any other Tier 2 hook) or a Svelte
- * readable store. Both expose `.subscribe(run)` with the same contract, so
- * `useTransform` consumes them interchangeably.
+ * Normalizes a `TransformSource<T>` into a `MotionValue<T>`. Returns the
+ * source as-is for any motion-value input (no bridge), or a fresh bridge
+ * `MotionValue` plus a cleanup for `Readable` inputs. The cast at the
+ * motion-value branch is safe — both `MotionValue` and `AugmentedMotionValue`
+ * are the same instance at runtime.
  */
-export type TransformSource<T> =
-    | (Readable<T> & { get?: () => T })
-    | AugmentedMotionValue<T>
-    | Readable<T>
-
-/**
- * Picks the mixer for a single segment: user-supplied mixer factory wins;
- * a numeric pair falls back to linear interpolation; mixed-type or
- * non-numeric endpoints snap from `o0` to `o1` at the segment midpoint. The
- * snap fallback uses its own `t` parameter (not a closure over outer
- * `progress`) so callers can safely store and re-invoke the returned mixer.
- */
-const pickMixer = <T>(o0: T, o1: T, mixer: TransformOptions['mixer']): ((t: number) => T) => {
-    if (mixer) return mixer(o0, o1) as (t: number) => T
-    if (typeof o0 === 'number' && typeof o1 === 'number') {
-        return linearMix(o0, o1) as unknown as (t: number) => T
+const toMotionValue = <T>(
+    source: TransformSource<T>
+): { value: MotionValue<T>; dispose: VoidFunction } => {
+    if (isMotionValue(source)) {
+        return { value: source as unknown as MotionValue<T>, dispose: () => undefined }
     }
-    return (t: number) => (t < 0.5 ? o0 : o1)
+    return bridgeReadable(source as Readable<T>)
 }
 
 /**
- * Builds a single-segment mapper for the mapping form. Encapsulates clamp,
- * ease, mixer selection, and the linear-progress math. Used per change of
- * the source.
+ * Single-input transformer signature: `(latest) => output`.
  */
-const buildMapper = <T>(
-    input: number[],
-    out: T[],
-    options: TransformOptions
-): ((x: number) => T) => {
-    const { clamp = true, ease, mixer } = options
-    if (input.length !== out.length) {
-        throw new Error(
-            `useTransform: input and output arrays must be the same length (input: ${input.length}, output: ${out.length})`
-        )
-    }
-    const easings: Array<(_t: number) => number> = Array.isArray(ease)
-        ? ease
-        : ease
-          ? new Array(Math.max(0, out.length - 1)).fill(ease)
-          : []
-    return (x: number): T => {
-        if (input.length === 0) return out[0] as T
-        if (input.length === 1) return out[0] as T
-        const seg = findSegment(input, x)
-        const i0 = input[seg]
-        const i1 = input[seg + 1]
-        const o0 = out[seg]
-        const o1 = out[seg + 1]
-
-        // Runtime validation to avoid non-null assertions
-        if (i0 === undefined || i1 === undefined || o0 === undefined || o1 === undefined) {
-            console.warn('useTransform: Invalid segment bounds', {
-                seg,
-                inputLength: input.length,
-                outputLength: out.length
-            })
-            return out[0] as T
-        }
-        const localClamp = clamp ? clampBidirectional : (val: number) => val
-        const progress = i0 === i1 ? 0 : (localClamp(x, i0, i1) - i0) / (i1 - i0)
-        const e = easings[seg]
-        const p = e ? e(progress) : progress
-        const mix = pickMixer(o0, o1, mixer)
-        return mix(p) as T
-    }
-}
+export type SingleTransformer<I, O> = (input: I) => O
+/**
+ * Multi-input transformer signature: `([latestA, latestB, ...]) => output`.
+ */
+export type MultiTransformer<I, O> = (inputs: I[]) => O
 
 /**
- * Creates a motion-dom `MotionValue<T>` whose value is derived from another
- * motion value (or Svelte readable) via a range mapping or a compute function.
+ * Output map for the multi-output mapping form: `{ key: [stop, …] }`. The
+ * keys are stable per call and each entry produces its own `MotionValue`.
+ */
+export type TransformOutputMap<O> = { [key: string]: O[] }
+
+/**
+ * Creates an augmented `MotionValue<O>` derived from one or more `MotionValue`s
+ * (or Svelte readables), composed via a range mapping or a compute function.
  *
- * Two supported forms (API parity with framer-motion's `useTransform`):
+ * Mirrors framer-motion's `useTransform` 1:1 with five forms:
  *
- * - **Mapping form** — `useTransform(source, input, output, options)`. Maps a
+ * - **Mapping form** — `useTransform(source, input, output, options?)` maps a
  *   numeric source's value across `input → output` stops with clamp, easing,
- *   and a pluggable mixer for non-numeric outputs.
- * - **Function form** — `useTransform(() => compute, deps)`. Recomputes from
- *   a function on every emit of any dep (either a `MotionValue` or a Svelte
- *   readable).
+ *   and a pluggable mixer for non-numeric outputs. Delegates to motion-dom's
+ *   `mapValue` (which is itself `transformValue` over the curried mapper).
+ * - **Multi-output mapping form** — `useTransform(source, input, outputMap, options?)`
+ *   produces an object of motion values, one per key in `outputMap`. Each
+ *   value is the same mapping form applied to that key's output stops.
+ * - **Single-transformer form** — `useTransform(mv, (latest) => O)` recomputes
+ *   on every change of `mv`. Auto-tracks via `transformValue`.
+ * - **Multi-transformer form** — `useTransform([mv1, mv2, …], ([latest, …]) => O)`
+ *   recomputes on every change of any input. Auto-tracks via `transformValue`.
+ * - **Compute form** — `useTransform(() => compute)` recomputes whenever any
+ *   `MotionValue` referenced inside `compute` (via `.get()` or `.current`)
+ *   changes. Auto-tracks via `transformValue` — no explicit deps array; the
+ *   `collectMotionValues` session inside `transformValue` discovers them.
  *
- * Returns an {@link AugmentedMotionValue} — a real motion-dom `MotionValue`
- * (so it composes with `useTransform`, `useSpring`, `animate()`, etc.) plus
- * a Svelte 5 reactive `.current` getter and a `.subscribe` shim. The internal
- * subscription to the source / deps is established eagerly so `.current`
- * stays live even when nothing else is consuming the value.
+ * Returns an {@link AugmentedMotionValue<O>} — a real motion-dom `MotionValue`
+ * (composes with `useSpring`, `useVelocity`, `animate()`, etc.) plus a
+ * `$state`-backed `.current` getter and a Svelte readable `.subscribe` shim.
  *
- * Lifecycle: must be called during component initialization. All source
- * subscriptions are released and the underlying `MotionValue` destroyed when
- * the surrounding `$effect` scope tears down.
+ * Lifecycle: must be called during component initialization. Source
+ * subscriptions, the underlying motion value, and any Svelte-readable bridges
+ * are torn down when the surrounding `$effect` scope unmounts.
  *
- * @template T Output value type.
- * @returns {AugmentedMotionValue<T>} A `MotionValue<T>` with `.current` and `.subscribe`.
  * @see https://motion.dev/docs/react-use-transform
  */
-export function useTransform<T = number>(
+export function useTransform<O>(
     source: TransformSource<number>,
     input: number[],
-    output: T[],
-    options?: TransformOptions
-): AugmentedMotionValue<T>
-export function useTransform<T = number>(
-    compute: () => T,
-    deps: Array<TransformSource<unknown>>
-): AugmentedMotionValue<T>
-export function useTransform<T = number>(
-    sourceOrCompute: TransformSource<number> | (() => T),
-    inputOrDeps: number[] | Array<TransformSource<unknown>>,
-    output?: T[],
-    options: TransformOptions = {}
-): AugmentedMotionValue<T> {
-    // Function form: (compute, deps)
+    output: O[],
+    options?: TransformOptions<O>
+): AugmentedMotionValue<O>
+export function useTransform<T extends TransformOutputMap<unknown>>(
+    source: TransformSource<number>,
+    input: number[],
+    outputMap: T,
+    options?: TransformOptions<T[keyof T][number]>
+): { [K in keyof T]: AugmentedMotionValue<T[K][number]> }
+export function useTransform<I, O>(
+    source: AnyMotionValue<I>,
+    transformer: SingleTransformer<I, O>
+): AugmentedMotionValue<O>
+export function useTransform<I, O>(
+    sources: ReadonlyArray<AnyMotionValue<I>>,
+    transformer: MultiTransformer<I, O>
+): AugmentedMotionValue<O>
+export function useTransform<O>(compute: () => O): AugmentedMotionValue<O>
+export function useTransform<O>(
+    sourceOrCompute:
+        | TransformSource<number>
+        | AnyMotionValue<unknown>
+        | ReadonlyArray<AnyMotionValue<unknown>>
+        | (() => O),
+    inputOrTransformer?: number[] | SingleTransformer<unknown, O> | MultiTransformer<unknown, O>,
+    outputOrOutputMap?: O[] | TransformOutputMap<unknown>,
+    options?: TransformOptions<unknown>
+): AugmentedMotionValue<O> | { [key: string]: AugmentedMotionValue<O> } {
+    // Compute form: useTransform(() => compute).
     if (typeof sourceOrCompute === 'function') {
-        const compute = sourceOrCompute as () => T
-        const deps = (inputOrDeps as Array<TransformSource<unknown>>) ?? []
-        const value = motionValue<T>(compute())
-        const unsubs = deps.map((dep) => subscribeAfterInitial(dep, () => value.set(compute())))
-        const dispose = () => {
-            for (const off of unsubs) off()
-        }
+        const compute = sourceOrCompute as () => O
+        const value = transformValue<O>(compute)
         $effect(() => () => value.destroy())
-        return augmentMotionValue(value, dispose)
+        return augmentMotionValue(value)
     }
 
-    // Mapping form: (source, input, output, options)
+    // Multi-input list form: useTransform([mv, mv, …], ([a, b, …]) => O).
+    if (Array.isArray(sourceOrCompute) && typeof inputOrTransformer === 'function') {
+        const sources = sourceOrCompute as ReadonlyArray<AnyMotionValue<unknown>>
+        const transformer = inputOrTransformer as MultiTransformer<unknown, O>
+        const value = transformValue<O>(() => {
+            const latest: unknown[] = []
+            for (let i = 0; i < sources.length; i++) {
+                latest.push((sources[i] as unknown as MotionValue<unknown>).get())
+            }
+            return transformer(latest)
+        })
+        $effect(() => () => value.destroy())
+        return augmentMotionValue(value)
+    }
+
+    // Single-MV transformer form: useTransform(mv, (latest) => O).
+    if (typeof inputOrTransformer === 'function') {
+        const source = sourceOrCompute as unknown as MotionValue<unknown>
+        const transformer = inputOrTransformer as SingleTransformer<unknown, O>
+        const value = transformValue<O>(() => transformer(source.get()))
+        $effect(() => () => value.destroy())
+        return augmentMotionValue(value)
+    }
+
+    // Mapping forms (single output array or output map).
     const source = sourceOrCompute as TransformSource<number>
-    const input = inputOrDeps as number[]
-    const out = (output ?? []) as T[]
-    const map = buildMapper(input, out, options)
+    const input = (inputOrTransformer as number[]) ?? []
+    const { value: numericSource, dispose: disposeBridge } = toMotionValue(source)
 
-    const value = motionValue<T>(map(sampleSource(source)))
-    const unsub = subscribeAfterInitial(source, (x) => value.set(map(x)))
+    // Multi-output mapping form: useTransform(source, [range], { key: [out], … }, options).
+    if (
+        outputOrOutputMap !== undefined &&
+        !Array.isArray(outputOrOutputMap) &&
+        typeof outputOrOutputMap === 'object'
+    ) {
+        const outputMap = outputOrOutputMap as TransformOutputMap<unknown>
+        const keys = Object.keys(outputMap)
+        const result: { [key: string]: AugmentedMotionValue<O> } = {}
+        for (const key of keys) {
+            const inner = mapValue<unknown>(
+                numericSource,
+                input,
+                outputMap[key],
+                options as TransformOptions<unknown> | undefined
+            )
+            $effect(() => () => inner.destroy())
+            result[key] = augmentMotionValue(inner) as unknown as AugmentedMotionValue<O>
+        }
+        $effect(() => () => disposeBridge())
+        return result
+    }
 
-    $effect(() => () => value.destroy())
-    return augmentMotionValue(value, unsub)
+    // Single-output mapping form: useTransform(source, [range], [out], options).
+    const output = (outputOrOutputMap as O[]) ?? []
+    const value = mapValue<O>(
+        numericSource,
+        input,
+        output,
+        options as TransformOptions<O> | undefined
+    )
+    $effect(() => () => {
+        value.destroy()
+        disposeBridge()
+    })
+    return augmentMotionValue(value)
 }

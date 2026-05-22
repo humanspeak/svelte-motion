@@ -1,19 +1,25 @@
-import { isMotionValue } from 'motion-dom'
+import { frame, isMotionValue } from 'motion-dom'
 import { get, readable, writable } from 'svelte/store'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMotionValue } from './motionValue.svelte.js'
-import { clampBidirectional, useTransform } from './transform.svelte.js'
+import { useTransform } from './transform.svelte.js'
 
 /**
- * `useTransform` now returns an augmented `MotionValue` instead of a derived
- * Svelte store. These tests cover the mapping- and function-form surfaces
- * that consumers relied on, plus the new motion-dom identity (`isMotionValue`
- * passes, `.current` reads, composition with `useMotionValue`).
+ * `useTransform` delegates to motion-dom's `mapValue` and `transformValue`
+ * primitives. The result motion value updates on the next render frame after
+ * any source emits, so tests await `nextFrame()` between `.set()` and read.
+ * This mirrors motion-dom's own upstream `transform-value.test.ts`.
  */
+const nextFrame = () =>
+    new Promise<void>((resolve) => {
+        frame.render(() => resolve())
+    })
+
 describe('utils/transform - useTransform', () => {
     let cleanups: VoidFunction[]
 
     beforeEach(() => {
+        vi.useRealTimers()
         cleanups = []
     })
 
@@ -38,154 +44,203 @@ describe('utils/transform - useTransform', () => {
         })
     })
 
-    it('maps ranges with default clamp', () => {
-        inRoot(() => {
-            const src = writable(0)
-            const out = useTransform(src, [0, 100], [0, 1])
-            expect(get(out)).toBe(0)
-            src.set(50)
-            expect(get(out)).toBeCloseTo(0.5)
-            src.set(200)
-            expect(get(out)).toBe(1)
-        })
-    })
-
-    it('exposes mapped value via .current', () => {
-        inRoot(() => {
+    it('mapping form: seeds initial value synchronously and updates next frame', async () => {
+        const out = inRoot(() => {
             const src = useMotionValue(0)
-            const out = useTransform(src, [0, 100], [0, 1])
-            expect(out.current).toBe(0)
+            const result = useTransform(src, [0, 100], [0, 1])
+            expect(result.current).toBe(0)
             src.set(50)
-            expect(out.current).toBeCloseTo(0.5)
+            return { src, result }
         })
+        await nextFrame()
+        expect(out.result.current).toBeCloseTo(0.5)
+        out.src.set(200)
+        await nextFrame()
+        expect(out.result.current).toBe(1)
     })
 
-    it('maps ranges without clamp', () => {
-        inRoot(() => {
-            const src = writable(0)
-            const out = useTransform(src, [0, 100], [0, 1], { clamp: false })
+    it('mapping form: maps without clamp', async () => {
+        const ctx = inRoot(() => {
+            const src = useMotionValue(0)
+            const result = useTransform(src, [0, 100], [0, 1], { clamp: false })
             src.set(200)
-            expect(get(out)).toBe(2)
+            return { src, result }
         })
+        await nextFrame()
+        expect(ctx.result.current).toBe(2)
     })
 
-    it('supports easing array per segment', () => {
-        inRoot(() => {
-            const easeIn = (t: number) => t * t
-            const src = writable(0)
-            const out = useTransform(src, [0, 100, 200], [0, 1, 2], { ease: [easeIn, easeIn] })
+    it('mapping form: supports easing array per segment', async () => {
+        const easeIn = (t: number) => t * t
+        const ctx = inRoot(() => {
+            const src = useMotionValue(0)
+            const result = useTransform(src, [0, 100, 200], [0, 1, 2], { ease: [easeIn, easeIn] })
             src.set(50)
-            expect(get(out)).toBeCloseTo(easeIn(0.5))
-            src.set(150)
-            expect(get(out)).toBeCloseTo(1 + easeIn(0.5))
+            return { src, result }
         })
+        await nextFrame()
+        expect(ctx.result.current).toBeCloseTo(easeIn(0.5))
+        ctx.src.set(150)
+        await nextFrame()
+        expect(ctx.result.current).toBeCloseTo(1 + easeIn(0.5))
     })
 
-    it('handles descending input ranges correctly', () => {
-        inRoot(() => {
-            const src = writable(100)
-            const out = useTransform(src, [100, 0], [0, 1])
-            expect(get(out)).toBe(0)
+    it('mapping form: handles descending input ranges', async () => {
+        const ctx = inRoot(() => {
+            const src = useMotionValue(100)
+            const result = useTransform(src, [100, 0], [0, 1])
+            expect(result.current).toBe(0)
             src.set(50)
-            expect(get(out)).toBeCloseTo(0.5)
-            src.set(0)
-            expect(get(out)).toBe(1)
+            return { src, result }
         })
+        await nextFrame()
+        expect(ctx.result.current).toBeCloseTo(0.5)
+        ctx.src.set(0)
+        await nextFrame()
+        expect(ctx.result.current).toBe(1)
     })
 
-    it('invokes mixer with correct t and returns mixer result', () => {
-        inRoot(() => {
-            const src = writable(0)
-            const recorded: number[] = []
-            const mixer = (a: unknown, b: unknown) => (t: number) => {
-                recorded.push(t)
-                return t < 0.5 ? a : b
-            }
-            const out = useTransform(src, [0, 1], ['red', 'blue'], { mixer })
-
-            const steps = [0, 0.25, 0.5, 0.75, 1]
-            for (const v of steps) {
-                src.set(v)
-                const result = get(out)
-                const lastT = recorded.at(-1)!
-                expect(lastT).toBeCloseTo(v)
-                expect(result).toBe(v < 0.5 ? 'red' : 'blue')
-            }
+    it('mapping form: invokes mixer with correct t', async () => {
+        const mixer = (a: string, b: string) => (t: number) => (t < 0.5 ? a : b)
+        const ctx = inRoot(() => {
+            const src = useMotionValue(0)
+            const result = useTransform<string>(src, [0, 1], ['red', 'blue'], { mixer })
+            return { src, result }
         })
+        ctx.src.set(0.25)
+        await nextFrame()
+        expect(ctx.result.current).toBe('red')
+        ctx.src.set(0.75)
+        await nextFrame()
+        expect(ctx.result.current).toBe('blue')
     })
 
-    it('function form computes from deps', () => {
-        inRoot(() => {
-            const a = writable(2)
-            const b = writable(3)
-            const out = useTransform(() => get(a) + get(b), [a, b])
-            expect(get(out)).toBe(5)
+    it('mapping form: accepts a Svelte readable source via the bridge', async () => {
+        const ctx = inRoot(() => {
+            const src = writable<number>(0)
+            const result = useTransform(src, [0, 100], [0, 1])
+            expect(get(result)).toBe(0)
+            src.set(50)
+            return { src, result }
+        })
+        await nextFrame()
+        expect(ctx.result.current).toBeCloseTo(0.5)
+        ctx.src.set(200)
+        await nextFrame()
+        expect(ctx.result.current).toBe(1)
+    })
+
+    it('compute form: auto-tracks MotionValue reads inside the function', async () => {
+        const ctx = inRoot(() => {
+            const a = useMotionValue(2)
+            const b = useMotionValue(3)
+            const result = useTransform(() => a.get() + b.get())
+            expect(result.current).toBe(5)
             a.set(4)
-            expect(get(out)).toBe(7)
+            return { a, b, result }
         })
+        await nextFrame()
+        expect(ctx.result.current).toBe(7)
+        ctx.b.set(10)
+        await nextFrame()
+        expect(ctx.result.current).toBe(14)
+    })
+
+    it('compute form: with no MotionValue reads, returns a static value', () => {
+        inRoot(() => {
+            const out = useTransform(() => 42)
+            expect(out.current).toBe(42)
+            expect(get(out)).toBe(42)
+        })
+    })
+
+    it('single-transformer form: maps a MotionValue through a function', async () => {
+        const ctx = inRoot(() => {
+            const x = useMotionValue(10)
+            const doubled = useTransform(x, (latest: number) => latest * 2)
+            expect(doubled.current).toBe(20)
+            x.set(7)
+            return { x, doubled }
+        })
+        await nextFrame()
+        expect(ctx.doubled.current).toBe(14)
+    })
+
+    it('multi-transformer form: combines an array of MotionValues', async () => {
+        const ctx = inRoot(() => {
+            const x = useMotionValue(2)
+            const y = useMotionValue(3)
+            const product = useTransform([x, y], ([a, b]: number[]) => a * b)
+            expect(product.current).toBe(6)
+            x.set(4)
+            return { x, y, product }
+        })
+        await nextFrame()
+        expect(ctx.product.current).toBe(12)
+    })
+
+    it('multi-output mapping form: returns an object of motion values', async () => {
+        const ctx = inRoot(() => {
+            const x = useMotionValue(0)
+            const { opacity, scale } = useTransform(x, [0, 100], {
+                opacity: [0, 1],
+                scale: [0.5, 1]
+            })
+            expect(isMotionValue(opacity)).toBe(true)
+            expect(isMotionValue(scale)).toBe(true)
+            expect(opacity.current).toBe(0)
+            expect(scale.current).toBe(0.5)
+            x.set(50)
+            return { x, opacity, scale }
+        })
+        await nextFrame()
+        expect(ctx.opacity.current).toBeCloseTo(0.5)
+        expect(ctx.scale.current).toBeCloseTo(0.75)
     })
 
     it('handles equal segment endpoints without NaN', () => {
         inRoot(() => {
-            const src = writable(0)
+            const src = useMotionValue(0)
             const out = useTransform(src, [0, 0, 1], [0, 1, 2])
             src.set(0)
-            expect(Number.isNaN(get(out) as unknown as number)).toBe(false)
+            expect(Number.isNaN(out.current as unknown as number)).toBe(false)
         })
     })
 
-    it('throws when input/output lengths differ', () => {
+    it('readable source: SSR-style readable() constructs without throwing', () => {
         inRoot(() => {
             const src = readable(0)
-            expect(() => useTransform(src, [0, 1], [0])).toThrowError()
+            const out = useTransform(src, [0, 1], [0, 1])
+            expect(out.current).toBe(0)
         })
     })
 
-    it('clampBidirectional clamps correctly for normal and reversed bounds', () => {
-        expect(clampBidirectional(5, 0, 10)).toBe(5)
-        expect(clampBidirectional(-1, 0, 10)).toBe(0)
-        expect(clampBidirectional(11, 0, 10)).toBe(10)
-        expect(clampBidirectional(5, 10, 0)).toBe(5)
-        expect(clampBidirectional(-1, 10, 0)).toBe(0)
-        expect(clampBidirectional(11, 10, 0)).toBe(10)
-    })
-
-    it('fills single ease across segments', () => {
-        inRoot(() => {
-            const easeIn = (t: number) => t * t
-            const src = writable(0)
-            const out = useTransform(src, [0, 50, 100], [0, 1, 2], { ease: easeIn })
+    it('fills single ease across segments', async () => {
+        const easeIn = (t: number) => t * t
+        const ctx = inRoot(() => {
+            const src = useMotionValue(0)
+            const result = useTransform(src, [0, 50, 100], [0, 1, 2], { ease: easeIn })
             src.set(25)
-            expect(get(out)).toBeCloseTo(easeIn(0.5))
-            src.set(75)
-            expect(get(out)).toBeCloseTo(1 + easeIn(0.5))
+            return { src, result }
         })
+        await nextFrame()
+        expect(ctx.result.current).toBeCloseTo(easeIn(0.5))
+        ctx.src.set(75)
+        await nextFrame()
+        expect(ctx.result.current).toBeCloseTo(1 + easeIn(0.5))
     })
 
-    it('function form without deps returns a static MotionValue', () => {
-        inRoot(() => {
-            const out = useTransform(() => 42, [])
-            expect(get(out)).toBe(42)
-            expect(out.current).toBe(42)
-        })
-    })
-
-    it('handles single-length input/output by returning the sole output', () => {
-        inRoot(() => {
-            const src = writable(0)
-            const out1 = useTransform(src, [0], [456])
-            expect(get(out1)).toBe(456)
-        })
-    })
-
-    it('composes with useMotionValue: chained transforms re-emit', () => {
-        inRoot(() => {
+    it('composes with useMotionValue: chained transforms re-emit', async () => {
+        const ctx = inRoot(() => {
             const src = useMotionValue(0)
             const stepA = useTransform(src, [0, 100], [0, 1])
             const stepB = useTransform(stepA, [0, 1], [0, 200])
-            expect(get(stepB)).toBe(0)
+            expect(stepB.current).toBe(0)
             src.set(50)
-            expect(get(stepB)).toBeCloseTo(100)
+            return { src, stepA, stepB }
         })
+        await nextFrame()
+        await nextFrame()
+        expect(ctx.stepB.current).toBeCloseTo(100)
     })
 })

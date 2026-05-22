@@ -1,6 +1,6 @@
-import { isMotionValue } from 'motion-dom'
+import { frame, isMotionValue } from 'motion-dom'
 import { get } from 'svelte/store'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMotionValue } from './motionValue.svelte.js'
 import { useTransform } from './transform.svelte.js'
 
@@ -20,6 +20,7 @@ describe('utils/motionValue - useMotionValue', () => {
     let cleanups: VoidFunction[]
 
     beforeEach(() => {
+        vi.useRealTimers()
         cleanups = []
     })
 
@@ -101,16 +102,21 @@ describe('utils/motionValue - useMotionValue', () => {
         })
     })
 
-    it('composes with useTransform mapping form', () => {
-        inRoot(() => {
+    it('composes with useTransform mapping form', async () => {
+        const ctx = inRoot(() => {
             const mv = useMotionValue(0)
             const out = useTransform(mv, [0, 100], [0, 1])
             expect(get(out)).toBe(0)
             mv.set(50)
-            expect(get(out)).toBeCloseTo(0.5)
-            mv.set(100)
-            expect(get(out)).toBe(1)
+            return { mv, out }
         })
+        // motion-dom's mapValue/transformValue propagates on the next render
+        // frame. Drive one frame, then assert.
+        await new Promise<void>((resolve) => frame.render(() => resolve()))
+        expect(get(ctx.out)).toBeCloseTo(0.5)
+        ctx.mv.set(100)
+        await new Promise<void>((resolve) => frame.render(() => resolve()))
+        expect(get(ctx.out)).toBe(1)
     })
 
     it('.on("change") fires on writes', () => {
