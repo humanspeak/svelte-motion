@@ -70,7 +70,8 @@ export { useSpring } from '$lib/utils/spring.svelte'
 export type { SpringMotionValue, UseSpringOptions } from '$lib/utils/spring.svelte'
 export { useIsPresent, usePresence } from '$lib/utils/usePresence'
 export type { UsePresenceState } from '$lib/utils/usePresence'
-export { useVelocity } from '$lib/utils/velocity'
+export { useVelocity } from '$lib/utils/velocity.svelte'
+export type { VelocitySource } from '$lib/utils/velocity.svelte'
 /**
  * @deprecated Use `styleString` instead for reactive styles with automatic unit handling.
  */

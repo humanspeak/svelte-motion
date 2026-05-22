@@ -57,12 +57,12 @@ This library is mid-migration toward returning real `MotionValue`s with `.curren
 | `useTransform`             | `MotionValue` + `.current` + `.subscribe` shim | **`transformed.current`** (preferred) or `$transformed` |
 | `useScroll`                | `{ scrollX, scrollY, … }` of augmented motion values | **`scrollY.current`** (preferred) or `$scrollY` |
 | `useTime`                  | `MotionValue` + `.current` + `.subscribe` shim | **`time.current`** (preferred) or `$time` |
-| `useVelocity`              | Svelte readable                        | `$velocity`                 |
+| `useVelocity`              | `MotionValue` + `.current` + `.subscribe` shim | **`velocity.current`** (preferred) or `$velocity` |
 | `useMotionTemplate`        | Svelte readable                        | `$composed`                 |
 
-The remaining Tier 2 hooks (`useVelocity`, `useMotionTemplate`) will migrate together so composition stays coherent. Until then, the `.subscribe()` shim on every already-migrated hook keeps the old store-consumer paths interoperable.
+`useMotionTemplate` is the final Tier 2 hook still returning a Svelte readable — it migrates next. Until then, the `.subscribe()` shim on every already-migrated hook keeps store-consumer paths interoperable.
 
-For new code today: use `.current` on every migrated hook (springs, motion values, transforms, scroll values, time), and `$store` on `useVelocity` / `useMotionTemplate`.
+For new code today: use `.current` on every migrated hook (springs, motion values, transforms, scroll values, time, velocity), and `$store` on `useMotionTemplate`.
 
 ### Composition
 
