@@ -21,7 +21,7 @@ description: "An overview of motion values — reactive primitives that drive an
 
 Motion values are reactive primitives that track the state and velocity of animating values. They're updated and read **outside** Svelte's reactive render cycle, so animations can run at full frame rate without triggering component re-renders.
 
-In `@humanspeak/svelte-motion`, motion values created via `useSpring` are real motion-dom `MotionValue` objects (with the same composition rules as React framer-motion) augmented with a Svelte 5 reactive `.current` getter:
+In `@humanspeak/svelte-motion`, every motion-value-producing hook returns the **same shape**: a real motion-dom `MotionValue` (passes `isMotionValue`, composes with `animate()`, follows other motion values) augmented with a Svelte-5 reactive `.current` getter and a `.subscribe` shim for legacy `$store` readers.
 
 ```svelte
 <script>
@@ -45,63 +45,27 @@ Motion values:
 - Track **velocity** automatically so springs and transforms stay smooth
 - Can be **composed** — pass one into another to build animation chains
 - Are **SSR-safe** — on the server they return static values with no timers
+- Implement Svelte's `Readable` store contract via a `.subscribe` shim, so `$x` template syntax, `svelte/store`'s `get()`, and `derived()` keep working
 
-## Migration in progress
+## Hooks at a glance
 
-This library is mid-migration toward returning real `MotionValue`s with `.current` from every motion-value-producing hook. The state of play:
+| Hook | Returns | Read pattern |
+| --- | --- | --- |
+| [`useSpring`](/docs/use-spring) | `MotionValue<number \| string>` | `spring.current` (preferred) or `$spring` |
+| [`useMotionValue`](/docs/motion-values) | `MotionValue<T>` | `mv.current` (preferred) or `$mv` |
+| [`useTransform`](/docs/use-transform) | `MotionValue<T>` | `transformed.current` (preferred) or `$transformed` |
+| [`useScroll`](/docs/use-scroll) | `{ scrollX, scrollY, scrollXProgress, scrollYProgress }` of `MotionValue<number>` | `scrollY.current` (preferred) or `$scrollY` |
+| [`useTime`](/docs/use-time) | `MotionValue<number>` | `time.current` (preferred) or `$time` |
+| [`useVelocity`](/docs/use-velocity) | `MotionValue<number>` | `velocity.current` (preferred) or `$velocity` |
+| [`useMotionTemplate`](/docs/use-motion-template) | `MotionValue<string>` | `template.current` (preferred) or `$template` |
 
-| Hook                       | Returns                                | Read pattern                |
-| -------------------------- | -------------------------------------- | --------------------------- |
-| `useSpring`                | `MotionValue` + `.current` + `.subscribe` shim | **`spring.current`** (preferred) or `$spring` |
-| `useMotionValue`           | `MotionValue` + `.current` + `.subscribe` shim | **`mv.current`** (preferred) or `$mv` |
-| `useTransform`             | `MotionValue` + `.current` + `.subscribe` shim | **`transformed.current`** (preferred) or `$transformed` |
-| `useScroll`                | `{ scrollX, scrollY, … }` of augmented motion values | **`scrollY.current`** (preferred) or `$scrollY` |
-| `useTime`                  | `MotionValue` + `.current` + `.subscribe` shim | **`time.current`** (preferred) or `$time` |
-| `useVelocity`              | `MotionValue` + `.current` + `.subscribe` shim | **`velocity.current`** (preferred) or `$velocity` |
-| `useMotionTemplate`        | Svelte readable                        | `$composed`                 |
-
-`useMotionTemplate` is the final Tier 2 hook still returning a Svelte readable — it migrates next. Until then, the `.subscribe()` shim on every already-migrated hook keeps store-consumer paths interoperable.
-
-For new code today: use `.current` on every migrated hook (springs, motion values, transforms, scroll values, time, velocity), and `$store` on `useMotionTemplate`.
-
-### Composition
-
-Motion values become powerful when you chain them. The output of one feeds into the next:
-
-```svelte
-<script>
-  import { useSpring, useTransform } from '@humanspeak/svelte-motion'
-
-  const x = useSpring(0)
-  const opacity = useTransform(x, [0, 200], [0, 1])
-  const backgroundColor = useTransform(x, [0, 200], ['#ff0088', '#00ccff'])
-</script>
-
-<div
-  style="transform: translateX({x.current}px); opacity: {opacity.current}; background: {backgroundColor.current}"
-  onpointermove={(e) => x.set(e.clientX)}
->
-  Composed motion values
-</div>
-```
-
-All three reads use `.current` because `useSpring`, `useMotionValue`, and `useTransform` now return augmented motion values. For hooks that haven't migrated yet (`useScroll`, `useTime`, `useVelocity`, `useMotionTemplate`), `$store` syntax is still the reactive read.
+For new code, prefer `.current` everywhere — it tracks under Svelte 5 runes without going through the subscribe path.
 
 ## Usage
 
 ### Creating motion values
 
-The simplest way to create a motion value is with `useSpring`:
-
-```svelte
-<script>
-  import { useSpring } from '@humanspeak/svelte-motion'
-
-  const x = useSpring(0)
-</script>
-```
-
-For a value without spring physics, use `useMotionValue`:
+Use `useMotionValue` for a value with no spring physics:
 
 ```svelte
 <script>
@@ -115,9 +79,20 @@ For a value without spring physics, use `useMotionValue`:
 </div>
 ```
 
-`useMotionValue` returns the same shape as `useSpring` — a real motion-dom `MotionValue` with a `.current` getter for reactive reads and a `.subscribe` shim for store-style consumers. The difference is that writes via `.set(v)` are immediate (no animation), since there's no spring physics or follow source.
+Use `useSpring` to animate toward each target with spring physics:
 
-A plain Svelte `writable` also works for values that don't need velocity tracking:
+```svelte
+<script>
+  import { useSpring } from '@humanspeak/svelte-motion'
+
+  const x = useSpring(0, { stiffness: 300, damping: 30 })
+</script>
+
+<button onclick={() => x.set(100)}>Animate</button>
+<div style="transform: translateX({x.current}px)">{x.current}</div>
+```
+
+A plain Svelte `writable` also works for values that don't need motion-value composition or velocity tracking:
 
 ```svelte
 <script>
@@ -129,15 +104,15 @@ A plain Svelte `writable` also works for values that don't need velocity trackin
 
 ### Reading values
 
-For springs and motion values, use `.current` in reactive scopes (templates, `$derived`, `$effect`):
+In templates, `$derived`, and `$effect` — use `.current`:
 
 ```svelte
 <div style="transform: translateX({x.current}px)">
-  Current value: {x.current}
+  {x.current}
 </div>
 ```
 
-In imperative code (event handlers, callbacks), use `.get()`:
+In imperative code (event handlers, callbacks) — use `.get()`:
 
 ```svelte
 <script>
@@ -147,18 +122,14 @@ In imperative code (event handlers, callbacks), use `.get()`:
 </script>
 ```
 
-The Svelte 4–style `$x` syntax also works on both via the `.subscribe()` shim — use it when migrating existing code or composing with hooks that still return stores.
-
-For motion values that haven't migrated yet (`useScroll`, `useTime`, etc.), `$store` is the only reactive read path.
+The Svelte 4–style `$x` syntax still works on every motion value via the `.subscribe()` shim — useful when migrating existing components incrementally.
 
 ### Setting values
 
-Springs and motion values support imperative writes:
-
 ```svelte
 <script>
-  x.set(200)  // animates toward 200 with spring physics on useSpring; immediate on useMotionValue
-  x.jump(200) // instantly sets to 200 (no animation, useSpring only)
+  x.set(200)   // useSpring: animates with spring physics. useMotionValue: immediate write.
+  x.jump(200)  // useSpring only: instantly sets without animation.
 </script>
 ```
 
@@ -194,39 +165,49 @@ Springs additionally expose motion-dom event types via `.on(...)`:
 
 ### Composition
 
-Chain motion values to build rich animations from simple building blocks:
-
-- **[useTransform](/docs/use-transform)** — map a motion value's output range to a new range
-- **[useSpring](/docs/use-spring)** — add spring physics to any motion value or store
-- **[useVelocity](/docs/use-velocity)** — derive velocity from any motion value
-- **[useMotionTemplate](/docs/use-motion-template)** — build CSS strings from multiple motion values
+Motion values become powerful when you chain them. The output of one feeds into the next:
 
 ```svelte
 <script>
-  import { useSpring, useTransform, useVelocity } from '@humanspeak/svelte-motion'
+  import { useSpring, useTransform, useVelocity, useMotionTemplate } from '@humanspeak/svelte-motion'
 
   const x = useSpring(0)
-  const xVelocity = useVelocity(x)
-  const skew = useTransform(xVelocity, [-1000, 0, 1000], [-20, 0, 20])
+  const velocity = useVelocity(x)
+  const skew = useTransform(velocity, [-1000, 0, 1000], [-20, 0, 20])
+  const filter = useMotionTemplate`drop-shadow(0 0 ${skew}px rgba(0, 0, 0, 0.4))`
 </script>
+
+<div
+  style="transform: translateX({x.current}px) skewX({skew.current}deg); filter: {filter.current}"
+  onpointermove={(e) => x.set(e.clientX)}
+>
+  Composed chain
+</div>
 ```
+
+Every step in the chain is a `MotionValue`, so `.current` reads reactively without crossing the subscribe boundary.
+
+### Chain helpers
+
+- **[useTransform](/docs/use-transform)** — map a motion value's output range to a new range
+- **[useSpring](/docs/use-spring)** — add spring physics to any motion value or readable
+- **[useVelocity](/docs/use-velocity)** — derive velocity from any motion value
+- **[useMotionTemplate](/docs/use-motion-template)** — build CSS strings from multiple motion values
 
 ## API
 
-Springs and `useMotionValue` both implement the motion-dom `MotionValue` interface plus a Svelte 5 reactive surface:
+Every motion-value-producing hook in this library returns a value implementing the motion-dom `MotionValue` interface plus a Svelte 5 reactive surface:
 
 | Member                  | Description                                                            |
 | ----------------------- | ---------------------------------------------------------------------- |
 | `current`               | Svelte 5 reactive getter — use in templates / `$derived` / `$effect`.   |
 | `get()`                 | Imperative current-value read.                                          |
-| `set(value)`            | Update the value. `useSpring` animates with spring physics; `useMotionValue` writes immediately. |
+| `set(value)`            | Update the value. `useSpring` animates with spring physics; every other hook writes immediately. |
 | `jump(value)`           | Set immediately without animation. `useSpring` only.                    |
 | `on(event, cb)`         | Subscribe to `'change'`, `'animationStart'`, `'animationComplete'`, etc.|
 | `getVelocity()`         | Current velocity of the value.                                          |
-| `subscribe(run)`        | Svelte readable store contract (powers `$mv` template syntax).          |
-| `destroy()`             | Tear down the motion value early (normally automatic).                  |
-
-The remaining motion-value-producing hooks (`useScroll`, `useTransform`, `useTime`, `useVelocity`, `useMotionTemplate`) currently implement Svelte's `Readable` interface only. That will change as each migrates.
+| `subscribe(run)`        | Svelte readable store contract — powers `$mv` template syntax and `derived(mv, …)`. |
+| `destroy()`             | Tear down the motion value early (normally bound to the surrounding `$effect`). |
 
 ## See also
 

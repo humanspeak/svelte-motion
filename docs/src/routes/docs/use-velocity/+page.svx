@@ -117,12 +117,10 @@ The returned value emits the rate of change in units per second and settles to `
   const filter = useMotionTemplate`blur(${blur}px)`
 </script>
 
-<div style="filter: {$filter}">
+<div style="filter: {filter.current}">
   Blurs when moving fast
 </div>
 ```
-
-`useMotionTemplate` is still a Svelte readable in this release — it migrates to the augmented motion-value shape in the same wave.
 
 ### Chaining velocities
 
