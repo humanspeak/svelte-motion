@@ -27,6 +27,8 @@ export {
 export { clamp, distance, distance2D, interpolate, mix, pipe, progress, wrap } from 'motion'
 
 // Re-export all Motion types so consumers can import types from this package
+export { Reorder, ReorderGroup, ReorderItem } from '$lib/components/Reorder/index'
+export type { ReorderContext, ItemData as ReorderItemData } from '$lib/components/Reorder/index'
 export type {
     DragAxis,
     DragConstraints,
@@ -75,9 +77,10 @@ export { useIsPresent, usePresence } from '$lib/utils/usePresence'
 export type { UsePresenceState } from '$lib/utils/usePresence'
 export { useVelocity } from '$lib/utils/velocity.svelte'
 export type { VelocitySource } from '$lib/utils/velocity.svelte'
-/**
- * @deprecated Use `styleString` instead for reactive styles with automatic unit handling.
- */
+// `@deprecated` JSDoc lives on the source declaration in styleObject.ts so
+// editor strike-through hints fire from there. Re-exporting cleanly here
+// keeps trunk's alphabetical export sort from binding the deprecation
+// to whatever symbol happens to land beneath it.
 export { stringifyStyleObject } from '$lib/utils/styleObject'
 export { styleString } from '$lib/utils/styleObject.svelte'
 export { useTime } from '$lib/utils/time.svelte'

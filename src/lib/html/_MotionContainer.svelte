@@ -467,9 +467,36 @@
         )
     )
 
+    // When `drag` is set and the gesture listener is enabled, mirror
+    // framer-motion's `use-props.ts` and suppress text selection +
+    // native HTML5 drag + scroll along the drag axis. Without this the
+    // browser interprets a drag-pointer-press as text selection,
+    // leaving consumers to fight CSS each time they use `drag`.
+    //
+    // See framer-motion@main/packages/framer-motion/src/render/html/use-props.ts:59-74.
+    const dragGestureActive = $derived(!!dragProp && dragListenerProp !== false)
+    const dragAxisValue = $derived<'x' | 'y' | true | false>(
+        dragProp === true || dragProp === 'x' || dragProp === 'y' ? dragProp : !!dragProp
+    )
+    const dragStyleOverrides = $derived<Record<string, string> | undefined>(
+        dragGestureActive && dragAxisValue
+            ? {
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  WebkitTouchCallout: 'none',
+                  touchAction:
+                      dragAxisValue === true ? 'none' : `pan-${dragAxisValue === 'x' ? 'y' : 'x'}`
+              }
+            : undefined
+    )
+
     // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
     const derivedAttrs = $derived<Record<string, unknown>>({
         ...(rest as Record<string, unknown>),
+        // When drag is active, disable native HTML5 drag so the
+        // browser's ghost element doesn't fight our pointer-based
+        // gesture. Matches `htmlProps.draggable = false` in framer-motion.
+        ...(dragGestureActive && dragAxisValue ? { draggable: false } : {}),
         // Gate on the *resolved* whileTap, not the raw prop. With
         // variant-label support a truthy-but-unresolved value (unknown
         // key, empty array) would otherwise add `tabindex=0` for an
@@ -502,20 +529,36 @@
             return {}
         })(),
         style: mergeInlineStyles(
-            initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting'
-                ? `${styleProp || ''};visibility:hidden`
-                : styleProp,
-            // Apply initialKeyframes as inline styles during mounting and initial phases
-            // The animation starts in RAF after 'initial' phase, so we need styles until then
-            // When ready AND we have initialKeyframes: DON'T set any animated properties!
-            // WAAPI is controlling them and inline styles can override the animation
-            isLoaded === 'mounting' || isLoaded === 'initial'
+            // Prepend drag-gesture style overrides (user-select, touch-action)
+            // when the gesture is active. These belong on the *base* style
+            // layer so neither initial nor animate inline styles can clobber
+            // them. We splice them in as a pseudo-existingStyle prefix.
+            (() => {
+                const baseStyle =
+                    initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting'
+                        ? `${styleProp || ''};visibility:hidden`
+                        : styleProp
+                if (!dragStyleOverrides) return baseStyle
+                const dragStyleString = Object.entries(dragStyleOverrides)
+                    .map(([k, v]) => `${k.replace(/([A-Z])/g, '-$1').toLowerCase()}:${v}`)
+                    .join(';')
+                return typeof baseStyle === 'string' && baseStyle.length > 0
+                    ? `${dragStyleString};${baseStyle}`
+                    : dragStyleString
+            })(),
+            // Apply initialKeyframes as the baseline inline style. Originally
+            // this only ran during 'mounting'/'initial' phases, but that left
+            // a hole: when the animation target equals `initial` (a no-op
+            // animation) or when WAAPI clears its keyframes on completion
+            // (default `fill: 'none'`), `transform`-shortcut properties
+            // (`scaleX`, `rotate`, etc.) vanish from the element — see #377.
+            // Keeping the baseline always-on is safe: WAAPI animations have
+            // higher specificity than inline styles while running, and when
+            // they end, the inline fallback shows the intended value.
+            isNotEmpty(initialKeyframes)
                 ? (initialKeyframes as unknown as Record<string, unknown>)
                 : undefined,
-            // Only use resolvedAnimate as fallback when we DON'T have initialKeyframes
-            // If we have initialKeyframes, the enter animation is running - setting
-            // inline styles to the target values will override the WAAPI animation
-            // Use isNotEmpty to handle empty initial objects (initial: {}) which should fallback
+            // Use resolvedAnimate as fallback when we DON'T have initialKeyframes.
             isNotEmpty(initialKeyframes)
                 ? undefined
                 : (resolvedAnimate as unknown as Record<string, unknown>)

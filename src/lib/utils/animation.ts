@@ -1,5 +1,6 @@
 import { pwLog } from '$lib/utils/log'
 import { hasFinishedPromise, isPromiseLike } from '$lib/utils/promise'
+import { mergeInlineStyles } from '$lib/utils/style'
 import { type AnimationOptions, type DOMKeyframesDefinition, animate } from 'motion'
 
 /**
@@ -55,13 +56,52 @@ export const animateWithLifecycle = (
     })
     onStart?.(payload)
     const controls = animate(el, payload, transition)
+
+    /**
+     * Commit the final keyframe values to the element's inline style so the
+     * animated-to state persists after WAAPI clears its keyframes (default
+     * `fill: 'none'`). Without this, `animate.{scaleX|scale|rotate|x|y|...}`
+     * snap back to the un-animated baseline once the animation ends because
+     * those transform shortcuts only exist via the `transform` property —
+     * which WAAPI returns to the element's inline `transform` on completion.
+     * CSS properties (`opacity`, `backgroundColor`, etc.) aren't affected
+     * because `mergeInlineStyles` writes them as discrete properties.
+     *
+     * Skips committing while a follow-up animation hasn't started — the
+     * lifecycle's `then()` resolution races with the next `animate()` call
+     * in the wait-mode chain, and we don't want to leak the prior state
+     * into the next animation's `from`.
+     *
+     * See issue #377 for full repro + history.
+     */
+    const commitFinalKeyframes = () => {
+        if (!el.isConnected) return
+        try {
+            const merged = mergeInlineStyles(
+                el.getAttribute('style') ?? '',
+                payload as Record<string, unknown>
+            )
+            if (merged) el.setAttribute('style', merged)
+        } catch {
+            // Swallow merge failures rather than dropping the onComplete chain.
+        }
+    }
+
     if (hasFinishedPromise(controls as unknown as { finished?: unknown })) {
         ;(controls as { finished?: Promise<unknown> }).finished
-            ?.then(() => onComplete?.(payload))
+            ?.then(() => {
+                commitFinalKeyframes()
+                onComplete?.(payload)
+            })
             .catch(() => {})
         return
     }
     if (isPromiseLike(controls as unknown)) {
-        ;(controls as unknown as Promise<unknown>).then(() => onComplete?.(payload)).catch(() => {})
+        ;(controls as unknown as Promise<unknown>)
+            .then(() => {
+                commitFinalKeyframes()
+                onComplete?.(payload)
+            })
+            .catch(() => {})
     }
 }

@@ -1,0 +1,112 @@
+---
+title: Reorder
+description: Drag-to-reorder list primitives — Reorder.Group + Reorder.Item with layout springs, auto-scroll, and the value-swap pattern.
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte';
+  import ReorderExample from '$lib/examples/reorder/demos/Default.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'Reorder | Docs | Svelte Motion'
+      seo.description = 'Drag-to-reorder list primitives. Reorder.Group owns the values + ordering callback, Reorder.Item drives the drag gesture and reports its measured position back to the group.'
+      seo.ogTitle = 'Reorder'
+      seo.ogTagline = 'Drag-to-reorder lists with layout springs'
+      seo.ogFeatures = ['Drag', 'Layout springs', 'Auto-scroll', 'Namespace API']
+      seo.ogSlug = 'docs-reorder'
+  }
+</script>
+
+# Reorder
+
+`Reorder.Group` and `Reorder.Item` are a pair of components that turn any list into a drag-to-reorder list, with each row physically springing into its new position as its neighbour is dragged past its centre.
+
+```svelte
+<script lang="ts">
+    import { Reorder } from '@humanspeak/svelte-motion'
+
+    let items = $state([0, 1, 2, 3, 4])
+</script>
+
+<Reorder.Group axis="y" values={items} onReorder={(next) => (items = next)}>
+    {#each items as item (item)}
+        <Reorder.Item value={item}>{item}</Reorder.Item>
+    {/each}
+</Reorder.Group>
+```
+
+That's the whole API for the basic case. Every row is draggable, the swap fires the moment a drag offset crosses a neighbour's centre, and `onReorder` receives the freshly permuted array.
+
+<Example isSmall exampleUrl="/examples/reorder">
+  <ReorderExample />
+</Example>
+
+## How it works
+
+- `Reorder.Group` provides a context that holds the **measured order** of its items — a `{ value, layout }[]` array sorted by each item's `layout.min` on the active axis. Every `Reorder.Item` registers itself on mount + after each reorder.
+- On every drag frame, the active `Reorder.Item` reads its drag offset + velocity and calls `context.updateOrder(value, offset, velocity)`.
+- `updateOrder` runs `checkReorder` — velocity-direction-based: if you're moving toward a neighbour AND your leading edge has crossed that neighbour's centre, swap. Otherwise, nothing.
+- When a swap happens, the group rebuilds `values` using the **value-swap pattern**: only the pair that actually changed positions is swapped in the consumer's `values` array. Unmeasured items (e.g. in a virtualised list) pass through untouched.
+
+## Reorder.Group
+
+### Props
+
+- **`values`** `V[]` (required) — the current state of the list. Pass the same array you render the children with.
+- **`onReorder`** `(next: V[]) => void` (required) — fires with a new permutation whenever a swap happens. Wire to `(next) => (items = next)`.
+- **`axis`** `'x' | 'y'` — defaults to `'y'`. Also pins the drag axis of every child `Reorder.Item`.
+- **`as`** `'ul' | 'ol' | 'div'` — defaults to `'ul'`. The HTML tag rendered for the group container.
+- Plus every prop a `motion.<as>` element accepts (`initial`, `animate`, `layout`, etc.).
+
+The group also sets `overflow-anchor: none` on its container — this prevents the browser's scroll-anchoring heuristic from interfering with drag math when items shift during reorder. You don't need to think about it; it's just there.
+
+## Reorder.Item
+
+### Props
+
+- **`value`** `V` (required) — the value this row represents in the parent's `values` array. Must be reference-stable across renders (use the item's id or the item object itself).
+- **`as`** `'li' | 'div'` — defaults to `'li'`. The HTML tag rendered for the item.
+- **`layout`** `true | 'position'` — defaults to `true`. Set to `'position'` to disable size animation (matches framer-motion semantics).
+- **`onDragStart`** / **`onDrag`** / **`onDragEnd`** — standard motion drag callbacks, forwarded after the internal reorder bookkeeping has run.
+- Plus every other prop a `motion.<as>` element accepts.
+
+The item automatically wires `drag={axis}` (from the group context), `dragSnapToOrigin`, and `layout={true}`. You don't pass these — they're the whole point of the component.
+
+## The value-swap pattern
+
+When `checkReorder` decides two items should swap, the group does **not** rebuild the entire `values` array from scratch. It finds the pair that changed positions in the freshly-computed order and swaps only that pair in a copy of `values`:
+
+```ts
+const newValues = [...values]
+for (let i = 0; i < next.length; i++) {
+    if (order[i].value !== next[i].value) {
+        const a = values.indexOf(order[i].value)
+        const b = values.indexOf(next[i].value)
+        ;[newValues[a], newValues[b]] = [newValues[b], newValues[a]]
+        break
+    }
+}
+onReorder(newValues)
+```
+
+The motivation is virtualisation: with a 10,000-row list where only 20 rows are mounted at a time, the order registry only knows about those 20. If we rebuilt `values` from `next`, we'd lose every unmounted entry. The pair-swap pattern preserves the rest.
+
+## Auto-scroll
+
+Drag near a viewport edge and the nearest scrollable ancestor scrolls to follow your pointer. Threshold is 50px from the edge, speed eases up to a 25px/frame cap, and the engine caps to the scrollable's initial scroll height so you can't runaway-grow the surface mid-drag. Velocity must point toward the edge for the scroll to engage — a stationary item parked at the threshold won't trigger anything.
+
+## SSR
+
+`Reorder.Group` and `Reorder.Item` render their underlying tags (`ul` / `li`) on the server with the consumer's content inline. Drag wiring, measurement, and auto-scroll only attach in the browser after hydration. The initial paint matches the server-rendered HTML.
+
+## See also
+
+- [Layout Animations](/docs/layout-animations) — the underlying primitive `Reorder.Item` uses to spring into new positions
+- [Drag](/docs/drag) — the gesture system `Reorder.Item` builds on
+- [AnimatePresence](/docs/animate-presence) — combine with `Reorder` to animate entry/exit of list items
+
+---
+
+Based on [Motion's Reorder](https://motion.dev/docs/react-reorder) API.
