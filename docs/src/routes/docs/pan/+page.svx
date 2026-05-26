@@ -1,0 +1,154 @@
+---
+title: Pan
+description: Pan gesture primitive — pointer offset/velocity reporting without drag constraints. Build swipe-to-dismiss sheets, custom carousels, and gesture-driven UI.
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte';
+  import PanExample from '$lib/examples/pan/demos/Default.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'Pan | Docs | Svelte Motion'
+      seo.description = 'Pan is the gesture primitive that powers swipe-to-dismiss drawers, swipe-to-delete rows, and custom carousels. Lower-level than drag — pure offset and velocity reporting.'
+      seo.ogTitle = 'Pan'
+      seo.ogTagline = 'Pointer offset + velocity, no constraints'
+      seo.ogFeatures = ['Pan', 'Gestures', 'Swipe', 'Velocity']
+      seo.ogSlug = 'docs-pan'
+  }
+</script>
+
+# Pan
+
+The **pan** gesture is the foundation under `drag`. Where `drag` adds constraints, momentum, snap-to-origin, and writes transforms to the element automatically, **pan just reports** — every frame you get `{ point, delta, offset, velocity }`. You decide what to do with it.
+
+That makes pan the right primitive for **anything that isn't free-form dragging**: swipe-to-dismiss bottom sheets, swipe-to-delete list items, custom carousels with snap points, image lightboxes with flick-to-close, swipe navigation patterns. All the "feels native on mobile web" interactions.
+
+```svelte
+<script lang="ts">
+    import { motion } from '@humanspeak/svelte-motion'
+
+    let dragY = $state(0)
+</script>
+
+<motion.div
+    onPan={(_event, info) => (dragY = info.offset.y)}
+    onPanEnd={() => (dragY = 0)}
+    style="transform: translateY({dragY}px)"
+>
+    Pan me — I'll move while you drag, then snap back on release.
+</motion.div>
+```
+
+<Example isSmall exampleUrl="/examples/pan">
+  <PanExample />
+</Example>
+
+## Callbacks
+
+All four lifecycle callbacks receive `(event: PointerEvent, info: PanInfo)`. `PanInfo` is structurally identical to `DragInfo`:
+
+```ts
+type PanInfo = {
+    point: { x: number; y: number }     // current page coordinates
+    delta: { x: number; y: number }     // change since last frame
+    offset: { x: number; y: number }    // total distance from gesture start
+    velocity: { x: number; y: number }  // px/s, smoothed over 100ms history
+}
+```
+
+### `onPanSessionStart`
+
+Fires immediately on `pointerdown`, before any movement threshold is met. Use it for setup work that needs to run regardless of whether the user actually pans — e.g., stop an in-flight return animation, capture the pointer.
+
+### `onPanStart`
+
+Fires the first frame after the pointer offset crosses the **distance threshold** (3px by default — matches framer-motion). This is your "the user committed to a gesture" signal. Use it to apply `whilePan` styling, set a `dragging` flag, etc.
+
+### `onPan`
+
+Fires once per render frame (throttled — a 1000Hz mouse won't drown your handler) while the gesture is active. The hot path. Read `info.offset` to follow the finger, `info.velocity` to project flicks.
+
+### `onPanEnd`
+
+Fires on `pointerup` / `pointercancel`, but **only if `onPanStart` ever fired**. If the user clicked without moving, `onPanEnd` does not fire — only `onPanSessionStart` / `onPanSessionEnd` (not currently exposed). That makes `onPanEnd` the right place to commit a release decision: did they pass the dismiss threshold? Snap or close?
+
+## `whilePan`
+
+Variant-style keyframes that apply while a pan gesture is active (after threshold). Same shape as `whileHover` / `whileTap` / `whileDrag`:
+
+```svelte
+<motion.div
+    onPan={(_e, info) => (translateY = info.offset.y)}
+    whilePan={{ scale: 1.02 }}
+/>
+```
+
+The keyframes apply on `onPanStart` and revert on `onPanEnd`.
+
+## Pan vs Drag — when to use which
+
+| Pattern | Use |
+|---|---|
+| Free-form drag inside constraints | `drag` |
+| Spring-back to origin when released | `drag` + `dragSnapToOrigin` |
+| Drag with momentum after release | `drag` (default `dragMomentum`) |
+| Swipe to dismiss with custom physics | `pan` — you decide what to do with velocity |
+| Custom carousel — snap to specific points based on offset | `pan` |
+| Swipe to delete with confirmation past threshold | `pan` |
+| Cursor-follow or scrub-bar — element doesn't move with finger | `pan` (the element transform is yours to control) |
+
+The rule: if the element should follow the finger **with default physics**, use `drag`. If you want to interpret the gesture and apply your own response, use `pan`.
+
+## Building a swipe-to-dismiss sheet
+
+Common pattern using `pan` + a manual snap decision:
+
+```svelte
+<script lang="ts">
+    import { motion, useMotionValue, useTransform } from '@humanspeak/svelte-motion'
+
+    let { open = $bindable(false) } = $props()
+    const y = useMotionValue(0)
+    const overlayOpacity = useTransform(y, [0, 300], [1, 0])
+
+    const onPanEnd = (_e, info) => {
+        const shouldDismiss = info.offset.y > 100 || info.velocity.y > 600
+        if (shouldDismiss) open = false
+        else y.set(0) // snap back via your spring of choice
+    }
+</script>
+
+{#if open}
+    <motion.div style="opacity: {overlayOpacity.current}" class="overlay" />
+    <motion.div
+        onPan={(_e, info) => y.set(Math.max(0, info.offset.y))}
+        {onPanEnd}
+        style="transform: translateY({y.current}px)"
+        class="sheet"
+    >
+        ...
+    </motion.div>
+{/if}
+```
+
+The sheet follows the finger, the overlay fades with distance, and the release decision combines distance and velocity — the typical "fast flick or pull > 100px to dismiss" UX.
+
+## SSR
+
+Pan is a pointer-only gesture and only attaches its listeners in the browser. The element renders identically server-side with no event wiring; the gesture activates after hydration.
+
+## Distance threshold
+
+The default 3px threshold (framer-motion's value) prevents accidental pan starts on a steady press. Currently fixed at attach time — a future API will let consumers pass `panThreshold` per element.
+
+## See also
+
+- [Drag](/docs/drag) — the constraint-aware higher-level gesture
+- [Gestures (overview)](/docs/gestures) — when to reach for each gesture primitive
+- [useMotionValue](/docs/motion-values) — the value-tracking primitive that pairs naturally with pan handlers
+
+---
+
+Based on [Motion's pan gesture](https://motion.dev/docs/react-gestures#pan) API.
