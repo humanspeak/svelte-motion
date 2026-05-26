@@ -71,8 +71,17 @@
     ) => {
         const passDistance = Math.abs(info.offset.x) > COMMIT_OFFSET_PX
         const passVelocity = Math.abs(info.velocity.x) > COMMIT_VELOCITY_PX_S
-        const direction =
-            info.offset.x === 0 ? Math.sign(info.velocity.x) : Math.sign(info.offset.x)
+        // Prefer the velocity's sign when the release was a clear fling —
+        // a user who drags right 50px then yank-flicks left at 800 px/s
+        // expects the card to fly LEFT (matching the last gesture vector),
+        // not RIGHT just because the lingering offset is positive. Fall
+        // back to the offset sign when the gesture stops without much
+        // velocity, and to the velocity sign when there's no offset at all.
+        const direction = passVelocity
+            ? Math.sign(info.velocity.x)
+            : info.offset.x !== 0
+              ? Math.sign(info.offset.x)
+              : Math.sign(info.velocity.x)
 
         if (direction !== 0 && (passDistance || passVelocity)) {
             // Fling the rest of the way across, then signal the parent.

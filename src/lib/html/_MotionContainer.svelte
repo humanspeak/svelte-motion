@@ -17,7 +17,11 @@
         DragControls,
         DragTransition,
         MotionWhileDrag,
-        DragInfo
+        DragInfo,
+        MotionOnPan,
+        MotionOnPanEnd,
+        MotionOnPanSessionStart,
+        MotionOnPanStart
     } from '$lib/types'
     import { isNotEmpty } from '$lib/utils/objects'
     import { sleep } from '$lib/utils/testing'
@@ -27,7 +31,7 @@
     import { VOID_TAGS } from '$lib/utils/constants'
     import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation'
     import { attachWhileTap } from '$lib/utils/interaction'
-    import { attachWhileHover } from '$lib/utils/hover'
+    import { attachWhileHover, computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
     import { attachWhileFocus } from '$lib/utils/focus'
     import { attachWhileInView } from '$lib/utils/inView.svelte'
     import {
@@ -48,7 +52,7 @@
     } from '$lib/utils/presence'
     import { getInitialKeyframes } from '$lib/utils/initial'
     import { attachDrag } from '$lib/utils/drag'
-    import { attachPan } from '$lib/utils/pan'
+    import { attachPan, type AttachPanCleanup } from '$lib/utils/pan'
     import { resolveInitial, resolveAnimate, resolveExit, resolveWhile } from '$lib/utils/variants'
     import {
         setVariantContext,
@@ -609,9 +613,75 @@
      * sheets, custom carousels, and any "tell me what the gesture is
      * doing right now" interaction. Mirrors framer-motion's `PanGesture`
      * (packages/framer-motion/src/gestures/pan/index.ts).
+     *
+     * Split into TWO effects:
+     *
+     * 1. `attach` — keyed on `element`, `isLoaded === 'ready'`, presence
+     *    of any pan handler/whilePan, and absence of `drag` (drag takes
+     *    precedence — upstream framer-motion routes drag THROUGH the pan
+     *    gesture internally, so co-attaching pan when drag is on would
+     *    fight transforms). Creates / tears down the underlying
+     *    `attachPan` lifetime once per element-bound interval.
+     *
+     * 2. `swap` — keyed on the user's handler/whilePan props. Calls
+     *    `teardownPan.update(next)` to hot-swap the live handler set
+     *    without destroying the in-flight `PanSession`. Without this
+     *    split, every parent re-render that produces a fresh inline
+     *    arrow handler would tear down the live gesture mid-pan —
+     *    pointer listeners removed, no `onPanEnd` ever fires, whilePan
+     *    keyframes leak.
      */
-    let teardownPan: (() => void) | null = null
+    let teardownPan: AttachPanCleanup | null = null
     let activeWhilePanKeyframes: Record<string, unknown> | null = null
+    let whilePanBaseline: Record<string, unknown> | null = null
+
+    const buildPanHandlers = (): {
+        onSessionStart?: MotionOnPanSessionStart
+        onStart: NonNullable<MotionOnPanStart>
+        onMove?: MotionOnPan
+        onEnd: NonNullable<MotionOnPanEnd>
+    } => ({
+        onSessionStart: onPanSessionStartProp,
+        onStart: (event, info) => {
+            if (resolvedWhilePan && element) {
+                // Snapshot the values we'll revert to BEFORE applying — same
+                // `computeHoverBaseline` path the other while-* gestures
+                // (whileHover/whileFocus/drag) use. Covers animatable transform
+                // shorthands (scale, rotate, x, y) AND restores non-animatable
+                // inline writes (cursor, pointer-events) since the baseline
+                // sniffs `animate` → `initial` → computed style → inline style.
+                whilePanBaseline = computeHoverBaseline(element, {
+                    initial: (initialKeyframes ?? {}) as Record<string, unknown>,
+                    animate: (resolvedAnimate ?? {}) as Record<string, unknown>,
+                    whileHover: (resolvedWhilePan ?? {}) as Record<string, unknown>
+                })
+                const { keyframes, transition } = splitHoverDefinition(
+                    resolvedWhilePan as Record<string, unknown>
+                )
+                activeWhilePanKeyframes = keyframes
+                animateWithLifecycle(
+                    element,
+                    keyframes as unknown as DOMKeyframesDefinition,
+                    (transition ?? mergedTransition ?? {}) as unknown as AnimationOptions
+                )
+            }
+            onPanStartProp?.(event, info)
+        },
+        onMove: onPanProp,
+        onEnd: (event, info) => {
+            if (activeWhilePanKeyframes && whilePanBaseline && element) {
+                animateWithLifecycle(
+                    element,
+                    whilePanBaseline as unknown as DOMKeyframesDefinition,
+                    (mergedTransition ?? {}) as unknown as AnimationOptions
+                )
+            }
+            activeWhilePanKeyframes = null
+            whilePanBaseline = null
+            onPanEndProp?.(event, info)
+        }
+    })
+
     $effect(() => {
         if (isPlaywright) {
             pwLog('[motion] pan attach effect run', {
@@ -621,8 +691,18 @@
             })
         }
         if (!element) return
-        teardownPan?.()
-        teardownPan = null
+        // Defer attachment until the element has settled out of the enter
+        // animation phase — matches the gate every other gesture effect
+        // in this file uses (drag, whileTap, whileHover, whileFocus,
+        // whileInView). Without this, a pointerdown during the
+        // initial / mounting phase would attach pan listeners against an
+        // element whose enter animation hasn't committed its baseline.
+        if (isLoaded !== 'ready') return
+        // Drag takes precedence — upstream framer-motion's drag gesture is
+        // implemented ON TOP of Pan, not alongside it. Co-attaching here
+        // would create two competing pointer pipelines fighting for the
+        // same transforms.
+        if (dragProp) return
 
         const hasAnyHandler =
             !!onPanProp ||
@@ -632,51 +712,39 @@
             !!resolvedWhilePan
         if (!hasAnyHandler) return
 
-        const applyWhilePan = (keyframes: Record<string, unknown> | null) => {
-            if (!element || !keyframes) return
-            activeWhilePanKeyframes = keyframes
-            animateWithLifecycle(
-                element,
-                keyframes as unknown as DOMKeyframesDefinition,
-                (mergedTransition ?? {}) as unknown as AnimationOptions
-            )
-        }
-        const revertWhilePan = () => {
-            if (!element || !activeWhilePanKeyframes) return
-            const reverted = Object.fromEntries(
-                Object.keys(activeWhilePanKeyframes).map((k) => [
-                    k,
-                    (resolvedAnimate as Record<string, unknown> | undefined)?.[k] ?? null
-                ])
-            )
-            activeWhilePanKeyframes = null
-            animateWithLifecycle(
-                element,
-                reverted as unknown as DOMKeyframesDefinition,
-                (mergedTransition ?? {}) as unknown as AnimationOptions
-            )
-        }
-
-        teardownPan = attachPan(element, {
-            onSessionStart: onPanSessionStartProp,
-            onStart: (event, info) => {
-                if (resolvedWhilePan) {
-                    applyWhilePan(resolvedWhilePan as Record<string, unknown>)
-                }
-                onPanStartProp?.(event, info)
-            },
-            onMove: onPanProp,
-            onEnd: (event, info) => {
-                if (activeWhilePanKeyframes) revertWhilePan()
-                onPanEndProp?.(event, info)
-            }
-        })
+        teardownPan = attachPan(element, buildPanHandlers())
 
         return () => {
+            // Synchronous revert of whilePan + lifecycle dispatch lives in
+            // attachPan.teardown() — the cleanup chain there calls
+            // session.dispatchTerminal(rawHandlers) BEFORE flipping isAlive,
+            // so onPanEnd fires (which runs the revert above) before the
+            // listeners go.
             teardownPan?.()
             teardownPan = null
             activeWhilePanKeyframes = null
+            whilePanBaseline = null
         }
+    })
+
+    /**
+     * Hot-swap effect — propagates handler / whilePan changes onto the
+     * existing PanSession via `teardownPan.update(next)`. Tracked
+     * separately from the attach effect so a fresh inline-arrow handler
+     * reference does NOT trigger teardown + re-attach. Without this
+     * split, every parent re-render mid-gesture would silently kill the
+     * live pan session.
+     */
+    $effect(() => {
+        // Track every prop the handler set depends on so this effect
+        // re-runs when any of them change.
+        void onPanSessionStartProp
+        void onPanStartProp
+        void onPanProp
+        void onPanEndProp
+        void resolvedWhilePan
+        if (!teardownPan) return
+        teardownPan.update(buildPanHandlers())
     })
 
     /**

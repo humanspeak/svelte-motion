@@ -62,24 +62,57 @@ import { cancelFrame, frame, frameData, isPrimaryPointer } from 'motion-dom'
  * `undefined`, so the session can keep its existing presence-check pattern.
  */
 type WrappableHandler = ((event: PointerEvent, info: DragInfo) => void) | undefined
-const wrapUpdate = (handler: WrappableHandler): WrappableHandler => {
+
+/**
+ * Brand we stamp on already-wrapped handlers so passing them back through
+ * `wrapHandlers` (e.g. by a future middleware layer) doesn't double-defer
+ * — that would compound frame latency invisibly per wrap depth. Symbol
+ * scoping keeps it private to this module.
+ */
+const WRAPPED_BRAND = Symbol('svelte-motion:pan:wrapped')
+type WrappedHandler = WrappableHandler & { [WRAPPED_BRAND]?: true }
+
+const wrapUpdate = (handler: WrappableHandler, isAlive: () => boolean): WrappableHandler => {
     if (!handler) return undefined
-    return (event, info) => {
-        frame.update(() => handler(event, info), false, true)
+    if ((handler as WrappedHandler)[WRAPPED_BRAND]) return handler
+    const wrapped: WrappedHandler = (event, info) => {
+        frame.update(
+            () => {
+                // `isAlive` flips false on teardown; any frame.update closure
+                // queued before teardown but not yet flushed will see this and
+                // short-circuit — that's our cancellation path for the
+                // otherwise-uncancellable anonymous closures `frame.update`
+                // accepts.
+                if (!isAlive()) return
+                handler(event, info)
+            },
+            false,
+            true
+        )
     }
+    Object.defineProperty(wrapped, WRAPPED_BRAND, { value: true })
+    return wrapped
 }
-const wrapPostRender = (handler: WrappableHandler): WrappableHandler => {
+
+const wrapPostRender = (handler: WrappableHandler, isAlive: () => boolean): WrappableHandler => {
     if (!handler) return undefined
-    return (event, info) => {
-        frame.postRender(() => handler(event, info))
+    if ((handler as WrappedHandler)[WRAPPED_BRAND]) return handler
+    const wrapped: WrappedHandler = (event, info) => {
+        frame.postRender(() => {
+            if (!isAlive()) return
+            handler(event, info)
+        })
     }
+    Object.defineProperty(wrapped, WRAPPED_BRAND, { value: true })
+    return wrapped
 }
-const wrapHandlers = (handlers: PanHandlers): PanHandlers => ({
-    onSessionStart: wrapUpdate(handlers.onSessionStart),
-    onStart: wrapUpdate(handlers.onStart),
-    onMove: wrapUpdate(handlers.onMove),
-    onEnd: wrapPostRender(handlers.onEnd),
-    onSessionEnd: wrapPostRender(handlers.onSessionEnd)
+
+const wrapHandlers = (handlers: PanHandlers, isAlive: () => boolean): PanHandlers => ({
+    onSessionStart: wrapUpdate(handlers.onSessionStart, isAlive),
+    onStart: wrapUpdate(handlers.onStart, isAlive),
+    onMove: wrapUpdate(handlers.onMove, isAlive),
+    onEnd: wrapPostRender(handlers.onEnd, isAlive),
+    onSessionEnd: wrapPostRender(handlers.onSessionEnd, isAlive)
 })
 
 type Point = { x: number; y: number }
@@ -180,22 +213,55 @@ export interface AttachPanOptions {
 }
 
 /**
+ * Cleanup function returned by `attachPan`. Carries an `update` method
+ * that hot-swaps the live handler set without tearing down the active
+ * `PanSession` — call this when a consumer's `onPan` reference changes
+ * mid-gesture (the canonical Svelte 5 pattern of inline arrow handlers
+ * passes a fresh closure every render). Without this, the host
+ * `$effect` would have to teardown + re-attach and the user's in-flight
+ * pan would silently die.
+ */
+export type AttachPanCleanup = (() => void) & {
+    update: (next: PanHandlers) => void
+}
+
+/**
  * Attach a pan gesture session to `el`. Returns a cleanup function that
- * tears down the pointerdown listener and ends any in-flight session.
+ * tears down the pointerdown listener and ends any in-flight session,
+ * with a `.update(next)` method for hot-swapping handlers mid-gesture.
  *
  * Internally a fresh `PanSession` spawns on each pointerdown — the
  * outer attachment just keeps the pointerdown listener alive across the
  * element's lifetime.
+ *
+ * SSR-safe: returns a no-op cleanup if `window` is undefined. The Svelte
+ * `$effect` consumer never fires on the server anyway, but defending the
+ * boundary lets the module load cleanly in node-only test runners.
  */
 export const attachPan = (
     el: HTMLElement,
     handlers: PanHandlers,
     options: AttachPanOptions = {}
-): (() => void) => {
+): AttachPanCleanup => {
+    if (typeof window === 'undefined') {
+        const noop = () => {}
+        return Object.assign(noop, { update: () => {} }) as AttachPanCleanup
+    }
+
     const contextWindow = options.contextWindow ?? el.ownerDocument?.defaultView ?? window
     const distanceThreshold = options.distanceThreshold ?? 3
 
     let session: PanSession | null = null
+    let rawHandlers = handlers
+
+    // Liveness flag the wrapped handler closures consult before invoking
+    // the user callback. Flips false at teardown so any frame.update /
+    // frame.postRender callbacks queued before teardown — but not yet
+    // flushed — see the flag and skip dispatch. This is our only way to
+    // cancel the anonymous closures the wrappers schedule (frame.update
+    // doesn't return a handle we can store per call).
+    let isAlive = true
+    const aliveGuard = () => isAlive
 
     // Frame-scheduled mirror of the live handlers — onSessionStart / onStart /
     // onMove are queued onto motion-dom's `update` step, onEnd / onSessionEnd
@@ -204,11 +270,15 @@ export const attachPan = (
     // wrapUpdate / wrapPostRender helpers at the top of this file for the
     // rationale. PanSession itself stays scheduler-unaware (and synchronous,
     // for testability) — the scheduling lives at the `attachPan` boundary.
-    let liveHandlers = wrapHandlers(handlers)
+    let liveHandlers = wrapHandlers(handlers, aliveGuard)
 
     const onPointerDown = (event: PointerEvent) => {
         // Match upstream: ignore non-primary pointers (multi-touch, right-click).
         if (!isPrimaryPointer(event)) return
+        // Defensively end any prior session before overwriting the reference.
+        // Without this, a second primary pointerdown that arrives before the
+        // first pointerup orphans the prior session's contextWindow listeners.
+        session?.end()
         session = new PanSession(event, liveHandlers, {
             distanceThreshold,
             contextWindow,
@@ -219,22 +289,29 @@ export const attachPan = (
     el.addEventListener('pointerdown', onPointerDown)
 
     const update = (next: PanHandlers): void => {
-        liveHandlers = wrapHandlers(next)
+        rawHandlers = next
+        liveHandlers = wrapHandlers(next, aliveGuard)
         session?.updateHandlers(liveHandlers)
     }
 
     const teardown = (): void => {
+        // Synthesize the gesture's terminal lifecycle BEFORE flipping
+        // `isAlive`, so a host that tears us down mid-pan (effect re-run,
+        // component unmount) still sees a balanced onPanEnd / onPanSessionEnd
+        // pair. Dispatched against the *raw* (unwrapped) handlers so the
+        // delivery is synchronous — the wrapped lane would otherwise queue
+        // the callbacks onto frame.postRender just for them to be cancelled
+        // by the `isAlive = false` line immediately below.
+        if (session) {
+            session.dispatchTerminal(rawHandlers)
+            session.end()
+            session = null
+        }
+        isAlive = false
         el.removeEventListener('pointerdown', onPointerDown)
-        session?.end()
-        session = null
     }
 
-    // Expose updateHandlers on the cleanup fn so the container can refresh
-    // callbacks mid-session without tearing down (e.g. when the consumer's
-    // onPan changes between renders). Optional — most callers can ignore it.
-    ;(teardown as unknown as { update: typeof update }).update = update
-
-    return teardown
+    return Object.assign(teardown, { update }) as AttachPanCleanup
 }
 
 interface PanSessionInternalOptions {
@@ -300,6 +377,31 @@ class PanSession {
         cancelFrame(this.updatePoint)
     }
 
+    /**
+     * Synthesize the gesture's terminal lifecycle pair (`onEnd` then
+     * `onSessionEnd`) against the supplied *raw* (unwrapped) handlers,
+     * using the last observed event + point as the synthetic terminal
+     * sample. Called by `attachPan.teardown` when a host kills the
+     * session mid-gesture — without this, an `$effect` re-run that
+     * tears down the attachment silently strands the consumer's state
+     * machine in an "in-progress" state (whilePan keyframes never
+     * revert, threshold-based commit decisions never run).
+     *
+     * Bypasses the frame-loop wrappers deliberately: the wrapped
+     * handlers would queue to `frame.postRender` only for the
+     * about-to-flip `isAlive` flag in attachPan to cancel them. Raw
+     * dispatch keeps the lifecycle synchronous with teardown.
+     *
+     * No-op when no pointermove ever fired — matches the
+     * `handlePointerUp` no-movement contract upstream uses.
+     */
+    dispatchTerminal(rawHandlers: PanHandlers): void {
+        if (!(this.lastMoveEvent && this.lastMovePoint)) return
+        const info = getPanInfo(this.lastMovePoint, this.history)
+        if (this.startEvent) rawHandlers.onEnd?.(this.lastMoveEvent, info)
+        rawHandlers.onSessionEnd?.(this.lastMoveEvent, info)
+    }
+
     private handlePointerMove = (event: PointerEvent): void => {
         this.lastMoveEvent = event
         this.lastMovePoint = extractEventPoint(event)
@@ -310,11 +412,13 @@ class PanSession {
     private handlePointerUp = (event: PointerEvent): void => {
         this.end()
         if (!(this.lastMoveEvent && this.lastMovePoint)) {
-            // Pointerup before any pointermove — fire session-end with the
-            // initial point so consumers see a balanced lifecycle.
-            const startPoint = this.history[0]
-            const info = getPanInfo(startPoint, this.history)
-            this.handlers.onSessionEnd?.(event, info)
+            // No pointermove ever fired — match upstream framer-motion
+            // (`packages/framer-motion/src/gestures/pan/PanSession.ts`
+            // ~line 320) and return WITHOUT firing onEnd / onSessionEnd.
+            // Consumers that want a "tap" signal should use the press /
+            // tap gesture instead. This prevents a spurious
+            // onPanSessionStart → onPanSessionEnd pair on every plain
+            // click of a pan-enabled element.
             return
         }
 
