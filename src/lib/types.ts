@@ -288,6 +288,16 @@ export type MotionOnDragEnd = ((event: PointerEvent, info: DragInfo) => void) | 
 export type MotionOnDirectionLock = ((axis: 'x' | 'y') => void) | undefined
 export type MotionOnDragTransitionEnd = (() => void) | undefined
 
+/**
+ * Pan-gesture callbacks. PanInfo is structurally identical to DragInfo
+ * (`{ point, delta, offset, velocity }`), so we re-use the type rather
+ * than ship a parallel alias.
+ */
+export type MotionOnPanSessionStart = ((event: PointerEvent, info: DragInfo) => void) | undefined
+export type MotionOnPanStart = ((event: PointerEvent, info: DragInfo) => void) | undefined
+export type MotionOnPan = ((event: PointerEvent, info: DragInfo) => void) | undefined
+export type MotionOnPanEnd = ((event: PointerEvent, info: DragInfo) => void) | undefined
+
 export type DragAxis = boolean | 'x' | 'y'
 export type DragConstraints =
     | {
@@ -364,6 +374,8 @@ export type MotionProps = {
     whileFocus?: MotionWhileFocus
     /** Drag interaction animation */
     whileDrag?: MotionWhileDrag
+    /** Pan interaction animation — applied while a pan gesture is active */
+    whilePan?: MotionWhileDrag
     /** In-view interaction animation - animates when element enters viewport */
     whileInView?: MotionWhileInView
     /** IntersectionObserver options for `whileInView` (once / root / margin / amount) */
@@ -400,6 +412,14 @@ export type MotionProps = {
     onDirectionLock?: MotionOnDirectionLock
     /** Called when the post-drag transition finishes on all axes */
     onDragTransitionEnd?: MotionOnDragTransitionEnd
+    /** Pan gesture: fires once per pointerdown, before threshold */
+    onPanSessionStart?: MotionOnPanSessionStart
+    /** Pan gesture: fires the first frame after offset crosses threshold */
+    onPanStart?: MotionOnPanStart
+    /** Pan gesture: fires once per frame while panning */
+    onPan?: MotionOnPan
+    /** Pan gesture: fires on pointerup if onPanStart ever fired */
+    onPanEnd?: MotionOnPanEnd
     /** Inline styles */
     style?: string
     /** CSS classes */

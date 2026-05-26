@@ -48,6 +48,7 @@
     } from '$lib/utils/presence'
     import { getInitialKeyframes } from '$lib/utils/initial'
     import { attachDrag } from '$lib/utils/drag'
+    import { attachPan } from '$lib/utils/pan'
     import { resolveInitial, resolveAnimate, resolveExit, resolveWhile } from '$lib/utils/variants'
     import {
         setVariantContext,
@@ -97,6 +98,11 @@
         whileInView: whileInViewProp,
         viewport: viewportProp,
         whileDrag: whileDragProp,
+        whilePan: whilePanProp,
+        onPanSessionStart: onPanSessionStartProp,
+        onPanStart: onPanStartProp,
+        onPan: onPanProp,
+        onPanEnd: onPanEndProp,
         onHoverStart: onHoverStartProp,
         onHoverEnd: onHoverEndProp,
         onFocusStart: onFocusStartProp,
@@ -455,6 +461,7 @@
     const resolvedWhileHover = $derived(resolveWhile(whileHoverProp, variantsProp, effectiveCustom))
     const resolvedWhileFocus = $derived(resolveWhile(whileFocusProp, variantsProp, effectiveCustom))
     const resolvedWhileDrag = $derived(resolveWhile(whileDragProp, variantsProp, effectiveCustom))
+    const resolvedWhilePan = $derived(resolveWhile(whilePanProp, variantsProp, effectiveCustom))
     const resolvedWhileInView = $derived(
         resolveWhile(whileInViewProp, variantsProp, effectiveCustom)
     )
@@ -591,6 +598,84 @@
         return () => {
             teardownDrag?.()
             teardownDrag = null
+        }
+    })
+
+    /**
+     * Pan-gesture wiring. Active whenever any of `onPanSessionStart`,
+     * `onPanStart`, `onPan`, `onPanEnd`, or `whilePan` is set. Unlike
+     * `drag`, Pan has no constraints / momentum / origin-snap — it's a
+     * pure pointer offset+velocity reporter, useful for swipe-to-dismiss
+     * sheets, custom carousels, and any "tell me what the gesture is
+     * doing right now" interaction. Mirrors framer-motion's `PanGesture`
+     * (packages/framer-motion/src/gestures/pan/index.ts).
+     */
+    let teardownPan: (() => void) | null = null
+    let activeWhilePanKeyframes: Record<string, unknown> | null = null
+    $effect(() => {
+        if (isPlaywright) {
+            pwLog('[motion] pan attach effect run', {
+                hasOnPan: !!onPanProp,
+                hasWhilePan: !!resolvedWhilePan,
+                isLoaded
+            })
+        }
+        if (!element) return
+        teardownPan?.()
+        teardownPan = null
+
+        const hasAnyHandler =
+            !!onPanProp ||
+            !!onPanStartProp ||
+            !!onPanEndProp ||
+            !!onPanSessionStartProp ||
+            !!resolvedWhilePan
+        if (!hasAnyHandler) return
+
+        const applyWhilePan = (keyframes: Record<string, unknown> | null) => {
+            if (!element || !keyframes) return
+            activeWhilePanKeyframes = keyframes
+            animateWithLifecycle(
+                element,
+                keyframes as unknown as DOMKeyframesDefinition,
+                (mergedTransition ?? {}) as unknown as AnimationOptions
+            )
+        }
+        const revertWhilePan = () => {
+            if (!element || !activeWhilePanKeyframes) return
+            const reverted = Object.fromEntries(
+                Object.keys(activeWhilePanKeyframes).map((k) => [
+                    k,
+                    (resolvedAnimate as Record<string, unknown> | undefined)?.[k] ?? null
+                ])
+            )
+            activeWhilePanKeyframes = null
+            animateWithLifecycle(
+                element,
+                reverted as unknown as DOMKeyframesDefinition,
+                (mergedTransition ?? {}) as unknown as AnimationOptions
+            )
+        }
+
+        teardownPan = attachPan(element, {
+            onSessionStart: onPanSessionStartProp,
+            onStart: (event, info) => {
+                if (resolvedWhilePan) {
+                    applyWhilePan(resolvedWhilePan as Record<string, unknown>)
+                }
+                onPanStartProp?.(event, info)
+            },
+            onMove: onPanProp,
+            onEnd: (event, info) => {
+                if (activeWhilePanKeyframes) revertWhilePan()
+                onPanEndProp?.(event, info)
+            }
+        })
+
+        return () => {
+            teardownPan?.()
+            teardownPan = null
+            activeWhilePanKeyframes = null
         }
     })
 
