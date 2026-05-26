@@ -298,6 +298,32 @@ export type MotionOnPanStart = ((event: PointerEvent, info: DragInfo) => void) |
 export type MotionOnPan = ((event: PointerEvent, info: DragInfo) => void) | undefined
 export type MotionOnPanEnd = ((event: PointerEvent, info: DragInfo) => void) | undefined
 
+/**
+ * Payload delivered to `onProjectionUpdate`. Re-declared structurally
+ * here (rather than imported from `projection.ts`) so `types.ts`
+ * stays dependency-free at the type layer. `delta.x/y.translate` is the
+ * px shift the element's layout box moved between the pre-change
+ * snapshot and the post-change measurement; `hasLayoutChanged` applies
+ * the rounding threshold that filters sub-pixel jitter.
+ */
+export type ProjectionUpdatePayload = {
+    layout: { x: { min: number; max: number }; y: { min: number; max: number } }
+    snapshot: { x: { min: number; max: number }; y: { min: number; max: number } }
+    delta: {
+        x: { translate: number; scale: number; origin: number; originPoint: number }
+        y: { translate: number; scale: number; origin: number; originPoint: number }
+    }
+    hasLayoutChanged: boolean
+}
+
+/**
+ * Fires after each layout change to a `motion.*` element that has
+ * `layout` enabled, with the FLIP delta between the pre- and
+ * post-change layout boxes. Mirrors framer-motion's `onLayoutMeasure`
+ * surface. Wired through the element's internal `ProjectionNode`.
+ */
+export type MotionOnProjectionUpdate = ((data: ProjectionUpdatePayload) => void) | undefined
+
 export type DragAxis = boolean | 'x' | 'y'
 export type DragConstraints =
     | {
@@ -426,6 +452,12 @@ export type MotionProps = {
     class?: string
     /** Enable FLIP layout animations; "position" limits to translation only */
     layout?: boolean | 'position'
+    /**
+     * Fires after each `layout`-driven change with the FLIP delta from
+     * the element's internal projection node. Mirrors framer-motion's
+     * `onLayoutMeasure`. Requires `layout` to be enabled.
+     */
+    onProjectionUpdate?: MotionOnProjectionUpdate
     /** Shared layout animation identifier. Elements with matching layoutId animate between positions. */
     layoutId?: string
     /**

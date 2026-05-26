@@ -39,12 +39,14 @@ export type {
     MotionOnDragTransitionEnd,
     MotionOnInViewEnd,
     MotionOnInViewStart,
+    MotionOnProjectionUpdate,
     MotionTransition,
     MotionWhileDrag,
     MotionWhileFocus,
     MotionWhileHover,
     MotionWhileInView,
     MotionWhileTap,
+    ProjectionUpdatePayload,
     ReducedMotionConfig,
     Variants
 } from '$lib/types'
