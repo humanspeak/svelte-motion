@@ -374,6 +374,17 @@ class PanSession {
     private distanceThreshold = 3
     private element: HTMLElement | null = null
     private scrollPositions = new Map<Element | Window, Point>()
+    /**
+     * Idempotency flag — set the first time the gesture's terminal
+     * lifecycle pair (`onEnd` + `onSessionEnd`) fires. Both
+     * `handlePointerUp` (the natural release path) and
+     * `dispatchTerminal` (the forced-teardown path called by
+     * `attachPan.teardown`) check this and bail if already dispatched.
+     * Without it, a normal pointerup followed by a host-side teardown
+     * (e.g. `$effect` cleanup, component unmount) would replay
+     * `onEnd`/`onSessionEnd` against handlers that already saw them.
+     */
+    private terminalDispatched = false
     private removeScrollListeners: (() => void) | null = null
     private removeListeners: (() => void) | null = null
 
@@ -440,10 +451,12 @@ class PanSession {
      * `handlePointerUp` no-movement contract upstream uses.
      */
     dispatchTerminal(rawHandlers: PanHandlers): void {
+        if (this.terminalDispatched) return
         if (!(this.lastMoveEvent && this.lastMovePoint)) return
         const info = getPanInfo(this.lastMovePoint, this.history)
         if (this.startEvent) rawHandlers.onEnd?.(this.lastMoveEvent, info)
         rawHandlers.onSessionEnd?.(this.lastMoveEvent, info)
+        this.terminalDispatched = true
     }
 
     private handlePointerMove = (event: PointerEvent): void => {
@@ -455,6 +468,7 @@ class PanSession {
 
     private handlePointerUp = (event: PointerEvent): void => {
         this.end()
+        if (this.terminalDispatched) return
         if (!(this.lastMoveEvent && this.lastMovePoint)) {
             // No pointermove ever fired — match upstream framer-motion
             // (`packages/framer-motion/src/gestures/pan/PanSession.ts`
@@ -472,6 +486,9 @@ class PanSession {
 
         if (this.startEvent) this.handlers.onEnd?.(event, info)
         this.handlers.onSessionEnd?.(event, info)
+        // Mark idempotent so a later forced teardown via
+        // `dispatchTerminal` doesn't replay this pair.
+        this.terminalDispatched = true
     }
 
     private updatePoint = (): void => {

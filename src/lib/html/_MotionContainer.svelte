@@ -27,7 +27,7 @@
     import { sleep } from '$lib/utils/testing'
     import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
     import { isPlaywrightEnv, pwLog } from '$lib/utils/log'
-    import { onDestroy, type Snippet } from 'svelte'
+    import { onDestroy, untrack, type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants'
     import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation'
     import { attachWhileTap } from '$lib/utils/interaction'
@@ -635,6 +635,24 @@
     let activeWhilePanKeyframes: Record<string, unknown> | null = null
     let whilePanBaseline: Record<string, unknown> | null = null
 
+    /**
+     * Boolean presence-check for "is any pan surface active?". Derived
+     * so the attach effect below tracks the *boolean value*, not the
+     * individual handler/whilePan reference identities. A consumer
+     * passing `onPan={(e, i) => ...}` (inline arrow — fresh ref every
+     * render) used to re-trigger the attach effect on every parent
+     * render; with this derived in place, the attach effect only
+     * re-runs when overall presence flips (none → some, some → none).
+     * Per-ref changes flow through the hot-swap effect instead.
+     */
+    const hasAnyPanHandler = $derived(
+        !!onPanProp ||
+            !!onPanStartProp ||
+            !!onPanEndProp ||
+            !!onPanSessionStartProp ||
+            !!resolvedWhilePan
+    )
+
     const buildPanHandlers = (): {
         onSessionStart?: MotionOnPanSessionStart
         onStart: NonNullable<MotionOnPanStart>
@@ -685,8 +703,7 @@
     $effect(() => {
         if (isPlaywright) {
             pwLog('[motion] pan attach effect run', {
-                hasOnPan: !!onPanProp,
-                hasWhilePan: !!resolvedWhilePan,
+                hasAnyPanHandler,
                 isLoaded
             })
         }
@@ -703,23 +720,30 @@
         // would create two competing pointer pipelines fighting for the
         // same transforms.
         if (dragProp) return
+        if (!hasAnyPanHandler) return
 
-        const hasAnyHandler =
-            !!onPanProp ||
-            !!onPanStartProp ||
-            !!onPanEndProp ||
-            !!onPanSessionStartProp ||
-            !!resolvedWhilePan
-        if (!hasAnyHandler) return
-
-        teardownPan = attachPan(element, buildPanHandlers())
+        // `untrack` so the reactive reads inside `buildPanHandlers`
+        // (onPan*Prop, resolvedWhilePan, initialKeyframes, resolvedAnimate,
+        // mergedTransition) don't register as dependencies of this attach
+        // effect. Otherwise every parent re-render that passes a fresh
+        // inline arrow handler would re-run this effect and call
+        // `teardownPan?.()`, killing the live PanSession mid-gesture.
+        // Handler-ref changes flow exclusively through the hot-swap
+        // effect below, which calls `teardownPan.update(next)` — that's
+        // the path that keeps an in-flight gesture alive across re-renders.
+        teardownPan = attachPan(
+            element,
+            untrack(() => buildPanHandlers())
+        )
 
         return () => {
             // Synchronous revert of whilePan + lifecycle dispatch lives in
             // attachPan.teardown() — the cleanup chain there calls
             // session.dispatchTerminal(rawHandlers) BEFORE flipping isAlive,
             // so onPanEnd fires (which runs the revert above) before the
-            // listeners go.
+            // listeners go. dispatchTerminal is idempotent (PanSession's
+            // terminalDispatched flag) so a host that tears down after a
+            // natural release won't replay the lifecycle pair.
             teardownPan?.()
             teardownPan = null
             activeWhilePanKeyframes = null
