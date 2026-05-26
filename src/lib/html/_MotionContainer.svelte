@@ -43,7 +43,7 @@
         type RectLike
     } from '$lib/utils/layout'
     import type { SvelteHTMLElements } from 'svelte/elements'
-    import { mergeInlineStyles } from '$lib/utils/style'
+    import { mergeInlineStyles, extractTransform } from '$lib/utils/style'
     import { isNativelyFocusable } from '$lib/utils/a11y'
     import {
         getAnimatePresenceContext,
@@ -201,26 +201,38 @@
     // boxes share the FLIP coordinate space, and zeros ancestor
     // transforms during measure so nested layout-animated parents don't
     // corrupt a child's delta.
+    // The user-authored transform, sourced from the `style` prop rather
+    // than the live inline transform — the latter already carries any
+    // transform-type `initial`/`animate` keyframe by the time the node
+    // measures, which would be mistaken for the user's base.
+    const userBaseTransform = $derived(extractTransform(styleProp))
+
     const projectionParent = getProjectionParent()
     const projection = new ProjectionNode({
         parent: projectionParent,
-        getScrollContainers: resolveLayoutScrollAncestors
+        getScrollContainers: resolveLayoutScrollAncestors,
+        getBaseTransform: () => userBaseTransform
     })
     setProjectionParent(projection)
 
-    // Ancestor-transform-invariant layout measurement for the FLIP effect.
-    // Returns the projection node's `Box` (ancestor chain reset to base,
-    // self transform stripped, scroll containers compensated) as the
+    // Convert a projection `Box` (ancestor chain reset to base, self
+    // transform stripped, scroll containers compensated) to the
     // `RectLike` shape `computeFlipTransforms` consumes.
+    const boxToRectLike = (box: {
+        x: { min: number; max: number }
+        y: { min: number; max: number }
+    }): RectLike => ({
+        left: box.x.min,
+        top: box.y.min,
+        width: box.x.max - box.x.min,
+        height: box.y.max - box.y.min
+    })
+
+    // Ancestor-transform-invariant layout measurement for seeding the
+    // FLIP effect's first rect.
     const measureLayoutRect = (): RectLike | null => {
         const box = projection.measure()
-        if (!box) return null
-        return {
-            left: box.x.min,
-            top: box.y.min,
-            width: box.x.max - box.x.min,
-            height: box.y.max - box.y.min
-        }
+        return box ? boxToRectLike(box) : null
     }
 
     // Get current presence depth (0 = direct child of AnimatePresence, undefined = not in AnimatePresence)
@@ -998,13 +1010,14 @@
 
         let rafId: number | null = null
         const runFlip = () => {
-            // Emit the projection didUpdate event off the same layout-change
-            // signal the FLIP runs on. The node diffs its cached pre-change
-            // layout against a fresh ancestor-stripped measurement and fans
-            // out the delta to `onProjectionUpdate` listeners. (#379)
-            projection.commitLayoutChange()
-            const next = measureLayoutRect()
-            if (!next) return
+            // commitLayoutChange does the ancestor-stripped measure, fans
+            // the delta out to `onProjectionUpdate` listeners, AND returns
+            // the freshly-measured box — so the FLIP reuses that single
+            // measurement as `next` instead of walking + transform-resetting
+            // the ancestor chain a second time per frame. (#379)
+            const nextBox = projection.commitLayoutChange()
+            if (!nextBox) return
+            const next = boxToRectLike(nextBox)
             if (!lastRect) {
                 lastRect = next
                 return

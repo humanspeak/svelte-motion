@@ -303,8 +303,9 @@ export type MotionOnPanEnd = ((event: PointerEvent, info: DragInfo) => void) | u
  * here (rather than imported from `projection.ts`) so `types.ts`
  * stays dependency-free at the type layer. `delta.x/y.translate` is the
  * px shift the element's layout box moved between the pre-change
- * snapshot and the post-change measurement; `hasLayoutChanged` applies
- * the rounding threshold that filters sub-pixel jitter.
+ * snapshot and the post-change measurement; `hasLayoutChanged` is false
+ * only when the delta is within a tight float epsilon (±0.01px
+ * translate), so even a sub-pixel real move is reported as a change.
  */
 export type ProjectionUpdatePayload = {
     layout: { x: { min: number; max: number }; y: { min: number; max: number } }

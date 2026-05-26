@@ -96,6 +96,25 @@ describe('utils/projection - ProjectionNode', () => {
             expect(() => node.unmount()).not.toThrow()
             expect(node.isMounted).toBe(false)
         })
+
+        it('re-mounting a parent onto a new element preserves its registered children', () => {
+            const parent = new ProjectionNode()
+            const child = new ProjectionNode({ parent })
+            const parentElA = makeEl()
+            const parentElB = makeEl()
+            parent.mount(parentElA)
+            child.mount(makeEl())
+            expect(parent.children.has(child)).toBe(true)
+
+            // Swap the parent onto a different element (e.g. element rebind).
+            parent.mount(parentElB)
+
+            // The still-mounted child must remain registered — a full
+            // unmount() on re-mount would have orphaned it.
+            expect(parent.element).toBe(parentElB)
+            expect(parent.isMounted).toBe(true)
+            expect(parent.children.has(child)).toBe(true)
+        })
     })
 
     describe('measure', () => {
@@ -229,6 +248,53 @@ describe('utils/projection - ProjectionNode', () => {
             const second = node.measure()
             expect(first).toEqual(second)
             expect(spy).toHaveBeenCalledTimes(2)
+        })
+
+        it('prefers the getBaseTransform thunk over the polluted mount-time inline transform (initial+layout guard)', () => {
+            // Simulates a `<motion.div layout initial={{ x: 100 }}>`: the
+            // initial keyframe is serialized into style.transform BEFORE
+            // mount, so the mount-time inline value is a MOTION transform,
+            // not the user's. The thunk supplies the real user base ('').
+            const el = makeEl()
+            el.style.transform = 'translateX(100px)' // motion-applied initial, present at mount
+            const spy = vi.spyOn(el.style, 'transform', 'set')
+            mockRect(el, new DOMRect(0, 0, 80, 80))
+
+            const node = new ProjectionNode({ getBaseTransform: () => '' })
+            node.mount(el)
+
+            node.measure()
+            // measure() must reset self to the thunk's value ('') during the
+            // read. Without the thunk it would use the mount-captured
+            // 'translateX(100px)' and the setter would NEVER see '' (it would
+            // only ever be set/restored to 'translateX(100px)'). So a '' write
+            // is the precise proof the thunk base was used. (The final restore
+            // legitimately writes the live 'translateX(100px)' back.)
+            expect(spy).toHaveBeenCalledWith('')
+            expect(el.style.transform).toBe('translateX(100px)') // restored after measure
+        })
+
+        it('thunk supplies the ancestor base too, stripping a motion transform an ancestor carried at mount', () => {
+            const outerEl = makeEl()
+            const innerEl = document.createElement('div')
+            outerEl.appendChild(innerEl)
+            // Outer mounts with a motion-applied transform inline; the user
+            // authored translate(40px, 60px) (what the thunk returns).
+            outerEl.style.transform = 'translate(40px, 60px) translateX(100px)'
+            mockRect(innerEl, new DOMRect(0, 0, 80, 80))
+
+            const outer = new ProjectionNode({ getBaseTransform: () => 'translate(40px, 60px)' })
+            const inner = new ProjectionNode({ parent: outer })
+            outer.mount(outerEl)
+            inner.mount(innerEl)
+
+            const outerSpy = vi.spyOn(outerEl.style, 'transform', 'set')
+            inner.measure()
+
+            // During the read the ancestor is reset to the thunk's user
+            // base, dropping the motion translateX(100px).
+            expect(outerSpy).toHaveBeenCalledWith('translate(40px, 60px)')
+            expect(outerEl.style.transform).toBe('translate(40px, 60px) translateX(100px)')
         })
     })
 

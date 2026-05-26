@@ -102,9 +102,11 @@ export type ProjectionEventName = 'willUpdate' | 'didUpdate' | 'measure'
  * + `motionValue.set(motionValue.get() + delta.translate)` to keep a
  * dragged element under the cursor while its slot moves.
  *
- * `hasLayoutChanged` is `!isDeltaZero(delta)` — uses the upstream
- * rounding threshold so sub-pixel jiggle from constraint-clamped
- * drags doesn't cascade as false-positive layout changes.
+ * `hasLayoutChanged` is `!isDeltaZero(delta)`. `isDeltaZero` (from
+ * motion-dom) treats an axis as unchanged only when its translate is
+ * within ±0.01px and its scale within ±0.0001 of identity — a tight
+ * floating-point epsilon, NOT a 1px rounding threshold. A genuine
+ * sub-pixel layout shift (say 0.4px) is therefore reported as a change.
  */
 export interface ProjectionDidUpdateData {
     layout: Box
@@ -143,6 +145,20 @@ export interface ProjectionNodeOptions {
      * viewport-relative measurements — fine for the common case.
      */
     getScrollContainers?: () => HTMLElement[]
+    /**
+     * Thunk returning the element's USER-authored `transform` — the
+     * value `measure()` resets to while reading, so the motion-applied
+     * portion (`initial`/`animate`/FLIP/drag) is stripped but the user's
+     * own transform is preserved.
+     *
+     * Preferred over the mount-time `baseTransform` capture, because at
+     * mount the inline `style.transform` already carries any
+     * transform-type `initial` keyframe (it is serialized inline before
+     * effects run). The consumer therefore sources this from the `style`
+     * prop instead (see `extractTransform`). When omitted, the node
+     * falls back to the mount-captured `baseTransform`.
+     */
+    getBaseTransform?: () => string
 }
 
 /**
@@ -206,31 +222,46 @@ export class ProjectionNode {
     /** Whether `mount()` has been called and `unmount()` has not. */
     isMounted = false
     /**
-     * The element's `style.transform` captured at `mount()` time — the
-     * user-authored base. Motion only ever writes a transform to the
-     * element AFTER mount (FLIP fires on a layout change, drag on
-     * pointerdown), so whatever is present at mount is the user's own
-     * styling transform and nothing else.
+     * Fallback user-authored base transform, captured from
+     * `element.style.transform` at `mount()` time. Used only when no
+     * `getBaseTransform` thunk was provided (e.g. unit tests that
+     * construct a bare node and set the transform before mounting).
      *
-     * `measure()` restores ancestors (and self, via `measureRect`) to
-     * this base rather than to `'none'`. That removes exactly the
-     * motion-applied portion of the transform while leaving the
-     * user-authored part intact — the same distinction framer-motion
-     * draws by only subtracting motion-tracked `latestValues` in
-     * `removeBoxTransforms` and skipping nodes with no tracked
-     * transform. A purely static user transform therefore stays in the
-     * measured layout box (matching upstream); a FLIP/drag transform
-     * written after mount is stripped.
+     * For real `motion.*` elements the `getBaseTransform` thunk is
+     * preferred: capturing at mount is unsafe because a transform-type
+     * `initial` keyframe is serialized into the inline `style.transform`
+     * BEFORE effects run, so the mount-time value can be a motion
+     * transform rather than the user's. `resolveBaseTransform()` picks
+     * the thunk first.
+     *
+     * `measure()` resets ancestors (and self, via `measureRect`) to this
+     * base rather than to `'none'`, removing the motion-applied portion
+     * while leaving the user-authored part intact — the same distinction
+     * framer-motion draws by only subtracting motion-tracked
+     * `latestValues` in `removeBoxTransforms`.
      */
     baseTransform = ''
 
     private readonly listeners: Map<ProjectionEventName, Set<(...args: unknown[]) => void>> =
         new Map()
     private readonly getScrollContainers: (() => HTMLElement[]) | undefined
+    private readonly getBaseTransform: (() => string) | undefined
 
     constructor(options: ProjectionNodeOptions = {}) {
         this.parent = options.parent ?? null
         this.getScrollContainers = options.getScrollContainers
+        this.getBaseTransform = options.getBaseTransform
+    }
+
+    /**
+     * The transform `measure()` resets this node's element to while
+     * reading. Prefers the `getBaseTransform` thunk (the user's authored
+     * `style` transform, motion-independent); falls back to the
+     * mount-captured `baseTransform`. See `getBaseTransform` /
+     * `baseTransform` for why the thunk is the safe source.
+     */
+    private resolveBaseTransform(): string {
+        return this.getBaseTransform?.() ?? this.baseTransform
     }
 
     /**
@@ -238,17 +269,27 @@ export class ProjectionNode {
      * Idempotent — calling `mount()` twice on the same element is a
      * no-op for the registration steps.
      *
+     * Re-mounting onto a DIFFERENT element swaps the element in place
+     * WITHOUT a full `unmount()`. A full unmount would `children.clear()`,
+     * orphaning still-mounted descendants that registered themselves in
+     * this node's `children` (they keep their `parent` pointer but the
+     * set would never be repopulated). Listeners and children are
+     * therefore preserved across an element swap.
+     *
      * @param element The DOM element this node represents.
      */
     mount(element: HTMLElement): void {
         if (this.isMounted && this.element === element) return
-        if (this.isMounted) this.unmount()
         this.element = element
-        // Capture the user-authored transform before motion ever writes
-        // one. See `baseTransform` for why mount-time is the right moment.
+        // Fallback base capture (the consumer's getBaseTransform thunk is
+        // preferred — see `baseTransform`).
         this.baseTransform = element.style.transform
-        this.isMounted = true
-        this.parent?.children.add(this)
+        // Stale measurement from a previous element; refreshed on next measure.
+        this.latestLayout = null
+        if (!this.isMounted) {
+            this.isMounted = true
+            this.parent?.children.add(this)
+        }
     }
 
     /**
@@ -278,14 +319,13 @@ export class ProjectionNode {
      *    mounted ancestor node (excludes self — `measureRect`
      *    handles self's transform internally).
      * 2. Snapshot each ancestor's current `el.style.transform`.
-     * 3. Set each to its node's `baseTransform` (the user-authored
-     *    value captured at mount). This strips any FLIP/drag transform
-     *    written after mount while keeping the user's static one — see
-     *    `baseTransform`.
+     * 3. Set each to its node's resolved base transform (the
+     *    user-authored value, via `resolveBaseTransform`). This strips
+     *    any FLIP/drag/initial transform while keeping the user's static
+     *    one — see `getBaseTransform` / `baseTransform`.
      * 4. Delegate to `measureRect(self.element, scrollContainers,
-     *    self.baseTransform)`, which applies self's base transform
-     *    inside its own try/finally and returns the scroll-compensated
-     *    DOMRect.
+     *    self base)`, which applies self's base transform inside its own
+     *    try/finally and returns the scroll-compensated DOMRect.
      * 5. Restore ancestor transforms in reverse order inside a
      *    `finally` block — guarantees restoration even if measure
      *    throws.
@@ -311,7 +351,7 @@ export class ProjectionNode {
             (node) => ({
                 el: node.element!,
                 prev: node.element!.style.transform,
-                base: node.baseTransform
+                base: node.resolveBaseTransform()
             })
         )
         try {
@@ -320,7 +360,7 @@ export class ProjectionNode {
             const rect = measureRect(
                 this.element,
                 this.getScrollContainers?.() ?? [],
-                this.baseTransform
+                this.resolveBaseTransform()
             )
             const box = rectToBox(rect)
             this.latestLayout = box
@@ -380,7 +420,10 @@ export class ProjectionNode {
         calcBoxDelta(delta, this.snapshot, layout)
         const hasLayoutChanged = !isDeltaZero(delta)
         const payload: ProjectionDidUpdateData = {
-            layout,
+            // Clone the layout box: it aliases `this.latestLayout`, so
+            // handing the live reference out would let a listener mutate
+            // the node's cached layout and poison the next diff.
+            layout: cloneBox(layout),
             snapshot: this.snapshot,
             delta,
             hasLayoutChanged
@@ -405,30 +448,40 @@ export class ProjectionNode {
      * First call after mount just seeds `latestLayout` (no prior
      * position to diff against) and fires nothing.
      *
-     * Crucially this is gated on a non-zero delta. The FLIP animation
-     * this commit runs alongside writes its own inverse `transform` to
-     * the element every frame, and those writes re-trigger the same
-     * `observeLayoutChanges` signal that drives this method. Those
-     * re-fires carry no real layout change (the ancestor-zeroed measure
-     * is identical to the previous one), so without the `isDeltaZero`
-     * gate every animation frame would fan out a `delta: 0` event and
-     * clobber the genuine delta from the originating change.
+     * Returns the freshly-measured `Box` (or `null` when unmounted) so
+     * the caller can reuse it — the FLIP loop in `_MotionContainer` uses
+     * this as its `next` rect instead of measuring a second time per
+     * frame.
+     *
+     * The `didUpdate` fan-out is gated on a non-zero delta. The FLIP
+     * animation this commit runs alongside writes its own inverse
+     * `transform` to the element every frame, and those writes re-trigger
+     * the same `observeLayoutChanges` signal that drives this method.
+     * Those re-fires carry no real layout change (the ancestor-stripped
+     * measure is identical to the previous one), so without the
+     * `isDeltaZero` gate every animation frame would fan out a `delta: 0`
+     * event and clobber the genuine delta from the originating change.
      */
-    commitLayoutChange(): void {
-        if (!this.element) return
+    commitLayoutChange(): Box | null {
+        if (!this.element) return null
         const previous = this.latestLayout
         const layout = this.measure()
-        if (!layout) return
-        if (!previous) return // first call after mount: seed only, nothing to diff
-        const delta = createDelta()
-        calcBoxDelta(delta, previous, layout)
-        if (isDeltaZero(delta)) return // observer re-fired on our own FLIP transform write
-        this.notify('didUpdate', {
-            layout,
-            snapshot: previous,
-            delta,
-            hasLayoutChanged: true
-        })
+        if (!layout) return null
+        if (previous) {
+            const delta = createDelta()
+            calcBoxDelta(delta, previous, layout)
+            // Skip the no-op re-fires from our own FLIP transform writes.
+            if (!isDeltaZero(delta)) {
+                this.notify('didUpdate', {
+                    // Clone: `layout` aliases `this.latestLayout`.
+                    layout: cloneBox(layout),
+                    snapshot: previous,
+                    delta,
+                    hasLayoutChanged: true
+                })
+            }
+        }
+        return layout
     }
 
     /**

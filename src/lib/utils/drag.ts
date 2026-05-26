@@ -377,8 +377,13 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
      */
     const adjustOrigin = (dx: number, dy: number) => {
         if (!dragging) return
-        origin.x += dx
-        origin.y += dy
+        // Advance the origin only on axes that are actually dragged —
+        // setXYImmediate writes (and bumps `applied` for) just those axes,
+        // so mutating origin on a locked-out axis would desync origin from
+        // applied and corrupt the next `offset = lastPoint - startPoint +
+        // origin` resolution.
+        if (axis === true || axis === 'x') origin.x += dx
+        if (axis === true || axis === 'y') origin.y += dy
         setXYImmediate(applied.x + dx, applied.y + dy)
     }
 

@@ -145,6 +145,26 @@ export const mergeInlineStyles = (
     return stringifyStyleObject(base)
 }
 
+/**
+ * Extract the user-authored `transform` declaration from a `style` prop.
+ *
+ * Used by the projection system as the "base" transform a node resets to
+ * while measuring — the value the user wrote, independent of any
+ * motion-applied transform (`initial`/`animate`/FLIP/drag) that lands on
+ * `element.style.transform` after mount. Reading it from the `style` prop
+ * rather than the live inline style is what keeps an `initial={{ x }}` (or
+ * any transform-type initial/animate) from being mistaken for the base.
+ *
+ * Returns `''` when the prop is not a string or carries no transform.
+ *
+ * @param style The component's `style` prop.
+ * @returns The user's `transform` value, or `''`.
+ */
+export const extractTransform = (style: unknown): string => {
+    if (typeof style !== 'string') return ''
+    return parseStyleString(style).transform ?? ''
+}
+
 const parseStyleString = (style: string): Record<string, string> => {
     const out: Record<string, string> = {}
     style
