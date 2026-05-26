@@ -237,6 +237,50 @@ export type AttachPanCleanup = (() => void) & {
  * SSR-safe: returns a no-op cleanup if `window` is undefined. The Svelte
  * `$effect` consumer never fires on the server anyway, but defending the
  * boundary lets the module load cleanly in node-only test runners.
+ *
+ * Lifecycle guarantee: when the returned cleanup runs mid-gesture, the
+ * session synthesizes `onEnd` + `onSessionEnd` against the raw handlers
+ * BEFORE removing listeners (see `PanSession.dispatchTerminal`). Hosts
+ * (e.g. `_MotionContainer`'s pan `$effect`) can put their `whilePan`
+ * revert logic inside the user-supplied `onEnd` and rely on it firing
+ * exactly once per gesture — whether the user released or the host
+ * forced teardown.
+ *
+ * @param el Target element to bind `pointerdown` on. Move/up/cancel
+ *   events are listened for on the element's owning window so a fast
+ *   swipe past the element's bounds keeps the gesture alive.
+ * @param handlers Pan lifecycle handlers. Any subset of
+ *   `onSessionStart` (fires on pointerdown), `onStart` (fires the first
+ *   time the cumulative offset crosses `distanceThreshold`), `onMove`
+ *   (per-frame-throttled on every pointermove past threshold), `onEnd`
+ *   (fires on pointerup/cancel if `onStart` ever fired), `onSessionEnd`
+ *   (fires on every pointerup/cancel where a pointermove occurred).
+ * @param options Per-session config. `distanceThreshold` (default 3px)
+ *   gates the start callback; `contextWindow` overrides the owning
+ *   window (use for shadow-root / iframe scenarios).
+ * @returns A cleanup function with an attached `.update(next)` method.
+ *   Calling the cleanup ends the session + removes the pointerdown
+ *   listener. Calling `.update(next)` swaps handlers in place on the
+ *   live session without rebuilding it — the canonical Svelte pattern
+ *   for inline arrow handlers that change identity each render.
+ *
+ * @example
+ * ```ts
+ * const cleanup = attachPan(node, {
+ *   onStart: (_event, info) => console.log('start', info.offset),
+ *   onMove: (_event, info) => x.set(info.offset.x),
+ *   onEnd: (_event, info) => {
+ *     if (Math.abs(info.velocity.x) > 600) commit()
+ *     else animate(x, 0, { type: 'spring' })
+ *   }
+ * })
+ *
+ * // Later, swap handlers without ending the live gesture:
+ * cleanup.update({ onMove: (_e, info) => x.set(info.offset.x * 2) })
+ *
+ * // On unmount:
+ * cleanup()
+ * ```
  */
 export const attachPan = (
     el: HTMLElement,
