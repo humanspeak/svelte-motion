@@ -53,7 +53,8 @@ export const docsSections: NavSection[] = [
         icon: Hand,
         items: [
             { title: 'Gestures (overview)', href: '/docs/gestures', icon: Hand },
-            { title: 'Drag', href: '/docs/drag', icon: Hand }
+            { title: 'Drag', href: '/docs/drag', icon: Hand },
+            { title: 'Pan', href: '/docs/pan', icon: Hand }
         ]
     },
     {
