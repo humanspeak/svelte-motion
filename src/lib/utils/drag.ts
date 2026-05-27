@@ -188,37 +188,51 @@ const computeReleaseVelocity = (
 }
 
 /**
+ * Cleanup handle returned by {@link attachDrag}. Invoke it to tear the
+ * gesture down (removes listeners, cancels any in-flight momentum/settle
+ * animation). It also carries `adjustOrigin(dx, dy)`, which shifts the
+ * LIVE gesture's origin + visual offset by a layout-shift delta mid-drag
+ * — used for projection-driven cursor pinning when a layout slot moves
+ * under the dragged element (#379 / #310). `adjustOrigin` is a no-op when
+ * not currently dragging and only affects axes the drag is unlocked on.
+ */
+export type AttachDragCleanup = (() => void) & {
+    adjustOrigin: (dx: number, dy: number) => void
+}
+
+/**
  * Attach a drag gesture to an element.
  *
- * Captures the pointer, updates x/y transforms with axis and optional direction lock,
- * applies elastic overflow against constraints, emits lifecycle callbacks with DragInfo,
- * and runs a momentum animation on release when enabled.
- */
-/**
- * Attach a drag gesture to an HTMLElement.
+ * Captures the pointer and updates x/y transforms with axis and optional
+ * direction lock, applies elastic overflow against constraints, emits
+ * lifecycle callbacks with `DragInfo`, and runs a momentum animation on
+ * release when enabled.
  *
  * Lifecycle:
  * - pointerdown → capture pointer, snapshot origin, start velocity history, enter whileDrag
  * - pointermove → compute deltas, direction lock, apply constraints + elastic, write x/y
  * - pointerup/cancel → either run momentum decay to a target or settle/clamp instantly
  *
- * Important invariants:
- * - `applied` tracks the currently applied transform (x/y). Always keep it in sync when
- *   writing transforms or finishing animations so a second drag starts from the right origin.
- * - If you see a "jump" at the start of a second drag, it usually means `applied` wasn't
- *   updated after a non-0-duration settle animation.
+ * Invariant: `applied` tracks the currently applied x/y transform — it
+ * must stay in sync when writing transforms or finishing animations, or a
+ * second drag "jumps" from a stale origin (commonly a missed update after
+ * a non-zero-duration settle animation).
+ *
+ * @param el The element to make draggable.
+ * @param opts Drag options — `axis`, `constraints`, `elastic`,
+ *   `momentum`, `whileDrag`, and the `onDrag*` lifecycle callbacks.
+ * @returns A callable cleanup handle ({@link AttachDragCleanup}): call it
+ *   to detach listeners + cancel animations, or call its
+ *   `adjustOrigin(dx, dy)` to reposition the live gesture mid-drag.
+ * @example
+ * ```ts
+ * const cleanup = attachDrag(el, { axis: 'x', momentum: true })
+ * // …when a layout swap shifts the slot under the cursor mid-drag:
+ * cleanup.adjustOrigin(10, -5)
+ * // on teardown:
+ * cleanup()
+ * ```
  */
-/**
- * Cleanup function returned by `attachDrag`. Carries an `adjustOrigin`
- * method that shifts the live gesture's origin + visual offset by a
- * layout-shift delta mid-drag — see the `adjustOrigin` closure inside
- * `attachDrag` for the rationale (projection-driven cursor pinning,
- * #379). The plain-call form tears the gesture down as before.
- */
-export type AttachDragCleanup = (() => void) & {
-    adjustOrigin: (dx: number, dy: number) => void
-}
-
 export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDragCleanup => {
     const EL_ID = el.getAttribute('data-testid') || el.id || el.tagName
     pwLog('[drag] attach', {

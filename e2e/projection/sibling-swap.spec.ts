@@ -86,4 +86,21 @@ test.describe('projection/sibling-swap', () => {
         await expect(page.getByTestId('delta-0')).toBeVisible()
         await expect(page.getByTestId('delta-1')).toBeVisible()
     })
+
+    test('swap control is discoverable by role and keyboard-operable', async ({ page }) => {
+        await page.goto('/tests/projection/sibling-swap?@isPlaywright=true')
+
+        // Discoverable through an accessible (role + name) query, not just testid.
+        const swap = page.getByRole('button', { name: /swap order/i })
+        await expect(swap).toBeVisible()
+
+        // Focusable (in the tab order — native <button>, no tabindex=-1).
+        await swap.focus()
+        await expect(swap).toBeFocused()
+
+        // Keyboard activation triggers the swap and updates both readouts.
+        await swap.press('Enter')
+        await expect(page.getByTestId('delta-0')).toContainText('changed=true')
+        await expect(page.getByTestId('delta-1')).toContainText('changed=true')
+    })
 })

@@ -159,6 +159,13 @@ export const mergeInlineStyles = (
  *
  * @param style The component's `style` prop.
  * @returns The user's `transform` value, or `''`.
+ * @example
+ * ```ts
+ * extractTransform('opacity: 0.5; transform: translateX(10px) scale(2)')
+ * // => 'translateX(10px) scale(2)'
+ * extractTransform('color: red') // => ''
+ * extractTransform({ color: 'red' }) // => '' (non-string)
+ * ```
  */
 export const extractTransform = (style: unknown): string => {
     if (typeof style !== 'string') return ''

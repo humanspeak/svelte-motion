@@ -115,4 +115,37 @@ test.describe('projection/nested-ancestor', () => {
         await expect(page.getByTestId('inner-delta')).toBeVisible()
         await expect(page.getByTestId('stripped-offset')).toBeVisible()
     })
+
+    test('controls are discoverable by role and keyboard-operable', async ({ page }) => {
+        await page.goto('/tests/projection/nested-ancestor?@isPlaywright=true')
+
+        // The toggle is reachable by role + accessible name and focusable.
+        const toggle = page.getByRole('button', { name: /toggle position/i })
+        await expect(toggle).toBeVisible()
+        await toggle.focus()
+        await expect(toggle).toBeFocused()
+
+        // Keyboard activation moves the inner box and updates its readout.
+        await toggle.press('Enter')
+        await expect(page.getByTestId('inner-delta')).toContainText('changed=true')
+
+        // The post-mount control is exposed as a checkbox and keyboard-togglable.
+        const motionTransform = page.getByRole('checkbox', { name: /post-mount transform/i })
+        await expect(motionTransform).not.toBeChecked()
+        await motionTransform.focus()
+        await expect(motionTransform).toBeFocused()
+        await motionTransform.press('Space')
+        await expect(motionTransform).toBeChecked()
+
+        // And the stripped offset reflects the now-applied motion transform.
+        await page.getByRole('button', { name: /toggle position/i }).press('Enter')
+        await expect
+            .poll(async () => {
+                const m = (await page.getByTestId('stripped-offset').textContent())?.match(
+                    /x=(-?\d+)\s+y=(-?\d+)/
+                )
+                return m ? { x: Number(m[1]), y: Number(m[2]) } : null
+            })
+            .toEqual({ x: 0, y: 40 })
+    })
 })

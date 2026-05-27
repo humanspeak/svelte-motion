@@ -364,7 +364,9 @@ export class ProjectionNode {
             )
             const box = rectToBox(rect)
             this.latestLayout = box
-            this.notify('measure', box)
+            // Clone for the event: `box` aliases `this.latestLayout`, so a
+            // listener mutating it would corrupt the cached layout.
+            this.notify('measure', cloneBox(box))
             return box
         } finally {
             // Reverse-order restore — important because ancestor
@@ -394,7 +396,9 @@ export class ProjectionNode {
         const measured = this.measure()
         if (!measured) return
         this.snapshot = cloneBox(measured)
-        this.notify('willUpdate', this.snapshot)
+        // Clone for the event: emitting `this.snapshot` by reference would
+        // let a listener mutate the stored snapshot.
+        this.notify('willUpdate', cloneBox(this.snapshot))
     }
 
     /**

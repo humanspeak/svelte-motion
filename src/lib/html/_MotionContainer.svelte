@@ -975,18 +975,29 @@
     )
 
     // Projection node lifecycle + the `onProjectionUpdate` listener.
-    // Mount once the element binds; seed the baseline layout; subscribe
-    // the consumer's callback if present; unmount on cleanup.
+    // Mount once the element binds; seed the baseline layout; unmount on
+    // cleanup. Depends ONLY on `element` — the `onProjectionUpdate`
+    // subscription lives in its own effect below so a change to the
+    // callback's identity re-subscribes WITHOUT tearing the node down
+    // (an unmount would clear latestLayout/children and re-seed the
+    // first commit instead of emitting a real delta).
     $effect(() => {
         if (!element) return
         projection.mount(element)
         projection.measure() // seed latestLayout so the first commit can diff
-        const off = onProjectionUpdateProp
-            ? projection.addEventListener('didUpdate', (data) => onProjectionUpdateProp(data))
-            : undefined
         return () => {
-            off?.()
             projection.unmount()
+        }
+    })
+
+    // Subscribe the consumer's `onProjectionUpdate` callback. Separate
+    // from the mount effect so re-subscribing on a callback-identity
+    // change never unmounts the node.
+    $effect(() => {
+        if (!(element && onProjectionUpdateProp)) return
+        const off = projection.addEventListener('didUpdate', (data) => onProjectionUpdateProp(data))
+        return () => {
+            off()
         }
     })
 
