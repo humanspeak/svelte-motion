@@ -188,13 +188,19 @@ const computeReleaseVelocity = (
 }
 
 /**
- * Cleanup handle returned by {@link attachDrag}. Invoke it to tear the
- * gesture down (removes listeners, cancels any in-flight momentum/settle
- * animation). It also carries `adjustOrigin(dx, dy)`, which shifts the
- * LIVE gesture's origin + visual offset by a layout-shift delta mid-drag
- * — used for projection-driven cursor pinning when a layout slot moves
- * under the dragged element (#379 / #310). `adjustOrigin` is a no-op when
- * not currently dragging and only affects axes the drag is unlocked on.
+ * Cleanup handle returned by {@link attachDrag}. Invoke it to detach the
+ * gesture's pointer/resize listeners. It does NOT cancel an in-flight
+ * momentum/settle animation — matching framer-motion, whose drag teardown
+ * removes listeners only and deliberately lets motion continue across an
+ * unmount/remount (e.g. reorder reconciliation); the animation is cleaned
+ * up by the element/motion-value lifecycle.
+ *
+ * The handle also carries `adjustOrigin(dx, dy)`, which shifts the LIVE
+ * gesture's origin + visual offset by a layout-shift delta mid-drag — used
+ * for projection-driven cursor pinning when a layout slot moves under the
+ * dragged element (#379 / #310). It is a no-op when not currently dragging
+ * and compensates on both axes (mirroring upstream's per-axis `eachAxis`
+ * compensation).
  */
 export type AttachDragCleanup = (() => void) & {
     adjustOrigin: (dx: number, dy: number) => void
@@ -222,8 +228,9 @@ export type AttachDragCleanup = (() => void) & {
  * @param opts Drag options — `axis`, `constraints`, `elastic`,
  *   `momentum`, `whileDrag`, and the `onDrag*` lifecycle callbacks.
  * @returns A callable cleanup handle ({@link AttachDragCleanup}): call it
- *   to detach listeners + cancel animations, or call its
- *   `adjustOrigin(dx, dy)` to reposition the live gesture mid-drag.
+ *   to detach the gesture's listeners (in-flight momentum is not
+ *   cancelled — see the type docs), or call its `adjustOrigin(dx, dy)` to
+ *   reposition the live gesture mid-drag.
  * @example
  * ```ts
  * const cleanup = attachDrag(el, { axis: 'x', momentum: true })
@@ -391,13 +398,13 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
      */
     const adjustOrigin = (dx: number, dy: number) => {
         if (!dragging) return
-        // Advance the origin only on axes that are actually dragged —
-        // setXYImmediate writes (and bumps `applied` for) just those axes,
-        // so mutating origin on a locked-out axis would desync origin from
-        // applied and corrupt the next `offset = lastPoint - startPoint +
-        // origin` resolution.
-        if (axis === true || axis === 'x') origin.x += dx
-        if (axis === true || axis === 'y') origin.y += dy
+        // Compensate on BOTH axes unconditionally — upstream's didUpdate
+        // handler applies the delta per-axis via `eachAxis` regardless of
+        // the drag axis or direction lock, because a layout slot can shift
+        // on either axis. `setXYImmediate` then writes the transform for
+        // the axis this drag manages.
+        origin.x += dx
+        origin.y += dy
         setXYImmediate(applied.x + dx, applied.y + dy)
     }
 
