@@ -313,6 +313,11 @@ describe('utils/variants - resolveRestingValues', () => {
         ).toEqual({ x: 60, rotate: 45, scaleY: 1 })
     })
 
+    it('omits keys whose value is an empty array (no resting value)', () => {
+        expect(resolveRestingValues({ x: [], y: 5 } as never)).toEqual({ y: 5 })
+        expect(resolveRestingValues({ x: [] } as never)).toEqual({})
+    })
+
     it('returns undefined when given undefined', () => {
         expect(resolveRestingValues(undefined)).toBeUndefined()
     })

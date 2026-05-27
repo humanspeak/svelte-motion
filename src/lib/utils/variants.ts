@@ -260,12 +260,14 @@ export const resolveWhile = (
  * @param keyframes - Resolved animate keyframes (scalars and/or arrays),
  *     or `undefined`.
  * @returns A new object with each value collapsed to its resting scalar,
- *     or `undefined` when given `undefined`.
+ *     or `undefined` when given `undefined`. Keys whose value is an empty
+ *     array are omitted (no resting value).
  *
  * @example
  * ```ts
  * resolveRestingValues({ x: [0, 100, 50], scaleX: 1 }) // { x: 50, scaleX: 1 }
  * resolveRestingValues({ opacity: 0.5 })               // { opacity: 0.5 }
+ * resolveRestingValues({ x: [], y: 5 })                // { y: 5 } (empty array dropped)
  * resolveRestingValues(undefined)                      // undefined
  * ```
  */
@@ -275,7 +277,13 @@ export const resolveRestingValues = (
     if (keyframes === undefined) return undefined
     const out: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(keyframes)) {
-        out[key] = Array.isArray(value) ? value[value.length - 1] : value
+        if (Array.isArray(value)) {
+            // An empty array has no resting value — omit the key rather than
+            // emitting `value[-1]` (undefined).
+            if (value.length > 0) out[key] = value[value.length - 1]
+        } else {
+            out[key] = value
+        }
     }
     return out as DOMKeyframesDefinition
 }
