@@ -51,9 +51,9 @@ Use `domAnimation` for most interface motion. Use `domMin` for pages that only n
 
 ```svelte
 <script>
-    import { LazyMotion, m } from '@humanspeak/svelte-motion'
+    import { LazyMotion, domAnimation, m } from '@humanspeak/svelte-motion'
 
-    const loadFeatures = () => import('./features').then((mod) => mod.domAnimation)
+    const loadFeatures = async () => domAnimation
 </script>
 
 <LazyMotion features={loadFeatures}>
@@ -66,4 +66,3 @@ Use `domAnimation` for most interface motion. Use `domMin` for pages that only n
 - [Tree Shaking](/docs/tree-shaking) — Import only the components you use
 - [Gestures](/docs/gestures) — Hover, tap, focus, pan, and in-view states
 - [Drag](/docs/drag) — Drag requires `domMax`
-

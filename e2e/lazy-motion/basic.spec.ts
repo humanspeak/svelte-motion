@@ -12,7 +12,9 @@ test.describe('LazyMotion', () => {
     test('gates gesture affordances by feature bundle', async ({ page }) => {
         await page.goto('/tests/lazy-motion/feature-bundles?@isPlaywright=true')
 
-        await expect(page.getByTestId('lazy-motion-domMin')).not.toHaveAttribute('tabindex', '0')
+        await expect
+            .poll(() => page.getByTestId('lazy-motion-domMin').getAttribute('tabindex'))
+            .toBeNull()
         await expect(page.getByTestId('lazy-motion-domAnimation')).toHaveAttribute('tabindex', '0')
         await expect(page.getByTestId('lazy-motion-domMax')).toHaveAttribute('tabindex', '0')
     })
@@ -22,6 +24,7 @@ test.describe('LazyMotion', () => {
 
         const box = page.getByTestId('lazy-motion-async-box')
         await expect(box).toBeVisible()
+        await expect.poll(() => box.getAttribute('tabindex')).toBeNull()
         await expect.poll(() => box.getAttribute('tabindex')).toBe('0')
     })
 })

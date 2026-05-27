@@ -7,11 +7,17 @@
         type FeatureBundle,
         type LazyFeatureBundle
     } from '$lib/features'
-    import { onMount, untrack, type Snippet } from 'svelte'
+    import { untrack, type Snippet } from 'svelte'
 
+    /**
+     * Props accepted by the LazyMotion component.
+     */
     type Props = {
+        /** Child content rendered inside the active LazyMotion context. */
         children?: Snippet
+        /** Eager or async feature bundle used by descendant `m.*` components. */
         features: FeatureBundle | LazyFeatureBundle
+        /** Enables strict LazyMotion usage checks. Defaults to false. */
         strict?: boolean
     }
 
@@ -30,25 +36,33 @@
         }
     })
 
+    let loadId = 0
+
     $effect(() => {
+        const currentLoadId = ++loadId
+
         if (!isLazyFeatureBundle(features)) {
             loadedFeatures = features
             isLoaded = true
+            return
         }
-    })
 
-    onMount(() => {
-        if (!isLazyFeatureBundle(features)) return
-
-        let cancelled = false
-        features().then((bundle) => {
-            if (cancelled) return
-            loadedFeatures = normalizeLazyFeatureBundle(bundle)
-            isLoaded = true
-        })
+        loadedFeatures = domMin
+        isLoaded = false
+        features()
+            .then((bundle) => {
+                if (currentLoadId !== loadId) return
+                loadedFeatures = normalizeLazyFeatureBundle(bundle)
+                isLoaded = true
+            })
+            .catch(() => {
+                if (currentLoadId !== loadId) return
+                loadedFeatures = domMin
+                isLoaded = false
+            })
 
         return () => {
-            cancelled = true
+            loadId += 1
         }
     })
 </script>
