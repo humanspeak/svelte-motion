@@ -188,27 +188,59 @@ const computeReleaseVelocity = (
 }
 
 /**
+ * Cleanup handle returned by {@link attachDrag}. Invoke it to detach the
+ * gesture's pointer/resize listeners. It does NOT cancel an in-flight
+ * momentum/settle animation — matching framer-motion, whose drag teardown
+ * removes listeners only and deliberately lets motion continue across an
+ * unmount/remount (e.g. reorder reconciliation); the animation is cleaned
+ * up by the element/motion-value lifecycle.
+ *
+ * The handle also carries `adjustOrigin(dx, dy)`, which shifts the LIVE
+ * gesture's origin + visual offset by a layout-shift delta mid-drag — used
+ * for projection-driven cursor pinning when a layout slot moves under the
+ * dragged element (#379 / #310). It is a no-op when not currently dragging
+ * and compensates on both axes (mirroring upstream's per-axis `eachAxis`
+ * compensation).
+ */
+export type AttachDragCleanup = (() => void) & {
+    adjustOrigin: (dx: number, dy: number) => void
+}
+
+/**
  * Attach a drag gesture to an element.
  *
- * Captures the pointer, updates x/y transforms with axis and optional direction lock,
- * applies elastic overflow against constraints, emits lifecycle callbacks with DragInfo,
- * and runs a momentum animation on release when enabled.
- */
-/**
- * Attach a drag gesture to an HTMLElement.
+ * Captures the pointer and updates x/y transforms with axis and optional
+ * direction lock, applies elastic overflow against constraints, emits
+ * lifecycle callbacks with `DragInfo`, and runs a momentum animation on
+ * release when enabled.
  *
  * Lifecycle:
  * - pointerdown → capture pointer, snapshot origin, start velocity history, enter whileDrag
  * - pointermove → compute deltas, direction lock, apply constraints + elastic, write x/y
  * - pointerup/cancel → either run momentum decay to a target or settle/clamp instantly
  *
- * Important invariants:
- * - `applied` tracks the currently applied transform (x/y). Always keep it in sync when
- *   writing transforms or finishing animations so a second drag starts from the right origin.
- * - If you see a "jump" at the start of a second drag, it usually means `applied` wasn't
- *   updated after a non-0-duration settle animation.
+ * Invariant: `applied` tracks the currently applied x/y transform — it
+ * must stay in sync when writing transforms or finishing animations, or a
+ * second drag "jumps" from a stale origin (commonly a missed update after
+ * a non-zero-duration settle animation).
+ *
+ * @param el The element to make draggable.
+ * @param opts Drag options — `axis`, `constraints`, `elastic`,
+ *   `momentum`, `whileDrag`, and the `onDrag*` lifecycle callbacks.
+ * @returns A callable cleanup handle ({@link AttachDragCleanup}): call it
+ *   to detach the gesture's listeners (in-flight momentum is not
+ *   cancelled — see the type docs), or call its `adjustOrigin(dx, dy)` to
+ *   reposition the live gesture mid-drag.
+ * @example
+ * ```ts
+ * const cleanup = attachDrag(el, { axis: 'x', momentum: true })
+ * // …when a layout swap shifts the slot under the cursor mid-drag:
+ * cleanup.adjustOrigin(10, -5)
+ * // on teardown:
+ * cleanup()
+ * ```
  */
-export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => void) => {
+export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDragCleanup => {
     const EL_ID = el.getAttribute('data-testid') || el.id || el.tagName
     pwLog('[drag] attach', {
         el: EL_ID,
@@ -308,6 +340,80 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
                 }
             }
         }
+    }
+
+    /**
+     * Write absolute element-space translation by mutating
+     * `el.style.transform` DIRECTLY — no `animate()`, no epsilon skip,
+     * no Playwright retry. The translate channel is rewritten while any
+     * non-translate transform the element already carries (e.g. a
+     * `whileDrag` scale) is preserved as a suffix.
+     *
+     * Why this exists separately from `setXY`: routing through
+     * `animate(el, _, { duration: 0 })` defers the write to Motion's
+     * scheduler, costing ~1 frame before the new position paints. For
+     * the projection-driven origin compensation (where a layout swap
+     * must keep the dragged element under the cursor in the SAME frame
+     * the swap commits), that frame of lag manifests as a visible
+     * wobble. This path lands synchronously. See #379 / the
+     * `adjustOrigin` hook below.
+     */
+    const setXYImmediate = (x: number, y: number) => {
+        const parts: string[] = []
+        if (axis === true || axis === 'x') parts.push(`translateX(${x}px)`)
+        if (axis === true || axis === 'y') parts.push(`translateY(${y}px)`)
+        // Strip existing translate channels, keep the rest (scale/rotate/etc.).
+        const nonTranslate = el.style.transform.replace(/translate[XYZ3d]*\([^)]*\)/g, '').trim()
+        el.style.transform = [...parts, nonTranslate].filter(Boolean).join(' ')
+        if (axis === true || axis === 'x') applied.x = x
+        if (axis === true || axis === 'y') applied.y = y
+    }
+
+    /**
+     * Adjust the drag origin + visual offset by a layout-shift delta,
+     * mid-gesture, keeping the dragged element pinned under the cursor
+     * while its underlying layout slot moves.
+     *
+     * Direct port of framer-motion's projection `didUpdate` handler in
+     * `VisualElementDragControls.ts:742-758`:
+     *
+     * ```ts
+     * this.originPoint[axis] += delta[axis].translate
+     * motionValue.set(motionValue.get() + delta[axis].translate)
+     * ```
+     *
+     * We do the same two-write dance: shift `origin` (the gesture's
+     * reference zero) AND the applied visual transform by the same
+     * delta, so `lastPoint - startPoint + origin` continues to resolve
+     * to the correct on-screen position after the layout slot moved.
+     * Uses `setXYImmediate` so the compensation is visible the same
+     * frame as the layout change.
+     *
+     * Not wired to any projection node in this PR — exposed on the
+     * `attachDrag` return handle for the Reorder PR (#310) to call from
+     * its `ProjectionNode.didUpdate` listener.
+     *
+     * @param dx Layout delta on the x axis (px).
+     * @param dy Layout delta on the y axis (px).
+     */
+    const adjustOrigin = (dx: number, dy: number) => {
+        if (!dragging) return
+        // Compensate the origin on BOTH axes unconditionally — upstream's
+        // didUpdate handler applies the delta per-axis via `eachAxis`
+        // regardless of the drag axis or direction lock, because a layout
+        // slot can shift on either axis.
+        origin.x += dx
+        origin.y += dy
+        // The VISUAL write is `setXYImmediate`, which only writes the axis
+        // this drag manages (`opts.axis`). For the dragged axis that pins
+        // the element same-frame; the cross-axis case (e.g. drag="x" + a
+        // y-shift) only updates `origin`, not the transform. Fully
+        // rendering cross-axis compensation needs to route through the
+        // Motion value the move path uses (a direct write here would be
+        // wiped by the next `setXY`), so it's finalized when this hook is
+        // wired in #310. The common Reorder case (drag axis === the shift
+        // axis) is fully compensated today.
+        setXYImmediate(applied.x + dx, applied.y + dy)
     }
 
     const startWhileDrag = () => {
@@ -867,7 +973,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
     el.addEventListener('pointerdown', onPointerDown)
     pwLog('[drag] pointerdown listener attached', { el: EL_ID })
 
-    return () => {
+    const teardown = () => {
         pwLog('[drag] detach', { el: EL_ID })
         el.removeEventListener('pointerdown', onPointerDown)
         el.removeEventListener('pointermove', onPointerMove as EventListener)
@@ -877,4 +983,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): (() => voi
         window.removeEventListener('pointerup', onPointerUp as EventListener)
         window.removeEventListener('pointercancel', onPointerCancel as EventListener)
     }
+
+    return Object.assign(teardown, { adjustOrigin }) as AttachDragCleanup
 }

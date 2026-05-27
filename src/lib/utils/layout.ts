@@ -15,8 +15,19 @@ import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'mot
  *
  * Pass an empty array (or omit) for viewport-relative behaviour.
  *
+ * `baseTransform` is the value the element's `transform` is set to while
+ * measuring (default `'none'`, i.e. all transforms removed). The
+ * projection system passes the element's mount-time transform here so
+ * that a user-authored static `transform` is preserved in the
+ * measurement while only the motion-applied portion (written after
+ * mount) is removed — mirroring framer-motion's `removeBoxTransforms`,
+ * which only subtracts motion-tracked `latestValues` and leaves
+ * user-authored transforms intact. Existing FLIP callers omit it and
+ * get the original strip-everything behaviour.
+ *
  * @param el Element to measure.
  * @param scrollContainers Optional ancestor chain with `layoutScroll` enabled.
+ * @param baseTransform Transform string applied during measurement. Defaults to `'none'`.
  * @returns DOMRect snapshot of the element.
  *
  * @example
@@ -31,10 +42,14 @@ import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'mot
  * const rect = measureRect(node, [innerScroll, outerScroll])
  * ```
  */
-export const measureRect = (el: HTMLElement, scrollContainers?: HTMLElement[]): DOMRect => {
+export const measureRect = (
+    el: HTMLElement,
+    scrollContainers?: HTMLElement[],
+    baseTransform = 'none'
+): DOMRect => {
     const prev = el.style.transform
     try {
-        el.style.transform = 'none'
+        el.style.transform = baseTransform
         const rect = el.getBoundingClientRect()
         if (!scrollContainers || scrollContainers.length === 0) return rect
         // Re-express the rect in the *combined* scroll-container coordinate
@@ -54,6 +69,20 @@ export const measureRect = (el: HTMLElement, scrollContainers?: HTMLElement[]): 
 }
 
 /**
+ * Minimal rectangle shape `computeFlipTransforms` reads. A `DOMRect`
+ * satisfies it structurally, and so does a projection `Box` converted to
+ * `{ left, top, width, height }`. Declared here (rather than importing
+ * the projection `Box`) so `layout.ts` stays free of a circular
+ * dependency on `projection.ts`, which imports `measureRect` from here.
+ */
+export interface RectLike {
+    left: number
+    top: number
+    width: number
+    height: number
+}
+
+/**
  * Compute FLIP transform deltas between two rects.
  *
  * @param prev Previous rect.
@@ -62,8 +91,8 @@ export const measureRect = (el: HTMLElement, scrollContainers?: HTMLElement[]): 
  * @return Deltas and flags indicating which transforms to apply.
  */
 export const computeFlipTransforms = (
-    prev: DOMRect,
-    next: DOMRect,
+    prev: RectLike,
+    next: RectLike,
     mode: boolean | 'position'
 ): {
     dx: number

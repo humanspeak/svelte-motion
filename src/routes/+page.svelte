@@ -381,5 +381,26 @@
                 </li>
             </ul>
         </div>
+        <div>
+            <h2 class="mb-3 text-xl font-medium">Projection (#379)</h2>
+            <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/projection/sibling-swap') + searchParams}
+                    >
+                        Sibling swap (didUpdate delta)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/projection/nested-ancestor') + searchParams}
+                    >
+                        Nested ancestor (zeroing correctness)
+                    </a>
+                </li>
+            </ul>
+        </div>
     </div>
 </div>

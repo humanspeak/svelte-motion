@@ -39,10 +39,11 @@
         computeFlipTransforms,
         runFlipAnimation,
         setCompositorHints,
-        observeLayoutChanges
+        observeLayoutChanges,
+        type RectLike
     } from '$lib/utils/layout'
     import type { SvelteHTMLElements } from 'svelte/elements'
-    import { mergeInlineStyles } from '$lib/utils/style'
+    import { mergeInlineStyles, extractTransform } from '$lib/utils/style'
     import { isNativelyFocusable } from '$lib/utils/a11y'
     import {
         getAnimatePresenceContext,
@@ -53,6 +54,8 @@
     import { getInitialKeyframes } from '$lib/utils/initial'
     import { attachDrag } from '$lib/utils/drag'
     import { attachPan, type AttachPanCleanup } from '$lib/utils/pan'
+    import { ProjectionNode } from '$lib/utils/projection'
+    import { getProjectionParent, setProjectionParent } from '$lib/components/projection.context'
     import { resolveInitial, resolveAnimate, resolveExit, resolveWhile } from '$lib/utils/variants'
     import {
         setVariantContext,
@@ -134,6 +137,7 @@
         layout: layoutProp,
         layoutId: layoutIdProp,
         layoutScroll: layoutScrollProp,
+        onProjectionUpdate: onProjectionUpdateProp,
         ref: element = $bindable(null),
         ...rest
     }: Props = $props()
@@ -189,6 +193,46 @@
         const refs = ancestorScrollContainerRef?.() ?? []
         // Filter out unbound refs (HTMLElement | null | undefined → HTMLElement[]).
         return refs.filter((el): el is HTMLElement => Boolean(el))
+    }
+
+    // Projection tree wiring (#379). Capture the parent node BEFORE
+    // publishing our own — same shadowing trap as layoutScroll above.
+    // The node measures through `resolveLayoutScrollAncestors` so its
+    // boxes share the FLIP coordinate space, and zeros ancestor
+    // transforms during measure so nested layout-animated parents don't
+    // corrupt a child's delta.
+    // The user-authored transform, sourced from the `style` prop rather
+    // than the live inline transform — the latter already carries any
+    // transform-type `initial`/`animate` keyframe by the time the node
+    // measures, which would be mistaken for the user's base.
+    const userBaseTransform = $derived(extractTransform(styleProp))
+
+    const projectionParent = getProjectionParent()
+    const projection = new ProjectionNode({
+        parent: projectionParent,
+        getScrollContainers: resolveLayoutScrollAncestors,
+        getBaseTransform: () => userBaseTransform
+    })
+    setProjectionParent(projection)
+
+    // Convert a projection `Box` (ancestor chain reset to base, self
+    // transform stripped, scroll containers compensated) to the
+    // `RectLike` shape `computeFlipTransforms` consumes.
+    const boxToRectLike = (box: {
+        x: { min: number; max: number }
+        y: { min: number; max: number }
+    }): RectLike => ({
+        left: box.x.min,
+        top: box.y.min,
+        width: box.x.max - box.x.min,
+        height: box.y.max - box.y.min
+    })
+
+    // Ancestor-transform-invariant layout measurement for seeding the
+    // FLIP effect's first rect.
+    const measureLayoutRect = (): RectLike | null => {
+        const box = projection.measure()
+        return box ? boxToRectLike(box) : null
     }
 
     // Get current presence depth (0 = direct child of AnimatePresence, undefined = not in AnimatePresence)
@@ -930,26 +974,65 @@
               : undefined
     )
 
+    // Projection node lifecycle + the `onProjectionUpdate` listener.
+    // Mount once the element binds; seed the baseline layout; unmount on
+    // cleanup. Depends ONLY on `element` — the `onProjectionUpdate`
+    // subscription lives in its own effect below so a change to the
+    // callback's identity re-subscribes WITHOUT tearing the node down
+    // (an unmount would clear latestLayout/children and re-seed the
+    // first commit instead of emitting a real delta).
+    $effect(() => {
+        if (!element) return
+        projection.mount(element)
+        projection.measure() // seed latestLayout so the first commit can diff
+        return () => {
+            projection.unmount()
+        }
+    })
+
+    // Subscribe the consumer's `onProjectionUpdate` callback. Separate
+    // from the mount effect so re-subscribing on a callback-identity
+    // change never unmounts the node.
+    $effect(() => {
+        if (!(element && onProjectionUpdateProp)) return
+        const off = projection.addEventListener('didUpdate', (data) => onProjectionUpdateProp(data))
+        return () => {
+            off()
+        }
+    })
+
     // Minimal layout animation using FLIP when `layout` is enabled.
     // When layout === 'position' we only translate.
     // When layout === true we also scale to smoothly interpolate size changes.
-    let lastRect: DOMRect | null = null
+    let lastRect: RectLike | null = null
     $effect(() => {
         if (!(element && layoutProp && isLoaded === 'ready')) return
 
-        // Initialize last rect on first ready frame
-        lastRect = measureRect(element!, resolveLayoutScrollAncestors())
+        // Initialize last rect on first ready frame. We measure through the
+        // projection node rather than `measureRect` directly so the rect is
+        // ancestor-transform-invariant: the node resets the whole ancestor
+        // chain to its mount-time base while reading, which strips any
+        // motion-applied (FLIP/drag) transform up the tree. Without this a
+        // child re-measures and FLIPs whenever an ancestor's transform
+        // animates, even though the child's own layout never moved. (#379)
+        lastRect = measureLayoutRect()
         // Hint compositor for smoother FLIP transforms
         setCompositorHints(element!, true)
 
         let rafId: number | null = null
         const runFlip = () => {
-            const scrollContainers = resolveLayoutScrollAncestors()
+            // commitLayoutChange does the ancestor-stripped measure, fans
+            // the delta out to `onProjectionUpdate` listeners, AND returns
+            // the freshly-measured box — so the FLIP reuses that single
+            // measurement as `next` instead of walking + transform-resetting
+            // the ancestor chain a second time per frame. (#379)
+            const nextBox = projection.commitLayoutChange()
+            if (!nextBox) return
+            const next = boxToRectLike(nextBox)
             if (!lastRect) {
-                lastRect = measureRect(element!, scrollContainers)
+                lastRect = next
                 return
             }
-            const next = measureRect(element!, scrollContainers)
             const transforms = computeFlipTransforms(lastRect, next, layoutProp ?? false)
             runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
             lastRect = next
