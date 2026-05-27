@@ -24,6 +24,30 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/basic') + searchParams}
+                    >
+                        LazyMotion — basic m.div
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/feature-bundles') + searchParams}
+                    >
+                        LazyMotion — feature bundles
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/async') + searchParams}
+                    >
+                        LazyMotion — async features
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/enter-animation') + searchParams}
                     >
                         Enter Animation

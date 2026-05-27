@@ -1,8 +1,14 @@
 import AnimatePresence from '$lib/components/AnimatePresence.svelte'
 import LayoutGroup from '$lib/components/LayoutGroup.svelte'
+import LazyMotion from '$lib/components/LazyMotion.svelte'
 import MotionConfig from '$lib/components/MotionConfig.svelte'
 import PresenceChild from '$lib/components/PresenceChild.svelte'
 
+export type { FeatureBundle, LazyFeatureBundle } from '$lib/features'
+export { domAnimation } from '$lib/features/domAnimation'
+export { domMax } from '$lib/features/domMax'
+export { domMin } from '$lib/features/domMin'
+export { m } from '$lib/m'
 export { motion } from '$lib/motion'
 
 // Re-export core animation functions from motion
@@ -91,7 +97,7 @@ export type {
     TransformOutputMap,
     TransformSource
 } from '$lib/utils/transform.svelte'
-export { AnimatePresence, LayoutGroup, MotionConfig, PresenceChild }
+export { AnimatePresence, LayoutGroup, LazyMotion, MotionConfig, PresenceChild }
 
 // Named component exports — tree-shakeable alternative to the `motion` object
 export { default as MotionA } from '$lib/html/A.svelte'

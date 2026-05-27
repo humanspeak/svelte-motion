@@ -10,6 +10,22 @@
 
 ## Notes
 
+## New feature checklist
+
+When asked to implement a new feature, handle it end-to-end by default:
+
+- Update the core component/API implementation.
+- Add 1-3 focused test/demo pages under `src/routes/tests/<feature>/`.
+- Link those test/demo pages from `src/routes/+page.svelte`.
+- Add public docs pages under `docs/src/routes/docs/<feature>/`.
+- Add example page(s) under `docs/src/routes/examples/<feature>/` and reusable demo components under `docs/src/lib/examples/<feature>/`.
+- Add focused unit and Playwright e2e coverage when the behavior is testable.
+- Create e2e tests for each test/demo page.
+- Create unit tests for each new function.
+- Ensure public functions, types, components, and exported constants follow Google-style JSDoc.
+- Run formatting, checks, package validation, and targeted tests.
+- If the user asks to review visually, start the appropriate docs/dev server and leave the example page open in the in-app browser.
+
 ## AnimatePresence wait mode
 
 - When enter is deferred in `mode="wait"`, mark the enter animation as already handled
