@@ -398,13 +398,21 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
      */
     const adjustOrigin = (dx: number, dy: number) => {
         if (!dragging) return
-        // Compensate on BOTH axes unconditionally — upstream's didUpdate
-        // handler applies the delta per-axis via `eachAxis` regardless of
-        // the drag axis or direction lock, because a layout slot can shift
-        // on either axis. `setXYImmediate` then writes the transform for
-        // the axis this drag manages.
+        // Compensate the origin on BOTH axes unconditionally — upstream's
+        // didUpdate handler applies the delta per-axis via `eachAxis`
+        // regardless of the drag axis or direction lock, because a layout
+        // slot can shift on either axis.
         origin.x += dx
         origin.y += dy
+        // The VISUAL write is `setXYImmediate`, which only writes the axis
+        // this drag manages (`opts.axis`). For the dragged axis that pins
+        // the element same-frame; the cross-axis case (e.g. drag="x" + a
+        // y-shift) only updates `origin`, not the transform. Fully
+        // rendering cross-axis compensation needs to route through the
+        // Motion value the move path uses (a direct write here would be
+        // wiped by the next `setXY`), so it's finalized when this hook is
+        // wired in #310. The common Reorder case (drag axis === the shift
+        // axis) is fully compensated today.
         setXYImmediate(applied.x + dx, applied.y + dy)
     }
 
