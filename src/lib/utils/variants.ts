@@ -245,3 +245,37 @@ export const resolveWhile = (
         return resolveVariantList(variants, value, custom)
     return value as DOMKeyframesDefinition
 }
+
+/**
+ * Collapse each keyframe value to the value the element comes to REST at
+ * — the last element of a keyframe array, or the value itself otherwise.
+ *
+ * Used when deriving the post-animation inline style baseline: an
+ * `animate={{ x: [0, 100, 50] }}` settles at `50`, so the resting inline
+ * transform must reflect `50`, not the first keyframe. Mirrors
+ * framer-motion, whose `buildTransform` reads the motion value as a
+ * scalar that has already settled at the final keyframe
+ * (`motion-dom/.../build-transform.ts`).
+ *
+ * @param keyframes - Resolved animate keyframes (scalars and/or arrays),
+ *     or `undefined`.
+ * @returns A new object with each value collapsed to its resting scalar,
+ *     or `undefined` when given `undefined`.
+ *
+ * @example
+ * ```ts
+ * resolveRestingValues({ x: [0, 100, 50], scaleX: 1 }) // { x: 50, scaleX: 1 }
+ * resolveRestingValues({ opacity: 0.5 })               // { opacity: 0.5 }
+ * resolveRestingValues(undefined)                      // undefined
+ * ```
+ */
+export const resolveRestingValues = (
+    keyframes: DOMKeyframesDefinition | undefined
+): DOMKeyframesDefinition | undefined => {
+    if (keyframes === undefined) return undefined
+    const out: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(keyframes)) {
+        out[key] = Array.isArray(value) ? value[value.length - 1] : value
+    }
+    return out as DOMKeyframesDefinition
+}

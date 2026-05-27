@@ -101,6 +101,14 @@
                         SVG Path Length
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/animate-transform-persist') + searchParams}
+                    >
+                        Transform persistence (#377)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
