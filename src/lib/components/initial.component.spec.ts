@@ -97,3 +97,65 @@ describe('motion component with initial={false}', () => {
         expect(element).toBeTruthy()
     })
 })
+
+describe('transform shortcut persists after animation (#377)', () => {
+    beforeEach(() => {
+        vi.useFakeTimers()
+    })
+
+    it('keeps a non-identity animate transform as inline style once settled (scaleX)', async () => {
+        // Non-identity target on purpose: scaleX(1) is the identity transform,
+        // which correctly serializes to `transform: none` (matching upstream
+        // build-transform), so it can't distinguish "persisted" from "reverted".
+        // scaleX(0.5) reverting to none WOULD be the bug.
+        const { container } = render(motion.div, {
+            props: {
+                initial: { scaleX: 0 },
+                animate: { scaleX: 0.5 },
+                transition: { duration: 0.4 },
+                'data-testid': 'persist-scalex'
+            }
+        })
+        const el = container.querySelector('[data-testid="persist-scalex"]') as HTMLElement
+
+        await vi.runAllTimersAsync()
+
+        // The bug: inline transform ends up empty, so WAAPI completion leaves
+        // transform:none. After the fix the resting target is the inline baseline.
+        expect(el.style.transform).not.toBe('')
+        expect(el.style.transform).toContain('scaleX(0.5)')
+    })
+
+    it('keeps a non-identity transform at rest (rotate)', async () => {
+        const { container } = render(motion.div, {
+            props: {
+                initial: { rotate: 0 },
+                animate: { rotate: 45 },
+                transition: { duration: 0.4 },
+                'data-testid': 'persist-rotate'
+            }
+        })
+        const el = container.querySelector('[data-testid="persist-rotate"]') as HTMLElement
+
+        await vi.runAllTimersAsync()
+
+        expect(el.style.transform).toContain('rotate(45deg)')
+    })
+
+    it('rests at the LAST keyframe of an array target, not the first', async () => {
+        const { container } = render(motion.div, {
+            props: {
+                initial: { x: 0 },
+                animate: { x: [0, 100, 50] },
+                transition: { duration: 0.4 },
+                'data-testid': 'persist-array'
+            }
+        })
+        const el = container.querySelector('[data-testid="persist-array"]') as HTMLElement
+
+        await vi.runAllTimersAsync()
+
+        expect(el.style.transform).toContain('translateX(50px)')
+        expect(el.style.transform).not.toContain('translateX(0px)')
+    })
+})

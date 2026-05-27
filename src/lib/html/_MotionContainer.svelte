@@ -56,7 +56,13 @@
     import { attachPan, type AttachPanCleanup } from '$lib/utils/pan'
     import { ProjectionNode } from '$lib/utils/projection'
     import { getProjectionParent, setProjectionParent } from '$lib/components/projection.context'
-    import { resolveInitial, resolveAnimate, resolveExit, resolveWhile } from '$lib/utils/variants'
+    import {
+        resolveInitial,
+        resolveAnimate,
+        resolveExit,
+        resolveWhile,
+        resolveRestingValues
+    } from '$lib/utils/variants'
     import {
         setVariantContext,
         getVariantContext,
@@ -142,6 +148,12 @@
         ...rest
     }: Props = $props()
     let isLoaded = $state<'mounting' | 'initial' | 'ready' | 'animated'>('mounting')
+    // True once the enter/animate animation has COMPLETED. Until then the
+    // WAAPI animation owns the transform; flipping the inline baseline to
+    // the target mid-run causes a one-frame snap (the target shows through
+    // for the frame the inline changes). We therefore only apply the target
+    // as the inline style once settled — see the style derivation. (#377)
+    let enterAnimationSettled = $state(false)
     let dataPath = $state<number>(-1)
     const motionConfig = $derived(getMotionConfig())
     const reducedMotionState = useReducedMotionConfig()
@@ -522,6 +534,17 @@
         )
     )
 
+    // Reduced-motion-filtered animate values used as the inline-style
+    // baseline so an animated value (transforms included) persists after
+    // the WAAPI animation completes (#377). Filtered exactly like
+    // `initialKeyframes` so transforms are stripped under reduced motion.
+    const animateKeyframes = $derived(
+        filterReducedMotionKeyframes(
+            resolvedAnimate as Record<string, unknown> | undefined,
+            reducedMotion
+        )
+    )
+
     // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
     const derivedAttrs = $derived<Record<string, unknown>>({
         ...(rest as Record<string, unknown>),
@@ -560,20 +583,33 @@
             initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting'
                 ? `${styleProp || ''};visibility:hidden`
                 : styleProp,
-            // Apply initialKeyframes as inline styles during mounting and initial phases
-            // The animation starts in RAF after 'initial' phase, so we need styles until then
-            // When ready AND we have initialKeyframes: DON'T set any animated properties!
-            // WAAPI is controlling them and inline styles can override the animation
+            // The "from" slot: apply initialKeyframes as inline styles during
+            // the mounting/initial phases (before the WAAPI animation locks
+            // its from-value and we promote to 'ready' — see the lifecycle
+            // around the enter rAF). mergeInlineStyles prefers this slot when
+            // non-empty, so it wins over the animate slot below in these phases.
             isLoaded === 'mounting' || isLoaded === 'initial'
                 ? (initialKeyframes as unknown as Record<string, unknown>)
                 : undefined,
-            // Only use resolvedAnimate as fallback when we DON'T have initialKeyframes
-            // If we have initialKeyframes, the enter animation is running - setting
-            // inline styles to the target values will override the WAAPI animation
-            // Use isNotEmpty to handle empty initial objects (initial: {}) which should fallback
-            isNotEmpty(initialKeyframes)
-                ? undefined
-                : (resolvedAnimate as unknown as Record<string, unknown>)
+            // The "target" slot. Only AFTER the enter animation completes does
+            // the target become the inline baseline, so the element holds it
+            // once WAAPI surrenders the property (default fill:'none' would
+            // otherwise leave transform:none). It must NOT be applied during
+            // the run: flipping the inline value to the target mid-animation
+            // shows the target for the one frame the inline changes (a visible
+            // snap), since WAAPI's composite doesn't override that exact frame.
+            // While the animation runs we keep the original behavior — initial
+            // keyframes own the inline (via the slot above), or, with no
+            // initial, the animate values seed the inline as the from. Resting
+            // values collapse keyframe arrays to their last element
+            // (animate={{x:[0,100,50]}} rests at 50). (#377)
+            enterAnimationSettled
+                ? (resolveRestingValues(
+                      animateKeyframes as DOMKeyframesDefinition | undefined
+                  ) as unknown as Record<string, unknown>)
+                : isNotEmpty(initialKeyframes)
+                  ? undefined
+                  : (animateKeyframes as unknown as Record<string, unknown>)
         ),
         class: classProp
     })
@@ -851,12 +887,20 @@
             transitionAnimate
         })
 
+        // A fresh run owns the transform again until it completes.
+        enterAnimationSettled = false
         animateWithLifecycle(
             element,
             payload as unknown as DOMKeyframesDefinition,
             transitionAnimate as unknown as AnimationOptions,
             (def) => onAnimationStartProp?.(def as unknown as DOMKeyframesDefinition | undefined),
-            (def) => onAnimationCompleteProp?.(def as unknown as DOMKeyframesDefinition | undefined)
+            (def) => {
+                // Now the target is the resting state — promote it to the
+                // inline baseline so it persists after WAAPI surrenders the
+                // property (default fill:'none'). (#377)
+                enterAnimationSettled = true
+                onAnimationCompleteProp?.(def as unknown as DOMKeyframesDefinition | undefined)
+            }
         )
     }
 

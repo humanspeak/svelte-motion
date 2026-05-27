@@ -4,6 +4,7 @@ import {
     resolveAnimate,
     resolveExit,
     resolveInitial,
+    resolveRestingValues,
     resolveVariant,
     resolveVariantList,
     resolveWhile
@@ -291,5 +292,40 @@ describe('utils/variants - resolveWhile', () => {
             hover: (i) => ({ scale: 1 + (i as number) * 0.1 }) as never
         }
         expect(resolveWhile('hover', variants, 3)).toEqual({ scale: 1.3 })
+    })
+})
+
+describe('utils/variants - resolveRestingValues', () => {
+    it('collapses a keyframe array to its last element (the resting value)', () => {
+        expect(resolveRestingValues({ x: [0, 100, 50] } as never)).toEqual({ x: 50 })
+    })
+
+    it('leaves scalar values untouched', () => {
+        expect(resolveRestingValues({ opacity: 0.5, scaleX: 1 } as never)).toEqual({
+            opacity: 0.5,
+            scaleX: 1
+        })
+    })
+
+    it('handles a mix of scalars and arrays', () => {
+        expect(
+            resolveRestingValues({ x: [0, 120, 60], rotate: 45, scaleY: [0, 1] } as never)
+        ).toEqual({ x: 60, rotate: 45, scaleY: 1 })
+    })
+
+    it('omits keys whose value is an empty array (no resting value)', () => {
+        expect(resolveRestingValues({ x: [], y: 5 } as never)).toEqual({ y: 5 })
+        expect(resolveRestingValues({ x: [] } as never)).toEqual({})
+    })
+
+    it('returns undefined when given undefined', () => {
+        expect(resolveRestingValues(undefined)).toBeUndefined()
+    })
+
+    it('returns a new object (does not mutate the input)', () => {
+        const input = { x: [0, 50] } as never
+        const out = resolveRestingValues(input)
+        expect(out).not.toBe(input)
+        expect((input as { x: number[] }).x).toEqual([0, 50])
     })
 })
