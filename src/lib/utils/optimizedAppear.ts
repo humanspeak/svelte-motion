@@ -1,6 +1,12 @@
 import { mergeInlineStyles } from '$lib/utils/style'
 import { resolveRestingValues } from '$lib/utils/variants'
 import { startWaapiAnimation, type AnimationOptions } from 'motion'
+import {
+    mapEasingToNativeEasing,
+    optimizedAppearDataAttribute,
+    optimizedAppearDataId,
+    transformProps
+} from 'motion-dom'
 
 type AppearValueName = 'opacity' | 'transform'
 
@@ -21,31 +27,13 @@ type SvelteMotionAppearStore = {
     started: Array<{ id: string; name: string }>
 }
 
-const optimizedAppearDataId = 'framerAppearId'
-const optimizedAppearDataAttribute = 'data-framer-appear-id'
+type NativeEasing = Parameters<typeof mapEasingToNativeEasing>[0]
 
 declare global {
     interface Window {
         __SvelteMotionAppear?: SvelteMotionAppearStore
     }
 }
-
-const transformProps = new Set([
-    'x',
-    'y',
-    'z',
-    'scale',
-    'scaleX',
-    'scaleY',
-    'rotate',
-    'rotateX',
-    'rotateY',
-    'rotateZ',
-    'skew',
-    'skewX',
-    'skewY',
-    'transform'
-])
 
 const appearStoreId = (elementId: string, valueName: string): string => {
     const key = transformProps.has(valueName) ? 'transform' : valueName
@@ -108,16 +96,18 @@ const readStyleProp = (style: string, prop: string): string | undefined => {
 const toNativeOptions = (transition: AnimationOptions | undefined): KeyframeAnimationOptions => {
     const duration = typeof transition?.duration === 'number' ? transition.duration : 0.3
     const delay = typeof transition?.delay === 'number' ? transition.delay : 0
+    const durationMs = duration * 1000
     const options: KeyframeAnimationOptions = {
-        duration: duration * 1000,
+        duration: durationMs,
         delay: delay * 1000,
         fill: 'both'
     }
 
-    if (typeof transition?.ease === 'string') {
-        options.easing = transition.ease
-    } else if (Array.isArray(transition?.ease) && transition.ease.length === 4) {
-        options.easing = `cubic-bezier(${transition.ease.join(', ')})`
+    const easing = mapEasingToNativeEasing(transition?.ease as NativeEasing, durationMs)
+    if (Array.isArray(easing)) {
+        options.easing = easing[0] ?? 'linear'
+    } else if (easing) {
+        options.easing = easing
     }
 
     return options

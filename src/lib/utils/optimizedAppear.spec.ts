@@ -64,6 +64,16 @@ describe('optimizedAppear', () => {
         expect(script).toContain('MotionHasOptimisedAnimation')
     })
 
+    it('maps Motion easing names to native WAAPI easing strings', () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0 },
+            { opacity: 1 },
+            { duration: 0.4, ease: 'easeInOut' }
+        )
+
+        expect(entries[0]?.options.easing).toBe('ease-in-out')
+    })
+
     it('starts and hands off imperative optimized appear animations', () => {
         const element = document.createElement('div')
         element.dataset.framerAppearId = 'appear-2'
