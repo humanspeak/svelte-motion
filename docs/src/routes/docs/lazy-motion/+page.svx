@@ -1,0 +1,68 @@
+---
+title: LazyMotion
+description: Load only the motion feature bundle your page needs
+---
+
+<script>
+    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+    const seo = getSeoContext()
+    if (seo) {
+        seo.title = 'LazyMotion | Docs | Svelte Motion'
+        seo.description = 'Use LazyMotion with the m namespace and domMin, domAnimation, or domMax feature bundles.'
+        seo.ogTitle = 'LazyMotion'
+        seo.ogTagline = 'Load motion features on demand'
+        seo.ogFeatures = ['m namespace', 'domMin', 'domAnimation', 'domMax']
+        seo.ogSlug = 'docs-lazy-motion'
+    }
+</script>
+
+# LazyMotion
+
+`LazyMotion` pairs with the `m` namespace to choose which runtime features are active for a subtree. It mirrors Framer Motion's bundle split while keeping the default `motion` export unchanged.
+
+```svelte
+<script>
+    import { LazyMotion, domAnimation, m } from '@humanspeak/svelte-motion'
+</script>
+
+<LazyMotion features={domAnimation}>
+    <m.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        whileHover={{ scale: 1.05 }}
+    />
+</LazyMotion>
+```
+
+## Feature bundles
+
+| Bundle | Includes |
+|---|---|
+| `domMin` | mount/update animations |
+| `domAnimation` | animations plus hover, tap, focus, pan, and in-view gestures |
+| `domMax` | everything in `domAnimation` plus drag and layout animations |
+
+Use `domAnimation` for most interface motion. Use `domMin` for pages that only need entrance/update animation. Use `domMax` when the subtree uses `drag`, `layout`, or `layoutId`.
+
+## Async loading
+
+`features` can also be a function returning a promise. The subtree renders with `domMin` first, then upgrades when the bundle resolves.
+
+```svelte
+<script>
+    import { LazyMotion, domAnimation, m } from '@humanspeak/svelte-motion'
+
+    const loadFeatures = async () => domAnimation
+</script>
+
+<LazyMotion features={loadFeatures}>
+    <m.button whileHover={{ scale: 1.08 }}>Hover me</m.button>
+</LazyMotion>
+```
+
+## Related
+
+- [Tree Shaking](/docs/tree-shaking) — Import only the components you use
+- [Gestures](/docs/gestures) — Hover, tap, focus, pan, and in-view states
+- [Drag](/docs/drag) — Drag requires `domMax`

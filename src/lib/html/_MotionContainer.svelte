@@ -5,6 +5,8 @@
 
 <script lang="ts">
     import { getMotionConfig } from '$lib/components/motionConfig.context'
+    import { getLazyMotionContext } from '$lib/components/lazyMotion.context'
+    import { domMax } from '$lib/features/domMax'
     import {
         filterReducedMotionKeyframes,
         useReducedMotionConfig
@@ -156,6 +158,11 @@
     let enterAnimationSettled = $state(false)
     let dataPath = $state<number>(-1)
     const motionConfig = $derived(getMotionConfig())
+    const lazyMotion = getLazyMotionContext()
+    const activeFeatures = $derived(lazyMotion?.getFeatures() ?? domMax)
+    const hasGestureFeatures = $derived(!!activeFeatures.gestures)
+    const hasDragFeatures = $derived(!!activeFeatures.drag)
+    const hasLayoutFeatures = $derived(!!activeFeatures.layout)
     const reducedMotionState = useReducedMotionConfig()
     // `.current` is $state-backed inside reducedMotionState; tracking it via
     // $derived makes `reducedMotion` re-evaluate whenever the OS preference
@@ -553,7 +560,8 @@
         // key, empty array) would otherwise add `tabindex=0` for an
         // element that never actually receives a tap gesture — an
         // unintended tab stop. (#349 CR feedback)
-        ...(isNotEmpty(resolvedWhileTap) &&
+        ...(hasGestureFeatures &&
+        isNotEmpty(resolvedWhileTap) &&
         !isNativelyFocusable(tag, rest as Record<string, unknown>) &&
         ((rest as Record<string, unknown>)?.tabindex ??
             (rest as Record<string, unknown>)?.tabIndex ??
@@ -626,7 +634,7 @@
     //   after any non-zero duration settle animation.
     let teardownDrag: (() => void) | null = null
     $effect(() => {
-        if (!(element && isLoaded === 'ready')) return
+        if (!(element && isLoaded === 'ready' && hasDragFeatures)) return
         // Only attach if drag enabled
         if (!dragProp) return
         // Clean up previous
@@ -787,7 +795,7 @@
                 isLoaded
             })
         }
-        if (!element) return
+        if (!element || !hasGestureFeatures) return
         // Defer attachment until the element has settled out of the enter
         // animation phase — matches the gate every other gesture effect
         // in this file uses (drag, whileTap, whileHover, whileFocus,
@@ -1050,7 +1058,7 @@
     // When layout === true we also scale to smoothly interpolate size changes.
     let lastRect: RectLike | null = null
     $effect(() => {
-        if (!(element && layoutProp && isLoaded === 'ready')) return
+        if (!(element && layoutProp && isLoaded === 'ready' && hasLayoutFeatures)) return
 
         // Initialize last rect on first ready frame. We measure through the
         // projection node rather than `measureRect` directly so the rect is
@@ -1105,7 +1113,16 @@
     // Shared layout animation via layoutId.
     // On mount, consume the previous snapshot and FLIP from its position.
     $effect(() => {
-        if (!(element && scopedLayoutId && layoutIdRegistry && isLoaded === 'ready')) return
+        if (
+            !(
+                element &&
+                scopedLayoutId &&
+                layoutIdRegistry &&
+                isLoaded === 'ready' &&
+                hasLayoutFeatures
+            )
+        )
+            return
 
         const prev = layoutIdRegistry.consume(scopedLayoutId)
         if (!prev) return // First appearance, no animation needed
@@ -1123,7 +1140,10 @@
 
     // whileTap handling via motion-dom's press()
     $effect(() => {
-        if (!(element && isLoaded === 'ready' && isNotEmpty(resolvedWhileTap))) return
+        if (
+            !(element && isLoaded === 'ready' && hasGestureFeatures && isNotEmpty(resolvedWhileTap))
+        )
+            return
         return attachWhileTap(
             element!,
             (resolvedWhileTap ?? {}) as Record<string, unknown>,
@@ -1143,7 +1163,15 @@
 
     // whileHover handling, gated to true-hover devices to avoid sticky states on touch
     $effect(() => {
-        if (!(element && isLoaded === 'ready' && isNotEmpty(resolvedWhileHover))) return
+        if (
+            !(
+                element &&
+                isLoaded === 'ready' &&
+                hasGestureFeatures &&
+                isNotEmpty(resolvedWhileHover)
+            )
+        )
+            return
         return attachWhileHover(
             element!,
             (resolvedWhileHover ?? {}) as Record<string, unknown>,
@@ -1158,7 +1186,15 @@
 
     // whileFocus handling for keyboard focus interactions
     $effect(() => {
-        if (!(element && isLoaded === 'ready' && isNotEmpty(resolvedWhileFocus))) return
+        if (
+            !(
+                element &&
+                isLoaded === 'ready' &&
+                hasGestureFeatures &&
+                isNotEmpty(resolvedWhileFocus)
+            )
+        )
+            return
         return attachWhileFocus(
             element!,
             (resolvedWhileFocus ?? {}) as Record<string, unknown>,
@@ -1173,7 +1209,15 @@
 
     // whileInView handling for viewport intersection
     $effect(() => {
-        if (!(element && isLoaded === 'ready' && isNotEmpty(resolvedWhileInView))) return
+        if (
+            !(
+                element &&
+                isLoaded === 'ready' &&
+                hasGestureFeatures &&
+                isNotEmpty(resolvedWhileInView)
+            )
+        )
+            return
         return attachWhileInView(
             element!,
             (resolvedWhileInView ?? {}) as Record<string, unknown>,

@@ -56,6 +56,10 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'Keep FLIP layout animations anchored when the parent container scrolls mid-animation.'
     },
+    'lazy-motion': {
+        title: 'LazyMotion',
+        description: 'Load Svelte Motion feature bundles with LazyMotion and the m namespace.'
+    },
     'motion-path': {
         title: 'Motion Path',
         description: 'Interactive motion path animation example using Svelte Motion.'

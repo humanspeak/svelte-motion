@@ -39,20 +39,23 @@ test.describe('motion/animate-transform-persist (#377)', () => {
         const sel = '[data-testid="persist-rotate"]'
         await page.locator(sel).waitFor({ state: 'visible' })
 
-        // Sample across the 0.6s animation; capture the max rotation seen
-        // mid-flight. rotate(θ) → matrix b = sin(θ); a partial frame has
-        // 0 < b < sin(45°). Proves it animates rather than jumping to 45°.
-        let sawIntermediate = false
-        for (let i = 0; i < 15; i++) {
-            const t = await page.locator(sel).evaluate((el) => getComputedStyle(el).transform)
-            const m = t.match(/matrix\(([^)]+)\)/)
-            if (m) {
-                const b = Number.parseFloat(m[1].split(',')[1])
-                if (b > 0.05 && b < 0.69) sawIntermediate = true // sin(45°) ≈ 0.707
-            }
-            await page.waitForTimeout(40)
-        }
-        expect(sawIntermediate).toBe(true)
+        // Poll during the 0.6s animation for an intermediate rotation frame.
+        // rotate(θ) -> matrix b = sin(θ); a partial frame has
+        // 0 < b < sin(45deg). Proves it animates rather than jumping to 45deg.
+        await expect
+            .poll(
+                async () => {
+                    const t = await page
+                        .locator(sel)
+                        .evaluate((el) => getComputedStyle(el).transform)
+                    const m = t.match(/matrix\(([^)]+)\)/)
+                    if (!m) return false
+                    const b = Math.abs(Number.parseFloat(m[1].split(',')[1]))
+                    return b > 0.05 && b < 0.69
+                },
+                { timeout: 1200, message: 'never observed an intermediate rotation frame' }
+            )
+            .toBe(true)
 
         // Rests rotated (b ≈ sin(45°) ≈ 0.707), not reverted.
         await expect
