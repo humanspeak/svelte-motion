@@ -52,4 +52,19 @@ describe('_MotionContainer SSR styles', () => {
         expect(style).not.toMatch(/opacity:/)
         expect(style).not.toMatch(/border-radius:/)
     })
+
+    it('emits optimized appear handoff metadata for SSR enter animations', () => {
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+        const { container } = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                initial: { opacity: 0, scale: 0.9 },
+                animate: { opacity: 1, scale: 1 },
+                transition: { duration: 0.5 }
+            }
+        })
+        const el = container.firstElementChild as HTMLElement
+        expect(el.getAttribute('data-framer-appear-id')).toMatch(/^svelte-motion-/)
+        expect(container.innerHTML).toContain('MotionHasOptimisedAnimation')
+    })
 })

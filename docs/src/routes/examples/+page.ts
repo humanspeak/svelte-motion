@@ -72,6 +72,10 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Notifications Stack',
         description: 'Interactive notifications stack animation example using Svelte Motion.'
     },
+    'optimized-appear': {
+        title: 'Optimized appear',
+        description: 'Start SSR appear animations before Svelte hydrates the motion runtime.'
+    },
     'path-morphing': {
         title: 'Path Morphing',
         description: 'Interactive path morphing animation example using Svelte Motion.'

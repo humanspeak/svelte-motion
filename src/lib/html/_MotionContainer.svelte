@@ -80,6 +80,14 @@
         isSVGTag,
         SVG_NAMESPACE
     } from '$lib/utils/svg'
+    import {
+        createOptimizedAppearData,
+        createOptimizedAppearScript,
+        finishOptimizedAppearAnimation,
+        hasOptimizedAppearAnimation,
+        markMotionMounted,
+        optimizedAppearDataAttribute
+    } from '$lib/utils/optimizedAppear'
     import { getLayoutIdRegistry } from '$lib/utils/layoutId'
     import {
         getLayoutScrollContainerRef,
@@ -92,6 +100,8 @@
         tag: keyof SvelteHTMLElements
         [key: string]: unknown
     }
+
+    const componentHydrationId = $props.id()
 
     let {
         children,
@@ -551,6 +561,23 @@
             reducedMotion
         )
     )
+    const optimizedAppearId = $derived(
+        effectiveInitialProp !== false &&
+            isNotEmpty(initialKeyframes) &&
+            isNotEmpty(animateKeyframes)
+            ? `svelte-motion-${componentHydrationId}`
+            : undefined
+    )
+    const optimizedAppearEntries = $derived(
+        createOptimizedAppearData(
+            initialKeyframes as Record<string, unknown> | undefined,
+            animateKeyframes as Record<string, unknown> | undefined,
+            mergedTransition
+        )
+    )
+    const optimizedAppearScript = $derived(
+        createOptimizedAppearScript(optimizedAppearId, optimizedAppearEntries)
+    )
 
     // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
     const derivedAttrs = $derived<Record<string, unknown>>({
@@ -575,6 +602,7 @@
                   'data-path': dataPath
               }
             : {}),
+        ...(optimizedAppearScript ? { [optimizedAppearDataAttribute]: optimizedAppearId } : {}),
         // Apply normalized SVG path attributes synchronously on first render to avoid flash
         // Compute via svg utils (no dynamic import in SSR/derived expressions)
         ...(() => {
@@ -1423,6 +1451,7 @@
 
     $effect(() => {
         if (!(element && isLoaded === 'mounting')) return
+        markMotionMounted()
 
         pwLog('[motion] main effect running', {
             effectiveAnimate: !!effectiveAnimate,
@@ -1452,6 +1481,29 @@
                 dataPath = 5
                 isLoaded = 'ready'
             } else if (isNotEmpty(initialKeyframes)) {
+                const canHandoffOptimizedAppear = hasOptimizedAppearAnimation(optimizedAppearId)
+                if (canHandoffOptimizedAppear) {
+                    pwLog('[motion] path: optimized appear handoff')
+                    dataPath = 6
+                    isLoaded = 'initial'
+                    initialAnimationTriggered = true
+                    if (animateProp && typeof animateProp !== 'string') {
+                        objectAnimateRanOnMount = true
+                        lastAnimatePropJson = JSON.stringify(animateProp)
+                    }
+                    finishOptimizedAppearAnimation(optimizedAppearId)
+                        .then(() => {
+                            enterAnimationSettled = true
+                            isLoaded = 'ready'
+                            onAnimationCompleteProp?.(
+                                resolvedAnimate as DOMKeyframesDefinition | undefined
+                            )
+                        })
+                        .catch(() => {
+                            isLoaded = 'ready'
+                        })
+                    return
+                }
                 pwLog('[motion] path: has initialKeyframes, will animate to target')
                 // Apply initial instantly BEFORE exposing 'initial' state
                 const transformedInitial = transformSVGPathProperties(
@@ -1572,15 +1624,23 @@
 {#if isVoidTag}
     {#if isSVGTag(String(tag))}
         <svelte:element this={tag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs} />
+        <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
+        {@html optimizedAppearScript}
     {:else}
         <svelte:element this={tag} bind:this={element} {...derivedAttrs} />
+        <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
+        {@html optimizedAppearScript}
     {/if}
 {:else if isSVGTag(String(tag))}
     <svelte:element this={tag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs}>
         {@render children?.()}
     </svelte:element>
+    <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
+    {@html optimizedAppearScript}
 {:else}
     <svelte:element this={tag} bind:this={element} {...derivedAttrs}>
         {@render children?.()}
     </svelte:element>
+    <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
+    {@html optimizedAppearScript}
 {/if}
