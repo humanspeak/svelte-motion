@@ -491,9 +491,9 @@ export const createAnimatePresenceContext = (context: {
         const rect = child.lastRect
         const computed = child.lastComputedStyle
 
-        // For sync/wait, preserve layout by inserting a hidden placeholder.
-        // For popLayout, we remove from layout immediately (no placeholder).
-        const shouldPreserveLayout = mode !== 'popLayout'
+        // Wait mode holds the exiting layout slot while the entering child is hidden.
+        // Sync and popLayout must not add an extra layout participant.
+        const shouldPreserveLayout = mode === 'wait'
         let placeholder: HTMLElement | null = null
         const liveLayoutInsertion = findLayoutInsertionParent(child.element)
         const layoutInsertion =

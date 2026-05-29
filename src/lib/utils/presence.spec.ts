@@ -402,22 +402,19 @@ describe('AnimatePresence modes', () => {
             await Promise.resolve()
         })
 
-        it('inserts and removes a placeholder for sync mode', async () => {
+        it('does not insert a placeholder for sync mode', async () => {
             const ctx = createAnimatePresenceContext({ mode: 'sync' })
             ctx.registerChild('k1', el, { opacity: 0 })
             ctx.unregisterChild('k1')
 
-            let placeholder = document.querySelector('[data-presence-placeholder="true"]')
-            expect(placeholder).toBeTruthy()
-
-            await Promise.resolve()
-            await Promise.resolve()
-
-            placeholder = document.querySelector('[data-presence-placeholder="true"]')
+            const placeholder = document.querySelector('[data-presence-placeholder="true"]')
             expect(placeholder).toBeFalsy()
+
+            await Promise.resolve()
+            await Promise.resolve()
         })
 
-        it('preserves grid placement on sync placeholders', () => {
+        it('preserves grid placement on wait placeholders', () => {
             vi.spyOn(window, 'getComputedStyle').mockImplementation((target: Element) => {
                 if (target === el) {
                     return mockComputedStyle({
@@ -438,7 +435,7 @@ describe('AnimatePresence modes', () => {
                 })
             })
 
-            const ctx = createAnimatePresenceContext({ mode: 'sync' })
+            const ctx = createAnimatePresenceContext({ mode: 'wait' })
             ctx.registerChild('k1', el, { opacity: 0 })
             ctx.unregisterChild('k1')
 

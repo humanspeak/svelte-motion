@@ -687,6 +687,186 @@ test.describe('AnimatePresence layout button dogfood', () => {
         }
     })
 
+    test('keeps sync shell anchored while both states are present', async ({ page }) => {
+        await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+
+        const button = page.getByTestId('sync-button')
+        await expect(button).toBeVisible()
+        await expect(button).toHaveText('copy')
+        await expect(button).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
+        await expectReadyCopyState(page, 'sync')
+
+        await button.click()
+
+        const samples = await page.evaluate(async () => {
+            const samples: Array<{
+                buttonTop: number
+                buttonHeight: number
+                buttonCenterX: number
+                labelCenterX: number
+                labelOpacity: number
+                labelText: string
+            }> = []
+            const started = performance.now()
+
+            return await new Promise<typeof samples>((resolve) => {
+                const frame = () => {
+                    const buttonElement = document.querySelector<HTMLElement>(
+                        '[data-testid="sync-button"]'
+                    )
+                    const labelElement =
+                        buttonElement &&
+                        Array.from(buttonElement.querySelectorAll<HTMLElement>('.state'))
+                            .map((state) => {
+                                const style = getComputedStyle(state)
+                                const rect = state.getBoundingClientRect()
+                                return {
+                                    element: state,
+                                    opacity: Number.parseFloat(style.opacity),
+                                    rect,
+                                    visible:
+                                        style.display !== 'none' &&
+                                        state.getAttribute('data-presence-wait-hidden') !==
+                                            'true' &&
+                                        !state.closest('[data-clone="true"]') &&
+                                        rect.width > 0 &&
+                                        rect.height > 0
+                                }
+                            })
+                            .filter((state) => state.visible)
+                            .sort((a, b) => b.opacity - a.opacity)[0]
+
+                    if (buttonElement && labelElement) {
+                        const buttonRect = buttonElement.getBoundingClientRect()
+                        samples.push({
+                            buttonTop: buttonRect.top,
+                            buttonHeight: buttonRect.height,
+                            buttonCenterX: buttonRect.left + buttonRect.width / 2,
+                            labelCenterX: labelElement.rect.left + labelElement.rect.width / 2,
+                            labelOpacity: labelElement.opacity,
+                            labelText: labelElement.element.textContent?.trim() ?? ''
+                        })
+                    }
+
+                    if (performance.now() - started < 900) requestAnimationFrame(frame)
+                    else resolve(samples)
+                }
+                requestAnimationFrame(frame)
+            })
+        })
+
+        const visibleSamples = samples.filter((sample) => sample.labelOpacity > 0.2)
+        expect(visibleSamples.length).toBeGreaterThan(5)
+
+        for (let i = 1; i < visibleSamples.length; i += 1) {
+            const movement = Math.abs(visibleSamples[i].buttonTop - visibleSamples[i - 1].buttonTop)
+            expect(movement, `top jump at sample ${i}`).toBeLessThanOrEqual(1)
+        }
+
+        for (const sample of visibleSamples) {
+            expect(sample.buttonHeight, sample.labelText).toBeLessThanOrEqual(33)
+            expect(
+                Math.abs(sample.labelCenterX - sample.buttonCenterX),
+                sample.labelText
+            ).toBeLessThanOrEqual(1)
+        }
+    })
+
+    test('keeps sync shell anchored during reset', async ({ page }) => {
+        await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+
+        const button = page.getByTestId('sync-button')
+        await expect(button).toBeVisible()
+        await expect(button).toHaveText('copy')
+        await expect(button).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
+        await expectReadyCopyState(page, 'sync')
+
+        await button.click()
+        await expect(page.getByTestId('sync-copied-state')).toBeVisible({ timeout: 300 })
+        await page.waitForTimeout(3100)
+
+        const samples = await page.evaluate(async () => {
+            const samples: Array<{
+                buttonCenterX: number
+                buttonHeight: number
+                buttonTop: number
+                buttonWidth: number
+                labelCenterX: number
+                labelOpacity: number
+                labelText: string
+            }> = []
+            const started = performance.now()
+
+            return await new Promise<typeof samples>((resolve) => {
+                const frame = () => {
+                    const buttonElement = document.querySelector<HTMLElement>(
+                        '[data-testid="sync-button"]'
+                    )
+                    const labelElement =
+                        buttonElement &&
+                        Array.from(buttonElement.querySelectorAll<HTMLElement>('.state'))
+                            .map((state) => {
+                                const style = getComputedStyle(state)
+                                const rect = state.getBoundingClientRect()
+                                return {
+                                    element: state,
+                                    opacity: Number.parseFloat(style.opacity),
+                                    rect,
+                                    visible:
+                                        style.display !== 'none' &&
+                                        state.getAttribute('data-presence-wait-hidden') !==
+                                            'true' &&
+                                        !state.closest('[data-clone="true"]') &&
+                                        rect.width > 0 &&
+                                        rect.height > 0
+                                }
+                            })
+                            .filter((state) => state.visible)
+                            .sort((a, b) => b.opacity - a.opacity)[0]
+
+                    if (buttonElement && labelElement) {
+                        const buttonRect = buttonElement.getBoundingClientRect()
+                        samples.push({
+                            buttonCenterX: buttonRect.left + buttonRect.width / 2,
+                            buttonHeight: buttonRect.height,
+                            buttonTop: buttonRect.top,
+                            buttonWidth: buttonRect.width,
+                            labelCenterX: labelElement.rect.left + labelElement.rect.width / 2,
+                            labelOpacity: labelElement.opacity,
+                            labelText: labelElement.element.textContent?.trim() ?? ''
+                        })
+                    }
+
+                    if (performance.now() - started < 900) requestAnimationFrame(frame)
+                    else resolve(samples)
+                }
+                requestAnimationFrame(frame)
+            })
+        })
+
+        const visibleSamples = samples.filter((sample) => sample.labelOpacity > 0.2)
+        expect(visibleSamples.length).toBeGreaterThan(5)
+
+        for (let i = 1; i < visibleSamples.length; i += 1) {
+            const topMovement = Math.abs(
+                visibleSamples[i].buttonTop - visibleSamples[i - 1].buttonTop
+            )
+            const centerMovement = Math.abs(
+                visibleSamples[i].labelCenterX - visibleSamples[i - 1].labelCenterX
+            )
+            expect(topMovement, `top jump at sample ${i}`).toBeLessThanOrEqual(1)
+            expect(centerMovement, `label jump at sample ${i}`).toBeLessThanOrEqual(1)
+        }
+
+        for (const sample of visibleSamples) {
+            expect(sample.buttonHeight, sample.labelText).toBeLessThanOrEqual(33)
+            expect(
+                Math.abs(sample.labelCenterX - sample.buttonCenterX),
+                sample.labelText
+            ).toBeLessThanOrEqual(1)
+        }
+    })
+
     test('animates button width instead of snapping to the final size', async ({ page }) => {
         await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
 

@@ -278,7 +278,9 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
     const mo = new MutationObserver(() => schedule())
     mo.observe(el, {
         attributes: true,
-        attributeFilter: ['class', 'style', 'data-presence-layout-hold']
+        attributeFilter: ['class', 'style', 'data-presence-layout-hold'],
+        childList: true,
+        subtree: true
     })
     if (el.parentElement) {
         mo.observe(el.parentElement, { childList: true, subtree: false, attributes: true })
