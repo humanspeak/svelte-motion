@@ -1,25 +1,19 @@
 <script lang="ts">
     import { motion } from '@humanspeak/svelte-motion'
-
-    let replayId = $state(0)
 </script>
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    {#key replayId}
-        <motion.article
-            class="appear-card"
-            initial={{ opacity: 0, y: 32, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        >
-            <span class="rail"></span>
-            <h3>Hydrated cleanly</h3>
-            <p>Opacity and transform start before the component runtime claims the element.</p>
-        </motion.article>
-    {/key}
-
-    <button type="button" class="replay" onclick={() => (replayId += 1)}>Replay</button>
+    <motion.article
+        class="appear-card"
+        initial={{ opacity: 0, y: 32, scale: 0.9 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+    >
+        <span class="rail"></span>
+        <h3>Hydrated cleanly</h3>
+        <p>Opacity and transform start before the component runtime claims the element.</p>
+    </motion.article>
 </div>
 
 <style>
@@ -58,15 +52,5 @@
         height: 6px;
         border-radius: 999px;
         background: #7dd3fc;
-    }
-
-    .replay {
-        font-size: 12px;
-        padding: 4px 10px;
-        border-radius: 6px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        background: transparent;
-        color: rgba(255, 255, 255, 0.7);
-        cursor: pointer;
     }
 </style>

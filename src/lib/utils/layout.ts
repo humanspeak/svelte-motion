@@ -1,5 +1,66 @@
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 
+const layoutSizeAnimationAttribute = 'data-layout-size-animation'
+
+const px = (value: number): string => `${Math.max(0, value)}px`
+
+const runBoxSizeAnimation = (
+    el: HTMLElement,
+    transforms: {
+        dx: number
+        dy: number
+        sx: number
+        sy: number
+    },
+    transition: AnimationOptions
+) => {
+    const { dx, dy, sx, sy } = transforms
+    const originalWidth = el.style.width
+    const originalHeight = el.style.height
+    const originalTransform = el.style.transform
+    const originalTransformOrigin = el.style.transformOrigin
+
+    const nextRect = el.getBoundingClientRect()
+    const prevWidth = nextRect.width * sx
+    const prevHeight = nextRect.height * sy
+
+    el.setAttribute(layoutSizeAnimationAttribute, 'true')
+    for (const child of el.querySelectorAll<HTMLElement>('[data-svelte-motion-layout]')) {
+        child.style.transform = ''
+        child.style.transformOrigin = ''
+        if (child.style.willChange === 'transform') child.style.willChange = ''
+    }
+    el.style.width = px(prevWidth)
+    el.style.height = px(prevHeight)
+
+    const sizedRect = el.getBoundingClientRect()
+    const residualDx = nextRect.left + dx - sizedRect.left
+    const residualDy = nextRect.top + dy - sizedRect.top
+    const shouldTranslate = Math.abs(residualDx) > 0.5 || Math.abs(residualDy) > 0.5
+
+    const keyframes: Record<string, unknown> = {
+        width: [px(prevWidth), px(nextRect.width)],
+        height: [px(prevHeight), px(nextRect.height)]
+    }
+
+    if (shouldTranslate) {
+        keyframes.x = [residualDx, 0]
+        keyframes.y = [residualDy, 0]
+        el.style.transformOrigin = '0 0'
+        el.style.transform = `translate(${residualDx}px, ${residualDy}px)`
+    }
+
+    const animation = animate(el, keyframes as unknown as DOMKeyframesDefinition, transition)
+
+    animation.finished?.finally(() => {
+        el.style.width = originalWidth
+        el.style.height = originalHeight
+        el.style.transformOrigin = originalTransformOrigin
+        el.style.transform = originalTransform
+        el.removeAttribute(layoutSizeAnimationAttribute)
+    })
+}
+
 /**
  * Measure an element's bounding client rect without current transform.
  *
@@ -137,6 +198,15 @@ export const runFlipAnimation = (
     const { dx, dy, sx, sy, shouldTranslate, shouldScale } = transforms
     if (!(shouldTranslate || shouldScale)) return
 
+    const correctionTargets = shouldScale
+        ? Array.from(el.querySelectorAll<HTMLElement>('[data-svelte-motion-layout]'))
+        : []
+
+    if (shouldScale && correctionTargets.length > 0) {
+        runBoxSizeAnimation(el, { dx, dy, sx, sy }, transition)
+        return
+    }
+
     const keyframes: Record<string, unknown> = {}
     if (shouldTranslate) {
         keyframes.x = [dx, 0]
@@ -184,6 +254,12 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
     let releaseTimeout: ReturnType<typeof setTimeout> | null = null
 
     const schedule = () => {
+        if (el.closest(`[${layoutSizeAnimationAttribute}]`)) {
+            el.style.transform = ''
+            el.style.transformOrigin = ''
+            if (el.style.willChange === 'transform') el.style.willChange = ''
+            return
+        }
         if (pendingRaf !== null || releaseTimeout !== null) return
         // Leading-edge: call immediately, then throttle further calls until next frame (or 50ms)
         onChange()
@@ -200,7 +276,10 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
     const ro = new ResizeObserver(() => schedule())
     ro.observe(el)
     const mo = new MutationObserver(() => schedule())
-    mo.observe(el, { attributes: true, attributeFilter: ['class', 'style'] })
+    mo.observe(el, {
+        attributes: true,
+        attributeFilter: ['class', 'style', 'data-presence-layout-hold']
+    })
     if (el.parentElement) {
         mo.observe(el.parentElement, { childList: true, subtree: false, attributes: true })
     }

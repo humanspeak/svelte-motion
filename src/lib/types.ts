@@ -451,8 +451,8 @@ export type MotionProps = {
     style?: string
     /** CSS classes */
     class?: string
-    /** Enable FLIP layout animations; "position" limits to translation only */
-    layout?: boolean | 'position'
+    /** Enable FLIP layout animations; string values select the upstream projection animation type. */
+    layout?: boolean | 'position' | 'size' | 'preserve-aspect'
     /**
      * Fires after each `layout`-driven change with the FLIP delta from
      * the element's internal projection node. Mirrors framer-motion's

@@ -1,0 +1,912 @@
+import { expect, test } from '@playwright/test'
+
+type ButtonSample = {
+    buttonText: string
+    hiddenWaitStates: number
+    labelClassName: string
+    buttonFontSize: string
+    buttonLineHeight: string
+    buttonColor: string
+    buttonBackgroundColor: string
+    buttonBorderColor: string
+    buttonAppearance: string
+    buttonOverflow: string
+    buttonTransform: string
+    labelFontSize: string
+    labelLineHeight: string
+    labelColor: string
+    labelOpacity: string
+    labelOverflow: string
+    labelTransform: string
+    labelWidth: number
+    labelHeight: number
+}
+
+const parseScaleX = (transform: string): number => {
+    if (!transform || transform === 'none') return 1
+    const matrix = transform.match(/^matrix\(([^)]+)\)$/)
+    if (!matrix) return 1
+    const [a] = matrix[1].split(',').map((value) => Number.parseFloat(value.trim()))
+    return Number.isFinite(a) ? a : 1
+}
+
+const visibleStateSelector = '.state:not([data-presence-wait-hidden="true"])'
+
+const sampleButton = async (
+    page: import('@playwright/test').Page,
+    testIdPrefix: string
+): Promise<ButtonSample> =>
+    page.getByTestId(`${testIdPrefix}-button`).evaluate((button) => {
+        const buttonElement = button as HTMLButtonElement
+        const labelElement =
+            Array.from(buttonElement.querySelectorAll<HTMLElement>('.state')).find((state) => {
+                const style = getComputedStyle(state)
+                const rect = state.getBoundingClientRect()
+                return (
+                    style.display !== 'none' &&
+                    state.getAttribute('data-presence-wait-hidden') !== 'true' &&
+                    !state.closest('[data-clone="true"]') &&
+                    rect.width > 0 &&
+                    rect.height > 0
+                )
+            }) ?? buttonElement.querySelector<HTMLElement>(visibleStateSelector)
+        if (!labelElement) throw new Error('missing label state')
+
+        const buttonStyle = getComputedStyle(buttonElement)
+        const labelStyle = getComputedStyle(labelElement)
+        const labelRect = labelElement.getBoundingClientRect()
+
+        return {
+            buttonText: buttonElement.textContent?.trim() ?? '',
+            hiddenWaitStates: buttonElement.querySelectorAll('[data-presence-wait-hidden="true"]')
+                .length,
+            labelClassName: labelElement.className,
+            buttonFontSize: buttonStyle.fontSize,
+            buttonLineHeight: buttonStyle.lineHeight,
+            buttonColor: buttonStyle.color,
+            buttonBackgroundColor: buttonStyle.backgroundColor,
+            buttonBorderColor: buttonStyle.borderColor,
+            buttonAppearance: buttonStyle.appearance,
+            buttonOverflow: buttonStyle.overflow,
+            buttonTransform: buttonStyle.transform,
+            labelFontSize: labelStyle.fontSize,
+            labelLineHeight: labelStyle.lineHeight,
+            labelColor: labelStyle.color,
+            labelOpacity: labelStyle.opacity,
+            labelOverflow: labelStyle.overflow,
+            labelTransform: labelStyle.transform,
+            labelWidth: labelRect.width,
+            labelHeight: labelRect.height
+        }
+    })
+
+const collectSamples = async (
+    page: import('@playwright/test').Page,
+    testIdPrefix: string,
+    durationMs: number
+): Promise<ButtonSample[]> =>
+    page.evaluate(
+        async ({ duration, prefix }) => {
+            const samples: ButtonSample[] = []
+            const started = performance.now()
+
+            const read = () => {
+                const buttonElement = document.querySelector<HTMLButtonElement>(
+                    `[data-testid="${prefix}-button"]`
+                )
+                const labelElement =
+                    buttonElement &&
+                    (Array.from(buttonElement.querySelectorAll<HTMLElement>('.state')).find(
+                        (state) => {
+                            const style = getComputedStyle(state)
+                            const rect = state.getBoundingClientRect()
+                            return (
+                                style.display !== 'none' &&
+                                state.getAttribute('data-presence-wait-hidden') !== 'true' &&
+                                !state.closest('[data-clone="true"]') &&
+                                rect.width > 0 &&
+                                rect.height > 0
+                            )
+                        }
+                    ) ??
+                        buttonElement.querySelector<HTMLElement>(
+                            '.state:not([data-presence-wait-hidden="true"])'
+                        ))
+                if (!buttonElement || !labelElement) return
+
+                const buttonStyle = getComputedStyle(buttonElement)
+                const labelStyle = getComputedStyle(labelElement)
+                const labelRect = labelElement.getBoundingClientRect()
+                samples.push({
+                    buttonText: buttonElement.textContent?.trim() ?? '',
+                    hiddenWaitStates: buttonElement.querySelectorAll(
+                        '[data-presence-wait-hidden="true"]'
+                    ).length,
+                    labelClassName: labelElement.className,
+                    buttonFontSize: buttonStyle.fontSize,
+                    buttonLineHeight: buttonStyle.lineHeight,
+                    buttonColor: buttonStyle.color,
+                    buttonBackgroundColor: buttonStyle.backgroundColor,
+                    buttonBorderColor: buttonStyle.borderColor,
+                    buttonAppearance: buttonStyle.appearance,
+                    buttonOverflow: buttonStyle.overflow,
+                    buttonTransform: buttonStyle.transform,
+                    labelFontSize: labelStyle.fontSize,
+                    labelLineHeight: labelStyle.lineHeight,
+                    labelColor: labelStyle.color,
+                    labelOpacity: labelStyle.opacity,
+                    labelOverflow: labelStyle.overflow,
+                    labelTransform: labelStyle.transform,
+                    labelWidth: labelRect.width,
+                    labelHeight: labelRect.height
+                })
+            }
+
+            return new Promise<ButtonSample[]>((resolve) => {
+                const frame = () => {
+                    read()
+                    if (performance.now() - started < duration) {
+                        requestAnimationFrame(frame)
+                    } else {
+                        resolve(samples)
+                    }
+                }
+                requestAnimationFrame(frame)
+            })
+        },
+        { duration: durationMs, prefix: testIdPrefix }
+    )
+
+const expectReadyCopyState = async (
+    page: import('@playwright/test').Page,
+    testIdPrefix: string
+) => {
+    const copyState = page.getByTestId(`${testIdPrefix}-copy-state`)
+    await expect(copyState).toBeVisible({ timeout: 3000 })
+    await expect(copyState).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
+    await expect(copyState).not.toHaveAttribute('data-presence-wait-hidden', 'true', {
+        timeout: 3000
+    })
+}
+
+test.describe('AnimatePresence layout button dogfood', () => {
+    test('renders status icons as SVG instead of font glyphs', async ({ page }) => {
+        await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+
+        const button = page.getByTestId('wait-button')
+        await expect(button).toBeVisible()
+        await expect(button).toHaveText('copy')
+        await expectReadyCopyState(page, 'wait')
+
+        await expect(button.locator('svg[data-testid="wait-copy-icon"]')).toBeVisible()
+        expect(
+            await button
+                .locator('svg[data-testid="wait-copy-icon"]')
+                .evaluate((icon) => icon.textContent)
+        ).toBe('')
+
+        await button.click()
+        await expect(page.getByTestId('wait-copied-state')).not.toHaveAttribute(
+            'data-presence-wait-hidden',
+            'true',
+            { timeout: 2500 }
+        )
+        await expect(button).toHaveText('copied')
+        await expect(button.locator('svg[data-testid="wait-copied-icon"]')).toBeVisible()
+        expect(
+            await button
+                .locator('svg[data-testid="wait-copied-icon"]')
+                .evaluate((icon) => icon.textContent)
+        ).toBe('')
+    })
+
+    test('keeps interactive paint metrics on whole pixels', async ({ page }) => {
+        const prefixes = ['wait', 'sync', 'pop-layout']
+
+        for (const prefix of prefixes) {
+            await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+
+            const button = page.getByTestId(`${prefix}-button`)
+            await expect(button).toBeVisible()
+            await expect(button).toHaveText('copy')
+            await expect(button).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
+            await expectReadyCopyState(page, prefix)
+
+            const readMetrics = async (label: string) =>
+                button.evaluate((buttonElement, snapshotLabel) => {
+                    const stateElement =
+                        Array.from(buttonElement.querySelectorAll<HTMLElement>('.state')).find(
+                            (state) => {
+                                const style = getComputedStyle(state)
+                                const rect = state.getBoundingClientRect()
+                                return (
+                                    style.display !== 'none' &&
+                                    state.getAttribute('data-presence-wait-hidden') !== 'true' &&
+                                    !state.closest('[data-clone="true"]') &&
+                                    rect.width > 0 &&
+                                    rect.height > 0
+                                )
+                            }
+                        ) ??
+                        buttonElement.querySelector<HTMLElement>(
+                            '.state:not([data-presence-wait-hidden="true"])'
+                        )
+                    if (!stateElement) throw new Error('missing visible state')
+
+                    const buttonStyle = getComputedStyle(buttonElement)
+                    const stateStyle = getComputedStyle(stateElement)
+                    const buttonRect = buttonElement.getBoundingClientRect()
+                    const stateRect = stateElement.getBoundingClientRect()
+
+                    return {
+                        label: snapshotLabel,
+                        buttonHeight: buttonRect.height,
+                        buttonLineHeight: Number.parseFloat(buttonStyle.lineHeight),
+                        stateHeight: stateRect.height,
+                        stateLineHeight: Number.parseFloat(stateStyle.lineHeight),
+                        stateText: stateElement.textContent?.trim() ?? ''
+                    }
+                }, label)
+
+            const samples = [await readMetrics('idle')]
+            expect(await sampleButton(page, prefix)).toMatchObject({
+                buttonAppearance: 'none'
+            })
+
+            await button.hover()
+            await button.focus()
+            samples.push(await readMetrics('hover-focus'))
+
+            await button.click()
+            await expect(page.getByTestId(`${prefix}-copied-state`)).toBeVisible({
+                timeout: 3000
+            })
+            await page.waitForFunction((testIdPrefix) => {
+                const buttonElement = document.querySelector<HTMLElement>(
+                    `[data-testid="${testIdPrefix}-button"]`
+                )
+                return buttonElement && buttonElement.style.width === ''
+            }, prefix)
+            samples.push(await readMetrics('copied-settled'))
+
+            const resetTimeout = prefix === 'wait' ? 6200 : 4200
+            await expect(button).toHaveText('copy', { timeout: resetTimeout })
+            await expect(page.getByTestId(`${prefix}-copy-state`)).toBeVisible({
+                timeout: 3000
+            })
+            await page.waitForFunction((testIdPrefix) => {
+                const buttonElement = document.querySelector<HTMLElement>(
+                    `[data-testid="${testIdPrefix}-button"]`
+                )
+                return buttonElement && buttonElement.style.width === ''
+            }, prefix)
+            samples.push(await readMetrics('reset-settled'))
+
+            for (const sample of samples) {
+                for (const [metric, value] of Object.entries(sample)) {
+                    if (typeof value !== 'number') continue
+
+                    expect(
+                        Math.abs(value - Math.round(value)),
+                        `${prefix} ${sample.label} ${metric}=${value}`
+                    ).toBeLessThanOrEqual(0.01)
+                }
+            }
+        }
+    })
+
+    test('keeps copy label typography stable during layout/presence swap', async ({ page }) => {
+        await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+
+        const button = page.getByTestId('wait-button')
+        await expect(button).toBeVisible()
+        await expect(button).toHaveText('copy')
+        await expect(button).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
+        await expectReadyCopyState(page, 'wait')
+
+        const baseline = await sampleButton(page, 'wait')
+        const copyStateColor = baseline.labelColor
+        const copyShellBorderColor = baseline.buttonBorderColor
+        const copyShellBackgroundColor = baseline.buttonBackgroundColor
+        const baselineFontSize = Number.parseFloat(baseline.labelFontSize)
+        const baselineLineHeight = Number.parseFloat(baseline.labelLineHeight)
+        expect(baselineLineHeight).toBeGreaterThanOrEqual(baselineFontSize * 1.15)
+        expect(baseline.buttonOverflow).not.toBe('hidden')
+        expect(baseline.labelOverflow).not.toBe('hidden')
+        await button.click()
+        const clickSamples = await collectSamples(page, 'wait', 620)
+
+        await expect(button).toHaveText('copied', { timeout: 2500 })
+        await expect(page.getByTestId('wait-copied-state')).toBeVisible({ timeout: 2500 })
+        const copiedSample = await sampleButton(page, 'wait')
+        const copiedStateColor = copiedSample.labelColor
+        const copiedShellBorderColor = copiedSample.buttonBorderColor
+        const copiedShellBackgroundColor = copiedSample.buttonBackgroundColor
+        await page.waitForTimeout(2200)
+        await expect(button).toHaveText('copied')
+        await page.waitForTimeout(3300)
+        const resetSamples = await collectSamples(page, 'wait', 620)
+
+        const samples = [...clickSamples, ...resetSamples]
+        expect(samples.length).toBeGreaterThan(5)
+
+        for (const sample of samples) {
+            expect(sample.buttonFontSize).toBe(baseline.buttonFontSize)
+            expect(sample.buttonLineHeight).toBe(baseline.buttonLineHeight)
+            expect(sample.labelFontSize).toBe(baseline.labelFontSize)
+            expect(sample.labelLineHeight).toBe(baseline.labelLineHeight)
+            expect(sample.buttonOverflow).not.toBe('hidden')
+            expect(sample.labelOverflow).not.toBe('hidden')
+
+            // Layout descendants should keep an effective glyph scale of 1.
+            // The implementation can get there via parent FLIP scale with
+            // correction or by animating the parent box size directly.
+            const effectiveLabelScale =
+                parseScaleX(sample.buttonTransform) * parseScaleX(sample.labelTransform)
+            expect(Math.abs(effectiveLabelScale - 1)).toBeLessThanOrEqual(0.001)
+
+            // Text state colors shouldn't be inherited from the shell state.
+            // Otherwise the outgoing "copy" label flashes accent blue as soon
+            // as the parent receives the copied class.
+            if (sample.labelClassName.includes('copy-state')) {
+                expect(sample.labelColor).toBe(copyStateColor)
+                expect(sample.buttonBorderColor).toBe(copyShellBorderColor)
+                expect(sample.buttonBackgroundColor).toBe(copyShellBackgroundColor)
+            }
+            if (sample.labelClassName.includes('copied-state')) {
+                expect(sample.labelColor).toBe(copiedStateColor)
+                expect(sample.buttonBorderColor).toBe(copiedShellBorderColor)
+                expect(sample.buttonBackgroundColor).toBe(copiedShellBackgroundColor)
+            }
+
+            if (
+                sample.labelClassName.includes('copy-state') &&
+                Number.parseFloat(sample.labelOpacity) > 0.2
+            ) {
+                expect(Math.abs(parseScaleX(sample.labelTransform) - 1)).toBeLessThanOrEqual(0.02)
+            }
+
+            expect(sample.labelWidth).toBeGreaterThan(0)
+            expect(sample.labelHeight).toBeGreaterThan(0)
+        }
+    })
+
+    test('keeps the readable label fully opaque during the swap', async ({ page }) => {
+        await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+
+        const button = page.getByTestId('wait-button')
+        await expect(button).toBeVisible()
+        await expect(button).toHaveText('copy')
+        await expect(button).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
+        await expectReadyCopyState(page, 'wait')
+
+        await button.click()
+
+        const samples = await page.evaluate(async () => {
+            const samples: Array<{ opacity: number; text: string; className: string }> = []
+            const started = performance.now()
+
+            return await new Promise<typeof samples>((resolve) => {
+                const frame = () => {
+                    const button = document.querySelector<HTMLElement>(
+                        '[data-testid="wait-button"]'
+                    )
+                    const buttonRect = button?.getBoundingClientRect()
+                    const states = Array.from(
+                        document.querySelectorAll<HTMLElement>('.state, .copy-button')
+                    )
+                    const visibleState = states.find((state) => {
+                        const style = getComputedStyle(state)
+                        const rect = state.getBoundingClientRect()
+                        return (
+                            buttonRect &&
+                            style.display !== 'none' &&
+                            style.visibility !== 'hidden' &&
+                            rect.width > 0 &&
+                            rect.height > 0 &&
+                            rect.right >= buttonRect.left - 4 &&
+                            rect.left <= buttonRect.right + 4 &&
+                            rect.bottom >= buttonRect.top - 4 &&
+                            rect.top <= buttonRect.bottom + 4
+                        )
+                    })
+
+                    if (visibleState) {
+                        const style = getComputedStyle(visibleState)
+                        samples.push({
+                            opacity: Number.parseFloat(style.opacity),
+                            text: visibleState.textContent?.trim() ?? '',
+                            className: visibleState.className
+                        })
+                    }
+
+                    if (performance.now() - started < 1700) requestAnimationFrame(frame)
+                    else resolve(samples)
+                }
+                requestAnimationFrame(frame)
+            })
+        })
+        expect(samples.length).toBeGreaterThan(5)
+
+        for (const sample of samples) {
+            expect(
+                sample.opacity,
+                `${sample.text} ${sample.className} opacity`
+            ).toBeGreaterThanOrEqual(0.99)
+        }
+    })
+
+    test('keeps copy label contained during slow layout animation', async ({ page }) => {
+        const prefixes = ['wait', 'sync', 'pop-layout']
+
+        for (const prefix of prefixes) {
+            await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+
+            const button = page.getByTestId(`${prefix}-button`)
+            await expect(button).toBeVisible()
+            await expect(button).toHaveText('copy')
+            await expect(button).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
+            await expectReadyCopyState(page, prefix)
+
+            await button.click()
+
+            const samples = await page.evaluate(async (testIdPrefix) => {
+                const samples: Array<{
+                    buttonRect: { left: number; right: number; top: number; bottom: number }
+                    stateRect: { left: number; right: number; top: number; bottom: number }
+                    stateOpacity: number
+                    stateText: string
+                }> = []
+                const started = performance.now()
+
+                return await new Promise<typeof samples>((resolve) => {
+                    const frame = () => {
+                        const buttonElement = document.querySelector<HTMLElement>(
+                            `[data-testid="${testIdPrefix}-button"]`
+                        )
+                        const stateElement =
+                            buttonElement &&
+                            Array.from(buttonElement.querySelectorAll<HTMLElement>('.state')).find(
+                                (state) => {
+                                    const style = getComputedStyle(state)
+                                    const rect = state.getBoundingClientRect()
+                                    return (
+                                        style.display !== 'none' &&
+                                        state.getAttribute('data-presence-wait-hidden') !==
+                                            'true' &&
+                                        !state.closest('[data-clone="true"]') &&
+                                        rect.width > 0 &&
+                                        rect.height > 0
+                                    )
+                                }
+                            )
+                        if (buttonElement && stateElement) {
+                            const buttonRect = buttonElement.getBoundingClientRect()
+                            const stateRect = stateElement.getBoundingClientRect()
+                            const stateStyle = getComputedStyle(stateElement)
+                            samples.push({
+                                buttonRect: {
+                                    left: buttonRect.left,
+                                    right: buttonRect.right,
+                                    top: buttonRect.top,
+                                    bottom: buttonRect.bottom
+                                },
+                                stateRect: {
+                                    left: stateRect.left,
+                                    right: stateRect.right,
+                                    top: stateRect.top,
+                                    bottom: stateRect.bottom
+                                },
+                                stateOpacity: Number.parseFloat(stateStyle.opacity),
+                                stateText: stateElement.textContent?.trim() ?? ''
+                            })
+                        }
+
+                        if (performance.now() - started < 3600) requestAnimationFrame(frame)
+                        else resolve(samples)
+                    }
+                    requestAnimationFrame(frame)
+                })
+            }, prefix)
+
+            const tolerance = prefix === 'sync' ? 8 : 1
+            const visibleSamples = samples.filter((sample) => sample.stateOpacity > 0.2)
+            expect(visibleSamples.length, prefix).toBeGreaterThan(5)
+
+            for (const sample of visibleSamples) {
+                expect(sample.stateRect.left, prefix).toBeGreaterThanOrEqual(
+                    sample.buttonRect.left - tolerance
+                )
+                expect(sample.stateRect.right, prefix).toBeLessThanOrEqual(
+                    sample.buttonRect.right + tolerance
+                )
+                expect(sample.stateRect.top, prefix).toBeGreaterThanOrEqual(
+                    sample.buttonRect.top - tolerance
+                )
+                expect(sample.stateRect.bottom, prefix).toBeLessThanOrEqual(
+                    sample.buttonRect.bottom + tolerance
+                )
+            }
+        }
+    })
+
+    test('keeps the readable active label visually centered during the swap', async ({ page }) => {
+        const prefixes = ['wait', 'sync', 'pop-layout']
+
+        for (const prefix of prefixes) {
+            await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+
+            const button = page.getByTestId(`${prefix}-button`)
+            await expect(button).toBeVisible()
+            await expect(button).toHaveText('copy')
+            await expect(button).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
+            await expectReadyCopyState(page, prefix)
+
+            await button.click()
+
+            const samples = await page.evaluate(async (testIdPrefix) => {
+                const samples: Array<{
+                    buttonWidth: number
+                    labelWidth: number
+                    labelOpacity: number
+                    labelText: string
+                    centerDelta: number
+                    leftInset: number
+                    rightInset: number
+                }> = []
+                const started = performance.now()
+
+                return await new Promise<typeof samples>((resolve) => {
+                    const frame = () => {
+                        const buttonElement = document.querySelector<HTMLElement>(
+                            `[data-testid="${testIdPrefix}-button"]`
+                        )
+                        const labelElements = buttonElement
+                            ? Array.from(buttonElement.querySelectorAll<HTMLElement>('.state'))
+                            : []
+
+                        for (const labelElement of labelElements) {
+                            const style = getComputedStyle(labelElement)
+                            const labelRect = labelElement.getBoundingClientRect()
+                            if (
+                                style.display === 'none' ||
+                                labelElement.getAttribute('data-presence-wait-hidden') === 'true' ||
+                                labelElement.closest('[data-clone="true"]') ||
+                                labelRect.width <= 0 ||
+                                labelRect.height <= 0
+                            ) {
+                                continue
+                            }
+
+                            const buttonRect = buttonElement!.getBoundingClientRect()
+                            samples.push({
+                                buttonWidth: buttonRect.width,
+                                labelWidth: labelRect.width,
+                                labelOpacity: Number.parseFloat(style.opacity),
+                                labelText: labelElement.textContent?.trim() ?? '',
+                                centerDelta:
+                                    labelRect.left +
+                                    labelRect.width / 2 -
+                                    (buttonRect.left + buttonRect.width / 2),
+                                leftInset: labelRect.left - buttonRect.left,
+                                rightInset: buttonRect.right - labelRect.right
+                            })
+                        }
+
+                        if (performance.now() - started < 3600) requestAnimationFrame(frame)
+                        else resolve(samples)
+                    }
+                    requestAnimationFrame(frame)
+                })
+            }, prefix)
+
+            const readableCopiedSamples = samples.filter(
+                (sample) => sample.labelText.includes('copied') && sample.labelOpacity > 0.2
+            )
+            expect(readableCopiedSamples.length, prefix).toBeGreaterThan(5)
+
+            for (const sample of readableCopiedSamples) {
+                expect(Math.abs(sample.centerDelta), prefix).toBeLessThanOrEqual(1)
+                expect(Math.abs(sample.leftInset - sample.rightInset), prefix).toBeLessThanOrEqual(
+                    1
+                )
+            }
+        }
+    })
+
+    test('moves the readable active label without one-frame jumps', async ({ page }) => {
+        const prefixes = ['wait', 'sync', 'pop-layout']
+
+        for (const prefix of prefixes) {
+            await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+
+            const button = page.getByTestId(`${prefix}-button`)
+            await expect(button).toBeVisible()
+            await expect(button).toHaveText('copy')
+            await expect(button).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
+            await expectReadyCopyState(page, prefix)
+
+            await button.click()
+
+            const samples = await page.evaluate(async (testIdPrefix) => {
+                const samples: Array<{
+                    labelCenterX: number
+                    labelOpacity: number
+                    labelText: string
+                }> = []
+                const started = performance.now()
+
+                return await new Promise<typeof samples>((resolve) => {
+                    const frame = () => {
+                        const buttonElement = document.querySelector<HTMLElement>(
+                            `[data-testid="${testIdPrefix}-button"]`
+                        )
+                        const labelElements = buttonElement
+                            ? Array.from(buttonElement.querySelectorAll<HTMLElement>('.state'))
+                            : []
+
+                        for (const labelElement of labelElements) {
+                            const style = getComputedStyle(labelElement)
+                            const labelRect = labelElement.getBoundingClientRect()
+                            if (
+                                style.display === 'none' ||
+                                labelElement.getAttribute('data-presence-wait-hidden') === 'true' ||
+                                labelElement.closest('[data-clone="true"]') ||
+                                labelRect.width <= 0 ||
+                                labelRect.height <= 0
+                            ) {
+                                continue
+                            }
+
+                            samples.push({
+                                labelCenterX: labelRect.left + labelRect.width / 2,
+                                labelOpacity: Number.parseFloat(style.opacity),
+                                labelText: labelElement.textContent?.trim() ?? ''
+                            })
+                        }
+
+                        if (performance.now() - started < 3600) requestAnimationFrame(frame)
+                        else resolve(samples)
+                    }
+                    requestAnimationFrame(frame)
+                })
+            }, prefix)
+
+            const readableCopiedSamples = samples.filter(
+                (sample) => sample.labelText.includes('copied') && sample.labelOpacity > 0.2
+            )
+            expect(readableCopiedSamples.length, prefix).toBeGreaterThan(5)
+
+            for (let i = 1; i < readableCopiedSamples.length; i += 1) {
+                const movement = Math.abs(
+                    readableCopiedSamples[i].labelCenterX -
+                        readableCopiedSamples[i - 1].labelCenterX
+                )
+                expect(movement, prefix).toBeLessThanOrEqual(1)
+            }
+        }
+    })
+
+    test('animates button width instead of snapping to the final size', async ({ page }) => {
+        await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+
+        const button = page.getByTestId('wait-button')
+        await expect(button).toBeVisible()
+        await expect(button).toHaveText('copy')
+        await expect(button).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
+        await expectReadyCopyState(page, 'wait')
+
+        const baselineWidth = await button.evaluate(
+            (element) => element.getBoundingClientRect().width
+        )
+
+        await button.click()
+        await expect(page.getByTestId('wait-copied-state')).not.toHaveAttribute(
+            'data-presence-wait-hidden',
+            'true',
+            { timeout: 2500 }
+        )
+
+        const samples = await page.evaluate(async () => {
+            const buttonElement = document.querySelector<HTMLElement>('[data-testid="wait-button"]')
+            if (!buttonElement) throw new Error('missing wait button')
+
+            const widths: number[] = []
+            const started = performance.now()
+
+            return await new Promise<number[]>((resolve) => {
+                const frame = () => {
+                    widths.push(buttonElement.getBoundingClientRect().width)
+                    if (performance.now() - started < 2600) requestAnimationFrame(frame)
+                    else resolve(widths)
+                }
+                requestAnimationFrame(frame)
+            })
+        })
+
+        await page.waitForFunction(() => {
+            const buttonElement = document.querySelector<HTMLElement>('[data-testid="wait-button"]')
+            return buttonElement && buttonElement.style.width === ''
+        })
+
+        const settledWidth = await button.evaluate(
+            (element) => element.getBoundingClientRect().width
+        )
+        expect(settledWidth).toBeGreaterThan(baselineWidth + 4)
+
+        const intermediateWidths = samples.filter(
+            (width) => width > baselineWidth + 1 && width < settledWidth - 1
+        )
+        expect(intermediateWidths.length).toBeGreaterThan(3)
+        expect(Math.max(...samples)).toBeLessThanOrEqual(settledWidth + 2)
+    })
+
+    test('keeps wait-mode copied label at natural scale without width reversal', async ({
+        page
+    }) => {
+        await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+
+        const button = page.getByTestId('wait-button')
+        await expect(button).toBeVisible()
+        await expect(button).toHaveText('copy')
+        await expect(button).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
+        await expectReadyCopyState(page, 'wait')
+
+        const baselineWidth = await button.evaluate(
+            (element) => element.getBoundingClientRect().width
+        )
+
+        await button.click()
+        await expect(page.getByTestId('wait-copied-state')).not.toHaveAttribute(
+            'data-presence-wait-hidden',
+            'true',
+            { timeout: 2500 }
+        )
+
+        const samples = await page.evaluate(async () => {
+            type WidthSample = {
+                buttonWidth: number
+                buttonCenterX: number
+                buttonScaleX: number
+                labelCenterX: number
+                labelScaleX: number
+                labelOpacity: number
+                labelText: string
+            }
+
+            const parseScaleX = (transform: string): number => {
+                if (!transform || transform === 'none') return 1
+                const matrix = transform.match(/^matrix\(([^)]+)\)$/)
+                if (!matrix) return 1
+                const [a] = matrix[1].split(',').map((value) => Number.parseFloat(value.trim()))
+                return Number.isFinite(a) ? a : 1
+            }
+
+            const samples: WidthSample[] = []
+            const started = performance.now()
+
+            return await new Promise<WidthSample[]>((resolve) => {
+                const frame = () => {
+                    const buttonElement = document.querySelector<HTMLElement>(
+                        '[data-testid="wait-button"]'
+                    )
+                    const labelElement =
+                        buttonElement &&
+                        Array.from(buttonElement.querySelectorAll<HTMLElement>('.state')).find(
+                            (state) => {
+                                const style = getComputedStyle(state)
+                                const rect = state.getBoundingClientRect()
+                                return (
+                                    style.display !== 'none' &&
+                                    state.getAttribute('data-presence-wait-hidden') !== 'true' &&
+                                    !state.closest('[data-clone="true"]') &&
+                                    rect.width > 0 &&
+                                    rect.height > 0
+                                )
+                            }
+                        )
+
+                    if (buttonElement && labelElement) {
+                        const buttonStyle = getComputedStyle(buttonElement)
+                        const labelStyle = getComputedStyle(labelElement)
+                        const buttonRect = buttonElement.getBoundingClientRect()
+                        const labelRect = labelElement.getBoundingClientRect()
+                        samples.push({
+                            buttonWidth: buttonRect.width,
+                            buttonCenterX: buttonRect.left + buttonRect.width / 2,
+                            buttonScaleX: parseScaleX(buttonStyle.transform),
+                            labelCenterX: labelRect.left + labelRect.width / 2,
+                            labelScaleX: parseScaleX(labelStyle.transform),
+                            labelOpacity: Number.parseFloat(labelStyle.opacity),
+                            labelText: labelElement.textContent?.trim() ?? ''
+                        })
+                    }
+
+                    if (performance.now() - started < 3200) requestAnimationFrame(frame)
+                    else resolve(samples)
+                }
+                requestAnimationFrame(frame)
+            })
+        })
+
+        const visibleCopiedSamples = samples.filter(
+            (sample) => sample.labelText.includes('copied') && sample.labelOpacity > 0.2
+        )
+        expect(visibleCopiedSamples.length).toBeGreaterThan(10)
+
+        for (const sample of visibleCopiedSamples) {
+            expect(Math.abs(sample.buttonScaleX * sample.labelScaleX - 1)).toBeLessThanOrEqual(
+                0.001
+            )
+        }
+
+        const opaqueCopiedSamples = visibleCopiedSamples.filter(
+            (sample) => sample.labelOpacity >= 0.99
+        )
+        expect(opaqueCopiedSamples.length).toBeGreaterThan(5)
+
+        for (const sample of opaqueCopiedSamples) {
+            expect(Math.abs(sample.labelCenterX - sample.buttonCenterX)).toBeLessThanOrEqual(1)
+        }
+
+        const grownSamples = visibleCopiedSamples.filter(
+            (sample) => sample.buttonWidth > baselineWidth + 2
+        )
+        expect(grownSamples.length).toBeGreaterThan(5)
+
+        let largestSeenWidth = baselineWidth
+        for (const sample of visibleCopiedSamples) {
+            if (sample.buttonWidth > largestSeenWidth) {
+                largestSeenWidth = sample.buttonWidth
+            }
+            expect(sample.buttonWidth).toBeGreaterThanOrEqual(largestSeenWidth - 1)
+        }
+
+        const maxWidth = Math.max(...grownSamples.map((sample) => sample.buttonWidth))
+        const finalWidth = grownSamples.at(-1)?.buttonWidth ?? 0
+        expect(finalWidth).toBeGreaterThanOrEqual(maxWidth - 1)
+    })
+
+    test('coordinates layout participation by presence mode', async ({ page }) => {
+        await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+
+        const waitButton = page.getByTestId('wait-button')
+        const syncButton = page.getByTestId('sync-button')
+        const popLayoutButton = page.getByTestId('pop-layout-button')
+
+        await expect(waitButton).toHaveAttribute('data-layout', 'true', { timeout: 3000 })
+        await expect(syncButton).toHaveAttribute('data-layout', 'true')
+        await expect(popLayoutButton).toHaveAttribute('data-layout', 'true')
+
+        await waitButton.click()
+        await expect(page.getByTestId('wait-copied-state')).toHaveAttribute(
+            'data-presence-wait-hidden',
+            'true',
+            { timeout: 300 }
+        )
+        await expect(page.getByTestId('wait-copied-state')).not.toHaveAttribute(
+            'data-presence-wait-hidden',
+            'true',
+            { timeout: 2500 }
+        )
+
+        await syncButton.click()
+        await expect(page.getByTestId('sync-copied-state')).not.toHaveAttribute(
+            'data-presence-wait-hidden',
+            'true',
+            { timeout: 300 }
+        )
+        await expect(page.getByTestId('sync-button')).toContainText('copied', { timeout: 300 })
+
+        await popLayoutButton.click()
+        await expect(page.getByTestId('pop-layout-copied-state')).not.toHaveAttribute(
+            'data-presence-wait-hidden',
+            'true',
+            { timeout: 300 }
+        )
+        await expect(page.getByTestId('pop-layout-button')).toContainText('copied', {
+            timeout: 300
+        })
+        await expect(page.locator('[data-presence-placeholder="true"]')).toHaveCount(0)
+    })
+})

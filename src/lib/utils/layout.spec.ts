@@ -228,6 +228,39 @@ describe('utils/layout', () => {
         expect('y' in (keyframes as Record<string, unknown>)).toBe(false)
     })
 
+    it('runFlipAnimation: animates box size when scaling would distort layout descendants', async () => {
+        const el = document.createElement('button')
+        const child = document.createElement('span')
+        child.setAttribute('data-svelte-motion-layout', '')
+        el.appendChild(child)
+
+        let measureCount = 0
+        vi.spyOn(el, 'getBoundingClientRect').mockImplementation(() => {
+            measureCount += 1
+            return measureCount === 1 ? new DOMRect(100, 20, 80, 30) : new DOMRect(100, 20, 60, 30)
+        })
+
+        animateMock.mockClear()
+        runFlipAnimation(
+            el,
+            { dx: 0, dy: 0, sx: 0.75, sy: 1, shouldTranslate: false, shouldScale: true },
+            {}
+        )
+
+        expect(el.getAttribute('data-layout-size-animation')).toBe('true')
+        expect(el.style.width).toBe('60px')
+
+        const call = animateMock.mock.calls[0]
+        expect(call?.[0]).toBe(el)
+        const keyframes = call?.[1] as Record<string, unknown>
+        expect(keyframes).toMatchObject({ width: ['60px', '80px'], height: ['30px', '30px'] })
+        expect('scaleX' in keyframes).toBe(false)
+        expect(child.style.transform).toBe('')
+
+        await Promise.resolve()
+        expect(el.hasAttribute('data-layout-size-animation')).toBe(false)
+    })
+
     it('setCompositorHints: toggles styles', () => {
         const el = document.createElement('div')
         setCompositorHints(el, true)
@@ -285,7 +318,7 @@ describe('utils/layout', () => {
                     target: el,
                     options: expect.objectContaining({
                         attributes: true,
-                        attributeFilter: ['class', 'style']
+                        attributeFilter: ['class', 'style', 'data-presence-layout-hold']
                     })
                 })
             ])
@@ -374,6 +407,53 @@ describe('utils/layout', () => {
         // Teardown
         rafSpy.mockRestore()
         cafSpy.mockRestore()
+        vi.unstubAllGlobals()
+    })
+
+    it('observeLayoutChanges: ignores layout changes while an ancestor is box-size animating', () => {
+        const parent = document.createElement('div')
+        const el = document.createElement('div')
+        parent.setAttribute('data-layout-size-animation', 'true')
+        parent.appendChild(el)
+        el.style.transform = 'translateX(12px)'
+        el.style.transformOrigin = '0 0'
+        el.style.willChange = 'transform'
+        const cb = vi.fn()
+
+        class FakeResizeObserver {
+            private _cb: ResizeObserverCallback
+            constructor(cb2: ResizeObserverCallback) {
+                this._cb = cb2
+            }
+            observe() {
+                this._cb([], this as unknown as ResizeObserver)
+            }
+            disconnect() {}
+        }
+        class FakeMutationObserver {
+            private _cb: MutationCallback
+            constructor(cb2: MutationCallback) {
+                this._cb = cb2
+            }
+            observe() {
+                this._cb([], this as unknown as MutationObserver)
+            }
+            disconnect() {}
+        }
+        vi.stubGlobal('ResizeObserver', FakeResizeObserver as unknown as typeof ResizeObserver)
+        vi.stubGlobal(
+            'MutationObserver',
+            FakeMutationObserver as unknown as typeof MutationObserver
+        )
+
+        const cleanup = observeLayoutChanges(el, cb)
+
+        expect(cb).not.toHaveBeenCalled()
+        expect(el.style.transform).toBe('')
+        expect(el.style.transformOrigin).toBe('')
+        expect(el.style.willChange).toBe('')
+
+        cleanup()
         vi.unstubAllGlobals()
     })
 
