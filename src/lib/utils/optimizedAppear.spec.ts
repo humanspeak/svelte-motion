@@ -91,4 +91,23 @@ describe('optimizedAppear', () => {
         expect(cancel).toHaveBeenCalled()
         expect(window.MotionHandoffIsComplete?.('appear-2')).toBe(true)
     })
+
+    it('creates an SSR bootstrap script with one shared ready animation gate', () => {
+        const script = createOptimizedAppearScript('appear-3', [
+            {
+                name: 'opacity',
+                keyframes: [0, 1],
+                options: { duration: 300, fill: 'both' }
+            },
+            {
+                name: 'transform',
+                keyframes: ['scale(0)', 'scale(1)'],
+                options: { duration: 300, fill: 'both' }
+            }
+        ])
+
+        expect(script).toContain('if(!s.readyAnimation)')
+        expect(script).toContain('const r=s.readyAnimation')
+        expect(script).not.toContain('const key=k(p.id,a.name),ready=')
+    })
 })

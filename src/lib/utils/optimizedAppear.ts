@@ -25,6 +25,8 @@ type SvelteMotionAppearStore = {
     animations: Map<string, AppearStoreEntry>
     complete: Map<string, boolean>
     started: Array<{ id: string; name: string }>
+    readyAnimation?: Animation
+    startFrameTime?: number
 }
 
 type NativeEasing = Parameters<typeof mapEasingToNativeEasing>[0]
@@ -172,7 +174,7 @@ export const createOptimizedAppearScript = (
 ): string => {
     if (!appearId || entries.length === 0) return ''
     const payload = JSON.stringify({ id: appearId, entries }).replace(/</g, '\\u003c')
-    return `<script>(()=>{const p=${payload},w=window;if(w.MotionIsMounted)return;const q=String(p.id).replace(/["\\\\]/g,"\\\\$&");const e=document.querySelector('[${optimizedAppearDataAttribute}="'+q+'"]');if(!e||!e.animate)return;const s=w.__SvelteMotionAppear||(w.__SvelteMotionAppear={animations:new Map,complete:new Map,started:[]});const k=(id,n)=>id+": "+(n==="transform"?"transform":n);w.MotionHasOptimisedAnimation=w.MotionHasOptimisedAnimation||((id,n)=>id?n?s.animations.has(k(id,n)):s.complete.has(id):false);w.MotionHandoffMarkAsComplete=w.MotionHandoffMarkAsComplete||((id)=>{if(s.complete.has(id))s.complete.set(id,true)});w.MotionHandoffIsComplete=w.MotionHandoffIsComplete||((id)=>s.complete.get(id)===true);w.MotionCancelOptimisedAnimation=w.MotionCancelOptimisedAnimation||((id,n)=>{const key=k(id,n),d=s.animations.get(key);if(!d)return;d.animation.cancel();s.animations.delete(key);if(!s.animations.size)w.MotionCancelOptimisedAnimation=undefined});s.complete.set(p.id,false);const t=performance.now();for(const a of p.entries){const anim=e.animate({[a.name]:a.keyframes},a.options);anim.startTime=t;s.animations.set(k(p.id,a.name),{animation:anim,startTime:t});s.started.push({id:p.id,name:a.name})}})();</script>`
+    return `<script>(()=>{const p=${payload},w=window;if(w.MotionIsMounted)return;const q=String(p.id).replace(/["\\\\]/g,"\\\\$&");const e=document.querySelector('[${optimizedAppearDataAttribute}="'+q+'"]');if(!e||!e.animate)return;const s=w.__SvelteMotionAppear||(w.__SvelteMotionAppear={animations:new Map,complete:new Map,started:[]});const k=(id,n)=>id+": "+(n==="transform"?"transform":n);w.MotionHasOptimisedAnimation=w.MotionHasOptimisedAnimation||((id,n)=>id?n?s.animations.has(k(id,n)):s.complete.has(id):false);w.MotionHandoffMarkAsComplete=w.MotionHandoffMarkAsComplete||((id)=>{if(s.complete.has(id))s.complete.set(id,true)});w.MotionHandoffIsComplete=w.MotionHandoffIsComplete||((id)=>s.complete.get(id)===true);w.MotionCancelOptimisedAnimation=w.MotionCancelOptimisedAnimation||((id,n)=>{const key=k(id,n),d=s.animations.get(key);if(!d)return;d.animation.cancel();s.animations.delete(key);if(!s.animations.size)w.MotionCancelOptimisedAnimation=undefined});s.complete.set(p.id,false);for(const a of p.entries){const key=k(p.id,a.name);if(!s.readyAnimation){s.readyAnimation=e.animate({[a.name]:[a.keyframes[0],a.keyframes[0]]},{duration:1e4,easing:"linear",fill:"both"});s.animations.set(key,{animation:s.readyAnimation,startTime:null})}const start=()=>{s.readyAnimation.cancel();let t=s.startFrameTime;if(t===undefined){t=performance.now();s.startFrameTime=t}const anim=e.animate({[a.name]:a.keyframes},a.options);anim.startTime=t;s.animations.set(key,{animation:anim,startTime:t});s.started.push({id:p.id,name:a.name})};const r=s.readyAnimation;r.ready?r.ready.then(start).catch(()=>{}):start()}})();</script>`
 }
 
 /**
@@ -202,13 +204,32 @@ export const startOptimizedAppearAnimation = (
     const store = getAppearStore()
     if (!store) return
 
-    const animation = startWaapiAnimation(element, name, keyframes, options as never)
-    const startTime = performance.now()
-    animation.startTime = startTime
+    const storeId = appearStoreId(id, name)
+    if (!store.readyAnimation) {
+        store.readyAnimation = startWaapiAnimation(element, name, [keyframes[0], keyframes[0]], {
+            duration: 10000,
+            ease: 'linear'
+        } as never)
+        store.animations.set(storeId, { animation: store.readyAnimation, startTime: null })
+    }
+
+    const startAnimation = () => {
+        store.readyAnimation?.cancel()
+        store.startFrameTime ??= performance.now()
+        const animation = startWaapiAnimation(element, name, keyframes, options as never)
+        animation.startTime = store.startFrameTime
+        store.animations.set(storeId, { animation, startTime: store.startFrameTime })
+        store.started.push({ id, name })
+        onReady?.(animation)
+    }
+
     store.complete.set(id, false)
-    store.animations.set(appearStoreId(id, name), { animation, startTime })
-    store.started.push({ id, name })
-    onReady?.(animation)
+    const readyAnimation = store.readyAnimation
+    if (readyAnimation.ready) {
+        readyAnimation.ready.then(startAnimation).catch(() => {})
+    } else {
+        startAnimation()
+    }
 }
 
 /**
@@ -252,14 +273,17 @@ export const finishOptimizedAppearAnimation = async (
     const store = getAppearStore()
     if (!store) return false
 
-    const entries = [...store.animations].filter(([key]) => key.startsWith(`${elementId}: `))
+    let entries = [...store.animations].filter(([key]) => key.startsWith(`${elementId}: `))
     if (!entries.length) return false
 
     await Promise.all(
-        entries.map(([, data]) => {
-            return data.animation.finished.catch(() => undefined)
-        })
+        entries.map(([, data]) =>
+            data.startTime === null ? data.animation.ready?.catch(() => undefined) : undefined
+        )
     )
+
+    entries = [...store.animations].filter(([key]) => key.startsWith(`${elementId}: `))
+    await Promise.all(entries.map(([, data]) => data.animation.finished.catch(() => undefined)))
 
     for (const [key, data] of entries) {
         if (!store.animations.has(key)) continue
