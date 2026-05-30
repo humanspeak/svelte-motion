@@ -1,8 +1,17 @@
 import { render } from '@testing-library/svelte'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import MotionContainer from './_MotionContainer.svelte'
 
 describe('_MotionContainer SSR styles', () => {
+    beforeEach(() => {
+        window.MotionIsMounted = false
+        window.MotionHasOptimisedAnimation = undefined
+        window.MotionHandoffMarkAsComplete = undefined
+        window.MotionHandoffIsComplete = undefined
+        window.MotionCancelOptimisedAnimation = undefined
+        window.__SvelteMotionAppear = undefined
+    })
+
     it('reflects initial styles in SSR output (opacity/borderRadius)', () => {
         /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {

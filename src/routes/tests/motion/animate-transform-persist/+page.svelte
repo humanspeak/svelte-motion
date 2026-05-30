@@ -1,6 +1,8 @@
 <script lang="ts">
     import { motion } from '$lib'
 
+    let { data }: { data: { slow: boolean } } = $props()
+
     // Regression route for #377 — transform shortcuts must persist as inline
     // style after the WAAPI animation completes (default fill:'none' otherwise
     // surrenders the property, leaving transform:none).
@@ -13,13 +15,9 @@
     //   • x [0,120,60]    (keyframe array — rests at the LAST element, 60)
     //
     // A slower transition gives e2e room to sample a mid-animation frame and
-    // confirm it actually animates (no snap-to-target). `?slow` stretches it
-    // to 4s for frame-by-frame debugging of transient glitches.
-    // `?slow` stretches the animation to 4s so the enter motion can be
-    // watched (and frame-sampled by e2e) instead of completing in 0.6s.
-    const slow =
-        typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('slow')
-    const transition = { duration: slow ? 4 : 0.6, ease: 'linear' } as const
+    // confirm it actually animates (no snap-to-target). Read via load() so SSR
+    // optimized-appear scripts and hydrated state use the same duration.
+    const transition = $derived({ duration: data.slow ? 4 : 0.6, ease: 'linear' } as const)
 </script>
 
 <svelte:head>

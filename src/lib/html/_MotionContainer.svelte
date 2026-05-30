@@ -611,6 +611,24 @@
             ? optimizedAppearScript
             : ''
     )
+    const applyAnimateRestingStyle = () => {
+        if (!element) return
+        const restingValues = resolveRestingValues(
+            animateKeyframes as DOMKeyframesDefinition | undefined
+        ) as Record<string, unknown> | undefined
+        if (!restingValues) return
+        element.setAttribute(
+            'style',
+            mergeInlineStyles(element.getAttribute('style') ?? '', undefined, restingValues)
+        )
+    }
+    const isJsdomRuntime = (): boolean =>
+        typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
+    const getTransitionFallbackMs = (transition: AnimationOptions | undefined): number => {
+        const duration = typeof transition?.duration === 'number' ? transition.duration : 0
+        const delay = typeof transition?.delay === 'number' ? transition.delay : 0
+        return Math.max(0, (duration + delay) * 1000)
+    }
     // Wait-mode enter coordination needs to affect the first rendered attrs,
     // before the blocked entrant can participate in layout.
     let waitCallbackRegistered = $state(false)
@@ -981,19 +999,30 @@
 
         // A fresh run owns the transform again until it completes.
         enterAnimationSettled = false
+        const completeEnterAnimation = (
+            def: DOMKeyframesDefinition | undefined = payload as unknown as DOMKeyframesDefinition
+        ) => {
+            if (enterAnimationSettled) return
+            // Now the target is the resting state — promote it to the
+            // inline baseline so it persists after WAAPI surrenders the
+            // property (default fill:'none'). (#377)
+            applyAnimateRestingStyle()
+            enterAnimationSettled = true
+            onAnimationCompleteProp?.(def)
+        }
         animateWithLifecycle(
             element,
             payload as unknown as DOMKeyframesDefinition,
             transitionAnimate as unknown as AnimationOptions,
             (def) => onAnimationStartProp?.(def as unknown as DOMKeyframesDefinition | undefined),
-            (def) => {
-                // Now the target is the resting state — promote it to the
-                // inline baseline so it persists after WAAPI surrenders the
-                // property (default fill:'none'). (#377)
-                enterAnimationSettled = true
-                onAnimationCompleteProp?.(def as unknown as DOMKeyframesDefinition | undefined)
-            }
+            (def) => completeEnterAnimation(def as unknown as DOMKeyframesDefinition | undefined)
         )
+        if (isJsdomRuntime()) {
+            window.setTimeout(
+                () => completeEnterAnimation(),
+                getTransitionFallbackMs(transitionAnimate as AnimationOptions)
+            )
+        }
     }
 
     // Cleanup wait callback on component unmount to prevent memory leaks
@@ -1763,6 +1792,7 @@
                     }
                     finishOptimizedAppearAnimation(optimizedAppearId)
                         .then(() => {
+                            applyAnimateRestingStyle()
                             enterAnimationSettled = true
                             isLoaded = 'ready'
                             onAnimationCompleteProp?.(
