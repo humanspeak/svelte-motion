@@ -133,6 +133,14 @@
                         Transform persistence (#377)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/optimized-appear') + searchParams}
+                    >
+                        Optimized appear animations
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
@@ -245,6 +253,14 @@
                         href={resolve('/tests/animate-presence/modes') + searchParams}
                     >
                         Modes (sync/wait/popLayout)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/layout-button') + searchParams}
+                    >
+                        Layout button content swap
                     </a>
                 </li>
             </ul>

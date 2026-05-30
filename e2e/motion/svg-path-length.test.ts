@@ -97,24 +97,25 @@ test.describe('SVG pathLength Animation', () => {
             .toBe(true)
 
         // After animation progresses, stroke-dasharray first value should increase
+        // while pathSpacing remains at upstream's default `1`.
         await expect
             .poll(
                 async () => {
                     const dasharray = await getStrokeDasharray()
                     if (dasharray === 'none') return false
                     const values = dasharray.split(/[\s,]+/).map((v) => parseFloat(v))
-                    // First value should be significantly larger than 0
-                    return values[0] > 0.3
+                    // First value should be significantly larger than 0 and the gap should remain 1.
+                    return values[0] > 0.3 && values[1] > 0.95
                 },
                 {
                     message:
-                        'strokeDasharray first value should increase during animation (line drawing)',
+                        'strokeDasharray should increase while preserving default pathSpacing=1',
                     timeout: 2500
                 }
             )
             .toBe(true)
 
-        // At the end, stroke-dasharray should be approximately "1px 0px" (fully drawn)
+        // At the end, stroke-dasharray should be approximately "1 1" (fully drawn)
         await expect
             .poll(
                 async () => {
@@ -122,11 +123,24 @@ test.describe('SVG pathLength Animation', () => {
                     if (dasharray === 'none') return false
                     const values = dasharray.split(/[\s,]+/).map((v) => parseFloat(v))
                     // First value should be close to 1 (fully drawn) in normalized units
-                    return values[0] > 0.9
+                    return values[0] > 0.9 && values[1] > 0.95
                 },
                 {
-                    message: 'stroke-dasharray should end near "1px 0px" for fully drawn path',
+                    message: 'stroke-dasharray should end near "1 1" for fully drawn path',
                     timeout: 3000
+                }
+            )
+            .toBe(true)
+
+        await expect
+            .poll(
+                async () =>
+                    await path.evaluate(
+                        (el) => !el.style.strokeDasharray && !el.style.strokeDashoffset
+                    ),
+                {
+                    message: 'SVG path drawing should be attribute-driven, not pinned as style',
+                    timeout: 1000
                 }
             )
             .toBe(true)

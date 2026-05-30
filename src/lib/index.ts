@@ -72,6 +72,10 @@ export type { MotionTemplateInput } from '$lib/utils/motionTemplate.svelte'
 export { useMotionValue } from '$lib/utils/motionValue.svelte'
 export type { MotionValue, RawMotionValue } from '$lib/utils/motionValue.svelte'
 export { useMotionValueEvent } from '$lib/utils/motionValueEvent'
+export {
+    optimizedAppearDataAttribute,
+    startOptimizedAppearAnimation
+} from '$lib/utils/optimizedAppear'
 export { useReducedMotion } from '$lib/utils/reducedMotion.svelte'
 export type { ReducedMotionState } from '$lib/utils/reducedMotion.svelte'
 export { useReducedMotionConfig } from '$lib/utils/reducedMotionConfig.svelte'

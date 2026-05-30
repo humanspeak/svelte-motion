@@ -31,6 +31,7 @@ type PresenceChild = {
     mergedTransition?: MotionTransition
     lastRect: DOMRect
     lastComputedStyle: CSSStyleDeclaration
+    layoutInsertion?: { parent: HTMLElement; before?: HTMLElement }
     /** Last captured mid-animation opacity (from rAF polling). */
     lastAnimatedOpacity?: string
     /** Last captured mid-animation transform (from rAF polling). */
@@ -59,6 +60,20 @@ const resetTransforms = (element: HTMLElement): void => {
     ;(s as any).OTransform = 'none'
 }
 
+const findLayoutInsertionParent = (
+    element: HTMLElement
+): { parent: HTMLElement; before?: HTMLElement } | null => {
+    let before = element
+    let parent = element.parentElement
+
+    while (parent && getComputedStyle(parent).display === 'contents') {
+        before = parent
+        parent = parent.parentElement
+    }
+
+    return parent ? { parent, before } : null
+}
+
 /**
  * Presence context API used by `AnimatePresence` and motion elements.
  * Consumers register/unregister children and provide size/style snapshots
@@ -76,10 +91,11 @@ export type AnimatePresenceContext = {
      */
     shouldAnimateEnter: (key: string) => boolean
     /**
-     * For mode='wait': Returns true if enters should be blocked (exits in progress).
+     * For mode='wait': Returns true if enters should be blocked by an exiting
+     * or currently-present sibling.
      * Motion elements should delay their enter animation until this returns false.
      */
-    isEnterBlocked: () => boolean
+    isEnterBlocked: (key?: string) => boolean
     /**
      * For mode='wait': Register a callback to be invoked when enters are unblocked.
      * Returns an unsubscribe function.
@@ -231,10 +247,22 @@ export const createAnimatePresenceContext = (context: {
      * }
      * ```
      */
-    const isEnterBlocked = (): boolean => {
-        // For wait mode, block enters only when there are actual in-flight exits
-        const blocked = mode === 'wait' && inFlightExits > 0
-        pwLog('[presence] isEnterBlocked', { blocked, mode, inFlightExits })
+    const isEnterBlocked = (key?: string): boolean => {
+        if (mode !== 'wait') {
+            pwLog('[presence] isEnterBlocked', { blocked: false, mode, inFlightExits, key })
+            return false
+        }
+
+        const hasBlockingSibling =
+            key !== undefined && Array.from(children.keys()).some((childKey) => childKey !== key)
+        const blocked = inFlightExits > 0 || hasBlockingSibling
+        pwLog('[presence] isEnterBlocked', {
+            blocked,
+            mode,
+            inFlightExits,
+            key,
+            hasBlockingSibling
+        })
         return blocked
     }
 
@@ -403,7 +431,8 @@ export const createAnimatePresenceContext = (context: {
             exit,
             mergedTransition,
             lastRect: initialRect,
-            lastComputedStyle: initialStyle
+            lastComputedStyle: initialStyle,
+            layoutInsertion: findLayoutInsertionParent(element) ?? undefined
         })
     }
 
@@ -462,12 +491,15 @@ export const createAnimatePresenceContext = (context: {
         const rect = child.lastRect
         const computed = child.lastComputedStyle
 
-        // For sync/wait, preserve layout by inserting a hidden placeholder.
-        // For popLayout, we remove from layout immediately (no placeholder).
-        const shouldPreserveLayout = mode !== 'popLayout'
+        // Wait mode holds the exiting layout slot while the entering child is hidden.
+        // Sync and popLayout must not add an extra layout participant.
+        const shouldPreserveLayout = mode === 'wait'
         let placeholder: HTMLElement | null = null
-        const layoutParent = child.element.parentElement
-        if (shouldPreserveLayout && layoutParent) {
+        const liveLayoutInsertion = findLayoutInsertionParent(child.element)
+        const layoutInsertion =
+            liveLayoutInsertion ??
+            (child.layoutInsertion?.parent.isConnected ? child.layoutInsertion : null)
+        if (shouldPreserveLayout && layoutInsertion) {
             placeholder = document.createElement(child.element.tagName.toLowerCase())
             placeholder.setAttribute('data-presence-placeholder', 'true')
             placeholder.style.display = computed.display === 'contents' ? 'block' : computed.display
@@ -484,7 +516,23 @@ export const createAnimatePresenceContext = (context: {
             if (computed.alignSelf) {
                 placeholder.style.alignSelf = computed.alignSelf
             }
-            layoutParent.insertBefore(placeholder, child.element)
+            if (computed.gridColumnStart) {
+                placeholder.style.gridColumnStart = computed.gridColumnStart
+            }
+            if (computed.gridColumnEnd) {
+                placeholder.style.gridColumnEnd = computed.gridColumnEnd
+            }
+            if (computed.gridRowStart) {
+                placeholder.style.gridRowStart = computed.gridRowStart
+            }
+            if (computed.gridRowEnd) {
+                placeholder.style.gridRowEnd = computed.gridRowEnd
+            }
+            const before =
+                layoutInsertion.before?.parentElement === layoutInsertion.parent
+                    ? layoutInsertion.before
+                    : null
+            layoutInsertion.parent.insertBefore(placeholder, before)
         }
 
         // Clone original node to preserve structure/classes, then inline computed styles to freeze look
@@ -624,7 +672,6 @@ export const createAnimatePresenceContext = (context: {
                         // ignore
                     }
                     clone.remove()
-                    placeholder?.remove()
 
                     // Log clone removal and element counts for debugging rapid toggle
                     pwLog('[presence] clone REMOVED from DOM', {
@@ -656,6 +703,7 @@ export const createAnimatePresenceContext = (context: {
                         clonesInDOM: document.querySelectorAll('[data-clone="true"]').length
                     })
 
+                    placeholder?.remove()
                     finishExit()
                 })
         })

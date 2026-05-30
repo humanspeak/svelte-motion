@@ -1,5 +1,125 @@
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 
+const layoutSizeAnimationAttribute = 'data-layout-size-animation'
+
+const px = (value: number): string => `${Math.max(0, value)}px`
+
+const isViewportOffscreen = (el: HTMLElement): boolean => {
+    if (typeof window === 'undefined') return false
+
+    const rect = el.getBoundingClientRect()
+    return (
+        rect.bottom <= 0 ||
+        rect.right <= 0 ||
+        rect.top >= window.innerHeight ||
+        rect.left >= window.innerWidth
+    )
+}
+
+const runBoxSizeAnimation = (
+    el: HTMLElement,
+    transforms: {
+        dx: number
+        dy: number
+        sx: number
+        sy: number
+    },
+    transition: AnimationOptions
+) => {
+    const { dx, dy, sx, sy } = transforms
+    const originalWidth = el.style.width
+    const originalHeight = el.style.height
+    const originalTransform = el.style.transform
+    const originalTransformOrigin = el.style.transformOrigin
+
+    const nextRect = el.getBoundingClientRect()
+    const prevWidth = nextRect.width * sx
+    const prevHeight = nextRect.height * sy
+
+    el.setAttribute(layoutSizeAnimationAttribute, 'true')
+    for (const child of el.querySelectorAll<HTMLElement>('[data-svelte-motion-layout]')) {
+        child.style.transform = ''
+        child.style.transformOrigin = ''
+        if (child.style.willChange === 'transform') child.style.willChange = ''
+    }
+    el.style.width = px(prevWidth)
+    el.style.height = px(prevHeight)
+
+    const sizedRect = el.getBoundingClientRect()
+    const residualDx = nextRect.left + dx - sizedRect.left
+    const residualDy = nextRect.top + dy - sizedRect.top
+    const shouldTranslate = Math.abs(residualDx) > 0.5 || Math.abs(residualDy) > 0.5
+
+    const keyframes: Record<string, unknown> = {
+        width: [px(prevWidth), px(nextRect.width)],
+        height: [px(prevHeight), px(nextRect.height)]
+    }
+
+    if (shouldTranslate) {
+        keyframes.x = [residualDx, 0]
+        keyframes.y = [residualDy, 0]
+        el.style.transformOrigin = '0 0'
+        el.style.transform = `translate(${residualDx}px, ${residualDy}px)`
+    }
+
+    const animation = animate(el, keyframes as unknown as DOMKeyframesDefinition, transition)
+
+    let removeScrollListener: (() => void) | undefined
+    let offscreenRaf: number | null = null
+    let cleanupRan = false
+    const cleanup = () => {
+        if (cleanupRan) return
+        cleanupRan = true
+        removeScrollListener?.()
+        if (
+            offscreenRaf !== null &&
+            typeof window !== 'undefined' &&
+            typeof window.cancelAnimationFrame === 'function'
+        ) {
+            window.cancelAnimationFrame(offscreenRaf)
+            offscreenRaf = null
+        }
+        el.style.width = originalWidth
+        el.style.height = originalHeight
+        el.style.transformOrigin = originalTransformOrigin
+        el.style.transform = originalTransform
+        el.removeAttribute(layoutSizeAnimationAttribute)
+    }
+
+    if (typeof window !== 'undefined') {
+        const completeIfOffscreen = () => {
+            if (cleanupRan) return
+            if (isViewportOffscreen(el)) {
+                animation.complete()
+                cleanup()
+            }
+        }
+        const scheduleCompleteIfOffscreen = () => {
+            if (typeof window.requestAnimationFrame !== 'function') {
+                completeIfOffscreen()
+                return
+            }
+            if (offscreenRaf !== null) return
+            offscreenRaf = window.requestAnimationFrame(() => {
+                offscreenRaf = null
+                completeIfOffscreen()
+            })
+        }
+        const handleScroll = () => {
+            completeIfOffscreen()
+            scheduleCompleteIfOffscreen()
+        }
+        window.addEventListener('scroll', handleScroll, { passive: true })
+        removeScrollListener = () => {
+            window.removeEventListener('scroll', handleScroll)
+        }
+        completeIfOffscreen()
+        scheduleCompleteIfOffscreen()
+    }
+
+    animation.finished?.finally(cleanup)
+}
+
 /**
  * Measure an element's bounding client rect without current transform.
  *
@@ -7,11 +127,13 @@ import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'mot
  * immediately after reading the rect.
  *
  * When `scrollContainers` are provided, the returned rect is shifted by the
- * **sum** of each container's `scrollLeft` / `scrollTop`. FLIP deltas
- * computed from two such measures stay correct even when the user scrolls
- * any of the containers between measurements — including a nested
- * `layoutScroll` inside another `layoutScroll`. Mirrors framer-motion's
- * `removeElementScroll`, which walks every ancestor in the path.
+ * **sum** of each container's `scrollLeft` / `scrollTop`. When
+ * `includeViewportScroll` is true, the viewport's `window.scrollX` /
+ * `window.scrollY` is included too. FLIP deltas computed from two such
+ * measures stay correct even when the user scrolls between measurements —
+ * including a nested `layoutScroll` inside another `layoutScroll`. Mirrors
+ * framer-motion's `removeElementScroll`, which walks every ancestor in the
+ * path, plus root scroll compensation from the projection tree.
  *
  * Pass an empty array (or omit) for viewport-relative behaviour.
  *
@@ -28,6 +150,7 @@ import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'mot
  * @param el Element to measure.
  * @param scrollContainers Optional ancestor chain with `layoutScroll` enabled.
  * @param baseTransform Transform string applied during measurement. Defaults to `'none'`.
+ * @param includeViewportScroll Whether to include `window.scrollX/Y` in the returned rect.
  * @returns DOMRect snapshot of the element.
  *
  * @example
@@ -45,19 +168,28 @@ import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'mot
 export const measureRect = (
     el: HTMLElement,
     scrollContainers?: HTMLElement[],
-    baseTransform = 'none'
+    baseTransform = 'none',
+    includeViewportScroll = false
 ): DOMRect => {
     const prev = el.style.transform
     try {
         el.style.transform = baseTransform
         const rect = el.getBoundingClientRect()
-        if (!scrollContainers || scrollContainers.length === 0) return rect
+        let offsetLeft = includeViewportScroll && typeof window !== 'undefined' ? window.scrollX : 0
+        let offsetTop = includeViewportScroll && typeof window !== 'undefined' ? window.scrollY : 0
+        if (!scrollContainers || scrollContainers.length === 0) {
+            if (offsetLeft === 0 && offsetTop === 0) return rect
+            return new DOMRect(
+                rect.left + offsetLeft,
+                rect.top + offsetTop,
+                rect.width,
+                rect.height
+            )
+        }
         // Re-express the rect in the *combined* scroll-container coordinate
         // space so a subsequent scroll on any of them doesn't show up as
         // movement. DOMRect's left/top are read-only, so allocate a fresh
         // one with the summed offsets applied.
-        let offsetLeft = 0
-        let offsetTop = 0
         for (const container of scrollContainers) {
             offsetLeft += container.scrollLeft
             offsetTop += container.scrollTop
@@ -137,6 +269,15 @@ export const runFlipAnimation = (
     const { dx, dy, sx, sy, shouldTranslate, shouldScale } = transforms
     if (!(shouldTranslate || shouldScale)) return
 
+    const correctionTargets = shouldScale
+        ? Array.from(el.querySelectorAll<HTMLElement>('[data-svelte-motion-layout]'))
+        : []
+
+    if (shouldScale && correctionTargets.length > 0) {
+        runBoxSizeAnimation(el, { dx, dy, sx, sy }, transition)
+        return
+    }
+
     const keyframes: Record<string, unknown> = {}
     if (shouldTranslate) {
         keyframes.x = [dx, 0]
@@ -184,6 +325,12 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
     let releaseTimeout: ReturnType<typeof setTimeout> | null = null
 
     const schedule = () => {
+        if (el.closest(`[${layoutSizeAnimationAttribute}]`)) {
+            el.style.transform = ''
+            el.style.transformOrigin = ''
+            if (el.style.willChange === 'transform') el.style.willChange = ''
+            return
+        }
         if (pendingRaf !== null || releaseTimeout !== null) return
         // Leading-edge: call immediately, then throttle further calls until next frame (or 50ms)
         onChange()
@@ -199,14 +346,23 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
     }
     const ro = new ResizeObserver(() => schedule())
     ro.observe(el)
-    const mo = new MutationObserver(() => schedule())
-    mo.observe(el, { attributes: true, attributeFilter: ['class', 'style'] })
+    const attributeObserver = new MutationObserver(() => schedule())
+    attributeObserver.observe(el, {
+        attributes: true,
+        attributeFilter: ['class', 'style', 'data-presence-layout-hold']
+    })
+    const childListObserver = new MutationObserver(() => schedule())
+    childListObserver.observe(el, {
+        childList: true,
+        subtree: true
+    })
     if (el.parentElement) {
-        mo.observe(el.parentElement, { childList: true, subtree: false, attributes: true })
+        childListObserver.observe(el.parentElement, { childList: true, subtree: false })
     }
     return () => {
         ro.disconnect()
-        mo.disconnect()
+        attributeObserver.disconnect()
+        childListObserver.disconnect()
         if (pendingRaf !== null && typeof cancelAnimationFrame === 'function') {
             cancelAnimationFrame(pendingRaf)
             pendingRaf = null

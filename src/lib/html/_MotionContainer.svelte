@@ -28,6 +28,7 @@
     import { isNotEmpty } from '$lib/utils/objects'
     import { sleep } from '$lib/utils/testing'
     import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
+    import { motionValue, svgEffect, type MotionValue } from 'motion-dom'
     import { isPlaywrightEnv, pwLog } from '$lib/utils/log'
     import { onDestroy, untrack, type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants'
@@ -58,6 +59,11 @@
     import { attachPan, type AttachPanCleanup } from '$lib/utils/pan'
     import { ProjectionNode } from '$lib/utils/projection'
     import { getProjectionParent, setProjectionParent } from '$lib/components/projection.context'
+    import { MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
+    import {
+        getMotionDomProjectionParent,
+        setMotionDomProjectionParent
+    } from '$lib/components/motionDomProjection.context'
     import {
         resolveInitial,
         resolveAnimate,
@@ -77,9 +83,19 @@
     import {
         transformSVGPathProperties,
         computeNormalizedSVGInitialAttrs,
+        hasSVGPathProperties,
+        isSVGPathElement,
         isSVGTag,
         SVG_NAMESPACE
     } from '$lib/utils/svg'
+    import {
+        createOptimizedAppearData,
+        createOptimizedAppearScript,
+        finishOptimizedAppearAnimation,
+        hasOptimizedAppearAnimation,
+        markMotionMounted,
+        optimizedAppearDataAttribute
+    } from '$lib/utils/optimizedAppear'
     import { getLayoutIdRegistry } from '$lib/utils/layoutId'
     import {
         getLayoutScrollContainerRef,
@@ -92,6 +108,8 @@
         tag: keyof SvelteHTMLElements
         [key: string]: unknown
     }
+
+    const componentHydrationId = $props.id()
 
     let {
         children,
@@ -234,6 +252,18 @@
     })
     setProjectionParent(projection)
 
+    const motionDomProjectionParent =
+        typeof window !== 'undefined' ? getMotionDomProjectionParent() : null
+    const motionDomProjection =
+        typeof window !== 'undefined'
+            ? new MotionDomProjectionAdapter({
+                  parent: motionDomProjectionParent
+              })
+            : null
+    if (motionDomProjection) {
+        setMotionDomProjectionParent(motionDomProjection)
+    }
+
     // Convert a projection `Box` (ancestor chain reset to base, self
     // transform stripped, scroll containers compensated) to the
     // `RectLike` shape `computeFlipTransforms` consumes.
@@ -246,9 +276,20 @@
         width: box.x.max - box.x.min,
         height: box.y.max - box.y.min
     })
+    const domRectToRectLike = (rect: DOMRect): RectLike => ({
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height
+    })
+    const isViewportOffscreen = (rect: DOMRect): boolean =>
+        rect.bottom <= 0 ||
+        rect.right <= 0 ||
+        rect.top >= window.innerHeight ||
+        rect.left >= window.innerWidth
 
     // Ancestor-transform-invariant layout measurement for seeding the
-    // FLIP effect's first rect.
+    // fallback FLIP effect's first rect.
     const measureLayoutRect = (): RectLike | null => {
         const box = projection.measure()
         return box ? boxToRectLike(box) : null
@@ -551,6 +592,173 @@
             reducedMotion
         )
     )
+    const optimizedAppearId = $derived(
+        effectiveInitialProp !== false &&
+            isNotEmpty(initialKeyframes) &&
+            isNotEmpty(animateKeyframes)
+            ? `svelte-motion-${componentHydrationId}`
+            : undefined
+    )
+    const optimizedAppearEntries = $derived(
+        createOptimizedAppearData(
+            initialKeyframes as Record<string, unknown> | undefined,
+            animateKeyframes as Record<string, unknown> | undefined,
+            mergedTransition
+        )
+    )
+    const optimizedAppearScript = $derived(
+        createOptimizedAppearScript(optimizedAppearId, optimizedAppearEntries)
+    )
+    const renderedOptimizedAppearScript = $derived(
+        optimizedAppearScript && (typeof window === 'undefined' || !window.MotionIsMounted)
+            ? optimizedAppearScript
+            : ''
+    )
+    const applyAnimateRestingStyle = () => {
+        if (!element) return
+        const restingValues = resolveRestingValues(
+            animateKeyframes as DOMKeyframesDefinition | undefined
+        ) as Record<string, unknown> | undefined
+        if (!restingValues) return
+        element.setAttribute(
+            'style',
+            mergeInlineStyles(element.getAttribute('style') ?? '', undefined, restingValues)
+        )
+    }
+    const isJsdomRuntime = (): boolean =>
+        typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
+    const getTransitionFallbackMs = (transition: AnimationOptions | undefined): number => {
+        const duration = typeof transition?.duration === 'number' ? transition.duration : 0
+        const delay = typeof transition?.delay === 'number' ? transition.delay : 0
+        return Math.max(0, (duration + delay) * 1000)
+    }
+    let cleanupSVGPathAttributeEffect: (() => void) | null = null
+
+    /**
+     * Reads the current normalized SVG path drawing state from DOM
+     * attributes. `motion-dom`'s svgEffect owns future writes; this only
+     * seeds its MotionValues from the currently rendered frame.
+     *
+     * @param {SVGPathElement} path The SVG path element to inspect.
+     * @returns {{ pathLength: number; pathSpacing: number; pathOffset: number }} The normalized drawing state.
+     */
+    const readSVGPathDrawingState = (
+        path: SVGPathElement
+    ): { pathLength: number; pathSpacing: number; pathOffset: number } => {
+        const dashArray =
+            path.getAttribute('stroke-dasharray') || path.style.strokeDasharray || '1 0'
+        const [rawLength, rawSpacing] = dashArray
+            .split(/[,\s]+/)
+            .filter(Boolean)
+            .map((part) => Number.parseFloat(part))
+        const rawOffset = Number.parseFloat(
+            path.getAttribute('stroke-dashoffset') || path.style.strokeDashoffset || '0'
+        )
+
+        return {
+            pathLength: Number.isFinite(rawLength) ? rawLength : 1,
+            pathSpacing: Number.isFinite(rawSpacing) ? rawSpacing : 1,
+            pathOffset: Number.isFinite(rawOffset) ? -rawOffset : 0
+        }
+    }
+
+    /**
+     * Removes custom SVG path props from keyframes after `svgEffect` has
+     * taken ownership of them.
+     *
+     * @param {Record<string, unknown>} keyframes Keyframes to copy.
+     * @returns {Record<string, unknown>} Keyframes without SVG path-only props.
+     */
+    const stripSVGPathKeyframes = (keyframes: Record<string, unknown>): Record<string, unknown> => {
+        const stripped = { ...keyframes }
+        delete stripped.pathLength
+        delete stripped.pathSpacing
+        delete stripped.pathOffset
+        return stripped
+    }
+
+    /**
+     * Extracts an animation completion promise from a Motion control when
+     * one is available.
+     *
+     * @param {unknown} control The return value from `animate`.
+     * @returns {Promise<unknown> | null} The finished promise, or null.
+     */
+    const getFinishedPromise = (control: unknown): Promise<unknown> | null => {
+        if (!control || typeof control !== 'object') return null
+        const finished = (control as { finished?: unknown }).finished
+        return finished && typeof (finished as Promise<unknown>).then === 'function'
+            ? (finished as Promise<unknown>)
+            : null
+    }
+
+    /**
+     * Animates SVG path drawing props via motion-dom's `svgEffect`, matching
+     * upstream's attribute-based pathLength/pathSpacing/pathOffset behavior.
+     *
+     * @param {SVGPathElement} path The path element to animate.
+     * @param {Record<string, unknown>} keyframes Keyframes containing SVG path props.
+     * @param {MotionTransition} transition The transition to apply to generated MotionValues.
+     * @returns {Promise<unknown>[]} Promises for generated path animations.
+     */
+    const animateSVGPathAttributes = (
+        path: SVGPathElement,
+        keyframes: Record<string, unknown>,
+        transition: MotionTransition
+    ): Promise<unknown>[] => {
+        if (!hasSVGPathProperties(keyframes)) return []
+
+        cleanupSVGPathAttributeEffect?.()
+        const current = readSVGPathDrawingState(path)
+        const values: Record<string, MotionValue<number>> = {}
+
+        if ('pathLength' in keyframes) {
+            values.pathLength = motionValue(current.pathLength)
+        }
+        if ('pathLength' in keyframes || 'pathSpacing' in keyframes) {
+            values.pathSpacing = motionValue(current.pathSpacing)
+        }
+        if ('pathOffset' in keyframes) {
+            values.pathOffset = motionValue(current.pathOffset)
+        }
+
+        cleanupSVGPathAttributeEffect = svgEffect(path, values)
+
+        return Object.entries(values)
+            .map(([key, value]) => {
+                const control = animate(
+                    value as never,
+                    (key === 'pathSpacing' && !('pathSpacing' in keyframes)
+                        ? 1
+                        : keyframes[key]) as never,
+                    transition as unknown as AnimationOptions
+                )
+                return getFinishedPromise(control)
+            })
+            .filter((promise): promise is Promise<unknown> => promise !== null)
+    }
+
+    onDestroy(() => {
+        cleanupSVGPathAttributeEffect?.()
+        cleanupSVGPathAttributeEffect = null
+    })
+
+    // Wait-mode enter coordination needs to affect the first rendered attrs,
+    // before the blocked entrant can participate in layout.
+    let waitCallbackRegistered = $state(false)
+    let waitUnsubscribe: (() => void) | null = null
+    let waitHiddenDisplay: string | null = null
+    let waitEnterReleased = $state(false)
+    let waitLayoutParent: HTMLElement | null = null
+    let waitLayoutParentWidth = ''
+    let waitLayoutParentHeight = ''
+    let waitLayoutViewportScrollX = 0
+    let waitLayoutViewportScrollY = 0
+    const presenceLayoutHoldAttribute = 'data-presence-layout-hold'
+    const presenceLayoutReleaseEvent = 'svelte-motion:presence-layout-release'
+    const waitEnterBlockedBeforeMount = $derived(
+        context?.mode === 'wait' && !waitEnterReleased && context.isEnterBlocked(presenceKey)
+    )
 
     // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
     const derivedAttrs = $derived<Record<string, unknown>>({
@@ -575,6 +783,16 @@
                   'data-path': dataPath
               }
             : {}),
+        ...(renderedOptimizedAppearScript
+            ? { [optimizedAppearDataAttribute]: optimizedAppearId }
+            : {}),
+        ...(layoutProp
+            ? { 'data-layout': String(layoutProp), 'data-svelte-motion-layout': '' }
+            : {}),
+        ...(scopedLayoutId ? { 'data-layout-id': scopedLayoutId } : {}),
+        ...(waitEnterBlockedBeforeMount || waitHiddenDisplay !== null
+            ? { 'data-presence-wait-hidden': 'true' }
+            : {}),
         // Apply normalized SVG path attributes synchronously on first render to avoid flash
         // Compute via svg utils (no dynamic import in SSR/derived expressions)
         ...(() => {
@@ -588,9 +806,7 @@
             return {}
         })(),
         style: mergeInlineStyles(
-            initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting'
-                ? `${styleProp || ''};visibility:hidden`
-                : styleProp,
+            `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${styleProp || ''};visibility:hidden` : (styleProp ?? '')}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`,
             // The "from" slot: apply initialKeyframes as inline styles during
             // the mounting/initial phases (before the WAAPI animation locks
             // its from-value and we promote to 'ready' — see the lifecycle
@@ -869,19 +1085,22 @@
         }
 
         const transitionAnimate: MotionTransition = mergedTransition ?? {}
-        let payload = $state.snapshot(resolvedAnimate)
+        const rawPayload = filterReducedMotionKeyframes(
+            $state.snapshot(resolvedAnimate) as Record<string, unknown>,
+            reducedMotion
+        ) as Record<string, unknown>
+        const svgPathFinished =
+            isSVGPathElement(element) && hasSVGPathProperties(rawPayload)
+                ? animateSVGPathAttributes(element, rawPayload, transitionAnimate)
+                : []
+        let payload = (
+            svgPathFinished.length > 0 ? stripSVGPathKeyframes(rawPayload) : rawPayload
+        ) as typeof rawPayload
 
         // Transform SVG path properties (pathLength, pathOffset) to their CSS equivalents
         payload = transformSVGPathProperties(
             element,
             payload as Record<string, unknown>
-        ) as typeof payload
-
-        // Strip transform keys when reduced-motion is active so the element
-        // stays in place while opacity / color etc. still animate.
-        payload = filterReducedMotionKeyframes(
-            payload as Record<string, unknown>,
-            reducedMotion
         ) as typeof payload
 
         // Ensure dash properties aren't pinned as inline styles
@@ -897,32 +1116,133 @@
 
         // A fresh run owns the transform again until it completes.
         enterAnimationSettled = false
-        animateWithLifecycle(
-            element,
-            payload as unknown as DOMKeyframesDefinition,
-            transitionAnimate as unknown as AnimationOptions,
-            (def) => onAnimationStartProp?.(def as unknown as DOMKeyframesDefinition | undefined),
-            (def) => {
-                // Now the target is the resting state — promote it to the
-                // inline baseline so it persists after WAAPI surrenders the
-                // property (default fill:'none'). (#377)
-                enterAnimationSettled = true
-                onAnimationCompleteProp?.(def as unknown as DOMKeyframesDefinition | undefined)
-            }
-        )
+        const completeEnterAnimation = (
+            def: DOMKeyframesDefinition | undefined = payload as unknown as DOMKeyframesDefinition
+        ) => {
+            if (enterAnimationSettled) return
+            // Now the target is the resting state — promote it to the
+            // inline baseline so it persists after WAAPI surrenders the
+            // property (default fill:'none'). (#377)
+            applyAnimateRestingStyle()
+            enterAnimationSettled = true
+            onAnimationCompleteProp?.(def)
+        }
+        if (isNotEmpty(payload)) {
+            animateWithLifecycle(
+                element,
+                payload as unknown as DOMKeyframesDefinition,
+                transitionAnimate as unknown as AnimationOptions,
+                (def) =>
+                    onAnimationStartProp?.(def as unknown as DOMKeyframesDefinition | undefined),
+                (def) =>
+                    completeEnterAnimation(def as unknown as DOMKeyframesDefinition | undefined)
+            )
+        } else if (svgPathFinished.length > 0) {
+            onAnimationStartProp?.(rawPayload as unknown as DOMKeyframesDefinition)
+            Promise.all(svgPathFinished)
+                .then(() => completeEnterAnimation(rawPayload as unknown as DOMKeyframesDefinition))
+                .catch(() =>
+                    completeEnterAnimation(rawPayload as unknown as DOMKeyframesDefinition)
+                )
+        }
+        if (isJsdomRuntime()) {
+            window.setTimeout(
+                () => completeEnterAnimation(),
+                getTransitionFallbackMs(transitionAnimate as AnimationOptions)
+            )
+        }
     }
-
-    // Track if we've already registered a wait callback to prevent duplicates
-    let waitCallbackRegistered = $state(false)
-    let waitUnsubscribe: (() => void) | null = null
 
     // Cleanup wait callback on component unmount to prevent memory leaks
     $effect(() => {
         return () => {
+            if (element && waitHiddenDisplay !== null) {
+                element.style.display = waitHiddenDisplay
+                element.removeAttribute('data-presence-wait-hidden')
+                waitHiddenDisplay = null
+            }
+            releaseWaitLayoutHold()
             waitUnsubscribe?.()
             waitUnsubscribe = null
         }
     })
+
+    const getPresenceLayoutParent = (): HTMLElement | null => {
+        let parent = element?.parentElement ?? null
+        const layoutParent = element?.parentElement?.closest<HTMLElement>(
+            '[data-svelte-motion-layout]'
+        )
+        if (layoutParent) return layoutParent
+
+        while (parent && getComputedStyle(parent).display === 'contents') {
+            parent = parent.parentElement
+        }
+        return parent
+    }
+
+    const holdWaitLayout = () => {
+        if (!element || waitLayoutParent) return
+        const parent = getPresenceLayoutParent()
+        if (!parent) return
+
+        const rect = parent.getBoundingClientRect()
+        waitLayoutParent = parent
+        waitLayoutParentWidth = parent.style.width
+        waitLayoutParentHeight = parent.style.height
+        waitLayoutViewportScrollX = typeof window !== 'undefined' ? window.scrollX : 0
+        waitLayoutViewportScrollY = typeof window !== 'undefined' ? window.scrollY : 0
+        parent.setAttribute(presenceLayoutHoldAttribute, 'true')
+        parent.style.width = `${rect.width}px`
+        parent.style.height = `${rect.height}px`
+    }
+
+    function releaseWaitLayoutHold() {
+        if (!waitLayoutParent) return
+        const parent = waitLayoutParent
+        const previousRect = parent.getBoundingClientRect()
+        parent.removeAttribute(presenceLayoutHoldAttribute)
+        if (waitLayoutParentWidth) {
+            parent.style.width = waitLayoutParentWidth
+        } else {
+            parent.style.removeProperty('width')
+        }
+        if (waitLayoutParentHeight) {
+            parent.style.height = waitLayoutParentHeight
+        } else {
+            parent.style.removeProperty('height')
+        }
+        const viewportScrolledDuringHold =
+            typeof window !== 'undefined' &&
+            (window.scrollX !== waitLayoutViewportScrollX ||
+                window.scrollY !== waitLayoutViewportScrollY)
+        parent.dispatchEvent(
+            new CustomEvent(presenceLayoutReleaseEvent, {
+                detail: {
+                    previousRect: domRectToRectLike(previousRect),
+                    viewportScrolledDuringHold
+                }
+            })
+        )
+        waitLayoutParent = null
+        waitLayoutParentWidth = ''
+        waitLayoutParentHeight = ''
+        waitLayoutViewportScrollX = 0
+        waitLayoutViewportScrollY = 0
+    }
+
+    const revealWaitHiddenElement = () => {
+        waitEnterReleased = true
+        if (waitHiddenDisplay !== null && element) {
+            if (waitHiddenDisplay) {
+                element.style.display = waitHiddenDisplay
+            } else {
+                element.style.removeProperty('display')
+            }
+            element.removeAttribute('data-presence-wait-hidden')
+            waitHiddenDisplay = null
+        }
+        releaseWaitLayoutHold()
+    }
 
     /**
      * Run the enter animation, respecting wait mode if inside AnimatePresence.
@@ -949,11 +1269,20 @@
                 return true // Still deferred
             }
 
-            const blocked = context.isEnterBlocked?.()
+            const blocked = context.isEnterBlocked?.(presenceKey)
             pwLog('[motion] runAnimation: wait mode', { blocked })
 
             if (blocked) {
                 pwLog('[motion] runAnimation: enters blocked, deferring')
+
+                waitEnterReleased = false
+                if (waitHiddenDisplay === null) {
+                    waitHiddenDisplay =
+                        element.style.display === 'none' ? '' : element.style.display
+                    element.style.display = 'none'
+                    element.setAttribute('data-presence-wait-hidden', 'true')
+                    holdWaitLayout()
+                }
 
                 waitCallbackRegistered = true
 
@@ -963,6 +1292,12 @@
                     waitUnsubscribe?.()
                     waitUnsubscribe = null
                     waitCallbackRegistered = false
+
+                    // Reveal synchronously after the exiting placeholder has
+                    // been removed. The parent is fixed-size until the next
+                    // frame, so it measures the final entrant instead of an
+                    // overlap between exiting and entering content.
+                    revealWaitHiddenElement()
 
                     // Snap to initial state first (in case inline styles were removed)
                     if (initialKeyframes && element) {
@@ -995,6 +1330,11 @@
                 })
                 return true // Animation was deferred
             }
+
+            if (waitHiddenDisplay !== null || waitEnterBlockedBeforeMount) {
+                pwLog('[motion] runAnimation: wait mode no longer blocked, revealing')
+                revealWaitHiddenElement()
+            }
         }
 
         // Not blocked - run animation immediately
@@ -1018,6 +1358,7 @@
     let objectAnimateRanOnMount = $state(false)
     // Track the serialized animateProp to detect changes for object animate props
     let lastAnimatePropJson = $state<string | undefined>(undefined)
+    let motionDomProjectionUpdatePending = false
     const currentAnimateKey = $derived(
         typeof animateProp === 'string'
             ? animateProp
@@ -1025,6 +1366,72 @@
               ? effectiveAnimate
               : undefined
     )
+
+    $effect(() => {
+        if (!motionDomProjection) return
+        motionDomProjection.updateOptions({
+            layout: layoutProp,
+            layoutId: scopedLayoutId,
+            transition: mergedTransition as never,
+            style: styleProp
+        })
+    })
+
+    $effect(() => {
+        if (!motionDomProjection) return
+        if (!element) return
+        motionDomProjection.mount(element)
+        return () => {
+            motionDomProjection.unmount()
+        }
+    })
+
+    let explicitLayoutSnapshot: RectLike | null = null
+    let lastRect: RectLike | null = null
+    const trackLayoutProjectionDependencies = () => [
+        classProp,
+        styleProp,
+        scopedLayoutId,
+        mergedTransition
+    ]
+
+    $effect.pre(() => {
+        const shouldProject = element && layoutProp && isLoaded === 'ready' && hasLayoutFeatures
+        // Track common layout-affecting props so Svelte-owned updates can
+        // snapshot before the DOM patch, matching upstream MeasureLayout.
+        trackLayoutProjectionDependencies()
+
+        if (!shouldProject) {
+            explicitLayoutSnapshot = null
+            return
+        }
+
+        explicitLayoutSnapshot = measureLayoutRect()
+        projection.willUpdate()
+        motionDomProjection?.willUpdate()
+        motionDomProjectionUpdatePending = true
+    })
+
+    $effect(() => {
+        const shouldProject = element && layoutProp && isLoaded === 'ready' && hasLayoutFeatures
+        trackLayoutProjectionDependencies()
+
+        if (!shouldProject || !motionDomProjectionUpdatePending) return
+        motionDomProjectionUpdatePending = false
+        const previous = explicitLayoutSnapshot
+        explicitLayoutSnapshot = null
+        if (previous) {
+            const next = measureLayoutRect()
+            if (next) {
+                const flipLayoutMode = layoutProp === 'position' ? 'position' : true
+                const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
+                runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
+                lastRect = next
+            }
+        }
+        projection.didUpdate()
+        motionDomProjection?.didUpdate()
+    })
 
     // Projection node lifecycle + the `onProjectionUpdate` listener.
     // Mount once the element binds; seed the baseline layout; unmount on
@@ -1053,56 +1460,104 @@
         }
     })
 
-    // Minimal layout animation using FLIP when `layout` is enabled.
-    // When layout === 'position' we only translate.
-    // When layout === true we also scale to smoothly interpolate size changes.
-    let lastRect: RectLike | null = null
+    // Upstream layout projection via motion-dom. Svelte runes mode doesn't
+    // expose the React-style pre/post render hook pair used upstream, so the
+    // component snapshots committed layout changes through DOM observers while
+    // keeping the existing local ProjectionNode event fan-out alive.
     $effect(() => {
         if (!(element && layoutProp && isLoaded === 'ready' && hasLayoutFeatures)) return
 
-        // Initialize last rect on first ready frame. We measure through the
-        // projection node rather than `measureRect` directly so the rect is
-        // ancestor-transform-invariant: the node resets the whole ancestor
-        // chain to its mount-time base while reading, which strips any
-        // motion-applied (FLIP/drag) transform up the tree. Without this a
-        // child re-measures and FLIPs whenever an ancestor's transform
-        // animates, even though the child's own layout never moved. (#379)
+        let rafId: number | null = null
+        let wasViewportOffscreenSinceLastLayout = false
+        const flipLayoutMode = layoutProp === 'position' ? 'position' : true
+        motionDomProjection?.seedLayout()
         lastRect = measureLayoutRect()
-        // Hint compositor for smoother FLIP transforms
         setCompositorHints(element!, true)
 
-        let rafId: number | null = null
-        const runFlip = () => {
-            // commitLayoutChange does the ancestor-stripped measure, fans
-            // the delta out to `onProjectionUpdate` listeners, AND returns
-            // the freshly-measured box — so the FLIP reuses that single
-            // measurement as `next` instead of walking + transform-resetting
-            // the ancestor chain a second time per frame. (#379)
-            const nextBox = projection.commitLayoutChange()
-            if (!nextBox) return
-            const next = boxToRectLike(nextBox)
-            if (!lastRect) {
-                lastRect = next
-                return
+        const rememberOffscreenScroll = () => {
+            if (isViewportOffscreen(element!.getBoundingClientRect())) {
+                wasViewportOffscreenSinceLastLayout = true
             }
-            const transforms = computeFlipTransforms(lastRect, next, layoutProp ?? false)
-            runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
-            lastRect = next
         }
 
-        const scheduleFlip = () => {
-            if (rafId) cancelAnimationFrame(rafId)
+        const commitObservedLayout = () => {
+            if (element!.hasAttribute('data-layout-size-animation')) {
+                return
+            }
+
+            const hasPresenceHold = element!.hasAttribute(presenceLayoutHoldAttribute)
+            const hasHiddenWaitEnter = !!element!.querySelector(
+                '[data-presence-wait-hidden="true"]'
+            )
+            const hasPresencePlaceholder = !!element!.querySelector(
+                '[data-presence-placeholder="true"]'
+            )
+
+            if (hasPresenceHold || hasHiddenWaitEnter) {
+                return
+            }
+
+            if (hasPresencePlaceholder) {
+                lastRect = measureLayoutRect()
+                motionDomProjection?.seedLayout()
+                return
+            }
+
+            const nextBox = projection.commitLayoutChange()
+            if (nextBox && lastRect) {
+                const next = boxToRectLike(nextBox)
+                const transforms = computeFlipTransforms(lastRect, next, flipLayoutMode)
+                runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
+                lastRect = next
+                wasViewportOffscreenSinceLastLayout = false
+            } else if (nextBox) {
+                lastRect = boxToRectLike(nextBox)
+                wasViewportOffscreenSinceLastLayout = false
+            }
+            motionDomProjection?.commitObservedLayoutChange()
+        }
+
+        const commitPresenceLayoutRelease = (event: Event) => {
+            const detail = (
+                event as CustomEvent<{
+                    previousRect?: RectLike
+                    viewportScrolledDuringHold?: boolean
+                }>
+            ).detail
+            const previous = detail?.previousRect
+            const viewportRect = element!.getBoundingClientRect()
+            const next = measureLayoutRect()
+            if (!(previous && next)) return
+
+            lastRect = next
+            const shouldSkipLayoutAnimation =
+                detail?.viewportScrolledDuringHold ||
+                wasViewportOffscreenSinceLastLayout ||
+                isViewportOffscreen(viewportRect)
+            if (!shouldSkipLayoutAnimation) {
+                const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
+                runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
+            }
+            wasViewportOffscreenSinceLastLayout = false
+            motionDomProjection?.commitObservedLayoutChange()
+        }
+
+        const scheduleProjectionCommit = () => {
+            if (rafId) return
+            commitObservedLayout()
             rafId = requestAnimationFrame(() => {
                 rafId = null
-                runFlip()
             })
         }
-        const disconnectObservers = observeLayoutChanges(element!, () => scheduleFlip())
+        const disconnectObservers = observeLayoutChanges(element!, () => scheduleProjectionCommit())
+        window.addEventListener('scroll', rememberOffscreenScroll, { passive: true })
+        element!.addEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
 
         return () => {
             disconnectObservers()
+            window.removeEventListener('scroll', rememberOffscreenScroll)
+            element?.removeEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
             lastRect = null
-            // Reset compositor hints on teardown
             if (element) {
                 setCompositorHints(element, false)
             }
@@ -1423,6 +1878,7 @@
 
     $effect(() => {
         if (!(element && isLoaded === 'mounting')) return
+        markMotionMounted()
 
         pwLog('[motion] main effect running', {
             effectiveAnimate: !!effectiveAnimate,
@@ -1452,6 +1908,30 @@
                 dataPath = 5
                 isLoaded = 'ready'
             } else if (isNotEmpty(initialKeyframes)) {
+                const canHandoffOptimizedAppear = hasOptimizedAppearAnimation(optimizedAppearId)
+                if (canHandoffOptimizedAppear) {
+                    pwLog('[motion] path: optimized appear handoff')
+                    dataPath = 6
+                    isLoaded = 'initial'
+                    initialAnimationTriggered = true
+                    if (animateProp && typeof animateProp !== 'string') {
+                        objectAnimateRanOnMount = true
+                        lastAnimatePropJson = JSON.stringify(animateProp)
+                    }
+                    finishOptimizedAppearAnimation(optimizedAppearId)
+                        .then(() => {
+                            applyAnimateRestingStyle()
+                            enterAnimationSettled = true
+                            isLoaded = 'ready'
+                            onAnimationCompleteProp?.(
+                                resolvedAnimate as DOMKeyframesDefinition | undefined
+                            )
+                        })
+                        .catch(() => {
+                            isLoaded = 'ready'
+                        })
+                    return
+                }
                 pwLog('[motion] path: has initialKeyframes, will animate to target')
                 // Apply initial instantly BEFORE exposing 'initial' state
                 const transformedInitial = transformSVGPathProperties(
@@ -1572,15 +2052,23 @@
 {#if isVoidTag}
     {#if isSVGTag(String(tag))}
         <svelte:element this={tag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs} />
+        <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
+        {@html renderedOptimizedAppearScript}
     {:else}
         <svelte:element this={tag} bind:this={element} {...derivedAttrs} />
+        <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
+        {@html renderedOptimizedAppearScript}
     {/if}
 {:else if isSVGTag(String(tag))}
     <svelte:element this={tag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs}>
         {@render children?.()}
     </svelte:element>
+    <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
+    {@html renderedOptimizedAppearScript}
 {:else}
     <svelte:element this={tag} bind:this={element} {...derivedAttrs}>
         {@render children?.()}
     </svelte:element>
+    <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
+    {@html renderedOptimizedAppearScript}
 {/if}

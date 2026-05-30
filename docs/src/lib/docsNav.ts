@@ -107,7 +107,10 @@ export const docsSections: NavSection[] = [
     {
         title: 'Performance',
         icon: Zap,
-        items: [{ title: 'Tree Shaking', href: '/docs/tree-shaking', icon: Zap }]
+        items: [
+            { title: 'Optimized appear', href: '/docs/optimized-appear', icon: Zap },
+            { title: 'Tree Shaking', href: '/docs/tree-shaking', icon: Zap }
+        ]
     },
     {
         title: 'shadcn/ui',

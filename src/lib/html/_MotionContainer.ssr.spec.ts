@@ -1,8 +1,17 @@
 import { render } from '@testing-library/svelte'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import MotionContainer from './_MotionContainer.svelte'
 
 describe('_MotionContainer SSR styles', () => {
+    beforeEach(() => {
+        window.MotionIsMounted = false
+        window.MotionHasOptimisedAnimation = undefined
+        window.MotionHandoffMarkAsComplete = undefined
+        window.MotionHandoffIsComplete = undefined
+        window.MotionCancelOptimisedAnimation = undefined
+        window.__SvelteMotionAppear = undefined
+    })
+
     it('reflects initial styles in SSR output (opacity/borderRadius)', () => {
         /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
@@ -51,5 +60,20 @@ describe('_MotionContainer SSR styles', () => {
         expect(style).toContain('width: 10px')
         expect(style).not.toMatch(/opacity:/)
         expect(style).not.toMatch(/border-radius:/)
+    })
+
+    it('emits optimized appear handoff metadata for SSR enter animations', () => {
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+        const { container } = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                initial: { opacity: 0, scale: 0.9 },
+                animate: { opacity: 1, scale: 1 },
+                transition: { duration: 0.5 }
+            }
+        })
+        const el = container.firstElementChild as HTMLElement
+        expect(el.getAttribute('data-framer-appear-id')).toMatch(/^svelte-motion-/)
+        expect(container.innerHTML).toContain('MotionHasOptimisedAnimation')
     })
 })

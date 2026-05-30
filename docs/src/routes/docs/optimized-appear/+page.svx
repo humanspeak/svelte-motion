@@ -1,0 +1,61 @@
+---
+title: Optimized appear
+description: Start SSR appear animations before hydration
+---
+
+<script>
+    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+    const seo = getSeoContext()
+    if (seo) {
+        seo.title = 'Optimized appear | Docs | Svelte Motion'
+        seo.description =
+            'Start server-rendered entrance animations before Svelte hydrates the motion runtime.'
+        seo.ogTitle = 'Optimized appear'
+        seo.ogTagline = 'SSR entrance animations without the flash'
+        seo.ogFeatures = ['SSR', 'Hydration', 'WAAPI', 'Appear handoff']
+        seo.ogSlug = 'docs-optimized-appear'
+    }
+</script>
+
+# Optimized appear
+
+Optimized appear starts mount animations from the server-rendered DOM before Svelte hydrates. It mirrors Framer Motion's `data-framer-appear-id` handoff: the SSR element receives an appear id, an inline bootstrap starts WAAPI opacity/transform animation, and the Svelte Motion runtime commits and continues from that visual state during hydration.
+
+```svelte
+<script>
+    import { motion } from '@humanspeak/svelte-motion'
+</script>
+
+<motion.div
+    initial={{ opacity: 0, y: 24, scale: 0.94 }}
+    animate={{ opacity: 1, y: 0, scale: 1 }}
+    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+/>
+```
+
+No additional prop is required. Svelte Motion enables optimized appear when all of these are true:
+
+- `initial` resolves to non-empty keyframes.
+- `animate` resolves to non-empty keyframes.
+- `initial={false}` is not set.
+- The enter animation includes WAAPI-friendly `opacity` and/or transform values.
+
+## Public helpers
+
+`startOptimizedAppearAnimation` is exported for low-level integrations that need to start a handoff animation manually.
+
+```ts
+import { optimizedAppearDataAttribute, startOptimizedAppearAnimation } from '@humanspeak/svelte-motion'
+
+element.setAttribute(optimizedAppearDataAttribute, 'hero')
+startOptimizedAppearAnimation(element, 'opacity', [0, 1], { duration: 0.4 })
+```
+
+Most applications should use declarative `motion.*` components instead of calling the helper directly.
+
+## Related
+
+- [API Reference](/docs/api-reference) — exported helpers and SSR behavior
+- [Tree Shaking](/docs/tree-shaking) — import only the animation surface you need
+- [Optimized appear example](/examples/optimized-appear) — live SSR handoff demo

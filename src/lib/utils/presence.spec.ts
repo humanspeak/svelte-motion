@@ -402,19 +402,63 @@ describe('AnimatePresence modes', () => {
             await Promise.resolve()
         })
 
-        it('inserts and removes a placeholder for sync mode', async () => {
+        it('does not insert a placeholder for sync mode', async () => {
             const ctx = createAnimatePresenceContext({ mode: 'sync' })
             ctx.registerChild('k1', el, { opacity: 0 })
             ctx.unregisterChild('k1')
 
-            let placeholder = document.querySelector('[data-presence-placeholder="true"]')
-            expect(placeholder).toBeTruthy()
-
-            await Promise.resolve()
-            await Promise.resolve()
-
-            placeholder = document.querySelector('[data-presence-placeholder="true"]')
+            const placeholder = document.querySelector('[data-presence-placeholder="true"]')
             expect(placeholder).toBeFalsy()
+
+            await Promise.resolve()
+            await Promise.resolve()
+        })
+
+        it('preserves grid placement on wait placeholders', () => {
+            vi.spyOn(window, 'getComputedStyle').mockImplementation((target: Element) => {
+                if (target === el) {
+                    return mockComputedStyle({
+                        borderRadius: '8px',
+                        boxSizing: 'border-box',
+                        display: 'flex',
+                        gridColumnStart: '1',
+                        gridColumnEnd: '2',
+                        gridRowStart: '1',
+                        gridRowEnd: '2'
+                    })
+                }
+
+                return mockComputedStyle({
+                    borderRadius: '8px',
+                    boxSizing: 'border-box',
+                    position: 'relative'
+                })
+            })
+
+            const ctx = createAnimatePresenceContext({ mode: 'wait' })
+            ctx.registerChild('k1', el, { opacity: 0 })
+            ctx.unregisterChild('k1')
+
+            const placeholder = document.querySelector(
+                '[data-presence-placeholder="true"]'
+            ) as HTMLElement | null
+
+            expect(placeholder).toBeTruthy()
+            expect(placeholder?.style.gridColumnStart).toBe('1')
+            expect(placeholder?.style.gridColumnEnd).toBe('2')
+            expect(placeholder?.style.gridRowStart).toBe('1')
+            expect(placeholder?.style.gridRowEnd).toBe('2')
+        })
+
+        it('uses the registered insertion parent when a child is detached before unregister', () => {
+            const ctx = createAnimatePresenceContext({ mode: 'wait' })
+            ctx.registerChild('k1', el, { opacity: 0 })
+
+            el.remove()
+            ctx.unregisterChild('k1')
+
+            const placeholder = parent.querySelector('[data-presence-placeholder="true"]')
+            expect(placeholder).toBeTruthy()
         })
     })
 })

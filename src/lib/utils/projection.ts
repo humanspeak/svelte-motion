@@ -137,9 +137,9 @@ export interface ProjectionNodeOptions {
     /**
      * Thunk returning the `layoutScroll` ancestor chain at measure
      * time. Used as the second argument to `measureRect`, which
-     * shifts the returned rect by the sum of ancestor
-     * `scrollLeft`/`scrollTop` so FLIP deltas stay correct when
-     * scrollable ancestors scroll between two measurements.
+     * shifts the returned rect by the viewport scroll plus the sum of
+     * ancestor `scrollLeft`/`scrollTop` so FLIP deltas stay correct
+     * when the page or scrollable ancestors scroll between two measurements.
      *
      * Returning `[]` (or omitting the option entirely) gives
      * viewport-relative measurements — fine for the common case.
@@ -360,7 +360,8 @@ export class ProjectionNode {
             const rect = measureRect(
                 this.element,
                 this.getScrollContainers?.() ?? [],
-                this.resolveBaseTransform()
+                this.resolveBaseTransform(),
+                true
             )
             const box = rectToBox(rect)
             this.latestLayout = box
