@@ -38,3 +38,12 @@ When asked to implement a new feature, handle it end-to-end by default:
 
 - Match the motion.dev example: `AnimatePresence mode="sync"` is only used in the label.
 - The icon `AnimatePresence` should use default mode (no explicit `mode` prop).
+
+## Failed e2e review workflow
+
+- When a full Playwright/e2e run fails, review failures one at a time.
+- For each failure, open the related test/demo page in the in-app browser before changing code.
+- Explain what the page is supposed to demonstrate, what the failing test asserted,
+  and what is visible on the page.
+- Decide with the user whether the behavior is wrong or the test is too tight/stale
+  before moving to the next failing page.
