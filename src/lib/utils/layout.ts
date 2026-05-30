@@ -346,19 +346,23 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
     }
     const ro = new ResizeObserver(() => schedule())
     ro.observe(el)
-    const mo = new MutationObserver(() => schedule())
-    mo.observe(el, {
+    const attributeObserver = new MutationObserver(() => schedule())
+    attributeObserver.observe(el, {
         attributes: true,
-        attributeFilter: ['class', 'style', 'data-presence-layout-hold'],
+        attributeFilter: ['class', 'style', 'data-presence-layout-hold']
+    })
+    const childListObserver = new MutationObserver(() => schedule())
+    childListObserver.observe(el, {
         childList: true,
         subtree: true
     })
     if (el.parentElement) {
-        mo.observe(el.parentElement, { childList: true, subtree: false, attributes: true })
+        childListObserver.observe(el.parentElement, { childList: true, subtree: false })
     }
     return () => {
         ro.disconnect()
-        mo.disconnect()
+        attributeObserver.disconnect()
+        childListObserver.disconnect()
         if (pendingRaf !== null && typeof cancelAnimationFrame === 'function') {
             cancelAnimationFrame(pendingRaf)
             pendingRaf = null

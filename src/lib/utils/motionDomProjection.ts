@@ -118,6 +118,12 @@ export class MotionDomProjectionAdapter {
      * Update projection options from current Svelte props.
      *
      * @param options Current layout-related motion props.
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * adapter.updateOptions({ layout, layoutId, transition, style })
+     * ```
      */
     updateOptions(options: MotionDomProjectionUpdateOptions): void {
         this.layout = options.layout
@@ -144,6 +150,12 @@ export class MotionDomProjectionAdapter {
      * Mount the upstream projection node to an element and seed its layout.
      *
      * @param element Element represented by the current motion component.
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * adapter.mount(element)
+     * ```
      */
     mount(element: HTMLElement): void {
         if (this.element === element) return
@@ -156,6 +168,13 @@ export class MotionDomProjectionAdapter {
 
     /**
      * Unmount the upstream projection node and clear its visual-element store.
+     *
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * adapter.unmount()
+     * ```
      */
     unmount(): void {
         if (!this.element) return
@@ -169,6 +188,13 @@ export class MotionDomProjectionAdapter {
 
     /**
      * Capture the upstream "before" snapshot.
+     *
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * adapter.willUpdate()
+     * ```
      */
     willUpdate(): void {
         if (!this.element || !this.layoutId) return
@@ -177,6 +203,13 @@ export class MotionDomProjectionAdapter {
 
     /**
      * Commit an upstream layout update after Svelte has patched the DOM.
+     *
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * adapter.didUpdate()
+     * ```
      */
     didUpdate(): void {
         if (!this.element || !this.layoutId) return
@@ -186,6 +219,13 @@ export class MotionDomProjectionAdapter {
 
     /**
      * Seed the current layout without animating.
+     *
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * adapter.seedLayout()
+     * ```
      */
     seedLayout(): void {
         if (!this.element) return
@@ -201,6 +241,13 @@ export class MotionDomProjectionAdapter {
      * Svelte runes mode doesn't expose the same component pre/post-update
      * hooks Framer Motion uses in React, so this adapter reuses upstream
      * projection while the Svelte component controls the snapshot timing.
+     *
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * adapter.commitObservedLayoutChange()
+     * ```
      */
     commitObservedLayoutChange(): void {
         if (!this.element || !this.layoutId) return

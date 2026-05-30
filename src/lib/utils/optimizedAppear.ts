@@ -123,6 +123,15 @@ const toNativeOptions = (transition: AnimationOptions | undefined): KeyframeAnim
  * @param animate Target keyframes for the enter animation.
  * @param transition Motion transition options.
  * @returns Appear entries for WAAPI-supported opacity and transform values.
+ *
+ * @example
+ * ```ts
+ * const entries = createOptimizedAppearData(
+ *     { opacity: 0, scale: 0.8 },
+ *     { opacity: 1, scale: 1 },
+ *     { duration: 0.6, ease: [0.16, 1, 0.3, 1] }
+ * )
+ * ```
  */
 export const createOptimizedAppearData = (
     initial: Record<string, unknown> | null | undefined,
@@ -167,6 +176,13 @@ export const createOptimizedAppearData = (
  * @param appearId Stable optimized-appear id attached to the motion element.
  * @param entries WAAPI animation entries to start.
  * @returns A script tag string, or an empty string when no entries exist.
+ *
+ * @example
+ * ```ts
+ * const script = createOptimizedAppearScript('appear-1', [
+ *     { name: 'opacity', keyframes: [0, 1], options: { duration: 300, fill: 'both' } }
+ * ])
+ * ```
  */
 export const createOptimizedAppearScript = (
     appearId: string | undefined,
@@ -188,6 +204,15 @@ export const createOptimizedAppearScript = (
  * @param keyframes WAAPI keyframes for the property.
  * @param options Motion animation options.
  * @param onReady Optional callback receiving the started animation.
+ * @returns Nothing.
+ *
+ * @example
+ * ```ts
+ * const element = document.querySelector('[data-framer-appear-id]')
+ * if (element instanceof HTMLElement) {
+ *     startOptimizedAppearAnimation(element, 'opacity', [0, 1], { duration: 0.3 })
+ * }
+ * ```
  */
 export const startOptimizedAppearAnimation = (
     element: HTMLElement,
@@ -237,6 +262,14 @@ export const startOptimizedAppearAnimation = (
  *
  * @param elementId Optimized appear id.
  * @returns `true` when at least one optimized animation was handed off.
+ *
+ * @example
+ * ```ts
+ * const wasHandedOff = handoffOptimizedAppearAnimation('appear-1')
+ * if (wasHandedOff) {
+ *     console.log('Animation handed off to runtime')
+ * }
+ * ```
  */
 export const handoffOptimizedAppearAnimation = (elementId: string | undefined): boolean => {
     if (!elementId || typeof window === 'undefined') return false
@@ -265,6 +298,14 @@ export const handoffOptimizedAppearAnimation = (elementId: string | undefined): 
  *
  * @param elementId Optimized appear id.
  * @returns Whether at least one optimized animation was adopted.
+ *
+ * @example
+ * ```ts
+ * const wasAdopted = await finishOptimizedAppearAnimation('appear-1')
+ * if (wasAdopted) {
+ *     console.log('Animation finished and adopted')
+ * }
+ * ```
  */
 export const finishOptimizedAppearAnimation = async (
     elementId: string | undefined
@@ -304,6 +345,13 @@ export const finishOptimizedAppearAnimation = async (
  *
  * @param elementId Optimized appear id.
  * @returns Whether any optimized appear animation is currently registered.
+ *
+ * @example
+ * ```ts
+ * if (hasOptimizedAppearAnimation('appear-1')) {
+ *     console.log('Animation is active')
+ * }
+ * ```
  */
 export const hasOptimizedAppearAnimation = (elementId: string | undefined): boolean => {
     if (!elementId || typeof window === 'undefined') return false
@@ -312,6 +360,13 @@ export const hasOptimizedAppearAnimation = (elementId: string | undefined): bool
 
 /**
  * Mark Motion as mounted so late optimized-appear starters no-op.
+ *
+ * @returns Nothing.
+ *
+ * @example
+ * ```ts
+ * markMotionMounted()
+ * ```
  */
 export const markMotionMounted = (): void => {
     if (typeof window !== 'undefined') {

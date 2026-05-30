@@ -337,9 +337,21 @@ describe('utils/layout', () => {
                     target: el,
                     options: expect.objectContaining({
                         attributes: true,
-                        attributeFilter: ['class', 'style', 'data-presence-layout-hold'],
+                        attributeFilter: ['class', 'style', 'data-presence-layout-hold']
+                    })
+                }),
+                expect.objectContaining({
+                    target: el,
+                    options: expect.objectContaining({
                         childList: true,
                         subtree: true
+                    })
+                }),
+                expect.objectContaining({
+                    target: parent,
+                    options: expect.objectContaining({
+                        childList: true,
+                        subtree: false
                     })
                 })
             ])

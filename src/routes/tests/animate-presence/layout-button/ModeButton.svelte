@@ -3,11 +3,15 @@
     import { onDestroy, onMount } from 'svelte'
     import type { AnimatePresenceMode } from '$lib/types'
 
-    const { mode, title, testIdPrefix } = $props<{
+    let {
+        mode,
+        title,
+        testIdPrefix
+    }: {
         mode: AnimatePresenceMode
         title: string
         testIdPrefix: string
-    }>()
+    } = $props()
 
     let copied = $state(false)
     let resetTimer: ReturnType<typeof setTimeout> | null = null

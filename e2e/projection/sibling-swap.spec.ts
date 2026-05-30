@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { isIdleDelta, parseProjectionDelta as parseDelta } from '../_helpers/projection'
 
 /**
  * Projection foundation (#379) — flat sibling-swap event stream.
@@ -14,26 +15,6 @@ import { expect, test } from '@playwright/test'
  * Expected: one box reports Δy ≈ +96, the other Δy ≈ -96, both with
  * `changed=true` and Δx ≈ 0. Swapping again flips the signs.
  */
-
-interface Delta {
-    dx: number
-    dy: number
-    changed: boolean
-}
-
-const parseDelta = (text: string | null): Delta | null => {
-    const m = text?.match(/Δx=(-?[\d.]+)\s+Δy=(-?[\d.]+)\s+changed=(true|false)/)
-    if (!m) return null
-    return { dx: Number(m[1]), dy: Number(m[2]), changed: m[3] === 'true' }
-}
-
-const isIdleDelta = (text: string | null): boolean => {
-    const delta = parseDelta(text)
-    return (
-        !!text?.includes('(no event yet)') ||
-        !!(delta && !delta.changed && Math.abs(delta.dx) < 0.5 && Math.abs(delta.dy) < 0.5)
-    )
-}
 
 const ROW_GAP_MIN = 88 // box height (80) + gap (16) leaves a comfortable lower bound
 const ROW_GAP_MAX = 104

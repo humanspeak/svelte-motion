@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { isIdleDelta, parseProjectionDelta as parseDelta } from '../_helpers/projection'
 
 /**
  * Projection foundation (#379) — nested-ancestor measure semantics.
@@ -22,29 +23,9 @@ import { expect, test } from '@playwright/test'
  * transforms in would report a non-zero offset for the static case.
  */
 
-interface Delta {
-    dx: number
-    dy: number
-    changed: boolean
-}
-
 interface Offset {
     x: number
     y: number
-}
-
-const parseDelta = (text: string | null): Delta | null => {
-    const m = text?.match(/Δx=(-?[\d.]+)\s+Δy=(-?[\d.]+)\s+changed=(true|false)/)
-    if (!m) return null
-    return { dx: Number(m[1]), dy: Number(m[2]), changed: m[3] === 'true' }
-}
-
-const isIdleDelta = (text: string | null): boolean => {
-    const delta = parseDelta(text)
-    return (
-        !!text?.includes('(no event yet)') ||
-        !!(delta && !delta.changed && Math.abs(delta.dx) < 0.5 && Math.abs(delta.dy) < 0.5)
-    )
 }
 
 const parseOffset = (text: string | null): Offset | null => {
