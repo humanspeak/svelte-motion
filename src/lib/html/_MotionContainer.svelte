@@ -28,6 +28,7 @@
     import { isNotEmpty } from '$lib/utils/objects'
     import { sleep } from '$lib/utils/testing'
     import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
+    import { motionValue, svgEffect, type MotionValue } from 'motion-dom'
     import { isPlaywrightEnv, pwLog } from '$lib/utils/log'
     import { onDestroy, untrack, type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants'
@@ -82,6 +83,8 @@
     import {
         transformSVGPathProperties,
         computeNormalizedSVGInitialAttrs,
+        hasSVGPathProperties,
+        isSVGPathElement,
         isSVGTag,
         SVG_NAMESPACE
     } from '$lib/utils/svg'
@@ -629,6 +632,117 @@
         const delay = typeof transition?.delay === 'number' ? transition.delay : 0
         return Math.max(0, (duration + delay) * 1000)
     }
+    let cleanupSVGPathAttributeEffect: (() => void) | null = null
+
+    /**
+     * Reads the current normalized SVG path drawing state from DOM
+     * attributes. `motion-dom`'s svgEffect owns future writes; this only
+     * seeds its MotionValues from the currently rendered frame.
+     *
+     * @param {SVGPathElement} path The SVG path element to inspect.
+     * @returns {{ pathLength: number; pathSpacing: number; pathOffset: number }} The normalized drawing state.
+     */
+    const readSVGPathDrawingState = (
+        path: SVGPathElement
+    ): { pathLength: number; pathSpacing: number; pathOffset: number } => {
+        const dashArray =
+            path.getAttribute('stroke-dasharray') || path.style.strokeDasharray || '1 0'
+        const [rawLength, rawSpacing] = dashArray
+            .split(/[,\s]+/)
+            .filter(Boolean)
+            .map((part) => Number.parseFloat(part))
+        const rawOffset = Number.parseFloat(
+            path.getAttribute('stroke-dashoffset') || path.style.strokeDashoffset || '0'
+        )
+
+        return {
+            pathLength: Number.isFinite(rawLength) ? rawLength : 1,
+            pathSpacing: Number.isFinite(rawSpacing) ? rawSpacing : 1,
+            pathOffset: Number.isFinite(rawOffset) ? -rawOffset : 0
+        }
+    }
+
+    /**
+     * Removes custom SVG path props from keyframes after `svgEffect` has
+     * taken ownership of them.
+     *
+     * @param {Record<string, unknown>} keyframes Keyframes to copy.
+     * @returns {Record<string, unknown>} Keyframes without SVG path-only props.
+     */
+    const stripSVGPathKeyframes = (keyframes: Record<string, unknown>): Record<string, unknown> => {
+        const stripped = { ...keyframes }
+        delete stripped.pathLength
+        delete stripped.pathSpacing
+        delete stripped.pathOffset
+        return stripped
+    }
+
+    /**
+     * Extracts an animation completion promise from a Motion control when
+     * one is available.
+     *
+     * @param {unknown} control The return value from `animate`.
+     * @returns {Promise<unknown> | null} The finished promise, or null.
+     */
+    const getFinishedPromise = (control: unknown): Promise<unknown> | null => {
+        if (!control || typeof control !== 'object') return null
+        const finished = (control as { finished?: unknown }).finished
+        return finished && typeof (finished as Promise<unknown>).then === 'function'
+            ? (finished as Promise<unknown>)
+            : null
+    }
+
+    /**
+     * Animates SVG path drawing props via motion-dom's `svgEffect`, matching
+     * upstream's attribute-based pathLength/pathSpacing/pathOffset behavior.
+     *
+     * @param {SVGPathElement} path The path element to animate.
+     * @param {Record<string, unknown>} keyframes Keyframes containing SVG path props.
+     * @param {MotionTransition} transition The transition to apply to generated MotionValues.
+     * @returns {Promise<unknown>[]} Promises for generated path animations.
+     */
+    const animateSVGPathAttributes = (
+        path: SVGPathElement,
+        keyframes: Record<string, unknown>,
+        transition: MotionTransition
+    ): Promise<unknown>[] => {
+        if (!hasSVGPathProperties(keyframes)) return []
+
+        cleanupSVGPathAttributeEffect?.()
+        const current = readSVGPathDrawingState(path)
+        const values: Record<string, MotionValue<number>> = {}
+
+        if ('pathLength' in keyframes) {
+            values.pathLength = motionValue(current.pathLength)
+        }
+        if ('pathLength' in keyframes || 'pathSpacing' in keyframes) {
+            values.pathSpacing = motionValue(current.pathSpacing)
+        }
+        if ('pathOffset' in keyframes) {
+            values.pathOffset = motionValue(current.pathOffset)
+        }
+
+        cleanupSVGPathAttributeEffect = svgEffect(path, values)
+
+        return Object.entries(values)
+            .map(([key, value]) => {
+                const control = animate(
+                    value as never,
+                    (key === 'pathSpacing' && !('pathSpacing' in keyframes)
+                        ? 1
+                        : keyframes[key]) as never,
+                    transition as unknown as AnimationOptions
+                )
+                return getFinishedPromise(control)
+            })
+            .filter((promise): promise is Promise<unknown> => promise !== null)
+    }
+
+    onDestroy(() => {
+        cleanupSVGPathAttributeEffect?.()
+        cleanupSVGPathAttributeEffect = null
+    })
+
     // Wait-mode enter coordination needs to affect the first rendered attrs,
     // before the blocked entrant can participate in layout.
     let waitCallbackRegistered = $state(false)
@@ -971,19 +1085,22 @@
         }
 
         const transitionAnimate: MotionTransition = mergedTransition ?? {}
-        let payload = $state.snapshot(resolvedAnimate)
+        const rawPayload = filterReducedMotionKeyframes(
+            $state.snapshot(resolvedAnimate) as Record<string, unknown>,
+            reducedMotion
+        ) as Record<string, unknown>
+        const svgPathFinished =
+            isSVGPathElement(element) && hasSVGPathProperties(rawPayload)
+                ? animateSVGPathAttributes(element, rawPayload, transitionAnimate)
+                : []
+        let payload = (
+            svgPathFinished.length > 0 ? stripSVGPathKeyframes(rawPayload) : rawPayload
+        ) as typeof rawPayload
 
         // Transform SVG path properties (pathLength, pathOffset) to their CSS equivalents
         payload = transformSVGPathProperties(
             element,
             payload as Record<string, unknown>
-        ) as typeof payload
-
-        // Strip transform keys when reduced-motion is active so the element
-        // stays in place while opacity / color etc. still animate.
-        payload = filterReducedMotionKeyframes(
-            payload as Record<string, unknown>,
-            reducedMotion
         ) as typeof payload
 
         // Ensure dash properties aren't pinned as inline styles
@@ -1010,13 +1127,24 @@
             enterAnimationSettled = true
             onAnimationCompleteProp?.(def)
         }
-        animateWithLifecycle(
-            element,
-            payload as unknown as DOMKeyframesDefinition,
-            transitionAnimate as unknown as AnimationOptions,
-            (def) => onAnimationStartProp?.(def as unknown as DOMKeyframesDefinition | undefined),
-            (def) => completeEnterAnimation(def as unknown as DOMKeyframesDefinition | undefined)
-        )
+        if (isNotEmpty(payload)) {
+            animateWithLifecycle(
+                element,
+                payload as unknown as DOMKeyframesDefinition,
+                transitionAnimate as unknown as AnimationOptions,
+                (def) =>
+                    onAnimationStartProp?.(def as unknown as DOMKeyframesDefinition | undefined),
+                (def) =>
+                    completeEnterAnimation(def as unknown as DOMKeyframesDefinition | undefined)
+            )
+        } else if (svgPathFinished.length > 0) {
+            onAnimationStartProp?.(rawPayload as unknown as DOMKeyframesDefinition)
+            Promise.all(svgPathFinished)
+                .then(() => completeEnterAnimation(rawPayload as unknown as DOMKeyframesDefinition))
+                .catch(() =>
+                    completeEnterAnimation(rawPayload as unknown as DOMKeyframesDefinition)
+                )
+        }
         if (isJsdomRuntime()) {
             window.setTimeout(
                 () => completeEnterAnimation(),

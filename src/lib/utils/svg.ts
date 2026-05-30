@@ -1,3 +1,5 @@
+import { buildSVGPath } from 'motion-dom'
+
 /**
  * SVG-specific properties that need special handling during animation.
  * These properties are not standard CSS properties and need to be transformed.
@@ -151,8 +153,8 @@ export const isSVGElement = (element: Element): element is SVGElement => {
  *
  * Normalized behavior (React/Framer Motion parity):
  * - Ensures `pathLength="1"` is set when any path prop is present
- * - Maps `pathLength`/`pathSpacing` → `stroke-dasharray` (px)
- * - Maps `pathOffset` → `stroke-dashoffset` (negative px)
+ * - Maps `pathLength`/`pathSpacing` → unitless `stroke-dasharray`
+ * - Maps `pathOffset` → unitless negative `stroke-dashoffset`
  *
  * @param {Element} element The element being animated (must be an SVG path).
  * @param {Record<string, unknown>} keyframes The input keyframes possibly containing path props.
@@ -205,47 +207,66 @@ export const transformSVGPathProperties = (
             return n ?? v
         })()
 
-        const toPx = (v: unknown): string => (typeof v === 'number' ? `${v}px` : String(v))
+        const toUnitless = (v: unknown): string => (typeof v === 'number' ? `${v}` : String(v))
 
-        const buildDashArray = (len: unknown, spa: unknown): string => `${toPx(len)} ${toPx(spa)}`
+        const buildDashArray = (len: unknown, spa: unknown): string =>
+            `${toUnitless(len)} ${toUnitless(spa)}`
 
-        // stroke-dasharray from pathLength/pathSpacing with default spacing = 1 - length
+        // stroke-dasharray from pathLength/pathSpacing with upstream's default spacing = 1
         if (Array.isArray(length)) {
             const lenArr = length as unknown[]
             const spaArr = Array.isArray(spacing)
                 ? (spacing as unknown[])
-                : lenArr.map((lv) =>
-                      typeof lv === 'number' ? 1 - (lv as number) : (spacing as unknown)
-                  )
+                : lenArr.map(() => (spacing !== undefined ? (spacing as unknown) : 1))
             const dashArray = lenArr.map((lv, i) => buildDashArray(lv, spaArr[i]))
             ;(transformed as Record<string, unknown>).strokeDasharray = dashArray
             ;(transformed as Record<string, unknown>)['stroke-dasharray'] = dashArray
         } else if (length !== undefined) {
-            const len = length
-            const lenNum = toNum(len) ?? 0
-            const spa = spacing !== undefined ? spacing : 1 - lenNum
-            const dashArray = buildDashArray(len, spa)
+            const lenNum = toNum(length)
+            const spaNum = spacing === undefined ? undefined : toNum(spacing)
+            const offsetNum = offset === undefined ? undefined : toNum(offset)
+            let dashArray: string
+            let dashOffset: string | undefined
+
+            if (
+                lenNum !== undefined &&
+                (spacing === undefined || spaNum !== undefined) &&
+                (offset === undefined || offsetNum !== undefined)
+            ) {
+                const attrs: Record<string, string | number> = {}
+                buildSVGPath(attrs, lenNum, spacing === undefined ? 1 : spaNum, offsetNum, true)
+                dashArray = String(attrs['stroke-dasharray'])
+                dashOffset = String(attrs['stroke-dashoffset'])
+            } else {
+                const spa = spacing !== undefined ? spacing : 1
+                dashArray = buildDashArray(length, spa)
+            }
+
             ;(transformed as Record<string, unknown>).strokeDasharray = dashArray
             ;(transformed as Record<string, unknown>)['stroke-dasharray'] = dashArray
+            if (dashOffset !== undefined) {
+                ;(transformed as Record<string, unknown>).strokeDashoffset = dashOffset
+                ;(transformed as Record<string, unknown>)['stroke-dashoffset'] = dashOffset
+            }
         }
 
         // stroke-dashoffset from -pathOffset
         if (Array.isArray(offset)) {
             const offs = (offset as unknown[]).map((ov) => {
                 const n = toNum(ov)
-                return n !== undefined ? `${-n}px` : String(ov)
+                return n !== undefined ? `${-n}` : String(ov)
             })
             ;(transformed as Record<string, unknown>).strokeDashoffset = offs
             ;(transformed as Record<string, unknown>)['stroke-dashoffset'] = offs
         } else if (offset !== undefined) {
             const n = toNum(offset)
-            const off = n !== undefined ? `${-n}px` : String(offset)
+            const off = n !== undefined ? `${-n}` : String(offset)
             ;(transformed as Record<string, unknown>).strokeDashoffset = off
             ;(transformed as Record<string, unknown>)['stroke-dashoffset'] = off
-        } else {
+        } else if (!('stroke-dashoffset' in transformed)) {
             // default 0
-            ;(transformed as Record<string, unknown>).strokeDashoffset = '0px'
-            ;(transformed as Record<string, unknown>)['stroke-dashoffset'] = '0px'
+            ;(transformed as Record<string, unknown>).strokeDashoffset = '0'
+            ;(transformed as Record<string, unknown>)['stroke-dashoffset'] = '0'
         }
 
         delete (transformed as Record<string, unknown>).pathLength
@@ -299,8 +320,8 @@ export const transformInitialSVGPathProperties = (
  *
  * Behavior matches React/Framer Motion parity:
  * - Always sets pathLength="1" whenever any of path props are present
- * - stroke-dasharray = px(pathLength) + ' ' + px(pathSpacing ?? 1 - Number(pathLength))
- * - stroke-dashoffset = px(-(pathOffset ?? 0))
+ * - stroke-dasharray = pathLength + ' ' + (pathSpacing ?? 1)
+ * - stroke-dashoffset = -(pathOffset ?? 0)
  *
  * The returned object is suitable for direct DOM attribute assignment (dash-cased keys).
  *
@@ -314,21 +335,19 @@ export const computeNormalizedSVGInitialAttrs = (
     const hasAny = 'pathLength' in initial || 'pathSpacing' in initial || 'pathOffset' in initial
     if (!hasAny) return null
 
-    const toPx = (v: unknown): string => (typeof v === 'number' ? `${v}px` : String(v))
-    const negatePx = (v: unknown): string => {
-        if (typeof v === 'number') return `${-v}px`
+    const toUnitless = (v: unknown): string => (typeof v === 'number' ? `${v}` : String(v))
+    const negate = (v: unknown): string => {
+        if (typeof v === 'number') return `${-v}`
         const s = String(v)
-        return s.startsWith('-') ? s : /^[\d.]+(px)?$/i.test(s) ? `-${s}` : s
+        return s.startsWith('-') ? s : /^[\d.]+(px)?$/i.test(s) ? `-${s.replace(/px$/i, '')}` : s
     }
 
     const len = (initial as Record<string, unknown>).pathLength ?? 0
-    const spa =
-        (initial as Record<string, unknown>).pathSpacing ??
-        (typeof len === 'number' ? 1 - (len as number) : 1)
+    const spa = (initial as Record<string, unknown>).pathSpacing ?? 1
     const off = (initial as Record<string, unknown>).pathOffset ?? 0
 
-    const dashArray = `${toPx(len)} ${toPx(spa)}`
-    const dashOffset = negatePx(off)
+    const dashArray = `${toUnitless(len)} ${toUnitless(spa)}`
+    const dashOffset = negate(off)
 
     // logging removed
 
