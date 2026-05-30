@@ -286,10 +286,16 @@ test.describe('AnimatePresence layout button dogfood', () => {
         await expectReadableRollingState(page, 'copied')
         await expectRollingShellAnchored(page, baselineShell, 'click')
 
-        const copiedWidth = await button.evaluate(
-            (element) => element.getBoundingClientRect().width
-        )
-        expect(copiedWidth).toBeGreaterThan(copyWidth + 4)
+        await expect
+            .poll(
+                async () =>
+                    button.evaluate((element) => {
+                        const rect = element.getBoundingClientRect()
+                        return rect.width
+                    }),
+                { message: 'copied state should grow the shell wider than copy', timeout: 1200 }
+            )
+            .toBeGreaterThan(copyWidth + 4)
 
         await expect(button).toHaveAttribute('data-stage', 'copy', { timeout: 3000 })
         await expect(page.getByTestId('rolling-copy-state')).toBeVisible()

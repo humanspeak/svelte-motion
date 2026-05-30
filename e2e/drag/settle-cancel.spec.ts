@@ -50,18 +50,22 @@ test.describe('drag/settle-cancel', () => {
         expect(midTranslate).toBeGreaterThan(10)
         expect(midTranslate).toBeLessThan(190)
 
-        // Re-grab without moving, hold 250 ms.
+        // Re-grab without moving. Take the baseline after pointerdown so
+        // one final in-flight frame before the re-grab isn't counted as
+        // drift while held.
         await page.mouse.move(midCx, cy)
         await page.mouse.down()
+        await page.evaluate(() => new Promise(requestAnimationFrame))
+        const grabbedTranslate = await readTranslateX(page, '[data-testid="snap-card"]')
         await page.waitForTimeout(250)
         const heldTranslate = await readTranslateX(page, '[data-testid="snap-card"]')
         await page.mouse.up()
 
         // With cancel: translate barely changes. Without cancel: card
         // creeps further toward 0 by tens of px in 250 ms.
-        // 12 px tolerance covers sub-frame timing between pointerdown
-        // dispatch and the cancel hook firing. Pre-fix value was ~60–90 px.
-        expect(Math.abs(heldTranslate - midTranslate)).toBeLessThanOrEqual(12)
+        // 8 px tolerance covers sub-frame style flushing after pointerdown.
+        // Pre-fix value was ~60–90 px.
+        expect(Math.abs(heldTranslate - grabbedTranslate)).toBeLessThanOrEqual(8)
     })
 
     test('no-momentum settle animation freezes when user re-grabs without moving', async ({
@@ -101,9 +105,13 @@ test.describe('drag/settle-cancel', () => {
         expect(midTranslate).toBeGreaterThan(130)
         expect(midTranslate).toBeLessThan(390)
 
-        // Re-grab without moving. Hold for 250 ms.
+        // Re-grab without moving. Take the baseline after pointerdown so
+        // one final in-flight frame before the re-grab isn't counted as
+        // drift while held.
         await page.mouse.move(midCx, cy)
         await page.mouse.down()
+        await page.evaluate(() => new Promise(requestAnimationFrame))
+        const grabbedTranslate = await readTranslateX(page, '[data-testid="settle-card"]')
         await page.waitForTimeout(250)
         const heldTranslate = await readTranslateX(page, '[data-testid="settle-card"]')
         await page.mouse.up()
@@ -111,8 +119,8 @@ test.describe('drag/settle-cancel', () => {
         // With cancel: translate barely changes during the hold (within a
         // few px for sub-frame jitter). Without cancel: translate creeps
         // toward +120 by tens of pixels over 250 ms.
-        // 12 px tolerance covers sub-frame timing between pointerdown
-        // dispatch and the cancel hook firing. Pre-fix value was ~60–90 px.
-        expect(Math.abs(heldTranslate - midTranslate)).toBeLessThanOrEqual(12)
+        // 8 px tolerance covers sub-frame style flushing after pointerdown.
+        // Pre-fix value was ~60–90 px.
+        expect(Math.abs(heldTranslate - grabbedTranslate)).toBeLessThanOrEqual(8)
     })
 })

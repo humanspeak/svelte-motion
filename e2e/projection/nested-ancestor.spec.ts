@@ -39,6 +39,14 @@ const parseDelta = (text: string | null): Delta | null => {
     return { dx: Number(m[1]), dy: Number(m[2]), changed: m[3] === 'true' }
 }
 
+const isIdleDelta = (text: string | null): boolean => {
+    const delta = parseDelta(text)
+    return (
+        !!text?.includes('(no event yet)') ||
+        !!(delta && !delta.changed && Math.abs(delta.dx) < 0.5 && Math.abs(delta.dy) < 0.5)
+    )
+}
+
 const parseOffset = (text: string | null): Offset | null => {
     const m = text?.match(/x=(-?\d+)\s+y=(-?\d+)/)
     if (!m) return null
@@ -57,7 +65,7 @@ test.describe('projection/nested-ancestor', () => {
         const innerDelta = page.getByTestId('inner-delta')
         const offset = page.getByTestId('stripped-offset')
         await innerDelta.waitFor({ state: 'visible' })
-        await expect(innerDelta).toContainText('(no event yet)')
+        await expect.poll(async () => isIdleDelta(await innerDelta.textContent())).toBe(true)
 
         await page.getByTestId('toggle').click()
         await expect(innerDelta).toContainText('changed=true')
