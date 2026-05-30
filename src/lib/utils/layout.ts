@@ -4,6 +4,18 @@ const layoutSizeAnimationAttribute = 'data-layout-size-animation'
 
 const px = (value: number): string => `${Math.max(0, value)}px`
 
+const isViewportOffscreen = (el: HTMLElement): boolean => {
+    if (typeof window === 'undefined') return false
+
+    const rect = el.getBoundingClientRect()
+    return (
+        rect.bottom <= 0 ||
+        rect.right <= 0 ||
+        rect.top >= window.innerHeight ||
+        rect.left >= window.innerWidth
+    )
+}
+
 const runBoxSizeAnimation = (
     el: HTMLElement,
     transforms: {
@@ -52,13 +64,60 @@ const runBoxSizeAnimation = (
 
     const animation = animate(el, keyframes as unknown as DOMKeyframesDefinition, transition)
 
-    animation.finished?.finally(() => {
+    let removeScrollListener: (() => void) | undefined
+    let offscreenRaf: number | null = null
+    let cleanupRan = false
+    const cleanup = () => {
+        if (cleanupRan) return
+        cleanupRan = true
+        removeScrollListener?.()
+        if (
+            offscreenRaf !== null &&
+            typeof window !== 'undefined' &&
+            typeof window.cancelAnimationFrame === 'function'
+        ) {
+            window.cancelAnimationFrame(offscreenRaf)
+            offscreenRaf = null
+        }
         el.style.width = originalWidth
         el.style.height = originalHeight
         el.style.transformOrigin = originalTransformOrigin
         el.style.transform = originalTransform
         el.removeAttribute(layoutSizeAnimationAttribute)
-    })
+    }
+
+    if (typeof window !== 'undefined') {
+        const completeIfOffscreen = () => {
+            if (cleanupRan) return
+            if (isViewportOffscreen(el)) {
+                animation.complete()
+                cleanup()
+            }
+        }
+        const scheduleCompleteIfOffscreen = () => {
+            if (typeof window.requestAnimationFrame !== 'function') {
+                completeIfOffscreen()
+                return
+            }
+            if (offscreenRaf !== null) return
+            offscreenRaf = window.requestAnimationFrame(() => {
+                offscreenRaf = null
+                completeIfOffscreen()
+            })
+        }
+        const handleScroll = () => {
+            completeIfOffscreen()
+            scheduleCompleteIfOffscreen()
+        }
+        window.addEventListener('scroll', handleScroll, { passive: true })
+        removeScrollListener = () => {
+            window.removeEventListener('scroll', handleScroll)
+        }
+        completeIfOffscreen()
+        scheduleCompleteIfOffscreen()
+    }
+
+    animation.finished?.finally(cleanup)
 }
 
 /**
@@ -68,11 +127,13 @@ const runBoxSizeAnimation = (
  * immediately after reading the rect.
  *
  * When `scrollContainers` are provided, the returned rect is shifted by the
- * **sum** of each container's `scrollLeft` / `scrollTop`. FLIP deltas
- * computed from two such measures stay correct even when the user scrolls
- * any of the containers between measurements — including a nested
- * `layoutScroll` inside another `layoutScroll`. Mirrors framer-motion's
- * `removeElementScroll`, which walks every ancestor in the path.
+ * **sum** of each container's `scrollLeft` / `scrollTop`. When
+ * `includeViewportScroll` is true, the viewport's `window.scrollX` /
+ * `window.scrollY` is included too. FLIP deltas computed from two such
+ * measures stay correct even when the user scrolls between measurements —
+ * including a nested `layoutScroll` inside another `layoutScroll`. Mirrors
+ * framer-motion's `removeElementScroll`, which walks every ancestor in the
+ * path, plus root scroll compensation from the projection tree.
  *
  * Pass an empty array (or omit) for viewport-relative behaviour.
  *
@@ -89,6 +150,7 @@ const runBoxSizeAnimation = (
  * @param el Element to measure.
  * @param scrollContainers Optional ancestor chain with `layoutScroll` enabled.
  * @param baseTransform Transform string applied during measurement. Defaults to `'none'`.
+ * @param includeViewportScroll Whether to include `window.scrollX/Y` in the returned rect.
  * @returns DOMRect snapshot of the element.
  *
  * @example
@@ -106,19 +168,28 @@ const runBoxSizeAnimation = (
 export const measureRect = (
     el: HTMLElement,
     scrollContainers?: HTMLElement[],
-    baseTransform = 'none'
+    baseTransform = 'none',
+    includeViewportScroll = false
 ): DOMRect => {
     const prev = el.style.transform
     try {
         el.style.transform = baseTransform
         const rect = el.getBoundingClientRect()
-        if (!scrollContainers || scrollContainers.length === 0) return rect
+        let offsetLeft = includeViewportScroll && typeof window !== 'undefined' ? window.scrollX : 0
+        let offsetTop = includeViewportScroll && typeof window !== 'undefined' ? window.scrollY : 0
+        if (!scrollContainers || scrollContainers.length === 0) {
+            if (offsetLeft === 0 && offsetTop === 0) return rect
+            return new DOMRect(
+                rect.left + offsetLeft,
+                rect.top + offsetTop,
+                rect.width,
+                rect.height
+            )
+        }
         // Re-express the rect in the *combined* scroll-container coordinate
         // space so a subsequent scroll on any of them doesn't show up as
         // movement. DOMRect's left/top are read-only, so allocate a fresh
         // one with the summed offsets applied.
-        let offsetLeft = 0
-        let offsetTop = 0
         for (const container of scrollContainers) {
             offsetLeft += container.scrollLeft
             offsetTop += container.scrollTop

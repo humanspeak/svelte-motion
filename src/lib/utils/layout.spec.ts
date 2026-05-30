@@ -52,6 +52,25 @@ describe('utils/layout', () => {
         spy.mockRestore()
     })
 
+    it('measureRect: adds viewport scroll when requested', () => {
+        const el = document.createElement('div')
+        const scrollX = vi.spyOn(window, 'scrollX', 'get').mockReturnValue(15)
+        const scrollY = vi.spyOn(window, 'scrollY', 'get').mockReturnValue(40)
+        const spy = vi
+            .spyOn(el, 'getBoundingClientRect')
+            .mockReturnValue(new DOMRect(10, 20, 100, 50))
+
+        const rect = measureRect(el, [], 'none', true)
+        expect(rect.left).toBe(25)
+        expect(rect.top).toBe(60)
+        expect(rect.width).toBe(100)
+        expect(rect.height).toBe(50)
+
+        spy.mockRestore()
+        scrollX.mockRestore()
+        scrollY.mockRestore()
+    })
+
     it('measureRect: adds a single scroll container offset to the returned rect', () => {
         const el = document.createElement('div')
         const scroller = document.createElement('div')

@@ -279,6 +279,11 @@
         width: rect.width,
         height: rect.height
     })
+    const isViewportOffscreen = (rect: DOMRect): boolean =>
+        rect.bottom <= 0 ||
+        rect.right <= 0 ||
+        rect.top >= window.innerHeight ||
+        rect.left >= window.innerWidth
 
     // Ancestor-transform-invariant layout measurement for seeding the
     // fallback FLIP effect's first rect.
@@ -615,6 +620,8 @@
     let waitLayoutParent: HTMLElement | null = null
     let waitLayoutParentWidth = ''
     let waitLayoutParentHeight = ''
+    let waitLayoutViewportScrollX = 0
+    let waitLayoutViewportScrollY = 0
     const presenceLayoutHoldAttribute = 'data-presence-layout-hold'
     const presenceLayoutReleaseEvent = 'svelte-motion:presence-layout-release'
     const waitEnterBlockedBeforeMount = $derived(
@@ -1025,6 +1032,8 @@
         waitLayoutParent = parent
         waitLayoutParentWidth = parent.style.width
         waitLayoutParentHeight = parent.style.height
+        waitLayoutViewportScrollX = typeof window !== 'undefined' ? window.scrollX : 0
+        waitLayoutViewportScrollY = typeof window !== 'undefined' ? window.scrollY : 0
         parent.setAttribute(presenceLayoutHoldAttribute, 'true')
         parent.style.width = `${rect.width}px`
         parent.style.height = `${rect.height}px`
@@ -1045,14 +1054,23 @@
         } else {
             parent.style.removeProperty('height')
         }
+        const viewportScrolledDuringHold =
+            typeof window !== 'undefined' &&
+            (window.scrollX !== waitLayoutViewportScrollX ||
+                window.scrollY !== waitLayoutViewportScrollY)
         parent.dispatchEvent(
             new CustomEvent(presenceLayoutReleaseEvent, {
-                detail: { previousRect: domRectToRectLike(previousRect) }
+                detail: {
+                    previousRect: domRectToRectLike(previousRect),
+                    viewportScrolledDuringHold
+                }
             })
         )
         waitLayoutParent = null
         waitLayoutParentWidth = ''
         waitLayoutParentHeight = ''
+        waitLayoutViewportScrollX = 0
+        waitLayoutViewportScrollY = 0
     }
 
     const revealWaitHiddenElement = () => {
@@ -1293,10 +1311,17 @@
         if (!(element && layoutProp && isLoaded === 'ready' && hasLayoutFeatures)) return
 
         let rafId: number | null = null
+        let wasViewportOffscreenSinceLastLayout = false
         const flipLayoutMode = layoutProp === 'position' ? 'position' : true
         motionDomProjection?.seedLayout()
         lastRect = measureLayoutRect()
         setCompositorHints(element!, true)
+
+        const rememberOffscreenScroll = () => {
+            if (isViewportOffscreen(element!.getBoundingClientRect())) {
+                wasViewportOffscreenSinceLastLayout = true
+            }
+        }
 
         const commitObservedLayout = () => {
             if (element!.hasAttribute('data-layout-size-animation')) {
@@ -1327,21 +1352,36 @@
                 const transforms = computeFlipTransforms(lastRect, next, flipLayoutMode)
                 runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
                 lastRect = next
+                wasViewportOffscreenSinceLastLayout = false
             } else if (nextBox) {
                 lastRect = boxToRectLike(nextBox)
+                wasViewportOffscreenSinceLastLayout = false
             }
             motionDomProjection?.commitObservedLayoutChange()
         }
 
         const commitPresenceLayoutRelease = (event: Event) => {
-            const previous = (event as CustomEvent<{ previousRect?: RectLike }>).detail
-                ?.previousRect
+            const detail = (
+                event as CustomEvent<{
+                    previousRect?: RectLike
+                    viewportScrolledDuringHold?: boolean
+                }>
+            ).detail
+            const previous = detail?.previousRect
+            const viewportRect = element!.getBoundingClientRect()
             const next = measureLayoutRect()
             if (!(previous && next)) return
 
-            const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
-            runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
             lastRect = next
+            const shouldSkipLayoutAnimation =
+                detail?.viewportScrolledDuringHold ||
+                wasViewportOffscreenSinceLastLayout ||
+                isViewportOffscreen(viewportRect)
+            if (!shouldSkipLayoutAnimation) {
+                const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
+                runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
+            }
+            wasViewportOffscreenSinceLastLayout = false
             motionDomProjection?.commitObservedLayoutChange()
         }
 
@@ -1353,10 +1393,12 @@
             })
         }
         const disconnectObservers = observeLayoutChanges(element!, () => scheduleProjectionCommit())
+        window.addEventListener('scroll', rememberOffscreenScroll, { passive: true })
         element!.addEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
 
         return () => {
             disconnectObservers()
+            window.removeEventListener('scroll', rememberOffscreenScroll)
             element?.removeEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
             lastRect = null
             if (element) {

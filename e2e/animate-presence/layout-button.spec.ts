@@ -22,6 +22,43 @@ type ButtonSample = {
     labelHeight: number
 }
 
+type ButtonBox = {
+    documentTop: number
+    height: number
+    text: string
+    width: number
+}
+
+type ShellBox = {
+    centerX: number
+    centerY: number
+    top: number
+}
+
+const sampleButtonBox = async (
+    page: import('@playwright/test').Page,
+    testIdPrefix: string
+): Promise<ButtonBox> =>
+    page.getByTestId(`${testIdPrefix}-button`).evaluate((button) => {
+        const rect = button.getBoundingClientRect()
+        return {
+            documentTop: rect.top + window.scrollY,
+            height: rect.height,
+            text: button.textContent?.trim() ?? '',
+            width: rect.width
+        }
+    })
+
+const sampleRollingShellBox = async (page: import('@playwright/test').Page): Promise<ShellBox> =>
+    page.getByTestId('rolling-button').evaluate((button) => {
+        const rect = button.getBoundingClientRect()
+        return {
+            centerX: rect.left + rect.width / 2,
+            centerY: rect.top + rect.height / 2,
+            top: rect.top
+        }
+    })
+
 const parseScaleX = (transform: string): number => {
     if (!transform || transform === 'none') return 1
     const matrix = transform.match(/^matrix\(([^)]+)\)$/)
@@ -169,7 +206,97 @@ const expectReadyCopyState = async (
     })
 }
 
+const expectReadableRollingState = async (
+    page: import('@playwright/test').Page,
+    state: 'copy' | 'copied'
+) => {
+    await expect
+        .poll(
+            async () =>
+                page.getByTestId('rolling-button').evaluate((button, expectedState) => {
+                    const buttonRect = button.getBoundingClientRect()
+                    const stateElement = button.querySelector<HTMLElement>(
+                        `[data-testid="rolling-${expectedState}-state"]`
+                    )
+                    if (!stateElement) return undefined
+
+                    const stateRect = stateElement.getBoundingClientRect()
+                    const stateStyle = getComputedStyle(stateElement)
+
+                    const sample = {
+                        opacity: Number.parseFloat(stateStyle.opacity),
+                        filter: stateStyle.filter,
+                        text: stateElement.textContent?.trim() ?? '',
+                        contained:
+                            stateRect.left >= buttonRect.left - 4 &&
+                            stateRect.right <= buttonRect.right + 4 &&
+                            stateRect.top >= buttonRect.top - 4 &&
+                            stateRect.bottom <= buttonRect.bottom + 4
+                    }
+
+                    return (
+                        sample.text.includes(expectedState) &&
+                        sample.opacity >= 0.99 &&
+                        sample.filter === 'blur(0px)' &&
+                        sample.contained
+                    )
+                }, state),
+            { message: `${state} should settle into a readable state`, timeout: 2200 }
+        )
+        .toBe(true)
+}
+
+const expectRollingShellAnchored = async (
+    page: import('@playwright/test').Page,
+    baseline: ShellBox,
+    label: string
+) => {
+    await expect
+        .poll(
+            async () => {
+                const current = await sampleRollingShellBox(page)
+                return (
+                    Math.abs(current.centerX - baseline.centerX) <= 1 &&
+                    Math.abs(current.centerY - baseline.centerY) <= 1 &&
+                    Math.abs(current.top - baseline.top) <= 1
+                )
+            },
+            { message: `${label} should not move the rolling button shell`, timeout: 1200 }
+        )
+        .toBe(true)
+}
+
 test.describe('AnimatePresence layout button dogfood', () => {
+    test('runs the interactive rolling copy control', async ({ page }) => {
+        await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+
+        const button = page.getByTestId('rolling-button')
+        await expect(button).toBeVisible()
+        await expect(button).toHaveAttribute('data-stage', 'copy')
+        await expectReadableRollingState(page, 'copy')
+
+        const copyWidth = await button.evaluate((element) => element.getBoundingClientRect().width)
+        const baselineShell = await sampleRollingShellBox(page)
+
+        await button.hover()
+        await expectRollingShellAnchored(page, baselineShell, 'hover')
+        await button.click()
+        await expect(button).toHaveAttribute('data-stage', 'copied', { timeout: 1200 })
+        await expect(page.getByTestId('rolling-copied-state')).toBeVisible()
+        await expectReadableRollingState(page, 'copied')
+        await expectRollingShellAnchored(page, baselineShell, 'click')
+
+        const copiedWidth = await button.evaluate(
+            (element) => element.getBoundingClientRect().width
+        )
+        expect(copiedWidth).toBeGreaterThan(copyWidth + 4)
+
+        await expect(button).toHaveAttribute('data-stage', 'copy', { timeout: 3000 })
+        await expect(page.getByTestId('rolling-copy-state')).toBeVisible()
+        await expectReadableRollingState(page, 'copy')
+        await expectRollingShellAnchored(page, baselineShell, 'reset')
+    })
+
     test('renders status icons as SVG instead of font glyphs', async ({ page }) => {
         await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
 
@@ -677,7 +804,21 @@ test.describe('AnimatePresence layout button dogfood', () => {
             )
             expect(readableCopiedSamples.length, prefix).toBeGreaterThan(5)
 
-            for (let i = 1; i < readableCopiedSamples.length; i += 1) {
+            // Wait mode can expose one handoff sample as the new label replaces
+            // the exiting label. This test guards the tracked label after that
+            // handoff; centering during the handoff is covered above.
+            const startIndex =
+                prefix === 'wait' &&
+                readableCopiedSamples.length > 1 &&
+                Math.abs(
+                    readableCopiedSamples[1].labelCenterX - readableCopiedSamples[0].labelCenterX
+                ) > 1
+                    ? 1
+                    : 0
+
+            expect(readableCopiedSamples.length - startIndex, prefix).toBeGreaterThan(5)
+
+            for (let i = startIndex + 1; i < readableCopiedSamples.length; i += 1) {
                 const movement = Math.abs(
                     readableCopiedSamples[i].labelCenterX -
                         readableCopiedSamples[i - 1].labelCenterX
@@ -865,6 +1006,81 @@ test.describe('AnimatePresence layout button dogfood', () => {
                 sample.labelText
             ).toBeLessThanOrEqual(1)
         }
+    })
+
+    test('restores button size after the page scrolls during layout animation', async ({
+        page
+    }) => {
+        const prefixes = ['wait', 'sync']
+
+        for (const prefix of prefixes) {
+            await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+            await page.evaluate(() => window.scrollTo(0, 0))
+
+            const button = page.getByTestId(`${prefix}-button`)
+            await expect(button).toBeVisible()
+            await expect(button).toHaveText('copy')
+            await expect(button).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
+            await expectReadyCopyState(page, prefix)
+
+            const before = await sampleButtonBox(page, prefix)
+
+            await button.click()
+            await page.waitForTimeout(350)
+            await page.evaluate(() => window.scrollBy(0, 240))
+            await expect(button).toHaveText('copy', { timeout: prefix === 'wait' ? 9000 : 7000 })
+            await page.waitForFunction(
+                (testIdPrefix) => {
+                    const buttonElement = document.querySelector<HTMLElement>(
+                        `[data-testid="${testIdPrefix}-button"]`
+                    )
+                    return !buttonElement?.hasAttribute('data-layout-size-animation')
+                },
+                prefix,
+                { timeout: 3500 }
+            )
+
+            const after = await sampleButtonBox(page, prefix)
+            expect(after.text, prefix).toBe(before.text)
+            expect(Math.abs(after.documentTop - before.documentTop), prefix).toBeLessThanOrEqual(1)
+            expect(Math.abs(after.height - before.height), prefix).toBeLessThanOrEqual(1)
+            expect(Math.abs(after.width - before.width), prefix).toBeLessThanOrEqual(1)
+        }
+    })
+
+    test('wait mode settles copied size when release happens fully offscreen', async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 360 })
+        await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+        await page.evaluate(() => window.scrollTo(0, 0))
+
+        const button = page.getByTestId('wait-button')
+        await expect(button).toBeVisible()
+        await expect(button).toHaveText('copy')
+        await expect(button).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
+        await expectReadyCopyState(page, 'wait')
+
+        const before = await sampleButtonBox(page, 'wait')
+
+        await button.click()
+        await page.waitForTimeout(150)
+        await button.evaluate((element) => {
+            const rect = element.getBoundingClientRect()
+            window.scrollBy(0, rect.bottom + 32)
+        })
+        await page.waitForFunction(() => {
+            const buttonElement = document.querySelector<HTMLElement>('[data-testid="wait-button"]')
+            return !!buttonElement && buttonElement.getBoundingClientRect().bottom <= 0
+        })
+        await expect(page.getByTestId('wait-copied-state')).not.toHaveAttribute(
+            'data-presence-wait-hidden',
+            'true',
+            { timeout: 4000 }
+        )
+        await page.evaluate(() => window.scrollTo(0, 0))
+
+        const returned = await sampleButtonBox(page, 'wait')
+        expect(returned.text).toBe('copied')
+        expect(returned.width).toBeGreaterThan(before.width + 4)
     })
 
     test('animates button width instead of snapping to the final size', async ({ page }) => {

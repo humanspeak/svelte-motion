@@ -1,5 +1,6 @@
 <script lang="ts">
     import ModeButton from './ModeButton.svelte'
+    import RollingCopyButton from './RollingCopyButton.svelte'
 </script>
 
 <svelte:head>
@@ -19,6 +20,7 @@
         </div>
 
         <div class="demos">
+            <RollingCopyButton />
             <ModeButton mode="wait" title="Wait" testIdPrefix="wait" />
             <ModeButton mode="sync" title="Sync" testIdPrefix="sync" />
             <ModeButton mode="popLayout" title="Pop layout" testIdPrefix="pop-layout" />
@@ -207,8 +209,66 @@
         color: inherit;
         background: transparent;
     }
+    :global(.featured-demo) {
+        background: #0c1519;
+    }
+    :global(.featured-copy) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 28px;
+        min-height: 132px;
+    }
+    :global(.featured-copy > div) {
+        max-width: 560px;
+    }
+    :global(.rolling-button-slot) {
+        display: grid;
+        flex: none;
+        place-items: center;
+        width: 180px;
+    }
+    :global(.rolling-copy-button) {
+        padding: 12px 18px;
+        min-width: 112px;
+        border-color: #52626d;
+        background: #111b21;
+        font-size: 15px;
+        line-height: 18px;
+        box-shadow: 0 0 0 0 rgba(125, 211, 252, 0);
+    }
+    :global(.rolling-copy-button:hover) {
+        border-color: #7dd3fc;
+        box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.28);
+    }
+    :global(.rolling-copy-button[data-stage='copied']) {
+        border-color: #7dd3fc;
+        background: #10232b;
+        color: #7dd3fc;
+    }
+    :global(.rolling-button-content) {
+        display: inline-grid;
+        place-items: center;
+        pointer-events: none;
+        transform-origin: center center;
+    }
+    :global(.rolling-state-stack) {
+        overflow: visible;
+    }
+    :global(.rolling-state) {
+        gap: 8px;
+        line-height: 18px;
+    }
+    :global(.rolling-state svg) {
+        width: 16px;
+        height: 16px;
+    }
     @media (max-width: 640px) {
         :global(.demo-head) {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+        :global(.featured-copy) {
             align-items: flex-start;
             flex-direction: column;
         }
