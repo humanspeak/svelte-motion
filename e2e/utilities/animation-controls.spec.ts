@@ -53,6 +53,30 @@ test.describe('useAnimationControls', () => {
         await expect(page.getByTestId('label')).toHaveText('idle')
     })
 
+    test('initial variant remains stable before controls run', async ({ page }) => {
+        await gotoReady(page)
+
+        await page.waitForTimeout(500)
+
+        const orb = await page.getByTestId('orb').evaluate((el) => {
+            const style = getComputedStyle(el)
+            const matrix =
+                style.transform === 'none'
+                    ? new DOMMatrixReadOnly()
+                    : new DOMMatrixReadOnly(style.transform)
+
+            return {
+                opacity: Number(style.opacity),
+                scaleX: matrix.a,
+                scaleY: matrix.d
+            }
+        })
+
+        expect(orb.opacity).toBeCloseTo(0.45, 2)
+        expect(orb.scaleX).toBeCloseTo(0.9, 2)
+        expect(orb.scaleY).toBeCloseTo(0.9, 2)
+    })
+
     test('stop freezes active subscribers mid-sequence', async ({ page }) => {
         await gotoReady(page)
 

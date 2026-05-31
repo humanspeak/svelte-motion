@@ -383,6 +383,29 @@ describe('_MotionContainer', () => {
         cleanup()
     })
 
+    it('keeps initial variants applied after mounting with animate controls', async () => {
+        const controls = animationControls()
+
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+        const { container } = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                animate: controls,
+                initial: 'ready',
+                variants: {
+                    ready: { opacity: 0.45, scaleX: 0.16 }
+                }
+            }
+        })
+
+        await flushTimers()
+        await flushTimers()
+
+        const el = container.firstElementChild as HTMLElement
+        expect(el.getAttribute('style')).toContain('opacity: 0.45')
+        expect(el.getAttribute('style')).toContain('transform: scaleX(0.16)')
+    })
+
     it('applies FLIP (translate + scale) when layout=true and size changes', async () => {
         // Stub ResizeObserver and capture instances
         const roInstances: Array<{ fire: () => void }> = []

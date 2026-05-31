@@ -722,6 +722,7 @@
 
     const activeAnimationControls = new SvelteSet<StoppableAnimationControl>()
     let animationControlsGeneration = 0
+    let animationControlsHasReceivedCommand = false
 
     const isStoppableAnimationControl = (control: unknown): control is StoppableAnimationControl =>
         !!control &&
@@ -757,6 +758,7 @@
         const resolved = resolveAnimationControlsDefinition(definition)
         if (!resolved) return
 
+        animationControlsHasReceivedCommand = true
         const target = { ...(resolved as Record<string, unknown>) } as Record<string, unknown> & {
             transition?: AnimationOptions
             transitionEnd?: Record<string, unknown>
@@ -783,6 +785,7 @@
     }
 
     const stopAnimationControlsAnimations = () => {
+        animationControlsHasReceivedCommand = true
         animationControlsGeneration += 1
 
         for (const control of activeAnimationControls) {
@@ -814,6 +817,7 @@
         const resolved = resolveAnimationControlsDefinition(definition)
         if (!resolved) return
 
+        animationControlsHasReceivedCommand = true
         const filtered = filterReducedMotionKeyframes(
             resolved as Record<string, unknown>,
             reducedMotion
@@ -1006,9 +1010,13 @@
                 ? (resolveRestingValues(
                       animateKeyframes as DOMKeyframesDefinition | undefined
                   ) as unknown as Record<string, unknown>)
-                : isNotEmpty(initialKeyframes)
-                  ? undefined
-                  : (animateKeyframes as unknown as Record<string, unknown>)
+                : animateControls &&
+                    !animationControlsHasReceivedCommand &&
+                    isNotEmpty(initialKeyframes)
+                  ? (initialKeyframes as unknown as Record<string, unknown>)
+                  : isNotEmpty(initialKeyframes)
+                    ? undefined
+                    : (animateKeyframes as unknown as Record<string, unknown>)
         ),
         class: classProp
     })
