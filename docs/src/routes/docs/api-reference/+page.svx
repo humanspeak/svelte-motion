@@ -37,6 +37,9 @@ import type {
     MotionWhileFocus,
     MotionWhileInView,
     MotionWhileDrag,
+    AnimationControls,
+    AnimationControlsDefinition,
+    AnimationControlsSubscriber,
 
     // Drag
     DragAxis,

@@ -1,3 +1,4 @@
+import { animationControls } from '$lib/utils/animationControls.svelte'
 import { fireEvent, render } from '@testing-library/svelte'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -269,6 +270,71 @@ describe('_MotionContainer', () => {
         expect(animateMock.mock.calls.length).toBeGreaterThan(initialAnimateCalls)
         const lastCall = animateMock.mock.calls.at(-1)
         expect(lastCall?.[1]).toMatchObject({ opacity: 0.9 })
+    })
+
+    it('subscribes animate controls and starts resolved variants', async () => {
+        const controls = animationControls()
+        const cleanup = controls.mount()
+
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+        render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                animate: controls,
+                variants: {
+                    visible: { opacity: 1, x: 20 }
+                },
+                transition: { duration: 0.4 }
+            }
+        })
+
+        await flushTimers()
+        animateMock.mockClear()
+
+        await controls.start('visible', { duration: 0.1 })
+
+        expect(
+            animateMock.mock.calls.some(
+                (call) =>
+                    (call[1] as Record<string, unknown>)?.opacity === 1 &&
+                    (call[1] as Record<string, unknown>)?.x === 20 &&
+                    (call[2] as Record<string, unknown>)?.duration === 0.1
+            )
+        ).toBe(true)
+
+        cleanup()
+    })
+
+    it('sets animate controls to final keyframe and transitionEnd values', async () => {
+        const controls = animationControls()
+        const cleanup = controls.mount()
+
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+        render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                animate: controls,
+                variants: {
+                    hidden: {
+                        opacity: [1, 0.2],
+                        transitionEnd: { display: 'none' }
+                    }
+                }
+            }
+        })
+
+        await flushTimers()
+        animateMock.mockClear()
+
+        controls.set('hidden')
+
+        expect(animateMock).toHaveBeenCalledWith(
+            expect.any(HTMLElement),
+            expect.objectContaining({ opacity: 0.2, display: 'none' }),
+            { duration: 0 }
+        )
+
+        cleanup()
     })
 
     it('applies FLIP (translate + scale) when layout=true and size changes', async () => {

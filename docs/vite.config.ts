@@ -81,17 +81,19 @@ export default defineConfig({
             disableAsyncLocalStorage: true
         })
     ],
-    // docs-kit ships .svelte source (not pre-compiled JS) so vite-plugin-svelte
-    // can run on its components and emit scoped styles. If Vite pre-bundles
-    // the package via optimizeDeps the scoped <style> blocks get stripped and
-    // every dk-* class falls back to unstyled `display: block` — the header
-    // collapses, the footer collapses, etc.
+    // docs-kit and the workspace package ship .svelte/source entrypoints that
+    // should be compiled by vite-plugin-svelte. If Vite pre-bundles docs-kit
+    // the scoped <style> blocks get stripped and every dk-* class falls back to
+    // unstyled `display: block` — the header collapses, the footer collapses,
+    // etc. If Vite pre-bundles @humanspeak/svelte-motion, pnpm can resolve the
+    // nested docs-kit dependency instead of this workspace package in dev.
     //
     // The transitive satori deps must also stay out of optimizeDeps because
     // rolldown (Vite 8's bundler) can't process the native @resvg bindings.
     optimizeDeps: {
         exclude: [
             '@humanspeak/docs-kit',
+            '@humanspeak/svelte-motion',
             '@humanspeak/svelte-satori-fix',
             '@resvg/resvg-js',
             'satori',

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import DocsKitCopyButton from './DocsKitCopyButton.svelte'
     import ModeButton from './ModeButton.svelte'
     import RollingCopyButton from './RollingCopyButton.svelte'
 </script>
@@ -20,6 +21,7 @@
         </div>
 
         <div class="demos">
+            <DocsKitCopyButton />
             <RollingCopyButton />
             <ModeButton mode="wait" title="Wait" testIdPrefix="wait" />
             <ModeButton mode="sync" title="Sync" testIdPrefix="sync" />
@@ -162,6 +164,13 @@
         justify-items: center;
     }
     :global(.state) {
+        display: inline-grid;
+        align-items: center;
+        justify-items: center;
+        white-space: nowrap;
+        line-height: 16px;
+    }
+    :global(.state-content) {
         grid-area: 1 / 1;
         display: inline-flex;
         align-items: center;
@@ -170,7 +179,7 @@
         white-space: nowrap;
         line-height: 16px;
     }
-    :global(.state svg) {
+    :global(.state-content svg) {
         width: 14px;
         height: 14px;
         flex: none;
@@ -209,6 +218,75 @@
         color: inherit;
         background: transparent;
     }
+    :global(.docs-kit-demo) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 28px;
+        background: #0c1519;
+    }
+    :global(.docs-kit-demo > div) {
+        max-width: 560px;
+    }
+    :global(.docs-kit-copy) {
+        appearance: none;
+        -webkit-appearance: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        position: relative;
+        flex: none;
+        overflow: hidden;
+        width: 74px;
+        height: 24px;
+        padding: 4px 9px;
+        border: 1px solid #43515a;
+        background: #11171c;
+        color: #cbd5e1;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 10.5px;
+        line-height: 1.2;
+        text-transform: lowercase;
+        letter-spacing: 0;
+        cursor: pointer;
+        transition:
+            color 0.15s,
+            border-color 0.15s,
+            background 0.15s;
+    }
+    :global(.docs-kit-copy:hover),
+    :global(.docs-kit-copy.copied) {
+        border-color: #7dd3fc;
+        background: #10232b;
+        color: #7dd3fc;
+    }
+    :global(.docs-kit-copy-state) {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        position: absolute;
+        inset: 0;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+    :global(.docs-kit-copy-state svg) {
+        width: 11px;
+        height: 11px;
+        flex: none;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+    :global(.docs-kit-copy-state.copy-state) {
+        color: #cbd5e1;
+    }
+    :global(.docs-kit-copy-state.copied-state) {
+        color: #7dd3fc;
+    }
     :global(.featured-demo) {
         background: #0c1519;
     }
@@ -230,7 +308,7 @@
     }
     :global(.rolling-copy-button) {
         padding: 12px 18px;
-        min-width: 112px;
+        min-width: 0;
         border-color: #52626d;
         background: #111b21;
         font-size: 15px;
@@ -269,6 +347,10 @@
             flex-direction: column;
         }
         :global(.featured-copy) {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+        :global(.docs-kit-demo) {
             align-items: flex-start;
             flex-direction: column;
         }

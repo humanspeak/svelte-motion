@@ -270,10 +270,12 @@ describe('utils/layout', () => {
         expect(el.style.width).toBe('60px')
 
         const call = animateMock.mock.calls[0]
-        expect(call?.[0]).toBe(el)
-        const keyframes = call?.[1] as Record<string, unknown>
-        expect(keyframes).toMatchObject({ width: ['60px', '80px'], height: ['30px', '30px'] })
-        expect('scaleX' in keyframes).toBe(false)
+        expect(call?.[0]).toBe(0)
+        expect(call?.[1]).toBe(1)
+        const options = call?.[2] as { onUpdate?: (progress: number) => void }
+        options.onUpdate?.(0.5)
+        expect(el.style.width).toBe('70px')
+        expect(el.style.height).toBe('30px')
         expect(child.style.transform).toBe('')
 
         await Promise.resolve()
@@ -337,7 +339,7 @@ describe('utils/layout', () => {
                     target: el,
                     options: expect.objectContaining({
                         attributes: true,
-                        attributeFilter: ['class', 'style', 'data-presence-layout-hold']
+                        attributeFilter: ['class', 'data-presence-layout-hold']
                     })
                 }),
                 expect.objectContaining({

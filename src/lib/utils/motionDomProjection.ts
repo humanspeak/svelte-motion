@@ -15,6 +15,20 @@ type ProjectionVisualElement = VisualElement & {
     latestValues: ResolvedValues
     projection?: IProjectionNode<HTMLElement>
 }
+type ProjectionTreeNode = {
+    children: Iterable<ProjectionTreeNode>
+    currentAnimation?: unknown
+    finishAnimation: () => void
+    isLayoutDirty: boolean
+    isProjectionDirty: boolean
+    layout?: Measurements
+    options: IProjectionNode['options']
+    relativeTarget?: unknown
+    scheduleRender: (notifyAll?: boolean) => void
+    snapshot?: Measurements
+    target?: unknown
+    targetDelta?: unknown
+}
 
 type LayoutOption = boolean | string | undefined
 type AnimationType = 'position' | 'x' | 'y' | 'size' | 'both' | 'preserve-aspect'
@@ -32,6 +46,8 @@ export interface MotionDomProjectionUpdateOptions {
     layout?: LayoutOption
     /** Shared layout id used by upstream projection matching. */
     layoutId?: string
+    /** Tracks scroll on this element for descendant layout projection. */
+    layoutScroll?: boolean
     /** Transition passed to the upstream layout animation builder. */
     transition?: Transition
     /** Inline style props passed through to the visual element. */
@@ -87,6 +103,8 @@ const animationTypeForLayout = (layout: LayoutOption): AnimationType =>
  * and `HTMLVisualElement` internals Framer Motion uses.
  */
 export class MotionDomProjectionAdapter {
+    private static adapters = new WeakMap<object, MotionDomProjectionAdapter>()
+
     readonly visualElement: ProjectionVisualElement
     readonly projection: IProjectionNode<HTMLElement>
 
@@ -112,6 +130,7 @@ export class MotionDomProjectionAdapter {
             parent?.projection as unknown as IProjectionNode | undefined
         )
         this.visualElement.projection = this.projection
+        MotionDomProjectionAdapter.adapters.set(this.projection, this)
     }
 
     /**
@@ -140,6 +159,7 @@ export class MotionDomProjectionAdapter {
         this.projection.setOptions({
             layout: options.layout,
             layoutId: options.layoutId,
+            layoutScroll: options.layoutScroll,
             animationType: animationTypeForLayout(options.layout),
             transition: options.transition,
             visualElement: this.visualElement
@@ -162,6 +182,7 @@ export class MotionDomProjectionAdapter {
         if (this.element) this.unmount()
 
         this.element = element
+        MotionDomProjectionAdapter.adapters.set(this.projection, this)
         this.visualElement.mount(element)
         this.seedLayout()
     }
@@ -182,6 +203,7 @@ export class MotionDomProjectionAdapter {
         this.projection.scheduleCheckAfterUnmount()
         this.visualElement.unmount()
         visualElementStore.delete(element)
+        MotionDomProjectionAdapter.adapters.delete(this.projection)
         this.element = null
         this.lastLayout = undefined
     }
@@ -197,7 +219,7 @@ export class MotionDomProjectionAdapter {
      * ```
      */
     willUpdate(): void {
-        if (!this.element || !this.layoutId) return
+        if (!this.element || !this.layout) return
         this.projection.willUpdate()
     }
 
@@ -212,7 +234,7 @@ export class MotionDomProjectionAdapter {
      * ```
      */
     didUpdate(): void {
-        if (!this.element || !this.layoutId) return
+        if (!this.element || !this.layout) return
         this.projection.root?.didUpdate()
         this.refreshCachedLayout()
     }
@@ -229,6 +251,7 @@ export class MotionDomProjectionAdapter {
      */
     seedLayout(): void {
         if (!this.element) return
+        this.updatePathScroll()
         this.projection.isLayoutDirty = true
         this.projection.updateLayout()
         this.lastLayout = cloneMeasurements(this.projection.layout)
@@ -250,18 +273,84 @@ export class MotionDomProjectionAdapter {
      * ```
      */
     commitObservedLayoutChange(): void {
-        if (!this.element || !this.layoutId) return
-        const snapshot = cloneMeasurements(this.lastLayout)
-        if (!snapshot) {
+        if (!this.element || !this.layout) return
+        if (!this.lastLayout) {
             this.seedLayout()
             return
         }
 
         this.projection.root?.startUpdate()
-        this.projection.snapshot = snapshot
-        this.projection.isLayoutDirty = true
+        this.seedCachedSnapshotsForSubtree(this.projection)
         this.projection.root?.didUpdate()
         this.refreshCachedLayout()
+    }
+
+    /**
+     * Finish any active upstream layout animation in this subtree.
+     *
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * adapter.finishAnimation()
+     * ```
+     */
+    finishAnimation(): void {
+        if (!this.element || !this.layout) return
+        this.finishAnimationForSubtree(this.projection)
+        this.seedLayout()
+    }
+
+    /**
+     * Check whether this projection subtree has an active layout animation.
+     *
+     * @returns `true` when this projection subtree is currently animating.
+     *
+     * @example
+     * ```ts
+     * if (adapter.isAnimating()) adapter.finishAnimation()
+     * ```
+     */
+    isAnimating(): boolean {
+        return this.isAnimatingSubtree(this.projection)
+    }
+
+    private seedCachedSnapshotsForSubtree(projection: ProjectionTreeNode): void {
+        const adapter = MotionDomProjectionAdapter.adapters.get(projection)
+        const snapshot = cloneMeasurements(adapter?.lastLayout)
+
+        if (snapshot && projection.options.layout) {
+            projection.snapshot = snapshot
+            projection.isLayoutDirty = true
+        }
+
+        for (const child of projection.children) {
+            this.seedCachedSnapshotsForSubtree(child)
+        }
+    }
+
+    private finishAnimationForSubtree(projection: ProjectionTreeNode): void {
+        projection.finishAnimation()
+        projection.targetDelta = projection.relativeTarget = projection.target = undefined
+        projection.isProjectionDirty = true
+        projection.scheduleRender()
+        for (const child of projection.children) {
+            this.finishAnimationForSubtree(child)
+        }
+    }
+
+    private isAnimatingSubtree(projection: ProjectionTreeNode): boolean {
+        if (projection.currentAnimation) return true
+        for (const child of projection.children) {
+            if (this.isAnimatingSubtree(child)) return true
+        }
+        return false
+    }
+
+    private updatePathScroll(): void {
+        for (const node of this.projection.path) {
+            node.updateScroll()
+        }
     }
 
     private refreshCachedLayout(): void {

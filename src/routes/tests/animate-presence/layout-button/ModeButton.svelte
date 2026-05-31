@@ -182,14 +182,17 @@
             transition={layoutTransition}
             onclick={showCopied}
         >
-            <span class="state-stack">
+            <motion.span
+                class="state {copied ? 'copied-state' : 'copy-state'}"
+                data-testid="{testIdPrefix}-{copied ? 'copied' : 'copy'}-state"
+                layout="position"
+            >
                 <AnimatePresence initial={false} {mode}>
                     {#if copied}
                         <motion.span
                             key="copied"
-                            class="state copied-state"
-                            data-testid="{testIdPrefix}-copied-state"
-                            layout="position"
+                            class="state-content copied-state"
+                            data-testid="{testIdPrefix}-copied-presence-state"
                             initial={{ opacity: 1 }}
                             animate={{ opacity: 1 }}
                             exit={visibleExit}
@@ -207,9 +210,8 @@
                     {:else}
                         <motion.span
                             key="copy"
-                            class="state copy-state"
-                            data-testid="{testIdPrefix}-copy-state"
-                            layout="position"
+                            class="state-content copy-state"
+                            data-testid="{testIdPrefix}-copy-presence-state"
                             initial={{ opacity: 1 }}
                             animate={{ opacity: 1 }}
                             exit={visibleExit}
@@ -227,7 +229,7 @@
                         </motion.span>
                     {/if}
                 </AnimatePresence>
-            </span>
+            </motion.span>
         </motion.button>
     </div>
 

@@ -14,6 +14,8 @@
     import type {
         MotionProps,
         MotionTransition,
+        AnimationControlsDefinition,
+        AnimationControlsSubscriber,
         DragAxis,
         DragConstraints,
         DragControls,
@@ -33,6 +35,7 @@
     import { onDestroy, untrack, type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants'
     import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation'
+    import { isAnimationControls } from '$lib/utils/animationControls.svelte'
     import { attachWhileTap } from '$lib/utils/interaction'
     import { attachWhileHover, computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
     import { attachWhileFocus } from '$lib/utils/focus'
@@ -69,6 +72,7 @@
         resolveAnimate,
         resolveExit,
         resolveWhile,
+        resolveVariantList,
         resolveRestingValues
     } from '$lib/utils/variants'
     import {
@@ -282,6 +286,11 @@
         width: rect.width,
         height: rect.height
     })
+    const hasRectChanged = (previous: RectLike, next: RectLike): boolean =>
+        Math.abs(previous.left - next.left) > 0.5 ||
+        Math.abs(previous.top - next.top) > 0.5 ||
+        Math.abs(previous.width - next.width) > 0.5 ||
+        Math.abs(previous.height - next.height) > 0.5
     const isViewportOffscreen = (rect: DOMRect): boolean =>
         rect.bottom <= 0 ||
         rect.right <= 0 ||
@@ -463,6 +472,8 @@
 
     // Variant inheritance and resolution
     const parentVariantStore = getVariantContext()
+    const animateControls = $derived(isAnimationControls(animateProp) ? animateProp : undefined)
+    const declarativeAnimateProp = $derived(animateControls ? undefined : animateProp)
 
     // Get initial inherited variant synchronously
     let initialInheritedVariant: string | undefined = undefined
@@ -472,8 +483,8 @@
 
     // Create store with initial value so children can inherit immediately
     const initialVariantValue =
-        typeof animateProp === 'string'
-            ? animateProp
+        typeof declarativeAnimateProp === 'string'
+            ? declarativeAnimateProp
             : (variantsProp && initialInheritedVariant) || undefined
     const localVariantStore = writable<string | undefined>(initialVariantValue)
 
@@ -490,7 +501,8 @@
 
     // Use the initial value first, then switch to reactive once mounted
     const effectiveAnimate = $derived(
-        animateProp ?? (variantsProp ? (inheritedVariant ?? initialInheritedVariant) : undefined)
+        declarativeAnimateProp ??
+            (variantsProp ? (inheritedVariant ?? initialInheritedVariant) : undefined)
     )
 
     // Propagate initial={false} to children BEFORE setting variant context
@@ -547,7 +559,8 @@
 
     $effect(() => {
         if (!variantsProp) return localVariantStore.set(undefined)
-        if (typeof animateProp === 'string') return localVariantStore.set(animateProp)
+        if (typeof declarativeAnimateProp === 'string')
+            return localVariantStore.set(declarativeAnimateProp)
         if (typeof effectiveAnimate === 'string') return localVariantStore.set(effectiveAnimate)
         localVariantStore.set(undefined)
     })
@@ -690,6 +703,120 @@
         return finished && typeof (finished as Promise<unknown>).then === 'function'
             ? (finished as Promise<unknown>)
             : null
+    }
+
+    const getAnimationPromise = (control: unknown): Promise<unknown> => {
+        const finished = getFinishedPromise(control)
+        if (finished) return finished
+        if (control && typeof (control as Promise<unknown>).then === 'function') {
+            return control as Promise<unknown>
+        }
+        return Promise.resolve()
+    }
+
+    const resolveAnimationControlsDefinition = (
+        definition: AnimationControlsDefinition
+    ): DOMKeyframesDefinition | undefined => {
+        const resolvedDefinition =
+            typeof definition === 'function' ? definition(effectiveCustom) : definition
+        if (typeof resolvedDefinition === 'string' || Array.isArray(resolvedDefinition)) {
+            return resolveVariantList(variantsProp, resolvedDefinition, effectiveCustom)
+        }
+        return resolvedDefinition
+    }
+
+    const applyAnimationControlsTarget = (definition: AnimationControlsDefinition) => {
+        if (!element) return
+        const resolved = resolveAnimationControlsDefinition(definition)
+        if (!resolved) return
+
+        const target = { ...(resolved as Record<string, unknown>) } as Record<string, unknown> & {
+            transition?: AnimationOptions
+            transitionEnd?: Record<string, unknown>
+        }
+        const transitionEnd = target.transitionEnd
+        delete target.transition
+        delete target.transitionEnd
+        const finalTarget = resolveRestingValues({
+            ...target,
+            ...(transitionEnd ?? {})
+        } as DOMKeyframesDefinition) as Record<string, unknown> | undefined
+        if (!finalTarget) return
+
+        const transformedTarget = transformSVGPathProperties(element, finalTarget) as Record<
+            string,
+            unknown
+        >
+        animate(element, transformedTarget as DOMKeyframesDefinition, { duration: 0 })
+        element.setAttribute(
+            'style',
+            mergeInlineStyles(element.getAttribute('style') ?? '', undefined, transformedTarget)
+        )
+        enterAnimationSettled = true
+    }
+
+    const stopAnimationControlsAnimations = () => {
+        if (!element) return
+        if (typeof element.getAnimations !== 'function') return
+        for (const animation of element.getAnimations()) {
+            try {
+                animation.commitStyles?.()
+            } catch {
+                // Ignore unsupported commitStyles cases.
+            }
+            animation.cancel()
+        }
+    }
+
+    const startAnimationControlsDefinition = async (
+        definition: AnimationControlsDefinition,
+        transitionOverride?: AnimationOptions
+    ): Promise<unknown> => {
+        if (!element) return
+        const resolved = resolveAnimationControlsDefinition(definition)
+        if (!resolved) return
+
+        const filtered = filterReducedMotionKeyframes(
+            resolved as Record<string, unknown>,
+            reducedMotion
+        ) as Record<string, unknown> & {
+            transition?: AnimationOptions
+            transitionEnd?: Record<string, unknown>
+        }
+        const transition = filtered.transition
+        const target = { ...filtered }
+        delete target.transition
+        delete target.transitionEnd
+        const transitionAnimate: MotionTransition =
+            transitionOverride ?? mergeTransitions(mergedTransition ?? {}, transition ?? {})
+        const svgPathFinished =
+            isSVGPathElement(element) && hasSVGPathProperties(target)
+                ? animateSVGPathAttributes(element, target, transitionAnimate)
+                : []
+        const payload = transformSVGPathProperties(
+            element,
+            svgPathFinished.length > 0 ? stripSVGPathKeyframes(target) : target
+        ) as Record<string, unknown>
+
+        enterAnimationSettled = false
+        onAnimationStartProp?.(definition as unknown as DOMKeyframesDefinition)
+
+        const promises: Promise<unknown>[] = [...svgPathFinished]
+        if (isNotEmpty(payload)) {
+            promises.push(
+                getAnimationPromise(
+                    animate(
+                        element,
+                        payload as DOMKeyframesDefinition,
+                        transitionAnimate as AnimationOptions
+                    )
+                )
+            )
+        }
+
+        await Promise.all(promises)
+        applyAnimationControlsTarget(definition)
+        onAnimationCompleteProp?.(definition as unknown as DOMKeyframesDefinition)
     }
 
     /**
@@ -1320,9 +1447,12 @@
                             // which shows up as a "pop" after the deferred animation completes.
                             pwLog('[motion] wait-unblocked: marking enter handled')
                             initialAnimationTriggered = true
-                            if (animateProp && typeof animateProp !== 'string') {
+                            if (
+                                declarativeAnimateProp &&
+                                typeof declarativeAnimateProp !== 'string'
+                            ) {
                                 objectAnimateRanOnMount = true
-                                lastAnimatePropJson = JSON.stringify(animateProp)
+                                lastAnimatePropJson = JSON.stringify(declarativeAnimateProp)
                             }
                             isLoaded = 'ready'
                         })
@@ -1360,8 +1490,8 @@
     let lastAnimatePropJson = $state<string | undefined>(undefined)
     let motionDomProjectionUpdatePending = false
     const currentAnimateKey = $derived(
-        typeof animateProp === 'string'
-            ? animateProp
+        typeof declarativeAnimateProp === 'string'
+            ? declarativeAnimateProp
             : typeof effectiveAnimate === 'string'
               ? effectiveAnimate
               : undefined
@@ -1372,6 +1502,7 @@
         motionDomProjection.updateOptions({
             layout: layoutProp,
             layoutId: scopedLayoutId,
+            layoutScroll: layoutScrollProp,
             transition: mergedTransition as never,
             style: styleProp
         })
@@ -1380,6 +1511,13 @@
     $effect(() => {
         if (!motionDomProjection) return
         if (!element) return
+        motionDomProjection.updateOptions({
+            layout: layoutProp,
+            layoutId: scopedLayoutId,
+            layoutScroll: layoutScrollProp,
+            transition: mergedTransition as never,
+            style: styleProp
+        })
         motionDomProjection.mount(element)
         return () => {
             motionDomProjection.unmount()
@@ -1423,10 +1561,18 @@
         if (previous) {
             const next = measureLayoutRect()
             if (next) {
-                const flipLayoutMode = layoutProp === 'position' ? 'position' : true
-                const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
-                runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
-                lastRect = next
+                if (motionDomProjection) {
+                    lastRect = next
+                } else {
+                    const flipLayoutMode = layoutProp === 'position' ? 'position' : true
+                    const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
+                    runFlipAnimation(
+                        element!,
+                        transforms,
+                        (mergedTransition ?? {}) as AnimationOptions
+                    )
+                    lastRect = next
+                }
             }
         }
         projection.didUpdate()
@@ -1469,14 +1615,20 @@
 
         let rafId: number | null = null
         let wasViewportOffscreenSinceLastLayout = false
+        let wasViewportScrolledSinceLastLayout = false
         const flipLayoutMode = layoutProp === 'position' ? 'position' : true
         motionDomProjection?.seedLayout()
         lastRect = measureLayoutRect()
         setCompositorHints(element!, true)
 
         const rememberOffscreenScroll = () => {
+            wasViewportScrolledSinceLastLayout = true
+            if (motionDomProjection?.isAnimating()) {
+                motionDomProjection.finishAnimation()
+            }
             if (isViewportOffscreen(element!.getBoundingClientRect())) {
                 wasViewportOffscreenSinceLastLayout = true
+                motionDomProjection?.finishAnimation()
             }
         }
 
@@ -1503,18 +1655,42 @@
                 return
             }
 
+            if (
+                wasViewportScrolledSinceLastLayout ||
+                wasViewportOffscreenSinceLastLayout ||
+                isViewportOffscreen(element!.getBoundingClientRect())
+            ) {
+                lastRect = measureLayoutRect()
+                motionDomProjection?.finishAnimation()
+                wasViewportScrolledSinceLastLayout = false
+                wasViewportOffscreenSinceLastLayout = false
+                return
+            }
+
             const nextBox = projection.commitLayoutChange()
+            let shouldCommitMotionDomLayout = false
             if (nextBox && lastRect) {
                 const next = boxToRectLike(nextBox)
-                const transforms = computeFlipTransforms(lastRect, next, flipLayoutMode)
-                runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
+                shouldCommitMotionDomLayout = hasRectChanged(lastRect, next)
+                if (!motionDomProjection) {
+                    const transforms = computeFlipTransforms(lastRect, next, flipLayoutMode)
+                    runFlipAnimation(
+                        element!,
+                        transforms,
+                        (mergedTransition ?? {}) as AnimationOptions
+                    )
+                }
                 lastRect = next
+                wasViewportScrolledSinceLastLayout = false
                 wasViewportOffscreenSinceLastLayout = false
             } else if (nextBox) {
                 lastRect = boxToRectLike(nextBox)
+                wasViewportScrolledSinceLastLayout = false
                 wasViewportOffscreenSinceLastLayout = false
             }
-            motionDomProjection?.commitObservedLayoutChange()
+            if (shouldCommitMotionDomLayout) {
+                motionDomProjection?.commitObservedLayoutChange()
+            }
         }
 
         const commitPresenceLayoutRelease = (event: Event) => {
@@ -1532,14 +1708,20 @@
             lastRect = next
             const shouldSkipLayoutAnimation =
                 detail?.viewportScrolledDuringHold ||
+                wasViewportScrolledSinceLastLayout ||
                 wasViewportOffscreenSinceLastLayout ||
                 isViewportOffscreen(viewportRect)
-            if (!shouldSkipLayoutAnimation) {
+            if (!shouldSkipLayoutAnimation && !motionDomProjection) {
                 const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
                 runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
             }
+            wasViewportScrolledSinceLastLayout = false
             wasViewportOffscreenSinceLastLayout = false
-            motionDomProjection?.commitObservedLayoutChange()
+            if (!shouldSkipLayoutAnimation && hasRectChanged(previous, next)) {
+                motionDomProjection?.commitObservedLayoutChange()
+            } else if (shouldSkipLayoutAnimation) {
+                motionDomProjection?.finishAnimation()
+            }
         }
 
         const scheduleProjectionCommit = () => {
@@ -1581,6 +1763,7 @@
 
         const prev = layoutIdRegistry.consume(scopedLayoutId)
         if (!prev) return // First appearance, no animation needed
+        if (motionDomProjection) return
 
         const next = measureRect(element, resolveLayoutScrollAncestors())
         const transforms = computeFlipTransforms(prev.rect, next, true)
@@ -1688,6 +1871,22 @@
             },
             viewportProp
         )
+    })
+
+    // Legacy animation controls (`animate={controls}`) mirror upstream's
+    // VisualElement subscription model with a small Svelte adapter. The
+    // controls own when animations start; this component only resolves
+    // variants/custom data and runs the resulting target on its element.
+    $effect(() => {
+        if (!(element && animateControls)) return
+
+        const subscriber: AnimationControlsSubscriber = {
+            start: startAnimationControlsDefinition,
+            set: applyAnimationControlsTarget,
+            stop: stopAnimationControlsAnimations
+        }
+
+        return animateControls.subscribe(subscriber)
     })
 
     // Handle key prop changes inside AnimatePresence (simulates React's key-based remounting)
@@ -1798,10 +1997,14 @@
     // Re-run animate when animateProp changes while ready
     $effect(() => {
         if (!(element && isLoaded === 'ready')) return
+        if (animateControls) return
         // Skip first run if we mounted with initial={false} AND the variant hasn't changed
         if (mountedWithInitialFalse) {
             // Only skip if the variant is the same as what we mounted with
-            if (typeof animateProp === 'string' && lastRanVariantKey === animateProp) {
+            if (
+                typeof declarativeAnimateProp === 'string' &&
+                lastRanVariantKey === declarativeAnimateProp
+            ) {
                 mountedWithInitialFalse = false
                 return
             }
@@ -1813,25 +2016,28 @@
             pwLog('[motion] effect: skipping, initial animation already triggered')
             initialAnimationTriggered = false
             // Also mark object animate as ran to prevent duplicate runs from effect re-triggers
-            if (animateProp && typeof animateProp !== 'string') {
+            if (declarativeAnimateProp && typeof declarativeAnimateProp !== 'string') {
                 objectAnimateRanOnMount = true
             }
             return
         }
-        if (typeof animateProp === 'string') {
+        if (typeof declarativeAnimateProp === 'string') {
             // Compare BOTH the variant key and the resolved keyframes JSON.
             // For static variants the JSON is constant per key; for
             // function-form variants the JSON changes when `custom`
             // changes, which we must treat as a new animation target.
             const resolvedJson = resolvedAnimate ? JSON.stringify(resolvedAnimate) : undefined
-            if (lastRanVariantKey !== animateProp || lastRanResolvedJson !== resolvedJson) {
-                lastRanVariantKey = animateProp
+            if (
+                lastRanVariantKey !== declarativeAnimateProp ||
+                lastRanResolvedJson !== resolvedJson
+            ) {
+                lastRanVariantKey = declarativeAnimateProp
                 lastRanResolvedJson = resolvedJson
                 runAnimation()
             }
-        } else if (animateProp) {
+        } else if (declarativeAnimateProp) {
             // Object animate props - detect if the prop actually changed
-            const currentJson = JSON.stringify(animateProp)
+            const currentJson = JSON.stringify(declarativeAnimateProp)
             const propChanged = lastAnimatePropJson !== currentJson
 
             // Reset flag if animate prop changed
@@ -1853,7 +2059,7 @@
     // Also run when inherited/effective variant changes
     $effect(() => {
         void resolvedAnimate
-        if (!(element && isLoaded === 'ready' && !animateProp && resolvedAnimate)) return
+        if (!(element && isLoaded === 'ready' && !declarativeAnimateProp && resolvedAnimate)) return
         // Skip first run if we mounted with initial={false} AND the variant hasn't changed
         if (mountedWithInitialFalse) {
             // Only skip if the variant is the same as what we mounted with
@@ -1914,9 +2120,9 @@
                     dataPath = 6
                     isLoaded = 'initial'
                     initialAnimationTriggered = true
-                    if (animateProp && typeof animateProp !== 'string') {
+                    if (declarativeAnimateProp && typeof declarativeAnimateProp !== 'string') {
                         objectAnimateRanOnMount = true
-                        lastAnimatePropJson = JSON.stringify(animateProp)
+                        lastAnimatePropJson = JSON.stringify(declarativeAnimateProp)
                     }
                     finishOptimizedAppearAnimation(optimizedAppearId)
                         .then(() => {
@@ -1980,8 +2186,8 @@
 
                     // Mark that we're triggering the initial animation to prevent duplicate runs
                     initialAnimationTriggered = true
-                    if (animateProp && typeof animateProp !== 'string') {
-                        lastAnimatePropJson = JSON.stringify(animateProp)
+                    if (declarativeAnimateProp && typeof declarativeAnimateProp !== 'string') {
+                        lastAnimatePropJson = JSON.stringify(declarativeAnimateProp)
                     }
 
                     // IMPORTANT: Start the animation BEFORE changing isLoaded.
