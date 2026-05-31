@@ -31,9 +31,9 @@
     const rollTransition = { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const }
     const settledState = { opacity: 1, y: 0, filter: 'blur(0px)' }
     const rollEnterState = { opacity: 0, y: 14, filter: 'blur(5px)' }
-    const contentRestState = { y: 0, scale: 1 }
-    const contentHoverState = { y: -1, scale: 1.025 }
-    const contentPressedState = { y: 0, scale: 0.94 }
+    const contentRestState = { y: 0 }
+    const contentHoverState = { y: -1 }
+    const contentPressedState = { y: 1 }
     const contentTransition = { type: 'spring' as const, stiffness: 500, damping: 30 }
 
     function clearTimers() {

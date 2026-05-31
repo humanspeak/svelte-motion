@@ -81,7 +81,109 @@ export type MotionInitial = DOMKeyframesDefinition | string | string[] | false |
  * <motion.div variants={myVariants} animate="visible" />
  * ```
  */
-export type MotionAnimate = DOMKeyframesDefinition | string | string[] | undefined
+/**
+ * Definition accepted by legacy animation controls.
+ *
+ * Mirrors Motion's `AnimationDefinition`: a keyframes object, a variant
+ * label, an ordered list of variant labels, or a resolver function that
+ * receives `custom` data.
+ *
+ * @example
+ * ```ts
+ * controls.start('visible')
+ * controls.start(['visible', 'active'])
+ * controls.start({ opacity: 1, x: 0 })
+ * controls.start((custom) => ({ x: custom * 100 }))
+ * ```
+ */
+export type AnimationControlsDefinition =
+    | DOMKeyframesDefinition
+    | string
+    | string[]
+    | ((custom: unknown) => DOMKeyframesDefinition | string)
+
+/**
+ * Internal subscriber shape used by {@link AnimationControls}.
+ *
+ * Motion's upstream controls subscribe VisualElements. Svelte Motion
+ * subscribes a lightweight adapter from each `motion.*` component.
+ */
+export type AnimationControlsSubscriber = {
+    /** Start an animation on the subscribed component. */
+    start: (
+        definition: AnimationControlsDefinition,
+        transitionOverride?: AnimationOptions
+    ) => Promise<unknown>
+    /** Synchronously set final values on the subscribed component. */
+    set: (definition: AnimationControlsDefinition) => void
+    /** Stop currently running animations on the subscribed component. */
+    stop: () => void
+}
+
+/**
+ * Legacy imperative controls returned by {@link useAnimationControls}.
+ *
+ * Pass the object to `animate={controls}` on one or more `motion.*`
+ * components, then call `controls.start(...)`, `controls.set(...)`, or
+ * `controls.stop()` from events or effects.
+ *
+ * @example
+ * ```svelte
+ * <script lang="ts">
+ *   import { motion, useAnimationControls } from '@humanspeak/svelte-motion'
+ *
+ *   const controls = useAnimationControls()
+ * </script>
+ *
+ * <button onclick={() => controls.start('open')}>Open</button>
+ * <motion.div animate={controls} variants={{ open: { opacity: 1 } }} />
+ * ```
+ */
+export type AnimationControls = {
+    /**
+     * Subscribe a motion component adapter to these controls.
+     *
+     * @param subscriber Component adapter to animate.
+     * @returns Unsubscribe callback.
+     */
+    subscribe: (subscriber: AnimationControlsSubscriber) => () => void
+    /**
+     * Start an animation on every subscribed component.
+     *
+     * @param definition Target keyframes, variant label(s), or resolver.
+     * @param transitionOverride Optional transition that overrides the
+     *   component/default transition for this run.
+     * @returns Promise resolving when all subscribed animations complete.
+     */
+    start: (
+        definition: AnimationControlsDefinition,
+        transitionOverride?: AnimationOptions
+    ) => Promise<unknown[]>
+    /**
+     * Synchronously set every subscribed component to the target's final
+     * values.
+     *
+     * @param definition Target keyframes, variant label(s), or resolver.
+     */
+    set: (definition: AnimationControlsDefinition) => void
+    /** Stop animations on every subscribed component. */
+    stop: () => void
+    /**
+     * Mark controls as mounted and return cleanup.
+     *
+     * Called automatically by `useAnimationControls()`.
+     *
+     * @returns Cleanup that marks controls unmounted and stops subscribers.
+     */
+    mount: () => () => void
+}
+
+export type MotionAnimate =
+    | DOMKeyframesDefinition
+    | string
+    | string[]
+    | AnimationControls
+    | undefined
 
 /**
  * Exit animation properties for a motion component when unmounted.

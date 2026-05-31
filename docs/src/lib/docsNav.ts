@@ -78,6 +78,11 @@ export const docsSections: NavSection[] = [
         icon: Clock,
         items: [
             { title: 'useAnimate', href: '/docs/use-animate', icon: Play },
+            {
+                title: 'useAnimationControls',
+                href: '/docs/use-animation-controls',
+                icon: Play
+            },
             { title: 'useAnimationFrame', href: '/docs/use-animation-frame', icon: Clock },
             { title: 'useCycle', href: '/docs/use-cycle', icon: RefreshCw },
             { title: 'useInView', href: '/docs/use-in-view', icon: Eye },

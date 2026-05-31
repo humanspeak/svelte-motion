@@ -112,6 +112,10 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'useAnimate',
         description: 'Interactive useAnimate animation example using Svelte Motion.'
     },
+    'use-animation-controls': {
+        title: 'useAnimationControls',
+        description: 'Coordinate motion components from a shared imperative controller.'
+    },
     'use-animation-frame': {
         title: 'useAnimationFrame',
         description: 'Interactive useAnimationFrame animation example using Svelte Motion.'

@@ -329,6 +329,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animation-controls') + searchParams}
+                    >
+                        useAnimationControls
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/animation-frame') + searchParams}
                     >
                         useAnimationFrame

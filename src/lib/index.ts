@@ -34,6 +34,9 @@ export { clamp, distance, distance2D, interpolate, mix, pipe, progress, wrap } f
 
 // Re-export all Motion types so consumers can import types from this package
 export type {
+    AnimationControls,
+    AnimationControlsDefinition,
+    AnimationControlsSubscriber,
     DragAxis,
     DragConstraints,
     DragControls,
@@ -58,6 +61,12 @@ export type {
 } from '$lib/types'
 export { useAnimate } from '$lib/utils/animate.svelte'
 export type { AnimationScope } from '$lib/utils/animate.svelte'
+export {
+    animationControls,
+    isAnimationControls,
+    useAnimation,
+    useAnimationControls
+} from '$lib/utils/animationControls.svelte'
 export { useAnimationFrame } from '$lib/utils/animationFrame'
 export type { AugmentedMotionValue } from '$lib/utils/augmentMotionValue.svelte'
 export { useCycle } from '$lib/utils/cycle.svelte'

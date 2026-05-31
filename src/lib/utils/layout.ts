@@ -1,8 +1,14 @@
-import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
+import {
+    animate,
+    type AnimationOptions,
+    type DOMKeyframesDefinition,
+    type ValueAnimationTransition
+} from 'motion'
 
 const layoutSizeAnimationAttribute = 'data-layout-size-animation'
 
-const px = (value: number): string => `${Math.max(0, value)}px`
+const roundedPx = (value: number): string => `${Math.max(0, Math.round(value))}px`
+const mix = (from: number, to: number, progress: number): number => from + (to - from) * progress
 
 const isViewportOffscreen = (el: HTMLElement): boolean => {
     if (typeof window === 'undefined') return false
@@ -42,27 +48,34 @@ const runBoxSizeAnimation = (
         child.style.transformOrigin = ''
         if (child.style.willChange === 'transform') child.style.willChange = ''
     }
-    el.style.width = px(prevWidth)
-    el.style.height = px(prevHeight)
+    el.style.width = roundedPx(prevWidth)
+    el.style.height = roundedPx(prevHeight)
 
     const sizedRect = el.getBoundingClientRect()
     const residualDx = nextRect.left + dx - sizedRect.left
     const residualDy = nextRect.top + dy - sizedRect.top
     const shouldTranslate = Math.abs(residualDx) > 0.5 || Math.abs(residualDy) > 0.5
 
-    const keyframes: Record<string, unknown> = {
-        width: [px(prevWidth), px(nextRect.width)],
-        height: [px(prevHeight), px(nextRect.height)]
-    }
-
     if (shouldTranslate) {
-        keyframes.x = [residualDx, 0]
-        keyframes.y = [residualDy, 0]
         el.style.transformOrigin = '0 0'
-        el.style.transform = `translate(${residualDx}px, ${residualDy}px)`
+        el.style.transform = `translate(${Math.round(residualDx)}px, ${Math.round(residualDy)}px)`
     }
 
-    const animation = animate(el, keyframes as unknown as DOMKeyframesDefinition, transition)
+    const writeBox = (progress: number) => {
+        el.style.width = roundedPx(mix(prevWidth, nextRect.width, progress))
+        el.style.height = roundedPx(mix(prevHeight, nextRect.height, progress))
+
+        if (shouldTranslate) {
+            const x = Math.round(mix(residualDx, 0, progress))
+            const y = Math.round(mix(residualDy, 0, progress))
+            el.style.transform = x === 0 && y === 0 ? '' : `translate(${x}px, ${y}px)`
+        }
+    }
+
+    const animation = animate(0, 1, {
+        ...(transition as ValueAnimationTransition<number>),
+        onUpdate: writeBox
+    })
 
     let removeScrollListener: (() => void) | undefined
     let offscreenRaf: number | null = null
@@ -349,7 +362,7 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
     const attributeObserver = new MutationObserver(() => schedule())
     attributeObserver.observe(el, {
         attributes: true,
-        attributeFilter: ['class', 'style', 'data-presence-layout-hold']
+        attributeFilter: ['class', 'data-presence-layout-hold']
     })
     const childListObserver = new MutationObserver(() => schedule())
     childListObserver.observe(el, {
