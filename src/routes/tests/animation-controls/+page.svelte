@@ -5,6 +5,7 @@
 
     let status = $state('idle')
     let runCount = $state(0)
+    let sequenceId = 0
     const hydrated = true
 
     const cardVariants = {
@@ -28,26 +29,32 @@
     const transition = { duration: 0.45, ease: 'easeOut' } as const
 
     const runSequence = async () => {
+        const id = ++sequenceId
         runCount += 1
         status = 'launching'
         await controls.start('launch', transition)
+        if (id !== sequenceId) return
         status = 'confirming'
         await controls.start('success', { duration: 0.35, ease: 'easeInOut' })
+        if (id !== sequenceId) return
         status = 'complete'
     }
 
     const setComplete = () => {
+        sequenceId += 1
         runCount += 1
         status = 'complete'
         controls.set('success')
     }
 
     const reset = () => {
+        sequenceId += 1
         status = 'idle'
         controls.set('idle')
     }
 
     const stop = () => {
+        sequenceId += 1
         status = 'stopped'
         controls.stop()
     }

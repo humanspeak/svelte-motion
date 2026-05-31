@@ -6,6 +6,7 @@
 
     let state = $state<'ready' | 'launching' | 'verified' | 'paused'>('ready')
     let count = $state(0)
+    let sequenceId = 0
 
     const shell = {
         ready: { x: 0, y: 0, scale: 1, rotate: 0, opacity: 1 },
@@ -32,25 +33,31 @@
     }
 
     const run = async () => {
+        const id = ++sequenceId
         count += 1
         state = 'launching'
         await controls.start('launch', { duration: 0.55, ease: 'easeOut' })
+        if (id !== sequenceId) return
         state = 'verified'
         await controls.start('verified', { duration: 0.42, ease: 'easeInOut' })
+        if (id !== sequenceId) return
     }
 
     const setVerified = () => {
+        sequenceId += 1
         count += 1
         state = 'verified'
         controls.set('verified')
     }
 
     const stop = () => {
+        sequenceId += 1
         state = 'paused'
         controls.stop()
     }
 
     const reset = () => {
+        sequenceId += 1
         state = 'ready'
         controls.set('ready')
     }

@@ -63,6 +63,7 @@
     import { ProjectionNode } from '$lib/utils/projection'
     import { getProjectionParent, setProjectionParent } from '$lib/components/projection.context'
     import { MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
+    import { SvelteSet } from 'svelte/reactivity'
     import {
         getMotionDomProjectionParent,
         setMotionDomProjectionParent
@@ -714,6 +715,32 @@
         return Promise.resolve()
     }
 
+    type StoppableAnimationControl = {
+        stop?: () => void
+        cancel?: () => void
+    }
+
+    const activeAnimationControls = new SvelteSet<StoppableAnimationControl>()
+    let animationControlsGeneration = 0
+
+    const isStoppableAnimationControl = (control: unknown): control is StoppableAnimationControl =>
+        !!control &&
+        typeof control === 'object' &&
+        (typeof (control as StoppableAnimationControl).stop === 'function' ||
+            typeof (control as StoppableAnimationControl).cancel === 'function')
+
+    const trackAnimationControlsControl = (control: unknown): Promise<unknown> => {
+        const promise = getAnimationPromise(control)
+        if (isStoppableAnimationControl(control)) {
+            activeAnimationControls.add(control)
+            promise.then(
+                () => activeAnimationControls.delete(control),
+                () => activeAnimationControls.delete(control)
+            )
+        }
+        return promise
+    }
+
     const resolveAnimationControlsDefinition = (
         definition: AnimationControlsDefinition
     ): DOMKeyframesDefinition | undefined => {
@@ -756,6 +783,17 @@
     }
 
     const stopAnimationControlsAnimations = () => {
+        animationControlsGeneration += 1
+
+        for (const control of activeAnimationControls) {
+            if (typeof control.stop === 'function') {
+                control.stop()
+            } else {
+                control.cancel?.()
+            }
+        }
+        activeAnimationControls.clear()
+
         if (!element) return
         if (typeof element.getAnimations !== 'function') return
         for (const animation of element.getAnimations()) {
@@ -791,20 +829,21 @@
             transitionOverride ?? mergeTransitions(mergedTransition ?? {}, transition ?? {})
         const svgPathFinished =
             isSVGPathElement(element) && hasSVGPathProperties(target)
-                ? animateSVGPathAttributes(element, target, transitionAnimate)
+                ? animateSVGPathAttributes(element, target, transitionAnimate, true)
                 : []
         const payload = transformSVGPathProperties(
             element,
             svgPathFinished.length > 0 ? stripSVGPathKeyframes(target) : target
         ) as Record<string, unknown>
 
+        const controlsGeneration = ++animationControlsGeneration
         enterAnimationSettled = false
         onAnimationStartProp?.(definition as unknown as DOMKeyframesDefinition)
 
         const promises: Promise<unknown>[] = [...svgPathFinished]
         if (isNotEmpty(payload)) {
             promises.push(
-                getAnimationPromise(
+                trackAnimationControlsControl(
                     animate(
                         element,
                         payload as DOMKeyframesDefinition,
@@ -814,7 +853,13 @@
             )
         }
 
-        await Promise.all(promises)
+        try {
+            await Promise.all(promises)
+        } catch (error) {
+            if (controlsGeneration !== animationControlsGeneration) return
+            throw error
+        }
+        if (controlsGeneration !== animationControlsGeneration) return
         applyAnimationControlsTarget(definition)
         onAnimationCompleteProp?.(definition as unknown as DOMKeyframesDefinition)
     }
@@ -831,7 +876,8 @@
     const animateSVGPathAttributes = (
         path: SVGPathElement,
         keyframes: Record<string, unknown>,
-        transition: MotionTransition
+        transition: MotionTransition,
+        trackControl = false
     ): Promise<unknown>[] => {
         if (!hasSVGPathProperties(keyframes)) return []
 
@@ -860,7 +906,9 @@
                         : keyframes[key]) as never,
                     transition as unknown as AnimationOptions
                 )
-                return getFinishedPromise(control)
+                return trackControl
+                    ? trackAnimationControlsControl(control)
+                    : getFinishedPromise(control)
             })
             .filter((promise): promise is Promise<unknown> => promise !== null)
     }

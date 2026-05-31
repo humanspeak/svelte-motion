@@ -337,6 +337,52 @@ describe('_MotionContainer', () => {
         cleanup()
     })
 
+    it('stops active animate controls using Motion playback controls', async () => {
+        const controls = animationControls()
+        const cleanup = controls.mount()
+
+        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
+        render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                animate: controls,
+                variants: {
+                    visible: { opacity: 1, x: 20 }
+                }
+            }
+        })
+
+        await flushTimers()
+        animateMock.mockClear()
+
+        let resolveFinished: () => void = () => {}
+        const stop = vi.fn()
+        const finished = new Promise<void>((resolve) => {
+            resolveFinished = resolve
+        })
+        animateMock.mockReturnValueOnce({ finished, stop })
+
+        const start = controls.start('visible', { duration: 4 })
+        await Promise.resolve()
+
+        controls.stop()
+
+        expect(stop).toHaveBeenCalledTimes(1)
+
+        resolveFinished()
+        await start
+
+        expect(
+            animateMock.mock.calls.some(
+                (call) =>
+                    (call[1] as Record<string, unknown>)?.opacity === 1 &&
+                    (call[2] as Record<string, unknown>)?.duration === 0
+            )
+        ).toBe(false)
+
+        cleanup()
+    })
+
     it('applies FLIP (translate + scale) when layout=true and size changes', async () => {
         // Stub ResizeObserver and capture instances
         const roInstances: Array<{ fire: () => void }> = []

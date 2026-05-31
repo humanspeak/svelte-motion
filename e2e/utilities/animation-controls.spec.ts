@@ -6,6 +6,20 @@ test.describe('useAnimationControls', () => {
         await expect(page.getByTestId('stage')).toHaveAttribute('data-hydrated', 'true')
     }
 
+    const readCardState = async (page: import('@playwright/test').Page) =>
+        page.getByTestId('card').evaluate((el) => {
+            const style = getComputedStyle(el)
+            const matrix =
+                style.transform === 'none'
+                    ? new DOMMatrixReadOnly()
+                    : new DOMMatrixReadOnly(style.transform)
+            return {
+                text: el.textContent ?? '',
+                transform: style.transform,
+                x: matrix.m41
+            }
+        })
+
     test('starts coordinated subscribers and completes the sequence', async ({ page }) => {
         await gotoReady(page)
 
@@ -37,5 +51,25 @@ test.describe('useAnimationControls', () => {
 
         await page.getByTestId('reset').click()
         await expect(page.getByTestId('label')).toHaveText('idle')
+    })
+
+    test('stop freezes active subscribers mid-sequence', async ({ page }) => {
+        await gotoReady(page)
+
+        await page.getByTestId('start').click()
+        await page.waitForTimeout(180)
+
+        const beforeStop = await readCardState(page)
+        expect(beforeStop.x).toBeGreaterThan(5)
+
+        await page.getByTestId('stop').click()
+        await expect(page.getByTestId('label')).toHaveText('stopped')
+
+        const stopped = await readCardState(page)
+        await page.waitForTimeout(900)
+        const later = await readCardState(page)
+
+        expect(later.text).toContain('stopped')
+        expect(Math.abs(later.x - stopped.x)).toBeLessThan(2)
     })
 })
