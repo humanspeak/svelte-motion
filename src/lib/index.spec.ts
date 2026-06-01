@@ -39,6 +39,7 @@ import {
     useInView,
     useIsPresent,
     usePresence,
+    usePresenceData,
     useReducedMotion,
     useSpring,
     useTime,
@@ -92,6 +93,7 @@ describe('public API: index.ts', () => {
         expect(typeof useInView).toBe('function')
         expect(typeof useIsPresent).toBe('function')
         expect(typeof usePresence).toBe('function')
+        expect(typeof usePresenceData).toBe('function')
         expect(typeof useReducedMotion).toBe('function')
         expect(typeof useSpring).toBe('function')
         expect(typeof stringifyStyleObject).toBe('function')

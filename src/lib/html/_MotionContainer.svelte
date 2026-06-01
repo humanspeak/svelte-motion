@@ -404,16 +404,26 @@
 
     // Reactively update registration when element/exit/transition props change
     $effect(() => {
-        if (element && context && !inPresenceChild && resolvedExit) {
-            const filteredExit = filterReducedMotionKeyframes(
-                resolvedExit as Record<string, unknown>,
-                reducedMotion
-            )
+        if (element && context && !inPresenceChild && exitProp !== undefined) {
+            const resolvePresenceExit = (custom: unknown) => {
+                const resolved = resolveExit(
+                    exitProp,
+                    variantsProp,
+                    custom !== undefined ? custom : effectiveCustom
+                )
+                if (!resolved) return undefined
+                return filterReducedMotionKeyframes(
+                    resolved as Record<string, unknown>,
+                    reducedMotion
+                ) as DOMKeyframesDefinition
+            }
+            const filteredExit = resolvePresenceExit(resolvePresenceCustom())
             context.registerChild(
                 presenceKey,
                 element,
                 filteredExit,
-                mergedTransition as unknown as MotionTransition
+                mergedTransition as unknown as MotionTransition,
+                resolvePresenceExit
             )
         }
     })
@@ -572,7 +582,11 @@
     const resolvedAnimate = $derived(
         resolveAnimate(effectiveAnimate, variantsProp, effectiveCustom)
     )
-    const resolvedExit = $derived(resolveExit(exitProp, variantsProp, effectiveCustom))
+    const resolvePresenceCustom = () => {
+        const presenceCustom = context?.custom
+        return presenceCustom !== undefined ? presenceCustom : effectiveCustom
+    }
+    const resolvedExit = $derived(resolveExit(exitProp, variantsProp, resolvePresenceCustom()))
 
     // Resolve `whileX` props against `variants` so each gesture's attach
     // helper receives a plain keyframes object regardless of whether the
@@ -628,11 +642,32 @@
             ? optimizedAppearScript
             : ''
     )
+    const extractTargetTransition = <T extends Record<string, unknown>>(
+        keyframes: T,
+        transitionOverride?: AnimationOptions
+    ) => {
+        const transition = keyframes.transition as AnimationOptions | undefined
+        const transitionEnd = keyframes.transitionEnd as Record<string, unknown> | undefined
+        const target = { ...keyframes }
+        delete target.transition
+        delete target.transitionEnd
+
+        return {
+            target,
+            transition:
+                transitionOverride ?? mergeTransitions(mergedTransition ?? {}, transition ?? {}),
+            transitionEnd
+        }
+    }
+
     const applyAnimateRestingStyle = () => {
         if (!element) return
-        const restingValues = resolveRestingValues(
-            animateKeyframes as DOMKeyframesDefinition | undefined
-        ) as Record<string, unknown> | undefined
+        if (!animateKeyframes) return
+        const { target, transitionEnd } = extractTargetTransition(animateKeyframes)
+        const restingValues = resolveRestingValues({
+            ...target,
+            ...(transitionEnd ?? {})
+        } as DOMKeyframesDefinition | undefined) as Record<string, unknown> | undefined
         if (!restingValues) return
         element.setAttribute(
             'style',
@@ -1267,18 +1302,19 @@
             return
         }
 
-        const transitionAnimate: MotionTransition = mergedTransition ?? {}
         const rawPayload = filterReducedMotionKeyframes(
             $state.snapshot(resolvedAnimate) as Record<string, unknown>,
             reducedMotion
         ) as Record<string, unknown>
+        const { target: rawTarget, transition: transitionAnimate } =
+            extractTargetTransition(rawPayload)
         const svgPathFinished =
-            isSVGPathElement(element) && hasSVGPathProperties(rawPayload)
-                ? animateSVGPathAttributes(element, rawPayload, transitionAnimate)
+            isSVGPathElement(element) && hasSVGPathProperties(rawTarget)
+                ? animateSVGPathAttributes(element, rawTarget, transitionAnimate)
                 : []
         let payload = (
-            svgPathFinished.length > 0 ? stripSVGPathKeyframes(rawPayload) : rawPayload
-        ) as typeof rawPayload
+            svgPathFinished.length > 0 ? stripSVGPathKeyframes(rawTarget) : rawTarget
+        ) as typeof rawTarget
 
         // Transform SVG path properties (pathLength, pathOffset) to their CSS equivalents
         payload = transformSVGPathProperties(
@@ -1994,18 +2030,18 @@
             try {
                 // 1. Run exit animation if defined
                 if (resolvedExit && element && !keyTransitionStopped) {
-                    const exitKeyframes = filterReducedMotionKeyframes(
+                    const exitPayload = filterReducedMotionKeyframes(
                         { ...(resolvedExit as Record<string, unknown>) },
                         reducedMotion
                     )
-                    // Remove transition from keyframes (it's passed separately)
-                    delete exitKeyframes.transition
+                    const { target: exitKeyframes, transition: exitTransition } =
+                        extractTargetTransition(exitPayload)
 
                     pwLog('[motion] key transition: running exit', { exitKeyframes })
                     await animate(
                         element,
                         exitKeyframes as DOMKeyframesDefinition,
-                        mergedTransition
+                        exitTransition as AnimationOptions
                     ).finished
                 }
 

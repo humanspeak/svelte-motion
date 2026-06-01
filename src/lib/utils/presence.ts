@@ -3,6 +3,7 @@ import { mergeTransitions } from '$lib/utils/animation'
 import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import { getContext, setContext } from 'svelte'
+import { createSubscriber } from 'svelte/reactivity'
 
 /**
  * Context key for `AnimatePresence`.
@@ -28,15 +29,126 @@ const PRESENCE_DEPTH_CONTEXT = Symbol('presence-depth-context')
 type PresenceChild = {
     element: HTMLElement
     exit?: MotionExit
+    resolveExit?: PresenceExitResolver
     mergedTransition?: MotionTransition
     lastRect: DOMRect
     lastComputedStyle: CSSStyleDeclaration
+    lastPopLayoutSnapshot?: PopLayoutSnapshot
     layoutInsertion?: { parent: HTMLElement; before?: HTMLElement }
     /** Last captured mid-animation opacity (from rAF polling). */
     lastAnimatedOpacity?: string
     /** Last captured mid-animation transform (from rAF polling). */
     lastAnimatedTransform?: string
 }
+
+/**
+ * A measured `popLayout` box in the same coordinate space used by Motion's
+ * upstream `PopChild`.
+ */
+export type PopLayoutSnapshot = {
+    /** Width of the exiting element in pixels. */
+    width: number
+    /** Height of the exiting element in pixels. */
+    height: number
+    /** Offset from the top of the element's offset parent. */
+    top: number
+    /** Offset from the left of the element's offset parent. */
+    left: number
+    /** Offset from the right of the element's offset parent. */
+    right: number
+    /** Offset from the bottom of the element's offset parent. */
+    bottom: number
+    /** Resolved text direction used by horizontal anchoring. */
+    direction: string
+}
+
+/**
+ * Anchor used to preserve horizontal positioning in `mode="popLayout"`.
+ */
+export type PopLayoutAnchorX = 'left' | 'right'
+
+/**
+ * Anchor used to preserve vertical positioning in `mode="popLayout"`.
+ */
+export type PopLayoutAnchorY = 'top' | 'bottom'
+
+const isHTMLElement = (element: Element | null): element is HTMLElement =>
+    element instanceof HTMLElement
+
+const readNumericStyle = (value: string, fallback: number): number => {
+    const parsed = parseFloat(value)
+    return Number.isFinite(parsed) ? parsed : fallback
+}
+
+/**
+ * Measure an element for `mode="popLayout"` using upstream Motion's coordinate
+ * model: offsets are captured relative to `offsetParent`, not the viewport.
+ *
+ * @param element The exiting element to measure while it is still in layout.
+ * @param computedStyle The computed style for the exiting element.
+ * @returns A snapshot that can be reapplied to an absolutely positioned exit node.
+ */
+export const measurePopLayoutSnapshot = (
+    element: HTMLElement,
+    computedStyle: CSSStyleDeclaration = getComputedStyle(element)
+): PopLayoutSnapshot => {
+    const parent = element.offsetParent
+    const parentWidth = isHTMLElement(parent) ? parent.offsetWidth || 0 : 0
+    const parentHeight = isHTMLElement(parent) ? parent.offsetHeight || 0 : 0
+    const rect = element.getBoundingClientRect()
+    const width = readNumericStyle(computedStyle.width, element.offsetWidth || rect.width)
+    const height = readNumericStyle(computedStyle.height, element.offsetHeight || rect.height)
+    const top = element.offsetTop
+    const left = element.offsetLeft
+
+    return {
+        width,
+        height,
+        top,
+        left,
+        right: parentWidth - width - left,
+        bottom: parentHeight - height - top,
+        direction: computedStyle.direction || 'ltr'
+    }
+}
+
+/**
+ * Convert a `popLayout` snapshot to absolute-positioned clone styles.
+ *
+ * @param snapshot The snapshot captured before the child exited.
+ * @param anchorX The horizontal edge to preserve.
+ * @param anchorY The vertical edge to preserve.
+ * @returns Inline styles equivalent to upstream `PopChild`'s injected rule.
+ */
+export const resolvePopLayoutStyles = (
+    snapshot: PopLayoutSnapshot,
+    anchorX: PopLayoutAnchorX = 'left',
+    anchorY: PopLayoutAnchorY = 'top'
+): Partial<CSSStyleDeclaration> => {
+    const isRTL = snapshot.direction === 'rtl'
+    const useLeft = anchorX === 'left' ? !isRTL : isRTL
+    const xProperty = useLeft ? 'left' : 'right'
+    const xValue = useLeft ? snapshot.left : snapshot.right
+    const yProperty = anchorY === 'bottom' ? 'bottom' : 'top'
+    const yValue = anchorY === 'bottom' ? snapshot.bottom : snapshot.top
+
+    return {
+        position: 'absolute',
+        width: `${snapshot.width}px`,
+        height: `${snapshot.height}px`,
+        [xProperty]: `${xValue}px`,
+        [yProperty]: `${yValue}px`
+    } as Partial<CSSStyleDeclaration>
+}
+
+/**
+ * Resolves an exiting child's keyframes with the nearest
+ * `<AnimatePresence custom>` value.
+ *
+ * @param custom Data supplied by `<AnimatePresence custom={...}>`.
+ * @returns The resolved exit keyframes, or `undefined` when no exit applies.
+ */
+export type PresenceExitResolver = (custom: unknown) => DOMKeyframesDefinition | undefined
 
 /**
  * Reset any CSS transforms on the element's inline style.
@@ -84,6 +196,16 @@ export type AnimatePresenceContext = {
     initial: boolean
     /** Animation coordination mode: 'sync', 'wait', or 'popLayout'. */
     mode: AnimatePresenceMode
+    /** Latest data passed via `<AnimatePresence custom>`. */
+    readonly custom: unknown
+    /** Read the latest data passed via `<AnimatePresence custom>`. */
+    getCustom: () => unknown
+    /**
+     * Update the latest data passed via `<AnimatePresence custom>`.
+     *
+     * @param custom Data supplied by the parent presence boundary.
+     */
+    setCustom: (custom: unknown) => void
     /**
      * Returns true if a child with the given key should animate its enter.
      * Returns false only during first render when initial={false} AND the key has never been seen.
@@ -108,7 +230,8 @@ export type AnimatePresenceContext = {
         key: string,
         element: HTMLElement,
         exit?: MotionExit,
-        mergedTransition?: MotionTransition
+        mergedTransition?: MotionTransition,
+        resolveExit?: PresenceExitResolver
     ) => void
     /** Update the last known rect/style snapshot for a registered child. */
     updateChildState: (key: string, rect: DOMRect, computedStyle: CSSStyleDeclaration) => void
@@ -155,12 +278,26 @@ export const createAnimatePresenceContext = (context: {
     initial?: boolean
     mode?: AnimatePresenceMode
     onExitComplete?: () => void
+    custom?: unknown
+    getCustom?: () => unknown
 }): AnimatePresenceContext => {
     // Default initial to true (animate on first mount) unless explicitly false
     const initial = context.initial !== false
 
     // Default mode to 'sync' if not specified
     const mode: AnimatePresenceMode = context.mode ?? 'sync'
+    let latestCustom = context.custom
+    const customSubscribers = new Set<() => void>()
+    const trackCustom = createSubscriber((update) => {
+        customSubscribers.add(update)
+        return () => customSubscribers.delete(update)
+    })
+    const getCustom = (): unknown => context.getCustom?.() ?? latestCustom
+    const setCustom = (custom: unknown): void => {
+        if (Object.is(latestCustom, custom)) return
+        latestCustom = custom
+        customSubscribers.forEach((update) => update())
+    }
 
     // Track whether we're still in the initial render phase
     // This is true only when initial={false} and we haven't completed the first frame
@@ -397,7 +534,8 @@ export const createAnimatePresenceContext = (context: {
         key: string,
         element: HTMLElement,
         exit?: MotionExit,
-        mergedTransition?: MotionTransition
+        mergedTransition?: MotionTransition,
+        resolveExit?: PresenceExitResolver
     ) => {
         const initialRect = element.getBoundingClientRect()
         const initialStyle = getComputedStyle(element)
@@ -429,9 +567,12 @@ export const createAnimatePresenceContext = (context: {
         children.set(key, {
             element,
             exit,
+            resolveExit,
             mergedTransition,
             lastRect: initialRect,
             lastComputedStyle: initialStyle,
+            lastPopLayoutSnapshot:
+                mode === 'popLayout' ? measurePopLayoutSnapshot(element, initialStyle) : undefined,
             layoutInsertion: findLayoutInsertionParent(element) ?? undefined
         })
     }
@@ -444,6 +585,9 @@ export const createAnimatePresenceContext = (context: {
         if (child && rect.width > 0 && rect.height > 0) {
             child.lastRect = rect
             child.lastComputedStyle = computedStyle
+            if (mode === 'popLayout') {
+                child.lastPopLayoutSnapshot = measurePopLayoutSnapshot(child.element, computedStyle)
+            }
         }
     }
 
@@ -482,7 +626,7 @@ export const createAnimatePresenceContext = (context: {
         // Mark this key as exited so re-entry will animate
         exitedKeys.add(key)
 
-        if (!child.exit) {
+        if (!child.exit && !child.resolveExit) {
             pwLog('[presence] unregisterChild - no exit animation, removing immediately')
             children.delete(key)
             return
@@ -561,9 +705,14 @@ export const createAnimatePresenceContext = (context: {
             clone.style.opacity = child.lastAnimatedOpacity
         }
 
-        // Attach to original parent and position absolutely at the last known rect
-        // Find the nearest positioned ancestor that isn't display: contents
-        let parent = child.element.parentElement ?? document.body
+        // Attach to the original insertion parent and position absolutely at the
+        // last known rect. Svelte can detach keyed nodes before unregister runs,
+        // so fall back to the parent captured at registration time instead of
+        // escaping to <body>, which would bypass clipping parents.
+        let parent =
+            child.element.parentElement ??
+            (child.layoutInsertion?.parent.isConnected ? child.layoutInsertion.parent : null) ??
+            document.body
         let positioningParent = parent
 
         // Walk up to find a parent that has actual layout (not display: contents)
@@ -575,11 +724,19 @@ export const createAnimatePresenceContext = (context: {
             positioningParent = positioningParent.parentElement ?? document.body
         }
 
-        const parentRect = positioningParent.getBoundingClientRect()
+        const popLayoutSnapshot =
+            mode === 'popLayout'
+                ? child.element.isConnected
+                    ? measurePopLayoutSnapshot(child.element, computed)
+                    : child.lastPopLayoutSnapshot
+                : undefined
+        const parentRect = popLayoutSnapshot ? undefined : positioningParent.getBoundingClientRect()
 
-        const parentPosition = getComputedStyle(positioningParent).position
-        if (parentPosition === 'static') {
-            ;(positioningParent as HTMLElement).style.position = 'relative'
+        if (!popLayoutSnapshot) {
+            const parentPosition = getComputedStyle(positioningParent).position
+            if (parentPosition === 'static') {
+                ;(positioningParent as HTMLElement).style.position = 'relative'
+            }
         }
 
         // Append to the actual positioning parent
@@ -588,18 +745,35 @@ export const createAnimatePresenceContext = (context: {
         // Preserve the original display property (especially flex for centered content)
         const originalDisplay = computed.display
 
-        clone.style.position = 'absolute'
-        clone.style.top = `${rect.top - parentRect.top + ((parent as HTMLElement).scrollTop ?? 0)}px`
-        clone.style.left = `${rect.left - parentRect.left + ((parent as HTMLElement).scrollLeft ?? 0)}px`
-        clone.style.width = `${rect.width}px`
-        clone.style.height = `${rect.height}px`
+        clone.style.left = ''
+        clone.style.right = ''
+        clone.style.top = ''
+        clone.style.bottom = ''
+        if (popLayoutSnapshot) {
+            const popStyles = resolvePopLayoutStyles(popLayoutSnapshot)
+            if (popStyles.position) clone.style.position = popStyles.position
+            if (popStyles.width) clone.style.width = popStyles.width
+            if (popStyles.height) clone.style.height = popStyles.height
+            if (popStyles.left) clone.style.left = popStyles.left
+            if (popStyles.right) clone.style.right = popStyles.right
+            if (popStyles.top) clone.style.top = popStyles.top
+            if (popStyles.bottom) clone.style.bottom = popStyles.bottom
+        } else {
+            clone.style.position = 'absolute'
+            clone.style.top = `${rect.top - parentRect!.top + ((parent as HTMLElement).scrollTop ?? 0)}px`
+            clone.style.left = `${rect.left - parentRect!.left + ((parent as HTMLElement).scrollLeft ?? 0)}px`
+            clone.style.width = `${rect.width}px`
+            clone.style.height = `${rect.height}px`
+        }
         clone.style.pointerEvents = 'none'
         clone.style.visibility = 'visible'
         // Preserve flex/grid layout, only force 'block' if it was 'none' or 'contents'
         if (originalDisplay === 'none' || originalDisplay === 'contents') {
             clone.style.display = 'block'
         }
-        clone.style.margin = '0'
+        if (!popLayoutSnapshot) {
+            clone.style.margin = '0'
+        }
         clone.style.boxSizing = 'border-box'
         // Redundantly ensure no transforms are applied before positioning/z-index take effect
         resetTransforms(clone)
@@ -629,37 +803,50 @@ export const createAnimatePresenceContext = (context: {
         })
         parent.appendChild(clone)
 
-        // Prepare exit keyframes - extract ease separately, filter out transition
-        // Note: transition is filtered out here as it's accessed via exitObj.transition for merging
-        const rawExit = (child.exit ?? {}) as unknown as Record<string, unknown>
-        const { ease: exitEase, transition: __, ...exitKeyframes } = rawExit
-        void __ // Suppress unused variable warning - transition is accessed via exitObj.transition
-
-        // Merge transitions: default < mergedTransition < exit.transition < exit.ease (last wins)
-        const exitObj = (child.exit ?? {}) as unknown as { transition?: MotionTransition }
-        const finalTransition = mergeTransitions(
-            { duration: 0.35 } as AnimationOptions,
-            (child.mergedTransition ?? {}) as AnimationOptions,
-            (exitObj.transition ?? {}) as AnimationOptions,
-            exitEase ? ({ ease: exitEase } as AnimationOptions) : {}
-        )
-
-        pwLog('[presence] starting exit animation', {
-            key,
-            mode,
-            exitKeyframes,
-            finalTransition
-        })
-
         // Capture the element reference for this specific exit animation
         // This prevents race conditions where re-entry registers a new element with the same key
         // before this exit animation completes
         const exitingElement = child.element
 
-        // Start exit and track in-flight count (handles wait-mode blocking)
-        startExit()
-
         requestAnimationFrame(() => {
+            const resolvedExit = child.resolveExit?.(getCustom()) ?? child.exit
+
+            if (!resolvedExit) {
+                pwLog('[presence] unregisterChild - no resolved exit animation after custom update')
+                clone.remove()
+                placeholder?.remove()
+                const currentChild = children.get(key)
+                if (currentChild && currentChild.element === exitingElement) {
+                    children.delete(key)
+                }
+                return
+            }
+
+            // Prepare exit keyframes - extract ease separately, filter out transition
+            // Note: transition is filtered out here as it's accessed via exitObj.transition for merging
+            const rawExit = (resolvedExit ?? {}) as unknown as Record<string, unknown>
+            const { ease: exitEase, transition: __, ...exitKeyframes } = rawExit
+            void __ // Suppress unused variable warning - transition is accessed via exitObj.transition
+
+            // Merge transitions: default < mergedTransition < exit.transition < exit.ease (last wins)
+            const exitObj = (resolvedExit ?? {}) as unknown as { transition?: MotionTransition }
+            const finalTransition = mergeTransitions(
+                { duration: 0.35 } as AnimationOptions,
+                (child.mergedTransition ?? {}) as AnimationOptions,
+                (exitObj.transition ?? {}) as AnimationOptions,
+                exitEase ? ({ ease: exitEase } as AnimationOptions) : {}
+            )
+
+            pwLog('[presence] starting exit animation', {
+                key,
+                mode,
+                exitKeyframes,
+                finalTransition
+            })
+
+            // Start exit and track in-flight count (handles wait-mode blocking)
+            startExit()
+
             animate(clone, exitKeyframes as unknown as DOMKeyframesDefinition, finalTransition)
                 .finished.catch(() => {})
                 .finally(() => {
@@ -712,6 +899,12 @@ export const createAnimatePresenceContext = (context: {
     return {
         initial,
         mode,
+        get custom() {
+            trackCustom()
+            return getCustom()
+        },
+        getCustom,
+        setCustom,
         shouldAnimateEnter,
         isEnterBlocked,
         onEnterUnblocked,

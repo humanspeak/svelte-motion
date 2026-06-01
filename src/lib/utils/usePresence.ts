@@ -1,4 +1,4 @@
-import { getPresenceChildContext } from '$lib/utils/presence'
+import { getAnimatePresenceContext, getPresenceChildContext } from '$lib/utils/presence'
 
 /**
  * Tuple returned by {@link usePresence}, matching framer-motion's shape:
@@ -79,4 +79,32 @@ export const usePresence = (): UsePresenceState => {
     const context = getPresenceChildContext()
     if (!context) return [true, null]
     return context.isPresent ? [true, null] : [false, context.safeToRemove]
+}
+
+/**
+ * Returns the nearest `<AnimatePresence custom={...}>` data.
+ *
+ * This mirrors Motion's `usePresenceData()` hook. It is useful for children
+ * that need the latest parent presence data while rendering enter/exit
+ * keyframes, for example directional slideshow controls.
+ *
+ * Outside of `<AnimatePresence>`, this returns `undefined`.
+ *
+ * @typeParam T Expected custom data type.
+ * @returns The current AnimatePresence custom data, or `undefined` outside a
+ *     presence boundary.
+ * @see https://motion.dev/docs/react-use-presence-data
+ *
+ * @example
+ * ```svelte
+ * <script lang="ts">
+ *   import { usePresenceData } from '@humanspeak/svelte-motion'
+ *
+ *   const direction = $derived(usePresenceData<1 | -1>() ?? 1)
+ * </script>
+ * ```
+ */
+export const usePresenceData = <T = unknown>(): T | undefined => {
+    const context = getAnimatePresenceContext()
+    return context ? (context.custom as T) : undefined
 }

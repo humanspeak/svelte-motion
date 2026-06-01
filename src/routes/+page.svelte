@@ -263,6 +263,14 @@
                         Layout button content swap
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/custom') + searchParams}
+                    >
+                        AnimatePresence custom
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

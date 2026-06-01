@@ -17,28 +17,44 @@
      *
      * @prop children Slotted content participating in presence.
      * @prop initial When false, children skip their enter animation on initial mount.
+     * @prop custom Data forwarded to exiting dynamic variants.
      * @prop mode Controls enter/exit coordination: 'sync' (default), 'wait', or 'popLayout'.
      * @prop onExitComplete Optional callback invoked once all exits complete.
      */
-    const {
+    let {
         children,
+        custom,
         initial = true,
         mode = 'sync',
         onExitComplete
     } = $props<{
         children?: Snippet
+        custom?: unknown
         initial?: boolean
         mode?: AnimatePresenceMode
         onExitComplete?: () => void
     }>()
 
-    pwLog('[AnimatePresence] mounting', { initial, mode, hasOnExitComplete: !!onExitComplete })
-    const context = createAnimatePresenceContext({ initial, mode, onExitComplete })
+    pwLog('[AnimatePresence] mounting', {
+        initial,
+        mode,
+        hasOnExitComplete: !!onExitComplete
+    })
+    const context = createAnimatePresenceContext({
+        initial,
+        mode,
+        onExitComplete,
+        custom
+    })
     setAnimatePresenceContext(context)
 
     // Initialize presence depth to 0 for direct children
     // Only direct children (depth 0) require explicit key props, matching Framer Motion behavior
     setPresenceDepth(0)
+
+    $effect.pre(() => {
+        context.setCustom(custom)
+    })
 </script>
 
 <div class="animate-presence-container">
