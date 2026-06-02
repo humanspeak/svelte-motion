@@ -83,6 +83,10 @@ const readNumericStyle = (value: string, fallback: number): number => {
 /**
  * Measure an element for `mode="popLayout"` using upstream Motion's coordinate
  * model: offsets are captured relative to `offsetParent`, not the viewport.
+ * Ancestor scroll is intentionally not subtracted here because upstream
+ * `PopChild` snapshots raw `offsetTop`/`offsetLeft`; any Svelte clone fallback
+ * that breaks that containing-block relationship must compensate at the clone
+ * application layer instead.
  *
  * @param element The exiting element to measure while it is still in layout.
  * @param computedStyle The computed style for the exiting element.
@@ -159,17 +163,17 @@ export type PresenceExitResolver = (custom: unknown) => DOMKeyframesDefinition |
  * @param element The element whose inline transform properties should be cleared.
  */
 const resetTransforms = (element: HTMLElement): void => {
-    const s = element.style
-    /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
-    ;(s as any).transform = 'none'
-    /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
-    ;(s as any).webkitTransform = 'none'
-    /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
-    ;(s as any).msTransform = 'none'
-    /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
-    ;(s as any).MozTransform = 'none'
-    /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
-    ;(s as any).OTransform = 'none'
+    const s = element.style as CSSStyleDeclaration & {
+        webkitTransform?: string
+        msTransform?: string
+        MozTransform?: string
+        OTransform?: string
+    }
+    s.transform = 'none'
+    s.webkitTransform = 'none'
+    s.msTransform = 'none'
+    s.MozTransform = 'none'
+    s.OTransform = 'none'
 }
 
 const findLayoutInsertionParent = (

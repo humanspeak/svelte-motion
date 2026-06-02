@@ -3,3 +3,8 @@ packages:
     - docs
 onlyBuiltDependencies:
     - '@humanspeak/docs-kit'
+allowBuilds:
+    '@humanspeak/docs-kit': true
+    esbuild: true
+    sharp: true
+    workerd: true

@@ -11,6 +11,19 @@ async function scrollTestIdIntoView(page: Page, testId: string) {
     await page.waitForTimeout(50)
 }
 
+async function scrollNestedPresenceDataViewport(page: Page) {
+    await page.evaluate(() => {
+        const viewport = document.querySelector(
+            '[data-testid="presence-data-nested-scroll-viewport"]'
+        ) as HTMLElement | null
+
+        if (!viewport) throw new Error('Missing presence-data-nested-scroll-viewport')
+
+        viewport.scrollTop = 180
+    })
+    await page.waitForTimeout(50)
+}
+
 async function waitForSettledSlide(page: Page, slide: string) {
     await page.waitForFunction(
         (expectedSlide) => {
@@ -271,7 +284,15 @@ async function readSettledPresenceDataSquareBounds(
                 transform: style.transform
             }
         })
-        const settled = squares.find((square) => square.opacity > 0.98 && !square.clone)
+        const settled = squares.find(
+            (square) =>
+                square.opacity > 0.98 &&
+                !square.clone &&
+                square.rect.right > containerRect.left &&
+                square.rect.left < containerRect.right &&
+                square.rect.bottom > containerRect.top &&
+                square.rect.top < containerRect.bottom
+        )
 
         return {
             container: {
@@ -359,6 +380,98 @@ async function clickAndSamplePresenceDataSquareOccupancy(
                         bottom: Math.round(containerRect.bottom),
                         left: Math.round(containerRect.left)
                     }
+                })
+
+                await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+            }
+
+            return samples
+        },
+        {
+            sampleDurationMs: durationMs,
+            targetContainerTestId: containerTestId,
+            targetTriggerTestId: triggerTestId
+        }
+    )
+}
+
+async function clickAndSamplePresenceDataSquareVerticalAlignment(
+    page: Page,
+    triggerTestId: string,
+    containerTestId: string,
+    durationMs = 500
+) {
+    return page.evaluate(
+        async ({ sampleDurationMs, targetContainerTestId, targetTriggerTestId }) => {
+            const container = document.querySelector(
+                `[data-testid="${targetContainerTestId}"]`
+            ) as HTMLElement | null
+            const trigger = document.querySelector(
+                `[data-testid="${targetTriggerTestId}"]`
+            ) as HTMLElement | null
+
+            if (!container) throw new Error(`Missing ${targetContainerTestId}`)
+            if (!trigger) throw new Error(`Missing ${targetTriggerTestId}`)
+
+            const readButtonCenterY = () => {
+                const buttons = Array.from(container.querySelectorAll('button')) as HTMLElement[]
+                const centers = buttons.map((button) => {
+                    const rect = button.getBoundingClientRect()
+
+                    return rect.top + rect.height / 2
+                })
+
+                return centers.reduce((total, center) => total + center, 0) / centers.length
+            }
+            const samples: Array<{
+                elapsed: number
+                maxDeltaY: number
+                squares: Array<{ slide: string | undefined; clone: boolean; deltaY: number }>
+            }> = []
+            const start = performance.now()
+
+            trigger.click()
+
+            while (performance.now() - start < sampleDurationMs) {
+                const containerRect = container.getBoundingClientRect()
+                const buttonCenterY = readButtonCenterY()
+                const squares = Array.from(
+                    document.querySelectorAll('[data-testid="presence-data-square"]')
+                )
+                    .map((element) => {
+                        const el = element as HTMLElement
+                        const rect = el.getBoundingClientRect()
+                        const style = getComputedStyle(el)
+                        const opacity = Number.parseFloat(style.opacity || '1')
+                        const centerY = rect.top + rect.height / 2
+
+                        return {
+                            slide: el.dataset.slide,
+                            clone: el.dataset.clone === 'true',
+                            opacity,
+                            rect,
+                            deltaY: Math.abs(centerY - buttonCenterY)
+                        }
+                    })
+                    .filter(
+                        ({ opacity, rect }) =>
+                            opacity > 0.05 &&
+                            rect.right > containerRect.left &&
+                            rect.left < containerRect.right &&
+                            rect.bottom > containerRect.top &&
+                            rect.top < containerRect.bottom
+                    )
+
+                samples.push({
+                    elapsed: Math.round(performance.now() - start),
+                    maxDeltaY: Number(
+                        Math.max(...squares.map((square) => square.deltaY), 0).toFixed(2)
+                    ),
+                    squares: squares.map(({ slide, clone, deltaY }) => ({
+                        slide,
+                        clone,
+                        deltaY: Number(deltaY.toFixed(2))
+                    }))
                 })
 
                 await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
@@ -493,5 +606,43 @@ test.describe('AnimatePresence custom', () => {
 
         expect(maxCombinedOpacity, JSON.stringify(samples, null, 2)).toBeGreaterThan(0.25)
         expect(badSample, JSON.stringify(badSample, null, 2)).toBeUndefined()
+    })
+
+    test('usePresenceData popLayout square stays in a nested scroll viewport after scroll and click', async ({
+        page
+    }) => {
+        await page.goto(URL)
+        await expect(page.getByTestId('presence-data-nested-scroll-stage')).toBeVisible()
+        await scrollTestIdIntoView(page, 'presence-data-nested-scroll-stage')
+        await scrollNestedPresenceDataViewport(page)
+
+        const transitionSamples = await clickAndSamplePresenceDataSquareOccupancy(
+            page,
+            'presence-data-nested-scroll-next',
+            'presence-data-nested-scroll-viewport'
+        )
+        const alignmentSamples = await clickAndSamplePresenceDataSquareVerticalAlignment(
+            page,
+            'presence-data-nested-scroll-previous',
+            'presence-data-nested-scroll-viewport'
+        )
+        const emptyFrame = transitionSamples.find((sample) => sample.visibleInsideCount === 0)
+        const misalignedFrame = alignmentSamples.find((sample) => sample.maxDeltaY > 4)
+
+        expect(emptyFrame, JSON.stringify(emptyFrame, null, 2)).toBeUndefined()
+        expect(misalignedFrame, JSON.stringify(misalignedFrame, null, 2)).toBeUndefined()
+        await page.waitForTimeout(700)
+        const report = await readSettledPresenceDataSquareBounds(
+            page,
+            'presence-data-nested-scroll-viewport'
+        )
+
+        expect(report.settled, JSON.stringify(report, null, 2)).toBeDefined()
+        expect(report.settled!.rect.top, JSON.stringify(report, null, 2)).toBeGreaterThanOrEqual(
+            report.container.top
+        )
+        expect(report.settled!.rect.bottom, JSON.stringify(report, null, 2)).toBeLessThanOrEqual(
+            report.container.bottom
+        )
     })
 })

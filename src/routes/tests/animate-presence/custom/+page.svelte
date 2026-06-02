@@ -36,10 +36,13 @@
     let squareDirection: 1 | -1 = $state(1)
     let isolatedSquare = $state(1)
     let isolatedSquareDirection: 1 | -1 = $state(1)
+    let nestedScrollSquare = $state(1)
+    let nestedScrollDirection: 1 | -1 = $state(1)
 
     const current = $derived(slides[index])
     const squareColor = $derived(`var(--hue-${selectedSquare})`)
     const isolatedSquareColor = $derived(`var(--hue-${isolatedSquare})`)
+    const nestedScrollColor = $derived(`var(--hue-${nestedScrollSquare})`)
 
     const variants: Variants = {
         enter: (custom) => ({
@@ -72,6 +75,11 @@
     const setIsolatedSquare = (nextDirection: 1 | -1) => {
         isolatedSquare = wrap(1, 6, isolatedSquare + nextDirection)
         isolatedSquareDirection = nextDirection
+    }
+
+    const setNestedScrollSquare = (nextDirection: 1 | -1) => {
+        nestedScrollSquare = wrap(1, 6, nestedScrollSquare + nextDirection)
+        nestedScrollDirection = nextDirection
     }
 </script>
 
@@ -219,6 +227,57 @@
                 </div>
             </MotionConfig>
         </MotionConfig>
+    </section>
+
+    <section class="stage canonical-stage" data-testid="presence-data-nested-scroll-stage">
+        <div>
+            <p class="kicker">nested scroll popLayout</p>
+            <h2>Cloned exits should stay pinned inside a scrolled layout parent.</h2>
+        </div>
+
+        <div class="nested-scroll-viewport" data-testid="presence-data-nested-scroll-viewport">
+            <div class="nested-scroll-spacer" aria-hidden="true"></div>
+            <div
+                class="canonical-row nested-scroll-row"
+                data-testid="presence-data-nested-scroll-container"
+            >
+                <motion.button
+                    initial={false}
+                    animate={{ backgroundColor: nestedScrollColor }}
+                    aria-label="Nested scroll previous"
+                    class="circle-button"
+                    data-testid="presence-data-nested-scroll-previous"
+                    onclick={() => setNestedScrollSquare(-1)}
+                    whileFocus={{ outline: `2px solid ${nestedScrollColor}` }}
+                    whileTap={{ scale: 0.9 }}
+                >
+                    ←
+                </motion.button>
+
+                <AnimatePresence custom={nestedScrollDirection} initial={false} mode="popLayout">
+                    {#key nestedScrollSquare}
+                        <PresenceDataSquare
+                            slideKey={nestedScrollSquare}
+                            color={nestedScrollColor}
+                        />
+                    {/key}
+                </AnimatePresence>
+
+                <motion.button
+                    initial={false}
+                    animate={{ backgroundColor: nestedScrollColor }}
+                    aria-label="Nested scroll next"
+                    class="circle-button"
+                    data-testid="presence-data-nested-scroll-next"
+                    onclick={() => setNestedScrollSquare(1)}
+                    whileFocus={{ outline: `2px solid ${nestedScrollColor}` }}
+                    whileTap={{ scale: 0.9 }}
+                >
+                    →
+                </motion.button>
+            </div>
+            <div class="nested-scroll-spacer" aria-hidden="true"></div>
+        </div>
     </section>
 </main>
 
@@ -398,6 +457,7 @@
     }
 
     .canonical-row {
+        position: relative;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -418,5 +478,20 @@
         outline-offset: 2px;
         color: white;
         cursor: pointer;
+    }
+
+    .nested-scroll-viewport {
+        height: 260px;
+        overflow: auto;
+        border: 1px solid #324a5b;
+        background: rgba(9, 15, 20, 0.78);
+    }
+
+    .nested-scroll-spacer {
+        height: 220px;
+    }
+
+    .nested-scroll-row {
+        min-height: 220px;
     }
 </style>

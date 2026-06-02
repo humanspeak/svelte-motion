@@ -1,13 +1,26 @@
 <script lang="ts">
+    /**
+     * Renders an animated square that reads directional custom data from the
+     * nearest AnimatePresence boundary.
+     *
+     * @component
+     * @param color CSS color used as the square background.
+     * @param slideKey Numeric slide identifier exposed to the e2e harness.
+     * @example
+     * ```svelte
+     * <PresenceDataSquare color="blue" slideKey={0} />
+     * ```
+     */
     import { motion, usePresenceData, type Variants } from '$lib'
 
     let { color, slideKey }: { color: string; slideKey: number } = $props()
 
     const direction = $derived(usePresenceData<1 | -1>() ?? 1)
-    const variants = {
+    const normalizeDirection = (custom: unknown): 1 | -1 => (custom === -1 ? -1 : 1)
+    const variants: Variants = {
         enter: (custom: unknown) => ({
             opacity: 0,
-            x: (custom as 1 | -1) * 50
+            x: normalizeDirection(custom) * 50
         }),
         center: {
             opacity: 1,
@@ -21,9 +34,9 @@
         },
         exit: (custom: unknown) => ({
             opacity: 0,
-            x: (custom as 1 | -1) * -50
+            x: normalizeDirection(custom) * -50
         })
-    } as unknown as Variants
+    }
 </script>
 
 <motion.div

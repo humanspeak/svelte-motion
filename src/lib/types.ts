@@ -21,10 +21,23 @@ import type { Snippet } from 'svelte'
  * />
  * ```
  */
-export type Variant =
-    | DOMKeyframesDefinition
-    | ((custom: unknown) => DOMKeyframesDefinition)
-    | undefined
+/**
+ * Keyframes returned from a variant, with optional transition timing.
+ *
+ * Framer Motion allows `transition` to live directly on a variant target, so
+ * Svelte Motion accepts the same shape for parity.
+ *
+ * @example
+ * ```ts
+ * const visible: VariantTarget = {
+ *   opacity: 1,
+ *   transition: { duration: 0.2 }
+ * }
+ * ```
+ */
+export type VariantTarget = DOMKeyframesDefinition & { transition?: AnimationOptions }
+
+export type Variant = VariantTarget | ((custom: unknown) => VariantTarget) | undefined
 
 /**
  * Variants define named animation states that can be referenced by string keys.
