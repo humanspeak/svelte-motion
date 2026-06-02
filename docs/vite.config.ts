@@ -3,7 +3,8 @@ import {
     docMirrorsPlugin,
     llmsFullPlugin,
     llmsPlugin,
-    sitemapManifestPlugin
+    sitemapManifestPlugin,
+    socialCardsPlugin
 } from '@humanspeak/docs-kit/vite'
 import { svelteMotionOptimize } from '@humanspeak/svelte-motion/vite'
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
@@ -13,9 +14,17 @@ import tailwindcss from '@tailwindcss/vite'
 // import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import devtoolsJson from 'vite-plugin-devtools-json'
+import { competitors } from './src/lib/compare-data'
 import { docsConfig } from './src/lib/docs-config'
 
 // const __filename = fileURLToPath(import.meta.url)
+
+const compareSocialFeatures = [
+    'Feature Comparison',
+    'Pros & Cons',
+    'Migration Guide',
+    'Honest Verdict'
+]
 
 export default defineConfig({
     plugins: [
@@ -69,6 +78,33 @@ export default defineConfig({
             siteUrl: docsConfig.url,
             pkgName: docsConfig.name,
             prepend: 'llms-positioning.md'
+        }),
+        // Renders `static/og-default.png` + per-page social cards from
+        // docs-kit's satori templates. The compare index and competitor pages
+        // get their SEO state from docs-kit components, so static route-file
+        // discovery can't see their runtime-built ogSlug values. Inject them
+        // explicitly so `/compare` and `/compare/<slug>` never fall back to
+        // missing social-card files.
+        socialCardsPlugin({
+            npmPackage: docsConfig.npmPackage,
+            defaultTitle: docsConfig.name,
+            defaultDescription:
+                'Spring physics, gestures, layout animations, exit animations, and scroll effects with a familiar declarative API.',
+            defaultFeatures: docsConfig.defaultFeatures,
+            extraPages: [
+                {
+                    ogSlug: 'compare',
+                    ogTitle: `${docsConfig.name} vs Alternatives`,
+                    ogTagline: 'Honest, side-by-side comparisons.',
+                    ogFeatures: compareSocialFeatures
+                },
+                ...competitors.map((competitor) => ({
+                    ogSlug: `compare-${competitor.slug}`,
+                    ogTitle: `vs ${competitor.name}`,
+                    ogTagline: competitor.tagline,
+                    ogFeatures: compareSocialFeatures
+                }))
+            ]
         }),
         svelteMotionOptimize(),
         tailwindcss(),
