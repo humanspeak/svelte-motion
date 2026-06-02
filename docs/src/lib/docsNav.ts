@@ -92,6 +92,7 @@ export const docsSections: NavSection[] = [
             { title: 'useCycle', href: '/docs/use-cycle', icon: RefreshCw },
             { title: 'useInView', href: '/docs/use-in-view', icon: Eye },
             { title: 'usePresence', href: '/docs/use-presence', icon: Ghost },
+            { title: 'usePresenceData', href: '/docs/use-presence-data', icon: ArrowUpDown },
             {
                 title: 'useReducedMotion',
                 href: '/docs/use-reduced-motion',

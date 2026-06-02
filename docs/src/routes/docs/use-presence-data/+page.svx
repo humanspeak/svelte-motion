@@ -1,0 +1,100 @@
+---
+title: 'usePresenceData'
+description: 'Read AnimatePresence custom data from an exiting child.'
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte';
+  import UsePresenceDataExample from '$lib/examples/use-presence-data/demos/Default.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'usePresenceData | Docs | Svelte Motion'
+      seo.description = 'Read custom data passed to AnimatePresence from entering and exiting children.'
+      seo.ogTitle = 'usePresenceData'
+      seo.ogTagline = 'Presence custom data inside exiting children'
+      seo.ogFeatures = ['AnimatePresence', 'custom', 'usePresenceData', 'Directional Exit']
+      seo.ogSlug = 'docs-use-presence-data'
+  }
+</script>
+
+# usePresenceData
+
+`usePresenceData()` returns the nearest `<AnimatePresence custom={...}>`
+value. It matches Motion's hook shape: inside a presence boundary it returns
+that boundary's `custom` data, and outside a boundary it returns `undefined`.
+
+The main use case is keyed exit animation. Once a child has been removed from
+state, its normal props are stale. Presence data gives that exiting child the
+latest parent-level data, such as a carousel direction.
+
+```svelte
+<script lang="ts">
+    import { AnimatePresence, motion, usePresenceData, wrap } from '@humanspeak/svelte-motion'
+
+    const items = [1, 2, 3]
+    let selected = $state(items[0])
+    let direction = $state(1)
+
+    function paginate(nextDirection: 1 | -1) {
+        selected = wrap(1, items.length, selected + nextDirection)
+        direction = nextDirection
+    }
+</script>
+
+<AnimatePresence custom={direction} initial={false} mode="popLayout">
+    {#key selected}
+        <Slide key={selected} />
+    {/key}
+</AnimatePresence>
+```
+
+Inside the keyed child:
+
+```svelte
+<script lang="ts">
+    import { motion, usePresenceData, type Variants } from '@humanspeak/svelte-motion'
+
+    const direction = $derived(usePresenceData<1 | -1>() ?? 1)
+
+    const variants: Variants = {
+        enter: (custom) => ({ x: custom > 0 ? 50 : -50, opacity: 0 }),
+        center: { x: 0, opacity: 1 },
+        exit: (custom) => ({ x: custom > 0 ? -50 : 50, opacity: 0 })
+    }
+</script>
+
+<motion.div
+    custom={direction}
+    {variants}
+    initial="enter"
+    animate="center"
+    exit="exit"
+/>
+```
+
+<Example isSmall exampleUrl="/examples/use-presence-data">
+  <UsePresenceDataExample />
+</Example>
+
+## API Reference
+
+### `usePresenceData<T = unknown>(): T | undefined`
+
+Returns the current `custom` value from the nearest `<AnimatePresence>`
+boundary.
+
+- Inside `<AnimatePresence custom={value}>`, returns `value`.
+- Outside `<AnimatePresence>`, returns `undefined`.
+- In Svelte reactive contexts, wrap it in `$derived(...)` so updates to
+  `custom` are tracked.
+
+## Related
+
+- [AnimatePresence custom](/docs/animate-presence-custom) — dynamic exit
+  variants using parent custom data.
+- [usePresence](/docs/use-presence) — manually delay removal with
+  `safeToRemove`.
+
+Based on [Motion's usePresenceData API](https://motion.dev/docs/react-use-presence-data).
