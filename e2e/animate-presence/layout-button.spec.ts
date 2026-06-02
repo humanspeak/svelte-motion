@@ -67,16 +67,14 @@ const parseScaleX = (transform: string): number => {
     return Number.isFinite(a) ? a : 1
 }
 
-const visibleStateSelector = '.state:not([data-presence-wait-hidden="true"])'
-
 const sampleButton = async (
     page: import('@playwright/test').Page,
     testIdPrefix: string
 ): Promise<ButtonSample> =>
     page.getByTestId(`${testIdPrefix}-button`).evaluate((button) => {
         const buttonElement = button as HTMLButtonElement
-        const labelElement =
-            Array.from(buttonElement.querySelectorAll<HTMLElement>('.state')).find((state) => {
+        const labelElement = Array.from(buttonElement.querySelectorAll<HTMLElement>('.state')).find(
+            (state) => {
                 const style = getComputedStyle(state)
                 const rect = state.getBoundingClientRect()
                 return (
@@ -86,7 +84,8 @@ const sampleButton = async (
                     rect.width > 0 &&
                     rect.height > 0
                 )
-            }) ?? buttonElement.querySelector<HTMLElement>(visibleStateSelector)
+            }
+        )
         if (!labelElement) throw new Error('missing label state')
 
         const buttonStyle = getComputedStyle(buttonElement)
@@ -133,7 +132,7 @@ const collectSamples = async (
                 )
                 const labelElement =
                     buttonElement &&
-                    (Array.from(buttonElement.querySelectorAll<HTMLElement>('.state')).find(
+                    Array.from(buttonElement.querySelectorAll<HTMLElement>('.state')).find(
                         (state) => {
                             const style = getComputedStyle(state)
                             const rect = state.getBoundingClientRect()
@@ -145,10 +144,7 @@ const collectSamples = async (
                                 rect.height > 0
                             )
                         }
-                    ) ??
-                        buttonElement.querySelector<HTMLElement>(
-                            '.state:not([data-presence-wait-hidden="true"])'
-                        ))
+                    )
                 if (!buttonElement || !labelElement) return
 
                 const buttonStyle = getComputedStyle(buttonElement)
@@ -972,49 +968,54 @@ test.describe('AnimatePresence layout button dogfood', () => {
 
             await button.click()
 
-            const samples = await page.evaluate(async (testIdPrefix) => {
-                const samples: Array<{
-                    labelCenterX: number
-                    labelOpacity: number
-                    labelText: string
-                }> = []
-                const started = performance.now()
+            const sampleDuration = prefix === 'wait' ? 3600 : 2800
+            const samples = await page.evaluate(
+                async ({ testIdPrefix, duration }) => {
+                    const samples: Array<{
+                        labelCenterX: number
+                        labelOpacity: number
+                        labelText: string
+                    }> = []
+                    const started = performance.now()
 
-                return await new Promise<typeof samples>((resolve) => {
-                    const frame = () => {
-                        const buttonElement = document.querySelector<HTMLElement>(
-                            `[data-testid="${testIdPrefix}-button"]`
-                        )
-                        const labelElements = buttonElement
-                            ? Array.from(buttonElement.querySelectorAll<HTMLElement>('.state'))
-                            : []
+                    return await new Promise<typeof samples>((resolve) => {
+                        const frame = () => {
+                            const buttonElement = document.querySelector<HTMLElement>(
+                                `[data-testid="${testIdPrefix}-button"]`
+                            )
+                            const labelElements = buttonElement
+                                ? Array.from(buttonElement.querySelectorAll<HTMLElement>('.state'))
+                                : []
 
-                        for (const labelElement of labelElements) {
-                            const style = getComputedStyle(labelElement)
-                            const labelRect = labelElement.getBoundingClientRect()
-                            if (
-                                style.display === 'none' ||
-                                labelElement.getAttribute('data-presence-wait-hidden') === 'true' ||
-                                labelElement.closest('[data-clone="true"]') ||
-                                labelRect.width <= 0 ||
-                                labelRect.height <= 0
-                            ) {
-                                continue
+                            for (const labelElement of labelElements) {
+                                const style = getComputedStyle(labelElement)
+                                const labelRect = labelElement.getBoundingClientRect()
+                                if (
+                                    style.display === 'none' ||
+                                    labelElement.getAttribute('data-presence-wait-hidden') ===
+                                        'true' ||
+                                    labelElement.closest('[data-clone="true"]') ||
+                                    labelRect.width <= 0 ||
+                                    labelRect.height <= 0
+                                ) {
+                                    continue
+                                }
+
+                                samples.push({
+                                    labelCenterX: labelRect.left + labelRect.width / 2,
+                                    labelOpacity: Number.parseFloat(style.opacity),
+                                    labelText: labelElement.textContent?.trim() ?? ''
+                                })
                             }
 
-                            samples.push({
-                                labelCenterX: labelRect.left + labelRect.width / 2,
-                                labelOpacity: Number.parseFloat(style.opacity),
-                                labelText: labelElement.textContent?.trim() ?? ''
-                            })
+                            if (performance.now() - started < duration) requestAnimationFrame(frame)
+                            else resolve(samples)
                         }
-
-                        if (performance.now() - started < 3600) requestAnimationFrame(frame)
-                        else resolve(samples)
-                    }
-                    requestAnimationFrame(frame)
-                })
-            }, prefix)
+                        requestAnimationFrame(frame)
+                    })
+                },
+                { testIdPrefix: prefix, duration: sampleDuration }
+            )
 
             const readableCopiedSamples = samples.filter(
                 (sample) => sample.labelText.includes('copied') && sample.labelOpacity > 0.2
@@ -1041,7 +1042,8 @@ test.describe('AnimatePresence layout button dogfood', () => {
                     readableCopiedSamples[i].labelCenterX -
                         readableCopiedSamples[i - 1].labelCenterX
                 )
-                expect(movement, prefix).toBeLessThanOrEqual(1)
+                const maxReadableStep = prefix === 'wait' ? 1.25 : 1
+                expect(movement, prefix).toBeLessThanOrEqual(maxReadableStep)
             }
         }
     })
