@@ -14,7 +14,8 @@ on:
             - tests/**
             - '!docs/**'
             - package.json
-            - package-lock.json
+            - pnpm-lock.yaml
+            - pnpm-workspace.yaml
             - svelte.config.*
             - vite.config.*
             - playwright.config.*
@@ -36,9 +37,7 @@ jobs:
                   persist-credentials: false
                   fetch-depth: 1
 
-            - uses: pnpm/action-setup@v4 # zizmor: ignore[unpinned-uses]
-              with:
-                  version: 10
+            - uses: pnpm/action-setup@v6 # zizmor: ignore[unpinned-uses]
 
             - name: Use Node.js - 24
               uses: actions/setup-node@v6 # zizmor: ignore[unpinned-uses]
@@ -103,9 +102,7 @@ jobs:
                   persist-credentials: false
                   fetch-depth: 1
 
-            - uses: pnpm/action-setup@v4 # zizmor: ignore[unpinned-uses]
-              with:
-                  version: 10
+            - uses: pnpm/action-setup@v6 # zizmor: ignore[unpinned-uses]
 
             - name: Use Node.js - 24
               uses: actions/setup-node@v6 # zizmor: ignore[unpinned-uses]
