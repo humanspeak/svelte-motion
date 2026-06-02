@@ -10,6 +10,8 @@
 
 ## Notes
 
+- When giving the user a shortlist of possible next features, include an online/live example for each option and call out the specific "WOW" behavior we would be trying to recreate.
+
 ## New feature checklist
 
 When asked to implement a new feature, handle it end-to-end by default:

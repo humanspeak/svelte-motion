@@ -1,6 +1,13 @@
+import { animate } from 'motion'
 import { getContext, setContext } from 'svelte'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createAnimatePresenceContext, getPresenceDepth, setPresenceDepth } from './presence'
+import {
+    createAnimatePresenceContext,
+    getPresenceDepth,
+    measurePopLayoutSnapshot,
+    resolvePopLayoutStyles,
+    setPresenceDepth
+} from './presence'
 
 // Shared context store for mock - exposed for clearing between tests
 const mockContextStore = new Map<symbol | string, unknown>()
@@ -44,6 +51,7 @@ describe('presence context', () => {
     let el: HTMLElement
 
     beforeEach(() => {
+        vi.clearAllMocks()
         document.body.innerHTML = ''
         parent = document.createElement('div')
         Object.assign(parent.style, { position: 'relative', width: '200px', height: '200px' })
@@ -122,6 +130,26 @@ describe('presence context', () => {
         ctx.unregisterChild('noexit')
         const clone = document.querySelector('[data-clone="true"]')
         expect(clone).toBeFalsy()
+    })
+
+    it('resolves exit variants with the latest AnimatePresence custom value', () => {
+        let direction = 1
+        const ctx = createAnimatePresenceContext({ getCustom: () => direction })
+        const resolveExit = vi.fn((custom: unknown) => ({
+            x: (custom as number) > 0 ? -160 : 160,
+            opacity: 0
+        }))
+
+        ctx.registerChild('custom', el, { opacity: 0 }, undefined, resolveExit)
+        direction = -1
+        ctx.unregisterChild('custom')
+
+        expect(resolveExit).toHaveBeenCalledWith(-1)
+        expect(animate).toHaveBeenCalledWith(
+            expect.any(HTMLElement),
+            expect.objectContaining({ x: 160, opacity: 0 }),
+            expect.any(Object)
+        )
     })
 
     it('calls onExitComplete after animation finished', async () => {
@@ -387,6 +415,143 @@ describe('AnimatePresence modes', () => {
     })
 
     describe('popLayout layout behavior', () => {
+        it('measures popLayout snapshots using offset parent coordinates', () => {
+            Object.defineProperties(parent, {
+                offsetWidth: { configurable: true, value: 240 },
+                offsetHeight: { configurable: true, value: 180 }
+            })
+            Object.defineProperties(el, {
+                offsetParent: { configurable: true, value: parent },
+                offsetTop: { configurable: true, value: 64 },
+                offsetLeft: { configurable: true, value: 32 },
+                offsetWidth: { configurable: true, value: 120 },
+                offsetHeight: { configurable: true, value: 80 }
+            })
+
+            const snapshot = measurePopLayoutSnapshot(
+                el,
+                mockComputedStyle({
+                    direction: 'ltr',
+                    height: '80px',
+                    width: '120px'
+                })
+            )
+
+            expect(snapshot).toEqual({
+                width: 120,
+                height: 80,
+                top: 64,
+                left: 32,
+                right: 88,
+                bottom: 36,
+                direction: 'ltr'
+            })
+        })
+
+        it('resolves popLayout styles with upstream left/top anchoring defaults', () => {
+            expect(
+                resolvePopLayoutStyles({
+                    width: 120,
+                    height: 80,
+                    top: 64,
+                    left: 32,
+                    right: 88,
+                    bottom: 36,
+                    direction: 'ltr'
+                })
+            ).toMatchObject({
+                position: 'absolute',
+                width: '120px',
+                height: '80px',
+                left: '32px',
+                top: '64px'
+            })
+        })
+
+        it('resolves popLayout right and bottom anchors like upstream', () => {
+            expect(
+                resolvePopLayoutStyles(
+                    {
+                        width: 120,
+                        height: 80,
+                        top: 64,
+                        left: 32,
+                        right: 88,
+                        bottom: 36,
+                        direction: 'ltr'
+                    },
+                    'right',
+                    'bottom'
+                )
+            ).toMatchObject({
+                position: 'absolute',
+                width: '120px',
+                height: '80px',
+                right: '88px',
+                bottom: '36px'
+            })
+        })
+
+        it('uses the stored offset snapshot for popLayout clones after scroll', async () => {
+            Object.defineProperties(parent, {
+                offsetWidth: { configurable: true, value: 240 },
+                offsetHeight: { configurable: true, value: 180 }
+            })
+            Object.defineProperties(el, {
+                offsetParent: { configurable: true, value: parent },
+                offsetTop: { configurable: true, value: 64 },
+                offsetLeft: { configurable: true, value: 32 },
+                offsetWidth: { configurable: true, value: 120 },
+                offsetHeight: { configurable: true, value: 80 }
+            })
+
+            vi.mocked(window.getComputedStyle).mockImplementation((target: Element) => {
+                if (target === el) {
+                    return mockComputedStyle({
+                        borderRadius: '8px',
+                        boxSizing: 'border-box',
+                        direction: 'ltr',
+                        height: '80px',
+                        position: 'static',
+                        width: '120px'
+                    })
+                }
+
+                return mockComputedStyle({
+                    borderRadius: '8px',
+                    boxSizing: 'border-box',
+                    position: 'static'
+                })
+            })
+
+            const ctx = createAnimatePresenceContext({ mode: 'popLayout' })
+            ctx.registerChild('k1', el, { opacity: 0 })
+
+            vi.spyOn(el, 'getBoundingClientRect').mockReturnValue({
+                x: 10,
+                y: -180,
+                top: -180,
+                left: 10,
+                bottom: -100,
+                right: 130,
+                width: 120,
+                height: 80,
+                toJSON: () => {}
+            } as unknown as DOMRect)
+
+            ctx.unregisterChild('k1')
+
+            const clone = parent.querySelector('[data-clone="true"]') as HTMLElement | null
+            expect(clone).toBeTruthy()
+            expect(clone?.style.top).toBe('64px')
+            expect(clone?.style.left).toBe('32px')
+            expect(clone?.style.width).toBe('120px')
+            expect(clone?.style.height).toBe('80px')
+
+            await Promise.resolve()
+            await Promise.resolve()
+        })
+
         it('does not insert a placeholder during exit', async () => {
             const ctx = createAnimatePresenceContext({ mode: 'popLayout' })
             ctx.registerChild('k1', el, { opacity: 0 })
@@ -458,7 +623,10 @@ describe('AnimatePresence modes', () => {
             ctx.unregisterChild('k1')
 
             const placeholder = parent.querySelector('[data-presence-placeholder="true"]')
+            const clone = parent.querySelector('[data-clone="true"]')
             expect(placeholder).toBeTruthy()
+            expect(clone).toBeTruthy()
+            expect(clone?.parentElement).toBe(parent)
         })
     })
 })

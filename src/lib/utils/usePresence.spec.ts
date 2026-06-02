@@ -1,3 +1,5 @@
+import AnimatePresenceDataHarness from '$lib/components/__tests__/AnimatePresenceDataHarness.svelte'
+import PresenceDataProbe from '$lib/components/__tests__/PresenceDataProbe.svelte'
 import PresenceHarness from '$lib/components/__tests__/PresenceHarness.svelte'
 import PresenceProbe from '$lib/components/__tests__/PresenceProbe.svelte'
 import StalePresenceHarness from '$lib/components/__tests__/StalePresenceHarness.svelte'
@@ -10,6 +12,7 @@ import { tick } from 'svelte'
 import { describe, expect, it } from 'vitest'
 
 const probe = () => screen.getByTestId('probe')
+const presenceDataProbe = () => screen.getByTestId('presence-data-probe')
 
 describe('utils/usePresence', () => {
     describe('outside any PresenceChild', () => {
@@ -22,6 +25,29 @@ describe('utils/usePresence', () => {
             render(PresenceProbe)
             expect(probe().getAttribute('data-tuple-is-present')).toBe('true')
             expect(probe().getAttribute('data-tuple-has-callback')).toBe('false')
+        })
+
+        it('usePresenceData returns undefined outside AnimatePresence', () => {
+            render(PresenceDataProbe)
+            expect(presenceDataProbe().getAttribute('data-value')).toBe('undefined')
+        })
+    })
+
+    describe('inside AnimatePresence', () => {
+        it('usePresenceData returns custom data passed to AnimatePresence', () => {
+            render(AnimatePresenceDataHarness, { props: { custom: 0.5 } })
+            expect(presenceDataProbe().getAttribute('data-value')).toBe('0.5')
+        })
+
+        it('usePresenceData tracks updated AnimatePresence custom data', async () => {
+            const { rerender } = render(AnimatePresenceDataHarness, {
+                props: { custom: 1 }
+            })
+            expect(presenceDataProbe().getAttribute('data-value')).toBe('1')
+
+            await rerender({ custom: -1 })
+            await tick()
+            expect(presenceDataProbe().getAttribute('data-value')).toBe('-1')
         })
     })
 

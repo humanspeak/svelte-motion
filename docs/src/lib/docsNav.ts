@@ -37,6 +37,11 @@ export const docsSections: NavSection[] = [
         icon: Ghost,
         items: [
             { title: 'AnimatePresence', href: '/docs/animate-presence', icon: Ghost },
+            {
+                title: 'AnimatePresence custom',
+                href: '/docs/animate-presence-custom',
+                icon: ArrowUpDown
+            },
             { title: 'LazyMotion', href: '/docs/lazy-motion', icon: Zap },
             { title: 'MotionConfig', href: '/docs/motion-config', icon: Settings }
         ]

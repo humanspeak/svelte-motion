@@ -15,20 +15,7 @@ type ProjectionVisualElement = VisualElement & {
     latestValues: ResolvedValues
     projection?: IProjectionNode<HTMLElement>
 }
-type ProjectionTreeNode = {
-    children: Iterable<ProjectionTreeNode>
-    currentAnimation?: unknown
-    finishAnimation: () => void
-    isLayoutDirty: boolean
-    isProjectionDirty: boolean
-    layout?: Measurements
-    options: IProjectionNode['options']
-    relativeTarget?: unknown
-    scheduleRender: (notifyAll?: boolean) => void
-    snapshot?: Measurements
-    target?: unknown
-    targetDelta?: unknown
-}
+type ProjectionTreeNode<Instance = unknown> = IProjectionNode<Instance>
 
 type LayoutOption = boolean | string | undefined
 type AnimationType = 'position' | 'x' | 'y' | 'size' | 'both' | 'preserve-aspect'
@@ -315,11 +302,14 @@ export class MotionDomProjectionAdapter {
         return this.isAnimatingSubtree(this.projection)
     }
 
-    private seedCachedSnapshotsForSubtree(projection: ProjectionTreeNode): void {
+    private seedCachedSnapshotsForSubtree<Instance>(
+        projection: ProjectionTreeNode<Instance>
+    ): void {
         const adapter = MotionDomProjectionAdapter.adapters.get(projection)
         const snapshot = cloneMeasurements(adapter?.lastLayout)
 
         if (snapshot && projection.options.layout) {
+            this.prepareSnapshotPath(projection)
             projection.snapshot = snapshot
             projection.isLayoutDirty = true
         }
@@ -329,7 +319,20 @@ export class MotionDomProjectionAdapter {
         }
     }
 
-    private finishAnimationForSubtree(projection: ProjectionTreeNode): void {
+    private prepareSnapshotPath<Instance>(projection: ProjectionTreeNode<Instance>): void {
+        projection.root!.hasTreeAnimated = true
+
+        for (const node of projection.path) {
+            node.shouldResetTransform = true
+            node.updateScroll('snapshot')
+
+            if (node.options.layoutRoot) {
+                node.willUpdate(false)
+            }
+        }
+    }
+
+    private finishAnimationForSubtree<Instance>(projection: ProjectionTreeNode<Instance>): void {
         projection.finishAnimation()
         projection.targetDelta = projection.relativeTarget = projection.target = undefined
         projection.isProjectionDirty = true
@@ -339,7 +342,7 @@ export class MotionDomProjectionAdapter {
         }
     }
 
-    private isAnimatingSubtree(projection: ProjectionTreeNode): boolean {
+    private isAnimatingSubtree<Instance>(projection: ProjectionTreeNode<Instance>): boolean {
         if (projection.currentAnimation) return true
         for (const child of projection.children) {
             if (this.isAnimatingSubtree(child)) return true

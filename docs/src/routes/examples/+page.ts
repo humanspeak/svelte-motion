@@ -10,6 +10,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'AnimatePresence',
         description: 'Interactive AnimatePresence animation example using Svelte Motion.'
     },
+    'animate-presence-custom': {
+        title: 'AnimatePresence custom',
+        description:
+            'Directional exit animations powered by AnimatePresence custom data and dynamic variants.'
+    },
     'animated-button': {
         title: 'Animated Button',
         description: 'Interactive animated button animation example using Svelte Motion.'
