@@ -137,6 +137,10 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'usePresence',
         description: 'Interactive usePresence animation example using Svelte Motion.'
     },
+    'use-presence-data': {
+        title: 'usePresenceData',
+        description: 'Read AnimatePresence custom data from an entering or exiting child.'
+    },
     'use-reduced-motion': {
         title: 'useReducedMotion',
         description: 'Interactive useReducedMotion animation example using Svelte Motion.'
