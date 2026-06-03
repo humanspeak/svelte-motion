@@ -488,11 +488,14 @@
     // Recognized HTML void elements that cannot contain children
     const isVoidTag = $derived(VOID_TAGS.has(tag as string))
 
-    let motionValueChildText = $state('')
+    const motionValueChildInitialText = $derived(
+        motionValueChild ? renderMotionValueChild(motionValueChild) : ''
+    )
+    let motionValueChildText = $state<string | undefined>(undefined)
 
     $effect(() => {
         if (!motionValueChild) {
-            motionValueChildText = ''
+            motionValueChildText = undefined
             return
         }
 
@@ -2383,7 +2386,7 @@
 {:else if isSVGTag(String(tag))}
     <svelte:element this={tag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs}>
         {#if motionValueChild}
-            {motionValueChildText}
+            {motionValueChildText ?? motionValueChildInitialText}
         {:else}
             {@render children?.()}
         {/if}
@@ -2393,7 +2396,7 @@
 {:else}
     <svelte:element this={tag} bind:this={element} {...derivedAttrs}>
         {#if motionValueChild}
-            {motionValueChildText}
+            {motionValueChildText ?? motionValueChildInitialText}
         {:else}
             {@render children?.()}
         {/if}

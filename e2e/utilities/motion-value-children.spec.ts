@@ -3,6 +3,16 @@ import { expect, test } from '@playwright/test'
 const URL = '/tests/motion-value-children?@isPlaywright=true'
 
 test.describe('MotionValue children', () => {
+    test('server-renders the initial motion value child text', async ({ request }) => {
+        const response = await request.get(URL)
+        const html = await response.text()
+
+        expect(response.ok()).toBe(true)
+        expect(html).toContain('1,200')
+        expect(html).toContain('18%')
+        expect(html).toContain('WARMING')
+    })
+
     test('renders the initial motion value child text and updates on change', async ({ page }) => {
         await page.goto(URL)
 

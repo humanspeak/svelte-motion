@@ -19,6 +19,13 @@ export type MotionValueChild<T extends number | string = number | string> = {
  *
  * @param value Value to inspect.
  * @returns Whether the value is a `MotionValue<number | string>`.
+ *
+ * @example
+ * ```ts
+ * const count = motionValue(0)
+ * isMotionValueChild(count) // true
+ * isMotionValueChild('0') // false
+ * ```
  */
 export const isMotionValueChild = (value: unknown): value is MotionValueChild => {
     return isMotionValue(value)
@@ -29,6 +36,12 @@ export const isMotionValueChild = (value: unknown): value is MotionValueChild =>
  *
  * @param child MotionValue child to sample.
  * @returns String form of the child's current value.
+ *
+ * @example
+ * ```ts
+ * const status = motionValue('ready')
+ * renderMotionValueChild(status) // 'ready'
+ * ```
  */
 export const renderMotionValueChild = <T extends number | string>(
     child: MotionValueChild<T>
@@ -41,6 +54,17 @@ export const renderMotionValueChild = <T extends number | string>(
  * @param element Element whose `textContent` should mirror the child.
  * @param onRender Optional callback fired with every rendered text value.
  * @returns Unsubscribe callback.
+ *
+ * @example
+ * ```ts
+ * const count = motionValue(0)
+ * const element = document.createElement('span')
+ * const unsubscribe = bindMotionValueChild(count, element)
+ *
+ * count.set(1)
+ * element.textContent // '1'
+ * unsubscribe()
+ * ```
  */
 export const bindMotionValueChild = (
     child: MotionValueChild,
