@@ -69,6 +69,10 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Motion Path',
         description: 'Interactive motion path animation example using Svelte Motion.'
     },
+    'motion-value-children': {
+        title: 'MotionValue children',
+        description: 'Render MotionValue values as live text in motion elements.'
+    },
     'multi-state-badge': {
         title: 'Multi-State Badge',
         description: 'Interactive multi-state badge animation example using Svelte Motion.'
