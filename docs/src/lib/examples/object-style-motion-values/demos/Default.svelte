@@ -38,7 +38,6 @@
     async function reverse() {
         const id = ++runId
         phase = 'routing'
-        progress.jump(1)
         await animate(progress as unknown as RawMotionValue<number>, 0, {
             duration: 0.95,
             ease: [0.22, 1, 0.36, 1]
@@ -56,16 +55,16 @@
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
     <div class="toolbar" aria-label="Packet route controls">
-        <button type="button" onclick={reverse} aria-label="Route left">
+        <button type="button" onclick={reverse}>
             <ArrowLeft size={15} />
             Return
         </button>
-        <button type="button" class="primary" onclick={route} aria-label="Route right">
+        <button type="button" class="primary" onclick={route}>
             <Send size={15} />
             Deliver
             <ArrowRight size={15} />
         </button>
-        <button type="button" onclick={reset} aria-label="Reset route">
+        <button type="button" onclick={reset}>
             <RotateCcw size={15} />
             Reset
         </button>
