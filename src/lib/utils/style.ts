@@ -1,3 +1,33 @@
+import { isMotionValue, type MotionValue } from 'motion-dom'
+
+/**
+ * Structural MotionValue shape accepted by object-form styles.
+ *
+ * The public API intentionally stays structural because Svelte Motion wraps
+ * and augments MotionValues while preserving Motion's runtime contract.
+ */
+export type MotionStyleMotionValue = {
+    /** Read the current style value. */
+    get: () => string | number
+}
+
+/**
+ * A value accepted inside Motion's object-form `style` prop.
+ *
+ * Static values are serialized into the rendered inline style. MotionValues
+ * are also serialized with their current value, then subscribed with
+ * `motion-dom`'s `styleEffect` so they can update the DOM without rerenders.
+ */
+export type MotionStyleValue = string | number | MotionStyleMotionValue | null | undefined
+
+/**
+ * React-style object form for the `style` prop.
+ *
+ * Supports normal CSS properties, CSS variables, and Motion transform
+ * shortcuts like `x`, `y`, `scale`, and `rotate`.
+ */
+export type MotionStyle = Record<string, MotionStyleValue>
+
 /**
  * Merge inline CSS styles from an existing style string with a Motion initial definition.
  * This is used during SSR to reflect the initial state in server-rendered markup.
@@ -168,9 +198,68 @@ export const mergeInlineStyles = (
  * ```
  */
 export const extractTransform = (style: unknown): string => {
-    if (typeof style !== 'string') return ''
+    if (typeof style !== 'string') {
+        if (!isMotionStyleObject(style)) return ''
+        const transform = resolveStyleValue(style.transform)
+        return transform == null ? '' : String(transform)
+    }
     return parseStyleString(style).transform ?? ''
 }
+
+/**
+ * Serialize a string or object-form Motion style prop into inline CSS.
+ *
+ * @param style The consumer-provided style prop.
+ * @returns Inline CSS suitable for Svelte's `style` attribute.
+ */
+export const serializeMotionStyle = (style: string | MotionStyle | null | undefined): string => {
+    if (typeof style === 'string') return style
+    if (!isMotionStyleObject(style)) return ''
+    return mergeInlineStyles('', resolveMotionStyle(style), null)
+}
+
+/**
+ * Collect MotionValue entries from object-form style props.
+ *
+ * @param style The consumer-provided style prop.
+ * @returns A map of style keys to MotionValues, or `undefined` when no live
+ *   style values are present.
+ */
+export const collectMotionStyleValues = (
+    style: unknown
+): Record<string, MotionValue> | undefined => {
+    if (!isMotionStyleObject(style)) return undefined
+
+    const values: Record<string, MotionValue> = {}
+    for (const [key, value] of Object.entries(style)) {
+        if (isMotionValue(value)) {
+            values[key] = value as MotionValue
+        }
+    }
+
+    return Object.keys(values).length ? values : undefined
+}
+
+const isMotionStyleObject = (style: unknown): style is MotionStyle =>
+    !!style && typeof style === 'object' && !Array.isArray(style)
+
+const resolveMotionStyle = (style: MotionStyle): Record<string, unknown> => {
+    const resolved: Record<string, unknown> = {}
+
+    for (const [key, value] of Object.entries(style)) {
+        resolved[key] = resolveStyleValue(value)
+    }
+
+    return resolved
+}
+
+const resolveStyleValue = (value: MotionStyleValue): string | number | null | undefined => {
+    if (isMotionStyleMotionValue(value)) return value.get()
+    return value
+}
+
+const isMotionStyleMotionValue = (value: MotionStyleValue): value is MotionStyleMotionValue =>
+    !!value && typeof value === 'object' && 'get' in value && typeof value.get === 'function'
 
 const parseStyleString = (style: string): Record<string, string> => {
     const out: Record<string, string> = {}

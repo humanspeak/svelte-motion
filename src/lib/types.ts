@@ -1,4 +1,5 @@
 import type { MotionValueChild } from '$lib/utils/motionValueChild'
+import type { MotionStyle } from '$lib/utils/style'
 import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
 import type { Snippet } from 'svelte'
 
@@ -563,8 +564,8 @@ export type MotionProps = {
     onPan?: MotionOnPan
     /** Pan gesture: fires on pointerup if onPanStart ever fired */
     onPanEnd?: MotionOnPanEnd
-    /** Inline styles */
-    style?: string
+    /** Inline styles as a CSS string or Motion-style object with live MotionValue entries. */
+    style?: string | MotionStyle
     /** CSS classes */
     class?: string
     /** Enable FLIP layout animations; string values select the upstream projection animation type. */

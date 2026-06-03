@@ -69,6 +69,11 @@ export const docsSections: NavSection[] = [
         items: [
             { title: 'Overview', href: '/docs/motion-values', icon: Signal },
             { title: 'MotionValue children', href: '/docs/motion-value-children', icon: Code },
+            {
+                title: 'Object style MotionValues',
+                href: '/docs/object-style-motion-values',
+                icon: Code
+            },
             { title: 'useFollowValue', href: '/docs/use-follow-value', icon: Activity },
             { title: 'useMotionTemplate', href: '/docs/use-motion-template', icon: Code },
             { title: 'useMotionValueEvent', href: '/docs/use-motion-value-event', icon: Zap },

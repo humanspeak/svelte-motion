@@ -72,6 +72,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/object-style-motion-values') + searchParams}
+                    >
+                        Object style MotionValues
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/aspect-ratio') + searchParams}
                     >
                         Aspect Ratio

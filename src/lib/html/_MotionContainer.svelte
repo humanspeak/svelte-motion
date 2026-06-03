@@ -30,7 +30,7 @@
     import { isNotEmpty } from '$lib/utils/objects'
     import { sleep } from '$lib/utils/testing'
     import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
-    import { motionValue, svgEffect, type MotionValue } from 'motion-dom'
+    import { motionValue, styleEffect, svgEffect, type MotionValue } from 'motion-dom'
     import { isPlaywrightEnv, pwLog } from '$lib/utils/log'
     import { onDestroy, untrack, type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants'
@@ -49,7 +49,12 @@
         type RectLike
     } from '$lib/utils/layout'
     import type { SvelteHTMLElements } from 'svelte/elements'
-    import { mergeInlineStyles, extractTransform } from '$lib/utils/style'
+    import {
+        collectMotionStyleValues,
+        extractTransform,
+        mergeInlineStyles,
+        serializeMotionStyle
+    } from '$lib/utils/style'
     import { isNativelyFocusable } from '$lib/utils/a11y'
     import {
         getAnimatePresenceContext,
@@ -254,6 +259,7 @@
     // than the live inline transform — the latter already carries any
     // transform-type `initial`/`animate` keyframe by the time the node
     // measures, which would be mistaken for the user's base.
+    const serializedStyleProp = $derived(serializeMotionStyle(styleProp))
     const userBaseTransform = $derived(extractTransform(styleProp))
 
     const projectionParent = getProjectionParent()
@@ -505,6 +511,15 @@
         return bindMotionValueChild(motionValueChild, element, (text) => {
             motionValueChildText = text
         })
+    })
+
+    $effect(() => {
+        if (!element) return
+
+        const styleValues = collectMotionStyleValues(styleProp)
+        if (!styleValues) return
+
+        return styleEffect(element, styleValues)
     })
 
     // Variant inheritance and resolution
@@ -1046,7 +1061,7 @@
             return {}
         })(),
         style: mergeInlineStyles(
-            `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${styleProp || ''};visibility:hidden` : (styleProp ?? '')}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`,
+            `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleProp};visibility:hidden` : serializedStyleProp}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`,
             // The "from" slot: apply initialKeyframes as inline styles during
             // the mounting/initial phases (before the WAAPI animation locks
             // its from-value and we promote to 'ready' — see the lifecycle
