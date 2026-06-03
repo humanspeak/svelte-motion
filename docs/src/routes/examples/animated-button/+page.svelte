@@ -1,16 +1,15 @@
 <script lang="ts">
     import {
         CodeReferenceV2,
-        type DemoManifestEntry,
         ExampleV2,
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Hourglass, MousePointerClick, Sparkles } from '@lucide/svelte'
+    import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import AnimatedButtonDefault from '$lib/examples/animated-button/demos/Default.svelte'
-    import demoManifest from '$lib/demo-manifest.json'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
@@ -32,8 +31,6 @@
 
     const SOURCE_URL =
         'https://github.com/humanspeak/svelte-motion/blob/main/docs/src/lib/examples/'
-
-    const manifest = demoManifest as Record<string, DemoManifestEntry>
 
     const sections: ExampleSection[] = [
         {
@@ -85,11 +82,11 @@
 {#snippet defaultCode()}
     <CodeReferenceV2
         samples={[
-            {
-                id: 'animated-button-default',
-                label: 'Default.svelte',
-                ...manifest['animated-button/demos/Default.svelte']
-            }
+            demoCodeSample(
+                'animated-button/demos/Default.svelte',
+                'animated-button-default',
+                'Default.svelte'
+            )
         ]}
         columns={1}
     />

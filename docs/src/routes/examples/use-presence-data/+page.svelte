@@ -1,16 +1,15 @@
 <script lang="ts">
     import {
         CodeReferenceV2,
-        type DemoManifestEntry,
         ExampleV2,
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { ArrowLeftRight, Layers, ScanEye } from '@lucide/svelte'
+    import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import UsePresenceDataDefault from '$lib/examples/use-presence-data/demos/Default.svelte'
-    import demoManifest from '$lib/demo-manifest.json'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
@@ -31,8 +30,6 @@
 
     const SOURCE_URL =
         'https://github.com/humanspeak/svelte-motion/blob/main/docs/src/lib/examples/'
-
-    const manifest = demoManifest as Record<string, DemoManifestEntry>
 
     const sections: ExampleSection[] = [
         {
@@ -83,16 +80,16 @@
 {#snippet defaultCode()}
     <CodeReferenceV2
         samples={[
-            {
-                id: 'use-presence-data-default',
-                label: 'Default.svelte',
-                ...manifest['use-presence-data/demos/Default.svelte']
-            },
-            {
-                id: 'use-presence-data-slide',
-                label: 'PresenceDataSlide.svelte',
-                ...manifest['use-presence-data/demos/PresenceDataSlide.svelte']
-            }
+            demoCodeSample(
+                'use-presence-data/demos/Default.svelte',
+                'use-presence-data-default',
+                'Default.svelte'
+            ),
+            demoCodeSample(
+                'use-presence-data/demos/PresenceDataSlide.svelte',
+                'use-presence-data-slide',
+                'PresenceDataSlide.svelte'
+            )
         ]}
         columns={1}
     />

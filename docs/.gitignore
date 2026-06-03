@@ -38,6 +38,7 @@ src/lib/sitemap-manifest.json
 
 # Generated demo manifest (docs-kit's demoManifestPlugin output)
 src/lib/demo-manifest.json
+src/lib/demo-loaders.ts
 
 # Generated GitHub stats (build artifact)
 src/lib/github-stats.json

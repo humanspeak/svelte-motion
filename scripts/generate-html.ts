@@ -47,6 +47,14 @@ const toComponentName = (tag: string): string =>
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
         .join('')
 
+const toComponentFileName = (tag: string): string =>
+    tag === 'set'
+        ? 'SetElement'
+        : tag
+              .split('-')
+              .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+              .join('')
+
 const needsQuoting = (tag: string): boolean => tag.includes('-')
 
 const generateComponentDocs = (tag: string, isVoid: boolean): string => {
@@ -94,23 +102,23 @@ const generateComponentDocs = (tag: string, isVoid: boolean): string => {
 FILTERED_HTML.forEach((tag) => {
     const isVoid = VOID_ELEMENTS.has(tag)
     const content = (isVoid ? voidTemplate : template).replace(/{{tag}}/g, tag as string)
-    const fileName = `${toComponentName(tag)}.svelte`
+    const fileName = `${toComponentFileName(tag)}.svelte`
     fs.writeFileSync(path.join(OUTPUT_DIR, fileName), content)
 })
 
 // Generate SVG components (never void)
 FILTERED_SVG.forEach((tag) => {
     const content = template.replace(/{{tag}}/g, tag as string)
-    const fileName = `${toComponentName(tag)}.svelte`
+    const fileName = `${toComponentFileName(tag)}.svelte`
     fs.writeFileSync(path.join(OUTPUT_DIR, fileName), content)
 })
 
 // Generate index.ts
-const ALL_TAGS = [...new Set([...FILTERED_HTML, ...FILTERED_SVG])]
+const ALL_TAGS = [...new Set([...FILTERED_HTML, ...FILTERED_SVG])].sort()
 
 const imports = ALL_TAGS.map((tag) => {
     const componentName = toComponentName(tag)
-    return `import ${componentName} from '$lib/html/${componentName}.svelte'`
+    return `import ${componentName} from '$lib/html/${toComponentFileName(tag)}.svelte'`
 }).join('\n')
 
 const regularElements = [

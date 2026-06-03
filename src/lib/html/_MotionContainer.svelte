@@ -107,9 +107,15 @@
         setLayoutScrollContainer
     } from '$lib/components/layoutScroll.context'
     import { getLayoutGroupContext, scopeLayoutId } from '$lib/components/layoutGroup.context'
+    import {
+        bindMotionValueChild,
+        renderMotionValueChild,
+        type MotionValueChild
+    } from '$lib/utils/motionValueChild'
 
     type Props = MotionProps & {
         children?: Snippet
+        motionValueChild?: MotionValueChild
         tag: keyof SvelteHTMLElements
         [key: string]: unknown
     }
@@ -118,6 +124,7 @@
 
     let {
         children,
+        motionValueChild,
         tag = 'div',
         key: keyProp,
         variants: variantsProp,
@@ -480,6 +487,25 @@
 
     // Recognized HTML void elements that cannot contain children
     const isVoidTag = $derived(VOID_TAGS.has(tag as string))
+
+    const motionValueChildInitialText = $derived(
+        motionValueChild ? renderMotionValueChild(motionValueChild) : ''
+    )
+    let motionValueChildText = $state<string | undefined>(undefined)
+
+    $effect(() => {
+        if (!motionValueChild) {
+            motionValueChildText = undefined
+            return
+        }
+
+        motionValueChildText = renderMotionValueChild(motionValueChild)
+        if (!element) return
+
+        return bindMotionValueChild(motionValueChild, element, (text) => {
+            motionValueChildText = text
+        })
+    })
 
     // Variant inheritance and resolution
     const parentVariantStore = getVariantContext()
@@ -2359,13 +2385,21 @@
     {/if}
 {:else if isSVGTag(String(tag))}
     <svelte:element this={tag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs}>
-        {@render children?.()}
+        {#if motionValueChild}
+            {motionValueChildText ?? motionValueChildInitialText}
+        {:else}
+            {@render children?.()}
+        {/if}
     </svelte:element>
     <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
     {@html renderedOptimizedAppearScript}
 {:else}
     <svelte:element this={tag} bind:this={element} {...derivedAttrs}>
-        {@render children?.()}
+        {#if motionValueChild}
+            {motionValueChildText ?? motionValueChildInitialText}
+        {:else}
+            {@render children?.()}
+        {/if}
     </svelte:element>
     <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
     {@html renderedOptimizedAppearScript}

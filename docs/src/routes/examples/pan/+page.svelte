@@ -1,17 +1,16 @@
 <script lang="ts">
     import {
         CodeReferenceV2,
-        type DemoManifestEntry,
         ExampleV2,
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Hand, Heart, Move, Zap } from '@lucide/svelte'
+    import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import PanDefault from '$lib/examples/pan/demos/Default.svelte'
     import PanSwipeCards from '$lib/examples/pan/demos/SwipeCards.svelte'
-    import demoManifest from '$lib/demo-manifest.json'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
@@ -30,8 +29,6 @@
 
     const SOURCE_URL =
         'https://github.com/humanspeak/svelte-motion/blob/main/docs/src/lib/examples/'
-
-    const manifest = demoManifest as Record<string, DemoManifestEntry>
 
     const sections: ExampleSection[] = [
         {
@@ -99,11 +96,7 @@
 {#snippet swipeCode()}
     <CodeReferenceV2
         samples={[
-            {
-                id: 'pan-swipe-cards',
-                label: 'SwipeCards.svelte',
-                ...manifest['pan/demos/SwipeCards.svelte']
-            }
+            demoCodeSample('pan/demos/SwipeCards.svelte', 'pan-swipe-cards', 'SwipeCards.svelte')
         ]}
         columns={1}
     />
@@ -143,13 +136,7 @@
 {/snippet}
 {#snippet defaultCode()}
     <CodeReferenceV2
-        samples={[
-            {
-                id: 'pan-default',
-                label: 'Default.svelte',
-                ...manifest['pan/demos/Default.svelte']
-            }
-        ]}
+        samples={[demoCodeSample('pan/demos/Default.svelte', 'pan-default', 'Default.svelte')]}
         columns={1}
     />
 {/snippet}

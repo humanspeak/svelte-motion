@@ -1,3 +1,4 @@
+import type { MotionValueChild } from '$lib/utils/motionValueChild'
 import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
 import type { Snippet } from 'svelte'
 
@@ -688,8 +689,14 @@ export type AnimatePresenceMode = 'sync' | 'wait' | 'popLayout'
  * ```
  */
 export type HTMLElementProps = MotionProps & {
-    /** Child content rendered inside the element */
-    children?: Snippet
+    /**
+     * Child content rendered inside the element.
+     *
+     * Svelte slot content arrives as a `Snippet`. For Motion parity, this
+     * also accepts a `MotionValue<number | string>` via `children={value}`,
+     * which renders as live text matching upstream MotionValue children.
+     */
+    children?: Snippet | MotionValueChild
     /** Ref to the element */
     ref?: HTMLElement | null
     /** Additional HTML attributes */

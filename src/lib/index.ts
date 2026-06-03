@@ -80,6 +80,7 @@ export { useMotionTemplate } from '$lib/utils/motionTemplate.svelte'
 export type { MotionTemplateInput } from '$lib/utils/motionTemplate.svelte'
 export { useMotionValue } from '$lib/utils/motionValue.svelte'
 export type { MotionValue, RawMotionValue } from '$lib/utils/motionValue.svelte'
+export type { MotionValueChild } from '$lib/utils/motionValueChild'
 export { useMotionValueEvent } from '$lib/utils/motionValueEvent'
 export {
     optimizedAppearDataAttribute,
