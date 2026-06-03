@@ -37,19 +37,18 @@ export default defineConfig({
         // docs-kit's default blog-folder scan — we don't have a blog.
         sitemapManifestPlugin({ blogDir: false }),
         // Scans `src/lib/examples/<slug>/demos/*.svelte`, pre-highlights each
-        // demo's source with Shiki (light + dark), and emits
-        // `src/lib/demo-manifest.json`. Pages import the manifest as a
-        // virtual JSON module and feed individual entries through
-        // `CodeReferenceV2` so the rendered preview and the displayed code
-        // come from the same single source of truth — edit a demo, the
-        // page reloads and the code panel updates in lockstep.
+        // demo's source with Shiki (light + dark), and emits a lightweight
+        // `src/lib/demo-manifest.json` index. The heavy code + Shiki HTML stay
+        // behind docs-kit's `virtual:docs-kit/demo/*` modules so
+        // `CodeReferenceV2` can lazy-load snippets without making every
+        // examples page pay the full source payload up front.
         //
         // No options needed: docs-kit's default `stripWrappers` includes
         // `dk-demo-shell` and default `stripComments` includes `dk-strip`,
         // so demos can declare a positioning shell + maintainer comments
         // that stay out of the published code panel without per-site
         // wiring.
-        demoManifestPlugin(),
+        demoManifestPlugin({ split: true }),
         // Scans `src/routes/docs/**/+page.svx`, strips Svelte syntax, and
         // emits LLM-readable Markdown to `static/docs/<slug>.md`. Replaces
         // the local `generate-doc-mirrors.mjs` script + chokidar watcher;

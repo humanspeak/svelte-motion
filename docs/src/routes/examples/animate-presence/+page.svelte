@@ -1,16 +1,15 @@
 <script lang="ts">
     import {
         CodeReferenceV2,
-        type DemoManifestEntry,
         ExampleV2,
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { ArrowLeftRight, Sparkles, Waves } from '@lucide/svelte'
+    import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import AnimatePresenceDefault from '$lib/examples/animate-presence/demos/Default.svelte'
-    import demoManifest from '$lib/demo-manifest.json'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
@@ -38,8 +37,6 @@
 
     const SOURCE_URL =
         'https://github.com/humanspeak/svelte-motion/blob/main/docs/src/lib/examples/'
-
-    const manifest = demoManifest as Record<string, DemoManifestEntry>
 
     const sections: ExampleSection[] = [
         {
@@ -93,11 +90,11 @@
 {#snippet defaultCode()}
     <CodeReferenceV2
         samples={[
-            {
-                id: 'animate-presence-default',
-                label: 'Default.svelte',
-                ...manifest['animate-presence/demos/Default.svelte']
-            }
+            demoCodeSample(
+                'animate-presence/demos/Default.svelte',
+                'animate-presence-default',
+                'Default.svelte'
+            )
         ]}
         columns={1}
     />

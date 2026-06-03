@@ -1,16 +1,15 @@
 <script lang="ts">
     import {
         CodeReferenceV2,
-        type DemoManifestEntry,
         ExampleV2,
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Hand, MousePointer, Sparkles } from '@lucide/svelte'
+    import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import HoverAndTapDefault from '$lib/examples/hover-and-tap/demos/Default.svelte'
-    import demoManifest from '$lib/demo-manifest.json'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
@@ -33,8 +32,6 @@
 
     const SOURCE_URL =
         'https://github.com/humanspeak/svelte-motion/blob/main/docs/src/lib/examples/'
-
-    const manifest = demoManifest as Record<string, DemoManifestEntry>
 
     const sections: ExampleSection[] = [
         {
@@ -85,11 +82,11 @@
 {#snippet defaultCode()}
     <CodeReferenceV2
         samples={[
-            {
-                id: 'hover-and-tap-default',
-                label: 'Default.svelte',
-                ...manifest['hover-and-tap/demos/Default.svelte']
-            }
+            demoCodeSample(
+                'hover-and-tap/demos/Default.svelte',
+                'hover-and-tap-default',
+                'Default.svelte'
+            )
         ]}
         columns={1}
     />

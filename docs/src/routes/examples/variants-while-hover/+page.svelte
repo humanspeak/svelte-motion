@@ -1,24 +1,16 @@
 <script lang="ts">
     import {
         CodeReferenceV2,
-        type DemoManifestEntry,
         ExampleV2,
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Code2, KeyRound, Layers, Repeat2 } from '@lucide/svelte'
+    import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import InlineForm from '$lib/examples/variants-while-hover/demos/InlineForm.svelte'
     import VariantKey from '$lib/examples/variants-while-hover/demos/VariantKey.svelte'
-    // The manifest is generated at build/dev start by `demoManifestPlugin`
-    // (registered in vite.config.ts). Each entry's key is the demo file's
-    // path relative to `src/lib/examples/`. Editing any demo file
-    // regenerates the manifest and Vite reloads the page — the rendered
-    // demo and the displayed code stay in lockstep with zero per-page
-    // bookkeeping.
-    import demoManifest from '$lib/demo-manifest.json'
-
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {
@@ -43,11 +35,8 @@
 
     // ── Sheet configuration ────────────────────────────────────────────
     // One row per sheet section. Each row carries lede words for the left
-    // column and references the demo file in the manifest — the demo
-    // component is mounted as the body, and the manifest entry is fed
-    // through CodeReferenceV2 as the toggleable code panel.
-
-    const manifest = demoManifest as Record<string, DemoManifestEntry>
+    // column and references the lazily loaded demo source for the
+    // toggleable CodeReferenceV2 panel.
 
     const sections: ExampleSection[] = [
         {
@@ -101,11 +90,11 @@
 {#snippet inlineFormCode()}
     <CodeReferenceV2
         samples={[
-            {
-                id: 'inline-form',
-                label: 'InlineForm.svelte',
-                ...manifest['variants-while-hover/demos/InlineForm.svelte']
-            }
+            demoCodeSample(
+                'variants-while-hover/demos/InlineForm.svelte',
+                'inline-form',
+                'InlineForm.svelte'
+            )
         ]}
         columns={1}
     />
@@ -136,11 +125,11 @@
 {#snippet variantKeyCode()}
     <CodeReferenceV2
         samples={[
-            {
-                id: 'variant-key',
-                label: 'VariantKey.svelte',
-                ...manifest['variants-while-hover/demos/VariantKey.svelte']
-            }
+            demoCodeSample(
+                'variants-while-hover/demos/VariantKey.svelte',
+                'variant-key',
+                'VariantKey.svelte'
+            )
         ]}
         columns={1}
     />
