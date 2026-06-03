@@ -23,29 +23,44 @@
 
     let phase = $state<'queued' | 'routing' | 'delivered'>('queued')
     let runId = 0
+    let activeAnimation: { stop: () => void } | null = null
+
+    function stopActiveAnimation() {
+        activeAnimation?.stop()
+        activeAnimation = null
+    }
 
     async function route() {
+        stopActiveAnimation()
         const id = ++runId
         phase = 'routing'
         progress.jump(0)
-        await animate(progress as unknown as RawMotionValue<number>, 1, {
+        const animation = animate(progress as unknown as RawMotionValue<number>, 1, {
             duration: 0.95,
             ease: [0.22, 1, 0.36, 1]
         })
+        activeAnimation = animation
+        await animation
+        if (activeAnimation === animation) activeAnimation = null
         if (id === runId) phase = 'delivered'
     }
 
     async function reverse() {
+        stopActiveAnimation()
         const id = ++runId
         phase = 'routing'
-        await animate(progress as unknown as RawMotionValue<number>, 0, {
+        const animation = animate(progress as unknown as RawMotionValue<number>, 0, {
             duration: 0.95,
             ease: [0.22, 1, 0.36, 1]
         })
+        activeAnimation = animation
+        await animation
+        if (activeAnimation === animation) activeAnimation = null
         if (id === runId) phase = 'queued'
     }
 
     function reset() {
+        stopActiveAnimation()
         runId += 1
         phase = 'queued'
         progress.jump(0)
