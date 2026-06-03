@@ -1,5 +1,11 @@
+import { motionValue } from 'motion-dom'
 import { describe, expect, it } from 'vitest'
-import { mergeInlineStyles } from './style.js'
+import {
+    collectMotionStyleValues,
+    extractTransform,
+    mergeInlineStyles,
+    serializeMotionStyle
+} from './style.js'
 
 describe('mergeInlineStyles', () => {
     it('returns existing style when no initial/animate provided', () => {
@@ -213,5 +219,65 @@ describe('mergeInlineStyles', () => {
             expect(out).toContain('pointer-events: none')
             expect(out).toContain('transform: translateY(60px) scale(0.8)')
         })
+    })
+})
+
+describe('serializeMotionStyle', () => {
+    it('serializes object-form styles with static CSS and transform shortcuts', () => {
+        const out = serializeMotionStyle({
+            x: 24,
+            opacity: 0.5,
+            backgroundColor: 'rgb(255, 0, 0)',
+            '--glow-x': 12
+        })
+
+        expect(out).toContain('transform: translateX(24px)')
+        expect(out).toContain('opacity: 0.5')
+        expect(out).toContain('background-color: rgb(255, 0, 0)')
+        expect(out).toContain('--glow-x: 12')
+    })
+
+    it('serializes MotionValues with their current value for initial markup', () => {
+        const x = motionValue(48)
+        const opacity = motionValue(0.75)
+
+        const out = serializeMotionStyle({ x, opacity })
+
+        expect(out).toContain('transform: translateX(48px)')
+        expect(out).toContain('opacity: 0.75')
+    })
+
+    it('passes string styles through unchanged', () => {
+        expect(serializeMotionStyle('color: red')).toBe('color: red')
+    })
+})
+
+describe('collectMotionStyleValues', () => {
+    it('returns only MotionValue entries from object-form styles', () => {
+        const x = motionValue(24)
+        const glow = motionValue('40%')
+
+        const values = collectMotionStyleValues({
+            x,
+            opacity: 0.5,
+            '--glow-x': glow
+        })
+
+        expect(values).toEqual({ x, '--glow-x': glow })
+    })
+
+    it('returns undefined when no MotionValues are present', () => {
+        expect(collectMotionStyleValues({ opacity: 0.5 })).toBeUndefined()
+        expect(collectMotionStyleValues('opacity: 0.5')).toBeUndefined()
+    })
+})
+
+describe('extractTransform', () => {
+    it('reads transform from object-form style props', () => {
+        expect(extractTransform({ transform: 'rotate(12deg)' })).toBe('rotate(12deg)')
+    })
+
+    it('reads transform from object-form MotionValues', () => {
+        expect(extractTransform({ transform: motionValue('scale(1.2)') })).toBe('scale(1.2)')
     })
 })

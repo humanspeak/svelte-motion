@@ -1,0 +1,98 @@
+---
+title: 'Object style MotionValues'
+description: 'Pass MotionValues directly to object-form style props.'
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte';
+  import ObjectStyleMotionValuesExample from '$lib/examples/object-style-motion-values/demos/Default.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'Object style MotionValues | Docs | Svelte Motion'
+      seo.description = 'Pass MotionValues directly to object-form style props and let motion-dom update inline styles.'
+      seo.ogTitle = 'Object style MotionValues'
+      seo.ogTagline = 'MotionValue interpolation directly inside style objects'
+      seo.ogFeatures = ['MotionValue', 'Style Objects', 'Transforms', 'motion-dom']
+      seo.ogSlug = 'docs-object-style-motion-values'
+  }
+</script>
+
+# Object style MotionValues
+
+Motion components accept object-form styles in addition to CSS strings. Static
+entries render into the initial inline style, while MotionValue entries are
+subscribed with Motion's `styleEffect` so they update on animation frames
+without `styleString`.
+
+```svelte
+<script lang="ts">
+  import { motion, useMotionValue, useTransform } from '@humanspeak/svelte-motion'
+
+  const x = useMotionValue(24)
+  const opacity = useTransform(x, [24, 160], [0.6, 1])
+</script>
+
+<motion.div
+  style={{
+    x,
+    opacity,
+    width: 160,
+    height: 96,
+    backgroundColor: '#0f766e'
+  }}
+/>
+```
+
+<Example isSmall exampleUrl="/examples/object-style-motion-values">
+  <ObjectStyleMotionValuesExample />
+</Example>
+
+## What Updates Live
+
+MotionValue entries inside `style` update live:
+
+```svelte
+<motion.div
+  style={{
+    x,
+    scale,
+    opacity,
+    backgroundColor,
+    '--glow-x': glowX
+  }}
+/>
+```
+
+Transform shortcuts like `x`, `y`, `scale`, and `rotate` are composed into one
+`transform` string by `motion-dom`. CSS variables use `style.setProperty`, and
+normal CSS properties write to the element's inline style.
+
+## Static Entries
+
+Static object entries are serialized into the rendered style attribute:
+
+```svelte
+<motion.div
+  style={{
+    width: 180,
+    height: 120,
+    borderRadius: 18,
+    backgroundColor: '#123244'
+  }}
+/>
+```
+
+Numbers follow Motion's existing style handling for common dimensional and
+transform properties. Use strings when a value needs a specific unit.
+
+## API Reference
+
+### `style={object}`
+
+Object-form `style` accepts CSS property names, CSS variables, and Motion
+transform shortcuts. Values may be strings, numbers, or MotionValues.
+
+This matches Motion's style MotionValue path in `motion-dom`:
+`packages/motion-dom/src/effects/style/index.ts`.
