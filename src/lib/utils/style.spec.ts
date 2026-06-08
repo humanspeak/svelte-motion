@@ -1,6 +1,7 @@
 import { motionValue } from 'motion-dom'
 import { describe, expect, it } from 'vitest'
 import {
+    applyMotionStyleEffect,
     collectMotionStyleValues,
     extractTransform,
     mergeInlineStyles,
@@ -163,6 +164,59 @@ describe('mergeInlineStyles', () => {
         })
     })
 
+    describe('transformTemplate', () => {
+        it('applies a template to generated transforms with unitized latest values', () => {
+            const out = mergeInlineStyles(
+                '',
+                { x: 10, rotate: 45 },
+                null,
+                ({ x, rotate }, generated) => `translateY(${x}) rotateZ(${rotate}) ${generated}`
+            )
+
+            expect(out).toContain(
+                'transform: translateY(10px) rotateZ(45deg) translateX(10px) rotate(45deg)'
+            )
+        })
+
+        it('calls the template even without generated transforms', () => {
+            const out = mergeInlineStyles('', { opacity: 0.5 }, null, (_latest, generated) =>
+                `perspective(600px) ${generated}`.trim()
+            )
+
+            expect(out).toContain('opacity: 0.5')
+            expect(out).toContain('transform: perspective(600px)')
+        })
+
+        it('calls the template when no style source exists', () => {
+            const out = mergeInlineStyles('', null, null, () => 'translateY(20px)')
+
+            expect(out).toContain('transform: translateY(20px)')
+        })
+
+        it('passes an explicit transform string as the generated transform', () => {
+            const out = mergeInlineStyles(
+                '',
+                { transform: 'translate(100px)' },
+                null,
+                (_latest, generated) => generated
+            )
+
+            expect(out).toContain('transform: translate(100px)')
+        })
+
+        it('removes the transform declaration when the template returns an empty string', () => {
+            const out = mergeInlineStyles(
+                'transform: rotate(10deg); color: red',
+                { x: 10 },
+                null,
+                () => ''
+            )
+
+            expect(out).toContain('color: red')
+            expect(out).not.toContain('transform:')
+        })
+    })
+
     describe('Pointer and cursor properties', () => {
         it('converts pointerEvents to kebab-case', () => {
             const out = mergeInlineStyles('', { pointerEvents: 'none' }, null)
@@ -247,8 +301,66 @@ describe('serializeMotionStyle', () => {
         expect(out).toContain('opacity: 0.75')
     })
 
+    it('serializes object-form styles through transformTemplate', () => {
+        const out = serializeMotionStyle(
+            { x: 24 },
+            ({ x }, generated) => `translateY(${x}) ${generated}`
+        )
+
+        expect(out).toContain('transform: translateY(24px) translateX(24px)')
+    })
+
+    it('serializes missing style through transformTemplate', () => {
+        const out = serializeMotionStyle(undefined, () => 'translateY(20px)')
+
+        expect(out).toContain('transform: translateY(20px)')
+    })
+
     it('passes string styles through unchanged', () => {
         expect(serializeMotionStyle('color: red')).toBe('color: red')
+    })
+})
+
+describe('applyMotionStyleEffect', () => {
+    it('updates MotionValue transform styles through transformTemplate', () => {
+        const el = document.createElement('div')
+        const x = motionValue(12)
+
+        const cleanup = applyMotionStyleEffect(
+            el,
+            { x },
+            ({ x: latestX }, generated) => `translateY(${latestX}) ${generated}`
+        )
+
+        expect(el.getAttribute('style')).toContain('translateY(12px) translateX(12px)')
+
+        x.set(36)
+
+        expect(el.getAttribute('style')).toContain('translateY(36px) translateX(36px)')
+
+        cleanup?.()
+    })
+
+    it('reapplies templated MotionValue styles after later subscribers write generated transforms', async () => {
+        const el = document.createElement('div')
+        const x = motionValue(12)
+
+        const cleanup = applyMotionStyleEffect(
+            el,
+            { x },
+            ({ x: latestX }, generated) => `translateY(${latestX}) ${generated}`
+        )
+        const generatedCleanup = x.on('change', (latestX) => {
+            el.setAttribute('style', `transform: translateX(${latestX}px)`)
+        })
+
+        x.set(36)
+        await Promise.resolve()
+
+        expect(el.getAttribute('style')).toContain('translateY(36px) translateX(36px)')
+
+        generatedCleanup()
+        cleanup?.()
     })
 })
 
