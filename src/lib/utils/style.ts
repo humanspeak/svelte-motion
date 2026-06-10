@@ -47,9 +47,71 @@ export type TransformTemplate = (
     generatedTransform: string
 ) => string
 
+const transformPropOrder = [
+    'transformPerspective',
+    'x',
+    'y',
+    'z',
+    'translateX',
+    'translateY',
+    'translateZ',
+    'scale',
+    'scaleX',
+    'scaleY',
+    'rotate',
+    'rotateX',
+    'rotateY',
+    'rotateZ',
+    'skew',
+    'skewX',
+    'skewY'
+] as const
+
+const transformAliases: Partial<Record<(typeof transformPropOrder)[number], string>> = {
+    transformPerspective: 'perspective',
+    x: 'translateX',
+    y: 'translateY',
+    z: 'translateZ'
+}
+
+const transformProps = new Set<string>(transformPropOrder)
+
+const unitForTransform = (key: string, value: unknown): string => {
+    if (key.startsWith('scale')) return ''
+    if (typeof value !== 'number') return ''
+    if (
+        key === 'x' ||
+        key === 'y' ||
+        key === 'z' ||
+        key === 'translateX' ||
+        key === 'translateY' ||
+        key === 'translateZ' ||
+        key === 'transformPerspective'
+    ) {
+        return 'px'
+    }
+    return 'deg'
+}
+
+const isDefaultTransformValue = (key: string, value: string | number): boolean => {
+    const parsed = typeof value === 'number' ? value : Number.parseFloat(value)
+    return key.startsWith('scale') ? parsed === 1 : parsed === 0
+}
+
 /**
  * Merge inline CSS styles from an existing style string with a Motion initial definition.
  * This is used during SSR to reflect the initial state in server-rendered markup.
+ * When `existingStyle` already contains a `transform` and no `initial` or
+ * `animateFallback` target is available, `transformTemplate` is not applied so
+ * the authored inline transform is preserved.
+ *
+ * @param existingStyle The consumer-provided inline style string to merge into.
+ * @param initial The Motion `initial` target used as the preferred style source.
+ * @param animateFallback The Motion `animate` target used when `initial` is empty.
+ * @param transformTemplate Optional callback that receives the latest
+ *   transform-related values and generated transform string, then returns the
+ *   final CSS transform string.
+ * @returns Inline CSS suitable for Svelte's `style` attribute.
  */
 export const mergeInlineStyles = (
     existingStyle: unknown,
@@ -75,6 +137,7 @@ export const mergeInlineStyles = (
 
     const transformParts: string[] = []
     const transformValues: Record<string, string | number> = {}
+    const transformPartsByKey: Record<string, string> = {}
     let explicitTransform: string | null = null
 
     const setProp = (cssProp: string, value: unknown) => {
@@ -91,17 +154,25 @@ export const mergeInlineStyles = (
         base[cssProp] = typeof v === 'number' ? `${v}px` : String(v)
     }
 
-    const addTransform = (key: string, fn: string, value: unknown, unit: string) => {
+    const addTransform = (key: string, value: unknown) => {
         if (value == null) return
         const v = Array.isArray(value) ? value[0] : value
         if (v == null) return
-        const val = typeof v === 'number' ? `${v}${unit}` : String(v)
+        const val = typeof v === 'number' ? `${v}${unitForTransform(key, v)}` : String(v)
         transformValues[key] = val
-        transformParts.push(`${fn}(${val})`)
+        if (!isDefaultTransformValue(key, val) || !transformTemplate) {
+            const fn = transformAliases[key as (typeof transformPropOrder)[number]] ?? key
+            transformPartsByKey[key] = `${fn}(${val})`
+        }
     }
 
     for (const key of Object.keys(source)) {
         const value = (source as Record<string, unknown>)[key]
+        if (transformProps.has(key)) {
+            addTransform(key, value)
+            continue
+        }
+
         switch (key) {
             case 'opacity':
                 setProp('opacity', value)
@@ -117,67 +188,6 @@ export const mergeInlineStyles = (
                 break
             case 'height':
                 setPx('height', value)
-                break
-            case 'x':
-                addTransform('x', 'translateX', value, 'px')
-                break
-            case 'y':
-                addTransform('y', 'translateY', value, 'px')
-                break
-            case 'z':
-                addTransform('z', 'translateZ', value, 'px')
-                break
-            case 'scale':
-                // scale is unitless
-                addTransform('scale', 'scale', value, '')
-                break
-            case 'scaleX':
-                addTransform('scaleX', 'scaleX', value, '')
-                break
-            case 'scaleY':
-                addTransform('scaleY', 'scaleY', value, '')
-                break
-            case 'rotate':
-                addTransform(
-                    'rotate',
-                    'rotate',
-                    value,
-                    typeof (Array.isArray(value) ? value[0] : value) === 'number' ? 'deg' : ''
-                )
-                break
-            case 'rotateX':
-                addTransform(
-                    'rotateX',
-                    'rotateX',
-                    value,
-                    typeof (Array.isArray(value) ? value[0] : value) === 'number' ? 'deg' : ''
-                )
-                break
-            case 'rotateY':
-                addTransform(
-                    'rotateY',
-                    'rotateY',
-                    value,
-                    typeof (Array.isArray(value) ? value[0] : value) === 'number' ? 'deg' : ''
-                )
-                break
-            case 'rotateZ':
-                addTransform(
-                    'rotateZ',
-                    'rotateZ',
-                    value,
-                    typeof (Array.isArray(value) ? value[0] : value) === 'number' ? 'deg' : ''
-                )
-                break
-            case 'skew':
-            case 'skewX':
-            case 'skewY':
-                addTransform(
-                    key,
-                    key,
-                    value,
-                    typeof (Array.isArray(value) ? value[0] : value) === 'number' ? 'deg' : ''
-                )
                 break
             case 'transform':
                 explicitTransform = String(Array.isArray(value) ? value[0] : value)
@@ -206,6 +216,11 @@ export const mergeInlineStyles = (
                 }
                 break
         }
+    }
+
+    for (const key of transformPropOrder) {
+        const transformPart = transformPartsByKey[key]
+        if (transformPart) transformParts.push(transformPart)
     }
 
     const generatedTransform =
@@ -259,6 +274,9 @@ export const extractTransform = (style: unknown): string => {
  * Serialize a string or object-form Motion style prop into inline CSS.
  *
  * @param style The consumer-provided style prop.
+ * @param transformTemplate Optional callback that receives the latest
+ *   transform-related values and generated transform string, then returns the
+ *   final CSS transform string for object-form styles.
  * @returns Inline CSS suitable for Svelte's `style` attribute.
  */
 export const serializeMotionStyle = (

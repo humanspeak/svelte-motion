@@ -34,6 +34,10 @@
     }
 
     const fixedTemplate = () => 'translateY(20px)'
+    const perspectiveTemplate = (
+        { transformPerspective }: Record<string, string | number>,
+        generated: string
+    ) => `${generated} translateZ(${transformPerspective})`.trim()
 
     const currentTemplate = $derived(
         templateVersion === 'single' ? upstreamInitialTemplate : upstreamUpdatedTemplate
@@ -221,6 +225,18 @@
                     Double
                 </button>
             </div>
+        </article>
+
+        <article>
+            <h2>Perspective template</h2>
+            <motion.div
+                class="orb cyan"
+                data-testid="template-perspective"
+                style={{ x: '100px', transformPerspective: '200px' }}
+                transformTemplate={perspectiveTemplate}
+            >
+                lens
+            </motion.div>
         </article>
 
         <article>

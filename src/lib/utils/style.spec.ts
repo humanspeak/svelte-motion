@@ -115,6 +115,13 @@ describe('mergeInlineStyles', () => {
     })
 
     describe('Transform shorthands', () => {
+        it('converts transformPerspective to an upstream-ordered perspective transform', () => {
+            const out = mergeInlineStyles('', { x: '100px', transformPerspective: '200px' }, null)
+
+            expect(out).toContain('transform: perspective(200px) translateX(100px)')
+            expect(out).not.toContain('transform-perspective')
+        })
+
         it('converts x, y, z to translateX/Y/Z transforms', () => {
             const out = mergeInlineStyles('', { x: 100, y: -50, z: 20 }, null)
             expect(out).toContain('transform: translateX(100px) translateY(-50px) translateZ(20px)')
@@ -175,6 +182,20 @@ describe('mergeInlineStyles', () => {
 
             expect(out).toContain(
                 'transform: translateY(10px) rotateZ(45deg) translateX(10px) rotate(45deg)'
+            )
+        })
+
+        it('passes transformPerspective through the template as perspective', () => {
+            const out = mergeInlineStyles(
+                '',
+                { x: '100px', transformPerspective: '200px' },
+                null,
+                ({ transformPerspective }, generated) =>
+                    `${generated} translateZ(${transformPerspective})`
+            )
+
+            expect(out).toContain(
+                'transform: perspective(200px) translateX(100px) translateZ(200px)'
             )
         })
 

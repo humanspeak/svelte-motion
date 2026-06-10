@@ -145,6 +145,56 @@ test.describe('transformTemplate', () => {
         expect(templatedIntermediateFrame).toBeTruthy()
     })
 
+    test('starts repeated transformTemplate animations from the current transform', async ({
+        page
+    }) => {
+        await page.goto(URL)
+
+        await page.waitForTimeout(250)
+        await page.getByTestId('template-slow-animated-toggle').click()
+
+        await expect
+            .poll(readStyleAttribute(page, 'template-slow-animated'), { timeout: 3000 })
+            .toContain('translateX(120px)')
+
+        await page.getByTestId('template-slow-animated-toggle').click()
+
+        const sampledTransforms = await page.getByTestId('template-slow-animated').evaluate(
+            async (element) =>
+                await new Promise<string[]>((resolve) => {
+                    const frames: string[] = []
+                    const started = performance.now()
+
+                    const tick = () => {
+                        frames.push(element.getAttribute('style') ?? '')
+                        if (performance.now() - started < 120) {
+                            requestAnimationFrame(tick)
+                        } else {
+                            resolve(frames)
+                        }
+                    }
+
+                    requestAnimationFrame(tick)
+                })
+        )
+
+        const xValues = sampledTransforms
+            .map((style) => style.match(/translateX\(([-\d.]+)px\)/)?.[1])
+            .filter((value): value is string => !!value)
+            .map(Number.parseFloat)
+
+        expect(xValues[0]).toBeGreaterThan(80)
+        expect(xValues.some((value) => value > 20 && value < 115)).toBe(true)
+    })
+
+    test('applies transformPerspective through transformTemplate', async ({ page }) => {
+        await page.goto(URL)
+
+        await expect
+            .poll(readStyleAttribute(page, 'template-perspective'))
+            .toContain('perspective(200px) translateX(100px) translateZ(200px)')
+    })
+
     test('is linked from the root test index', async ({ page }) => {
         await page.goto('/?@isPlaywright=true')
         await expect(page.getByRole('link', { name: 'transformTemplate' })).toHaveAttribute(

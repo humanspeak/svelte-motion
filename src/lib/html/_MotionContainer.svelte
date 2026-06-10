@@ -33,6 +33,7 @@
     import {
         animateSingleValue,
         motionValue,
+        readTransformValue,
         styleEffect,
         svgEffect,
         type MotionValue,
@@ -817,6 +818,9 @@
     const activeAnimationControls = new SvelteSet<StoppableAnimationControl>()
     let animationControlsGeneration = 0
     let animationControlsHasReceivedCommand = false
+    const templatedTransformMotionValues: Record<string, MotionValue> = {}
+    let templatedTransformAnimationControls: StoppableAnimationControl[] = []
+    let templatedTransformAnimationGeneration = 0
     let templatedTransformAnimationCleanup: (() => void) | null = null
 
     const isStoppableAnimationControl = (control: unknown): control is StoppableAnimationControl =>
@@ -851,6 +855,9 @@
         'skew',
         'skewX',
         'skewY',
+        'translateX',
+        'translateY',
+        'translateZ',
         'transform',
         'transformPerspective'
     ])
@@ -886,6 +893,25 @@
         return 0
     }
 
+    const getCurrentTransformValue = (key: string, target: unknown): unknown => {
+        if (!element || key === 'transform') return undefined
+
+        try {
+            const current = readTransformValue(element, key)
+            if (!Number.isFinite(current)) return undefined
+            if (typeof target === 'string') {
+                if (/%$/.test(target)) return `${current}%`
+                if (/turn$/.test(target)) return `${current}turn`
+                if (/rad$/.test(target)) return `${current}rad`
+                if (/deg$/.test(target)) return `${current}deg`
+                if (/px$/.test(target)) return `${current}px`
+            }
+            return current
+        } catch {
+            return undefined
+        }
+    }
+
     const getTemplatedTransformInitialValue = (key: string, target: unknown): unknown => {
         const fromInitial =
             initialKeyframes && key in (initialKeyframes as Record<string, unknown>)
@@ -897,6 +923,32 @@
         if (fromStyle != null) return getFirstKeyframeValue(fromStyle)
 
         return getDefaultTransformValue(key, getFirstKeyframeValue(target))
+    }
+
+    const getTemplatedTransformMotionValue = (key: string, target: unknown): MotionValue => {
+        const existing = templatedTransformMotionValues[key]
+        if (existing) return existing
+
+        const firstTarget = getFirstKeyframeValue(target)
+        const initialValue =
+            getCurrentTransformValue(key, firstTarget) ??
+            getTemplatedTransformInitialValue(key, firstTarget)
+
+        const value = motionValue(initialValue) as MotionValue
+        templatedTransformMotionValues[key] = value
+        return value
+    }
+
+    const stopTemplatedTransformAnimations = () => {
+        templatedTransformAnimationGeneration += 1
+        for (const control of templatedTransformAnimationControls) {
+            if (typeof control.stop === 'function') {
+                control.stop()
+            } else {
+                control.cancel?.()
+            }
+        }
+        templatedTransformAnimationControls = []
     }
 
     const splitTemplatedTransformPayload = (payload: Record<string, unknown>) => {
@@ -934,11 +986,11 @@
             ...transition,
             delay: typeof transition.delay === 'number' ? transition.delay : undefined
         }
+        stopTemplatedTransformAnimations()
+        const generation = templatedTransformAnimationGeneration
 
         for (const [key, target] of Object.entries(templatePayload)) {
-            motionValues[key] = motionValue(
-                getTemplatedTransformInitialValue(key, target)
-            ) as MotionValue
+            motionValues[key] = getTemplatedTransformMotionValue(key, target)
         }
 
         templatedTransformAnimationCleanup?.()
@@ -949,11 +1001,11 @@
 
         const promises: Promise<unknown>[] = []
         for (const [key, target] of Object.entries(templatePayload)) {
-            promises.push(
-                getAnimationPromise(
-                    animateSingleValue(motionValues[key], target as never, valueTransition)
-                )
-            )
+            const control = animateSingleValue(motionValues[key], target as never, valueTransition)
+            if (isStoppableAnimationControl(control)) {
+                templatedTransformAnimationControls.push(control)
+            }
+            promises.push(getAnimationPromise(control))
         }
 
         if (hasNativePayload) {
@@ -962,11 +1014,15 @@
 
         Promise.all(promises)
             .then(() => {
+                if (generation !== templatedTransformAnimationGeneration) return
+                templatedTransformAnimationControls = []
                 templatedTransformAnimationCleanup?.()
                 templatedTransformAnimationCleanup = null
                 onComplete(payload)
             })
             .catch(() => {
+                if (generation !== templatedTransformAnimationGeneration) return
+                templatedTransformAnimationControls = []
                 templatedTransformAnimationCleanup?.()
                 templatedTransformAnimationCleanup = null
                 onComplete(payload)
@@ -1156,6 +1212,7 @@
     onDestroy(() => {
         cleanupSVGPathAttributeEffect?.()
         cleanupSVGPathAttributeEffect = null
+        stopTemplatedTransformAnimations()
         templatedTransformAnimationCleanup?.()
         templatedTransformAnimationCleanup = null
     })
