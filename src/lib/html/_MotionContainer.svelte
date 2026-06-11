@@ -30,7 +30,15 @@
     import { isNotEmpty } from '$lib/utils/objects'
     import { sleep } from '$lib/utils/testing'
     import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
-    import { motionValue, styleEffect, svgEffect, type MotionValue } from 'motion-dom'
+    import {
+        animateSingleValue,
+        motionValue,
+        readTransformValue,
+        styleEffect,
+        svgEffect,
+        type MotionValue,
+        type ValueAnimationTransition
+    } from 'motion-dom'
     import { isPlaywrightEnv, pwLog } from '$lib/utils/log'
     import { onDestroy, untrack, type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants'
@@ -50,6 +58,7 @@
     } from '$lib/utils/layout'
     import type { SvelteHTMLElements } from 'svelte/elements'
     import {
+        applyMotionStyleEffect,
         collectMotionStyleValues,
         extractTransform,
         mergeInlineStyles,
@@ -140,6 +149,7 @@
         transition: transitionProp,
         onAnimationStart: onAnimationStartProp,
         onAnimationComplete: onAnimationCompleteProp,
+        transformTemplate: transformTemplateProp,
         style: styleProp,
         class: classProp,
         whileTap: whileTapProp,
@@ -259,7 +269,7 @@
     // than the live inline transform — the latter already carries any
     // transform-type `initial`/`animate` keyframe by the time the node
     // measures, which would be mistaken for the user's base.
-    const serializedStyleProp = $derived(serializeMotionStyle(styleProp))
+    const serializedStyleProp = $derived(serializeMotionStyle(styleProp, transformTemplateProp))
     const userBaseTransform = $derived(extractTransform(styleProp))
 
     const projectionParent = getProjectionParent()
@@ -519,6 +529,10 @@
         const styleValues = collectMotionStyleValues(styleProp)
         if (!styleValues) return
 
+        if (transformTemplateProp) {
+            return applyMotionStyleEffect(element, styleProp, transformTemplateProp)
+        }
+
         return styleEffect(element, styleValues)
     })
 
@@ -712,7 +726,12 @@
         if (!restingValues) return
         element.setAttribute(
             'style',
-            mergeInlineStyles(element.getAttribute('style') ?? '', undefined, restingValues)
+            mergeInlineStyles(
+                element.getAttribute('style') ?? '',
+                undefined,
+                restingValues,
+                transformTemplateProp
+            )
         )
     }
     const isJsdomRuntime = (): boolean =>
@@ -799,6 +818,10 @@
     const activeAnimationControls = new SvelteSet<StoppableAnimationControl>()
     let animationControlsGeneration = 0
     let animationControlsHasReceivedCommand = false
+    const templatedTransformMotionValues: Record<string, MotionValue> = {}
+    let templatedTransformAnimationControls: StoppableAnimationControl[] = []
+    let templatedTransformAnimationGeneration = 0
+    let templatedTransformAnimationCleanup: (() => void) | null = null
 
     const isStoppableAnimationControl = (control: unknown): control is StoppableAnimationControl =>
         !!control &&
@@ -816,6 +839,208 @@
             )
         }
         return promise
+    }
+
+    const templatedTransformKeys = new Set([
+        'x',
+        'y',
+        'z',
+        'scale',
+        'scaleX',
+        'scaleY',
+        'rotate',
+        'rotateX',
+        'rotateY',
+        'rotateZ',
+        'skew',
+        'skewX',
+        'skewY',
+        'translateX',
+        'translateY',
+        'translateZ',
+        'transform',
+        'transformPerspective'
+    ])
+
+    const getFirstKeyframeValue = (value: unknown): unknown =>
+        Array.isArray(value) ? value[0] : value
+
+    const getMotionStyleInitialValue = (key: string): unknown => {
+        if (!styleProp || typeof styleProp !== 'object' || Array.isArray(styleProp))
+            return undefined
+        const value = (styleProp as Record<string, unknown>)[key]
+        if (
+            value &&
+            typeof value === 'object' &&
+            'get' in value &&
+            typeof value.get === 'function'
+        ) {
+            return (value as { get: () => unknown }).get()
+        }
+        return value
+    }
+
+    const getDefaultTransformValue = (key: string, target: unknown): unknown => {
+        if (key === 'transform') {
+            return element?.style.transform || getComputedStyle(element!).transform || 'none'
+        }
+        if (key.startsWith('scale')) return 1
+        if (typeof target === 'string' && /%$/.test(target)) return '0%'
+        if (typeof target === 'string' && /turn$/.test(target)) return '0turn'
+        if (typeof target === 'string' && /rad$/.test(target)) return '0rad'
+        if (typeof target === 'string' && /deg$/.test(target)) return '0deg'
+        if (typeof target === 'string' && /px$/.test(target)) return '0px'
+        return 0
+    }
+
+    const getCurrentTransformValue = (key: string, target: unknown): unknown => {
+        if (!element || key === 'transform') return undefined
+
+        try {
+            const current = readTransformValue(element, key)
+            if (!Number.isFinite(current)) return undefined
+            if (typeof target === 'string') {
+                if (/%$/.test(target)) return `${current}%`
+                if (/turn$/.test(target)) return `${current}turn`
+                if (/rad$/.test(target)) return `${current}rad`
+                if (/deg$/.test(target)) return `${current}deg`
+                if (/px$/.test(target)) return `${current}px`
+            }
+            return current
+        } catch {
+            return undefined
+        }
+    }
+
+    const getTemplatedTransformInitialValue = (key: string, target: unknown): unknown => {
+        const fromInitial =
+            initialKeyframes && key in (initialKeyframes as Record<string, unknown>)
+                ? getFirstKeyframeValue((initialKeyframes as Record<string, unknown>)[key])
+                : undefined
+        if (fromInitial != null) return fromInitial
+
+        const fromStyle = getMotionStyleInitialValue(key)
+        if (fromStyle != null) return getFirstKeyframeValue(fromStyle)
+
+        return getDefaultTransformValue(key, getFirstKeyframeValue(target))
+    }
+
+    const getTemplatedTransformMotionValue = (key: string, target: unknown): MotionValue => {
+        const existing = templatedTransformMotionValues[key]
+        if (existing) return existing
+
+        const firstTarget = getFirstKeyframeValue(target)
+        const initialValue =
+            getCurrentTransformValue(key, firstTarget) ??
+            getTemplatedTransformInitialValue(key, firstTarget)
+
+        const value = motionValue(initialValue) as MotionValue
+        templatedTransformMotionValues[key] = value
+        return value
+    }
+
+    const stopTemplatedTransformAnimations = () => {
+        templatedTransformAnimationGeneration += 1
+        for (const control of templatedTransformAnimationControls) {
+            if (typeof control.stop === 'function') {
+                control.stop()
+            } else {
+                control.cancel?.()
+            }
+        }
+        templatedTransformAnimationControls = []
+    }
+
+    const cleanupTemplatedTransformAnimations = () => {
+        stopTemplatedTransformAnimations()
+        templatedTransformAnimationCleanup?.()
+        templatedTransformAnimationCleanup = null
+    }
+
+    const splitTemplatedTransformPayload = (payload: Record<string, unknown>) => {
+        const templatePayload: Record<string, unknown> = {}
+        const nativePayload: Record<string, unknown> = {}
+
+        for (const [key, value] of Object.entries(payload)) {
+            if (templatedTransformKeys.has(key)) {
+                templatePayload[key] = value
+            } else {
+                nativePayload[key] = value
+            }
+        }
+
+        return {
+            templatePayload,
+            nativePayload,
+            hasTemplatePayload: Object.keys(templatePayload).length > 0,
+            hasNativePayload: Object.keys(nativePayload).length > 0
+        }
+    }
+
+    const animateTemplatedTransformPayload = (
+        payload: Record<string, unknown>,
+        transition: AnimationOptions,
+        onStart: (def: unknown) => void,
+        onComplete: (def: unknown) => void
+    ): Promise<unknown> => {
+        if (!element || !transformTemplateProp) return Promise.resolve()
+
+        const { templatePayload, nativePayload, hasNativePayload } =
+            splitTemplatedTransformPayload(payload)
+        const motionValues: Record<string, MotionValue> = {}
+        const valueTransition: ValueAnimationTransition = {
+            ...transition,
+            delay: typeof transition.delay === 'number' ? transition.delay : undefined
+        }
+        stopTemplatedTransformAnimations()
+        const generation = templatedTransformAnimationGeneration
+
+        for (const [key, target] of Object.entries(templatePayload)) {
+            motionValues[key] = getTemplatedTransformMotionValue(key, target)
+        }
+
+        templatedTransformAnimationCleanup?.()
+        templatedTransformAnimationCleanup =
+            applyMotionStyleEffect(element, motionValues, transformTemplateProp) ?? null
+
+        onStart(payload)
+
+        const promises: Promise<unknown>[] = []
+        for (const [key, target] of Object.entries(templatePayload)) {
+            const control = animateSingleValue(motionValues[key], target as never, valueTransition)
+            if (isStoppableAnimationControl(control)) {
+                templatedTransformAnimationControls.push(control)
+            }
+            promises.push(getAnimationPromise(control))
+        }
+
+        if (hasNativePayload) {
+            const nativeControl = animate(
+                element,
+                nativePayload as DOMKeyframesDefinition,
+                transition
+            )
+            if (isStoppableAnimationControl(nativeControl)) {
+                templatedTransformAnimationControls.push(nativeControl)
+            }
+            promises.push(getAnimationPromise(nativeControl))
+        }
+
+        return Promise.all(promises)
+            .then(() => {
+                if (generation !== templatedTransformAnimationGeneration) return
+                templatedTransformAnimationControls = []
+                templatedTransformAnimationCleanup?.()
+                templatedTransformAnimationCleanup = null
+                onComplete(payload)
+            })
+            .catch(() => {
+                if (generation !== templatedTransformAnimationGeneration) return
+                templatedTransformAnimationControls = []
+                templatedTransformAnimationCleanup?.()
+                templatedTransformAnimationCleanup = null
+                onComplete(payload)
+            })
     }
 
     const resolveAnimationControlsDefinition = (
@@ -855,7 +1080,12 @@
         animate(element, transformedTarget as DOMKeyframesDefinition, { duration: 0 })
         element.setAttribute(
             'style',
-            mergeInlineStyles(element.getAttribute('style') ?? '', undefined, transformedTarget)
+            mergeInlineStyles(
+                element.getAttribute('style') ?? '',
+                undefined,
+                transformedTarget,
+                transformTemplateProp
+            )
         )
         enterAnimationSettled = true
     }
@@ -922,15 +1152,32 @@
 
         const promises: Promise<unknown>[] = [...svgPathFinished]
         if (isNotEmpty(payload)) {
-            promises.push(
-                trackAnimationControlsControl(
-                    animate(
-                        element,
-                        payload as DOMKeyframesDefinition,
-                        transitionAnimate as AnimationOptions
+            const shouldAnimateThroughTransformTemplate =
+                !!transformTemplateProp &&
+                splitTemplatedTransformPayload(payload as Record<string, unknown>)
+                    .hasTemplatePayload
+
+            if (shouldAnimateThroughTransformTemplate) {
+                promises.push(
+                    animateTemplatedTransformPayload(
+                        payload,
+                        transitionAnimate as unknown as AnimationOptions,
+                        () => {},
+                        () => {}
                     )
                 )
-            )
+            } else {
+                cleanupTemplatedTransformAnimations()
+                promises.push(
+                    trackAnimationControlsControl(
+                        animate(
+                            element,
+                            payload as DOMKeyframesDefinition,
+                            transitionAnimate as AnimationOptions
+                        )
+                    )
+                )
+            }
         }
 
         try {
@@ -996,6 +1243,9 @@
     onDestroy(() => {
         cleanupSVGPathAttributeEffect?.()
         cleanupSVGPathAttributeEffect = null
+        stopTemplatedTransformAnimations()
+        templatedTransformAnimationCleanup?.()
+        templatedTransformAnimationCleanup = null
     })
 
     // Wait-mode enter coordination needs to affect the first rendered attrs,
@@ -1091,8 +1341,11 @@
                     isNotEmpty(initialKeyframes)
                   ? (initialKeyframes as unknown as Record<string, unknown>)
                   : isNotEmpty(initialKeyframes)
-                    ? undefined
-                    : (animateKeyframes as unknown as Record<string, unknown>)
+                    ? !effectiveAnimate
+                        ? (initialKeyframes as unknown as Record<string, unknown>)
+                        : undefined
+                    : (animateKeyframes as unknown as Record<string, unknown>),
+            transformTemplateProp
         ),
         class: classProp
     })
@@ -1387,7 +1640,21 @@
             enterAnimationSettled = true
             onAnimationCompleteProp?.(def)
         }
-        if (isNotEmpty(payload)) {
+        const shouldAnimateThroughTransformTemplate =
+            !!transformTemplateProp &&
+            splitTemplatedTransformPayload(payload as Record<string, unknown>).hasTemplatePayload
+
+        if (isNotEmpty(payload) && shouldAnimateThroughTransformTemplate) {
+            animateTemplatedTransformPayload(
+                payload as Record<string, unknown>,
+                transitionAnimate as unknown as AnimationOptions,
+                (def) =>
+                    onAnimationStartProp?.(def as unknown as DOMKeyframesDefinition | undefined),
+                (def) =>
+                    completeEnterAnimation(def as unknown as DOMKeyframesDefinition | undefined)
+            )
+        } else if (isNotEmpty(payload)) {
+            cleanupTemplatedTransformAnimations()
             animateWithLifecycle(
                 element,
                 payload as unknown as DOMKeyframesDefinition,
@@ -2372,7 +2639,15 @@
                 element!,
                 initialKeyframes as Record<string, unknown>
             )
-            animate(element!, transformedInitial as DOMKeyframesDefinition, { duration: 0 })
+            element!.setAttribute(
+                'style',
+                mergeInlineStyles(
+                    element!.getAttribute('style') ?? '',
+                    transformedInitial as Record<string, unknown>,
+                    undefined,
+                    transformTemplateProp
+                )
+            )
             dataPath = 3
             isLoaded = 'initial'
             requestAnimationFrame(async () => {

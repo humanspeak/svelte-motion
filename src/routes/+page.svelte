@@ -80,6 +80,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/transform-template') + searchParams}
+                    >
+                        transformTemplate
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/aspect-ratio') + searchParams}
                     >
                         Aspect Ratio

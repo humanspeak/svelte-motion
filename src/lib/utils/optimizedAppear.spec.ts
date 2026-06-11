@@ -38,7 +38,7 @@ describe('optimizedAppear', () => {
             },
             {
                 name: 'transform',
-                keyframes: ['scale(0.8) translateY(16px)', 'scale(1) translateY(0px)'],
+                keyframes: ['translateY(16px) scale(0.8)', 'translateY(0px) scale(1)'],
                 options: {
                     duration: 600,
                     delay: 0,

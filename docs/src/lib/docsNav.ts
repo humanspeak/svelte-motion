@@ -51,6 +51,7 @@ export const docsSections: NavSection[] = [
         icon: Layers,
         items: [
             { title: 'Layout Animations', href: '/docs/layout-animations', icon: Move },
+            { title: 'transformTemplate', href: '/docs/transform-template', icon: Code },
             { title: 'Variants', href: '/docs/variants', icon: Layers }
         ]
     },

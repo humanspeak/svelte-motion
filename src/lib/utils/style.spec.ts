@@ -1,6 +1,7 @@
 import { motionValue } from 'motion-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
+    applyMotionStyleEffect,
     collectMotionStyleValues,
     extractTransform,
     mergeInlineStyles,
@@ -114,6 +115,13 @@ describe('mergeInlineStyles', () => {
     })
 
     describe('Transform shorthands', () => {
+        it('converts transformPerspective to an upstream-ordered perspective transform', () => {
+            const out = mergeInlineStyles('', { x: '100px', transformPerspective: '200px' }, null)
+
+            expect(out).toContain('transform: perspective(200px) translateX(100px)')
+            expect(out).not.toContain('transform-perspective')
+        })
+
         it('converts x, y, z to translateX/Y/Z transforms', () => {
             const out = mergeInlineStyles('', { x: 100, y: -50, z: 20 }, null)
             expect(out).toContain('transform: translateX(100px) translateY(-50px) translateZ(20px)')
@@ -160,6 +168,102 @@ describe('mergeInlineStyles', () => {
             expect(out).toContain('scale(1.5)')
             expect(out).toContain('rotate(45deg)')
             expect(out).toContain('skewX(5deg)')
+        })
+
+        it('does not serialize identity transform values', () => {
+            const out = mergeInlineStyles('', { x: 0, y: '0px', scale: 1, rotate: 0 }, null)
+
+            expect(out).not.toContain('transform:')
+        })
+
+        it('can preserve identity transform values for animation keyframes', () => {
+            const out = mergeInlineStyles(
+                '',
+                { x: 0, y: '0px', scale: 1, rotate: 0 },
+                null,
+                undefined,
+                { preserveTransformDefaults: true }
+            )
+
+            expect(out).toContain('translateX(0px)')
+            expect(out).toContain('translateY(0px)')
+            expect(out).toContain('scale(1)')
+            expect(out).toContain('rotate(0deg)')
+        })
+    })
+
+    describe('transformTemplate', () => {
+        it('applies a template to generated transforms with unitized latest values', () => {
+            const out = mergeInlineStyles(
+                '',
+                { x: 10, rotate: 45 },
+                null,
+                ({ x, rotate }, generated) => `translateY(${x}) rotateZ(${rotate}) ${generated}`
+            )
+
+            expect(out).toContain(
+                'transform: translateY(10px) rotateZ(45deg) translateX(10px) rotate(45deg)'
+            )
+        })
+
+        it('passes transformPerspective through the template as perspective', () => {
+            const out = mergeInlineStyles(
+                '',
+                { x: '100px', transformPerspective: '200px' },
+                null,
+                ({ transformPerspective }, generated) =>
+                    `${generated} translateZ(${transformPerspective})`
+            )
+
+            expect(out).toContain(
+                'transform: perspective(200px) translateX(100px) translateZ(200px)'
+            )
+        })
+
+        it('calls the template even without generated transforms', () => {
+            const out = mergeInlineStyles('', { opacity: 0.5 }, null, (_latest, generated) =>
+                `perspective(600px) ${generated}`.trim()
+            )
+
+            expect(out).toContain('opacity: 0.5')
+            expect(out).toContain('transform: perspective(600px)')
+        })
+
+        it('calls the template when no style source exists', () => {
+            const out = mergeInlineStyles('', null, null, () => 'translateY(20px)')
+
+            expect(out).toContain('transform: translateY(20px)')
+        })
+
+        it('passes an explicit transform string as the generated transform', () => {
+            const out = mergeInlineStyles(
+                '',
+                { transform: 'translate(100px)' },
+                null,
+                (_latest, generated) => generated
+            )
+
+            expect(out).toContain('transform: translate(100px)')
+        })
+
+        it('removes the transform declaration when the template returns an empty string', () => {
+            const out = mergeInlineStyles(
+                'transform: rotate(10deg); color: red',
+                { x: 10 },
+                null,
+                () => ''
+            )
+
+            expect(out).toContain('color: red')
+            expect(out).not.toContain('transform:')
+        })
+
+        it('propagates errors thrown by the template callback', () => {
+            expect(() =>
+                mergeInlineStyles('', { x: 10 }, null, () => {
+                    throw new Error('Template error')
+                })
+            ).toThrow('Template error')
         })
     })
 
@@ -247,8 +351,114 @@ describe('serializeMotionStyle', () => {
         expect(out).toContain('opacity: 0.75')
     })
 
+    it('serializes object-form styles through transformTemplate', () => {
+        const out = serializeMotionStyle(
+            { x: 24 },
+            ({ x }, generated) => `translateY(${x}) ${generated}`
+        )
+
+        expect(out).toContain('transform: translateY(24px) translateX(24px)')
+    })
+
+    it('serializes missing style through transformTemplate', () => {
+        const out = serializeMotionStyle(undefined, () => 'translateY(20px)')
+
+        expect(out).toContain('transform: translateY(20px)')
+    })
+
     it('passes string styles through unchanged', () => {
         expect(serializeMotionStyle('color: red')).toBe('color: red')
+    })
+})
+
+describe('applyMotionStyleEffect', () => {
+    it('updates MotionValue transform styles through transformTemplate', () => {
+        const el = document.createElement('div')
+        const x = motionValue(12)
+
+        const cleanup = applyMotionStyleEffect(
+            el,
+            { x },
+            ({ x: latestX }, generated) => `translateY(${latestX}) ${generated}`
+        )
+
+        expect(el.getAttribute('style')).toContain('translateY(12px) translateX(12px)')
+
+        x.set(36)
+
+        expect(el.getAttribute('style')).toContain('translateY(36px) translateX(36px)')
+
+        cleanup?.()
+    })
+
+    it('reapplies templated MotionValue styles after later subscribers write generated transforms', async () => {
+        const el = document.createElement('div')
+        const x = motionValue(12)
+
+        const cleanup = applyMotionStyleEffect(
+            el,
+            { x },
+            ({ x: latestX }, generated) => `translateY(${latestX}) ${generated}`
+        )
+        const generatedCleanup = x.on('change', (latestX) => {
+            el.setAttribute('style', `transform: translateX(${latestX}px)`)
+        })
+
+        x.set(36)
+        await Promise.resolve()
+
+        expect(el.getAttribute('style')).toContain('translateY(36px) translateX(36px)')
+
+        generatedCleanup()
+        cleanup?.()
+    })
+
+    it('coalesces deferred style writes across same-tick MotionValue changes', () => {
+        const el = document.createElement('div')
+        const x = motionValue(12)
+        const y = motionValue(4)
+        const queuedMicrotasks: VoidFunction[] = []
+        const queuedFrames: FrameRequestCallback[] = []
+        const queueMicrotaskSpy = vi
+            .spyOn(globalThis, 'queueMicrotask')
+            .mockImplementation((callback) => {
+                queuedMicrotasks.push(callback)
+            })
+        const requestAnimationFrameSpy = vi
+            .spyOn(globalThis, 'requestAnimationFrame')
+            .mockImplementation((callback) => {
+                queuedFrames.push(callback)
+                return queuedFrames.length
+            })
+
+        try {
+            const cleanup = applyMotionStyleEffect(
+                el,
+                { x, y },
+                ({ x: latestX }, generated) => `translateY(${latestX}) ${generated}`
+            )
+
+            expect(queueMicrotaskSpy).toHaveBeenCalledTimes(1)
+            expect(requestAnimationFrameSpy).toHaveBeenCalledTimes(1)
+
+            x.set(24)
+            y.set(18)
+
+            expect(queueMicrotaskSpy).toHaveBeenCalledTimes(1)
+            expect(requestAnimationFrameSpy).toHaveBeenCalledTimes(1)
+
+            queuedMicrotasks.shift()?.()
+            queuedFrames.shift()?.(performance.now())
+            x.set(36)
+
+            expect(queueMicrotaskSpy).toHaveBeenCalledTimes(2)
+            expect(requestAnimationFrameSpy).toHaveBeenCalledTimes(2)
+
+            cleanup?.()
+        } finally {
+            queueMicrotaskSpy.mockRestore()
+            requestAnimationFrameSpy.mockRestore()
+        }
     })
 })
 

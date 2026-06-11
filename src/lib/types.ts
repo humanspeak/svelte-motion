@@ -1,5 +1,5 @@
 import type { MotionValueChild } from '$lib/utils/motionValueChild'
-import type { MotionStyle } from '$lib/utils/style'
+import type { MotionStyle, TransformTemplate } from '$lib/utils/style'
 import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
 import type { Snippet } from 'svelte'
 
@@ -528,6 +528,23 @@ export type MotionProps = {
     onAnimationStart?: MotionAnimationStart
     /** Called after a main animate transition completes */
     onAnimationComplete?: MotionAnimationComplete
+    /**
+     * Customize the CSS `transform` string generated from Motion transform
+     * shortcuts.
+     *
+     * Receives the latest transform values with CSS units applied, plus the
+     * generated transform string. Return the transform string that should be
+     * written to the element.
+     *
+     * @example
+     * ```svelte
+     * <motion.div
+     *   style={{ x: 10 }}
+     *   transformTemplate={({ x }, generated) => `translateY(${x}) ${generated}`}
+     * />
+     * ```
+     */
+    transformTemplate?: TransformTemplate
     /** Called when a true hover gesture starts (not emulated by touch) */
     onHoverStart?: MotionOnHoverStart
     /** Called when a true hover gesture ends */
