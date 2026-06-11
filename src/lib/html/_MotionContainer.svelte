@@ -951,6 +951,12 @@
         templatedTransformAnimationControls = []
     }
 
+    const cleanupTemplatedTransformAnimations = () => {
+        stopTemplatedTransformAnimations()
+        templatedTransformAnimationCleanup?.()
+        templatedTransformAnimationCleanup = null
+    }
+
     const splitTemplatedTransformPayload = (payload: Record<string, unknown>) => {
         const templatePayload: Record<string, unknown> = {}
         const nativePayload: Record<string, unknown> = {}
@@ -976,8 +982,8 @@
         transition: AnimationOptions,
         onStart: (def: unknown) => void,
         onComplete: (def: unknown) => void
-    ): void => {
-        if (!element || !transformTemplateProp) return
+    ): Promise<unknown> => {
+        if (!element || !transformTemplateProp) return Promise.resolve()
 
         const { templatePayload, nativePayload, hasNativePayload } =
             splitTemplatedTransformPayload(payload)
@@ -1009,10 +1015,18 @@
         }
 
         if (hasNativePayload) {
-            promises.push(getAnimationPromise(animate(element, nativePayload, transition)))
+            const nativeControl = animate(
+                element,
+                nativePayload as DOMKeyframesDefinition,
+                transition
+            )
+            if (isStoppableAnimationControl(nativeControl)) {
+                templatedTransformAnimationControls.push(nativeControl)
+            }
+            promises.push(getAnimationPromise(nativeControl))
         }
 
-        Promise.all(promises)
+        return Promise.all(promises)
             .then(() => {
                 if (generation !== templatedTransformAnimationGeneration) return
                 templatedTransformAnimationControls = []
@@ -1138,15 +1152,32 @@
 
         const promises: Promise<unknown>[] = [...svgPathFinished]
         if (isNotEmpty(payload)) {
-            promises.push(
-                trackAnimationControlsControl(
-                    animate(
-                        element,
-                        payload as DOMKeyframesDefinition,
-                        transitionAnimate as AnimationOptions
+            const shouldAnimateThroughTransformTemplate =
+                !!transformTemplateProp &&
+                splitTemplatedTransformPayload(payload as Record<string, unknown>)
+                    .hasTemplatePayload
+
+            if (shouldAnimateThroughTransformTemplate) {
+                promises.push(
+                    animateTemplatedTransformPayload(
+                        payload,
+                        transitionAnimate as unknown as AnimationOptions,
+                        () => {},
+                        () => {}
                     )
                 )
-            )
+            } else {
+                cleanupTemplatedTransformAnimations()
+                promises.push(
+                    trackAnimationControlsControl(
+                        animate(
+                            element,
+                            payload as DOMKeyframesDefinition,
+                            transitionAnimate as AnimationOptions
+                        )
+                    )
+                )
+            }
         }
 
         try {
@@ -1623,6 +1654,7 @@
                     completeEnterAnimation(def as unknown as DOMKeyframesDefinition | undefined)
             )
         } else if (isNotEmpty(payload)) {
+            cleanupTemplatedTransformAnimations()
             animateWithLifecycle(
                 element,
                 payload as unknown as DOMKeyframesDefinition,

@@ -1,7 +1,14 @@
 <script lang="ts">
-    import { animate, motion, useMotionValue, type RawMotionValue } from '$lib'
+    import {
+        animate,
+        motion,
+        useAnimationControls,
+        useMotionValue,
+        type RawMotionValue
+    } from '$lib'
 
     const liveX = useMotionValue(24)
+    const controls = useAnimationControls()
 
     let moved = $state(false)
     let animated = $state(false)
@@ -12,6 +19,7 @@
     let removeSameTemplate = $state(true)
     let removeOnlyTemplate = $state(true)
     let slowAnimated = $state(false)
+    let controlsSent = $state(false)
 
     const transformTemplate = (
         { x, rotate }: Record<string, string | number>,
@@ -73,6 +81,17 @@
 
     function toggleSlowAnimated() {
         slowAnimated = !slowAnimated
+    }
+
+    function toggleControlsAnimation() {
+        controlsSent = !controlsSent
+        void controls.start(
+            {
+                x: controlsSent ? 120 : 0,
+                rotate: controlsSent ? 30 : 0
+            },
+            { duration: 1.2, ease: 'linear' }
+        )
     }
 
     function updateTemplate() {
@@ -206,6 +225,28 @@
                     onclick={toggleSlowAnimated}
                 >
                     {slowAnimated ? 'Back' : 'Send'}
+                </button>
+            </div>
+        </article>
+
+        <article>
+            <h2>Controls template frames</h2>
+            <motion.div
+                class="orb pink"
+                data-testid="template-controls-animated"
+                initial={{ x: 0, rotate: 0 }}
+                animate={controls}
+                {transformTemplate}
+            >
+                controls
+            </motion.div>
+            <div class="controls">
+                <button
+                    type="button"
+                    data-testid="template-controls-animated-toggle"
+                    onclick={toggleControlsAnimation}
+                >
+                    {controlsSent ? 'Back' : 'Send'}
                 </button>
             </div>
         </article>

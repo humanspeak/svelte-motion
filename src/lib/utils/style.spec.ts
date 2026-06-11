@@ -1,5 +1,5 @@
 import { motionValue } from 'motion-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
     applyMotionStyleEffect,
     collectMotionStyleValues,
@@ -169,6 +169,27 @@ describe('mergeInlineStyles', () => {
             expect(out).toContain('rotate(45deg)')
             expect(out).toContain('skewX(5deg)')
         })
+
+        it('does not serialize identity transform values', () => {
+            const out = mergeInlineStyles('', { x: 0, y: '0px', scale: 1, rotate: 0 }, null)
+
+            expect(out).not.toContain('transform:')
+        })
+
+        it('can preserve identity transform values for animation keyframes', () => {
+            const out = mergeInlineStyles(
+                '',
+                { x: 0, y: '0px', scale: 1, rotate: 0 },
+                null,
+                undefined,
+                { preserveTransformDefaults: true }
+            )
+
+            expect(out).toContain('translateX(0px)')
+            expect(out).toContain('translateY(0px)')
+            expect(out).toContain('scale(1)')
+            expect(out).toContain('rotate(0deg)')
+        })
     })
 
     describe('transformTemplate', () => {
@@ -235,6 +256,14 @@ describe('mergeInlineStyles', () => {
 
             expect(out).toContain('color: red')
             expect(out).not.toContain('transform:')
+        })
+
+        it('propagates errors thrown by the template callback', () => {
+            expect(() =>
+                mergeInlineStyles('', { x: 10 }, null, () => {
+                    throw new Error('Template error')
+                })
+            ).toThrow('Template error')
         })
     })
 
@@ -382,6 +411,54 @@ describe('applyMotionStyleEffect', () => {
 
         generatedCleanup()
         cleanup?.()
+    })
+
+    it('coalesces deferred style writes across same-tick MotionValue changes', () => {
+        const el = document.createElement('div')
+        const x = motionValue(12)
+        const y = motionValue(4)
+        const queuedMicrotasks: VoidFunction[] = []
+        const queuedFrames: FrameRequestCallback[] = []
+        const queueMicrotaskSpy = vi
+            .spyOn(globalThis, 'queueMicrotask')
+            .mockImplementation((callback) => {
+                queuedMicrotasks.push(callback)
+            })
+        const requestAnimationFrameSpy = vi
+            .spyOn(globalThis, 'requestAnimationFrame')
+            .mockImplementation((callback) => {
+                queuedFrames.push(callback)
+                return queuedFrames.length
+            })
+
+        try {
+            const cleanup = applyMotionStyleEffect(
+                el,
+                { x, y },
+                ({ x: latestX }, generated) => `translateY(${latestX}) ${generated}`
+            )
+
+            expect(queueMicrotaskSpy).toHaveBeenCalledTimes(1)
+            expect(requestAnimationFrameSpy).toHaveBeenCalledTimes(1)
+
+            x.set(24)
+            y.set(18)
+
+            expect(queueMicrotaskSpy).toHaveBeenCalledTimes(1)
+            expect(requestAnimationFrameSpy).toHaveBeenCalledTimes(1)
+
+            queuedMicrotasks.shift()?.()
+            queuedFrames.shift()?.(performance.now())
+            x.set(36)
+
+            expect(queueMicrotaskSpy).toHaveBeenCalledTimes(2)
+            expect(requestAnimationFrameSpy).toHaveBeenCalledTimes(2)
+
+            cleanup?.()
+        } finally {
+            queueMicrotaskSpy.mockRestore()
+            requestAnimationFrameSpy.mockRestore()
+        }
     })
 })
 

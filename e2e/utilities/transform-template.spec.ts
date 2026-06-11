@@ -108,9 +108,10 @@ test.describe('transformTemplate', () => {
     test('applies transformTemplate throughout transform animation frames', async ({ page }) => {
         await page.goto(URL)
 
-        await page.waitForTimeout(250)
-        await page.getByTestId('template-slow-animated-toggle').click()
-        await expect(page.getByTestId('template-slow-animated-toggle')).toHaveText('Back')
+        const toggle = page.getByTestId('template-slow-animated-toggle')
+        await expect(toggle).toHaveText('Send')
+        await toggle.click()
+        await expect(toggle).toHaveText('Back')
 
         const sampledTransforms = await page.getByTestId('template-slow-animated').evaluate(
             async (element) =>
@@ -150,14 +151,15 @@ test.describe('transformTemplate', () => {
     }) => {
         await page.goto(URL)
 
-        await page.waitForTimeout(250)
-        await page.getByTestId('template-slow-animated-toggle').click()
+        const toggle = page.getByTestId('template-slow-animated-toggle')
+        await expect(toggle).toHaveText('Send')
+        await toggle.click()
 
         await expect
             .poll(readStyleAttribute(page, 'template-slow-animated'), { timeout: 3000 })
             .toContain('translateX(120px)')
 
-        await page.getByTestId('template-slow-animated-toggle').click()
+        await toggle.click()
 
         const sampledTransforms = await page.getByTestId('template-slow-animated').evaluate(
             async (element) =>
@@ -183,8 +185,77 @@ test.describe('transformTemplate', () => {
             .filter((value): value is string => !!value)
             .map(Number.parseFloat)
 
+        expect(xValues.length).toBeGreaterThan(0)
         expect(xValues[0]).toBeGreaterThan(80)
         expect(xValues.some((value) => value > 20 && value < 115)).toBe(true)
+    })
+
+    test('applies transformTemplate throughout animation controls frames', async ({ page }) => {
+        await page.goto(URL)
+
+        const toggle = page.getByTestId('template-controls-animated-toggle')
+        await expect(toggle).toHaveText('Send')
+        await toggle.click()
+        await expect(toggle).toHaveText('Back')
+
+        const sampledTransforms = await page.getByTestId('template-controls-animated').evaluate(
+            async (element) =>
+                await new Promise<string[]>((resolve) => {
+                    const frames: string[] = []
+                    const started = performance.now()
+
+                    const tick = () => {
+                        frames.push(element.getAttribute('style') ?? '')
+                        if (performance.now() - started < 700) {
+                            requestAnimationFrame(tick)
+                        } else {
+                            resolve(frames)
+                        }
+                    }
+
+                    requestAnimationFrame(tick)
+                })
+        )
+
+        const templatedIntermediateFrame = sampledTransforms.find((style) => {
+            const y = style.match(/translateY\(([-\d.]+)px\)/)
+            const x = style.match(/translateX\(([-\d.]+)px\)/)
+            if (!y || !x) return false
+
+            const yValue = Number.parseFloat(y[1])
+            const xValue = Number.parseFloat(x[1])
+
+            return yValue > 10 && yValue < 110 && Math.abs(yValue - xValue) < 0.5
+        })
+
+        expect(templatedIntermediateFrame).toBeTruthy()
+    })
+
+    test('supports keyboard activation and accessible names for transform toggles', async ({
+        page
+    }) => {
+        await page.goto(URL)
+
+        const updateToggle = page.getByTestId('template-update-toggle')
+        const animatedToggle = page.getByTestId('template-animated-toggle')
+
+        await expect(updateToggle).toHaveAccessibleName('Double')
+        await expect(animatedToggle).toHaveAccessibleName('Send')
+
+        await updateToggle.focus()
+        await page.keyboard.press('Enter')
+
+        await expect
+            .poll(readStyleAttribute(page, 'template-updated'))
+            .toContain('translateY(20px) translateX(10px)')
+
+        await animatedToggle.focus()
+        await page.keyboard.press('Enter')
+
+        await expect(animatedToggle).toHaveText('Back')
+        await expect
+            .poll(readStyleAttribute(page, 'template-animated'), { timeout: 3000 })
+            .toContain('translateX(120px)')
     })
 
     test('applies transformPerspective through transformTemplate', async ({ page }) => {

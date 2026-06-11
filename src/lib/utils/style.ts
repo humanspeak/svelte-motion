@@ -47,6 +47,10 @@ export type TransformTemplate = (
     generatedTransform: string
 ) => string
 
+type MergeInlineStylesOptions = {
+    preserveTransformDefaults?: boolean
+}
+
 const transformPropOrder = [
     'transformPerspective',
     'x',
@@ -111,13 +115,20 @@ const isDefaultTransformValue = (key: string, value: string | number): boolean =
  * @param transformTemplate Optional callback that receives the latest
  *   transform-related values and generated transform string, then returns the
  *   final CSS transform string.
+ * @param options Serialization options for specialized animation setup paths.
  * @returns Inline CSS suitable for Svelte's `style` attribute.
+ * @example
+ * ```ts
+ * mergeInlineStyles('color: red', { x: 20 }, null)
+ * // => 'color: red; transform: translateX(20px)'
+ * ```
  */
 export const mergeInlineStyles = (
     existingStyle: unknown,
     initial: Record<string, unknown> | null | undefined,
     animateFallback?: Record<string, unknown> | null | undefined,
-    transformTemplate?: TransformTemplate
+    transformTemplate?: TransformTemplate,
+    options: MergeInlineStylesOptions = {}
 ): string => {
     const base: Record<string, string> = parseStyleString(
         typeof existingStyle === 'string' ? existingStyle : ''
@@ -160,7 +171,7 @@ export const mergeInlineStyles = (
         if (v == null) return
         const val = typeof v === 'number' ? `${v}${unitForTransform(key, v)}` : String(v)
         transformValues[key] = val
-        if (!isDefaultTransformValue(key, val) || !transformTemplate) {
+        if (options.preserveTransformDefaults || !isDefaultTransformValue(key, val)) {
             const fn = transformAliases[key as (typeof transformPropOrder)[number]] ?? key
             transformPartsByKey[key] = `${fn}(${val})`
         }
@@ -278,6 +289,11 @@ export const extractTransform = (style: unknown): string => {
  *   transform-related values and generated transform string, then returns the
  *   final CSS transform string for object-form styles.
  * @returns Inline CSS suitable for Svelte's `style` attribute.
+ * @example
+ * ```ts
+ * serializeMotionStyle({ x: 24, opacity: 0.5 })
+ * // => 'opacity: 0.5; transform: translateX(24px)'
+ * ```
  */
 export const serializeMotionStyle = (
     style: string | MotionStyle | null | undefined,
@@ -325,6 +341,13 @@ export const collectMotionStyleValues = (
  * @param style Object-form style prop to observe.
  * @param transformTemplate Optional transform template callback.
  * @returns Cleanup function, or `undefined` when no MotionValues are present.
+ * @example
+ * ```ts
+ * const cleanup = applyMotionStyleEffect(element, { x }, ({ x }, generated) =>
+ *     `translateY(${x}) ${generated}`
+ * )
+ * cleanup?.()
+ * ```
  */
 export const applyMotionStyleEffect = (
     element: HTMLElement,
@@ -346,11 +369,24 @@ export const applyMotionStyleEffect = (
         )
     }
 
+    let microtaskQueued = false
+    let rafQueued = false
+
     const applyAfterOtherSubscribers = () => {
         apply()
-        queueMicrotask(apply)
-        if (typeof requestAnimationFrame === 'function') {
-            requestAnimationFrame(apply)
+        if (!microtaskQueued) {
+            microtaskQueued = true
+            queueMicrotask(() => {
+                microtaskQueued = false
+                apply()
+            })
+        }
+        if (typeof requestAnimationFrame === 'function' && !rafQueued) {
+            rafQueued = true
+            requestAnimationFrame(() => {
+                rafQueued = false
+                apply()
+            })
         }
     }
 
