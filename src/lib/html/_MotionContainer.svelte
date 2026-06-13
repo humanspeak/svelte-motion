@@ -269,8 +269,54 @@
     // than the live inline transform — the latter already carries any
     // transform-type `initial`/`animate` keyframe by the time the node
     // measures, which would be mistaken for the user's base.
+    const splitSerializedTransform = (style: string): { rest: string; transform: string } => {
+        const rest: string[] = []
+        let transform = ''
+
+        for (const declaration of style.split(';')) {
+            const trimmed = declaration.trim()
+            if (!trimmed) continue
+
+            const separator = trimmed.indexOf(':')
+            if (separator === -1) {
+                rest.push(trimmed)
+                continue
+            }
+
+            const property = trimmed.slice(0, separator).trim()
+            const value = trimmed.slice(separator + 1).trim()
+            if (property === 'transform') {
+                transform = value
+            } else {
+                rest.push(trimmed)
+            }
+        }
+
+        return { rest: rest.join('; '), transform }
+    }
+
     const serializedStyleProp = $derived(serializeMotionStyle(styleProp, transformTemplateProp))
     const userBaseTransform = $derived(extractTransform(styleProp))
+    let liveGestureTransform = $state<string | null>(null)
+    const liveGestureComposedTransform = $derived.by(() => {
+        if (!liveGestureTransform) return null
+
+        const { transform } = splitSerializedTransform(serializedStyleProp)
+        return [liveGestureTransform, transform].filter(Boolean).join(' ')
+    })
+    const serializedStyleWithLiveGestureTransform = $derived.by(() => {
+        if (!liveGestureComposedTransform) return serializedStyleProp
+
+        const { rest } = splitSerializedTransform(serializedStyleProp)
+        return `${rest}${rest ? '; ' : ''}transform: ${liveGestureComposedTransform}`
+    })
+
+    $effect(() => {
+        if (!element || !liveGestureComposedTransform) return
+        if (element.style.transform === liveGestureComposedTransform) return
+
+        element.style.transform = liveGestureComposedTransform
+    })
 
     const projectionParent = getProjectionParent()
     const projection = new ProjectionNode({
@@ -1311,7 +1357,7 @@
             return {}
         })(),
         style: mergeInlineStyles(
-            `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleProp};visibility:hidden` : serializedStyleProp}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`,
+            `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleWithLiveGestureTransform};visibility:hidden` : serializedStyleWithLiveGestureTransform}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`,
             // The "from" slot: apply initialKeyframes as inline styles during
             // the mounting/initial phases (before the WAAPI animation locks
             // its from-value and we promote to 'ready' — see the lifecycle
@@ -1393,12 +1439,18 @@
                 onMove: onDragProp as (e: PointerEvent, info: DragInfo) => void,
                 onEnd: onDragEndProp as (e: PointerEvent, info: DragInfo) => void,
                 onDirectionLock: onDirectionLockProp as (axis: 'x' | 'y') => void,
-                onTransitionEnd: onDragTransitionEndProp as () => void
+                onTransitionEnd: () => {
+                    ;(onDragTransitionEndProp as (() => void) | undefined)?.()
+                },
+                onVisualUpdate: (transform: string) => {
+                    liveGestureTransform = transform || null
+                }
             },
             baselineSources: {
                 initial: (initialKeyframes ?? {}) as Record<string, unknown>,
                 animate: (resolvedAnimate ?? {}) as Record<string, unknown>
             },
+            getBaseTransform: () => splitSerializedTransform(serializedStyleProp).transform,
             propagation: !!dragPropagationProp,
             snapToOrigin: !!dragSnapToOriginProp
         }

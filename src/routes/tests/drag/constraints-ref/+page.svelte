@@ -6,6 +6,7 @@
 <div style="height: 320px; display: grid; place-items: center">
     <div
         bind:this={bounds}
+        data-testid="constraint-box"
         style="width:240px;height:180px;border:2px dashed #999;position:relative;display:grid;place-items:center"
     >
         <motion.div
@@ -15,5 +16,7 @@
             style="width:80px;height:80px;background:#a78bfa;border-radius:8px;"
         />
     </div>
-    <p style="font:12px system-ui;color:#666">Drag is constrained to dashed box</p>
+    <p style="font:12px system-ui;color:#666">
+        Default dragElastic allows overdrag; release settles inside dashed box
+    </p>
 </div>

@@ -458,6 +458,7 @@ export type DragTransition = {
     timeConstant?: number
     restDelta?: number
     restSpeed?: number
+    modifyTarget?: (target: number) => number
     min?: number
     max?: number
 }

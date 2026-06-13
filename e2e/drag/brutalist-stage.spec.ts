@@ -7,9 +7,8 @@ import { expect, test } from '@playwright/test'
  * `dragElastic: 0.18`, `dragMomentum: true`, and
  * `dragTransition { bounceStiffness: 360, bounceDamping: 24 }`, dragging
  * hard past a constraint and releasing should settle the card translate
- * back inside the constraint bounds. CSS rotate is disabled in these
- * tests so the assertion targets the raw translate (rotation expands
- * the AABB but doesn't change where the constraint clamps).
+ * back inside the constraint bounds. Rotation-disabled tests target raw
+ * translate, while the rotated tests assert transform composition too.
  */
 
 const STAGE_PATH = '/tests/drag/brutalist-stage?@isPlaywright=true'
@@ -18,7 +17,7 @@ const RIGHT = 200
 const TOP = -120
 const BOTTOM = 120
 
-import { readTranslate } from '../_helpers/transform'
+import { readTransform, readTranslate } from '../_helpers/transform'
 
 const disableRotate = async (page: import('@playwright/test').Page) => {
     const rotateToggle = page.locator('.knobs input[type="checkbox"]').first()
@@ -26,6 +25,125 @@ const disableRotate = async (page: import('@playwright/test').Page) => {
 }
 
 test.describe('drag/brutalist-stage', () => {
+    test('rotated card follows the pointer during active drag', async ({ page }) => {
+        await page.goto(STAGE_PATH)
+        const card = page.getByTestId('drag-card')
+        await card.waitFor({ state: 'visible' })
+
+        const start = await card.boundingBox()
+        if (!start) throw new Error('no card bbox')
+        const cx = start.x + start.width / 2
+        const cy = start.y + start.height / 2
+
+        await page.mouse.move(cx, cy)
+        await page.mouse.down()
+        await page.mouse.move(cx + 32, cy + 18, { steps: 1 })
+        await expect(page.locator('.telemetry')).toContainText('status · dragging')
+
+        for (const point of [
+            { x: cx + 64, y: cy + 36 },
+            { x: cx + 96, y: cy + 54 },
+            { x: cx + 128, y: cy + 72 }
+        ]) {
+            await page.mouse.move(point.x, point.y, { steps: 1 })
+            await page.waitForTimeout(16)
+            const box = await card.boundingBox()
+            if (!box) throw new Error('no card bbox during drag')
+            const cardCenter = {
+                x: box.x + box.width / 2,
+                y: box.y + box.height / 2
+            }
+            expect(Math.abs(cardCenter.x - point.x)).toBeLessThanOrEqual(24)
+            expect(Math.abs(cardCenter.y - point.y)).toBeLessThanOrEqual(24)
+        }
+
+        const activeTransform = await readTransform(page, '[data-testid="drag-card"]')
+        expect(Math.abs(activeTransform.b)).toBeGreaterThan(0.08)
+        expect(Math.abs(activeTransform.c)).toBeGreaterThan(0.08)
+
+        await page.mouse.up()
+    })
+
+    test('hard rotated release preserves translate while whileDrag scale restores', async ({
+        page
+    }) => {
+        await page.goto(STAGE_PATH)
+        const card = page.getByTestId('drag-card')
+        await card.waitFor({ state: 'visible' })
+        await page.waitForSelector('[data-testid="drag-card"][data-is-loaded="ready"]')
+
+        const start = await card.boundingBox()
+        if (!start) throw new Error('no card bbox')
+        const cx = start.x + start.width / 2
+        const cy = start.y + start.height / 2
+
+        await page.mouse.move(cx, cy)
+        await page.mouse.down()
+        for (let i = 1; i <= 8; i++) {
+            await page.mouse.move(cx + i * 36, cy + i * 18, { steps: 1 })
+            await page.waitForTimeout(16)
+        }
+        await page.mouse.up()
+
+        // This used to briefly render `transform: none` after release when
+        // the whileDrag scale restore completed before/after inertia.
+        await page.waitForTimeout(400)
+        const settled = await readTransform(page, '[data-testid="drag-card"]')
+        expect(settled.tx).toBeGreaterThan(150)
+        expect(settled.tx).toBeLessThanOrEqual(RIGHT + 1)
+        expect(settled.ty).toBeGreaterThan(90)
+        expect(settled.ty).toBeLessThanOrEqual(BOTTOM + 1)
+        expect(Math.abs(settled.a - Math.cos((12 * Math.PI) / 180))).toBeLessThan(0.03)
+        expect(Math.abs(settled.b - Math.sin((12 * Math.PI) / 180))).toBeLessThan(0.03)
+    })
+
+    test('moving the mouse after release does not let hover reset drag translate', async ({
+        page
+    }) => {
+        await page.goto(STAGE_PATH)
+        const card = page.getByTestId('drag-card')
+        await card.waitFor({ state: 'visible' })
+        await page.waitForSelector('[data-testid="drag-card"][data-is-loaded="ready"]')
+
+        const start = await card.boundingBox()
+        if (!start) throw new Error('no card bbox')
+        const cx = start.x + start.width / 2
+        const cy = start.y + start.height / 2
+
+        await page.mouse.move(cx, cy)
+        await page.mouse.down()
+        for (let i = 1; i <= 8; i++) {
+            await page.mouse.move(cx + i * 36, cy + i * 18, { steps: 1 })
+            await page.waitForTimeout(16)
+        }
+        await page.mouse.up()
+        await page.waitForTimeout(700)
+
+        const settled = await readTransform(page, '[data-testid="drag-card"]')
+        expect(settled.tx).toBeGreaterThan(150)
+        expect(settled.ty).toBeGreaterThan(90)
+
+        // Releasing while hovered and then moving the pointer should fire
+        // whileHover cleanup/start. Those gesture animations must preserve
+        // the drag translate instead of replacing transform with scale/none.
+        await page.mouse.move(24, 24, { steps: 4 })
+        await page.waitForTimeout(120)
+        const afterMoveAway = await readTransform(page, '[data-testid="drag-card"]')
+        expect(afterMoveAway.tx).toBeGreaterThan(150)
+        expect(afterMoveAway.ty).toBeGreaterThan(90)
+
+        const current = await card.boundingBox()
+        if (!current) throw new Error('no card bbox after hover leave')
+        await page.mouse.move(current.x + current.width / 2, current.y + current.height / 2, {
+            steps: 4
+        })
+        await page.waitForTimeout(120)
+        const afterMoveBack = await readTransform(page, '[data-testid="drag-card"]')
+        expect(afterMoveBack.tx).toBeGreaterThan(150)
+        expect(afterMoveBack.ty).toBeGreaterThan(90)
+        expect(Math.abs(afterMoveBack.b)).toBeGreaterThan(0.08)
+    })
+
     test('settles within constraint bounds after hard left + down drag', async ({ page }) => {
         await page.goto(STAGE_PATH)
         const card = page.getByTestId('drag-card')
@@ -145,15 +263,10 @@ test.describe('drag/brutalist-stage', () => {
         expect(afterSecond.ty).toBeLessThanOrEqual(BOTTOM + 1)
     })
 
-    // Regression for the post-release momentum-past-constraint bug fixed
-    // in src/lib/utils/inertia.ts: when the value is already out-of-bounds
-    // at release with non-zero velocity, only the velocity component
-    // *toward* the boundary is carried into the boundary spring; any
-    // velocity that would pull the value further past the constraint is
-    // dropped. Previously the spring received the full release velocity
-    // and took ~50–120 ms to decelerate the outward component, during
-    // which the value travelled further past the constraint — visually
-    // 'the card escapes the dragConstraints box just after I let go'.
+    // Regression for post-release momentum past constraints: when the
+    // value is already out-of-bounds at release, upstream inertia should
+    // immediately hand off to the boundary spring instead of travelling
+    // further past the constraint.
     test('post-release motion never moves further from origin than release position', async ({
         page
     }) => {

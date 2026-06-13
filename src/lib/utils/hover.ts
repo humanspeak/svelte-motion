@@ -1,5 +1,6 @@
+import { parseMatrixTranslate } from '$lib/utils/dragMath'
 import { type AnimationOptions, type DOMKeyframesDefinition, animate } from 'motion'
-import { hover } from 'motion-dom'
+import { animateValue, hover } from 'motion-dom'
 
 /**
  * Determine whether the current environment supports true hover.
@@ -34,6 +35,66 @@ export const splitHoverDefinition = (
 } => {
     const { transition, ...rest } = (def ?? {}) as { transition?: AnimationOptions }
     return { keyframes: rest, transition }
+}
+
+const readTransformScale = (el: HTMLElement): number => {
+    const transform = getComputedStyle(el).transform
+    const matrix = transform.match(/matrix\(([^)]+)\)/)
+    if (!matrix) return 1
+
+    const [a, b] = matrix[1].split(',').map((part) => Number.parseFloat(part.trim()))
+    if (!Number.isFinite(a)) return 1
+    if (!Number.isFinite(b)) return a
+    return Math.hypot(a, b)
+}
+
+const readTransformRotation = (el: HTMLElement): string | undefined => {
+    const inlineTransform = el.style.transform || ''
+    const rotateMatch = inlineTransform.match(/(?:^|\s)rotate\(([^)]+)\)/)
+    if (rotateMatch) return rotateMatch[1]
+
+    const computedTransform = getComputedStyle(el).transform
+    const matrix = computedTransform.match(/matrix\(([^)]+)\)/)
+    if (!matrix) return undefined
+
+    const [a, b] = matrix[1].split(',').map((part) => Number.parseFloat(part.trim()))
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return undefined
+
+    const degrees = Math.atan2(b, a) * (180 / Math.PI)
+    if (Math.abs(degrees) < 0.001) return undefined
+    return `${degrees}deg`
+}
+
+const getFinalNumber = (value: unknown): number | null => {
+    const raw = Array.isArray(value) ? value[value.length - 1] : value
+    const parsed = typeof raw === 'number' ? raw : Number.parseFloat(String(raw))
+    return Number.isFinite(parsed) ? parsed : null
+}
+
+const toMillisecondsTransition = (
+    transition: AnimationOptions | undefined
+): Record<string, unknown> => {
+    const valueTransition = { ...((transition ?? {}) as Record<string, unknown>) }
+    for (const key of ['duration', 'delay', 'repeatDelay']) {
+        if (typeof valueTransition[key] === 'number') {
+            valueTransition[key] = (valueTransition[key] as number) * 1000
+        }
+    }
+    return valueTransition
+}
+
+const writeComposedScale = (el: HTMLElement, scale: number) => {
+    const { tx, ty } = parseMatrixTranslate(getComputedStyle(el).transform)
+    const rotate = readTransformRotation(el)
+
+    el.style.transform = [
+        `translateX(${tx}px)`,
+        `translateY(${ty}px)`,
+        Math.abs(scale - 1) > 0.0001 ? `scale(${scale})` : '',
+        rotate == null ? '' : `rotate(${rotate})`
+    ]
+        .filter(Boolean)
+        .join(' ')
 }
 
 /**
@@ -148,8 +209,45 @@ export const attachWhileHover = (
     if (!whileHover) return () => {}
 
     let hoverBaseline: Record<string, unknown> | null = null
+    let scaleAnimation: { stop?: () => void } | null = null
 
-    return hover(el, () => {
+    const stopScaleAnimation = () => {
+        scaleAnimation?.stop?.()
+        scaleAnimation = null
+    }
+
+    const animateScale = (
+        target: unknown,
+        transition: AnimationOptions | undefined,
+        onComplete?: () => void
+    ) => {
+        const targetScale = getFinalNumber(target)
+        if (targetScale == null) {
+            onComplete?.()
+            return
+        }
+
+        stopScaleAnimation()
+        scaleAnimation = animateValue({
+            ...toMillisecondsTransition(transition ?? mergedTransition),
+            keyframes: [readTransformScale(el), targetScale],
+            onUpdate: (value: number) => {
+                writeComposedScale(el, value)
+            },
+            onComplete: () => {
+                writeComposedScale(el, targetScale)
+                scaleAnimation = null
+                onComplete?.()
+            }
+        })
+    }
+
+    const handleDragStart = () => stopScaleAnimation()
+    el.addEventListener('svelte-motion:drag-start', handleDragStart)
+
+    const cleanupHover = hover(el, () => {
+        if (el.dataset.svelteMotionDragActive === 'true') return () => {}
+
         // Hover start: compute baseline and animate to whileHover values
         hoverBaseline = computeHoverBaseline(el, {
             initial: baselineSources?.initial,
@@ -158,19 +256,39 @@ export const attachWhileHover = (
         })
         callbacks?.onStart?.()
         const { keyframes, transition } = splitHoverDefinition(whileHover)
-        animate(
-            el,
-            keyframes as unknown as DOMKeyframesDefinition,
-            (transition ?? mergedTransition) as AnimationOptions
-        )
+        const { scale, ...nativeKeyframes } = keyframes
+        if (scale != null) animateScale(scale, transition)
+        if (Object.keys(nativeKeyframes).length > 0) {
+            animate(
+                el,
+                nativeKeyframes as unknown as DOMKeyframesDefinition,
+                (transition ?? mergedTransition) as AnimationOptions
+            )
+        }
 
         // Return cleanup function for hover end
         return () => {
+            if (el.dataset.svelteMotionDragActive === 'true') return
+
             // Hover end: restore baseline values
             if (hoverBaseline && Object.keys(hoverBaseline).length > 0) {
-                animate(el, hoverBaseline as unknown as DOMKeyframesDefinition, mergedTransition)
+                const { scale: baselineScale, ...nativeBaseline } = hoverBaseline
+                if (baselineScale != null) animateScale(baselineScale, mergedTransition)
+                if (Object.keys(nativeBaseline).length > 0) {
+                    animate(
+                        el,
+                        nativeBaseline as unknown as DOMKeyframesDefinition,
+                        mergedTransition
+                    )
+                }
             }
             callbacks?.onEnd?.()
         }
     })
+
+    return () => {
+        stopScaleAnimation()
+        el.removeEventListener('svelte-motion:drag-start', handleDragStart)
+        cleanupHover()
+    }
 }
