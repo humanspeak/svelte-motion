@@ -12,7 +12,7 @@
 
 <div style="height: 360px; display: grid; place-items: center; gap: 24px;">
     <section style="display: grid; place-items: center; gap: 8px;">
-        <button on:pointerdown={start} data-testid="handle">Start Drag</button>
+        <button onpointerdown={start} data-testid="handle">Start Drag</button>
         <motion.div
             drag="x"
             dragControls={controls}
@@ -22,7 +22,7 @@
         />
     </section>
     <section style="display: grid; place-items: center; gap: 8px;">
-        <button on:pointerdown={startInitial} data-testid="initial-handle">
+        <button onpointerdown={startInitial} data-testid="initial-handle">
             Start Initial Drag
         </button>
         <motion.div

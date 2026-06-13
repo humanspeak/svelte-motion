@@ -46,6 +46,11 @@ export type DragInertiaAxisOptions = {
  *
  * @param options Initial axis state, boundary constraints, and inertia physics.
  * @returns Motion animation options consumed by `animateValue` or `inertia`.
+ *
+ * @example
+ * ```ts
+ * const options = createDragInertiaOptions({ value: 0, velocity: 600, min: -100, max: 100 })
+ * ```
  */
 export const createDragInertiaOptions = (
     options: DragInertiaAxisOptions
@@ -88,6 +93,14 @@ export const createDragInertiaOptions = (
  * @param handlers.onUpdate Called repeatedly with the current axis value.
  * @param handlers.onComplete Called once when the inertia animation settles.
  * @returns Motion animation playback controls.
+ *
+ * @example
+ * ```ts
+ * const controls = startDragInertia(
+ *   { value: 0, velocity: 600 },
+ *   { onUpdate: console.log, onComplete: () => undefined }
+ * )
+ * ```
  */
 export const startDragInertia = (
     options: DragInertiaAxisOptions,
@@ -112,6 +125,12 @@ export const startDragInertia = (
  *
  * @param options Initial axis state and inertia transition options.
  * @returns A keyframe generator that can be sampled deterministically.
+ *
+ * @example
+ * ```ts
+ * const generator = createDragInertiaGenerator({ value: 0, velocity: 600 })
+ * const sample = generator.next(100)
+ * ```
  */
 export const createDragInertiaGenerator = (
     options: DragInertiaAxisOptions

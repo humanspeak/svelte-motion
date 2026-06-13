@@ -67,6 +67,7 @@ test.describe('drag/constraints-ref', () => {
 
         const distinctX = new Set(releaseSamples.map((sample) => Math.round(sample.x))).size
         expect(distinctX).toBeGreaterThan(3)
+        expect(releaseSamples.length).toBeGreaterThanOrEqual(2)
         expect(releaseSamples[0]?.x).toBeLessThan(b.x - 20)
         expect(releaseSamples[1]?.x).toBeLessThan(b.x - 5)
         expect(releaseSamples.some((sample) => sample.x > active.x + 10 && sample.x < b.x)).toBe(

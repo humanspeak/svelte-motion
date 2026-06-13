@@ -451,6 +451,16 @@ export type DragConstraints =
           bottom?: number
       }
     | HTMLElement
+/**
+ * Controls how far a draggable element can stretch beyond its constraints
+ * before release.
+ *
+ * @example
+ * ```svelte
+ * <motion.div drag dragElastic={0.2} />
+ * <motion.div drag dragElastic={{ left: 0, right: 0.5 }} />
+ * ```
+ */
 export type DragElastic =
     | boolean
     | number
