@@ -17,11 +17,11 @@
     const dragTransition = $derived(
         data.slow
             ? {
-                  bounceStiffness: 26,
-                  bounceDamping: 7,
-                  timeConstant: 1600,
-                  restDelta: 0.2,
-                  restSpeed: 2
+                  bounceStiffness: 8,
+                  bounceDamping: 4,
+                  timeConstant: 3200,
+                  restDelta: 0.08,
+                  restSpeed: 0.6
               }
             : undefined
     )
