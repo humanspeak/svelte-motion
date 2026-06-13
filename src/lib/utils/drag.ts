@@ -1,4 +1,11 @@
-import type { DragAxis, DragConstraints, DragControls, DragInfo, MotionWhileDrag } from '$lib/types'
+import type {
+    DragAxis,
+    DragConstraints,
+    DragControls,
+    DragElastic,
+    DragInfo,
+    MotionWhileDrag
+} from '$lib/types'
 import { pwLog } from '$lib/utils/log'
 /**
  * Drag utilities
@@ -46,7 +53,7 @@ type Rect = {
 export type AttachDragOptions = {
     axis: DragAxis
     constraints?: DragConstraints
-    elastic?: number
+    elastic?: DragElastic
     momentum?: boolean
     transition?: {
         bounceStiffness?: number
@@ -99,6 +106,44 @@ const getRect = (el: HTMLElement | null): Rect | null => {
 const clamp = (v: number, min: number, max: number): number => Math.min(Math.max(v, min), max)
 
 const mix = (min: number, max: number, progress: number): number => min + (max - min) * progress
+
+type ResolvedDragElastic = {
+    x: { min: number; max: number }
+    y: { min: number; max: number }
+}
+
+const defaultElastic = 0.35
+
+const clampElastic = (value: number): number => Math.max(0, Math.min(1, value))
+
+type NormalizedDragElastic = number | Exclude<DragElastic, boolean | number>
+
+const resolvePointElastic = (
+    elastic: NormalizedDragElastic,
+    key: 'left' | 'right' | 'top' | 'bottom'
+) => (typeof elastic === 'number' ? elastic : (elastic[key] ?? 0))
+
+const resolveAxisElastic = (
+    elastic: NormalizedDragElastic,
+    minKey: 'left' | 'top',
+    maxKey: 'right' | 'bottom'
+) => ({
+    min: clampElastic(resolvePointElastic(elastic, minKey)),
+    max: clampElastic(resolvePointElastic(elastic, maxKey))
+})
+
+const resolveDragElastic = (elastic: DragElastic = defaultElastic): ResolvedDragElastic => {
+    if (elastic === false) elastic = 0
+    if (elastic === true) elastic = defaultElastic
+
+    return {
+        x: resolveAxisElastic(elastic, 'left', 'right'),
+        y: resolveAxisElastic(elastic, 'top', 'bottom')
+    }
+}
+
+const getMaxElastic = (elastic: ResolvedDragElastic): number =>
+    Math.max(elastic.x.min, elastic.x.max, elastic.y.min, elastic.y.max)
 
 const calcConstraintProgress = (value: number, min: number, max: number): number | null => {
     if (!Number.isFinite(min) || !Number.isFinite(max)) return null
@@ -273,7 +318,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     const axis = opts.axis
     const directionLock = !!opts.directionLock
     const listenerEnabled = opts.listener !== false
-    const elastic = typeof opts.elastic === 'number' ? opts.elastic : 0.35
+    const elastic = resolveDragElastic(opts.elastic)
+    const maxElastic = getMaxElastic(elastic)
     const momentum = opts.momentum !== false
     const mergedTransition = (opts.mergedTransition ?? {}) as AnimationOptions
 
@@ -786,8 +832,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 bounds: { minX, maxX, minY, maxY },
                 preClamp
             })
-            x = applyFloatConstraints(x, { min: minX, max: maxX }, elastic)
-            y = applyFloatConstraints(y, { min: minY, max: maxY }, elastic)
+            x = applyFloatConstraints(x, { min: minX, max: maxX }, elastic.x)
+            y = applyFloatConstraints(y, { min: minY, max: maxY }, elastic.y)
             pwLog('[drag] constrain+elastic', {
                 el: EL_ID,
                 preClamp,
@@ -896,7 +942,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 : constraintsBase.y + (constraints?.bottom ?? Infinity)
 
             const { power, timeConstant, restDelta, restSpeed, bounceStiffness, bounceDamping } =
-                deriveBoundaryPhysics(elastic, opts.transition)
+                deriveBoundaryPhysics(maxElastic, opts.transition)
 
             pwLog('⚙️ boundary-physics', {
                 power,
@@ -1114,7 +1160,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             let running = true
             const animations: AnimationPlaybackControlsWithThen[] = []
             const { timeConstant, restDelta, restSpeed, bounceStiffness, bounceDamping } =
-                deriveBoundaryPhysics(elastic, opts.transition)
+                deriveBoundaryPhysics(maxElastic, opts.transition)
 
             const renderLatest = () => {
                 if (!running) return
@@ -1195,7 +1241,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 stopInertia = null
             }
 
-            if (elastic === 0) {
+            if (maxElastic === 0) {
                 latestX = applyX ? x : applied.x
                 latestY = applyY ? y : applied.y
                 finishSettle()

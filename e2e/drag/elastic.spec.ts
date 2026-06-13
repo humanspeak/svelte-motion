@@ -136,6 +136,38 @@ test.describe('drag/elastic', () => {
         expect(dx).toBeLessThanOrEqual(32)
     })
 
+    test('object elastic applies per-edge overdrag', async ({ page }) => {
+        await page.goto('/tests/drag/elastic?@isPlaywright=true')
+        const el = page.getByTestId('elastic-right-only')
+        await el.waitFor({ state: 'visible' })
+        const start = await el.boundingBox()
+        if (!start) throw new Error('no start')
+
+        const cx = start.x + start.width / 2
+        const cy = start.y + start.height / 2
+        await page.mouse.move(cx, cy)
+        await page.mouse.down()
+        await page.mouse.move(cx + 200, cy, { steps: 8 })
+        const rightActive = await el.boundingBox()
+        if (!rightActive) throw new Error('no rightActive')
+        expect(rightActive.x - start.x).toBeGreaterThan(80)
+        await page.mouse.up()
+        await page.waitForTimeout(600)
+
+        const settled = await el.boundingBox()
+        if (!settled) throw new Error('no settled')
+        const settledCx = settled.x + settled.width / 2
+        const settledCy = settled.y + settled.height / 2
+        await page.mouse.move(settledCx, settledCy)
+        await page.mouse.down()
+        await page.mouse.move(settledCx - 200, settledCy, { steps: 8 })
+        const leftActive = await el.boundingBox()
+        if (!leftActive) throw new Error('no leftActive')
+        expect(leftActive.x - start.x).toBeGreaterThanOrEqual(-32)
+        expect(leftActive.x - start.x).toBeLessThanOrEqual(-28)
+        await page.mouse.up()
+    })
+
     test('elastic=0 (no overdrag) settles without visible bounce', async ({ page }) => {
         await page.goto('/tests/drag/elastic?@isPlaywright=true')
 

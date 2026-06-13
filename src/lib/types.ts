@@ -451,6 +451,15 @@ export type DragConstraints =
           bottom?: number
       }
     | HTMLElement
+export type DragElastic =
+    | boolean
+    | number
+    | {
+          top?: number
+          left?: number
+          right?: number
+          bottom?: number
+      }
 export type DragTransition = {
     bounceStiffness?: number
     bounceDamping?: number
@@ -619,7 +628,7 @@ export type MotionProps = {
     /** Constrain dragging either to pixel bounds or an HTMLElement's bounding box. */
     dragConstraints?: DragConstraints
     /** Elasticity when overdragging beyond constraints (0 = none, 1 = full). */
-    dragElastic?: number
+    dragElastic?: DragElastic
     /** Continue with momentum/inertia after release (default true). */
     dragMomentum?: boolean
     /** Configure inertia/bounce physics for momentum. */

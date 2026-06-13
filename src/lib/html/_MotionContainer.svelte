@@ -19,6 +19,7 @@
         DragAxis,
         DragConstraints,
         DragControls,
+        DragElastic,
         DragTransition,
         MotionWhileDrag,
         DragInfo,
@@ -1426,7 +1427,7 @@
         const opts = {
             axis,
             constraints: dragConstraintsProp as DragConstraints | undefined,
-            elastic: dragElasticProp as number | undefined,
+            elastic: dragElasticProp as DragElastic | undefined,
             momentum: dragMomentumProp as boolean | undefined,
             transition: dragTransitionProp as DragTransition | undefined,
             directionLock: !!dragDirectionLockProp,
