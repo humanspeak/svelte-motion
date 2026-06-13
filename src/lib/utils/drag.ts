@@ -738,15 +738,17 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
 
         const applyXAxis = axis === true || axis === 'x'
         const applyYAxis = axis === true || axis === 'y'
-        // For external dragControls we avoid snap-to-cursor to prevent teleports
-        const useSnapToCursor = snapToCursor && !opts.controls
-        if (useSnapToCursor) {
+        if (snapToCursor) {
+            const rendered = parseMatrixTranslate(getComputedStyle(el).transform)
+            const base = parseMatrixTranslate(opts.getBaseTransform?.() ?? '')
+            if (applyXAxis) applied.x = rendered.tx - base.tx
+            if (applyYAxis) applied.y = rendered.ty - base.ty
             const rect = el.getBoundingClientRect()
-            // Rebase to center under cursor while preserving accumulated transform frame
-            const desiredX = e.clientX - rect.width / 2
-            const desiredY = e.clientY - rect.height / 2
-            if (applyXAxis) origin.x = desiredX
-            if (applyYAxis) origin.y = desiredY
+            const centerX = rect.left + rect.width / 2
+            const centerY = rect.top + rect.height / 2
+            if (applyXAxis) origin.x = applied.x + e.clientX - centerX
+            if (applyYAxis) origin.y = applied.y + e.clientY - centerY
+            setXYImmediate(origin.x, origin.y)
             pwLog('[drag] snapToCursor origin', { el: EL_ID, origin })
         }
 
