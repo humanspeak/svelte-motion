@@ -1,6 +1,89 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('drag/elastic', () => {
+    const expectElasticReleaseSpringsBack = async (
+        page: import('@playwright/test').Page,
+        testId: string
+    ) => {
+        await page.goto('/tests/drag/elastic?@isPlaywright=true')
+
+        const box = page.getByTestId(testId)
+        await box.waitFor({ state: 'visible' })
+        await page.waitForSelector(`[data-testid="${testId}"][data-is-loaded="ready"]`)
+        const start = await box.boundingBox()
+        if (!start) throw new Error('no start')
+
+        const startX = start.x + start.width / 2
+        const startY = start.y + start.height / 2
+        await page.mouse.move(startX, startY)
+        await page.mouse.down()
+        for (let i = 1; i <= 8; i++) {
+            await page.mouse.move(startX + i * 35, startY, { steps: 1 })
+            await page.waitForTimeout(16)
+        }
+        await page.waitForTimeout(80)
+
+        const active = await box.boundingBox()
+        if (!active) throw new Error('no active')
+        const activeDx = active.x - start.x
+        expect(activeDx).toBeGreaterThan(60)
+
+        const releaseSamplesPromise = page.evaluate((id) => {
+            return new Promise<Array<{ t: number; x: number }>>((resolve) => {
+                const node = document.querySelector(`[data-testid="${id}"]`)
+                if (!(node instanceof HTMLElement)) {
+                    resolve([])
+                    return
+                }
+                const startedAt = performance.now()
+                const samples: Array<{ t: number; x: number }> = []
+                const tick = () => {
+                    const rect = node.getBoundingClientRect()
+                    samples.push({
+                        t: Math.round(performance.now() - startedAt),
+                        x: Math.round(rect.x * 100) / 100
+                    })
+                    if (performance.now() - startedAt < 1000) {
+                        requestAnimationFrame(tick)
+                    } else {
+                        resolve(samples)
+                    }
+                }
+                requestAnimationFrame(tick)
+            })
+        }, testId)
+        await page.mouse.up()
+        const releaseSamples = await releaseSamplesPromise
+
+        const final = await box.boundingBox()
+        if (!final) throw new Error('no final')
+        const finalDx = final.x - start.x
+        expect(finalDx).toBeGreaterThanOrEqual(28)
+        expect(finalDx).toBeLessThanOrEqual(32)
+
+        const first = releaseSamples[0]?.x
+        const second = releaseSamples[1]?.x
+        const boundaryX = start.x + 30
+        expect(first).toBeLessThanOrEqual(active.x + 1)
+        expect(second).toBeGreaterThan(boundaryX + 5)
+        expect(
+            releaseSamples.some((sample) => sample.x < active.x - 10 && sample.x > boundaryX + 5)
+        ).toBe(true)
+        expect(new Set(releaseSamples.map((sample) => Math.round(sample.x))).size).toBeGreaterThan(
+            3
+        )
+    }
+
+    test('elastic=0.5 springs back over multiple frames after overdrag release', async ({
+        page
+    }) => {
+        await expectElasticReleaseSpringsBack(page, 'elastic-05')
+    })
+
+    test('elastic=1 springs back over multiple frames after overdrag release', async ({ page }) => {
+        await expectElasticReleaseSpringsBack(page, 'elastic-1')
+    })
+
     test('elastic=0 multiple drags never exceed +30 bound', async ({ page }) => {
         await page.goto('/tests/drag/elastic?@isPlaywright=true')
 

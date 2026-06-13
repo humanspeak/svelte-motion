@@ -1070,13 +1070,20 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 applyY
             })
         } else {
-            // No momentum: animate to clamped target or origin to resolve elastic overdrag
-            const applyX = axis === true || axis === 'x'
-            const applyY = axis === true || axis === 'y'
+            // No momentum: spring from the rendered overdrag value back to
+            // the clamped target. This must use the same direct transform
+            // writer as active drag so release doesn't snap through Motion's
+            // separate DOM animation state.
+            const applyX = (axis === true || axis === 'x') && lockAxis !== 'y'
+            const applyY = (axis === true || axis === 'y') && lockAxis !== 'x'
             const dx = lastPoint.x - startPoint.x
             const dy = lastPoint.y - startPoint.y
             let x = origin.x + (applyX ? dx : 0)
             let y = origin.y + (applyY ? dy : 0)
+            let minX = -Infinity
+            let maxX = Infinity
+            let minY = -Infinity
+            let maxY = Infinity
 
             // Respect direction lock
             if (lockAxis === 'x') y = origin.y
@@ -1086,10 +1093,10 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 x = 0
                 y = 0
             } else if (constraints) {
-                const minX = constraintsBase.x + (constraints.left ?? -Infinity)
-                const maxX = constraintsBase.x + (constraints.right ?? Infinity)
-                const minY = constraintsBase.y + (constraints.top ?? -Infinity)
-                const maxY = constraintsBase.y + (constraints.bottom ?? Infinity)
+                minX = constraintsBase.x + (constraints.left ?? -Infinity)
+                maxX = constraintsBase.x + (constraints.right ?? Infinity)
+                minY = constraintsBase.y + (constraints.top ?? -Infinity)
+                maxY = constraintsBase.y + (constraints.bottom ?? Infinity)
                 pwLog('[drag] settle (no momentum) bounds', {
                     el: EL_ID,
                     base: { ...constraintsBase },
@@ -1110,23 +1117,85 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 elastic
             })
 
-            // When elastic=0, the element is already at the clamped position during drag,
-            // so use instant settle (duration: 0) to avoid spring bounce.
-            // Otherwise use the merged transition for smooth settle animation.
-            const settleTransition =
-                elastic === 0 ? { duration: 0 } : ((mergedTransition ?? {}) as AnimationOptions)
-
-            // Animate with the merged transition so the settle feels consistent with other motion
             postReleaseAnimationActive = true
-            const controls = animate(
-                el,
-                { ...(applyX ? { x } : {}), ...(applyY ? { y } : {}) } as DOMKeyframesDefinition,
-                settleTransition
-            )
-            // Cancel hook so re-grab interrupts the settle animation cleanly.
+            let latestX = applied.x
+            let latestY = applied.y
+            let running = true
+            const animations: AnimationPlaybackControlsWithThen[] = []
+            const { timeConstant, restDelta, restSpeed, bounceStiffness, bounceDamping } =
+                deriveBoundaryPhysics(elastic, opts.transition)
+
+            const renderLatest = () => {
+                if (!running) return
+                setXYImmediate(latestX, latestY)
+            }
+
+            const finishSettle = () => {
+                if (!running) return
+                if (applyX) applied.x = applyFloatConstraints(latestX, { min: minX, max: maxX })
+                if (applyY) applied.y = applyFloatConstraints(latestY, { min: minY, max: maxY })
+                setXYImmediate(applied.x, applied.y)
+                running = false
+                stopInertia = null
+                postReleaseAnimationActive = false
+                maybeStopTransformComposer()
+                opts.callbacks?.onTransitionEnd?.()
+            }
+
+            let remainingAnimations = 0
+            const completeAxis = () => {
+                remainingAnimations--
+                if (remainingAnimations <= 0) finishSettle()
+            }
+
+            const addSettleAnimation = (
+                from: number,
+                to: number,
+                min: number,
+                max: number,
+                onUpdate: (value: number) => void
+            ) => {
+                const shouldSpringBoundary = from < min || from > max
+                if (Math.abs(from - to) < 0.01 && !shouldSpringBoundary) {
+                    onUpdate(to)
+                    return
+                }
+
+                remainingAnimations++
+                animations.push(
+                    shouldSpringBoundary
+                        ? startDragInertia(
+                              {
+                                  value: from,
+                                  velocity: 0,
+                                  min,
+                                  max,
+                                  power: 0,
+                                  timeConstant,
+                                  restDelta,
+                                  restSpeed,
+                                  bounceStiffness,
+                                  bounceDamping
+                              },
+                              { onUpdate, onComplete: completeAxis }
+                          )
+                        : animateValue({
+                              keyframes: [from, to],
+                              type: 'spring',
+                              stiffness: bounceStiffness,
+                              damping: bounceDamping,
+                              restDelta,
+                              restSpeed,
+                              onUpdate,
+                              onComplete: completeAxis
+                          })
+                )
+            }
+
             stopInertia = () => {
                 pwLog('❌ settle (no momentum) cancelled')
-                ;(controls as unknown as { stop?: () => void }).stop?.()
+                running = false
+                for (const animation of animations) animation.stop()
                 const { tx, ty } = parseMatrixTranslate(getComputedStyle(el).transform)
                 if (applyX) applied.x = tx
                 if (applyY) applied.y = ty
@@ -1134,24 +1203,29 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 maybeStopTransformComposer()
                 stopInertia = null
             }
-            // Fire transition end once settled
-            Promise.resolve((controls as unknown as { finished?: Promise<void> }).finished)
-                .then(() => {
-                    // Sync internal applied transform so next drag uses the correct origin
-                    if (applyX) applied.x = x
-                    if (applyY) applied.y = y
-                    pwLog('[drag] settle finished → sync applied', {
-                        el: EL_ID,
-                        applied
+
+            if (elastic === 0) {
+                latestX = applyX ? x : applied.x
+                latestY = applyY ? y : applied.y
+                finishSettle()
+            } else {
+                if (applyX) {
+                    addSettleAnimation(applied.x, x, minX, maxX, (value) => {
+                        latestX = value
+                        renderLatest()
                     })
-                    if (stopInertia) stopInertia = null
-                })
-                .catch(() => {})
-                .finally(() => {
-                    postReleaseAnimationActive = false
-                    maybeStopTransformComposer()
-                    opts.callbacks?.onTransitionEnd?.()
-                })
+                }
+                if (applyY) {
+                    addSettleAnimation(applied.y, y, minY, maxY, (value) => {
+                        latestY = value
+                        renderLatest()
+                    })
+                }
+
+                if (!animations.length) {
+                    finishSettle()
+                }
+            }
         }
 
         opts.callbacks?.onEnd?.(e, computeInfo())
