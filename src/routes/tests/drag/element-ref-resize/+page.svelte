@@ -9,26 +9,32 @@
      */
     import { motion } from '$lib'
 
+    const originalWidth = 400
+    const resizedWidth = 200
+
     let { data }: { data: { slow: boolean } } = $props()
-    let containerWidth = $state(400)
+    let containerWidth = $state(originalWidth)
     const dragTransition = $derived(
         data.slow
             ? {
-                  bounceStiffness: 80,
-                  bounceDamping: 12,
-                  timeConstant: 900,
-                  restDelta: 0.5
+                  bounceStiffness: 26,
+                  bounceDamping: 7,
+                  timeConstant: 1600,
+                  restDelta: 0.2,
+                  restSpeed: 2
               }
             : undefined
     )
-    const shrink = () => {
-        containerWidth = 200
+    const toggleWidth = () => {
+        containerWidth = containerWidth === originalWidth ? resizedWidth : originalWidth
     }
     let containerEl: HTMLDivElement | null = $state(null)
 </script>
 
 <div style="padding: 20px;">
-    <button type="button" data-testid="shrink-btn" onclick={shrink}>Shrink to 200</button>
+    <button type="button" data-testid="resize-btn" onclick={toggleWidth}>
+        {containerWidth === originalWidth ? 'Shrink to 200' : 'Grow to 400'}
+    </button>
     <div
         bind:this={containerEl}
         data-testid="container"
