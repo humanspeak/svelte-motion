@@ -14,14 +14,17 @@
 
     let { data }: { data: { slow: boolean } } = $props()
     let containerWidth = $state(originalWidth)
+    const containerTransition = $derived(
+        data.slow ? 'width 3200ms cubic-bezier(0.16, 1, 0.3, 1)' : 'none'
+    )
     const dragTransition = $derived(
         data.slow
             ? {
-                  bounceStiffness: 8,
-                  bounceDamping: 4,
-                  timeConstant: 3200,
-                  restDelta: 0.08,
-                  restSpeed: 0.6
+                  bounceStiffness: 4,
+                  bounceDamping: 3,
+                  timeConstant: 5200,
+                  restDelta: 0.04,
+                  restSpeed: 0.3
               }
             : undefined
     )
@@ -38,7 +41,7 @@
     <div
         bind:this={containerEl}
         data-testid="container"
-        style="margin-top:16px;height:200px;width:{containerWidth}px;border:2px dashed #888;position:relative;display:grid;place-items:center;background:#0d1110;"
+        style="margin-top:16px;height:200px;width:{containerWidth}px;border:2px dashed #888;position:relative;display:grid;place-items:center;background:#0d1110;transition:{containerTransition};"
     >
         <motion.div
             drag

@@ -103,4 +103,21 @@ test.describe('drag/element-ref-resize', () => {
         expect(finalCard.left).toBeGreaterThanOrEqual(finalContainer.left - 1)
         expect(finalCard.right).toBeGreaterThan(smallContainer.right + 20)
     })
+
+    test('slow review mode animates constraint resize for visual inspection', async ({ page }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true&slow')
+
+        const transition = await page.evaluate(() => {
+            const container = document.querySelector('[data-testid="container"]')
+            if (!(container instanceof HTMLElement)) return null
+            const style = getComputedStyle(container)
+            return {
+                property: style.transitionProperty,
+                duration: style.transitionDuration
+            }
+        })
+
+        expect(transition?.property).toContain('width')
+        expect(transition?.duration).toContain('3.2s')
+    })
 })
