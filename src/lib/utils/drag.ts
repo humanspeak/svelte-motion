@@ -96,6 +96,16 @@ const getRect = (el: HTMLElement | null): Rect | null => {
 
 // const clamp = (v: number, min: number, max: number): number => Math.min(Math.max(v, min), max)
 
+const clamp = (v: number, min: number, max: number): number => Math.min(Math.max(v, min), max)
+
+const mix = (min: number, max: number, progress: number): number => min + (max - min) * progress
+
+const calcConstraintProgress = (value: number, min: number, max: number): number | null => {
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return null
+    if (max === min) return 0
+    return clamp((value - min) / (max - min), 0, 1)
+}
+
 /**
  * Resolve drag constraints into pixel offsets relative to the dragged element's origin.
  *
@@ -316,32 +326,50 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         velocity: { ...velocity }
     })
 
-    const clampAppliedToCurrentConstraints = () => {
+    const getConstraintBounds = (
+        base: { x: number; y: number },
+        currentConstraints: { top: number; left: number; right: number; bottom: number }
+    ) => ({
+        minX: base.x + (currentConstraints.left ?? -Infinity),
+        maxX: base.x + (currentConstraints.right ?? Infinity),
+        minY: base.y + (currentConstraints.top ?? -Infinity),
+        maxY: base.y + (currentConstraints.bottom ?? Infinity)
+    })
+
+    const scalePositionWithinConstraints = () => {
         if (dragging || !constraints) return
+        const isElementRefConstraint = isDomElement(opts.constraints as unknown)
+        if (!isElementRefConstraint) return
+
+        const oldBounds = getConstraintBounds(constraintsBase, constraints)
+        if (stopInertia) stopInertia()
+        const progressX = calcConstraintProgress(applied.x, oldBounds.minX, oldBounds.maxX)
+        const progressY = calcConstraintProgress(applied.y, oldBounds.minY, oldBounds.maxY)
+
         const freshConstraints = resolveConstraints(el, opts.constraints)
         if (!freshConstraints) return
 
-        const isElementRefConstraint = isDomElement(opts.constraints as unknown)
         constraints = freshConstraints
-        constraintsBase = isElementRefConstraint ? { x: applied.x, y: applied.y } : { x: 0, y: 0 }
-
+        constraintsBase = { x: applied.x, y: applied.y }
         const applyX = axis === true || axis === 'x'
         const applyY = axis === true || axis === 'y'
-        const minX = constraintsBase.x + (freshConstraints.left ?? -Infinity)
-        const maxX = constraintsBase.x + (freshConstraints.right ?? Infinity)
-        const minY = constraintsBase.y + (freshConstraints.top ?? -Infinity)
-        const maxY = constraintsBase.y + (freshConstraints.bottom ?? Infinity)
+        const { minX, maxX, minY, maxY } = getConstraintBounds(constraintsBase, freshConstraints)
         const nextX = applyX
-            ? applyFloatConstraints(applied.x, { min: minX, max: maxX })
+            ? progressX == null
+                ? applyFloatConstraints(applied.x, { min: minX, max: maxX })
+                : mix(minX, maxX, progressX)
             : applied.x
         const nextY = applyY
-            ? applyFloatConstraints(applied.y, { min: minY, max: maxY })
+            ? progressY == null
+                ? applyFloatConstraints(applied.y, { min: minY, max: maxY })
+                : mix(minY, maxY, progressY)
             : applied.y
 
         if (nextX === applied.x && nextY === applied.y) return
-        pwLog('[drag] constraints resized → clamp applied', {
+        pwLog('[drag] constraints resized → scale position', {
             el: EL_ID,
             bounds: { minX, maxX, minY, maxY },
+            progress: { x: progressX, y: progressY },
             from: { ...applied },
             to: { x: nextX, y: nextY }
         })
@@ -351,7 +379,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     const stopConstraintResizeObserver =
         isDomElement(opts.constraints as unknown) && typeof ResizeObserver !== 'undefined'
             ? (() => {
-                  const observer = new ResizeObserver(() => clampAppliedToCurrentConstraints())
+                  const observer = new ResizeObserver(() => scalePositionWithinConstraints())
+                  observer.observe(el)
                   observer.observe(opts.constraints as unknown as HTMLElement)
                   return () => observer.disconnect()
               })()

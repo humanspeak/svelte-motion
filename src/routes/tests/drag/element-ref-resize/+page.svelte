@@ -9,7 +9,18 @@
      */
     import { motion } from '$lib'
 
+    let { data }: { data: { slow: boolean } } = $props()
     let containerWidth = $state(400)
+    const dragTransition = $derived(
+        data.slow
+            ? {
+                  bounceStiffness: 80,
+                  bounceDamping: 12,
+                  timeConstant: 900,
+                  restDelta: 0.5
+              }
+            : undefined
+    )
     const shrink = () => {
         containerWidth = 200
     }
@@ -26,6 +37,7 @@
         <motion.div
             drag
             dragConstraints={containerEl}
+            {dragTransition}
             data-testid="drag-card"
             style="width:80px;height:80px;background:#fb923c;border-radius:8px;cursor:grab;user-select:none;"
         />

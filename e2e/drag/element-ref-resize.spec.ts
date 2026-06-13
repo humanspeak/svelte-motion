@@ -9,8 +9,9 @@ import { expect, test } from '@playwright/test'
  * resize the card must end up inside the new (smaller) container —
  * not at the stale 400 px boundary the stepper captured.
  *
- * The fix re-resolves the constraints on every rAF frame for element-
- * ref constraints and clamps the stepper output to the latest bounds.
+ * The fix follows upstream's ref-resize path: observe the draggable
+ * element and constraint element, stop any stale post-release animation,
+ * then remap the current position into the freshly measured constraints.
  */
 
 const readRect = (page: import('@playwright/test').Page, selector: string) =>
