@@ -6,7 +6,21 @@ import {
     type ValueAnimationOptions
 } from 'motion-dom'
 
-/** Options for one axis of a drag-release inertia animation. */
+/**
+ * Options for one axis of a drag-release inertia animation.
+ *
+ * @property value Current axis position in pixels.
+ * @property velocity Release velocity in pixels per second.
+ * @property min Optional minimum boundary in pixels.
+ * @property max Optional maximum boundary in pixels.
+ * @property power Optional inertia target multiplier.
+ * @property timeConstant Optional exponential decay time constant, in milliseconds.
+ * @property bounceStiffness Optional boundary spring stiffness.
+ * @property bounceDamping Optional boundary spring damping.
+ * @property restDelta Optional distance threshold for settling, in pixels.
+ * @property restSpeed Optional velocity threshold for settling, in pixels per second.
+ * @property modifyTarget Optional callback that adjusts the calculated inertia target.
+ */
 export type DragInertiaAxisOptions = {
     value: number
     velocity: number
@@ -22,10 +36,16 @@ export type DragInertiaAxisOptions = {
 }
 
 /**
- * Creates the upstream Motion inertia generator options for one drag axis.
+ * Creates Motion-compatible inertia animation options for one drag axis.
  *
- * @param options Initial axis state and inertia transition options.
- * @returns Motion-compatible inertia animation options.
+ * Converts {@link DragInertiaAxisOptions} into
+ * {@link ValueAnimationOptions}. The duplicated `keyframes` value seeds
+ * Motion's inertia generator from the current drag-release position while the
+ * `inertia` type calculates the target from velocity, bounds, and
+ * `modifyTarget`.
+ *
+ * @param options Initial axis state, boundary constraints, and inertia physics.
+ * @returns Motion animation options consumed by `animateValue` or `inertia`.
  */
 export const createDragInertiaOptions = (
     options: DragInertiaAxisOptions
@@ -65,6 +85,8 @@ export const createDragInertiaOptions = (
  *
  * @param options Initial axis state and inertia transition options.
  * @param handlers Animation lifecycle handlers.
+ * @param handlers.onUpdate Called repeatedly with the current axis value.
+ * @param handlers.onComplete Called once when the inertia animation settles.
  * @returns Motion animation playback controls.
  */
 export const startDragInertia = (
@@ -84,8 +106,12 @@ export const startDragInertia = (
 /**
  * Creates an upstream Motion inertia generator for deterministic sampling.
  *
+ * Use this when tests or calculations need repeatable samples from Motion's
+ * inertia generator without starting a live animation. For DOM animation,
+ * prefer {@link startDragInertia}.
+ *
  * @param options Initial axis state and inertia transition options.
- * @returns A Motion inertia keyframe generator.
+ * @returns A keyframe generator that can be sampled deterministically.
  */
 export const createDragInertiaGenerator = (
     options: DragInertiaAxisOptions

@@ -20,6 +20,7 @@
     let removeOnlyTemplate = $state(true)
     let slowAnimated = $state(false)
     let controlsSent = $state(false)
+    let styleAnimated = $state(false)
 
     const transformTemplate = (
         { x, rotate }: Record<string, string | number>,
@@ -90,8 +91,12 @@
                 x: controlsSent ? 120 : 0,
                 rotate: controlsSent ? 30 : 0
             },
-            { duration: 1.2, ease: 'linear' }
+            { duration: 2.4, ease: 'linear' }
         )
+    }
+
+    function toggleStyleAnimation() {
+        styleAnimated = !styleAnimated
     }
 
     function updateTemplate() {
@@ -247,6 +252,30 @@
                     onclick={toggleControlsAnimation}
                 >
                     {controlsSent ? 'Back' : 'Send'}
+                </button>
+            </div>
+        </article>
+
+        <article>
+            <h2>Style + animated transform</h2>
+            <motion.div
+                class="orb green"
+                data-testid="template-style-animated"
+                style={{ rotate: 8 }}
+                initial={{ x: 0 }}
+                animate={styleAnimated ? { x: 120 } : { x: 0 }}
+                transition={{ duration: 0.28, ease: 'easeOut' }}
+                {transformTemplate}
+            >
+                mixed
+            </motion.div>
+            <div class="controls">
+                <button
+                    type="button"
+                    data-testid="template-style-animated-toggle"
+                    onclick={toggleStyleAnimation}
+                >
+                    {styleAnimated ? 'Back' : 'Send'}
                 </button>
             </div>
         </article>

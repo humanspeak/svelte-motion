@@ -1024,6 +1024,16 @@
         }
     }
 
+    const getTemplatedStyleTransformValues = (): Record<string, unknown> => {
+        if (!styleProp || typeof styleProp !== 'object' || Array.isArray(styleProp)) return {}
+
+        const values: Record<string, unknown> = {}
+        for (const [key, value] of Object.entries(styleProp as Record<string, unknown>)) {
+            if (templatedTransformKeys.has(key)) values[key] = value
+        }
+        return values
+    }
+
     const animateTemplatedTransformPayload = (
         payload: Record<string, unknown>,
         transition: AnimationOptions,
@@ -1048,7 +1058,11 @@
 
         templatedTransformAnimationCleanup?.()
         templatedTransformAnimationCleanup =
-            applyMotionStyleEffect(element, motionValues, transformTemplateProp) ?? null
+            applyMotionStyleEffect(
+                element,
+                { ...getTemplatedStyleTransformValues(), ...motionValues },
+                transformTemplateProp
+            ) ?? null
 
         onStart(payload)
 
@@ -1124,7 +1138,9 @@
             string,
             unknown
         >
-        animate(element, transformedTarget as DOMKeyframesDefinition, { duration: 0 })
+        if (!transformTemplateProp) {
+            animate(element, transformedTarget as DOMKeyframesDefinition, { duration: 0 })
+        }
         element.setAttribute(
             'style',
             mergeInlineStyles(

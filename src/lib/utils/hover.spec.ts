@@ -26,7 +26,23 @@ vi.mock('motion-dom', () => {
             return hoverCleanup
         }
     )
-    return { hover: hoverMock }
+    const animateValueMock = vi.fn(
+        ({
+            keyframes,
+            onUpdate,
+            onComplete
+        }: {
+            keyframes?: unknown[]
+            onUpdate?: (value: number) => void
+            onComplete?: () => void
+        }) => {
+            const finalValue = Number(keyframes?.at(-1))
+            if (Number.isFinite(finalValue)) onUpdate?.(finalValue)
+            onComplete?.()
+            return { stop: vi.fn(), then: vi.fn() }
+        }
+    )
+    return { animateValue: animateValueMock, hover: hoverMock }
 })
 
 describe('utils/hover', () => {
@@ -147,10 +163,10 @@ describe('utils/hover', () => {
         const el = document.createElement('div')
         const cleanup = attachWhileHover(
             el,
-            { scale: 1.2, transition: { duration: 0.12 } },
+            { opacity: 0.5, transition: { duration: 0.12 } },
             { duration: 0.25 },
             undefined,
-            { initial: { scale: 1 }, animate: { scale: 1.1 } }
+            { initial: { opacity: 1 }, animate: { opacity: 0.8 } }
         )
 
         // Simulate hover start by calling the callback
@@ -161,14 +177,14 @@ describe('utils/hover', () => {
         await Promise.resolve()
         expect(animateMock).toHaveBeenCalled()
         const enterCall = animateMock.mock.calls.at(-1)
-        expect(enterCall?.[1]).toMatchObject({ scale: 1.2 })
+        expect(enterCall?.[1]).toMatchObject({ opacity: 0.5 })
         expect(enterCall?.[2]).toMatchObject({ duration: 0.12 })
 
         // Simulate hover end by calling the cleanup function
         hoverEnd!()
         await Promise.resolve()
         const leaveCall = animateMock.mock.calls.at(-1)
-        expect(leaveCall?.[1]).toMatchObject({ scale: 1.1 })
+        expect(leaveCall?.[1]).toMatchObject({ opacity: 0.8 })
         expect(leaveCall?.[2]).toMatchObject({ duration: 0.25 })
         cleanup()
     })
@@ -195,6 +211,32 @@ describe('utils/hover', () => {
 
         hoverEnd!()
         await Promise.resolve()
+        expect(onEnd).toHaveBeenCalledOnce()
+        cleanup()
+    })
+
+    it('attachWhileHover: restores hover state if drag starts before hover ends', async () => {
+        const el = document.createElement('div')
+        const onEnd = vi.fn()
+        const cleanup = attachWhileHover(
+            el,
+            { backgroundColor: 'black' },
+            { duration: 0.2 },
+            { onEnd },
+            { animate: { backgroundColor: 'white' } }
+        )
+
+        expect(hoverCallback).toBeTruthy()
+        const hoverEnd = hoverCallback!(el)
+        expect(hoverEnd).toBeTruthy()
+        await Promise.resolve()
+
+        el.dataset.svelteMotionDragActive = 'true'
+        hoverEnd!()
+        await Promise.resolve()
+
+        const leaveCall = animateMock.mock.calls.at(-1)
+        expect(leaveCall?.[1]).toMatchObject({ backgroundColor: 'white' })
         expect(onEnd).toHaveBeenCalledOnce()
         cleanup()
     })

@@ -39,6 +39,7 @@ export const splitHoverDefinition = (
 
 const readTransformScale = (el: HTMLElement): number => {
     const transform = getComputedStyle(el).transform
+    if (!transform || transform === 'none') return 1
     const matrix = transform.match(/matrix\(([^)]+)\)/)
     if (!matrix) return 1
 
@@ -54,6 +55,7 @@ const readTransformRotation = (el: HTMLElement): string | undefined => {
     if (rotateMatch) return rotateMatch[1]
 
     const computedTransform = getComputedStyle(el).transform
+    if (!computedTransform || computedTransform === 'none') return undefined
     const matrix = computedTransform.match(/matrix\(([^)]+)\)/)
     if (!matrix) return undefined
 
@@ -84,7 +86,7 @@ const toMillisecondsTransition = (
 }
 
 const writeComposedScale = (el: HTMLElement, scale: number) => {
-    const { tx, ty } = parseMatrixTranslate(getComputedStyle(el).transform)
+    const { tx, ty } = parseMatrixTranslate(getComputedStyle(el).transform || 'none')
     const rotate = readTransformRotation(el)
 
     el.style.transform = [
@@ -268,8 +270,6 @@ export const attachWhileHover = (
 
         // Return cleanup function for hover end
         return () => {
-            if (el.dataset.svelteMotionDragActive === 'true') return
-
             // Hover end: restore baseline values
             if (hoverBaseline && Object.keys(hoverBaseline).length > 0) {
                 const { scale: baselineScale, ...nativeBaseline } = hoverBaseline

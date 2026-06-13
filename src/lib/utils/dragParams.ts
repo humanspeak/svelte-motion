@@ -31,7 +31,7 @@ export type BoundaryPhysics = {
  * @returns {BoundaryPhysics} Fully resolved physics parameters for inertia and boundary spring.
  */
 export const deriveBoundaryPhysics = (
-    _elastic: number | undefined,
+    elastic: number | undefined,
     transition?: {
         bounceStiffness?: number
         bounceDamping?: number
@@ -41,7 +41,7 @@ export const deriveBoundaryPhysics = (
         restSpeed?: number
     }
 ): BoundaryPhysics => {
-    const truthyElastic = typeof _elastic === 'number' ? _elastic > 0 : !!_elastic
+    const truthyElastic = typeof elastic === 'number' ? elastic > 0 : !!elastic
 
     return {
         power: transition?.power ?? 0.8,
