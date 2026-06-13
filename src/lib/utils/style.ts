@@ -1,4 +1,11 @@
-import { isMotionValue, type MotionValue } from 'motion-dom'
+import {
+    buildHTMLStyles,
+    isMotionValue,
+    type AnyResolvedKeyframe,
+    type HTMLRenderState,
+    type TransformTemplate as MotionTransformTemplate,
+    type MotionValue
+} from 'motion-dom'
 
 /**
  * Structural MotionValue shape accepted by object-form styles.
@@ -42,65 +49,7 @@ export type MotionStyle = Record<string, MotionStyleValue>
  *     `translateY(${x}) ${generated}`
  * ```
  */
-export type TransformTemplate = (
-    transform: Record<string, string | number>,
-    generatedTransform: string
-) => string
-
-type MergeInlineStylesOptions = {
-    preserveTransformDefaults?: boolean
-}
-
-const transformPropOrder = [
-    'transformPerspective',
-    'x',
-    'y',
-    'z',
-    'translateX',
-    'translateY',
-    'translateZ',
-    'scale',
-    'scaleX',
-    'scaleY',
-    'rotate',
-    'rotateX',
-    'rotateY',
-    'rotateZ',
-    'skew',
-    'skewX',
-    'skewY'
-] as const
-
-const transformAliases: Partial<Record<(typeof transformPropOrder)[number], string>> = {
-    transformPerspective: 'perspective',
-    x: 'translateX',
-    y: 'translateY',
-    z: 'translateZ'
-}
-
-const transformProps = new Set<string>(transformPropOrder)
-
-const unitForTransform = (key: string, value: unknown): string => {
-    if (key.startsWith('scale')) return ''
-    if (typeof value !== 'number') return ''
-    if (
-        key === 'x' ||
-        key === 'y' ||
-        key === 'z' ||
-        key === 'translateX' ||
-        key === 'translateY' ||
-        key === 'translateZ' ||
-        key === 'transformPerspective'
-    ) {
-        return 'px'
-    }
-    return 'deg'
-}
-
-const isDefaultTransformValue = (key: string, value: string | number): boolean => {
-    const parsed = typeof value === 'number' ? value : Number.parseFloat(value)
-    return key.startsWith('scale') ? parsed === 1 : parsed === 0
-}
+export type TransformTemplate = MotionTransformTemplate
 
 /**
  * Merge inline CSS styles from an existing style string with a Motion initial definition.
@@ -115,7 +64,6 @@ const isDefaultTransformValue = (key: string, value: string | number): boolean =
  * @param transformTemplate Optional callback that receives the latest
  *   transform-related values and generated transform string, then returns the
  *   final CSS transform string.
- * @param options Serialization options for specialized animation setup paths.
  * @returns Inline CSS suitable for Svelte's `style` attribute.
  * @example
  * ```ts
@@ -127,8 +75,7 @@ export const mergeInlineStyles = (
     existingStyle: unknown,
     initial: Record<string, unknown> | null | undefined,
     animateFallback?: Record<string, unknown> | null | undefined,
-    transformTemplate?: TransformTemplate,
-    options: MergeInlineStylesOptions = {}
+    transformTemplate?: TransformTemplate
 ): string => {
     const base: Record<string, string> = parseStyleString(
         typeof existingStyle === 'string' ? existingStyle : ''
@@ -146,106 +93,7 @@ export const mergeInlineStyles = (
         return stringifyStyleObject(base)
     }
 
-    const transformParts: string[] = []
-    const transformValues: Record<string, string | number> = {}
-    const transformPartsByKey: Record<string, string> = {}
-    let explicitTransform: string | null = null
-
-    const setProp = (cssProp: string, value: unknown) => {
-        if (value == null) return
-        const v = Array.isArray(value) ? value[0] : value
-        if (v == null) return
-        base[cssProp] = String(v)
-    }
-
-    const setPx = (cssProp: string, value: unknown) => {
-        if (value == null) return
-        const v = Array.isArray(value) ? value[0] : value
-        if (v == null) return
-        base[cssProp] = typeof v === 'number' ? `${v}px` : String(v)
-    }
-
-    const addTransform = (key: string, value: unknown) => {
-        if (value == null) return
-        const v = Array.isArray(value) ? value[0] : value
-        if (v == null) return
-        const val = typeof v === 'number' ? `${v}${unitForTransform(key, v)}` : String(v)
-        transformValues[key] = val
-        if (options.preserveTransformDefaults || !isDefaultTransformValue(key, val)) {
-            const fn = transformAliases[key as (typeof transformPropOrder)[number]] ?? key
-            transformPartsByKey[key] = `${fn}(${val})`
-        }
-    }
-
-    for (const key of Object.keys(source)) {
-        const value = (source as Record<string, unknown>)[key]
-        if (transformProps.has(key)) {
-            addTransform(key, value)
-            continue
-        }
-
-        switch (key) {
-            case 'opacity':
-                setProp('opacity', value)
-                break
-            case 'backgroundColor':
-                setProp('background-color', value)
-                break
-            case 'borderRadius':
-                setProp('border-radius', value)
-                break
-            case 'width':
-                setPx('width', value)
-                break
-            case 'height':
-                setPx('height', value)
-                break
-            case 'transform':
-                explicitTransform = String(Array.isArray(value) ? value[0] : value)
-                setProp('transform', value)
-                break
-            case 'pointerEvents':
-                base['pointer-events'] = String(Array.isArray(value) ? value[0] : value)
-                break
-            case 'cursor':
-                setProp('cursor', value)
-                break
-            // Skip SVG path animation properties - they'll be set by animate()
-            case 'pathLength':
-            case 'pathOffset':
-            case 'pathSpacing':
-            case 'strokeDasharray':
-            case 'stroke-dasharray':
-            case 'strokeDashoffset':
-            case 'stroke-dashoffset':
-                // Don't add these to inline styles - they interfere with animation
-                break
-            default:
-                // Fallback: write raw as-is for simple CSS props
-                if (typeof value === 'string' || typeof value === 'number') {
-                    base[toKebabCase(key)] = String(value)
-                }
-                break
-        }
-    }
-
-    for (const key of transformPropOrder) {
-        const transformPart = transformPartsByKey[key]
-        if (transformPart) transformParts.push(transformPart)
-    }
-
-    const generatedTransform =
-        transformParts.length > 0 ? transformParts.join(' ') : (explicitTransform ?? '')
-    if (transformTemplate) {
-        const templatedTransform = transformTemplate(transformValues, generatedTransform)
-        if (templatedTransform) {
-            base['transform'] = templatedTransform
-        } else {
-            delete base['transform']
-        }
-    } else if (generatedTransform) {
-        base['transform'] = generatedTransform
-    }
+    mergeRenderStateIntoStyle(base, buildMotionHTMLRenderState(source, transformTemplate))
 
     return stringifyStyleObject(base)
 }
@@ -420,6 +268,68 @@ const resolveStyleValue = (value: MotionStyleValue): string | number | null | un
 
 const isMotionStyleMotionValue = (value: MotionStyleValue): value is MotionStyleMotionValue =>
     !!value && typeof value === 'object' && 'get' in value && typeof value.get === 'function'
+
+const buildMotionHTMLRenderState = (
+    source: Record<string, unknown>,
+    transformTemplate?: TransformTemplate
+): HTMLRenderState => {
+    const state: HTMLRenderState = {
+        style: {},
+        transform: {},
+        transformOrigin: {},
+        vars: {}
+    }
+
+    buildHTMLStyles(state, resolveLatestStyleValues(source), transformTemplate)
+    return state
+}
+
+const resolveLatestStyleValues = (
+    source: Record<string, unknown>
+): Record<string, AnyResolvedKeyframe> => {
+    const latestValues: Record<string, AnyResolvedKeyframe> = {}
+
+    for (const [key, value] of Object.entries(source)) {
+        const latest = Array.isArray(value) ? value[0] : value
+        if (
+            latest == null ||
+            shouldSkipInlineStyleKey(key) ||
+            (typeof latest !== 'string' && typeof latest !== 'number')
+        ) {
+            continue
+        }
+        latestValues[key] = latest
+    }
+
+    return latestValues
+}
+
+const shouldSkipInlineStyleKey = (key: string): boolean =>
+    key === 'pathLength' ||
+    key === 'pathOffset' ||
+    key === 'pathSpacing' ||
+    key === 'strokeDasharray' ||
+    key === 'stroke-dasharray' ||
+    key === 'strokeDashoffset' ||
+    key === 'stroke-dashoffset'
+
+const mergeRenderStateIntoStyle = (base: Record<string, string>, state: HTMLRenderState) => {
+    for (const [key, value] of Object.entries(state.style)) {
+        if (value == null) continue
+        const cssKey = toKebabCase(key)
+        const cssValue = String(value)
+        if (cssKey === 'transform' && !cssValue) {
+            delete base.transform
+            continue
+        }
+        base[cssKey] = cssValue
+    }
+
+    for (const [key, value] of Object.entries(state.vars)) {
+        if (value == null) continue
+        base[key] = String(value)
+    }
+}
 
 const parseStyleString = (style: string): Record<string, string> => {
     const out: Record<string, string> = {}
