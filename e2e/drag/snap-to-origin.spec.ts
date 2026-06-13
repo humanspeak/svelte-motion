@@ -1,6 +1,36 @@
 import { expect, test } from '@playwright/test'
 
+import { readTranslate } from '../_helpers/transform'
+
 test.describe('drag/snap-to-origin', () => {
+    test('release animates back to origin instead of snapping instantly', async ({ page }) => {
+        await page.goto('/tests/drag/snap-to-origin?@isPlaywright=true')
+
+        const box = page.getByTestId('snap-origin-box')
+        await box.waitFor({ state: 'visible' })
+        const start = await box.boundingBox()
+        if (!start) throw new Error('no start')
+
+        const cx = start.x + start.width / 2
+        const cy = start.y + start.height / 2
+
+        await page.mouse.move(cx, cy)
+        await page.mouse.down()
+        await page.mouse.move(cx + 120, cy + 60, { steps: 8 })
+        const released = await readTranslate(page, '[data-testid="snap-origin-box"]')
+        await page.mouse.up()
+
+        await page.waitForTimeout(80)
+        const mid = await readTranslate(page, '[data-testid="snap-origin-box"]')
+
+        expect(released.tx).toBeGreaterThan(20)
+        expect(released.ty).toBeGreaterThan(8)
+        expect(mid.tx).toBeGreaterThan(4)
+        expect(mid.ty).toBeGreaterThan(2)
+        expect(mid.tx).toBeLessThan(released.tx - 2)
+        expect(mid.ty).toBeLessThan(released.ty - 1)
+    })
+
     test('releases back to origin after drag', async ({ page }) => {
         await page.goto('/tests/drag/snap-to-origin?@isPlaywright=true')
 
@@ -17,8 +47,8 @@ test.describe('drag/snap-to-origin', () => {
         })
         await page.mouse.up()
 
-        // Wait for snap-to-origin settle
-        await page.waitForTimeout(500)
+        // Wait for the upstream inertia-style snap-to-origin settle.
+        await page.waitForTimeout(1200)
         const after = await box.boundingBox()
         if (!after) throw new Error('no after')
 

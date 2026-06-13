@@ -876,52 +876,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 historyFirst: history[0],
                 historyLast: history[history.length - 1]
             })
-            // If snapToOrigin, skip inertia and spring: use settle path to 0 for consistency
-            if (opts.snapToOrigin) {
-                pwLog('↩️ snapToOrigin: settle to (0,0)')
-                postReleaseAnimationActive = true
-                const applyX = axis === true || axis === 'x'
-                const applyY = axis === true || axis === 'y'
-                const controls = animate(
-                    el,
-                    {
-                        ...(applyX ? { x: 0 } : {}),
-                        ...(applyY ? { y: 0 } : {})
-                    } as DOMKeyframesDefinition,
-                    (mergedTransition ?? {}) as AnimationOptions
-                )
-                // Cancel hook so re-grab / controls.stop() interrupts the snap.
-                stopInertia = () => {
-                    pwLog('❌ snapToOrigin cancelled')
-                    ;(controls as unknown as { stop?: () => void }).stop?.()
-                    // Sync applied to wherever the snap reached so the next drag origin is correct.
-                    const { tx, ty } = parseMatrixTranslate(getComputedStyle(el).transform)
-                    if (applyX) applied.x = tx
-                    if (applyY) applied.y = ty
-                    postReleaseAnimationActive = false
-                    maybeStopTransformComposer()
-                    stopInertia = null
-                }
-                Promise.resolve((controls as unknown as { finished?: Promise<void> }).finished)
-                    .then(() => {
-                        // Sync internal applied transform so next drag uses the correct origin
-                        if (applyX) applied.x = 0
-                        if (applyY) applied.y = 0
-                        pwLog('[drag] snapToOrigin finished → sync applied', {
-                            el: EL_ID,
-                            applied
-                        })
-                        if (stopInertia) stopInertia = null
-                    })
-                    .catch(() => {})
-                    .finally(() => {
-                        postReleaseAnimationActive = false
-                        maybeStopTransformComposer()
-                        opts.callbacks?.onTransitionEnd?.()
-                    })
-                return
-            }
-
             // Boundary min/max anchor to `constraintsBase` (the absolute
             // pixel-constraint origin) so the inertia handoff snaps to the
             // same edge pointermove's elastic clamping uses — not to a
@@ -970,10 +924,22 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             let remainingAnimations = (applyX ? 1 : 0) + (applyY ? 1 : 0)
             const transitionMin = opts.transition?.min
             const transitionMax = opts.transition?.max
-            const inertiaMinX = transitionMin ?? (noConstraints ? undefined : minX)
-            const inertiaMaxX = transitionMax ?? (noConstraints ? undefined : maxX)
-            const inertiaMinY = transitionMin ?? (noConstraints ? undefined : minY)
-            const inertiaMaxY = transitionMax ?? (noConstraints ? undefined : maxY)
+            const inertiaMinX = opts.snapToOrigin
+                ? 0
+                : (transitionMin ?? (noConstraints ? undefined : minX))
+            const inertiaMaxX = opts.snapToOrigin
+                ? 0
+                : (transitionMax ?? (noConstraints ? undefined : maxX))
+            const inertiaMinY = opts.snapToOrigin
+                ? 0
+                : (transitionMin ?? (noConstraints ? undefined : minY))
+            const inertiaMaxY = opts.snapToOrigin
+                ? 0
+                : (transitionMax ?? (noConstraints ? undefined : maxY))
+            const finalMinX = opts.snapToOrigin ? 0 : minX
+            const finalMaxX = opts.snapToOrigin ? 0 : maxX
+            const finalMinY = opts.snapToOrigin ? 0 : minY
+            const finalMaxY = opts.snapToOrigin ? 0 : maxY
 
             const renderLatest = () => {
                 if (!running) return
@@ -995,8 +961,10 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 remainingAnimations--
                 if (remainingAnimations > 0) return
 
-                if (applyX) applied.x = applyFloatConstraints(latestX, { min: minX, max: maxX })
-                if (applyY) applied.y = applyFloatConstraints(latestY, { min: minY, max: maxY })
+                if (applyX)
+                    applied.x = applyFloatConstraints(latestX, { min: finalMinX, max: finalMaxX })
+                if (applyY)
+                    applied.y = applyFloatConstraints(latestY, { min: finalMinY, max: finalMaxY })
                 setXYImmediate(applied.x, applied.y)
 
                 pwLog('✅ REST REACHED', {
