@@ -14,7 +14,7 @@ import { pwLog } from '$lib/utils/log'
  * It intentionally avoids Svelte-specific APIs so it can be reused in action-like contexts.
  *
  * Troubleshooting tips when drag "doesn't move":
- * - Ensure we are writing transforms via `animate(el, { x, y }, { duration: 0 })`.
+ * - Ensure we are writing transforms via the synchronous drag transform writer.
  *   If computed style shows `transform: none`, another CSS rule may be overwriting the transform.
  * - Confirm `axis` allows the intended direction (true | 'x' | 'y').
  * - If using constraints as HTMLElement, verify both element and constraint refs are non-null and connected.
@@ -231,21 +231,30 @@ const computeReleaseVelocity = (
     nowMs: number
 ): { x: number; y: number } => {
     if (history.length < 2) return { x: 0, y: 0 }
-    const newest = history[history.length - 1]
-    if (nowMs - newest.t > MAX_VELOCITY_DELTA_MS) return { x: 0, y: 0 }
-    let oldestIdx = history.length - 1
-    for (let i = history.length - 2; i >= 0; i--) {
-        if (newest.t - history[i].t > MAX_VELOCITY_DELTA_MS) break
-        oldestIdx = i
+
+    for (let newestIdx = history.length - 1; newestIdx > 0; newestIdx--) {
+        const newest = history[newestIdx]
+        if (nowMs - newest.t > MAX_VELOCITY_DELTA_MS) return { x: 0, y: 0 }
+
+        let oldestIdx = newestIdx
+        for (let i = newestIdx - 1; i >= 0; i--) {
+            if (newest.t - history[i].t > MAX_VELOCITY_DELTA_MS) break
+            oldestIdx = i
+        }
+
+        if (oldestIdx === newestIdx) continue
+
+        const oldest = history[oldestIdx]
+        const dtMs = newest.t - oldest.t
+        if (dtMs < MIN_VELOCITY_INTERVAL_MS) continue
+
+        return {
+            x: ((newest.x - oldest.x) / dtMs) * 1000,
+            y: ((newest.y - oldest.y) / dtMs) * 1000
+        }
     }
-    if (oldestIdx === history.length - 1) return { x: 0, y: 0 }
-    const oldest = history[oldestIdx]
-    const dtMs = newest.t - oldest.t
-    if (dtMs < MIN_VELOCITY_INTERVAL_MS) return { x: 0, y: 0 }
-    return {
-        x: ((newest.x - oldest.x) / dtMs) * 1000,
-        y: ((newest.y - oldest.y) / dtMs) * 1000
-    }
+
+    return { x: 0, y: 0 }
 }
 
 /**
@@ -457,8 +466,16 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 ? `scale(${managedScale})`
                 : ''
         const liveTransform = [...parts, scalePart].filter(Boolean).join(' ')
-        const baseTransform = opts.getBaseTransform?.() ?? ''
-        el.style.transform = [liveTransform, baseTransform].filter(Boolean).join(' ')
+        el.dataset.svelteMotionDragTransform = liveTransform
+        const writeComposedTransform = () => {
+            if (el.dataset.svelteMotionDragTransform !== liveTransform) return
+            const baseTransform = opts.getBaseTransform?.() ?? ''
+            el.style.transform = [liveTransform, baseTransform].filter(Boolean).join(' ')
+        }
+
+        writeComposedTransform()
+        queueMicrotask(writeComposedTransform)
+        requestAnimationFrame(writeComposedTransform)
         if (axis === true || axis === 'x') applied.x = x
         if (axis === true || axis === 'y') applied.y = y
         opts.callbacks?.onVisualUpdate?.(liveTransform)
@@ -491,7 +508,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             if (dragging || postReleaseAnimationActive || whileDragRestoreActive) return
             setXYImmediate(applied.x, applied.y)
             markDragTransformActive(false)
-            stopTransformComposer()
         })
     }
 
@@ -735,6 +751,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         lastPoint = { ...startPoint }
         velocity = { x: 0, y: 0 }
         history = [{ x: e.clientX, y: e.clientY, t: now() }]
+        startTransformComposer()
 
         const applyXAxis = axis === true || axis === 'x'
         const applyYAxis = axis === true || axis === 'y'
@@ -1167,6 +1184,16 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             const renderLatest = () => {
                 if (!running) return
                 setXYImmediate(latestX, latestY)
+            }
+
+            if (cancelled) {
+                if (applyX) latestX = x
+                if (applyY) latestY = y
+                setXYImmediate(latestX, latestY)
+                postReleaseAnimationActive = false
+                maybeStopTransformComposer()
+                opts.callbacks?.onTransitionEnd?.()
+                return
             }
 
             const finishSettle = () => {

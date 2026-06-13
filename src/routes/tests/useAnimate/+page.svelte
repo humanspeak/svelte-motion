@@ -1,10 +1,12 @@
 <script lang="ts">
     import { stagger, useAnimate } from '$lib'
+    import { onMount, tick } from 'svelte'
 
     const [scope, animate] = useAnimate()
 
     let status: 'idle' | 'running' | 'done' = $state('idle')
     let runToken = 0
+    let hydrated = $state(false)
 
     const run = async () => {
         const token = ++runToken
@@ -28,6 +30,12 @@
         animate('button.target', { scale: 1 }, { duration: 0 })
         status = 'idle'
     }
+
+    onMount(async () => {
+        await tick()
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+        hydrated = true
+    })
 </script>
 
 <svelte:head>
@@ -52,7 +60,7 @@
         <span class="status" data-testid="status">{status}</span>
     </section>
 
-    <div {@attach scope} class="stage" data-testid="stage">
+    <div {@attach scope} class="stage" data-testid="stage" data-hydrated={hydrated}>
         <ul data-testid="list">
             <li data-testid="item-1">Item one</li>
             <li data-testid="item-2">Item two</li>

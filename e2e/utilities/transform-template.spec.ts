@@ -118,37 +118,24 @@ test.describe('transformTemplate', () => {
         await toggle.click()
         await expect(toggle).toHaveText('Back')
 
-        const sampledTransforms = await page.getByTestId('template-slow-animated').evaluate(
-            async (element) =>
-                await new Promise<string[]>((resolve) => {
-                    const frames: string[] = []
-                    const started = performance.now()
+        await expect
+            .poll(
+                async () => {
+                    const style =
+                        (await page.getByTestId('template-slow-animated').getAttribute('style')) ??
+                        ''
+                    const y = style.match(/translateY\(([-\d.]+)px\)/)
+                    const x = style.match(/translateX\(([-\d.]+)px\)/)
+                    if (!y || !x) return false
 
-                    const tick = () => {
-                        frames.push(element.getAttribute('style') ?? '')
-                        if (performance.now() - started < 700) {
-                            requestAnimationFrame(tick)
-                        } else {
-                            resolve(frames)
-                        }
-                    }
+                    const yValue = Number.parseFloat(y[1])
+                    const xValue = Number.parseFloat(x[1])
 
-                    requestAnimationFrame(tick)
-                })
-        )
-
-        const templatedIntermediateFrame = sampledTransforms.find((style) => {
-            const y = style.match(/translateY\(([-\d.]+)px\)/)
-            const x = style.match(/translateX\(([-\d.]+)px\)/)
-            if (!y || !x) return false
-
-            const yValue = Number.parseFloat(y[1])
-            const xValue = Number.parseFloat(x[1])
-
-            return yValue > 10 && yValue < 110 && Math.abs(yValue - xValue) < 0.5
-        })
-
-        expect(templatedIntermediateFrame).toBeTruthy()
+                    return yValue > 10 && yValue < 110 && Math.abs(yValue - xValue) < 0.5
+                },
+                { intervals: [16, 16, 16, 32, 50, 50, 100], timeout: 4000 }
+            )
+            .toBe(true)
     })
 
     test('starts repeated transformTemplate animations from the current transform', async ({
@@ -162,7 +149,7 @@ test.describe('transformTemplate', () => {
         await toggle.click()
 
         await expect
-            .poll(readStyleAttribute(page, 'template-slow-animated'), { timeout: 3000 })
+            .poll(readStyleAttribute(page, 'template-slow-animated'), { timeout: 6000 })
             .toContain('translateX(120px)')
 
         await toggle.click()

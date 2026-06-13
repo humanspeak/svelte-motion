@@ -81,7 +81,12 @@ export const mergeInlineStyles = (
         typeof existingStyle === 'string' ? existingStyle : ''
     )
 
-    const source = initial && Object.keys(initial).length > 0 ? initial : (animateFallback ?? null)
+    const source =
+        initial && Object.keys(initial).length > 0
+            ? initial
+            : animateFallback && Object.keys(animateFallback).length > 0
+              ? animateFallback
+              : null
     if (!source) {
         if (transformTemplate && !base.transform) {
             const templatedTransform = transformTemplate({}, '')

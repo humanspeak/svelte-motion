@@ -287,7 +287,7 @@
             const property = trimmed.slice(0, separator).trim()
             const value = trimmed.slice(separator + 1).trim()
             if (property === 'transform') {
-                transform = value
+                transform = value === 'none' ? '' : value
             } else {
                 rest.push(trimmed)
             }
@@ -1327,6 +1327,45 @@
     const waitEnterBlockedBeforeMount = $derived(
         context?.mode === 'wait' && !waitEnterReleased && context.isEnterBlocked(presenceKey)
     )
+    const renderedInlineStyle = $derived.by(() =>
+        mergeInlineStyles(
+            `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleWithLiveGestureTransform};visibility:hidden` : serializedStyleWithLiveGestureTransform}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`,
+            // The "from" slot: apply initialKeyframes as inline styles during
+            // the mounting/initial phases (before the WAAPI animation locks
+            // its from-value and we promote to 'ready' — see the lifecycle
+            // around the enter rAF). mergeInlineStyles prefers this slot when
+            // non-empty, so it wins over the animate slot below in these phases.
+            isLoaded === 'mounting' || isLoaded === 'initial'
+                ? (initialKeyframes as unknown as Record<string, unknown>)
+                : undefined,
+            // The "target" slot. Only AFTER the enter animation completes does
+            // the target become the inline baseline, so the element holds it
+            // once WAAPI surrenders the property (default fill:'none' would
+            // otherwise leave transform:none). It must NOT be applied during
+            // the run: flipping the inline value to the target mid-animation
+            // shows the target for the one frame the inline changes (a visible
+            // snap), since WAAPI's composite doesn't override that exact frame.
+            // While the animation runs we keep the original behavior — initial
+            // keyframes own the inline (via the slot above), or, with no
+            // initial, the animate values seed the inline as the from. Resting
+            // values collapse keyframe arrays to their last element
+            // (animate={{x:[0,100,50]}} rests at 50). (#377)
+            enterAnimationSettled
+                ? (resolveRestingValues(
+                      animateKeyframes as DOMKeyframesDefinition | undefined
+                  ) as unknown as Record<string, unknown>)
+                : animateControls &&
+                    !animationControlsHasReceivedCommand &&
+                    isNotEmpty(initialKeyframes)
+                  ? (initialKeyframes as unknown as Record<string, unknown>)
+                  : isNotEmpty(initialKeyframes)
+                    ? !effectiveAnimate
+                        ? (initialKeyframes as unknown as Record<string, unknown>)
+                        : undefined
+                    : (animateKeyframes as unknown as Record<string, unknown>),
+            transformTemplateProp
+        )
+    )
 
     // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
     const derivedAttrs = $derived<Record<string, unknown>>({
@@ -1373,43 +1412,7 @@
             }
             return {}
         })(),
-        style: mergeInlineStyles(
-            `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleWithLiveGestureTransform};visibility:hidden` : serializedStyleWithLiveGestureTransform}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`,
-            // The "from" slot: apply initialKeyframes as inline styles during
-            // the mounting/initial phases (before the WAAPI animation locks
-            // its from-value and we promote to 'ready' — see the lifecycle
-            // around the enter rAF). mergeInlineStyles prefers this slot when
-            // non-empty, so it wins over the animate slot below in these phases.
-            isLoaded === 'mounting' || isLoaded === 'initial'
-                ? (initialKeyframes as unknown as Record<string, unknown>)
-                : undefined,
-            // The "target" slot. Only AFTER the enter animation completes does
-            // the target become the inline baseline, so the element holds it
-            // once WAAPI surrenders the property (default fill:'none' would
-            // otherwise leave transform:none). It must NOT be applied during
-            // the run: flipping the inline value to the target mid-animation
-            // shows the target for the one frame the inline changes (a visible
-            // snap), since WAAPI's composite doesn't override that exact frame.
-            // While the animation runs we keep the original behavior — initial
-            // keyframes own the inline (via the slot above), or, with no
-            // initial, the animate values seed the inline as the from. Resting
-            // values collapse keyframe arrays to their last element
-            // (animate={{x:[0,100,50]}} rests at 50). (#377)
-            enterAnimationSettled
-                ? (resolveRestingValues(
-                      animateKeyframes as DOMKeyframesDefinition | undefined
-                  ) as unknown as Record<string, unknown>)
-                : animateControls &&
-                    !animationControlsHasReceivedCommand &&
-                    isNotEmpty(initialKeyframes)
-                  ? (initialKeyframes as unknown as Record<string, unknown>)
-                  : isNotEmpty(initialKeyframes)
-                    ? !effectiveAnimate
-                        ? (initialKeyframes as unknown as Record<string, unknown>)
-                        : undefined
-                    : (animateKeyframes as unknown as Record<string, unknown>),
-            transformTemplateProp
-        ),
+        style: renderedInlineStyle,
         class: classProp
     })
 
@@ -1440,6 +1443,14 @@
         if (dragConstraintsProp === null) return
 
         const controls = dragControlsProp as DragControls | undefined
+        const dragRuntimeOptions = untrack(() => ({
+            whileDrag: resolvedWhileDrag as MotionWhileDrag,
+            mergedTransition: (mergedTransition ?? {}) as AnimationOptions,
+            baselineSources: {
+                initial: (initialKeyframes ?? {}) as Record<string, unknown>,
+                animate: (resolvedAnimate ?? {}) as Record<string, unknown>
+            }
+        }))
         const opts = {
             axis,
             constraints: dragConstraintsProp as DragConstraints | undefined,
@@ -1449,8 +1460,8 @@
             directionLock: !!dragDirectionLockProp,
             listener: dragListenerProp !== false,
             controls,
-            whileDrag: resolvedWhileDrag as MotionWhileDrag,
-            mergedTransition: (mergedTransition ?? {}) as AnimationOptions,
+            whileDrag: dragRuntimeOptions.whileDrag,
+            mergedTransition: dragRuntimeOptions.mergedTransition,
             callbacks: {
                 onStart: onDragStartProp as (e: PointerEvent, info: DragInfo) => void,
                 onMove: onDragProp as (e: PointerEvent, info: DragInfo) => void,
@@ -1463,10 +1474,7 @@
                     liveGestureTransform = transform || null
                 }
             },
-            baselineSources: {
-                initial: (initialKeyframes ?? {}) as Record<string, unknown>,
-                animate: (resolvedAnimate ?? {}) as Record<string, unknown>
-            },
+            baselineSources: dragRuntimeOptions.baselineSources,
             getBaseTransform: () => splitSerializedTransform(serializedStyleProp).transform,
             propagation: !!dragPropagationProp,
             snapToOrigin: dragSnapToOriginProp as boolean | 'x' | 'y' | undefined

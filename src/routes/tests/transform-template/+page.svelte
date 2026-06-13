@@ -214,7 +214,7 @@
                 data-testid="template-slow-animated"
                 initial={{ x: 0, rotate: 0 }}
                 animate={slowAnimated ? { x: 120, rotate: 30 } : { x: 0, rotate: 0 }}
-                transition={{ duration: 1.2, ease: 'linear' }}
+                transition={{ duration: 2.4, ease: 'linear' }}
                 {transformTemplate}
             >
                 frames

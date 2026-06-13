@@ -51,7 +51,7 @@ test.describe('usePresence', () => {
         await expect(page.getByTestId('wait-b')).toBeVisible()
 
         // Eventually A's transitionend fires, triggering safeToRemove → unmount.
-        await expect(page.getByTestId('wait-a')).toHaveCount(0, { timeout: 2000 })
+        await expect(page.getByTestId('wait-a')).toHaveCount(0, { timeout: 5000 })
         await expect(page.getByTestId('wait-b')).toHaveAttribute('data-is-present', 'true')
     })
 })

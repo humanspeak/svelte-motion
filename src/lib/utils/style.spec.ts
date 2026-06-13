@@ -15,6 +15,12 @@ describe('mergeInlineStyles', () => {
         expect(out).toContain('width: 10px')
     })
 
+    it('preserves existing transform when animate fallback is empty', () => {
+        const out = mergeInlineStyles('transform: translateX(64px) rotate(12deg)', null, {})
+
+        expect(out).toContain('transform: translateX(64px) rotate(12deg)')
+    })
+
     it('merges initial scalar props into style (opacity, backgroundColor, borderRadius)', () => {
         const out = mergeInlineStyles(
             '',
