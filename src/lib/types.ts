@@ -628,8 +628,8 @@ export type MotionProps = {
     dragDirectionLock?: boolean
     /** Allow bubbling to parent drags. If false, uses a shared lock to prevent nesting. */
     dragPropagation?: boolean
-    /** On release, animate back to origin (0). */
-    dragSnapToOrigin?: boolean
+    /** On release, animate back to origin (0) on both axes, or only the specified axis. */
+    dragSnapToOrigin?: boolean | 'x' | 'y'
     /** Enable the default drag listener; set false to use dragControls only. */
     dragListener?: boolean
     /** Pass controls to start drag imperatively from another element. */

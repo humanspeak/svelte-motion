@@ -75,7 +75,7 @@ export type AttachDragOptions = {
     baselineSources?: { initial?: Record<string, unknown>; animate?: Record<string, unknown> }
     getBaseTransform?: () => string
     propagation?: boolean
-    snapToOrigin?: boolean
+    snapToOrigin?: boolean | 'x' | 'y'
 }
 
 /**
@@ -924,22 +924,16 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             let remainingAnimations = (applyX ? 1 : 0) + (applyY ? 1 : 0)
             const transitionMin = opts.transition?.min
             const transitionMax = opts.transition?.max
-            const inertiaMinX = opts.snapToOrigin
-                ? 0
-                : (transitionMin ?? (noConstraints ? undefined : minX))
-            const inertiaMaxX = opts.snapToOrigin
-                ? 0
-                : (transitionMax ?? (noConstraints ? undefined : maxX))
-            const inertiaMinY = opts.snapToOrigin
-                ? 0
-                : (transitionMin ?? (noConstraints ? undefined : minY))
-            const inertiaMaxY = opts.snapToOrigin
-                ? 0
-                : (transitionMax ?? (noConstraints ? undefined : maxY))
-            const finalMinX = opts.snapToOrigin ? 0 : minX
-            const finalMaxX = opts.snapToOrigin ? 0 : maxX
-            const finalMinY = opts.snapToOrigin ? 0 : minY
-            const finalMaxY = opts.snapToOrigin ? 0 : maxY
+            const snapX = opts.snapToOrigin === true || opts.snapToOrigin === 'x'
+            const snapY = opts.snapToOrigin === true || opts.snapToOrigin === 'y'
+            const inertiaMinX = snapX ? 0 : (transitionMin ?? (noConstraints ? undefined : minX))
+            const inertiaMaxX = snapX ? 0 : (transitionMax ?? (noConstraints ? undefined : maxX))
+            const inertiaMinY = snapY ? 0 : (transitionMin ?? (noConstraints ? undefined : minY))
+            const inertiaMaxY = snapY ? 0 : (transitionMax ?? (noConstraints ? undefined : maxY))
+            const finalMinX = snapX ? 0 : minX
+            const finalMaxX = snapX ? 0 : maxX
+            const finalMinY = snapY ? 0 : minY
+            const finalMaxY = snapY ? 0 : maxY
 
             const renderLatest = () => {
                 if (!running) return
@@ -1087,8 +1081,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             if (lockAxis === 'y') x = origin.x
 
             if (opts.snapToOrigin) {
-                x = 0
-                y = 0
+                if (opts.snapToOrigin === true || opts.snapToOrigin === 'x') x = 0
+                if (opts.snapToOrigin === true || opts.snapToOrigin === 'y') y = 0
             } else if (constraints) {
                 minX = constraintsBase.x + (constraints.left ?? -Infinity)
                 maxX = constraintsBase.x + (constraints.right ?? Infinity)

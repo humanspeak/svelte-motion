@@ -1452,7 +1452,7 @@
             },
             getBaseTransform: () => splitSerializedTransform(serializedStyleProp).transform,
             propagation: !!dragPropagationProp,
-            snapToOrigin: !!dragSnapToOriginProp
+            snapToOrigin: dragSnapToOriginProp as boolean | 'x' | 'y' | undefined
         }
 
         // Attach and hold teardown so we can re-attach if props change
