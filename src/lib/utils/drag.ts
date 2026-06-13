@@ -263,7 +263,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     const axis = opts.axis
     const directionLock = !!opts.directionLock
     const listenerEnabled = opts.listener !== false
-    const elastic = typeof opts.elastic === 'number' ? opts.elastic : 0.5
+    const elastic = typeof opts.elastic === 'number' ? opts.elastic : 0.35
     const momentum = opts.momentum !== false
     const mergedTransition = (opts.mergedTransition ?? {}) as AnimationOptions
 

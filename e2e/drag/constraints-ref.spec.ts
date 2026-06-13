@@ -19,7 +19,7 @@ test.describe('drag/constraints-ref', () => {
         await page.mouse.move(startX, startY)
         await page.mouse.down()
 
-        // Framer's default dragElastic is 0.5: the element can be pulled
+        // Framer's default dragElastic is 0.35: the element can be pulled
         // outside the referenced constraints while the pointer is held.
         for (let i = 1; i <= 10; i++) {
             await page.mouse.move(startX - i * 32, startY, { steps: 1 })
