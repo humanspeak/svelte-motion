@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Snippet } from 'svelte'
+    import { onDestroy, type Snippet } from 'svelte'
     import {
         getAnimatePresenceContext,
         getPresenceDepth,
@@ -37,14 +37,15 @@
         setPresenceDepth(presenceDepth + 1)
     }
 
-    // Three-phase exit lifecycle:
-    //   'idle'      — no exit in progress; render iff `present`.
-    //   'holding'   — `present` flipped false; we're still rendering with
-    //                 isPresent=false, waiting for the consumer to call
-    //                 safeToRemove.
-    //   'completed' — consumer signaled completion. Stop rendering. Returning
-    //                 to 'idle' only happens if `present` flips back to true.
-    type ExitPhase = 'idle' | 'holding' | 'completed'
+    // Four-phase lifecycle:
+    //   'idle'          — no exit in progress; render iff `present`.
+    //   'holding'       — `present` flipped false; we're still rendering with
+    //                     isPresent=false, waiting for the consumer to call
+    //                     safeToRemove.
+    //   'completed'     — consumer signaled completion. Stop rendering.
+    //   'enter-blocked' — mode='wait' is holding this child out of the tree
+    //                     until all sibling exits complete.
+    type ExitPhase = 'idle' | 'holding' | 'completed' | 'enter-blocked'
     let phase = $state<ExitPhase>('idle')
     // Track the prior `present` value so we only start an exit on a true→false
     // transition, not when mounted with `present=false` (a no-op steady state).
@@ -57,8 +58,51 @@
     // captured-then-late-fired callback (setTimeout, external lib, stray
     // listener after cleanup) from cycle A cannot complete cycle B.
     let currentSafeToRemove: () => void = noopSafeToRemove
+    let waitEnterVersion = 0
+    let unsubscribeEnterUnblocked: (() => void) | null = null
 
     function noopSafeToRemove() {}
+
+    function cancelWaitEnterBlock(): void {
+        waitEnterVersion += 1
+        unsubscribeEnterUnblocked?.()
+        unsubscribeEnterUnblocked = null
+    }
+
+    function releaseWaitEnterBlock(version: number): void {
+        if (waitEnterVersion !== version || !present || phase !== 'enter-blocked') return
+        unsubscribeEnterUnblocked?.()
+        unsubscribeEnterUnblocked = null
+        phase = 'idle'
+    }
+
+    function scheduleWaitEnterProbe(callback: () => void): void {
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(callback)
+            return
+        }
+
+        setTimeout(callback, 0)
+    }
+
+    function beginWaitEnterBlock(): void {
+        cancelWaitEnterBlock()
+        phase = 'enter-blocked'
+
+        const version = waitEnterVersion
+        scheduleWaitEnterProbe(() => {
+            if (waitEnterVersion !== version || !present || phase !== 'enter-blocked') return
+
+            if (animatePresence?.isEnterBlocked()) {
+                unsubscribeEnterUnblocked = animatePresence.onEnterUnblocked(() => {
+                    releaseWaitEnterBlock(version)
+                })
+                return
+            }
+
+            releaseWaitEnterBlock(version)
+        })
+    }
 
     function mintSafeToRemove(): () => void {
         // Closure compares against its own identity (`self`) to detect
@@ -105,7 +149,12 @@
             prevPresent = current
             return
         }
-        if (prevPresent && !current && currentPhase === 'idle') {
+        if (prevPresent && !current && currentPhase === 'enter-blocked') {
+            cancelWaitEnterBlock()
+            phase = 'idle'
+            currentSafeToRemove = noopSafeToRemove
+        } else if (prevPresent && !current && currentPhase === 'idle') {
+            cancelWaitEnterBlock()
             phase = 'holding'
             currentSafeToRemove = mintSafeToRemove()
             animatePresence?.notifyExitStart()
@@ -113,17 +162,37 @@
             // Re-entry mid-hold cancels the exit accounting. Replacing the
             // slot invalidates the cycle's `safeToRemove` for any consumer
             // that captured it.
+            cancelWaitEnterBlock()
             phase = 'idle'
             currentSafeToRemove = noopSafeToRemove
             animatePresence?.notifyExitComplete()
-        } else if (!prevPresent && current && currentPhase === 'completed') {
-            // Re-mounted after a previous exit fully completed.
+        } else if (
+            !prevPresent &&
+            current &&
+            (currentPhase === 'completed' || currentPhase === 'idle')
+        ) {
+            // Re-mounted after a previous exit fully completed, or entering
+            // from a steady false state. In wait mode, hold the enter for one
+            // frame so sibling PresenceChild exits that start later in the
+            // same update can raise the shared exit block first.
+            if (animatePresence?.mode === 'wait') {
+                beginWaitEnterBlock()
+            } else {
+                phase = 'idle'
+            }
+        } else if (!current) {
+            cancelWaitEnterBlock()
+        } else if (currentPhase === 'enter-blocked' && animatePresence?.mode !== 'wait') {
             phase = 'idle'
         }
         prevPresent = current
     })
+
+    onDestroy(() => {
+        cancelWaitEnterBlock()
+    })
 </script>
 
-{#if present || phase === 'holding'}
+{#if (present && phase !== 'enter-blocked') || phase === 'holding'}
     {@render children?.()}
 {/if}

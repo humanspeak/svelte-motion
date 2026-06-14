@@ -37,7 +37,9 @@ test.describe('usePresence', () => {
         await expect(page.getByTestId('card')).toHaveAttribute('data-is-present', 'true')
     })
 
-    test('swap: outgoing PresenceChild holds until its safeToRemove fires', async ({ page }) => {
+    test('swap: wait mode holds each incoming PresenceChild until safeToRemove fires', async ({
+        page
+    }) => {
         await page.goto('/tests/use-presence')
 
         await expect(page.getByTestId('wait-a')).toBeVisible()
@@ -45,13 +47,23 @@ test.describe('usePresence', () => {
 
         await page.getByTestId('toggle-wait').click()
 
-        // A is held (still in DOM, marked exiting) while its CSS transition runs.
+        // A exits alone. B must not enter until A calls safeToRemove.
         await expect(page.getByTestId('wait-a')).toHaveAttribute('data-is-present', 'false')
-        // B has entered the render path now that its present flipped true.
-        await expect(page.getByTestId('wait-b')).toBeVisible()
+        await expect(page.getByTestId('wait-b')).toHaveCount(0)
 
-        // Eventually A's transitionend fires, triggering safeToRemove → unmount.
+        // Eventually A's transitionend fires, triggering safeToRemove and B's enter.
         await expect(page.getByTestId('wait-a')).toHaveCount(0, { timeout: 5000 })
         await expect(page.getByTestId('wait-b')).toHaveAttribute('data-is-present', 'true')
+
+        await page.getByTestId('toggle-wait').click()
+
+        // The reverse direction should behave the same way. This catches the
+        // sibling update-order case where A can observe present=true before B
+        // has announced its exit.
+        await expect(page.getByTestId('wait-b')).toHaveAttribute('data-is-present', 'false')
+        await expect(page.getByTestId('wait-a')).toHaveCount(0)
+
+        await expect(page.getByTestId('wait-b')).toHaveCount(0, { timeout: 5000 })
+        await expect(page.getByTestId('wait-a')).toHaveAttribute('data-is-present', 'true')
     })
 })
