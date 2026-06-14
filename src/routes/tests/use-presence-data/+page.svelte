@@ -30,6 +30,10 @@
         <p>
             The child calls <code>usePresenceData()</code>. On each navigation, the leaving card
             should exit using the latest parent <code>custom</code> direction.
+            <strong>Next</strong> sets <code>direction 1</code>, so the old card exits left and the
+            new card enters from the right. <strong>Previous</strong> sets
+            <code>direction -1</code>, so the old card exits right and the new card enters from the
+            left.
         </p>
     </section>
 
