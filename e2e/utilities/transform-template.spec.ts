@@ -8,6 +8,32 @@ const readStyleAttribute = (page: Page, testId: string) => async () =>
 const readComputedTransform = (page: Page, testId: string) => async () =>
     page.getByTestId(testId).evaluate((element) => getComputedStyle(element).transform)
 
+const readMixedTransformState = (page: Page) => async () =>
+    page.getByTestId('template-style-animated').evaluate((element) => {
+        const style = getComputedStyle(element)
+        const matrix = style.transform.match(/^matrix\(([^,]+),\s*([^,]+)/)
+        const angle = matrix
+            ? Math.round(
+                  (Math.atan2(Number.parseFloat(matrix[2]), Number.parseFloat(matrix[1])) * 180) /
+                      Math.PI
+              )
+            : null
+        return {
+            inline: element.getAttribute('style') ?? '',
+            transform: style.transform,
+            rotate: style.rotate,
+            angle
+        }
+    })
+
+const readTransformAngle = (transform: string): number | null => {
+    const matrix = transform.match(/^matrix\(([^,]+),\s*([^,]+)/)
+    if (!matrix) return null
+    return Math.round(
+        (Math.atan2(Number.parseFloat(matrix[2]), Number.parseFloat(matrix[1])) * 180) / Math.PI
+    )
+}
+
 const waitForMotionReady = async (page: Page, testId: string) => {
     await expect(page.getByTestId(testId)).toHaveAttribute('data-is-loaded', 'ready')
 }
@@ -234,12 +260,47 @@ test.describe('transformTemplate', () => {
         await expect
             .poll(readStyleAttribute(page, 'template-style-animated'))
             .toContain('translateX(120px)')
+        await expect.poll(readMixedTransformState(page)).toMatchObject({
+            angle: 8
+        })
         await expect
             .poll(readStyleAttribute(page, 'template-style-animated'))
-            .toContain('rotateZ(8deg)')
+            .not.toContain('rotateZ(8deg)')
+
+        await page.getByTestId('template-style-animated-toggle').click()
+        const returnFrames = await page.getByTestId('template-style-animated').evaluate(
+            async (element) =>
+                await new Promise<string[]>((resolve) => {
+                    const frames: string[] = []
+                    const started = performance.now()
+
+                    const tick = () => {
+                        frames.push(getComputedStyle(element).transform)
+                        if (performance.now() - started < 180) {
+                            requestAnimationFrame(tick)
+                        } else {
+                            resolve(frames)
+                        }
+                    }
+
+                    requestAnimationFrame(tick)
+                })
+        )
+        const returnAngles = returnFrames
+            .map(readTransformAngle)
+            .filter((angle): angle is number => angle !== null)
+
+        expect(returnAngles.length).toBeGreaterThan(0)
+        expect(returnAngles.every((angle) => angle === 8)).toBe(true)
+
         await expect
-            .poll(readStyleAttribute(page, 'template-style-animated'))
-            .toContain('rotate(8deg)')
+            .poll(readStyleAttribute(page, 'template-style-animated'), { timeout: 3000 })
+            .toContain('translateY(0px)')
+        const settledState = await readMixedTransformState(page)()
+        await page.waitForTimeout(500)
+        const postSettleState = await readMixedTransformState(page)()
+
+        expect(postSettleState).toEqual(settledState)
     })
 
     test('supports keyboard activation and accessible names for transform toggles', async ({
@@ -271,10 +332,15 @@ test.describe('transformTemplate', () => {
 
     test('applies transformPerspective through transformTemplate', async ({ page }) => {
         await page.goto(URL)
+        const lens = page.getByTestId('template-perspective')
 
         await expect
             .poll(readStyleAttribute(page, 'template-perspective'))
-            .toContain('perspective(200px) translateX(100px) translateZ(200px)')
+            .toContain('perspective(400px) translateX(100px) translateZ(80px)')
+        await expect(lens).toBeVisible()
+        await expect
+            .poll(() => lens.evaluate((element) => element.getBoundingClientRect().width))
+            .toBeGreaterThan(100)
     })
 
     test('is linked from the root test index', async ({ page }) => {

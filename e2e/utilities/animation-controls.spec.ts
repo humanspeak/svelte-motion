@@ -35,6 +35,60 @@ test.describe('useAnimationControls', () => {
         expect(cardTransform === 'none' || cardTransform === 'matrix(1, 0, 0, 1, 0, 0)').toBe(true)
     })
 
+    test('does not flash back to rest between chained controls animations', async ({ page }) => {
+        await gotoReady(page)
+
+        const framesPromise = page.evaluate(
+            async () =>
+                await new Promise<Array<{ x: number; label: string }>>((resolve) => {
+                    const card = document.querySelector<HTMLElement>('[data-testid="card"]')
+                    const frames: Array<{ x: number; label: string }> = []
+                    const label = document.querySelector<HTMLElement>('[data-testid="label"]')
+                    const started = performance.now()
+
+                    const readX = () => {
+                        if (!card) return 0
+                        const style = getComputedStyle(card)
+                        const matrix =
+                            style.transform === 'none'
+                                ? new DOMMatrixReadOnly()
+                                : new DOMMatrixReadOnly(style.transform)
+                        return matrix.m41
+                    }
+
+                    const tick = () => {
+                        frames.push({
+                            x: readX(),
+                            label: label?.textContent ?? ''
+                        })
+
+                        if (performance.now() - started < 1200) {
+                            requestAnimationFrame(tick)
+                        } else {
+                            resolve(frames)
+                        }
+                    }
+
+                    requestAnimationFrame(tick)
+                })
+        )
+
+        await page.getByTestId('start').click()
+        const confirmingFrames = await framesPromise
+
+        const confirmingX = confirmingFrames
+            .filter((frame) => frame.label.includes('confirming'))
+            .map((frame) => frame.x)
+
+        expect(confirmingX.length).toBeGreaterThan(3)
+
+        const firstNearRestIndex = confirmingX.findIndex((x) => x < 20)
+        if (firstNearRestIndex !== -1) {
+            const laterMax = Math.max(...confirmingX.slice(firstNearRestIndex + 1))
+            expect(laterMax).toBeLessThan(30)
+        }
+    })
+
     test('set jumps subscribers to their final variant state', async ({ page }) => {
         await gotoReady(page)
 

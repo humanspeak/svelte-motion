@@ -8,6 +8,13 @@
     let runCount = $state(0)
     let sequenceId = 0
     let hydrated = $state(false)
+    let frame = $state(0)
+    let cardTransform = $state('none')
+    let cardOpacity = $state('')
+    let orbTransform = $state('none')
+    let orbOpacity = $state('')
+    let labelTransform = $state('none')
+    let labelOpacity = $state('')
 
     const cardVariants = {
         idle: { opacity: 1, x: 0, scale: 1, rotate: 0 },
@@ -60,10 +67,42 @@
         controls.stop()
     }
 
-    onMount(async () => {
-        await tick()
-        await new Promise((resolve) => requestAnimationFrame(resolve))
-        hydrated = true
+    onMount(() => {
+        let raf = 0
+        const readElement = (testId: string) => {
+            const element = document.querySelector<HTMLElement>(`[data-testid="${testId}"]`)
+            if (!element) return { transform: 'missing', opacity: 'missing' }
+            const style = getComputedStyle(element)
+            return {
+                transform: style.transform === 'none' ? 'none' : style.transform,
+                opacity: style.opacity
+            }
+        }
+
+        const tickFrame = () => {
+            frame += 1
+            const card = readElement('card')
+            const orb = readElement('orb')
+            const label = readElement('label')
+
+            cardTransform = card.transform
+            cardOpacity = card.opacity
+            orbTransform = orb.transform
+            orbOpacity = orb.opacity
+            labelTransform = label.transform
+            labelOpacity = label.opacity
+
+            raf = requestAnimationFrame(tickFrame)
+        }
+
+        void (async () => {
+            await tick()
+            await new Promise((resolve) => requestAnimationFrame(resolve))
+            hydrated = true
+            raf = requestAnimationFrame(tickFrame)
+        })()
+
+        return () => cancelAnimationFrame(raf)
     })
 </script>
 
@@ -90,34 +129,66 @@
         </div>
 
         <div class="stage" data-testid="stage" data-hydrated={hydrated}>
-            <motion.div
-                class="card"
-                data-testid="card"
-                initial="idle"
-                animate={controls}
-                variants={cardVariants}
-                {transition}
-            >
+            <dl class="frame-readout" data-testid="animation-controls-readout">
+                <div>
+                    <dt>frame</dt>
+                    <dd>{frame}</dd>
+                </div>
+                <div>
+                    <dt>card</dt>
+                    <dd>{cardTransform}</dd>
+                </div>
+                <div>
+                    <dt>card o</dt>
+                    <dd>{cardOpacity}</dd>
+                </div>
+                <div>
+                    <dt>orb</dt>
+                    <dd>{orbTransform}</dd>
+                </div>
+                <div>
+                    <dt>orb o</dt>
+                    <dd>{orbOpacity}</dd>
+                </div>
+                <div>
+                    <dt>label</dt>
+                    <dd>{labelTransform}</dd>
+                </div>
+                <div>
+                    <dt>label o</dt>
+                    <dd>{labelOpacity}</dd>
+                </div>
+            </dl>
+            <div class="motion-area">
                 <motion.div
-                    class="orb"
-                    data-testid="orb"
+                    class="card"
+                    data-testid="card"
                     initial="idle"
                     animate={controls}
-                    variants={orbVariants}
-                    {transition}
-                />
-                <motion.div
-                    class="label"
-                    data-testid="label"
-                    initial="idle"
-                    animate={controls}
-                    variants={labelVariants}
+                    variants={cardVariants}
                     {transition}
                 >
-                    {status}
+                    <motion.div
+                        class="orb"
+                        data-testid="orb"
+                        initial="idle"
+                        animate={controls}
+                        variants={orbVariants}
+                        {transition}
+                    />
+                    <motion.div
+                        class="label"
+                        data-testid="label"
+                        initial="idle"
+                        animate={controls}
+                        variants={labelVariants}
+                        {transition}
+                    >
+                        {status}
+                    </motion.div>
+                    <span data-testid="run-count">runs: {runCount}</span>
                 </motion.div>
-                <span data-testid="run-count">runs: {runCount}</span>
-            </motion.div>
+            </div>
         </div>
     </section>
 </main>
@@ -205,13 +276,62 @@
     .stage {
         min-height: 360px;
         display: grid;
-        place-items: center;
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 18px;
+        padding: 14px;
+        box-sizing: border-box;
         border: 1px solid #263844;
         background:
             linear-gradient(90deg, rgba(125, 211, 252, 0.12) 1px, transparent 1px),
             linear-gradient(0deg, rgba(125, 211, 252, 0.12) 1px, transparent 1px), #0b1116;
         background-size: 48px 48px;
         overflow: hidden;
+    }
+
+    .frame-readout {
+        width: 100%;
+        height: 172px;
+        box-sizing: border-box;
+        display: grid;
+        grid-template-rows: repeat(7, 1fr);
+        gap: 5px;
+        margin: 0;
+        padding: 10px;
+        border: 1px solid rgba(125, 211, 252, 0.26);
+        background: rgba(8, 17, 23, 0.86);
+        color: #c8f7ff;
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+        font-size: 11px;
+        line-height: 1.3;
+        pointer-events: none;
+        overflow: hidden;
+    }
+
+    .motion-area {
+        min-height: 0;
+        display: grid;
+        place-items: center;
+    }
+
+    .frame-readout div {
+        min-width: 0;
+        display: grid;
+        grid-template-columns: 56px minmax(0, 1fr);
+        gap: 8px;
+    }
+
+    .frame-readout dt {
+        color: #67e8f9;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+
+    .frame-readout dd {
+        min-width: 0;
+        margin: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     :global(.card) {

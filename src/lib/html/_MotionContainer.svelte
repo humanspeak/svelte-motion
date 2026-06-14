@@ -202,6 +202,8 @@
     // for the frame the inline changes). We therefore only apply the target
     // as the inline style once settled — see the style derivation. (#377)
     let enterAnimationSettled = $state(false)
+    let lastAnimateRestingValues = $state<Record<string, unknown> | undefined>(undefined)
+    let lastAnimateRestingJson = $state<string | undefined>(undefined)
     let dataPath = $state<number>(-1)
     const motionConfig = $derived(getMotionConfig())
     const lazyMotion = getLazyMotionContext()
@@ -744,6 +746,16 @@
             ? optimizedAppearScript
             : ''
     )
+    const renderedAnimateBaseline = $derived.by(() => {
+        const restingValues = resolveRestingValues(
+            animateKeyframes as DOMKeyframesDefinition | undefined
+        ) as unknown as Record<string, unknown> | undefined
+        if (!transformTemplateProp || !restingValues) return restingValues
+
+        const restingJson = JSON.stringify(restingValues)
+        if (enterAnimationSettled && lastAnimateRestingJson === restingJson) return restingValues
+        return lastAnimateRestingValues ?? restingValues
+    })
     const extractTargetTransition = <T extends Record<string, unknown>>(
         keyframes: T,
         transitionOverride?: AnimationOptions
@@ -767,10 +779,13 @@
         if (!animateKeyframes) return
         const { target, transitionEnd } = extractTargetTransition(animateKeyframes)
         const restingValues = resolveRestingValues({
+            ...getResolvedStyleTransformValues(),
             ...target,
             ...(transitionEnd ?? {})
         } as DOMKeyframesDefinition | undefined) as Record<string, unknown> | undefined
         if (!restingValues) return
+        lastAnimateRestingValues = restingValues
+        lastAnimateRestingJson = JSON.stringify(restingValues)
         element.setAttribute(
             'style',
             mergeInlineStyles(
@@ -865,6 +880,7 @@
     const activeAnimationControls = new SvelteSet<StoppableAnimationControl>()
     let animationControlsGeneration = 0
     let animationControlsHasReceivedCommand = false
+    let lastAnimationControlsTarget = $state<Record<string, unknown> | undefined>(undefined)
     const templatedTransformMotionValues: Record<string, MotionValue> = {}
     let templatedTransformAnimationControls: StoppableAnimationControl[] = []
     let templatedTransformAnimationGeneration = 0
@@ -1034,6 +1050,15 @@
         return values
     }
 
+    const getResolvedStyleTransformValues = (): Record<string, unknown> => {
+        const values: Record<string, unknown> = {}
+        for (const key of templatedTransformKeys) {
+            const value = getMotionStyleInitialValue(key)
+            if (value !== undefined) values[key] = value
+        }
+        return values
+    }
+
     const animateTemplatedTransformPayload = (
         payload: Record<string, unknown>,
         transition: AnimationOptions,
@@ -1150,6 +1175,7 @@
                 transformTemplateProp
             )
         )
+        lastAnimationControlsTarget = transformedTarget
         enterAnimationSettled = true
     }
 
@@ -1351,18 +1377,18 @@
             // values collapse keyframe arrays to their last element
             // (animate={{x:[0,100,50]}} rests at 50). (#377)
             enterAnimationSettled
-                ? (resolveRestingValues(
-                      animateKeyframes as DOMKeyframesDefinition | undefined
-                  ) as unknown as Record<string, unknown>)
+                ? renderedAnimateBaseline
                 : animateControls &&
                     !animationControlsHasReceivedCommand &&
                     isNotEmpty(initialKeyframes)
                   ? (initialKeyframes as unknown as Record<string, unknown>)
-                  : isNotEmpty(initialKeyframes)
-                    ? !effectiveAnimate
-                        ? (initialKeyframes as unknown as Record<string, unknown>)
-                        : undefined
-                    : (animateKeyframes as unknown as Record<string, unknown>),
+                  : animateControls && animationControlsHasReceivedCommand
+                    ? lastAnimationControlsTarget
+                    : isNotEmpty(initialKeyframes)
+                      ? !effectiveAnimate
+                          ? (initialKeyframes as unknown as Record<string, unknown>)
+                          : undefined
+                      : renderedAnimateBaseline,
             transformTemplateProp
         )
     )

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { onMount } from 'svelte'
     import {
         animate,
         motion,
@@ -22,11 +23,22 @@
     let slowAnimated = $state(false)
     let controlsSent = $state(false)
     let styleAnimated = $state(false)
+    let mixedFrame = $state(0)
+    let mixedInlineTransform = $state('')
+    let mixedInlineRotate = $state('')
+    let mixedComputedTransform = $state('')
+    let mixedComputedRotate = $state('')
+    let mixedComputedAngle = $state('')
 
     const transformTemplate: TransformTemplate = ({ x, rotate }, generated) => {
         const lift = x ?? '0px'
         const tilt = rotate ?? '0deg'
         return `translateY(${lift}) rotateZ(${tilt}) ${generated}`.trim()
+    }
+
+    const xMirrorTemplate: TransformTemplate = ({ x }, generated) => {
+        const lift = x ?? '0px'
+        return `translateY(${lift}) ${generated}`.trim()
     }
 
     const upstreamInitialTemplate: TransformTemplate = ({ x }, generated) =>
@@ -41,8 +53,15 @@
     }
 
     const fixedTemplate: TransformTemplate = () => 'translateY(20px)'
-    const perspectiveTemplate: TransformTemplate = ({ transformPerspective }, generated) =>
-        `${generated} translateZ(${transformPerspective})`.trim()
+    const perspectiveTemplate: TransformTemplate = (_latest, generated) =>
+        `${generated} translateZ(80px)`.trim()
+
+    const readMatrixAngle = (matrix: string): string => {
+        const match = matrix.match(/^matrix\(([^,]+),\s*([^,]+)/)
+        if (!match) return 'none'
+        const radians = Math.atan2(Number.parseFloat(match[2]), Number.parseFloat(match[1]))
+        return `${Math.round((radians * 180) / Math.PI)}deg`
+    }
 
     const currentTemplate = $derived(
         templateVersion === 'single' ? upstreamInitialTemplate : upstreamUpdatedTemplate
@@ -111,6 +130,30 @@
     function removeOnlyTransformTemplate() {
         removeOnlyTemplate = false
     }
+
+    onMount(() => {
+        let raf = 0
+
+        const tick = () => {
+            mixedFrame += 1
+            const element = document.querySelector<HTMLElement>(
+                '[data-testid="template-style-animated"]'
+            )
+
+            if (element) {
+                mixedInlineTransform = element.style.transform || 'none'
+                mixedInlineRotate = element.style.rotate || 'none'
+                mixedComputedTransform = getComputedStyle(element).transform
+                mixedComputedRotate = getComputedStyle(element).rotate
+                mixedComputedAngle = readMatrixAngle(mixedComputedTransform)
+            }
+
+            raf = requestAnimationFrame(tick)
+        }
+
+        raf = requestAnimationFrame(tick)
+        return () => cancelAnimationFrame(raf)
+    })
 </script>
 
 <svelte:head>
@@ -131,6 +174,10 @@
     <section class="grid">
         <article>
             <h2>Initial render</h2>
+            <p class="expectation">
+                Starts already offset. Expected transform:
+                <code>translateY(10px)</code> wrapping <code>translateX(10px)</code>.
+            </p>
             <motion.div
                 class="orb cyan"
                 data-testid="template-initial"
@@ -143,6 +190,10 @@
 
         <article>
             <h2>Style transform</h2>
+            <p class="expectation">
+                Static style <code>x: 10</code> should be wrapped by a fixed
+                <code>translateY(20px)</code>.
+            </p>
             <motion.div
                 class="orb cyan"
                 data-testid="template-style"
@@ -155,6 +206,10 @@
 
         <article>
             <h2>Template only</h2>
+            <p class="expectation">
+                No Motion transform props. The template alone should render
+                <code>translateY(20px)</code>.
+            </p>
             <motion.div
                 class="orb cyan"
                 data-testid="template-only"
@@ -166,6 +221,10 @@
 
         <article>
             <h2>MotionValue style</h2>
+            <p class="expectation">
+                Move animates a live MotionValue from <code>x: 24</code> to <code>x: 180</code>. The
+                box should travel diagonally because the template mirrors x into y.
+            </p>
             <motion.div
                 class="orb pink"
                 data-testid="template-live"
@@ -186,6 +245,10 @@
 
         <article>
             <h2>Animate target</h2>
+            <p class="expectation">
+                Send animates to <code>x: 120</code> and <code>rotate: 30</code>. It should land
+                diagonally down-right and stay there without losing the template.
+            </p>
             <motion.div
                 class="orb green"
                 data-testid="template-animated"
@@ -209,6 +272,10 @@
 
         <article>
             <h2>Animated template frames</h2>
+            <p class="expectation">
+                Slow version of Animate target. Every in-between frame should keep
+                <code>translateY</code> and <code>translateX</code> matched.
+            </p>
             <motion.div
                 class="orb mint"
                 data-testid="template-slow-animated"
@@ -232,6 +299,10 @@
 
         <article>
             <h2>Controls template frames</h2>
+            <p class="expectation">
+                Same transformTemplate path, but started by animation controls. It should move
+                smoothly and preserve the template during the whole controls animation.
+            </p>
             <motion.div
                 class="orb pink"
                 data-testid="template-controls-animated"
@@ -254,6 +325,36 @@
 
         <article>
             <h2>Style + animated transform</h2>
+            <p class="expectation">
+                Style keeps one <code>rotate: 8</code> while Send animates <code>x: 120</code>. It
+                should move diagonally, keep that single tilt, and not twitch after landing.
+            </p>
+            <dl class="frame-readout" data-testid="template-style-animated-readout">
+                <div>
+                    <dt>frame</dt>
+                    <dd>{mixedFrame}</dd>
+                </div>
+                <div>
+                    <dt>inline</dt>
+                    <dd>{mixedInlineTransform}</dd>
+                </div>
+                <div>
+                    <dt>i rotate</dt>
+                    <dd>{mixedInlineRotate}</dd>
+                </div>
+                <div>
+                    <dt>computed</dt>
+                    <dd>{mixedComputedTransform}</dd>
+                </div>
+                <div>
+                    <dt>c rotate</dt>
+                    <dd>{mixedComputedRotate}</dd>
+                </div>
+                <div>
+                    <dt>c angle</dt>
+                    <dd>{mixedComputedAngle}</dd>
+                </div>
+            </dl>
             <motion.div
                 class="orb green"
                 data-testid="template-style-animated"
@@ -261,7 +362,7 @@
                 initial={{ x: 0 }}
                 animate={styleAnimated ? { x: 120 } : { x: 0 }}
                 transition={{ duration: 0.28, ease: 'easeOut' }}
-                {transformTemplate}
+                transformTemplate={xMirrorTemplate}
             >
                 mixed
             </motion.div>
@@ -278,6 +379,10 @@
 
         <article>
             <h2>Updated template</h2>
+            <p class="expectation">
+                Double swaps the template from <code>translateY(x)</code> to
+                <code>translateY(x * 2)</code>, so the box should jump from y 10 to y 20.
+            </p>
             <motion.div
                 class="orb blue"
                 data-testid="template-updated"
@@ -295,10 +400,15 @@
 
         <article>
             <h2>Perspective template</h2>
+            <p class="expectation">
+                Adds <code>translateZ(80px)</code> after Motion's generated
+                <code>perspective(400px) translateX(100px)</code>. The lens should remain visible
+                and look slightly enlarged.
+            </p>
             <motion.div
                 class="orb cyan"
                 data-testid="template-perspective"
-                style={{ x: '100px', transformPerspective: '200px' }}
+                style={{ x: '100px', transformPerspective: '400px' }}
                 transformTemplate={perspectiveTemplate}
             >
                 lens
@@ -307,6 +417,10 @@
 
         <article>
             <h2>Remove template + change transform</h2>
+            <p class="expectation">
+                Remove drops the template and changes x from 10 to 20. Expected final transform:
+                only <code>translateX(20px)</code>.
+            </p>
             <motion.div
                 class="orb amber"
                 data-testid="template-remove-changed"
@@ -328,6 +442,10 @@
 
         <article>
             <h2>Remove template + keep transform</h2>
+            <p class="expectation">
+                Remove drops the template but keeps x at 10. Expected final transform: only
+                <code>translateX(10px)</code>.
+            </p>
             <motion.div
                 class="orb violet"
                 data-testid="template-remove-same"
@@ -349,6 +467,10 @@
 
         <article>
             <h2>Remove template only</h2>
+            <p class="expectation">
+                Remove drops a template that was the only transform source. The box should return to
+                no CSS transform.
+            </p>
             <motion.div
                 class="orb slate"
                 data-testid="template-remove-only"
@@ -462,6 +584,51 @@
         color: #dff8ff;
         font-size: 18px;
         line-height: 1;
+    }
+
+    .expectation {
+        margin: -12px 0 0;
+        color: #a9c9cf;
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    .frame-readout {
+        height: 148px;
+        box-sizing: border-box;
+        display: grid;
+        gap: 6px;
+        grid-template-rows: repeat(6, 1fr);
+        margin: -10px 0 0;
+        padding: 10px;
+        border: 1px solid rgba(125, 211, 252, 0.24);
+        background: rgba(3, 19, 22, 0.72);
+        color: #c8f7ff;
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+        font-size: 11px;
+        line-height: 1.35;
+        overflow: hidden;
+    }
+
+    .frame-readout div {
+        min-width: 0;
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr);
+        gap: 8px;
+    }
+
+    .frame-readout dt {
+        color: #67e8f9;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+
+    .frame-readout dd {
+        min-width: 0;
+        margin: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     :global(.orb) {
