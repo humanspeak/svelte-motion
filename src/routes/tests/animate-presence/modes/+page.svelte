@@ -9,10 +9,6 @@
     let internalState = $state(true)
 
     const switchItems = () => {
-        console.log('[AnimatePresenceModes] switchItems', {
-            from: internalState,
-            to: !internalState
-        })
         pwLog('[AnimatePresenceModes] switchItems', { from: internalState, to: !internalState })
         internalState = !internalState
     }

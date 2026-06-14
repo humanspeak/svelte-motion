@@ -1,6 +1,7 @@
 import {
     animate,
     type AnimationOptions,
+    type AnimationPlaybackControls,
     type DOMKeyframesDefinition,
     type ValueAnimationTransition
 } from 'motion'
@@ -9,6 +10,37 @@ const layoutSizeAnimationAttribute = 'data-layout-size-animation'
 
 const roundedPx = (value: number): string => `${Math.max(0, Math.round(value))}px`
 const mix = (from: number, to: number, progress: number): number => from + (to - from) * progress
+const activeFlipAnimations = new WeakMap<HTMLElement, Set<AnimationPlaybackControls>>()
+
+const rememberFlipAnimation = (el: HTMLElement, animation: AnimationPlaybackControls) => {
+    let animations = activeFlipAnimations.get(el)
+    if (!animations) {
+        animations = new Set()
+        activeFlipAnimations.set(el, animations)
+    }
+    animations.add(animation)
+    animation.finished?.finally(() => {
+        animations?.delete(animation)
+        if (animations?.size === 0) activeFlipAnimations.delete(el)
+    })
+}
+
+/**
+ * Complete any active FLIP animation on an element and return it to its
+ * committed layout transform.
+ *
+ * @param el Target element.
+ */
+export const finishFlipAnimations = (el: HTMLElement): void => {
+    const animations = activeFlipAnimations.get(el)
+    if (!animations) return
+
+    for (const animation of animations) {
+        animation.complete()
+    }
+    activeFlipAnimations.delete(el)
+    el.style.transform = ''
+}
 
 const isViewportOffscreen = (el: HTMLElement): boolean => {
     if (typeof window === 'undefined') return false
@@ -76,6 +108,7 @@ const runBoxSizeAnimation = (
         ...(transition as ValueAnimationTransition<number>),
         onUpdate: writeBox
     })
+    rememberFlipAnimation(el, animation)
 
     let removeScrollListener: (() => void) | undefined
     let offscreenRaf: number | null = null
@@ -307,7 +340,8 @@ export const runFlipAnimation = (
     el.style.transformOrigin = '0 0'
     el.style.transform = parts.join(' ')
 
-    animate(el, keyframes as unknown as DOMKeyframesDefinition, transition)
+    const animation = animate(el, keyframes as unknown as DOMKeyframesDefinition, transition)
+    rememberFlipAnimation(el, animation)
 }
 
 /**
@@ -345,15 +379,19 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
             return
         }
         if (pendingRaf !== null || releaseTimeout !== null) return
-        // Leading-edge: call immediately, then throttle further calls until next frame (or 50ms)
+        // Leading-edge catches synchronous layout writes. The trailing read
+        // catches Svelte presence DOM that finishes patching on the next frame
+        // without polling throughout the active layout animation.
         onChange()
         if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
             pendingRaf = window.requestAnimationFrame(() => {
                 pendingRaf = null
+                onChange()
             })
         } else {
             releaseTimeout = setTimeout(() => {
                 releaseTimeout = null
+                onChange()
             }, 50)
         }
     }
@@ -370,7 +408,7 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
         subtree: true
     })
     if (el.parentElement) {
-        childListObserver.observe(el.parentElement, { childList: true, subtree: false })
+        childListObserver.observe(el.parentElement, { childList: true, subtree: true })
     }
     return () => {
         ro.disconnect()

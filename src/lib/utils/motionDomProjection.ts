@@ -19,6 +19,7 @@ type ProjectionTreeNode<Instance = unknown> = IProjectionNode<Instance>
 
 type LayoutOption = boolean | string | undefined
 type AnimationType = 'position' | 'x' | 'y' | 'size' | 'both' | 'preserve-aspect'
+type RectLike = { left: number; top: number; width: number; height: number }
 
 export interface MotionDomProjectionOptions {
     /** Parent adapter used to connect this node into the upstream projection tree. */
@@ -67,6 +68,23 @@ const cloneMeasurements = (measurements: Measurements | undefined): Measurements
         source: measurements.source
     }
 }
+
+const boxFromRect = (rect: RectLike) => {
+    const box = createBox()
+    box.x.min = rect.left
+    box.x.max = rect.left + rect.width
+    box.y.min = rect.top
+    box.y.max = rect.top + rect.height
+    return box
+}
+
+const measurementsFromRect = (rect: RectLike, base: Measurements | undefined): Measurements => ({
+    animationId: base?.animationId ?? 0,
+    measuredBox: boxFromRect(rect),
+    layoutBox: boxFromRect(rect),
+    latestValues: { ...(base?.latestValues ?? {}) },
+    source: base?.source ?? 0
+})
 
 const animationTypes = new Set<AnimationType>([
     'position',
@@ -259,15 +277,18 @@ export class MotionDomProjectionAdapter {
      * adapter.commitObservedLayoutChange()
      * ```
      */
-    commitObservedLayoutChange(): void {
+    commitObservedLayoutChange(previousRect?: RectLike): void {
         if (!this.element || !this.layout) return
-        if (!this.lastLayout) {
+        const snapshot = previousRect
+            ? measurementsFromRect(previousRect, this.lastLayout ?? this.projection.layout)
+            : this.lastLayout
+        if (!snapshot) {
             this.seedLayout()
             return
         }
 
         this.projection.root?.startUpdate()
-        this.seedCachedSnapshotsForSubtree(this.projection)
+        this.seedCachedSnapshotsForSubtree(this.projection, snapshot)
         this.projection.root?.didUpdate()
         this.refreshCachedLayout()
     }
@@ -303,10 +324,15 @@ export class MotionDomProjectionAdapter {
     }
 
     private seedCachedSnapshotsForSubtree<Instance>(
-        projection: ProjectionTreeNode<Instance>
+        projection: ProjectionTreeNode<Instance>,
+        rootSnapshot?: Measurements
     ): void {
         const adapter = MotionDomProjectionAdapter.adapters.get(projection)
-        const snapshot = cloneMeasurements(adapter?.lastLayout)
+        const snapshot = cloneMeasurements(
+            projection === (this.projection as unknown as ProjectionTreeNode<Instance>)
+                ? (rootSnapshot ?? adapter?.lastLayout)
+                : adapter?.lastLayout
+        )
 
         if (snapshot && projection.options.layout) {
             this.prepareSnapshotPath(projection)
@@ -357,6 +383,7 @@ export class MotionDomProjectionAdapter {
     }
 
     private refreshCachedLayout(): void {
+        this.lastLayout = cloneMeasurements(this.projection.layout)
         requestAnimationFrame(() => {
             this.lastLayout = cloneMeasurements(this.projection.layout)
         })

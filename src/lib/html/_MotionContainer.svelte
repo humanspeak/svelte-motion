@@ -53,6 +53,7 @@
         measureRect,
         computeFlipTransforms,
         runFlipAnimation,
+        finishFlipAnimations,
         setCompositorHints,
         observeLayoutChanges,
         type RectLike
@@ -2149,17 +2150,19 @@
             const hasHiddenWaitEnter = !!element!.querySelector(
                 '[data-presence-wait-hidden="true"]'
             )
-            const hasPresencePlaceholder = !!element!.querySelector(
-                '[data-presence-placeholder="true"]'
-            )
+            const hasPresencePlaceholder =
+                !!element!.querySelector('[data-presence-placeholder="true"]') ||
+                !!element!.parentElement?.querySelector('[data-presence-placeholder="true"]')
 
             if (hasPresenceHold || hasHiddenWaitEnter) {
                 return
             }
 
             if (hasPresencePlaceholder) {
+                finishFlipAnimations(element!)
                 lastRect = measureLayoutRect()
                 motionDomProjection?.seedLayout()
+                motionDomProjection?.finishAnimation()
                 return
             }
 
@@ -2176,17 +2179,22 @@
             }
 
             const nextBox = projection.commitLayoutChange()
-            let shouldCommitMotionDomLayout = false
             if (nextBox && lastRect) {
                 const next = boxToRectLike(nextBox)
-                shouldCommitMotionDomLayout = hasRectChanged(lastRect, next)
-                if (!motionDomProjection) {
-                    const transforms = computeFlipTransforms(lastRect, next, flipLayoutMode)
-                    runFlipAnimation(
-                        element!,
-                        transforms,
-                        (mergedTransition ?? {}) as AnimationOptions
-                    )
+                const previous = lastRect
+                const shouldCommitMotionDomLayout = hasRectChanged(lastRect, next)
+                if (shouldCommitMotionDomLayout) {
+                    if (motionDomProjection) {
+                        motionDomProjection.commitObservedLayoutChange(previous)
+                    } else {
+                        finishFlipAnimations(element!)
+                        const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
+                        runFlipAnimation(
+                            element!,
+                            transforms,
+                            (mergedTransition ?? {}) as AnimationOptions
+                        )
+                    }
                 }
                 lastRect = next
                 wasViewportScrolledSinceLastLayout = false
@@ -2195,9 +2203,6 @@
                 lastRect = boxToRectLike(nextBox)
                 wasViewportScrolledSinceLastLayout = false
                 wasViewportOffscreenSinceLastLayout = false
-            }
-            if (shouldCommitMotionDomLayout) {
-                motionDomProjection?.commitObservedLayoutChange()
             }
         }
 
@@ -2220,13 +2225,16 @@
                 wasViewportOffscreenSinceLastLayout ||
                 isViewportOffscreen(viewportRect)
             if (!shouldSkipLayoutAnimation && !motionDomProjection) {
+                finishFlipAnimations(element!)
                 const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
                 runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
             }
             wasViewportScrolledSinceLastLayout = false
             wasViewportOffscreenSinceLastLayout = false
             if (!shouldSkipLayoutAnimation && hasRectChanged(previous, next)) {
-                motionDomProjection?.commitObservedLayoutChange()
+                if (motionDomProjection) {
+                    motionDomProjection.commitObservedLayoutChange(previous)
+                }
             } else if (shouldSkipLayoutAnimation) {
                 motionDomProjection?.finishAnimation()
             }
@@ -2239,6 +2247,7 @@
                 rafId = null
             })
         }
+
         const disconnectObservers = observeLayoutChanges(element!, () => scheduleProjectionCommit())
         window.addEventListener('scroll', rememberOffscreenScroll, { passive: true })
         element!.addEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
