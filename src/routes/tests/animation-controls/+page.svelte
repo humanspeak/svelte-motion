@@ -1,12 +1,13 @@
 <script lang="ts">
     import { motion, useAnimationControls } from '$lib'
+    import { onMount, tick } from 'svelte'
 
     const controls = useAnimationControls()
 
     let status = $state('idle')
     let runCount = $state(0)
     let sequenceId = 0
-    const hydrated = true
+    let hydrated = $state(false)
 
     const cardVariants = {
         idle: { opacity: 1, x: 0, scale: 1, rotate: 0 },
@@ -58,6 +59,12 @@
         status = 'stopped'
         controls.stop()
     }
+
+    onMount(async () => {
+        await tick()
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+        hydrated = true
+    })
 </script>
 
 <svelte:head>

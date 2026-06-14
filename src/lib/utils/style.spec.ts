@@ -15,6 +15,12 @@ describe('mergeInlineStyles', () => {
         expect(out).toContain('width: 10px')
     })
 
+    it('preserves existing transform when animate fallback is empty', () => {
+        const out = mergeInlineStyles('transform: translateX(64px) rotate(12deg)', null, {})
+
+        expect(out).toContain('transform: translateX(64px) rotate(12deg)')
+    })
+
     it('merges initial scalar props into style (opacity, backgroundColor, borderRadius)', () => {
         const out = mergeInlineStyles(
             '',
@@ -170,25 +176,10 @@ describe('mergeInlineStyles', () => {
             expect(out).toContain('skewX(5deg)')
         })
 
-        it('does not serialize identity transform values', () => {
+        it('serializes identity transform values as none', () => {
             const out = mergeInlineStyles('', { x: 0, y: '0px', scale: 1, rotate: 0 }, null)
 
-            expect(out).not.toContain('transform:')
-        })
-
-        it('can preserve identity transform values for animation keyframes', () => {
-            const out = mergeInlineStyles(
-                '',
-                { x: 0, y: '0px', scale: 1, rotate: 0 },
-                null,
-                undefined,
-                { preserveTransformDefaults: true }
-            )
-
-            expect(out).toContain('translateX(0px)')
-            expect(out).toContain('translateY(0px)')
-            expect(out).toContain('scale(1)')
-            expect(out).toContain('rotate(0deg)')
+            expect(out).toContain('transform: none')
         })
     })
 
@@ -235,15 +226,16 @@ describe('mergeInlineStyles', () => {
             expect(out).toContain('transform: translateY(20px)')
         })
 
-        it('passes an explicit transform string as the generated transform', () => {
+        it('does not run transformTemplate over explicit transform strings', () => {
             const out = mergeInlineStyles(
                 '',
                 { transform: 'translate(100px)' },
                 null,
-                (_latest, generated) => generated
+                () => 'translateY(20px)'
             )
 
             expect(out).toContain('transform: translate(100px)')
+            expect(out).not.toContain('translateY(20px)')
         })
 
         it('removes the transform declaration when the template returns an empty string', () => {

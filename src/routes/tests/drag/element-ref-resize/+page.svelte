@@ -9,23 +9,44 @@
      */
     import { motion } from '$lib'
 
-    let containerWidth = $state(400)
-    const shrink = () => {
-        containerWidth = 200
+    const originalWidth = 400
+    const resizedWidth = 200
+
+    let { data }: { data: { slow: boolean } } = $props()
+    let containerWidth = $state(originalWidth)
+    const containerTransition = $derived(
+        data.slow ? 'width 3200ms cubic-bezier(0.16, 1, 0.3, 1)' : 'none'
+    )
+    const dragTransition = $derived(
+        data.slow
+            ? {
+                  bounceStiffness: 4,
+                  bounceDamping: 3,
+                  timeConstant: 5200,
+                  restDelta: 0.04,
+                  restSpeed: 0.3
+              }
+            : undefined
+    )
+    const toggleWidth = () => {
+        containerWidth = containerWidth === originalWidth ? resizedWidth : originalWidth
     }
     let containerEl: HTMLDivElement | null = $state(null)
 </script>
 
 <div style="padding: 20px;">
-    <button type="button" data-testid="shrink-btn" onclick={shrink}>Shrink to 200</button>
+    <button type="button" data-testid="resize-btn" onclick={toggleWidth}>
+        {containerWidth === originalWidth ? 'Shrink to 200' : 'Grow to 400'}
+    </button>
     <div
         bind:this={containerEl}
         data-testid="container"
-        style="margin-top:16px;height:200px;width:{containerWidth}px;border:2px dashed #888;position:relative;display:grid;place-items:center;background:#0d1110;"
+        style="margin-top:16px;height:200px;width:{containerWidth}px;border:2px dashed #888;position:relative;display:grid;place-items:center;background:#0d1110;transition:{containerTransition};"
     >
         <motion.div
             drag
             dragConstraints={containerEl}
+            {dragTransition}
             data-testid="drag-card"
             style="width:80px;height:80px;background:#fb923c;border-radius:8px;cursor:grab;user-select:none;"
         />

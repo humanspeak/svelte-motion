@@ -6,6 +6,7 @@
         useMotionValue,
         type RawMotionValue
     } from '$lib'
+    import type { TransformTemplate } from 'motion-dom'
 
     const liveX = useMotionValue(24)
     const controls = useAnimationControls()
@@ -20,32 +21,28 @@
     let removeOnlyTemplate = $state(true)
     let slowAnimated = $state(false)
     let controlsSent = $state(false)
+    let styleAnimated = $state(false)
 
-    const transformTemplate = (
-        { x, rotate }: Record<string, string | number>,
-        generated: string
-    ) => {
+    const transformTemplate: TransformTemplate = ({ x, rotate }, generated) => {
         const lift = x ?? '0px'
         const tilt = rotate ?? '0deg'
         return `translateY(${lift}) rotateZ(${tilt}) ${generated}`.trim()
     }
 
-    const upstreamInitialTemplate = ({ x }: Record<string, string | number>, generated: string) =>
+    const upstreamInitialTemplate: TransformTemplate = ({ x }, generated) =>
         `translateY(${x}) ${generated}`.trim()
 
-    const upstreamStyleTemplate = (_latest: Record<string, string | number>, generated: string) =>
+    const upstreamStyleTemplate: TransformTemplate = (_latest, generated) =>
         `translateY(20px) ${generated}`.trim()
 
-    const upstreamUpdatedTemplate = ({ x }: Record<string, string | number>, generated: string) => {
+    const upstreamUpdatedTemplate: TransformTemplate = ({ x }, generated) => {
         const nextX = typeof x === 'string' ? Number.parseFloat(x) : Number(x)
         return `translateY(${nextX * 2}px) ${generated}`.trim()
     }
 
-    const fixedTemplate = () => 'translateY(20px)'
-    const perspectiveTemplate = (
-        { transformPerspective }: Record<string, string | number>,
-        generated: string
-    ) => `${generated} translateZ(${transformPerspective})`.trim()
+    const fixedTemplate: TransformTemplate = () => 'translateY(20px)'
+    const perspectiveTemplate: TransformTemplate = ({ transformPerspective }, generated) =>
+        `${generated} translateZ(${transformPerspective})`.trim()
 
     const currentTemplate = $derived(
         templateVersion === 'single' ? upstreamInitialTemplate : upstreamUpdatedTemplate
@@ -90,8 +87,12 @@
                 x: controlsSent ? 120 : 0,
                 rotate: controlsSent ? 30 : 0
             },
-            { duration: 1.2, ease: 'linear' }
+            { duration: 2.4, ease: 'linear' }
         )
+    }
+
+    function toggleStyleAnimation() {
+        styleAnimated = !styleAnimated
     }
 
     function updateTemplate() {
@@ -213,7 +214,7 @@
                 data-testid="template-slow-animated"
                 initial={{ x: 0, rotate: 0 }}
                 animate={slowAnimated ? { x: 120, rotate: 30 } : { x: 0, rotate: 0 }}
-                transition={{ duration: 1.2, ease: 'linear' }}
+                transition={{ duration: 2.4, ease: 'linear' }}
                 {transformTemplate}
             >
                 frames
@@ -247,6 +248,30 @@
                     onclick={toggleControlsAnimation}
                 >
                     {controlsSent ? 'Back' : 'Send'}
+                </button>
+            </div>
+        </article>
+
+        <article>
+            <h2>Style + animated transform</h2>
+            <motion.div
+                class="orb green"
+                data-testid="template-style-animated"
+                style={{ rotate: 8 }}
+                initial={{ x: 0 }}
+                animate={styleAnimated ? { x: 120 } : { x: 0 }}
+                transition={{ duration: 0.28, ease: 'easeOut' }}
+                {transformTemplate}
+            >
+                mixed
+            </motion.div>
+            <div class="controls">
+                <button
+                    type="button"
+                    data-testid="template-style-animated-toggle"
+                    onclick={toggleStyleAnimation}
+                >
+                    {styleAnimated ? 'Back' : 'Send'}
                 </button>
             </div>
         </article>

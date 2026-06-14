@@ -54,4 +54,34 @@ test.describe('drag/controls', () => {
         // y should remain effectively unchanged
         expect(Math.abs(e.y - s.y)).toBeLessThan(2)
     })
+
+    test('snapToCursor is consistent with initial coordinates', async ({ page }) => {
+        await page.goto('/tests/drag/controls?@isPlaywright=true')
+        const el = page.getByTestId('drag-controls-initial')
+        const handle = page.getByTestId('initial-handle')
+        await el.waitFor({ state: 'visible' })
+        await handle.waitFor({ state: 'visible' })
+
+        const dragToHandle = async () => {
+            const h = await handle.boundingBox()
+            if (!h) throw new Error('no h')
+            await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2)
+            await page.mouse.down()
+            await page.mouse.move(h.x + h.width / 2 + 50, h.y + h.height / 2 + 50, {
+                steps: 5
+            })
+            await page.waitForTimeout(50)
+            const active = await el.boundingBox()
+            await page.mouse.up()
+            await page.waitForTimeout(100)
+            if (!active) throw new Error('no active')
+            return active
+        }
+
+        const first = await dragToHandle()
+        const second = await dragToHandle()
+
+        expect(second.x).toBeCloseTo(first.x, 0)
+        expect(second.y).toBeCloseTo(first.y, 0)
+    })
 })

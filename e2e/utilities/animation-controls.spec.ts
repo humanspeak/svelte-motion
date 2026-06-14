@@ -81,10 +81,9 @@ test.describe('useAnimationControls', () => {
         await gotoReady(page)
 
         await page.getByTestId('start').click()
-        await page.waitForTimeout(180)
-
-        const beforeStop = await readCardState(page)
-        expect(beforeStop.x).toBeGreaterThan(5)
+        await expect
+            .poll(async () => (await readCardState(page)).x, { timeout: 3000 })
+            .toBeGreaterThan(5)
 
         await page.getByTestId('stop').click()
         await expect(page.getByTestId('label')).toHaveText('stopped')

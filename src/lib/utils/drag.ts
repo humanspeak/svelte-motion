@@ -1,5 +1,12 @@
-import type { DragAxis, DragConstraints, DragControls, DragInfo, MotionWhileDrag } from '$lib/types'
-import { isPlaywrightEnv, pwLog, pwWarn } from '$lib/utils/log'
+import type {
+    DragAxis,
+    DragConstraints,
+    DragControls,
+    DragElastic,
+    DragInfo,
+    MotionWhileDrag
+} from '$lib/types'
+import { pwLog } from '$lib/utils/log'
 /**
  * Drag utilities
  *
@@ -7,7 +14,7 @@ import { isPlaywrightEnv, pwLog, pwWarn } from '$lib/utils/log'
  * It intentionally avoids Svelte-specific APIs so it can be reused in action-like contexts.
  *
  * Troubleshooting tips when drag "doesn't move":
- * - Ensure we are writing transforms via `animate(el, { x, y }, { duration: 0 })`.
+ * - Ensure we are writing transforms via the synchronous drag transform writer.
  *   If computed style shows `transform: none`, another CSS rule may be overwriting the transform.
  * - Confirm `axis` allows the intended direction (true | 'x' | 'y').
  * - If using constraints as HTMLElement, verify both element and constraint refs are non-null and connected.
@@ -17,14 +24,15 @@ import { isPlaywrightEnv, pwLog, pwWarn } from '$lib/utils/log'
  * - For nested drags, set `propagation` as needed to avoid parent-child contention.
  */
 import { isDomElement } from '$lib/utils/dom'
+import { startDragInertia } from '$lib/utils/dragInertia'
 import {
     applyConstraints as applyFloatConstraints,
     parseMatrixTranslate
 } from '$lib/utils/dragMath'
 import { deriveBoundaryPhysics } from '$lib/utils/dragParams'
 import { computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
-import { createInertiaToBoundary } from '$lib/utils/inertia'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
+import { animateValue, type AnimationPlaybackControlsWithThen } from 'motion-dom'
 
 type Rect = {
     top: number
@@ -45,13 +53,16 @@ type Rect = {
 export type AttachDragOptions = {
     axis: DragAxis
     constraints?: DragConstraints
-    elastic?: number
+    elastic?: DragElastic
     momentum?: boolean
     transition?: {
         bounceStiffness?: number
         bounceDamping?: number
         power?: number
         timeConstant?: number
+        restDelta?: number
+        restSpeed?: number
+        modifyTarget?: (target: number) => number
         min?: number
         max?: number
     }
@@ -66,10 +77,12 @@ export type AttachDragOptions = {
         onEnd?: (e: PointerEvent, info: DragInfo) => void
         onDirectionLock?: (axis: 'x' | 'y') => void
         onTransitionEnd?: () => void
+        onVisualUpdate?: (transform: string) => void
     }
     baselineSources?: { initial?: Record<string, unknown>; animate?: Record<string, unknown> }
+    getBaseTransform?: () => string
     propagation?: boolean
-    snapToOrigin?: boolean
+    snapToOrigin?: boolean | 'x' | 'y'
 }
 
 /**
@@ -89,6 +102,54 @@ const getRect = (el: HTMLElement | null): Rect | null => {
 }
 
 // const clamp = (v: number, min: number, max: number): number => Math.min(Math.max(v, min), max)
+
+const clamp = (v: number, min: number, max: number): number => Math.min(Math.max(v, min), max)
+
+const mix = (min: number, max: number, progress: number): number => min + (max - min) * progress
+
+type ResolvedDragElastic = {
+    x: { min: number; max: number }
+    y: { min: number; max: number }
+}
+
+const defaultElastic = 0.35
+
+const clampElastic = (value: number): number => Math.max(0, Math.min(1, value))
+
+type NormalizedDragElastic = number | Exclude<DragElastic, boolean | number>
+
+const resolvePointElastic = (
+    elastic: NormalizedDragElastic,
+    key: 'left' | 'right' | 'top' | 'bottom'
+) => (typeof elastic === 'number' ? elastic : (elastic[key] ?? 0))
+
+const resolveAxisElastic = (
+    elastic: NormalizedDragElastic,
+    minKey: 'left' | 'top',
+    maxKey: 'right' | 'bottom'
+) => ({
+    min: clampElastic(resolvePointElastic(elastic, minKey)),
+    max: clampElastic(resolvePointElastic(elastic, maxKey))
+})
+
+const resolveDragElastic = (elastic: DragElastic = defaultElastic): ResolvedDragElastic => {
+    if (elastic === false) elastic = 0
+    if (elastic === true) elastic = defaultElastic
+
+    return {
+        x: resolveAxisElastic(elastic, 'left', 'right'),
+        y: resolveAxisElastic(elastic, 'top', 'bottom')
+    }
+}
+
+const getMaxElastic = (elastic: ResolvedDragElastic): number =>
+    Math.max(elastic.x.min, elastic.x.max, elastic.y.min, elastic.y.max)
+
+const calcConstraintProgress = (value: number, min: number, max: number): number | null => {
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return null
+    if (max === min) return 0
+    return clamp((value - min) / (max - min), 0, 1)
+}
 
 /**
  * Resolve drag constraints into pixel offsets relative to the dragged element's origin.
@@ -170,21 +231,30 @@ const computeReleaseVelocity = (
     nowMs: number
 ): { x: number; y: number } => {
     if (history.length < 2) return { x: 0, y: 0 }
-    const newest = history[history.length - 1]
-    if (nowMs - newest.t > MAX_VELOCITY_DELTA_MS) return { x: 0, y: 0 }
-    let oldestIdx = history.length - 1
-    for (let i = history.length - 2; i >= 0; i--) {
-        if (newest.t - history[i].t > MAX_VELOCITY_DELTA_MS) break
-        oldestIdx = i
+
+    for (let newestIdx = history.length - 1; newestIdx > 0; newestIdx--) {
+        const newest = history[newestIdx]
+        if (nowMs - newest.t > MAX_VELOCITY_DELTA_MS) return { x: 0, y: 0 }
+
+        let oldestIdx = newestIdx
+        for (let i = newestIdx - 1; i >= 0; i--) {
+            if (newest.t - history[i].t > MAX_VELOCITY_DELTA_MS) break
+            oldestIdx = i
+        }
+
+        if (oldestIdx === newestIdx) continue
+
+        const oldest = history[oldestIdx]
+        const dtMs = newest.t - oldest.t
+        if (dtMs < MIN_VELOCITY_INTERVAL_MS) continue
+
+        return {
+            x: ((newest.x - oldest.x) / dtMs) * 1000,
+            y: ((newest.y - oldest.y) / dtMs) * 1000
+        }
     }
-    if (oldestIdx === history.length - 1) return { x: 0, y: 0 }
-    const oldest = history[oldestIdx]
-    const dtMs = newest.t - oldest.t
-    if (dtMs < MIN_VELOCITY_INTERVAL_MS) return { x: 0, y: 0 }
-    return {
-        x: ((newest.x - oldest.x) / dtMs) * 1000,
-        y: ((newest.y - oldest.y) / dtMs) * 1000
-    }
+
+    return { x: 0, y: 0 }
 }
 
 /**
@@ -257,7 +327,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     const axis = opts.axis
     const directionLock = !!opts.directionLock
     const listenerEnabled = opts.listener !== false
-    const elastic = typeof opts.elastic === 'number' ? opts.elastic : 0.35
+    const elastic = resolveDragElastic(opts.elastic)
+    const maxElastic = getMaxElastic(elastic)
     const momentum = opts.momentum !== false
     const mergedTransition = (opts.mergedTransition ?? {}) as AnimationOptions
 
@@ -283,7 +354,22 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     let history: Array<{ x: number; y: number; t: number }> = []
 
     let whileDragBaseline: Record<string, unknown> | null = null
+    let transformComposerRaf = 0
+    let transformComposerActive = false
+    let postReleaseAnimationActive = false
+    let whileDragRestoreActive = false
+    let managedScaleActive = false
+    let managedScale = 1
+    let scaleAnimation: AnimationPlaybackControlsWithThen | null = null
     let stopInertia: (() => void) | null = null
+
+    const markDragTransformActive = (active: boolean) => {
+        if (active) {
+            el.dataset.svelteMotionDragActive = 'true'
+        } else {
+            delete el.dataset.svelteMotionDragActive
+        }
+    }
 
     const computeInfo = (): DragInfo => ({
         point: { ...lastPoint },
@@ -295,52 +381,65 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         velocity: { ...velocity }
     })
 
-    /**
-     * Write absolute element-space translation using Motion's animate() with duration 0.
-     * Also update `applied` so subsequent drags have the correct origin.
-     */
-    const setXY = (x: number, y: number) => {
-        pwLog('[drag] setXY → animate(0)', { el: EL_ID, x, y })
-        const payload: Record<string, unknown> = {}
-        if (axis === true || axis === 'x') payload.x = x
-        if (axis === true || axis === 'y') payload.y = y
-        // Skip no-op writes within a tiny epsilon to reduce layout churn
-        const EPS = 0.01
-        const wantX = 'x' in payload
-        const wantY = 'y' in payload
-        const skipX = wantX && Math.abs(applied.x - x) < EPS
-        const skipY = wantY && Math.abs(applied.y - y) < EPS
-        if ((wantX ? skipX : true) && (wantY ? skipY : true)) {
-            return
-        }
-        // duration: 0 to write instantly via Motion
-        animate(el, payload as DOMKeyframesDefinition, { duration: 0 })
-        // Track applied transform for correct subsequent drag origins
-        if ('x' in payload) applied.x = x
-        if ('y' in payload) applied.y = y
+    const getConstraintBounds = (
+        base: { x: number; y: number },
+        currentConstraints: { top: number; left: number; right: number; bottom: number }
+    ) => ({
+        minX: base.x + (currentConstraints.left ?? -Infinity),
+        maxX: base.x + (currentConstraints.right ?? Infinity),
+        minY: base.y + (currentConstraints.top ?? -Infinity),
+        maxY: base.y + (currentConstraints.bottom ?? Infinity)
+    })
 
-        // Playwright-only sanity check: confirm the transform actually
-        // landed on the element and retry once if not. Forces a style
-        // recalc via getComputedStyle, so we gate it behind the same
-        // playwright env flag pwLog uses so it never fires in prod.
-        if (isPlaywrightEnv()) {
-            let actualTransform = getComputedStyle(el).transform
-            if (actualTransform === 'none' || !actualTransform.includes('matrix')) {
-                pwWarn('⚠️ setXY transform missing; retrying write', { x, y })
-                animate(
-                    el,
-                    ('x' in payload || 'y' in payload
-                        ? payload
-                        : { x, y }) as DOMKeyframesDefinition,
-                    { duration: 0 }
-                )
-                actualTransform = getComputedStyle(el).transform
-                if (actualTransform === 'none' || !actualTransform.includes('matrix')) {
-                    pwWarn('⚠️ setXY second attempt still missing transform', { x, y })
-                }
-            }
-        }
+    const scalePositionWithinConstraints = () => {
+        if (dragging || !constraints) return
+        const isElementRefConstraint = isDomElement(opts.constraints as unknown)
+        if (!isElementRefConstraint) return
+
+        const oldBounds = getConstraintBounds(constraintsBase, constraints)
+        if (stopInertia) stopInertia()
+        const progressX = calcConstraintProgress(applied.x, oldBounds.minX, oldBounds.maxX)
+        const progressY = calcConstraintProgress(applied.y, oldBounds.minY, oldBounds.maxY)
+
+        const freshConstraints = resolveConstraints(el, opts.constraints)
+        if (!freshConstraints) return
+
+        constraints = freshConstraints
+        constraintsBase = { x: applied.x, y: applied.y }
+        const applyX = axis === true || axis === 'x'
+        const applyY = axis === true || axis === 'y'
+        const { minX, maxX, minY, maxY } = getConstraintBounds(constraintsBase, freshConstraints)
+        const nextX = applyX
+            ? progressX == null
+                ? applyFloatConstraints(applied.x, { min: minX, max: maxX })
+                : mix(minX, maxX, progressX)
+            : applied.x
+        const nextY = applyY
+            ? progressY == null
+                ? applyFloatConstraints(applied.y, { min: minY, max: maxY })
+                : mix(minY, maxY, progressY)
+            : applied.y
+
+        if (nextX === applied.x && nextY === applied.y) return
+        pwLog('[drag] constraints resized → scale position', {
+            el: EL_ID,
+            bounds: { minX, maxX, minY, maxY },
+            progress: { x: progressX, y: progressY },
+            from: { ...applied },
+            to: { x: nextX, y: nextY }
+        })
+        setXYImmediate(nextX, nextY)
     }
+
+    const stopConstraintResizeObserver =
+        isDomElement(opts.constraints as unknown) && typeof ResizeObserver !== 'undefined'
+            ? (() => {
+                  const observer = new ResizeObserver(() => scalePositionWithinConstraints())
+                  observer.observe(el)
+                  observer.observe(opts.constraints as unknown as HTMLElement)
+                  return () => observer.disconnect()
+              })()
+            : null
 
     /**
      * Write absolute element-space translation by mutating
@@ -362,11 +461,112 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         const parts: string[] = []
         if (axis === true || axis === 'x') parts.push(`translateX(${x}px)`)
         if (axis === true || axis === 'y') parts.push(`translateY(${y}px)`)
-        // Strip existing translate channels, keep the rest (scale/rotate/etc.).
-        const nonTranslate = el.style.transform.replace(/translate[XYZ3d]*\([^)]*\)/g, '').trim()
-        el.style.transform = [...parts, nonTranslate].filter(Boolean).join(' ')
+        const scalePart =
+            managedScaleActive && Math.abs(managedScale - 1) > 0.0001
+                ? `scale(${managedScale})`
+                : ''
+        const liveTransform = [...parts, scalePart].filter(Boolean).join(' ')
+        el.dataset.svelteMotionDragTransform = liveTransform
+        const writeComposedTransform = () => {
+            if (el.dataset.svelteMotionDragTransform !== liveTransform) return
+            const baseTransform = opts.getBaseTransform?.() ?? ''
+            el.style.transform = [liveTransform, baseTransform].filter(Boolean).join(' ')
+        }
+
+        writeComposedTransform()
+        queueMicrotask(writeComposedTransform)
+        requestAnimationFrame(writeComposedTransform)
         if (axis === true || axis === 'x') applied.x = x
         if (axis === true || axis === 'y') applied.y = y
+        opts.callbacks?.onVisualUpdate?.(liveTransform)
+    }
+
+    const startTransformComposer = () => {
+        if (transformComposerActive) return
+        transformComposerActive = true
+
+        const tick = () => {
+            if (!transformComposerActive) return
+            setXYImmediate(applied.x, applied.y)
+            transformComposerRaf = requestAnimationFrame(tick)
+        }
+
+        transformComposerRaf = requestAnimationFrame(tick)
+    }
+
+    const stopTransformComposer = () => {
+        transformComposerActive = false
+        if (!transformComposerRaf) return
+        cancelAnimationFrame(transformComposerRaf)
+        transformComposerRaf = 0
+    }
+
+    const maybeStopTransformComposer = () => {
+        if (dragging || postReleaseAnimationActive || whileDragRestoreActive) return
+
+        requestAnimationFrame(() => {
+            if (dragging || postReleaseAnimationActive || whileDragRestoreActive) return
+            setXYImmediate(applied.x, applied.y)
+            markDragTransformActive(false)
+        })
+    }
+
+    const readCurrentScale = () => {
+        const transform = getComputedStyle(el).transform
+        if (!transform || transform === 'none') return 1
+        const matrix = transform.match(/matrix\(([^)]+)\)/)
+        if (!matrix) return 1
+        const [a, b] = matrix[1]
+            .split(',')
+            .map((part) => Number.parseFloat(part.trim()))
+            .slice(0, 2)
+        if (!Number.isFinite(a)) return 1
+        if (!Number.isFinite(b)) return a
+        return Math.hypot(a, b)
+    }
+
+    const animateManagedScale = (
+        target: unknown,
+        transition: AnimationOptions | undefined,
+        onComplete?: () => void
+    ) => {
+        const targetScale = Number(Array.isArray(target) ? target[target.length - 1] : target)
+        if (!Number.isFinite(targetScale)) {
+            onComplete?.()
+            return null
+        }
+
+        scaleAnimation?.stop()
+        managedScaleActive = true
+        managedScale = readCurrentScale()
+        const valueTransition = {
+            ...((transition ?? mergedTransition ?? {}) as Record<string, unknown>)
+        }
+        if (typeof valueTransition.duration === 'number') {
+            valueTransition.duration = valueTransition.duration * 1000
+        }
+        if (typeof valueTransition.delay === 'number') {
+            valueTransition.delay = valueTransition.delay * 1000
+        }
+        if (typeof valueTransition.repeatDelay === 'number') {
+            valueTransition.repeatDelay = valueTransition.repeatDelay * 1000
+        }
+
+        const controls = animateValue({
+            ...valueTransition,
+            keyframes: [managedScale, targetScale],
+            onUpdate: (value: number) => {
+                managedScale = value
+                setXYImmediate(applied.x, applied.y)
+            },
+            onComplete: () => {
+                managedScale = targetScale
+                setXYImmediate(applied.x, applied.y)
+                onComplete?.()
+            }
+        })
+        scaleAnimation = controls
+        return controls
     }
 
     /**
@@ -427,17 +627,67 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         const { keyframes, transition } = splitHoverDefinition(
             opts.whileDrag as Record<string, unknown>
         )
-        animate(
-            el,
-            keyframes as DOMKeyframesDefinition,
-            (transition ?? mergedTransition) as AnimationOptions
-        )
+        startTransformComposer()
+        const { scale, ...nativeKeyframes } = keyframes
+        if (scale != null) animateManagedScale(scale, transition)
+        if (Object.keys(nativeKeyframes).length > 0) {
+            animate(
+                el,
+                nativeKeyframes as DOMKeyframesDefinition,
+                (transition ?? mergedTransition) as AnimationOptions
+            )
+        }
     }
 
     const endWhileDrag = () => {
-        if (!whileDragBaseline || Object.keys(whileDragBaseline).length === 0) return
-        animate(el, whileDragBaseline as unknown as DOMKeyframesDefinition, mergedTransition)
+        const baseline = whileDragBaseline
+        if (!baseline || Object.keys(baseline).length === 0) {
+            maybeStopTransformComposer()
+            return
+        }
+        whileDragRestoreActive = true
+        const { scale, ...nativeBaseline } = baseline
+        const restore =
+            Object.keys(nativeBaseline).length > 0
+                ? animate(el, nativeBaseline as unknown as DOMKeyframesDefinition, mergedTransition)
+                : null
         whileDragBaseline = null
+
+        const finishRestore = () => {
+            whileDragRestoreActive = false
+            if (managedScaleActive && Math.abs(managedScale - 1) <= 0.0001) {
+                managedScale = 1
+                setXYImmediate(applied.x, applied.y)
+                managedScaleActive = false
+            }
+            maybeStopTransformComposer()
+        }
+
+        const scaleRestore =
+            scale != null || managedScaleActive
+                ? animateManagedScale(scale ?? 1, mergedTransition, () => {
+                      managedScale = Number(scale ?? 1)
+                      if (Math.abs(managedScale - 1) <= 0.0001) {
+                          managedScale = 1
+                          setXYImmediate(applied.x, applied.y)
+                          managedScaleActive = false
+                      }
+                  })
+                : null
+
+        const restorePromises: PromiseLike<unknown>[] = []
+        for (const control of [restore, scaleRestore]) {
+            if (control && typeof (control as PromiseLike<unknown>).then === 'function') {
+                restorePromises.push(control as PromiseLike<unknown>)
+            }
+        }
+
+        if (restorePromises.length > 0) {
+            Promise.allSettled(restorePromises).then(finishRestore)
+            return
+        }
+
+        finishRestore()
     }
 
     const onPointerDown = (e: PointerEvent) => {
@@ -492,6 +742,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         }
 
         dragging = true
+        el.dispatchEvent(new CustomEvent('svelte-motion:drag-start'))
+        markDragTransformActive(true)
         lockAxis = null
         // Start from current applied transform, not viewport rect
         origin = { x: applied.x, y: applied.y }
@@ -499,18 +751,21 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         lastPoint = { ...startPoint }
         velocity = { x: 0, y: 0 }
         history = [{ x: e.clientX, y: e.clientY, t: now() }]
+        startTransformComposer()
 
         const applyXAxis = axis === true || axis === 'x'
         const applyYAxis = axis === true || axis === 'y'
-        // For external dragControls we avoid snap-to-cursor to prevent teleports
-        const useSnapToCursor = snapToCursor && !opts.controls
-        if (useSnapToCursor) {
+        if (snapToCursor) {
+            const rendered = parseMatrixTranslate(getComputedStyle(el).transform)
+            const base = parseMatrixTranslate(opts.getBaseTransform?.() ?? '')
+            if (applyXAxis) applied.x = rendered.tx - base.tx
+            if (applyYAxis) applied.y = rendered.ty - base.ty
             const rect = el.getBoundingClientRect()
-            // Rebase to center under cursor while preserving accumulated transform frame
-            const desiredX = e.clientX - rect.width / 2
-            const desiredY = e.clientY - rect.height / 2
-            if (applyXAxis) origin.x = desiredX
-            if (applyYAxis) origin.y = desiredY
+            const centerX = rect.left + rect.width / 2
+            const centerY = rect.top + rect.height / 2
+            if (applyXAxis) origin.x = applied.x + e.clientX - centerX
+            if (applyYAxis) origin.y = applied.y + e.clientY - centerY
+            setXYImmediate(origin.x, origin.y)
             pwLog('[drag] snapToCursor origin', { el: EL_ID, origin })
         }
 
@@ -596,8 +851,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 bounds: { minX, maxX, minY, maxY },
                 preClamp
             })
-            x = applyFloatConstraints(x, { min: minX, max: maxX }, elastic)
-            y = applyFloatConstraints(y, { min: minY, max: maxY }, elastic)
+            x = applyFloatConstraints(x, { min: minX, max: maxX }, elastic.x)
+            y = applyFloatConstraints(y, { min: minY, max: maxY }, elastic.y)
             pwLog('[drag] constrain+elastic', {
                 el: EL_ID,
                 preClamp,
@@ -608,8 +863,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             })
         }
 
-        // Apply absolute transform in element space
-        setXY(x, y)
+        // Apply absolute transform in element space. Pointermove must paint
+        // in the same frame as the event; Motion's zero-duration animate()
+        // path schedules the write and can leave the element visibly chasing
+        // the pointer on dense/rotated drag surfaces.
+        setXYImmediate(x, y)
         opts.callbacks?.onMove?.(e, computeInfo())
     }
 
@@ -643,6 +901,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
      */
     const finishDrag = (e: PointerEvent, cancelled = false) => {
         dragging = false
+        postReleaseAnimationActive = false
 
         velocity = computeReleaseVelocity(history, now())
 
@@ -682,45 +941,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 historyFirst: history[0],
                 historyLast: history[history.length - 1]
             })
-            // If snapToOrigin, skip inertia and spring: use settle path to 0 for consistency
-            if (opts.snapToOrigin) {
-                pwLog('↩️ snapToOrigin: settle to (0,0)')
-                const applyX = axis === true || axis === 'x'
-                const applyY = axis === true || axis === 'y'
-                const controls = animate(
-                    el,
-                    {
-                        ...(applyX ? { x: 0 } : {}),
-                        ...(applyY ? { y: 0 } : {})
-                    } as DOMKeyframesDefinition,
-                    (mergedTransition ?? {}) as AnimationOptions
-                )
-                // Cancel hook so re-grab / controls.stop() interrupts the snap.
-                stopInertia = () => {
-                    pwLog('❌ snapToOrigin cancelled')
-                    ;(controls as unknown as { stop?: () => void }).stop?.()
-                    // Sync applied to wherever the snap reached so the next drag origin is correct.
-                    const { tx, ty } = parseMatrixTranslate(getComputedStyle(el).transform)
-                    if (applyX) applied.x = tx
-                    if (applyY) applied.y = ty
-                    stopInertia = null
-                }
-                Promise.resolve((controls as unknown as { finished?: Promise<void> }).finished)
-                    .then(() => {
-                        // Sync internal applied transform so next drag uses the correct origin
-                        if (applyX) applied.x = 0
-                        if (applyY) applied.y = 0
-                        pwLog('[drag] snapToOrigin finished → sync applied', {
-                            el: EL_ID,
-                            applied
-                        })
-                        if (stopInertia) stopInertia = null
-                    })
-                    .catch(() => {})
-                    .finally(() => opts.callbacks?.onTransitionEnd?.())
-                return
-            }
-
             // Boundary min/max anchor to `constraintsBase` (the absolute
             // pixel-constraint origin) so the inertia handoff snaps to the
             // same edge pointermove's elastic clamping uses — not to a
@@ -740,11 +960,12 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 ? applied.y + huge
                 : constraintsBase.y + (constraints?.bottom ?? Infinity)
 
-            const { timeConstantMs, restDelta, restSpeed, bounceStiffness, bounceDamping } =
-                deriveBoundaryPhysics(elastic, opts.transition)
+            const { power, timeConstant, restDelta, restSpeed, bounceStiffness, bounceDamping } =
+                deriveBoundaryPhysics(maxElastic, opts.transition)
 
             pwLog('⚙️ boundary-physics', {
-                timeConstantMs,
+                power,
+                timeConstant,
                 restDelta,
                 restSpeed,
                 bounceStiffness,
@@ -759,111 +980,139 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             const applyX = (axis === true || axis === 'x') && lockAxis !== 'y'
             const applyY = (axis === true || axis === 'y') && lockAxis !== 'x'
 
-            // Element-ref constraints can resize / reflow during inertia.
-            // Pixel constraints never change once set. We re-resolve only
-            // for element-ref each frame in the rAF loop below.
-            const isElementRefConstraint = isDomElement(opts.constraints as unknown)
-
-            const stepX = applyX
-                ? createInertiaToBoundary(
-                      { value: applied.x, velocity: velocity.x },
-                      { min: minX, max: maxX },
-                      { timeConstantMs, restDelta, restSpeed, bounceStiffness, bounceDamping }
-                  )
-                : null
-            const stepY = applyY
-                ? createInertiaToBoundary(
-                      { value: applied.y, velocity: velocity.y },
-                      { min: minY, max: maxY },
-                      { timeConstantMs, restDelta, restSpeed, bounceStiffness, bounceDamping }
-                  )
-                : null
-
-            let running = true
-            const startTs = now()
+            let latestX = applied.x
+            let latestY = applied.y
             let frameCount = 0
+            let running = true
+            postReleaseAnimationActive = true
+            const animations: AnimationPlaybackControlsWithThen[] = []
+            let remainingAnimations = (applyX ? 1 : 0) + (applyY ? 1 : 0)
+            const transitionMin = opts.transition?.min
+            const transitionMax = opts.transition?.max
+            const snapX = opts.snapToOrigin === true || opts.snapToOrigin === 'x'
+            const snapY = opts.snapToOrigin === true || opts.snapToOrigin === 'y'
+            const inertiaMinX = snapX ? 0 : (transitionMin ?? (noConstraints ? undefined : minX))
+            const inertiaMaxX = snapX ? 0 : (transitionMax ?? (noConstraints ? undefined : maxX))
+            const inertiaMinY = snapY ? 0 : (transitionMin ?? (noConstraints ? undefined : minY))
+            const inertiaMaxY = snapY ? 0 : (transitionMax ?? (noConstraints ? undefined : maxY))
+            const finalMinX = snapX ? 0 : minX
+            const finalMaxX = snapX ? 0 : maxX
+            const finalMinY = snapY ? 0 : minY
+            const finalMaxY = snapY ? 0 : maxY
 
-            const raf = () => {
-                if (!running) {
-                    pwLog('🛑 RAF stopped (running = false)')
-                    return
-                }
-                const t = now() - startTs
+            const renderLatest = () => {
+                if (!running) return
                 frameCount++
-
-                // Use the precomputed step functions (built once per release)
-                const rx = stepX ? stepX(t) : { value: applied.x, done: true }
-                const ry = stepY ? stepY(t) : { value: applied.y, done: true }
-
-                // Element-ref constraints may have resized / reflowed since
-                // the steppers were built. Re-resolve and clamp the output
-                // so the card never lands outside the now-current container
-                // even if its boundary moved mid-spring. Pixel constraints
-                // don't move so we skip the work.
-                let nextX = rx.value
-                let nextY =
-                    (axis === true || axis === 'y') && lockAxis !== 'x' ? ry.value : applied.y
-                if (isElementRefConstraint) {
-                    const freshConstraints = resolveConstraints(el, opts.constraints)
-                    if (freshConstraints) {
-                        constraintsBase = { x: applied.x, y: applied.y }
-                        const freshMinX = constraintsBase.x + (freshConstraints.left ?? -Infinity)
-                        const freshMaxX = constraintsBase.x + (freshConstraints.right ?? Infinity)
-                        const freshMinY = constraintsBase.y + (freshConstraints.top ?? -Infinity)
-                        const freshMaxY = constraintsBase.y + (freshConstraints.bottom ?? Infinity)
-                        if (applyX) nextX = Math.max(freshMinX, Math.min(freshMaxX, nextX))
-                        if (applyY) nextY = Math.max(freshMinY, Math.min(freshMaxY, nextY))
-                    }
-                }
-                setXY(nextX, nextY)
+                setXYImmediate(latestX, latestY)
 
                 if (frameCount <= 3 || frameCount % 10 === 0) {
                     pwLog(`🔄 FRAME ${frameCount}`, {
-                        t: t.toFixed(0),
-                        px: rx.value.toFixed?.(2) ?? rx.value,
-                        py: ry.value.toFixed?.(2) ?? ry.value,
-                        doneX: rx.done,
-                        doneY: ry.done,
+                        px: latestX.toFixed?.(2) ?? latestX,
+                        py: latestY.toFixed?.(2) ?? latestY,
                         boundsX: { minX, maxX },
                         boundsY: { minY, maxY }
                     })
                 }
+            }
 
-                if ((rx.done || !stepX) && (ry.done || !stepY)) {
-                    pwLog('✅ REST REACHED', {
-                        frameCount,
-                        finalX: nextX,
-                        finalY: nextY,
-                        timeConstantMs,
-                        restDelta,
-                        restSpeed
-                    })
-                    // Sync `applied` from the post-clamp frame values
-                    // (nextX/nextY), not the raw stepper output. When
-                    // element-ref constraints clamped this frame, raw
-                    // rx.value sits outside the visible bounds and would
-                    // desync the next-drag origin from the rendered transform.
-                    const finalX = stepX ? nextX : applied.x
-                    const finalY = stepY ? nextY : applied.y
-                    if (axis === true || axis === 'x') applied.x = finalX
-                    if (axis === true || axis === 'y') applied.y = finalY
-                    running = false
-                    stopInertia = null
-                    opts.callbacks?.onTransitionEnd?.()
-                    return
-                }
-                requestAnimationFrame(raf)
+            const completeAxis = () => {
+                if (!running) return
+                remainingAnimations--
+                if (remainingAnimations > 0) return
+
+                if (applyX)
+                    applied.x = applyFloatConstraints(latestX, { min: finalMinX, max: finalMaxX })
+                if (applyY)
+                    applied.y = applyFloatConstraints(latestY, { min: finalMinY, max: finalMaxY })
+                setXYImmediate(applied.x, applied.y)
+
+                pwLog('✅ REST REACHED', {
+                    frameCount,
+                    finalX: applied.x,
+                    finalY: applied.y,
+                    power,
+                    timeConstant,
+                    restDelta,
+                    restSpeed
+                })
+
+                running = false
+                stopInertia = null
+                postReleaseAnimationActive = false
+                maybeStopTransformComposer()
+                opts.callbacks?.onTransitionEnd?.()
+            }
+
+            if (applyX) {
+                animations.push(
+                    startDragInertia(
+                        {
+                            value: applied.x,
+                            velocity: velocity.x,
+                            min: inertiaMinX,
+                            max: inertiaMaxX,
+                            power,
+                            timeConstant,
+                            restDelta,
+                            restSpeed,
+                            modifyTarget: opts.transition?.modifyTarget,
+                            bounceStiffness,
+                            bounceDamping
+                        },
+                        {
+                            onUpdate: (value) => {
+                                latestX = value
+                                renderLatest()
+                            },
+                            onComplete: completeAxis
+                        }
+                    )
+                )
+            }
+
+            if (applyY) {
+                animations.push(
+                    startDragInertia(
+                        {
+                            value: applied.y,
+                            velocity: velocity.y,
+                            min: inertiaMinY,
+                            max: inertiaMaxY,
+                            power,
+                            timeConstant,
+                            restDelta,
+                            restSpeed,
+                            modifyTarget: opts.transition?.modifyTarget,
+                            bounceStiffness,
+                            bounceDamping
+                        },
+                        {
+                            onUpdate: (value) => {
+                                latestY = value
+                                renderLatest()
+                            },
+                            onComplete: completeAxis
+                        }
+                    )
+                )
+            }
+
+            if (!animations.length) {
+                postReleaseAnimationActive = false
+                maybeStopTransformComposer()
+                opts.callbacks?.onTransitionEnd?.()
+                return
             }
 
             stopInertia = () => {
                 pwLog('❌ MOMENTUM CANCELLED')
                 running = false
-                // `applied` is already in sync with the last frame rendered
-                // by the rAF loop (setXY updates it on every frame). We
-                // intentionally do NOT call stepX/stepY again here —
-                // they're stateful (mutate lastT/springX/springV) and an
-                // extra call advances them past the visible state, leaving
-                // applied slightly out of sync with what the user sees.
+                for (const animation of animations) animation.stop()
+                const { tx, ty } = parseMatrixTranslate(getComputedStyle(el).transform)
+                if (applyX) applied.x = tx
+                if (applyY) applied.y = ty
+                postReleaseAnimationActive = false
+                maybeStopTransformComposer()
                 pwLog('[drag] inertia cancelled → sync applied', {
                     el: EL_ID,
                     applied: { x: applied.x, y: applied.y }
@@ -871,29 +1120,39 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 stopInertia = null
             }
 
-            pwLog('🏁 QUEUING RAF')
-            requestAnimationFrame(raf)
+            pwLog('🏁 STARTED MOTION-DOM INERTIA', {
+                animations: animations.length,
+                applyX,
+                applyY
+            })
         } else {
-            // No momentum: animate to clamped target or origin to resolve elastic overdrag
-            const applyX = axis === true || axis === 'x'
-            const applyY = axis === true || axis === 'y'
+            // No momentum: spring from the rendered overdrag value back to
+            // the clamped target. This must use the same direct transform
+            // writer as active drag so release doesn't snap through Motion's
+            // separate DOM animation state.
+            const applyX = (axis === true || axis === 'x') && lockAxis !== 'y'
+            const applyY = (axis === true || axis === 'y') && lockAxis !== 'x'
             const dx = lastPoint.x - startPoint.x
             const dy = lastPoint.y - startPoint.y
             let x = origin.x + (applyX ? dx : 0)
             let y = origin.y + (applyY ? dy : 0)
+            let minX = -Infinity
+            let maxX = Infinity
+            let minY = -Infinity
+            let maxY = Infinity
 
             // Respect direction lock
             if (lockAxis === 'x') y = origin.y
             if (lockAxis === 'y') x = origin.x
 
             if (opts.snapToOrigin) {
-                x = 0
-                y = 0
+                if (opts.snapToOrigin === true || opts.snapToOrigin === 'x') x = 0
+                if (opts.snapToOrigin === true || opts.snapToOrigin === 'y') y = 0
             } else if (constraints) {
-                const minX = constraintsBase.x + (constraints.left ?? -Infinity)
-                const maxX = constraintsBase.x + (constraints.right ?? Infinity)
-                const minY = constraintsBase.y + (constraints.top ?? -Infinity)
-                const maxY = constraintsBase.y + (constraints.bottom ?? Infinity)
+                minX = constraintsBase.x + (constraints.left ?? -Infinity)
+                maxX = constraintsBase.x + (constraints.right ?? Infinity)
+                minY = constraintsBase.y + (constraints.top ?? -Infinity)
+                maxY = constraintsBase.y + (constraints.bottom ?? Infinity)
                 pwLog('[drag] settle (no momentum) bounds', {
                     el: EL_ID,
                     base: { ...constraintsBase },
@@ -914,41 +1173,125 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 elastic
             })
 
-            // When elastic=0, the element is already at the clamped position during drag,
-            // so use instant settle (duration: 0) to avoid spring bounce.
-            // Otherwise use the merged transition for smooth settle animation.
-            const settleTransition =
-                elastic === 0 ? { duration: 0 } : ((mergedTransition ?? {}) as AnimationOptions)
+            postReleaseAnimationActive = true
+            let latestX = applied.x
+            let latestY = applied.y
+            let running = true
+            const animations: AnimationPlaybackControlsWithThen[] = []
+            const { timeConstant, restDelta, restSpeed, bounceStiffness, bounceDamping } =
+                deriveBoundaryPhysics(maxElastic, opts.transition)
 
-            // Animate with the merged transition so the settle feels consistent with other motion
-            const controls = animate(
-                el,
-                { ...(applyX ? { x } : {}), ...(applyY ? { y } : {}) } as DOMKeyframesDefinition,
-                settleTransition
-            )
-            // Cancel hook so re-grab interrupts the settle animation cleanly.
+            const renderLatest = () => {
+                if (!running) return
+                setXYImmediate(latestX, latestY)
+            }
+
+            if (cancelled) {
+                if (applyX) latestX = x
+                if (applyY) latestY = y
+                setXYImmediate(latestX, latestY)
+                postReleaseAnimationActive = false
+                maybeStopTransformComposer()
+                opts.callbacks?.onTransitionEnd?.()
+                return
+            }
+
+            const finishSettle = () => {
+                if (!running) return
+                if (applyX) applied.x = applyFloatConstraints(latestX, { min: minX, max: maxX })
+                if (applyY) applied.y = applyFloatConstraints(latestY, { min: minY, max: maxY })
+                setXYImmediate(applied.x, applied.y)
+                running = false
+                stopInertia = null
+                postReleaseAnimationActive = false
+                maybeStopTransformComposer()
+                opts.callbacks?.onTransitionEnd?.()
+            }
+
+            let remainingAnimations = 0
+            const completeAxis = () => {
+                remainingAnimations--
+                if (remainingAnimations <= 0) finishSettle()
+            }
+
+            const addSettleAnimation = (
+                from: number,
+                to: number,
+                min: number,
+                max: number,
+                onUpdate: (value: number) => void
+            ) => {
+                const shouldSpringBoundary = from < min || from > max
+                if (Math.abs(from - to) < 0.01 && !shouldSpringBoundary) {
+                    onUpdate(to)
+                    return
+                }
+
+                remainingAnimations++
+                animations.push(
+                    shouldSpringBoundary
+                        ? startDragInertia(
+                              {
+                                  value: from,
+                                  velocity: 0,
+                                  min,
+                                  max,
+                                  power: 0,
+                                  timeConstant,
+                                  restDelta,
+                                  restSpeed,
+                                  bounceStiffness,
+                                  bounceDamping
+                              },
+                              { onUpdate, onComplete: completeAxis }
+                          )
+                        : animateValue({
+                              keyframes: [from, to],
+                              type: 'spring',
+                              stiffness: bounceStiffness,
+                              damping: bounceDamping,
+                              restDelta,
+                              restSpeed,
+                              onUpdate,
+                              onComplete: completeAxis
+                          })
+                )
+            }
+
             stopInertia = () => {
                 pwLog('❌ settle (no momentum) cancelled')
-                ;(controls as unknown as { stop?: () => void }).stop?.()
+                running = false
+                for (const animation of animations) animation.stop()
                 const { tx, ty } = parseMatrixTranslate(getComputedStyle(el).transform)
                 if (applyX) applied.x = tx
                 if (applyY) applied.y = ty
+                postReleaseAnimationActive = false
+                maybeStopTransformComposer()
                 stopInertia = null
             }
-            // Fire transition end once settled
-            Promise.resolve((controls as unknown as { finished?: Promise<void> }).finished)
-                .then(() => {
-                    // Sync internal applied transform so next drag uses the correct origin
-                    if (applyX) applied.x = x
-                    if (applyY) applied.y = y
-                    pwLog('[drag] settle finished → sync applied', {
-                        el: EL_ID,
-                        applied
+
+            if (maxElastic === 0) {
+                latestX = applyX ? x : applied.x
+                latestY = applyY ? y : applied.y
+                finishSettle()
+            } else {
+                if (applyX) {
+                    addSettleAnimation(applied.x, x, minX, maxX, (value) => {
+                        latestX = value
+                        renderLatest()
                     })
-                    if (stopInertia) stopInertia = null
-                })
-                .catch(() => {})
-                .finally(() => opts.callbacks?.onTransitionEnd?.())
+                }
+                if (applyY) {
+                    addSettleAnimation(applied.y, y, minY, maxY, (value) => {
+                        latestY = value
+                        renderLatest()
+                    })
+                }
+
+                if (!animations.length) {
+                    finishSettle()
+                }
+            }
         }
 
         opts.callbacks?.onEnd?.(e, computeInfo())
@@ -975,6 +1318,10 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
 
     const teardown = () => {
         pwLog('[drag] detach', { el: EL_ID })
+        markDragTransformActive(false)
+        stopTransformComposer()
+        scaleAnimation?.stop()
+        stopConstraintResizeObserver?.()
         el.removeEventListener('pointerdown', onPointerDown)
         el.removeEventListener('pointermove', onPointerMove as EventListener)
         el.removeEventListener('pointerup', onPointerUp as EventListener)

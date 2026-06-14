@@ -8,7 +8,8 @@
      *   - dragConstraints { left: -200, right: 200, top: -120, bottom: 120 }
      *   - dragElastic: 0.18
      *   - dragTransition { bounceStiffness: 360, bounceDamping: 24 }
-     *   - CSS `rotate` derived from onDrag info.offset.x via $state
+     *   - Motion object-style `rotate` derived from rendered x via $state,
+     *     matching React Framer Motion's `style={{ rotate }}` transform path
      *
      * Telemetry side panel logs x / y / rotate, peak x / peak y, and a
      * "frames" counter so we can see whether onDrag stops firing while
@@ -235,7 +236,7 @@
                 {onDragStart}
                 {onDragEnd}
                 data-testid="drag-card"
-                style="rotate: {rotateClamped}deg"
+                style={{ rotate: `${rotateClamped}deg` }}
             >
                 <span class="card-label">motion.div</span>
                 <ul class="card-props">
