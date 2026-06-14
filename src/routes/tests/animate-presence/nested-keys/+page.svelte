@@ -22,7 +22,8 @@
     <h1 class="text-2xl font-bold text-white">Nested Key Test</h1>
     <p class="max-w-md text-center text-gray-400">
         This test demonstrates that only direct children of AnimatePresence require keys. Nested
-        motion elements can work without explicit keys.
+        motion elements can enter/update without explicit keys, but their own conditional exits are
+        not held unless they have another AnimatePresence boundary.
     </p>
 
     <div class="flex gap-4">
@@ -120,8 +121,10 @@
                 <code class="text-cyan-400">key="card"</code> - Required on direct child of AnimatePresence
             </li>
             <li>Nested motion elements work without explicit keys</li>
-            <li>Exit animations still work for the entire tree</li>
-            <li>Toggle "Hide Nested" to test conditional nested elements</li>
+            <li>Parent exit animations still hold the entire card tree</li>
+            <li>
+                Toggle "Hide Nested" to verify nested conditionals unmount immediately like upstream
+            </li>
         </ul>
     </div>
 </div>

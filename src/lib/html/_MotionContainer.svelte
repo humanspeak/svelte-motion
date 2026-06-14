@@ -394,6 +394,11 @@
         setPresenceDepth(presenceDepth + 1)
     }
 
+    // Upstream AnimatePresence only holds direct motion children for exit.
+    // Nested motion elements can animate on mount/update, but their own
+    // conditional unmounts are immediate unless wrapped in another boundary.
+    const shouldRegisterPresenceExit = !!context && presenceDepth === 0 && !inPresenceChild
+
     // Use the provided key for presence tracking
     // When not inside AnimatePresence, use a stable identifier based on component instance
     // trunk-ignore(eslint/no-useless-assignment): false positive — presenceKey is used throughout the component
@@ -415,7 +420,7 @@
 
     // Register onDestroy at component level (guaranteed to work in Svelte 5)
     // — getContext()/onDestroy() must run during component initialization.
-    if (context && !inPresenceChild) {
+    if (shouldRegisterPresenceExit) {
         onDestroy(() => {
             pwLog('[presence] onDestroy triggered', { key: presenceKey })
             context.unregisterChild(presenceKey)
@@ -428,7 +433,7 @@
     // getAnimations()/commitStyles() can't work at clone time).
     // Skipped inside <PresenceChild>: the wrapper drives exit, no clone path.
     $effect(() => {
-        if (!(element && context) || inPresenceChild) return
+        if (!(element && shouldRegisterPresenceExit)) return
         let rafId: number
         const capture = () => {
             if (element && element.isConnected && element.getAnimations().length > 0) {
@@ -476,7 +481,7 @@
 
     // Reactively update registration when element/exit/transition props change
     $effect(() => {
-        if (element && context && !inPresenceChild && exitProp !== undefined) {
+        if (element && shouldRegisterPresenceExit && exitProp !== undefined) {
             const resolvePresenceExit = (custom: unknown) => {
                 const resolved = resolveExit(
                     exitProp,
@@ -503,7 +508,7 @@
     // Update presence context with current state when element is ready and has size.
     // Skipped inside <PresenceChild> — the rect/style snapshot only feeds the clone path.
     $effect(() => {
-        if (!(context && element && isLoaded === 'ready') || inPresenceChild) return
+        if (!(shouldRegisterPresenceExit && element && isLoaded === 'ready')) return
 
         let lastWidth = 0
         let lastHeight = 0
@@ -2404,7 +2409,7 @@
         // 3. Key actually changed (not undefined → value on mount)
         // 4. Not already transitioning
         if (
-            !context ||
+            !shouldRegisterPresenceExit ||
             !element ||
             isLoaded !== 'ready' ||
             keyTrackerIsTransitioning ||

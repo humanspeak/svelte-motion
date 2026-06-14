@@ -37,7 +37,9 @@ test.describe('AnimatePresence Nested Keys', () => {
         await expect(deeplyNested).toContainText('Deeply nested span (no key)')
     })
 
-    test('conditional nested element should animate independently', async ({ page }) => {
+    test('conditional nested element should unmount immediately like upstream', async ({
+        page
+    }) => {
         await page.goto('/tests/animate-presence/nested-keys?@isPlaywright=true')
 
         const nestedConditional = page.getByTestId('nested-conditional')
@@ -48,7 +50,8 @@ test.describe('AnimatePresence Nested Keys', () => {
 
         // Hide conditional nested element
         await toggleNested.click()
-        await expect(nestedConditional).not.toBeVisible()
+        await page.waitForTimeout(50)
+        await expect(nestedConditional).toHaveCount(0, { timeout: 100 })
 
         // Show conditional nested element
         await toggleNested.click()
