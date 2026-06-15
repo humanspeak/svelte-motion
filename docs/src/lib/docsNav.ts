@@ -19,6 +19,7 @@ import {
     Play,
     RefreshCw,
     Settings,
+    ShieldCheck,
     Signal,
     SlidersHorizontal,
     Timer,
@@ -137,6 +138,11 @@ export const docsSections: NavSection[] = [
             { title: 'Button', href: '/docs/shadcn-button', icon: MousePointer },
             { title: 'Tabs', href: '/docs/shadcn-tabs', icon: Columns2 }
         ]
+    },
+    {
+        title: 'Patterns',
+        icon: ShieldCheck,
+        items: [{ title: 'Armed Buttons', href: '/docs/armed-buttons', icon: ShieldCheck }]
     }
 ]
 

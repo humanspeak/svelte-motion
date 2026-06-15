@@ -97,7 +97,9 @@ body {
     height: 100vh;
     margin: 0;
     padding: 0;
-    overflow: hidden;
+    height: auto !important;
+    min-height: 100%;
+    overflow-y: auto !important;
 }
 
 #sandbox {

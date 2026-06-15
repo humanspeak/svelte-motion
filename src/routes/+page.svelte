@@ -165,6 +165,22 @@
                         Optimized appear animations
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/armed-buttons/archive') + searchParams}
+                    >
+                        Armed buttons — archive confirm
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/armed-buttons/delete-wait') + searchParams}
+                    >
+                        Armed buttons — delete wait
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

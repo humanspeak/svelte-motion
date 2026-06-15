@@ -6,6 +6,11 @@ type ExampleEntry = {
 }
 
 const EXAMPLES: Record<string, ExampleEntry> = {
+    'armed-buttons': {
+        title: 'Armed Buttons',
+        description:
+            'Production-style archive and delete wait button microinteractions built with Svelte Motion.'
+    },
     'animate-presence': {
         title: 'AnimatePresence',
         description: 'Interactive AnimatePresence animation example using Svelte Motion.'
