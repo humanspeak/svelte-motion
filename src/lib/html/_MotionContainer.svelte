@@ -2228,15 +2228,21 @@
                 wasViewportScrolledSinceLastLayout ||
                 wasViewportOffscreenSinceLastLayout ||
                 isViewportOffscreen(viewportRect)
-            if (!shouldSkipLayoutAnimation && !motionDomProjection) {
+            const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
+            const hasSizeCorrectionTarget = !!element!.querySelector('[data-svelte-motion-layout]')
+            const shouldUseSizeCorrectedFallback = transforms.shouldScale && hasSizeCorrectionTarget
+
+            if (
+                !shouldSkipLayoutAnimation &&
+                (!motionDomProjection || shouldUseSizeCorrectedFallback)
+            ) {
                 finishFlipAnimations(element!)
-                const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
                 runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
             }
             wasViewportScrolledSinceLastLayout = false
             wasViewportOffscreenSinceLastLayout = false
             if (!shouldSkipLayoutAnimation && hasRectChanged(previous, next)) {
-                if (motionDomProjection) {
+                if (motionDomProjection && !shouldUseSizeCorrectedFallback) {
                     motionDomProjection.commitObservedLayoutChange(previous)
                 }
             } else if (shouldSkipLayoutAnimation) {

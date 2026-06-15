@@ -69,6 +69,7 @@
 
     onMount(() => {
         let raf = 0
+        let disposed = false
         const readElement = (testId: string) => {
             const element = document.querySelector<HTMLElement>(`[data-testid="${testId}"]`)
             if (!element) return { transform: 'missing', opacity: 'missing' }
@@ -80,6 +81,7 @@
         }
 
         const tickFrame = () => {
+            if (disposed) return
             frame += 1
             const card = readElement('card')
             const orb = readElement('orb')
@@ -98,11 +100,15 @@
         void (async () => {
             await tick()
             await new Promise((resolve) => requestAnimationFrame(resolve))
+            if (disposed) return
             hydrated = true
             raf = requestAnimationFrame(tickFrame)
         })()
 
-        return () => cancelAnimationFrame(raf)
+        return () => {
+            disposed = true
+            cancelAnimationFrame(raf)
+        }
     })
 </script>
 

@@ -550,6 +550,8 @@ describe('AnimatePresence modes', () => {
 
             await Promise.resolve()
             await Promise.resolve()
+
+            expect(document.querySelector('[data-presence-placeholder="true"]')).toBeFalsy()
         })
 
         it('does not insert a placeholder during exit', async () => {

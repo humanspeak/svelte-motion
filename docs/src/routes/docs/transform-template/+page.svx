@@ -33,7 +33,7 @@ and the generated string, then returns the transform that should be rendered.
   import { motion } from '@humanspeak/svelte-motion'
 
   const transformTemplate = ({ y }, generated) =>
-    `translateX(${y}) ${generated}`
+    `translateY(${y}) ${generated}`
 </script>
 
 <motion.div

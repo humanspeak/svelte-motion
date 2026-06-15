@@ -46,7 +46,8 @@
         outline: none;
     `
 
-    pwLog('[AnimatePresenceModes] Page mounted', { state: internalState })
+    const logMount = () => pwLog('[AnimatePresenceModes] Page mounted', { state: internalState })
+    logMount()
 </script>
 
 <div style={container} data-testid="modes-container">

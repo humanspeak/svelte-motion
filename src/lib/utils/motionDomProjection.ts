@@ -270,6 +270,8 @@ export class MotionDomProjectionAdapter {
      * hooks Framer Motion uses in React, so this adapter reuses upstream
      * projection while the Svelte component controls the snapshot timing.
      *
+     * @param previousRect Optional pre-update rect used to seed the root
+     * projection snapshot.
      * @returns Nothing.
      *
      * @example

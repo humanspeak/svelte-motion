@@ -143,7 +143,7 @@
         }
     })
 
-    const flowExit = {
+    const getFlowExit = () => ({
         opacity: 0,
         scale: 0.8,
         x: mode === 'popLayout' ? 12 : 0,
@@ -151,23 +151,26 @@
             duration: 0.6,
             ease: defaultEase
         }
-    }
+    })
 
-    const iconNote =
+    const iconNote = $derived(
         mode === 'popLayout'
             ? 'Icon swap: enter and exit overlap, and the exiting icon is popped out of layout.'
             : mode === 'sync'
               ? 'Icon swap: enter and exit run together, so this should visually overlap like popLayout.'
               : 'Icon swap: enter waits until the old icon finishes exiting.'
+    )
 
-    const flowNote =
+    const flowNote = $derived(
         mode === 'popLayout'
             ? 'Layout row: MID fades as an overlay; RIGHT should move into the dashed slot immediately.'
             : mode === 'sync'
               ? 'Layout row: MID keeps its layout slot while fading; RIGHT should wait, then move after exit.'
               : 'Layout row: enter waits in swaps; here the slot also stays until exit completes.'
+    )
 
-    pwLog('[ModeExample] render', { mode, state })
+    const logRender = () => pwLog('[ModeExample] render', { mode, state })
+    logRender()
 </script>
 
 <div style={modeSection} data-testid="mode-section-{mode}">
@@ -204,7 +207,7 @@
                         style={middlePill}
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        exit={flowExit}
+                        exit={getFlowExit()}
                         transition={{ duration: 0.35, ease: defaultEase }}
                         data-testid="flow-middle-{mode}"
                     >

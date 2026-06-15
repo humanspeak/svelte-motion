@@ -76,15 +76,17 @@ test.describe('useAnimationControls', () => {
         await page.getByTestId('start').click()
         const confirmingFrames = await framesPromise
 
-        const confirmingX = confirmingFrames
-            .filter((frame) => frame.label.includes('confirming'))
-            .map((frame) => frame.x)
+        const xFrames = confirmingFrames.map((frame) => frame.x)
+        const peak = Math.max(...xFrames)
+        const peakIndex = xFrames.findIndex((x) => x === peak)
+        const afterPeak = xFrames.slice(peakIndex)
 
-        expect(confirmingX.length).toBeGreaterThan(3)
+        expect(peak).toBeGreaterThan(50)
+        expect(Math.min(...afterPeak.slice(-10))).toBeLessThan(5)
 
-        const firstNearRestIndex = confirmingX.findIndex((x) => x < 20)
-        if (firstNearRestIndex !== -1) {
-            const laterMax = Math.max(...confirmingX.slice(firstNearRestIndex + 1))
+        for (let i = 0; i < afterPeak.length - 1; i += 1) {
+            if (afterPeak[i] >= 20) continue
+            const laterMax = Math.max(...afterPeak.slice(i + 1))
             expect(laterMax).toBeLessThan(30)
         }
     })

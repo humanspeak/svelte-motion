@@ -10,18 +10,39 @@ const layoutSizeAnimationAttribute = 'data-layout-size-animation'
 
 const roundedPx = (value: number): string => `${Math.max(0, Math.round(value))}px`
 const mix = (from: number, to: number, progress: number): number => from + (to - from) * progress
-const activeFlipAnimations = new WeakMap<HTMLElement, Set<AnimationPlaybackControls>>()
+type TrackedFlipAnimation = {
+    animation: AnimationPlaybackControls
+    cleanup: () => void
+}
 
-const rememberFlipAnimation = (el: HTMLElement, animation: AnimationPlaybackControls) => {
+const activeFlipAnimations = new WeakMap<HTMLElement, Set<TrackedFlipAnimation>>()
+
+const rememberFlipAnimation = (
+    el: HTMLElement,
+    animation: AnimationPlaybackControls,
+    cleanup: () => void = () => {}
+) => {
     let animations = activeFlipAnimations.get(el)
     if (!animations) {
         animations = new Set()
         activeFlipAnimations.set(el, animations)
     }
-    animations.add(animation)
+    let cleanupRan = false
+    const tracked: TrackedFlipAnimation = {
+        animation,
+        cleanup: () => {
+            if (cleanupRan) return
+            cleanupRan = true
+            cleanup()
+        }
+    }
+    animations.add(tracked)
     animation.finished?.finally(() => {
-        animations?.delete(animation)
-        if (animations?.size === 0) activeFlipAnimations.delete(el)
+        tracked.cleanup()
+        const current = activeFlipAnimations.get(el)
+        if (current !== animations) return
+        current.delete(tracked)
+        if (current.size === 0) activeFlipAnimations.delete(el)
     })
 }
 
@@ -30,15 +51,24 @@ const rememberFlipAnimation = (el: HTMLElement, animation: AnimationPlaybackCont
  * committed layout transform.
  *
  * @param el Target element.
+ * @returns Nothing.
+ *
+ * @example
+ * ```ts
+ * finishFlipAnimations(node)
+ * ```
  */
 export const finishFlipAnimations = (el: HTMLElement): void => {
     const animations = activeFlipAnimations.get(el)
     if (!animations) return
 
     for (const animation of animations) {
-        animation.complete()
+        animation.animation.complete()
+        animation.cleanup()
     }
-    activeFlipAnimations.delete(el)
+    if (activeFlipAnimations.get(el) === animations) {
+        activeFlipAnimations.delete(el)
+    }
     el.style.transform = ''
 }
 
@@ -104,12 +134,6 @@ const runBoxSizeAnimation = (
         }
     }
 
-    const animation = animate(0, 1, {
-        ...(transition as ValueAnimationTransition<number>),
-        onUpdate: writeBox
-    })
-    rememberFlipAnimation(el, animation)
-
     let removeScrollListener: (() => void) | undefined
     let offscreenRaf: number | null = null
     let cleanupRan = false
@@ -131,6 +155,12 @@ const runBoxSizeAnimation = (
         el.style.transform = originalTransform
         el.removeAttribute(layoutSizeAnimationAttribute)
     }
+
+    const animation = animate(0, 1, {
+        ...(transition as ValueAnimationTransition<number>),
+        onUpdate: writeBox
+    })
+    rememberFlipAnimation(el, animation, cleanup)
 
     if (typeof window !== 'undefined') {
         const completeIfOffscreen = () => {
@@ -162,8 +192,6 @@ const runBoxSizeAnimation = (
         completeIfOffscreen()
         scheduleCompleteIfOffscreen()
     }
-
-    animation.finished?.finally(cleanup)
 }
 
 /**

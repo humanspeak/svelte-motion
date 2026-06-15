@@ -50,8 +50,7 @@ test.describe('AnimatePresence Nested Keys', () => {
 
         // Hide conditional nested element
         await toggleNested.click()
-        await page.waitForTimeout(50)
-        await expect(nestedConditional).toHaveCount(0, { timeout: 100 })
+        await expect(nestedConditional).toHaveCount(0, { timeout: 50 })
 
         // Show conditional nested element
         await toggleNested.click()
