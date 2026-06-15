@@ -13,16 +13,18 @@ import type { Page } from '@playwright/test'
 export const readTransform = (
     page: Page,
     selector: string
-): Promise<{ tx: number; ty: number; a: number; d: number }> =>
+): Promise<{ tx: number; ty: number; a: number; b: number; c: number; d: number }> =>
     page.evaluate((sel) => {
         const el = document.querySelector(sel) as HTMLElement | null
-        if (!el) return { tx: 0, ty: 0, a: 1, d: 1 }
+        if (!el) return { tx: 0, ty: 0, a: 1, b: 0, c: 0, d: 1 }
         const t = window.getComputedStyle(el).transform
         const m = t.match(/matrix\(([^)]+)\)/)
-        if (!m) return { tx: 0, ty: 0, a: 1, d: 1 }
+        if (!m) return { tx: 0, ty: 0, a: 1, b: 0, c: 0, d: 1 }
         const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
         return {
             a: parts[0] ?? 1,
+            b: parts[1] ?? 0,
+            c: parts[2] ?? 0,
             d: parts[3] ?? 1,
             tx: parts[4] ?? 0,
             ty: parts[5] ?? 0

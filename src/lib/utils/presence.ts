@@ -639,9 +639,10 @@ export const createAnimatePresenceContext = (context: {
         const rect = child.lastRect
         const computed = child.lastComputedStyle
 
-        // Wait mode holds the exiting layout slot while the entering child is hidden.
-        // Sync and popLayout must not add an extra layout participant.
-        const shouldPreserveLayout = mode === 'wait'
+        // sync/wait exits keep their layout slot until the exit finishes.
+        // popLayout is the mode that explicitly pops exits out of flow so
+        // surrounding layout can reflow immediately.
+        const shouldPreserveLayout = mode !== 'popLayout'
         let placeholder: HTMLElement | null = null
         const liveLayoutInsertion = findLayoutInsertionParent(child.element)
         const layoutInsertion =

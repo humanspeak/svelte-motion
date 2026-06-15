@@ -249,12 +249,13 @@ The `info` object passed to drag callbacks contains:
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `bounceStiffness` | `number` | `200` | Spring stiffness at constraint boundaries |
-| `bounceDamping` | `number` | `40` | Damping at constraint boundaries |
+| `bounceStiffness` | `number` | `200` with elasticity, `1000000` without | Spring stiffness at constraint boundaries |
+| `bounceDamping` | `number` | `40` with elasticity, `10000000` without | Damping at constraint boundaries |
 | `power` | `number` | `0.8` | Momentum power factor |
-| `timeConstant` | `number` | `700` | Exponential decay time constant (ms) |
-| `restDelta` | `number` | `0.5` | Distance threshold for "at rest" |
-| `restSpeed` | `number` | `10` | Velocity threshold for "at rest" |
+| `timeConstant` | `number` | `750` | Exponential decay time constant (ms) |
+| `restDelta` | `number` | `1` | Distance threshold for "at rest" |
+| `restSpeed` | `number` | `10` | Velocity threshold for boundary spring rest |
+| `modifyTarget` | `(target: number) => number` | — | Adjust the calculated inertia target |
 | `min` | `number` | — | Minimum value for axis |
 | `max` | `number` | — | Maximum value for axis |
 

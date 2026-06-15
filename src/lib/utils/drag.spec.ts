@@ -31,15 +31,16 @@ describe('utils/drag', () => {
         el.style.width = '100px'
         el.style.height = '100px'
         document.body.appendChild(el)
+        const callbacks = {
+            onStart: vi.fn(),
+            onMove: vi.fn(),
+            onEnd: vi.fn()
+        }
 
         const cleanup = attachDrag(el, {
             axis: true,
             mergedTransition: { duration: 0 },
-            callbacks: {
-                onStart: vi.fn(),
-                onMove: vi.fn(),
-                onEnd: vi.fn()
-            }
+            callbacks
         } as unknown as Parameters<typeof attachDrag>[1])
 
         el.dispatchEvent(
@@ -52,8 +53,11 @@ describe('utils/drag', () => {
             new PointerEvent('pointerup', { clientX: 20, clientY: 30, pointerId: 1 })
         )
 
-        // One or more animate() calls expected
-        expect(animateMock).toHaveBeenCalled()
+        expect(callbacks.onStart).toHaveBeenCalled()
+        expect(callbacks.onMove).toHaveBeenCalled()
+        expect(callbacks.onEnd).toHaveBeenCalled()
+        expect(el.style.transform).toContain('translateX(10px)')
+        expect(el.style.transform).toContain('translateY(20px)')
         cleanup()
     })
 })

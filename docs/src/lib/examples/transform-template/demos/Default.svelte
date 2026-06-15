@@ -1,12 +1,6 @@
 <script lang="ts">
     import { ArrowLeft, ArrowRight, RotateCcw, Sparkles } from '@lucide/svelte'
-    import {
-        animate,
-        motion,
-        useMotionValue,
-        useTransform,
-        type RawMotionValue
-    } from '@humanspeak/svelte-motion'
+    import { animate, motion, useMotionValue, useTransform } from '@humanspeak/svelte-motion'
 
     const travel = 700
     const progress = useMotionValue(0)
@@ -35,7 +29,7 @@
         const id = ++runId
         state = 'moving'
 
-        const animation = animate(progress as unknown as RawMotionValue<number>, target, {
+        const animation = animate(progress, target, {
             duration: 1,
             ease: [0.22, 1, 0.36, 1]
         })

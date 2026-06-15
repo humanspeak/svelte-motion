@@ -156,14 +156,8 @@ export const createOptimizedAppearData = (
         })
     }
 
-    const initialTransform = readStyleProp(
-        mergeInlineStyles('', initial, null, undefined, { preserveTransformDefaults: true }),
-        'transform'
-    )
-    const targetTransform = readStyleProp(
-        mergeInlineStyles('', target, null, undefined, { preserveTransformDefaults: true }),
-        'transform'
-    )
+    const initialTransform = readStyleProp(mergeInlineStyles('', initial, null), 'transform')
+    const targetTransform = readStyleProp(mergeInlineStyles('', target, null), 'transform')
     if (initialTransform && targetTransform && initialTransform !== targetTransform) {
         entries.push({
             name: 'transform',

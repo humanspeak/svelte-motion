@@ -1,8 +1,13 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('useAnimate', () => {
-    test('idle on load; list items render', async ({ page }) => {
+    const gotoReady = async (page: import('@playwright/test').Page) => {
         await page.goto('/tests/useAnimate')
+        await expect(page.getByTestId('stage')).toHaveAttribute('data-hydrated', 'true')
+    }
+
+    test('idle on load; list items render', async ({ page }) => {
+        await gotoReady(page)
 
         await expect(page.getByTestId('status')).toHaveText('idle')
         await expect(page.getByTestId('list').locator('li')).toHaveCount(4)
@@ -10,7 +15,7 @@ test.describe('useAnimate', () => {
     })
 
     test('clicking Animate runs the sequence and flips status to done', async ({ page }) => {
-        await page.goto('/tests/useAnimate')
+        await gotoReady(page)
 
         await page.getByTestId('run').click()
         await expect(page.getByTestId('status')).toHaveText('done', { timeout: 4000 })
@@ -25,7 +30,7 @@ test.describe('useAnimate', () => {
     test('the second sequence segment animates the target button (sibling of the list)', async ({
         page
     }) => {
-        await page.goto('/tests/useAnimate')
+        await gotoReady(page)
 
         // The sequence's second segment grows the target to scale 1.15. It
         // only runs if scope.current resolves a parent containing both the
@@ -49,7 +54,7 @@ test.describe('useAnimate', () => {
     })
 
     test('clicking Reset returns status to idle', async ({ page }) => {
-        await page.goto('/tests/useAnimate')
+        await gotoReady(page)
 
         await page.getByTestId('run').click()
         await expect(page.getByTestId('status')).toHaveText('done', { timeout: 4000 })

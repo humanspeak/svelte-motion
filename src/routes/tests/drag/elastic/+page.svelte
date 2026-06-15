@@ -59,6 +59,24 @@
             />
         </div>
     </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+        <p style="font: 12px system-ui; color: #666;">Object elastic = right only</p>
+        <div
+            style="position: relative; width: 140px; height: 80px; display: grid; place-items: center;"
+        >
+            <div
+                style="position: absolute; width: 140px; height: 80px; border: 2px dashed #22c55e; opacity: 0.4; pointer-events: none;"
+            ></div>
+            <motion.div
+                drag="x"
+                dragElastic={{ left: 0, right: 0.75 }}
+                dragConstraints={{ left: -30, right: 30 }}
+                dragMomentum={false}
+                data-testid="elastic-right-only"
+                style="width:80px;height:80px;background:#4ade80;border-radius:8px;"
+            />
+        </div>
+    </div>
     <p style="font: 11px system-ui; color: #999;">
         Drag horizontally past the dashed boundary (±30px) to feel elastic resistance
     </p>

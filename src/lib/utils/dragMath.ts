@@ -69,7 +69,16 @@ export const applyConstraints = (
  */
 export const parseMatrixTranslate = (transform: string): { tx: number; ty: number } => {
     const m = transform.match(/matrix\(([^)]+)\)/)
-    if (!m) return { tx: 0, ty: 0 }
-    const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
-    return { tx: parts[4] ?? 0, ty: parts[5] ?? 0 }
+    if (m) {
+        const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
+        return { tx: parts[4] ?? 0, ty: parts[5] ?? 0 }
+    }
+
+    const tx = transform.match(/translateX\((-?\d*\.?\d+)px\)/)?.[1]
+    const ty = transform.match(/translateY\((-?\d*\.?\d+)px\)/)?.[1]
+    const translate = transform.match(/translate\((-?\d*\.?\d+)px(?:,\s*(-?\d*\.?\d+)px)?\)/)
+    return {
+        tx: Number.parseFloat(tx ?? translate?.[1] ?? '0') || 0,
+        ty: Number.parseFloat(ty ?? translate?.[2] ?? '0') || 0
+    }
 }

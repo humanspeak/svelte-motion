@@ -9,10 +9,6 @@
     let internalState = $state(true)
 
     const switchItems = () => {
-        console.log('[AnimatePresenceModes] switchItems', {
-            from: internalState,
-            to: !internalState
-        })
         pwLog('[AnimatePresenceModes] switchItems', { from: internalState, to: !internalState })
         internalState = !internalState
     }
@@ -50,7 +46,8 @@
         outline: none;
     `
 
-    pwLog('[AnimatePresenceModes] Page mounted', { state: internalState })
+    const logMount = () => pwLog('[AnimatePresenceModes] Page mounted', { state: internalState })
+    logMount()
 </script>
 
 <div style={container} data-testid="modes-container">

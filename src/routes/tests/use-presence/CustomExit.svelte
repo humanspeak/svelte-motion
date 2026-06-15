@@ -9,12 +9,22 @@
         const [present, safeToRemove] = presence
         if (present || !node || !safeToRemove) return
         const el = node
-        const onEnd = (e: TransitionEvent) => {
-            if (e.target !== el) return
+        let done = false
+        const finish = () => {
+            if (done) return
+            done = true
             safeToRemove()
         }
+        const onEnd = (e: TransitionEvent) => {
+            if (e.target !== el) return
+            finish()
+        }
+        const timeout = window.setTimeout(finish, 360)
         el.addEventListener('transitionend', onEnd, { once: true })
-        return () => el.removeEventListener('transitionend', onEnd)
+        return () => {
+            window.clearTimeout(timeout)
+            el.removeEventListener('transitionend', onEnd)
+        }
     })
 </script>
 

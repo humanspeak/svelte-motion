@@ -353,7 +353,7 @@ describe('utils/layout', () => {
                     target: parent,
                     options: expect.objectContaining({
                         childList: true,
-                        subtree: false
+                        subtree: true
                     })
                 })
             ])
@@ -432,12 +432,14 @@ describe('utils/layout', () => {
         // Leading-edge throttling: callback should have fired only once
         expect(cb).toHaveBeenCalledTimes(1)
 
-        // Now cleanup should cancel any pending rAF
+        // The scheduled frame fires a trailing check for post-mutation layout.
         expect(rafCallbacks.size).toBeGreaterThan(0)
         const scheduledId = [...rafCallbacks.keys()][0]
         expect(typeof scheduledId).toBe('number')
+        rafCallbacks.get(scheduledId)?.(performance.now())
+        expect(cb).toHaveBeenCalledTimes(2)
+
         cleanup()
-        expect(cafSpy).toHaveBeenCalled()
 
         // Teardown
         rafSpy.mockRestore()
@@ -505,10 +507,10 @@ describe('utils/layout', () => {
         // Capture setTimeout id and ensure clearTimeout receives it
         const timeoutId = 98765
         const setTimeoutSpy = vi
-            .spyOn(globalThis, 'setTimeout')
+            .spyOn(window, 'setTimeout')
             // @ts-expect-error types mismatch acceptable for test stub
             .mockImplementation(() => timeoutId)
-        const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout').mockImplementation(() => {})
+        const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout').mockImplementation(() => {})
 
         // Shims to trigger schedule()
         class FakeResizeObserver {

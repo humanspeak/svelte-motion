@@ -451,6 +451,25 @@ export type DragConstraints =
           bottom?: number
       }
     | HTMLElement
+/**
+ * Controls how far a draggable element can stretch beyond its constraints
+ * before release.
+ *
+ * @example
+ * ```svelte
+ * <motion.div drag dragElastic={0.2} />
+ * <motion.div drag dragElastic={{ left: 0, right: 0.5 }} />
+ * ```
+ */
+export type DragElastic =
+    | boolean
+    | number
+    | {
+          top?: number
+          left?: number
+          right?: number
+          bottom?: number
+      }
 export type DragTransition = {
     bounceStiffness?: number
     bounceDamping?: number
@@ -458,6 +477,7 @@ export type DragTransition = {
     timeConstant?: number
     restDelta?: number
     restSpeed?: number
+    modifyTarget?: (target: number) => number
     min?: number
     max?: number
 }
@@ -618,7 +638,7 @@ export type MotionProps = {
     /** Constrain dragging either to pixel bounds or an HTMLElement's bounding box. */
     dragConstraints?: DragConstraints
     /** Elasticity when overdragging beyond constraints (0 = none, 1 = full). */
-    dragElastic?: number
+    dragElastic?: DragElastic
     /** Continue with momentum/inertia after release (default true). */
     dragMomentum?: boolean
     /** Configure inertia/bounce physics for momentum. */
@@ -627,8 +647,8 @@ export type MotionProps = {
     dragDirectionLock?: boolean
     /** Allow bubbling to parent drags. If false, uses a shared lock to prevent nesting. */
     dragPropagation?: boolean
-    /** On release, animate back to origin (0). */
-    dragSnapToOrigin?: boolean
+    /** On release, animate back to origin (0) on both axes, or only the specified axis. */
+    dragSnapToOrigin?: boolean | 'x' | 'y'
     /** Enable the default drag listener; set false to use dragControls only. */
     dragListener?: boolean
     /** Pass controls to start drag imperatively from another element. */

@@ -137,6 +137,8 @@
         place-items: center;
         align-content: center;
         justify-content: center;
+        box-sizing: border-box;
+        height: 32px;
         padding: 7px 12px;
         border: 1px solid #43515a;
         background: #11171c;
@@ -174,8 +176,11 @@
         grid-area: 1 / 1;
         display: inline-flex;
         align-items: center;
+        align-self: center;
         justify-content: center;
+        justify-self: center;
         gap: 6px;
+        width: max-content;
         white-space: nowrap;
         line-height: 16px;
     }
@@ -189,11 +194,18 @@
         stroke-linecap: round;
         stroke-linejoin: round;
     }
+    :global(.state-content svg *) {
+        fill: none;
+        stroke: currentColor;
+    }
     :global(.copy-state) {
         color: #cbd5e1;
     }
     :global(.copied-state) {
         color: #7dd3fc;
+    }
+    :global([data-testid='sync-button'] [data-clone='true'].copy-state) {
+        opacity: 0 !important;
     }
     :global(.debug-log) {
         display: grid;
@@ -281,6 +293,10 @@
         stroke-linecap: round;
         stroke-linejoin: round;
     }
+    :global(.docs-kit-copy-state svg *) {
+        fill: none;
+        stroke: currentColor;
+    }
     :global(.docs-kit-copy-state.copy-state) {
         color: #cbd5e1;
     }
@@ -307,6 +323,7 @@
         width: 180px;
     }
     :global(.rolling-copy-button) {
+        height: auto;
         padding: 12px 18px;
         min-width: 0;
         border-color: #52626d;
@@ -340,6 +357,16 @@
     :global(.rolling-state svg) {
         width: 16px;
         height: 16px;
+        flex: none;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+    :global(.rolling-state svg *) {
+        fill: none;
+        stroke: currentColor;
     }
     @media (max-width: 640px) {
         :global(.demo-head) {
