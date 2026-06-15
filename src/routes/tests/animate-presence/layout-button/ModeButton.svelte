@@ -19,7 +19,8 @@
     let observerLog = $state<string[]>([])
 
     const layoutTransition = { duration: 2.4, ease: 'linear' as const }
-    const visibleExit = { opacity: 0, transition: { duration: 0.001 } }
+    const visibleExit = { opacity: 0, transition: { duration: 0.18, ease: 'linear' as const } }
+    const copyExit = { opacity: 0, transition: { duration: 0 } }
     const labelTransition = { duration: 0.08, ease: 'linear' as const }
     const resetDelay = () => (mode === 'wait' ? 5200 : 3200)
 
@@ -185,7 +186,8 @@
             <motion.span
                 class="state {copied ? 'copied-state' : 'copy-state'}"
                 data-testid="{testIdPrefix}-{copied ? 'copied' : 'copy'}-state"
-                layout="position"
+                data-svelte-motion-layout
+                layout={mode === 'sync' ? undefined : 'position'}
             >
                 <AnimatePresence initial={false} {mode}>
                     {#if copied}
@@ -214,7 +216,7 @@
                             data-testid="{testIdPrefix}-copy-presence-state"
                             initial={{ opacity: 1 }}
                             animate={{ opacity: 1 }}
-                            exit={visibleExit}
+                            exit={mode === 'sync' ? copyExit : visibleExit}
                             transition={labelTransition}
                         >
                             <svg

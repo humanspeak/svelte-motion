@@ -176,8 +176,11 @@
         grid-area: 1 / 1;
         display: inline-flex;
         align-items: center;
+        align-self: center;
         justify-content: center;
+        justify-self: center;
         gap: 6px;
+        width: max-content;
         white-space: nowrap;
         line-height: 16px;
     }
@@ -200,6 +203,9 @@
     }
     :global(.copied-state) {
         color: #7dd3fc;
+    }
+    :global([data-testid='sync-button'] [data-clone='true'].copy-state) {
+        opacity: 0 !important;
     }
     :global(.debug-log) {
         display: grid;

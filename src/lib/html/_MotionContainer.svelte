@@ -2153,12 +2153,13 @@
             const hasPresencePlaceholder =
                 !!element!.querySelector('[data-presence-placeholder="true"]') ||
                 !!element!.parentElement?.querySelector('[data-presence-placeholder="true"]')
+            const hasSizeCorrectionTarget = !!element!.querySelector('[data-svelte-motion-layout]')
 
             if (hasPresenceHold || hasHiddenWaitEnter) {
                 return
             }
 
-            if (hasPresencePlaceholder) {
+            if (hasPresencePlaceholder && !hasSizeCorrectionTarget) {
                 finishFlipAnimations(element!)
                 lastRect = measureLayoutRect()
                 motionDomProjection?.seedLayout()
@@ -2184,11 +2185,14 @@
                 const previous = lastRect
                 const shouldCommitMotionDomLayout = hasRectChanged(lastRect, next)
                 if (shouldCommitMotionDomLayout) {
-                    if (motionDomProjection) {
+                    const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
+                    const shouldUseSizeCorrectedFallback =
+                        transforms.shouldScale && hasSizeCorrectionTarget
+
+                    if (motionDomProjection && !shouldUseSizeCorrectedFallback) {
                         motionDomProjection.commitObservedLayoutChange(previous)
                     } else {
                         finishFlipAnimations(element!)
-                        const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
                         runFlipAnimation(
                             element!,
                             transforms,
