@@ -567,13 +567,16 @@ describe('AnimatePresence modes', () => {
             await Promise.resolve()
         })
 
-        it('does not insert a placeholder for sync mode', async () => {
+        it('preserves the layout slot for sync mode', async () => {
             const ctx = createAnimatePresenceContext({ mode: 'sync' })
             ctx.registerChild('k1', el, { opacity: 0 })
             ctx.unregisterChild('k1')
 
             const placeholder = document.querySelector('[data-presence-placeholder="true"]')
-            expect(placeholder).toBeFalsy()
+            expect(placeholder).toBeTruthy()
+            expect((placeholder as HTMLElement).style.visibility).toBe('hidden')
+            expect((placeholder as HTMLElement).style.width).toBe('100px')
+            expect((placeholder as HTMLElement).style.height).toBe('100px')
 
             await Promise.resolve()
             await Promise.resolve()

@@ -353,7 +353,7 @@ describe('utils/layout', () => {
                     target: parent,
                     options: expect.objectContaining({
                         childList: true,
-                        subtree: false
+                        subtree: true
                     })
                 })
             ])
