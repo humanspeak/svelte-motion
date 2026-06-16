@@ -35,6 +35,8 @@ type PresenceChild = {
     lastComputedStyle: CSSStyleDeclaration
     lastPopLayoutSnapshot?: PopLayoutSnapshot
     layoutInsertion?: { parent: HTMLElement; before?: HTMLElement }
+    hasScrollableAncestor: boolean
+    lastScrollSnapshot: ScrollSnapshot[]
     /** Last captured mid-animation opacity (from rAF polling). */
     lastAnimatedOpacity?: string
     /** Last captured mid-animation transform (from rAF polling). */
@@ -60,6 +62,12 @@ export type PopLayoutSnapshot = {
     bottom: number
     /** Resolved text direction used by horizontal anchoring. */
     direction: string
+}
+
+type ScrollSnapshot = {
+    element: HTMLElement
+    scrollLeft: number
+    scrollTop: number
 }
 
 /**
@@ -188,6 +196,65 @@ const findLayoutInsertionParent = (
     }
 
     return parent ? { parent, before } : null
+}
+
+const canElementScroll = (element: HTMLElement): boolean => {
+    const computed = getComputedStyle(element)
+    const overflow = `${computed.overflow}${computed.overflowX}${computed.overflowY}`
+    const canScroll =
+        element.scrollHeight > element.clientHeight + 1 ||
+        element.scrollWidth > element.clientWidth + 1
+
+    return canScroll && /(auto|scroll|overlay)/.test(overflow)
+}
+
+const captureScrollSnapshot = (element: HTMLElement): ScrollSnapshot[] => {
+    const snapshots: ScrollSnapshot[] = []
+    let parent = element.parentElement
+
+    while (parent && parent !== document.body && parent !== document.documentElement) {
+        if (canElementScroll(parent)) {
+            snapshots.push({
+                element: parent,
+                scrollLeft: parent.scrollLeft,
+                scrollTop: parent.scrollTop
+            })
+        }
+
+        parent = parent.parentElement
+    }
+
+    const scrollingElement = document.scrollingElement
+    if (snapshots.length === 0 && isHTMLElement(scrollingElement)) {
+        snapshots.push({
+            element: scrollingElement,
+            scrollLeft: scrollingElement.scrollLeft,
+            scrollTop: scrollingElement.scrollTop
+        })
+    }
+
+    return snapshots
+}
+
+const measureScrollDelta = (snapshots: ScrollSnapshot[]): { left: number; top: number } => {
+    return snapshots.reduce(
+        (delta, snapshot) => {
+            if (!snapshot.element.isConnected) return delta
+
+            return {
+                left: delta.left + snapshot.element.scrollLeft - snapshot.scrollLeft,
+                top: delta.top + snapshot.element.scrollTop - snapshot.scrollTop
+            }
+        },
+        { left: 0, top: 0 }
+    )
+}
+
+const translateRectByScrollDelta = (
+    rect: DOMRect,
+    delta: { left: number; top: number }
+): DOMRect => {
+    return new DOMRect(rect.left - delta.left, rect.top - delta.top, rect.width, rect.height)
 }
 
 /**
@@ -466,8 +533,20 @@ export const createAnimatePresenceContext = (context: {
     })
 
     const children = new Map<string, PresenceChild>()
+    const exitPlaceholders = new Map<string, HTMLElement>()
     // Track number of in-flight exit animations to invoke onExitComplete once
     let inFlightExits = 0
+
+    const removeExitPlaceholder = (key: string, placeholder?: HTMLElement | null) => {
+        const current = exitPlaceholders.get(key)
+        const target = placeholder ?? current
+        if (!target) return
+
+        target.remove()
+        if (!current || current === target) {
+            exitPlaceholders.delete(key)
+        }
+    }
 
     /**
      * Begin tracking an exit.
@@ -541,11 +620,16 @@ export const createAnimatePresenceContext = (context: {
         mergedTransition?: MotionTransition,
         resolveExit?: PresenceExitResolver
     ) => {
+        const wasExited = exitedKeys.has(key)
+        if (wasExited) {
+            removeExitPlaceholder(key)
+        }
+
         const initialRect = element.getBoundingClientRect()
         const initialStyle = getComputedStyle(element)
+        const initialScrollSnapshot = captureScrollSnapshot(element)
 
         // Mark this key as seen
-        const wasExited = exitedKeys.has(key)
         seenKeys.add(key)
 
         // If this key was previously exited, remove it from exitedKeys (it's re-entering)
@@ -577,7 +661,9 @@ export const createAnimatePresenceContext = (context: {
             lastComputedStyle: initialStyle,
             lastPopLayoutSnapshot:
                 mode === 'popLayout' ? measurePopLayoutSnapshot(element, initialStyle) : undefined,
-            layoutInsertion: findLayoutInsertionParent(element) ?? undefined
+            layoutInsertion: findLayoutInsertionParent(element) ?? undefined,
+            hasScrollableAncestor: initialScrollSnapshot.length > 0,
+            lastScrollSnapshot: initialScrollSnapshot
         })
     }
 
@@ -589,6 +675,8 @@ export const createAnimatePresenceContext = (context: {
         if (child && rect.width > 0 && rect.height > 0) {
             child.lastRect = rect
             child.lastComputedStyle = computedStyle
+            child.lastScrollSnapshot = captureScrollSnapshot(child.element)
+            child.hasScrollableAncestor = child.lastScrollSnapshot.length > 0
             if (mode === 'popLayout') {
                 child.lastPopLayoutSnapshot = measurePopLayoutSnapshot(child.element, computedStyle)
             }
@@ -636,8 +724,16 @@ export const createAnimatePresenceContext = (context: {
             return
         }
 
-        const rect = child.lastRect
-        const computed = child.lastComputedStyle
+        const elementIsLive = child.element.isConnected
+        const staleScrollDelta = measureScrollDelta(child.lastScrollSnapshot)
+        const rect = elementIsLive
+            ? child.element.getBoundingClientRect()
+            : translateRectByScrollDelta(child.lastRect, staleScrollDelta)
+        const computed = elementIsLive ? getComputedStyle(child.element) : child.lastComputedStyle
+        if (elementIsLive) {
+            child.lastScrollSnapshot = captureScrollSnapshot(child.element)
+            child.hasScrollableAncestor = child.lastScrollSnapshot.length > 0
+        }
 
         // sync/wait exits keep their layout slot until the exit finishes.
         // popLayout is the mode that explicitly pops exits out of flow so
@@ -682,6 +778,7 @@ export const createAnimatePresenceContext = (context: {
                     ? layoutInsertion.before
                     : null
             layoutInsertion.parent.insertBefore(placeholder, before)
+            exitPlaceholders.set(key, placeholder)
         }
 
         // Clone original node to preserve structure/classes, then inline computed styles to freeze look
@@ -819,7 +916,7 @@ export const createAnimatePresenceContext = (context: {
             if (!resolvedExit) {
                 pwLog('[presence] unregisterChild - no resolved exit animation after custom update')
                 clone.remove()
-                placeholder?.remove()
+                removeExitPlaceholder(key, placeholder)
                 const currentChild = children.get(key)
                 if (currentChild && currentChild.element === exitingElement) {
                     children.delete(key)
@@ -895,7 +992,7 @@ export const createAnimatePresenceContext = (context: {
                         clonesInDOM: document.querySelectorAll('[data-clone="true"]').length
                     })
 
-                    placeholder?.remove()
+                    removeExitPlaceholder(key, placeholder)
                     finishExit()
                 })
         })

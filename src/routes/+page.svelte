@@ -282,6 +282,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/document-scroll') + searchParams}
+                    >
+                        Document scroll exit clone
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/animate-presence/nested-keys') + searchParams}
                     >
                         Nested Keys (no key required)
