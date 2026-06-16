@@ -1,7 +1,12 @@
 <script lang="ts">
-    import { animate, useMotionValue, useTransform } from '@humanspeak/svelte-motion'
+    import {
+        animate,
+        useMotionValue,
+        useTransform,
+        type RawMotionValue
+    } from '@humanspeak/svelte-motion'
     import { interpolate } from 'flubber'
-    import { onDestroy } from 'svelte'
+    import { onDestroy, untrack } from 'svelte'
 
     // Morph through a sequence of SVG paths (lightning → hand → plane
     // → heart → note → star → lightning). flubber computes the
@@ -40,7 +45,7 @@
     )
 
     // Use function form — calls cheap pre-computed interpolator per frame
-    const path = useTransform(() => {
+    const path = useTransform<string>(() => {
         const v = progress.get()
         const i = Math.min(Math.floor(v), paths.length - 2)
         const t = v - i
@@ -48,7 +53,7 @@
         const interp = pathInterpolators[i]
         if (!interp) return paths[i]
         return interp(t)
-    }, [progress])
+    })
 
     let pathIndex = $state(0)
     let animation: ReturnType<typeof animate> | undefined
@@ -59,20 +64,21 @@
 
         animation?.stop()
 
-        animation = animate(progress.get(), target, {
-            duration: 1.0,
-            ease: 'easeInOut',
-            onUpdate: (v: number) => progress.set(v),
-            onComplete: () => {
-                if (target === paths.length - 1) {
-                    // Snap back to 0 (same shape — lightning) then animate to 1
-                    progress.set(0)
-                    pathIndex = 1
-                } else {
-                    pathIndex = target + 1
+        animation = untrack(() =>
+            animate(progress as unknown as RawMotionValue<number>, target, {
+                duration: 1.0,
+                ease: 'easeInOut',
+                onComplete: () => {
+                    if (target === paths.length - 1) {
+                        // Snap back to 0 (same shape — lightning) then animate to 1
+                        progress.jump(0)
+                        pathIndex = 1
+                    } else {
+                        pathIndex = target + 1
+                    }
                 }
-            }
-        })
+            })
+        )
     })
 
     onDestroy(() => {

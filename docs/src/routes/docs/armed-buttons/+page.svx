@@ -1,0 +1,78 @@
+---
+title: Armed Buttons
+description: Build intentional destructive action microinteractions with Svelte Motion
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte'
+  import ArmedButtonsDefault from '$lib/examples/armed-buttons/demos/Default.svelte'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'Armed Buttons | Docs | Svelte Motion'
+      seo.description = 'Build archive and delete wait button microinteractions with Svelte Motion, AnimatePresence, keyed icon swaps, and spring transitions.'
+      seo.ogTitle = 'Armed Buttons'
+      seo.ogTagline = 'Intentional destructive action microinteractions'
+      seo.ogFeatures = ['AnimatePresence', 'Spring Transitions', 'Countdown Wait', 'Accessible State']
+      seo.ogSlug = 'docs-armed-buttons'
+  }
+</script>
+
+# Armed Buttons
+
+Armed buttons turn risky actions into deliberate two-step interactions. The first click reveals intent; the second click confirms. With Svelte Motion, the transition between those states can feel crisp without adding a modal or shifting the surrounding layout.
+
+<Example exampleUrl="/examples/armed-buttons">
+  <ArmedButtonsDefault />
+</Example>
+
+## Archive confirm
+
+The archive pattern starts as a quiet icon button inside a row. On click, the row stores an armed id and renders a compact confirm button in an `AnimatePresence` block.
+
+```svelte
+<AnimatePresence>
+  {#if isArmed}
+    <motion.div
+      key="archive-confirm"
+      initial={{ opacity: 0, scale: 0.78, x: 10 }}
+      animate={{ opacity: 1, scale: 1, x: 0 }}
+      exit={{ opacity: 0, scale: 0.78, x: 10 }}
+      transition={{ type: 'spring', stiffness: 560, damping: 30 }}
+    >
+      <button onclick={confirmArchive}>Archive</button>
+    </motion.div>
+  {/if}
+</AnimatePresence>
+```
+
+The important detail is placement: the confirm button is absolutely positioned over reserved trailing space. It can grow from the right without resizing the row.
+
+## Delete wait
+
+The delete wait pattern arms the full row, disables confirmation during a countdown, then allows the second click once the timer reaches zero.
+
+```svelte
+{#key locked ? 'locked' : armed ? 'ready' : 'idle'}
+  <motion.span
+    initial={{ opacity: 0, scale: 0.6 }}
+    animate={{ opacity: 1, scale: 1 }}
+    transition={{ type: 'spring', stiffness: 520, damping: 30 }}
+  >
+    {#if locked}
+      <LoaderCircle />
+    {:else}
+      <Trash2 />
+    {/if}
+  </motion.span>
+{/key}
+```
+
+Keyed spans are useful here because the icon swap is the animation. The button keeps a fixed height and reserves a small trailing slot for the countdown, so `3`, `2`, `1`, and `Ready` do not push the label around.
+
+## Accessibility
+
+Use real `<button>` elements, preserve keyboard focus, and expose clear labels such as `aria-label="Archive insight"` when the idle state is icon-only. Disable the delete button only while the countdown is locked or a request is pending; once it is ready, the same control should be keyboard-confirmable.
+
+For destructive actions, auto-disarm abandoned state. A short timeout prevents a row from staying primed after the user moves on.

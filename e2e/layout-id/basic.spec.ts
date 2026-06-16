@@ -49,6 +49,26 @@ test.describe('layoutId shared layout animation', () => {
         )
     })
 
+    test('underline animates through an in-flight FLIP transform', async ({ page }) => {
+        await page.goto('/tests/layout-id?@isPlaywright=true')
+
+        const tab2 = page.locator('[data-testid="tab-2"]')
+        await tab2.click()
+
+        await page.waitForFunction(
+            () => {
+                const underline = document.querySelector(
+                    '[data-testid="underline"]'
+                ) as HTMLElement | null
+                if (!underline) return false
+
+                return getComputedStyle(underline).transform !== 'none'
+            },
+            undefined,
+            { timeout: 1000 }
+        )
+    })
+
     test('full cycle through all tabs', async ({ page }) => {
         await page.goto('/tests/layout-id?@isPlaywright=true')
 

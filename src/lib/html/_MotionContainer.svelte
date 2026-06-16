@@ -2290,7 +2290,7 @@
 
         const prev = layoutIdRegistry.consume(scopedLayoutId)
         if (!prev) return // First appearance, no animation needed
-        if (motionDomProjection) return
+        if (motionDomProjection && layoutProp) return
 
         const next = measureRect(element, resolveLayoutScrollAncestors())
         const transforms = computeFlipTransforms(prev.rect, next, true)

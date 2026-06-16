@@ -165,7 +165,9 @@
     const variantChildren = Array.from({ length: 12 }, (_, i) => i)
     const CHILD_COUNT = variantChildren.length
     const childDelay = (i: number) =>
-        ((directionForward ? i : CHILD_COUNT - 1 - i) * staggerMs) / 1000
+        variantState === 'play'
+            ? ((directionForward ? i : CHILD_COUNT - 1 - i) * staggerMs) / 1000
+            : 0
 
     // We drive the cascade with transform only — svelte-motion does not
     // reliably apply variant inline styles before the first state change,
@@ -587,7 +589,10 @@
             </div>
             <div class="panel">
                 <div class="head">
+                    <span class="head-k">file ·</span>
                     <span class="tab on">variants.svelte</span>
+                    <span class="head-k">state</span>
+                    <span class="head-v accent">{variantState}</span>
                     <span class="grow"></span>
                     <button class="ctrl" type="button" onclick={resetVariants}>⟲ reset</button>
                     <button class="ctrl primary" type="button" onclick={playVariants}>
@@ -616,11 +621,6 @@
                         <span class="strip-k">direction</span>
                         <span class="strip-v">{directionForward ? '01 → 12' : '12 → 01'}</span>
                     </button>
-                    <span class="strip-spacer"></span>
-                    <span class="strip-status">
-                        <span class="strip-k">state</span>
-                        <span class="strip-v accent">{variantState}</span>
-                    </span>
                 </div>
                 <div class="body">
                     <div class="vgrid">
@@ -1423,17 +1423,28 @@
         padding: 8px 14px;
         border-bottom: 1px solid var(--brut-rule);
         font-size: 11px;
-        color: var(--brut-ink-3);
+        color: var(--brut-ink-2);
         background: var(--brut-bg-2);
         align-items: center;
-        gap: 12px;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+    .brut-lab .panel .head .head-k {
+        color: var(--brut-ink-3);
+    }
+    .brut-lab .panel .head .head-v {
+        color: var(--brut-ink);
+        font-variant-numeric: tabular-nums;
+    }
+    .brut-lab .panel .head .head-v.accent {
+        color: var(--brut-accent);
     }
     .brut-lab .panel .head .tab {
-        padding: 0 12px;
-        border-right: 1px solid var(--brut-rule);
-        margin-right: -1px;
+        padding: 0;
+        border: 0;
+        margin-right: 2px;
         color: var(--brut-ink);
-        background: var(--brut-bg);
+        background: transparent;
     }
     .brut-lab .panel .head .grow {
         flex: 1;
@@ -1466,15 +1477,15 @@
         display: flex;
         align-items: center;
         gap: 18px;
-        padding: 6px 14px;
+        padding: 8px 14px;
         border-bottom: 1px solid var(--brut-rule);
         font-size: 11px;
-        background: var(--brut-bg);
+        color: var(--brut-ink-2);
+        background: var(--brut-bg-2);
         flex-wrap: wrap;
     }
     .brut-lab .panel .strip .strip-lbl,
-    .brut-lab .panel .strip .strip-toggle,
-    .brut-lab .panel .strip .strip-status {
+    .brut-lab .panel .strip .strip-toggle {
         display: inline-flex;
         align-items: center;
         gap: 8px;
@@ -1489,12 +1500,10 @@
         color: var(--brut-ink);
         font-variant-numeric: tabular-nums;
     }
-    .brut-lab .panel .strip .strip-v.accent {
-        color: var(--brut-accent);
-    }
     .brut-lab .panel .strip input[type='range'] {
         accent-color: var(--brut-accent);
-        width: 120px;
+        min-width: 120px;
+        width: 160px;
     }
     .brut-lab .panel .strip .strip-toggle {
         background: transparent;
@@ -1505,11 +1514,9 @@
         color: var(--brut-ink-2);
     }
     .brut-lab .panel .strip .strip-toggle:hover {
+        background: var(--brut-bg);
         border-color: var(--brut-accent);
         color: var(--brut-ink);
-    }
-    .brut-lab .panel .strip .strip-spacer {
-        flex: 1;
     }
     .brut-lab .panel .body {
         padding: 28px 22px 36px;
@@ -1986,6 +1993,9 @@
         .brut-lab .panel :global(.vgrid) {
             grid-template-columns: repeat(4, 1fr);
         }
+        .brut-lab .panel .strip input[type='range'] {
+            width: min(42vw, 220px);
+        }
         .brut-ex,
         .brut-ai {
             grid-template-columns: 1fr;
@@ -2030,6 +2040,19 @@
         }
         .brut-lab .panel :global(.vgrid) {
             grid-template-columns: repeat(3, 1fr);
+        }
+        .brut-lab .panel .head .grow {
+            display: none;
+        }
+        .brut-lab .panel .head .ctrl {
+            flex: 1;
+        }
+        .brut-lab .panel .strip .strip-lbl {
+            flex-wrap: wrap;
+        }
+        .brut-lab .panel .strip input[type='range'] {
+            width: 100%;
+            order: 3;
         }
         .brut-foot {
             grid-template-columns: 1fr;
