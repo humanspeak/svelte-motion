@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion } from '@humanspeak/svelte-motion'
+    import { motion } from '$lib'
 
     const COUNTDOWN_SECONDS = 2
 

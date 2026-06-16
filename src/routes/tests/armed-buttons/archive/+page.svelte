@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { AnimatePresence, motion } from '@humanspeak/svelte-motion'
+    import { AnimatePresence, motion } from '$lib'
 
     const ID = 'share-1'
 
