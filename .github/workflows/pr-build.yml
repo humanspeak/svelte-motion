@@ -52,3 +52,33 @@ jobs:
 
             - name: Build package and app
               run: pnpm build
+
+    docs-build:
+        if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+        runs-on: blacksmith-2vcpu-ubuntu-2404 # trunk-ignore(actionlint/runner-label)
+        timeout-minutes: 15
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6 # zizmor: ignore[unpinned-uses]
+              with:
+                  persist-credentials: false
+                  fetch-depth: 1
+
+            - uses: pnpm/action-setup@v6 # zizmor: ignore[unpinned-uses]
+
+            - name: Use Node.js - 24
+              uses: actions/setup-node@v6 # zizmor: ignore[unpinned-uses]
+              with:
+                  node-version: 24
+
+            - name: Install workspace dependencies
+              run: pnpm install --frozen-lockfile --config.engine-strict=false
+
+            - name: Build package
+              run: pnpm build
+
+            - name: Build docs
+              working-directory: docs
+              env:
+                  NODE_OPTIONS: --max-old-space-size=4096
+              run: pnpm run build
