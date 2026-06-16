@@ -1,0 +1,54 @@
+name: PR Build
+
+permissions:
+    contents: read
+
+on:
+    pull_request:
+        types: [opened, synchronize, reopened, ready_for_review]
+        branches:
+            - main
+            - '!dependabot/**'
+        paths:
+            - docs/**
+            - src/**
+            - tests/**
+            - e2e/**
+            - package.json
+            - pnpm-lock.yaml
+            - pnpm-workspace.yaml
+            - svelte.config.*
+            - vite.config.*
+            - playwright.config.*
+            - tsconfig*.json
+            - .github/workflows/pr-build.yml
+    workflow_dispatch:
+
+concurrency:
+    group: pr-build-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    build:
+        if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+        runs-on: blacksmith-2vcpu-ubuntu-2404 # trunk-ignore(actionlint/runner-label)
+        timeout-minutes: 10
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6 # zizmor: ignore[unpinned-uses]
+              with:
+                  persist-credentials: false
+                  fetch-depth: 1
+
+            - uses: pnpm/action-setup@v6 # zizmor: ignore[unpinned-uses]
+
+            - name: Use Node.js - 24
+              uses: actions/setup-node@v6 # zizmor: ignore[unpinned-uses]
+              with:
+                  node-version: 24
+
+            - name: Install dependencies
+              run: pnpm install --filter . --frozen-lockfile --config.engine-strict=false
+
+            - name: Build package and app
+              run: pnpm build

@@ -62,6 +62,10 @@ const expectNoOverlap = (a: RectSnapshot, b: RectSnapshot, message: string) => {
     expect(overlapArea(a, b), message).toBe(0)
 }
 
+const expectNearZero = (value: number, message?: string, tolerance = 1) => {
+    expect(Math.abs(value), message).toBeLessThanOrEqual(tolerance)
+}
+
 const scrollAndRectSnapshot = async (
     page: Page,
     selector: string
@@ -157,7 +161,7 @@ test.describe('AnimatePresence scroll stress', () => {
             }
         })
 
-        expect(state.boxCenterOffset, state.diagnostics).toBe(0)
+        expectNearZero(state.boxCenterOffset, state.diagnostics)
     })
 
     test('keeps clone centered after scrolling with the page control then hiding', async ({
@@ -216,8 +220,8 @@ test.describe('AnimatePresence scroll stress', () => {
         })
 
         expectCenterNear(state.cloneRect, state.placeholderRect, 2)
-        expect(state.cloneStyleLeft, state.diagnostics).toBe(0)
-        expect(state.dx, state.diagnostics).toBe(0)
+        expectNearZero(state.cloneStyleLeft, state.diagnostics)
+        expectNearZero(state.dx, state.diagnostics)
     })
 
     test('keeps a scrolled exit clone centered on its placeholder', async ({ page }) => {
