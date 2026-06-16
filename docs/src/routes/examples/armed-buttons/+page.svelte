@@ -6,7 +6,7 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Archive, ShieldCheck, Sparkles, TimerReset, Trash2 } from '@lucide/svelte'
-    import { demoCodeSamples } from '$lib/demo-loaders'
+    import { demoCodeSamples } from '$lib/demo-code-samples'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import ArchiveArmedDemo from '$lib/examples/armed-buttons/demos/Archive.svelte'
