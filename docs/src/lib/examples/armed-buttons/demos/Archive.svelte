@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { SvelteSet } from 'svelte/reactivity'
     import ArchiveArmedButton from '../ArchiveArmedButton.svelte'
 
     const rows = [
@@ -8,7 +9,7 @@
     ]
 
     let armedId = $state<string | null>(null)
-    let archivedIds = $state(new Set<string>())
+    const archivedIds = new SvelteSet<string>()
 
     $effect(() => {
         if (!armedId) return
@@ -19,8 +20,12 @@
         return () => window.clearTimeout(timer)
     })
 
-    const archiveRow = (id: string) => {
-        archivedIds = new Set([...archivedIds, id])
+    const toggleArchiveRow = (id: string) => {
+        if (archivedIds.has(id)) {
+            archivedIds.delete(id)
+        } else {
+            archivedIds.add(id)
+        }
         armedId = null
     }
 </script>
@@ -39,7 +44,7 @@
                 onDisarm={() => {
                     if (armedId === row.id) armedId = null
                 }}
-                onArchive={() => archiveRow(row.id)}
+                onArchive={() => toggleArchiveRow(row.id)}
             />
         {/each}
     </div>

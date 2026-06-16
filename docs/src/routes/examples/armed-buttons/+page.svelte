@@ -83,8 +83,8 @@
             <Archive />
             <span>
                 The WOW behavior is the small archive icon blooming into a labeled confirm button,
-                keeping the row calm until the user shows intent. Clicking another row proves the
-                shared armed state by ejecting the previous confirm.
+                keeping the row calm until the user shows intent. Archived rows flip the same slot
+                into an armed unarchive action.
             </span>
         </li>
         <li>

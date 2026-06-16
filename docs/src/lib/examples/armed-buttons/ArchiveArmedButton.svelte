@@ -1,6 +1,6 @@
 <script lang="ts">
     import { AnimatePresence, motion } from '@humanspeak/svelte-motion'
-    import { Archive, FileText } from '@lucide/svelte'
+    import { Archive, ArchiveRestore, FileText } from '@lucide/svelte'
 
     interface Props {
         id?: string
@@ -58,7 +58,6 @@
     })
 
     const armArchive = () => {
-        if (isArchived) return
         if (isArmed) {
             if (controlledArmed === undefined) {
                 armedId = null
@@ -75,7 +74,7 @@
     }
 
     const confirmArchive = () => {
-        archivedState = true
+        archivedState = !isArchived
         armedId = null
         onArchive?.()
     }
@@ -84,7 +83,7 @@
 <motion.div
     class="group/archive-row relative flex w-full max-w-[26rem] items-center gap-3 rounded-lg border border-border/70 bg-background/95 p-3 shadow-sm"
     animate={isArchived ? { opacity: 0.55, x: 0 } : { opacity: 1, x: 0 }}
-    whileHover={isArchived ? undefined : { x: 2 }}
+    whileHover={{ x: 2 }}
     transition={{ type: 'spring', stiffness: 520, damping: 32 }}
     data-testid="archive-row"
     data-armed={isArmed}
@@ -116,17 +115,20 @@
             class="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground/55 transition-colors hover:bg-muted hover:text-foreground group-hover/archive-row:text-muted-foreground {coverArchiveSlot
                 ? 'pointer-events-none opacity-0'
                 : 'opacity-100'}"
-            aria-label="Archive insight"
+            aria-label={isArchived ? 'Unarchive insight' : 'Archive insight'}
             aria-hidden={coverArchiveSlot}
             tabindex={coverArchiveSlot ? -1 : 0}
-            disabled={isArchived}
             whileHover={{ scale: 1.16 }}
             whileTap={{ scale: 0.9 }}
             transition={{ type: 'spring', stiffness: 520, damping: 28 }}
             onclick={armArchive}
             data-testid="archive-arm"
         >
-            <Archive size={15} />
+            {#if isArchived}
+                <ArchiveRestore size={15} />
+            {:else}
+                <Archive size={15} />
+            {/if}
         </motion.button>
 
         <AnimatePresence mode="popLayout">
@@ -146,8 +148,13 @@
                         onclick={confirmArchive}
                         data-testid="archive-confirm"
                     >
-                        <Archive size={13} />
-                        Archive
+                        {#if isArchived}
+                            <ArchiveRestore size={13} />
+                            Unarchive
+                        {:else}
+                            <Archive size={13} />
+                            Archive
+                        {/if}
                     </button>
                 </motion.div>
             {/if}
