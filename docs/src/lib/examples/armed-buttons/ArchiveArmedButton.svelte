@@ -144,10 +144,19 @@
                 >
                     <button
                         type="button"
-                        class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold whitespace-nowrap text-primary-foreground transition-opacity hover:opacity-90"
+                        class="relative inline-flex h-8 overflow-hidden items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold whitespace-nowrap text-primary-foreground transition-opacity hover:opacity-90"
                         onclick={confirmArchive}
                         data-testid="archive-confirm"
                     >
+                        <motion.span
+                            key="archive-disarm-meter"
+                            class="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 origin-left bg-current/45"
+                            initial={{ scaleX: 1 }}
+                            animate={{ scaleX: 0 }}
+                            transition={{ duration: timeoutMs / 1000, ease: 'linear' }}
+                            aria-hidden="true"
+                            data-testid="archive-disarm-meter"
+                        />
                         {#if isArchived}
                             <ArchiveRestore size={13} />
                             Unarchive

@@ -31,6 +31,9 @@
 
     const armed = $derived(controlledArmed ?? armedState)
     const locked = $derived((armed && secondsLeft > 0) || deleting)
+    const disarmMeterSeconds = $derived(
+        Math.max((disarmAfterMs - countdownSeconds * 1000) / 1000, 0.1)
+    )
     const spinTarget = useMotionValue(0)
     const spinRotate = useSpring(spinTarget, { stiffness: 220, damping: 18, mass: 0.8 })
 
@@ -109,7 +112,7 @@
     <button
         type="button"
         disabled={locked || deleted}
-        class="flex h-12 w-full items-center gap-3 rounded-lg border px-4 text-sm leading-none font-semibold shadow-sm transition-colors duration-200 {deleted
+        class="relative flex h-12 w-full overflow-hidden items-center gap-3 rounded-lg border px-4 text-sm leading-none font-semibold shadow-sm transition-colors duration-200 {deleted
             ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
             : armed
               ? 'border-destructive bg-destructive text-destructive-foreground'
@@ -120,6 +123,18 @@
         data-locked={locked}
         data-deleted={deleted}
     >
+        {#if armed && !deleted && !deleting}
+            <motion.span
+                key={secondsLeft > 0 ? 'delete-disarm-meter-wait' : 'delete-disarm-meter-ready'}
+                class="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 origin-left bg-current/45"
+                initial={{ scaleX: 1 }}
+                animate={{ scaleX: secondsLeft > 0 ? 1 : 0 }}
+                transition={{ duration: secondsLeft > 0 ? 0 : disarmMeterSeconds, ease: 'linear' }}
+                aria-hidden="true"
+                data-testid="delete-disarm-meter"
+            />
+        {/if}
+
         {#key deleted ? 'done' : locked ? 'locked' : armed ? 'ready' : 'idle'}
             <motion.span
                 class="inline-flex size-5 shrink-0 items-center justify-center"

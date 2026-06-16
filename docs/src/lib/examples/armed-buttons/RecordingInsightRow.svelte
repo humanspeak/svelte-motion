@@ -17,6 +17,9 @@
         archived: boolean
         locked: boolean
         deleteSecondsLeft: number
+        archiveTimeoutMs?: number
+        deleteDisarmAfterMs?: number
+        deleteCountdownSeconds?: number
         spinRotate: SpringMotionValue<number>
         onArmArchive: (_id: string) => void
         onConfirmArchive: (_id: string) => void
@@ -32,6 +35,9 @@
         archived,
         locked,
         deleteSecondsLeft,
+        archiveTimeoutMs = 4000,
+        deleteDisarmAfterMs = 10000,
+        deleteCountdownSeconds = 3,
         spinRotate,
         onArmArchive,
         onConfirmArchive,
@@ -42,6 +48,9 @@
         `Delete ${row.eyebrow.split(' ').at(-1)?.toLowerCase() ?? 'item'}`
     )
     const deleteActive = $derived(deleteArmed || deleting || deleted)
+    const deleteMeterSeconds = $derived(
+        Math.max((deleteDisarmAfterMs - deleteCountdownSeconds * 1000) / 1000, 0.1)
+    )
     let coverArchiveSlot = $state(false)
 
     $effect(() => {
@@ -62,7 +71,7 @@
         key="recording-delete-row"
         type="button"
         disabled={locked || deleting || deleted}
-        class="relative flex h-16 w-full items-center gap-3 rounded-lg border px-3 text-sm leading-none font-semibold shadow-sm transition-colors duration-200 {deleted
+        class="relative flex h-16 w-full overflow-hidden items-center gap-3 rounded-lg border px-3 text-sm leading-none font-semibold shadow-sm transition-colors duration-200 {deleted
             ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
             : 'border-destructive bg-destructive text-destructive-foreground'} disabled:cursor-not-allowed disabled:opacity-100"
         initial={{ opacity: 0, x: 18, scale: 0.98 }}
@@ -75,6 +84,20 @@
         data-delete-armed={deleteArmed}
         data-delete-row-active={deleteActive}
     >
+        {#if deleteArmed && !deleted && !deleting}
+            <motion.span
+                key={locked
+                    ? 'recording-delete-disarm-meter-wait'
+                    : 'recording-delete-disarm-meter-ready'}
+                class="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 origin-left bg-current/45"
+                initial={{ scaleX: 1 }}
+                animate={{ scaleX: locked ? 1 : 0 }}
+                transition={{ duration: locked ? 0 : deleteMeterSeconds, ease: 'linear' }}
+                aria-hidden="true"
+                data-testid="recording-delete-disarm-meter"
+            />
+        {/if}
+
         {#key deleted ? 'done' : locked || deleting ? 'locked' : 'ready'}
             <motion.span
                 class="inline-flex size-10 shrink-0 items-center justify-center rounded-md text-current {locked ||
@@ -207,9 +230,21 @@
                         >
                             <button
                                 type="button"
-                                class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold whitespace-nowrap text-primary-foreground transition-opacity hover:opacity-90"
+                                class="relative inline-flex h-8 overflow-hidden items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold whitespace-nowrap text-primary-foreground transition-opacity hover:opacity-90"
                                 onclick={() => onConfirmArchive(row.id)}
                             >
+                                <motion.span
+                                    key="recording-archive-disarm-meter"
+                                    class="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 origin-left bg-current/45"
+                                    initial={{ scaleX: 1 }}
+                                    animate={{ scaleX: 0 }}
+                                    transition={{
+                                        duration: archiveTimeoutMs / 1000,
+                                        ease: 'linear'
+                                    }}
+                                    aria-hidden="true"
+                                    data-testid="recording-archive-disarm-meter"
+                                />
                                 {#if archived}
                                     <ArchiveRestore size={13} />
                                     Unarchive

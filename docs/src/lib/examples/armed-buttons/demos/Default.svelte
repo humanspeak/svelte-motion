@@ -16,6 +16,8 @@
     ]
 
     const DELETE_COUNTDOWN_SECONDS = 3
+    const ARCHIVE_DISARM_AFTER_MS = 4000
+    const DELETE_DISARM_AFTER_MS = 10000
 
     let archiveArmedId = $state<string | null>(null)
     const archiveArchivedIds = new SvelteSet<string>()
@@ -59,7 +61,7 @@
         }, 1000)
         const disarm = window.setTimeout(() => {
             if (!deletingId) deleteArmedId = null
-        }, 10000)
+        }, DELETE_DISARM_AFTER_MS)
 
         return () => {
             window.clearInterval(ticker)
@@ -71,7 +73,7 @@
         if (!archiveArmedId) return
         const timer = window.setTimeout(() => {
             archiveArmedId = null
-        }, 4000)
+        }, ARCHIVE_DISARM_AFTER_MS)
 
         return () => window.clearTimeout(timer)
     })
@@ -141,6 +143,9 @@
                             {archived}
                             {locked}
                             {deleteSecondsLeft}
+                            archiveTimeoutMs={ARCHIVE_DISARM_AFTER_MS}
+                            deleteDisarmAfterMs={DELETE_DISARM_AFTER_MS}
+                            deleteCountdownSeconds={DELETE_COUNTDOWN_SECONDS}
                             {spinRotate}
                             onArmArchive={armArchive}
                             onConfirmArchive={confirmArchive}
