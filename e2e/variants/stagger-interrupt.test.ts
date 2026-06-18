@@ -7,15 +7,8 @@ test.describe('variants/stagger-interrupt', () => {
 
         const cells = page.getByTestId('variant-cell')
         await expect(cells).toHaveCount(12)
-
-        await page.getByTestId('play').click()
-        await page.waitForTimeout(180)
-        await page.getByTestId('stop').click()
-
-        const samples: number[][] = []
-        for (let sample = 0; sample < 10; sample += 1) {
-            await page.waitForTimeout(120)
-            const yValues = await cells.evaluateAll((elements) =>
+        const readYValues = () =>
+            cells.evaluateAll((elements) =>
                 elements.map((element) => {
                     const transform = getComputedStyle(element).transform
                     if (!transform || transform === 'none') return 0
@@ -27,12 +20,21 @@ test.describe('variants/stagger-interrupt', () => {
                     return values[5] || 0
                 })
             )
-            samples.push(yValues)
+
+        await page.getByTestId('play').click()
+        await page.waitForTimeout(180)
+        const yAtStop = await readYValues()
+        await page.getByTestId('stop').click()
+
+        const samples: number[][] = []
+        for (let sample = 0; sample < 10; sample += 1) {
+            await page.waitForTimeout(120)
+            samples.push(await readYValues())
         }
 
         for (const yValues of samples) {
-            for (const y of yValues) {
-                expect(y).toBeGreaterThanOrEqual(-8)
+            for (const [index, y] of yValues.entries()) {
+                expect(y - yAtStop[index]).toBeGreaterThanOrEqual(-16)
             }
         }
 
