@@ -1,5 +1,7 @@
 import {
     buildHTMLStyles,
+    cancelFrame,
+    frame,
     isMotionValue,
     type AnyResolvedKeyframe,
     type HTMLRenderState,
@@ -222,25 +224,17 @@ export const applyMotionStyleEffect = (
         )
     }
 
-    let microtaskQueued = false
-    let rafQueued = false
+    let disposed = false
+
+    const render = () => {
+        if (disposed) return
+        apply()
+    }
 
     const applyAfterOtherSubscribers = () => {
+        if (disposed) return
         apply()
-        if (!microtaskQueued) {
-            microtaskQueued = true
-            queueMicrotask(() => {
-                microtaskQueued = false
-                apply()
-            })
-        }
-        if (typeof requestAnimationFrame === 'function' && !rafQueued) {
-            rafQueued = true
-            requestAnimationFrame(() => {
-                rafQueued = false
-                apply()
-            })
-        }
+        frame.render(render)
     }
 
     applyAfterOtherSubscribers()
@@ -249,7 +243,9 @@ export const applyMotionStyleEffect = (
         value.on('change', applyAfterOtherSubscribers)
     )
     return () => {
+        disposed = true
         for (const cleanup of cleanups) cleanup()
+        cancelFrame(render)
     }
 }
 

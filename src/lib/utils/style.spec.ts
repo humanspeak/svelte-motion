@@ -1,4 +1,4 @@
-import { motionValue } from 'motion-dom'
+import { frameData, frameSteps, motionValue } from 'motion-dom'
 import { describe, expect, it, vi } from 'vitest'
 import {
     applyMotionStyleEffect,
@@ -7,6 +7,8 @@ import {
     mergeInlineStyles,
     serializeMotionStyle
 } from './style.js'
+
+const flushRenderFrame = () => frameSteps.render.process(frameData)
 
 describe('mergeInlineStyles', () => {
     it('returns existing style when no initial/animate provided', () => {
@@ -383,7 +385,7 @@ describe('applyMotionStyleEffect', () => {
         cleanup?.()
     })
 
-    it('reapplies templated MotionValue styles after later subscribers write generated transforms', async () => {
+    it('reapplies templated MotionValue styles on the Motion render frame', () => {
         const el = document.createElement('div')
         const x = motionValue(12)
 
@@ -397,7 +399,7 @@ describe('applyMotionStyleEffect', () => {
         })
 
         x.set(36)
-        await Promise.resolve()
+        flushRenderFrame()
 
         expect(el.getAttribute('style')).toContain('translateY(36px) translateX(36px)')
 
@@ -409,48 +411,49 @@ describe('applyMotionStyleEffect', () => {
         const el = document.createElement('div')
         const x = motionValue(12)
         const y = motionValue(4)
-        const queuedMicrotasks: VoidFunction[] = []
-        const queuedFrames: FrameRequestCallback[] = []
-        const queueMicrotaskSpy = vi
-            .spyOn(globalThis, 'queueMicrotask')
-            .mockImplementation((callback) => {
-                queuedMicrotasks.push(callback)
-            })
-        const requestAnimationFrameSpy = vi
-            .spyOn(globalThis, 'requestAnimationFrame')
-            .mockImplementation((callback) => {
-                queuedFrames.push(callback)
-                return queuedFrames.length
-            })
+        const transformTemplate = vi.fn(
+            ({ x: latestX }, generated) => `translateY(${latestX}) ${generated}`
+        )
 
-        try {
-            const cleanup = applyMotionStyleEffect(
-                el,
-                { x, y },
-                ({ x: latestX }, generated) => `translateY(${latestX}) ${generated}`
-            )
+        const cleanup = applyMotionStyleEffect(el, { x, y }, transformTemplate)
 
-            expect(queueMicrotaskSpy).toHaveBeenCalledTimes(1)
-            expect(requestAnimationFrameSpy).toHaveBeenCalledTimes(1)
+        expect(transformTemplate).toHaveBeenCalledTimes(1)
 
-            x.set(24)
-            y.set(18)
+        x.set(24)
+        y.set(18)
 
-            expect(queueMicrotaskSpy).toHaveBeenCalledTimes(1)
-            expect(requestAnimationFrameSpy).toHaveBeenCalledTimes(1)
+        expect(transformTemplate).toHaveBeenCalledTimes(3)
 
-            queuedMicrotasks.shift()?.()
-            queuedFrames.shift()?.(performance.now())
-            x.set(36)
+        flushRenderFrame()
 
-            expect(queueMicrotaskSpy).toHaveBeenCalledTimes(2)
-            expect(requestAnimationFrameSpy).toHaveBeenCalledTimes(2)
+        expect(transformTemplate).toHaveBeenCalledTimes(4)
 
-            cleanup?.()
-        } finally {
-            queueMicrotaskSpy.mockRestore()
-            requestAnimationFrameSpy.mockRestore()
-        }
+        cleanup?.()
+    })
+
+    it('cancels deferred frame writes after cleanup', () => {
+        const el = document.createElement('div')
+        const x = motionValue(12)
+
+        const cleanup = applyMotionStyleEffect(
+            el,
+            { x },
+            ({ x: latestX }, generated) => `translateY(${latestX}) ${generated}`
+        )
+        const generatedCleanup = x.on('change', (latestX) => {
+            el.setAttribute('style', `transform: translateX(${latestX}px)`)
+        })
+
+        x.set(36)
+
+        expect(el.getAttribute('style')).toBe('transform: translateX(36px)')
+
+        cleanup?.()
+        flushRenderFrame()
+
+        expect(el.getAttribute('style')).toBe('transform: translateX(36px)')
+
+        generatedCleanup()
     })
 })
 
