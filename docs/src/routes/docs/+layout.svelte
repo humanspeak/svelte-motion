@@ -1,6 +1,8 @@
 <script lang="ts">
     import { page } from '$app/state'
     import { afterNavigate } from '$app/navigation'
+    import { browser } from '$app/environment'
+    import posthog from 'posthog-js'
     import {
         HeaderV2,
         FooterV2,
@@ -130,6 +132,13 @@
 
     afterNavigate(() => {
         requestAnimationFrame(refreshHeadings)
+        if (browser) {
+            posthog.capture('doc_page_viewed', {
+                pathname: page.url.pathname,
+                slug: page.url.pathname.replace(/^\/docs\/?/, '') || 'index',
+                title: (page.data?.title as string | undefined) ?? undefined
+            })
+        }
     })
 </script>
 

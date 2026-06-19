@@ -5,8 +5,14 @@
     import rootPkg from '../../../../package.json'
     import '@fontsource-variable/inter/index.css'
     import '@fontsource-variable/jetbrains-mono/index.css'
+    import posthog from 'posthog-js'
+    import { browser } from '$app/environment'
 
     const PKG_VERSION = rootPkg.version
+
+    $effect(() => {
+        if (browser) posthog.capture('svelte_animations_viewed')
+    })
 
     const breadcrumbs = getBreadcrumbContext()
     if (breadcrumbs) breadcrumbs.breadcrumbs = [{ title: 'Svelte Animations' }]
