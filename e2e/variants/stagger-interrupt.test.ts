@@ -22,18 +22,24 @@ test.describe('variants/stagger-interrupt', () => {
             )
 
         await page.getByTestId('play').click()
+        // Let the forward stagger begin, but stop before all delayed children
+        // have started their play animation.
         await page.waitForTimeout(180)
         const yAtStop = await readYValues()
         await page.getByTestId('stop').click()
 
         const samples: number[][] = []
         for (let sample = 0; sample < 10; sample += 1) {
+            // Sample far enough apart to catch delayed children that would pop
+            // upward after stop, while still watching the spring settle.
             await page.waitForTimeout(120)
             samples.push(await readYValues())
         }
 
         for (const yValues of samples) {
             for (const [index, y] of yValues.entries()) {
+                // Allow harmless spring wobble, but fail if a cell starts a
+                // fresh upward play motion after the stop command.
                 expect(y - yAtStop[index]).toBeGreaterThanOrEqual(-16)
             }
         }
