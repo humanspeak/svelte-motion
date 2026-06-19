@@ -13,11 +13,13 @@ test.describe('variants/stagger-interrupt', () => {
                     const transform = getComputedStyle(element).transform
                     if (!transform || transform === 'none') return 0
                     const matrix = transform.match(/matrix\(([^)]+)\)/)
-                    if (!matrix) return 0
-                    const values = matrix[1]
+                    const matrix3d = transform.match(/matrix3d\(([^)]+)\)/)
+                    const rawValues = matrix3d?.[1] ?? matrix?.[1]
+                    if (!rawValues) return 0
+                    const values = rawValues
                         .split(',')
                         .map((value) => Number.parseFloat(value.trim()))
-                    return values[5] || 0
+                    return matrix3d ? values[13] || 0 : values[5] || 0
                 })
             )
 

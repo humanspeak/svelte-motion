@@ -440,6 +440,9 @@ describe('applyMotionStyleEffect', () => {
             { x },
             ({ x: latestX }, generated) => `translateY(${latestX}) ${generated}`
         )
+        if (!cleanup) {
+            throw new Error('Expected applyMotionStyleEffect to return a cleanup')
+        }
         const generatedCleanup = x.on('change', (latestX) => {
             el.setAttribute('style', `transform: translateX(${latestX}px)`)
         })
@@ -448,7 +451,7 @@ describe('applyMotionStyleEffect', () => {
 
         expect(el.getAttribute('style')).toBe('transform: translateX(36px)')
 
-        cleanup?.()
+        cleanup()
         flushRenderFrame()
 
         expect(el.getAttribute('style')).toBe('transform: translateX(36px)')
