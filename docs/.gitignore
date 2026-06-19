@@ -55,3 +55,5 @@ static/llms-full.txt
 .dev.vars*
 !.dev.vars.example
 .env*
+.env.local
+.claude/

@@ -12,6 +12,7 @@
     import githubStats from '$lib/github-stats.json'
     import '@fontsource-variable/inter/index.css'
     import '@fontsource-variable/jetbrains-mono/index.css'
+    import posthog from 'posthog-js'
     import type { PageData } from './$types'
 
     const { data }: { data: PageData } = $props()
@@ -294,6 +295,15 @@
         }
     ]
 
+    // ── PostHog event handlers ───────────────────────────────────────
+    const captureGetStarted = () => posthog.capture('get_started_clicked', { location: 'hero' })
+    const captureExampleTile = (slug: string, title: string, index: number) =>
+        posthog.capture('example_tile_clicked', { slug, title, index })
+    const captureCompareLibrary = (library: string, libraryName: string) =>
+        posthog.capture('compare_library_clicked', { library, ['library_name']: libraryName })
+    const captureAILink = (type: string, path: string) =>
+        posthog.capture('llms_txt_opened', { type, path })
+
     // ── Copy install command ─────────────────────────────────────────
     const installCmd = $derived(`npm i ${PKG_NAME}`)
     let copied = $state(false)
@@ -303,6 +313,7 @@
             await navigator.clipboard.writeText(installCmd)
             copied = true
             setTimeout(() => (copied = false), 1500)
+            posthog.capture('install_command_copied', { package: PKG_NAME, version: PKG_VERSION })
         } catch {
             /* clipboard blocked — fail quiet */
         }
@@ -433,7 +444,7 @@
                     <code>svelte/transition</code> for declarative gestures, layout, and exit animations.
                 </p>
                 <div class="cta-row">
-                    <a class="pri" href="/docs">get started ↗</a>
+                    <a class="pri" href="/docs" onclick={captureGetStarted}>get started ↗</a>
                     <a href="/docs/animate-presence">api reference</a>
                     <a href="/examples">examples</a>
                     <MotionButton
@@ -676,7 +687,11 @@
                             <tr class={i === 0 ? 'us-row' : ''}>
                                 <td class={i === 0 ? 'us' : ''}>
                                     {#if row.slug}
-                                        <a class="comp-link" href="/compare/{row.slug}"
+                                        <a
+                                            class="comp-link"
+                                            href="/compare/{row.slug}"
+                                            onclick={() =>
+                                                captureCompareLibrary(row.slug!, row.name)}
                                             >{row.name}</a
                                         >
                                     {:else}
@@ -715,7 +730,13 @@
                     <span class="ai-meta">/llmstxt.org</span>
                 </div>
                 <div class="ai-grid">
-                    <a class="ai-cell" href="/llms.txt" target="_blank" rel="noopener">
+                    <a
+                        class="ai-cell"
+                        href="/llms.txt"
+                        target="_blank"
+                        rel="noopener"
+                        onclick={() => captureAILink('index', '/llms.txt')}
+                    >
                         <div class="ai-cell-k">01 · index</div>
                         <h3>
                             <code>/llms.txt</code>
@@ -726,7 +747,13 @@
                         </p>
                         <div class="ai-cell-foot">~3 kB · open ↗</div>
                     </a>
-                    <a class="ai-cell" href="/llms-full.txt" target="_blank" rel="noopener">
+                    <a
+                        class="ai-cell"
+                        href="/llms-full.txt"
+                        target="_blank"
+                        rel="noopener"
+                        onclick={() => captureAILink('full', '/llms-full.txt')}
+                    >
                         <div class="ai-cell-k">02 · full</div>
                         <h3>
                             <code>/llms-full.txt</code>
@@ -737,7 +764,13 @@
                         </p>
                         <div class="ai-cell-foot">~16 kB · open ↗</div>
                     </a>
-                    <a class="ai-cell" href="/docs" target="_blank" rel="noopener">
+                    <a
+                        class="ai-cell"
+                        href="/docs"
+                        target="_blank"
+                        rel="noopener"
+                        onclick={() => captureAILink('per-page', '/docs')}
+                    >
                         <div class="ai-cell-k">03 · per-page mirrors</div>
                         <h3>
                             <code>/docs/&lt;slug&gt;.md</code>
@@ -773,7 +806,11 @@
             <div>
                 <div class="grid">
                     {#each featuredExamples as ex, i (ex.slug)}
-                        <a class="cell" href="/examples/{ex.slug}">
+                        <a
+                            class="cell"
+                            href="/examples/{ex.slug}"
+                            onclick={() => captureExampleTile(ex.slug, ex.title, i)}
+                        >
                             <div class="id">
                                 № {String(i + 1).padStart(2, '0')} / {String(
                                     featuredExamples.length

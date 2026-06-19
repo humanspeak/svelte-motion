@@ -37,6 +37,9 @@
     "vars": {
         "PUBLIC_SITE_URL": "https://motion.svelte.page",
         "PUBLIC_ENVIRONMENT": "production",
+        // checkov:skip=CKV_SECRET_6: PostHog project tokens are public client-side SDK identifiers.
+        "PUBLIC_POSTHOG_PROJECT_TOKEN": "phc_urqpUgNEfk5aMzbZYTtHvYvyMtD4feCik6rqGaZQzdXA",
+        "PUBLIC_POSTHOG_HOST": "https://t.svelte.page",
         "ENVIRONMENT": "production",
         "NODE_ENV": "production"
     },

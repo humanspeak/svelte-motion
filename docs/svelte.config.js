@@ -48,6 +48,9 @@ const config = {
         // If your environment is not supported, or you settled on a specific environment, switch out the adapter.
         // See https://svelte.dev/docs/kit/adapters for more information about adapters.
         adapter: adapter(),
+        paths: {
+            relative: false
+        },
         alias: {
             $msgs: 'src/lib/paraglide/messages.js'
         },
@@ -59,13 +62,21 @@ const config = {
                     'self',
                     'https://*.ahrefs.com',
                     'https://*.posthog.com',
+                    'https://t.svelte.page',
                     'unsafe-inline'
                 ],
                 'style-src': ['self', 'unsafe-inline'],
                 'img-src': ['self', 'data:', 'https:'],
                 'font-src': ['self', 'data:'],
                 'worker-src': ['self', 'blob:'],
-                'connect-src': ['self', 'https:'],
+                'connect-src': [
+                    'self',
+                    'https://analytics.ahrefs.com',
+                    'https://*.posthog.com',
+                    'https://t.svelte.page',
+                    'ws://localhost:*',
+                    'ws://127.0.0.1:*'
+                ],
                 'frame-ancestors': ['none'],
                 'form-action': ['self'],
                 'base-uri': ['self'],

@@ -1,6 +1,14 @@
 <script lang="ts">
     import { CompareIndexV2 } from '@humanspeak/docs-kit'
     import { competitors, ours } from '$lib/compare-data'
+    import posthog from 'posthog-js'
+    import { browser } from '$app/environment'
+
+    $effect(() => {
+        if (browser) {
+            posthog.capture('compare_index_viewed')
+        }
+    })
 </script>
 
 <CompareIndexV2

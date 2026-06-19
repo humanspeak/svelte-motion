@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Dialog } from 'bits-ui'
     import { AnimatePresence, motion } from '@humanspeak/svelte-motion'
+    import posthog from 'posthog-js'
     import { registryItems } from '$lib/generated/registry-data'
     import {
         Code,
@@ -73,9 +74,14 @@
     let highlightedFiles = $state<Array<{ light: string; dark: string }> | null>(null)
     let highlighterLoaded = $state(false)
 
-    // Lazy-load shiki when dialog opens
+    // Lazy-load shiki when dialog opens; track first open
     $effect(() => {
         if (open && !highlighterLoaded) {
+            posthog.capture('component_source_opened', {
+                component: name,
+                slug,
+                ['file_count']: files.length
+            })
             highlighterLoaded = true
             ;(async () => {
                 const [{ createHighlighter }, { createJavaScriptRegexEngine }] = await Promise.all([
@@ -107,6 +113,11 @@
         navigator.clipboard.writeText(content)
         copied = true
         setTimeout(() => (copied = false), 2000)
+        posthog.capture('component_source_copied', {
+            component: name,
+            slug,
+            file: files[activeFileIndex]?.target ?? ''
+        })
     }
 </script>
 

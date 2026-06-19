@@ -3,7 +3,13 @@
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import sitemapManifest from '$lib/sitemap-manifest.json'
+    import posthog from 'posthog-js'
+    import { browser } from '$app/environment'
     import type { PageData } from './$types'
+
+    $effect(() => {
+        if (browser) posthog.capture('examples_index_viewed')
+    })
 
     type ExampleData = {
         title: string
