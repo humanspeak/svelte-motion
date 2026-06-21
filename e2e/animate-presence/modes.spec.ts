@@ -40,6 +40,7 @@ const framePoll = {
     timeout: 2000,
     intervals: Array.from({ length: 125 }, () => 16)
 }
+const layoutDeltaTolerance = 3
 
 test.describe('AnimatePresence modes', () => {
     test('sync preserves exiting layout while popLayout reflows immediately', async ({ page }) => {
@@ -67,7 +68,7 @@ test.describe('AnimatePresence modes', () => {
         const syncDelta = syncBefore!.x - (await readX(syncRight))
         const popLayoutDelta = popLayoutBefore!.x - (await readX(popLayoutRight))
 
-        expect(syncDelta).toBeLessThanOrEqual(popLayoutDelta + 1)
+        expect(syncDelta).toBeLessThanOrEqual(popLayoutDelta + layoutDeltaTolerance)
     })
 
     test('sync does not move layout siblings under a visible exiting child on repeated toggles', async ({

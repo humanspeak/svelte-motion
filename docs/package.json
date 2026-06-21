@@ -27,6 +27,7 @@
         "@humanspeak/docs-kit": "github:humanspeak/docs-kit#2026.6.9",
         "@humanspeak/svelte-markdown": "^1.5.3",
         "@humanspeak/svelte-motion": "workspace:*",
+        "@humanspeak/svelte-scoped-props": "^0.1.1",
         "@inlang/paraglide-js": "^2.18.1",
         "@lucide/svelte": "^1.17.0",
         "bits-ui": "^2.18.1",

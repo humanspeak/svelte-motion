@@ -64,6 +64,12 @@ Svelte gives you the power to build dynamic user interfaces with excellent perfo
 
 ```
 
+> **Using component-scoped CSS?** If you replace a styled native element like
+> `<h2 class="headline">` with `<motion.h2 class="headline">`, Svelte may treat
+> `.headline` as unused because the class is now passed to a component. Use
+> [`scoped:class` with @humanspeak/svelte-scoped-props](/docs/scoped-motion-classes)
+> when you need parent-scoped CSS to survive that boundary.
+
 <Example isSmall exampleUrl="/examples/animated-button">
   <AnimatedButton />
 </Example>
