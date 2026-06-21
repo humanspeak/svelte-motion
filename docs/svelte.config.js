@@ -1,3 +1,4 @@
+import { scopedProps } from '@humanspeak/svelte-scoped-props'
 import adapter from '@sveltejs/adapter-cloudflare'
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte'
 import { mdsvex } from 'mdsvex'
@@ -9,11 +10,25 @@ const highlighter = await createHighlighter({
     langs: ['javascript', 'typescript', 'svelte', 'html', 'css', 'json', 'bash', 'shell']
 })
 
+const scopedPropsPreprocess = scopedProps({
+    runtimeModule: '@humanspeak/svelte-scoped-props/runtime'
+})
+
+const scopedPropsSvelteOnly = {
+    name: 'svelte-scoped-props-motion-docs',
+    markup(options) {
+        if (!options.filename?.endsWith('.svelte')) return undefined
+
+        return scopedPropsPreprocess.markup?.(options)
+    }
+}
+
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
     // Consult https://svelte.dev/docs/kit/integrations
     // for more information about preprocessors
     preprocess: [
+        scopedPropsSvelteOnly,
         vitePreprocess(),
         mdsvex({
             highlight: {

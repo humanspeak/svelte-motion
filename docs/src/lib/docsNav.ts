@@ -31,7 +31,10 @@ export const docsSections: NavSection[] = [
     {
         title: 'Get started',
         icon: Play,
-        items: [{ title: 'Get started', href: '/docs', icon: Play, exact: true }]
+        items: [
+            { title: 'Get started', href: '/docs', icon: Play, exact: true },
+            { title: 'Scoped Motion Classes', href: '/docs/scoped-motion-classes', icon: Code }
+        ]
     },
     {
         title: 'Components',

@@ -106,6 +106,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Scroll Progress',
         description: 'Interactive scroll progress animation example using Svelte Motion.'
     },
+    'scoped-motion-classes': {
+        title: 'Scoped Motion Classes',
+        description:
+            'Keep component-scoped CSS selectors alive when they are passed to motion components.'
+    },
     'shared-layout-animation': {
         title: 'Shared Layout Animation',
         description: 'Interactive shared layout animation example using Svelte Motion.'

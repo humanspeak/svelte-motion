@@ -183,6 +183,9 @@ importers:
       '@humanspeak/svelte-motion':
         specifier: workspace:*
         version: link:..
+      '@humanspeak/svelte-scoped-props':
+        specifier: ^0.1.1
+        version: 0.1.1(svelte@5.56.0(@typescript-eslint/types@8.60.0))
       '@inlang/paraglide-js':
         specifier: ^2.18.1
         version: 2.18.1(typescript@6.0.3)
@@ -960,6 +963,11 @@ packages:
 
   '@humanspeak/svelte-satori-fix@0.0.6':
     resolution: {integrity: sha512-8ZvVrdm/OMxKGG/SNTEaemrUx0hyFzyccJOdGM9LQ/unt9837WtC6N4IffjJHLxJwmSEquwSHl1UKZGeHgWYQw==}
+    peerDependencies:
+      svelte: ^5.0.0
+
+  '@humanspeak/svelte-scoped-props@0.1.1':
+    resolution: {integrity: sha512-X/A1eabtkiZdCYUroVfLWw0r5HJUuB0iPZJ5EI0+mbjdNmajeE0CB3CTVYJF2rmr/zIwz3bOhI5iWCzTFVJE4Q==}
     peerDependencies:
       svelte: ^5.0.0
 
@@ -4885,6 +4893,10 @@ snapshots:
       svelte: 5.56.0(@typescript-eslint/types@8.60.0)
 
   '@humanspeak/svelte-satori-fix@0.0.6(svelte@5.56.0(@typescript-eslint/types@8.60.0))':
+    dependencies:
+      svelte: 5.56.0(@typescript-eslint/types@8.60.0)
+
+  '@humanspeak/svelte-scoped-props@0.1.1(svelte@5.56.0(@typescript-eslint/types@8.60.0))':
     dependencies:
       svelte: 5.56.0(@typescript-eslint/types@8.60.0)
 

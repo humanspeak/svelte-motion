@@ -1,0 +1,154 @@
+---
+title: Scoped Motion Classes
+description: Use @humanspeak/svelte-scoped-props when component-scoped CSS classes are passed to motion components.
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte'
+  import ScopedMotionClasses from '$lib/examples/scoped-motion-classes/demos/Default.svelte'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'Scoped Motion Classes | Docs | Svelte Motion'
+      seo.description = 'Use @humanspeak/svelte-scoped-props when Svelte prunes scoped CSS selectors that are only passed to motion components.'
+      seo.ogTitle = 'Scoped Motion Classes'
+      seo.ogTagline = 'Keep parent-scoped CSS on motion components'
+      seo.ogFeatures = ['scoped:class', 'motion.*', 'Svelte CSS', 'Companion Preprocessor']
+      seo.ogSlug = 'docs-scoped-motion-classes'
+  }
+</script>
+
+# Scoped Motion Classes
+
+Svelte can prune a component-scoped CSS selector when that selector is only passed to a
+component, including `motion.*`. This is the behavior reported in
+[issue #215](https://github.com/humanspeak/svelte-motion/issues/215): a normal
+`<h2 class="black">` keeps `.black`, but `<motion.h2 class="black">` can make Svelte
+treat `.black` as unused.
+
+For those cases, use the companion preprocessor
+[`@humanspeak/svelte-scoped-props`](https://github.com/humanspeak/svelte-scoped-props).
+It adds explicit `scoped:` props so the parent component can opt into forwarding its
+own CSS scope hash through a component prop.
+
+For the deeper compiler-design notes behind this workaround, see the
+[Svelte Scoped Props docs](https://scoped.svelte.page/docs) and the
+[design notes](https://scoped.svelte.page/docs/design-notes).
+
+```svelte
+<script lang="ts">
+    import { motion, useTime, useTransform } from '@humanspeak/svelte-motion'
+
+    const time = useTime()
+    const y = useTransform(time, (latest) => Math.sin(latest / 280) * -10)
+    const scale = useTransform(time, (latest) => 1 + Math.sin(latest / 280) * 0.04)
+    const rotate = useTransform(time, (latest) => Math.sin(latest / 360) * -1.5)
+</script>
+
+<h2 class="headline">Native heading keeps the style.</h2>
+
+<motion.h2 scoped:class="headline" style={{ y, scale, rotate }}>
+    Motion heading keeps it too.
+</motion.h2>
+
+<style>
+    .headline {
+        width: fit-content;
+        border: 2px solid hsl(var(--primary));
+        background: color-mix(in oklab, hsl(var(--primary)) 12%, hsl(var(--background)));
+        color: hsl(var(--foreground));
+        font-size: 2rem;
+        font-weight: 800;
+    }
+</style>
+```
+
+<Example isSmall exampleUrl="/examples/scoped-motion-classes">
+  <ScopedMotionClasses />
+</Example>
+
+## Install
+
+```bash
+pnpm add -D @humanspeak/svelte-scoped-props
+```
+
+Add the preprocessor to `svelte.config.js` before Svelte compiles your components:
+
+```js title="svelte.config.js"
+import { scopedProps } from '@humanspeak/svelte-scoped-props'
+import adapter from '@sveltejs/adapter-auto'
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte'
+
+const config = {
+    preprocess: [
+        scopedProps({
+            runtimeModule: '@humanspeak/svelte-scoped-props/runtime'
+        }),
+        vitePreprocess()
+    ],
+    kit: {
+        adapter: adapter()
+    }
+}
+
+export default config
+```
+
+If you already have other preprocessors that change CSS, keep `scopedProps()` after
+those style preprocessors so it sees the same CSS Svelte will hash.
+
+## How it works
+
+`scoped:class` is rewritten before Svelte analyzes the component:
+
+```svelte
+<motion.h2 scoped:class="black" />
+```
+
+becomes equivalent to:
+
+```svelte
+<motion.h2 class="black svelte-abc123" />
+```
+
+The package also adds a tiny compile-time marker so Svelte sees `.black` as used in
+the parent file and keeps the scoped CSS rule.
+
+## When to use it
+
+Use `scoped:class` when all of these are true:
+
+- The class is defined in the same Svelte file's `<style>` block.
+- The class is passed to `motion.div`, `motion.h2`, `m.div`, or another component tag.
+- Svelte warns that the selector is unused, or the compiled CSS no longer contains it.
+
+You do not need it for native elements:
+
+```svelte
+<h2 class="black">Hello</h2>
+```
+
+Native elements already live in the current component, so Svelte can see the selector
+usage directly.
+
+## Limits
+
+`@humanspeak/svelte-scoped-props` is an experimental companion package, not a Svelte
+core feature. It mirrors Svelte's default CSS hash behavior because Svelte does not
+export that hash helper publicly.
+
+The directive is intentionally explicit. Use it on component tags only:
+
+```svelte
+<motion.div scoped:class="card" />
+<Child scoped:class="card" />
+```
+
+Avoid combining `scoped:class` and `class` on the same component. If a value is
+dynamic, pass the dynamic value to `scoped:class` instead:
+
+```svelte
+<motion.div scoped:class={['card', { active }]} />
+```
