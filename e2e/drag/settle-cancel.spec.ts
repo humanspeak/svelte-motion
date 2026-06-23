@@ -124,6 +124,52 @@ test.describe('drag/settle-cancel', () => {
         expect(Math.abs(heldTranslate - grabbedTranslate)).toBeLessThanOrEqual(8)
     })
 
+    test('slow no-momentum settle follows rightward movement after re-grab', async ({ page }) => {
+        // Regression from manual review: catch the slow boundary-settle card,
+        // move the pointer back to the right, and the card should keep moving
+        // with the pointer. It must not stall under the pointer or jump left
+        // while the second drag is active.
+        await page.goto('/tests/drag/settle-cancel?slow=true&@isPlaywright=true')
+        const card = page.getByTestId('settle-card')
+        await card.waitFor({ state: 'visible' })
+
+        const start = await card.boundingBox()
+        if (!start) throw new Error('no start bbox')
+        const cy = start.y + start.height / 2
+        const cx = start.x + start.width / 2
+
+        await page.mouse.move(cx, cy)
+        await page.mouse.down()
+        await page.mouse.move(cx + 400, cy, { steps: 8 })
+        await page.mouse.up()
+
+        await page.waitForTimeout(420)
+        const caughtRect = await card.boundingBox()
+        if (!caughtRect) throw new Error('no caught bbox')
+        const caughtCx = caughtRect.x + caughtRect.width / 2
+        const caughtTranslate = await readTranslateX(page, '[data-testid="settle-card"]')
+        expect(caughtTranslate).toBeGreaterThan(130)
+
+        await page.mouse.move(caughtCx, cy)
+        await page.mouse.down()
+        await page.evaluate(() => new Promise(requestAnimationFrame))
+        const grabbedTranslate = await readTranslateX(page, '[data-testid="settle-card"]')
+
+        await page.mouse.move(caughtCx + 70, cy, { steps: 8 })
+        await page.evaluate(() => new Promise(requestAnimationFrame))
+        const movedRightTranslate = await readTranslateX(page, '[data-testid="settle-card"]')
+
+        await page.mouse.move(caughtCx + 120, cy, { steps: 8 })
+        await page.evaluate(() => new Promise(requestAnimationFrame))
+        const movedFartherRightTranslate = await readTranslateX(page, '[data-testid="settle-card"]')
+        await page.mouse.up()
+
+        expect(movedRightTranslate).toBeGreaterThanOrEqual(grabbedTranslate - 4)
+        expect(movedRightTranslate).toBeGreaterThan(grabbedTranslate + 10)
+        expect(movedFartherRightTranslate).toBeGreaterThanOrEqual(movedRightTranslate - 4)
+        expect(movedFartherRightTranslate).toBeGreaterThan(movedRightTranslate + 6)
+    })
+
     test('release cancellation preserves authored base transform on re-grab', async ({ page }) => {
         await page.goto('/tests/drag/settle-cancel?@isPlaywright=true')
         const card = page.getByTestId('base-transform-card')
