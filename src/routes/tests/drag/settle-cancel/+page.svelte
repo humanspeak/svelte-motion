@@ -264,6 +264,10 @@
         left: 50%;
     }
 
+    .demo-lane-authored::before {
+        content: none;
+    }
+
     .lane-marker {
         display: grid;
         align-content: end;
