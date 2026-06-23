@@ -40,6 +40,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Conic Gradient',
         description: 'Interactive conic gradient animation example using Svelte Motion.'
     },
+    'drag-constraints': {
+        title: 'Drag Constraints',
+        description:
+            'A polished constrained-drag stage showing elastic overdrag, ref bounds, and spring settling.'
+    },
     'fancy-like-button': {
         title: 'Fancy Like Button',
         description: 'Interactive fancy like button animation example using Svelte Motion.'

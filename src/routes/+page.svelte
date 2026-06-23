@@ -221,6 +221,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/motion-dev-constraints') + searchParams}
+                    >
+                        Drag Constraints (Motion.dev parity)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/drag/elastic') + searchParams}
                     >
                         Drag Elastic
