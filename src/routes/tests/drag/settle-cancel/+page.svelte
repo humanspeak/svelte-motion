@@ -12,9 +12,43 @@
      * release paths. Each should honour a re-grab cleanly.
      */
     import { motion } from '$lib'
+    import type { PageData } from './$types'
+
+    let { data }: { data: PageData } = $props()
+
+    const slowSnapTransition = $derived(
+        data.slow
+            ? {
+                  bounceStiffness: 6,
+                  bounceDamping: 2.4,
+                  restDelta: 0.01,
+                  restSpeed: 0.01
+              }
+            : undefined
+    )
+    const slowSettleTransition = $derived(
+        data.slow
+            ? {
+                  bounceStiffness: 7,
+                  bounceDamping: 2.6,
+                  restDelta: 0.01,
+                  restSpeed: 0.01
+              }
+            : undefined
+    )
+    const slowBaseTransition = $derived(
+        data.slow
+            ? {
+                  bounceStiffness: 6,
+                  bounceDamping: 2.4,
+                  restDelta: 0.01,
+                  restSpeed: 0.01
+              }
+            : undefined
+    )
 </script>
 
-<div class="page-shell">
+<div class:slow={data.slow} class="page-shell">
     <header class="intro">
         <p class="eyebrow">Issue #401</p>
         <h1>Drag release cancellation</h1>
@@ -23,59 +57,78 @@
             While you hold the pointer still, the card should stay under the pointer without
             drifting, snapping, or jumping.
         </p>
+        {#if data.slow}
+            <p class="slow-note">Very slow review mode is on.</p>
+        {/if}
     </header>
 
     <section class="case-card">
         <div>
+            <p class="case-index">1. returns home</p>
             <p class="case-title">Snap to origin</p>
             <p class="case-copy">
-                Try: release, re-grab during the return animation, and hold. Pass: it freezes at the
-                re-grab position.
+                Drag right and release: it heads all the way back to the home line. Re-grab
+                mid-return and hold still. Pass: it freezes under your pointer.
             </p>
         </div>
-        <motion.div
-            class="drag-card drag-card-blue"
-            drag="x"
-            dragSnapToOrigin
-            transition={{ duration: 0.6 }}
-            data-testid="snap-card"
-        />
+        <div class="demo-lane">
+            <span class="lane-marker lane-marker-home">home</span>
+            <motion.div
+                class="drag-card drag-card-blue"
+                drag="x"
+                dragSnapToOrigin
+                dragMomentum={!data.slow}
+                dragTransition={slowSnapTransition}
+                data-testid="snap-card"
+            />
+        </div>
     </section>
     <section class="case-card">
         <div>
+            <p class="case-index">2. settles to boundary</p>
             <p class="case-title">No-momentum constraint settle</p>
             <p class="case-copy">
-                Try: drag past the right constraint, release, then re-grab mid-settle. Pass: it
-                stops fighting the new drag.
+                Drag far past the right edge and release: it springs back only to the constraint
+                line, not all the way home. Re-grab mid-settle. Pass: it stops fighting the new
+                drag.
             </p>
         </div>
-        <motion.div
-            class="drag-card drag-card-orange"
-            drag="x"
-            dragMomentum={false}
-            dragConstraints={{ left: -120, right: 120 }}
-            dragElastic={0.5}
-            transition={{ duration: 0.6 }}
-            data-testid="settle-card"
-        />
+        <div class="demo-lane">
+            <span class="lane-marker lane-marker-home">home</span>
+            <span class="lane-marker lane-marker-boundary">right limit</span>
+            <motion.div
+                class="drag-card drag-card-orange"
+                drag="x"
+                dragMomentum={false}
+                dragConstraints={{ left: -120, right: 120 }}
+                dragElastic={0.5}
+                dragTransition={slowSettleTransition}
+                data-testid="settle-card"
+            />
+        </div>
     </section>
     <section class="case-card">
         <div>
+            <p class="case-index">3. keeps authored transform</p>
             <p class="case-title">Authored base transform</p>
             <p class="case-copy">
                 Try: same re-grab gesture. Pass: the tilted, offset card does not jump by its
                 authored 40px base transform.
             </p>
         </div>
-        <motion.div
-            class="drag-card drag-card-teal"
-            drag="x"
-            dragConstraints={{ left: -160, right: 160 }}
-            dragElastic={0.25}
-            transition={{ duration: 0.8 }}
-            data-testid="base-transform-card"
-            style="transform:translateX(40px) rotate(3deg);"
-        />
+        <div class="demo-lane">
+            <span class="lane-marker lane-marker-home">authored +40px</span>
+            <motion.div
+                class="drag-card drag-card-teal"
+                drag="x"
+                dragMomentum={!data.slow}
+                dragConstraints={{ left: -160, right: 160 }}
+                dragElastic={0.25}
+                dragTransition={slowBaseTransition}
+                data-testid="base-transform-card"
+                style="transform:translateX(40px) rotate(3deg);"
+            />
+        </div>
     </section>
 </div>
 
@@ -130,26 +183,46 @@
     }
 
     .intro p:not(.eyebrow),
-    .case-copy {
+    .case-copy,
+    .slow-note {
         color: #aeb8c5;
         font-size: 14px;
         line-height: 1.55;
     }
 
+    .slow-note {
+        width: fit-content;
+        border: 1px solid rgb(120 220 202 / 0.38);
+        border-radius: 999px;
+        background: rgb(120 220 202 / 0.08);
+        padding: 6px 10px;
+        color: #c7fff5;
+        font-weight: 700;
+    }
+
     .case-card {
-        width: min(760px, 100%);
-        min-height: 148px;
+        width: min(960px, 100%);
+        min-height: 170px;
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 160px;
+        grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
         align-items: center;
-        gap: 24px;
+        gap: 28px;
         border: 1px solid #26313d;
         border-radius: 8px;
         background: #161b22;
         padding: 20px;
     }
 
+    .case-index {
+        color: #78dcca;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
     .case-title {
+        margin-top: 3px;
         color: #f8fafc;
         font-size: 16px;
         font-weight: 700;
@@ -160,7 +233,58 @@
         max-width: 460px;
     }
 
+    .demo-lane {
+        position: relative;
+        width: min(100%, 420px);
+        height: 122px;
+        display: grid;
+        place-items: center;
+        justify-self: stretch;
+        border-radius: 8px;
+        background:
+            linear-gradient(90deg, transparent 0 8px, rgb(255 255 255 / 0.04) 8px 9px) 0 0 / 28px
+                100%,
+            #11161d;
+        overflow: visible;
+    }
+
+    .demo-lane::before,
+    .lane-marker {
+        position: absolute;
+        top: 12px;
+        bottom: 12px;
+        width: 1px;
+        background: rgb(120 220 202 / 0.5);
+    }
+
+    .demo-lane::before {
+        content: '';
+        left: 50%;
+    }
+
+    .lane-marker {
+        display: grid;
+        align-content: end;
+        padding-bottom: 4px;
+        color: #9fb2c5;
+        font-size: 11px;
+        pointer-events: none;
+        white-space: nowrap;
+        text-indent: 7px;
+    }
+
+    .lane-marker-home {
+        left: 50%;
+    }
+
+    .lane-marker-boundary {
+        left: calc(50% + 120px);
+        background: rgb(255 177 95 / 0.65);
+    }
+
     :global(.drag-card) {
+        position: relative;
+        z-index: 1;
         width: 100px;
         height: 100px;
         justify-self: center;
@@ -193,6 +317,10 @@
         .case-card {
             grid-template-columns: 1fr;
             justify-items: start;
+        }
+
+        .demo-lane {
+            width: 100%;
         }
 
         :global(.drag-card) {
