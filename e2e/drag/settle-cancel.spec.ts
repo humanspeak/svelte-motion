@@ -15,7 +15,7 @@ import { expect, test } from '@playwright/test'
  * pointer position (within elastic), not drift back toward 0 / clamp.
  */
 
-import { readTranslateX } from '../_helpers/transform'
+import { readDragTranslate, readTranslateX } from '../_helpers/transform'
 
 test.describe('drag/settle-cancel', () => {
     test('snapToOrigin animation freezes when user re-grabs without moving', async ({ page }) => {
@@ -122,5 +122,39 @@ test.describe('drag/settle-cancel', () => {
         // 8 px tolerance covers sub-frame style flushing after pointerdown.
         // Pre-fix value was ~60–90 px.
         expect(Math.abs(heldTranslate - grabbedTranslate)).toBeLessThanOrEqual(8)
+    })
+
+    test('release cancellation preserves authored base transform on re-grab', async ({ page }) => {
+        await page.goto('/tests/drag/settle-cancel?@isPlaywright=true')
+        const card = page.getByTestId('base-transform-card')
+        await card.waitFor({ state: 'visible' })
+
+        const start = await card.boundingBox()
+        if (!start) throw new Error('no start bbox')
+        const cy = start.y + start.height / 2
+        const cx = start.x + start.width / 2
+
+        await page.mouse.move(cx, cy)
+        await page.mouse.down()
+        await page.mouse.move(cx + 220, cy, { steps: 8 })
+        await page.mouse.up()
+
+        await page.waitForTimeout(80)
+        const midRect = await card.boundingBox()
+        if (!midRect) throw new Error('no mid bbox')
+        const midCx = midRect.x + midRect.width / 2
+        const beforeRegrab = await readDragTranslate(page, '[data-testid="base-transform-card"]')
+        expect(beforeRegrab.tx).toBeGreaterThan(40)
+
+        await page.mouse.move(midCx, cy)
+        await page.mouse.down()
+        await page.evaluate(() => new Promise(requestAnimationFrame))
+        const grabbed = await readDragTranslate(page, '[data-testid="base-transform-card"]')
+        await page.waitForTimeout(120)
+        const held = await readDragTranslate(page, '[data-testid="base-transform-card"]')
+        await page.mouse.up()
+
+        expect(Math.abs(grabbed.tx - beforeRegrab.tx)).toBeLessThanOrEqual(8)
+        expect(Math.abs(held.tx - grabbed.tx)).toBeLessThanOrEqual(8)
     })
 })

@@ -58,11 +58,33 @@ test.describe('drag/snap-to-origin', () => {
         const xOnly = await readTranslate(page, '[data-testid="snap-origin-x-box"]')
         expect(Math.abs(xOnly.tx)).toBeLessThan(2)
         expect(xOnly.ty).toBeGreaterThan(20)
+        expect(xOnly.ty).toBeLessThanOrEqual(31)
 
         await dragBox(page, 'snap-origin-y-box', 120, 80)
         await page.waitForTimeout(1200)
         const yOnly = await readTranslate(page, '[data-testid="snap-origin-y-box"]')
         expect(yOnly.tx).toBeGreaterThan(40)
+        expect(yOnly.tx).toBeLessThanOrEqual(61)
+        expect(Math.abs(yOnly.ty)).toBeLessThan(2)
+    })
+
+    test('axis-specific snap constrains the other active axis without momentum', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/snap-to-origin?@isPlaywright=true')
+
+        await dragBox(page, 'snap-origin-x-no-momentum-box', 120, 120)
+        await page.waitForTimeout(1000)
+        const xOnly = await readTranslate(page, '[data-testid="snap-origin-x-no-momentum-box"]')
+        expect(Math.abs(xOnly.tx)).toBeLessThan(2)
+        expect(xOnly.ty).toBeGreaterThanOrEqual(29)
+        expect(xOnly.ty).toBeLessThanOrEqual(31)
+
+        await dragBox(page, 'snap-origin-y-no-momentum-box', 120, 120)
+        await page.waitForTimeout(1000)
+        const yOnly = await readTranslate(page, '[data-testid="snap-origin-y-no-momentum-box"]')
+        expect(yOnly.tx).toBeGreaterThanOrEqual(59)
+        expect(yOnly.tx).toBeLessThanOrEqual(61)
         expect(Math.abs(yOnly.ty)).toBeLessThan(2)
     })
 

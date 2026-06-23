@@ -507,6 +507,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         requestAnimationFrame(() => {
             if (dragging || postReleaseAnimationActive || whileDragRestoreActive) return
             setXYImmediate(applied.x, applied.y)
+            stopTransformComposer()
             markDragTransformActive(false)
         })
     }
@@ -1108,9 +1109,9 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 pwLog('❌ MOMENTUM CANCELLED')
                 running = false
                 for (const animation of animations) animation.stop()
-                const { tx, ty } = parseMatrixTranslate(getComputedStyle(el).transform)
-                if (applyX) applied.x = tx
-                if (applyY) applied.y = ty
+                if (applyX) applied.x = latestX
+                if (applyY) applied.y = latestY
+                setXYImmediate(applied.x, applied.y)
                 postReleaseAnimationActive = false
                 maybeStopTransformComposer()
                 pwLog('[drag] inertia cancelled → sync applied', {
@@ -1145,10 +1146,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             if (lockAxis === 'x') y = origin.y
             if (lockAxis === 'y') x = origin.x
 
-            if (opts.snapToOrigin) {
-                if (opts.snapToOrigin === true || opts.snapToOrigin === 'x') x = 0
-                if (opts.snapToOrigin === true || opts.snapToOrigin === 'y') y = 0
-            } else if (constraints) {
+            if (constraints) {
                 minX = constraintsBase.x + (constraints.left ?? -Infinity)
                 maxX = constraintsBase.x + (constraints.right ?? Infinity)
                 minY = constraintsBase.y + (constraints.top ?? -Infinity)
@@ -1159,10 +1157,26 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                     bounds: { minX, maxX, minY, maxY },
                     preClamp: { x, y }
                 })
-                x = applyFloatConstraints(x, { min: minX, max: maxX })
-                y = applyFloatConstraints(y, { min: minY, max: maxY })
-                pwLog('[drag] settle (no momentum) clamped', { el: EL_ID, out: { x, y } })
             }
+
+            const snapX = opts.snapToOrigin === true || opts.snapToOrigin === 'x'
+            const snapY = opts.snapToOrigin === true || opts.snapToOrigin === 'y'
+            if (snapX) {
+                x = 0
+                minX = 0
+                maxX = 0
+            } else if (constraints && applyX) {
+                x = applyFloatConstraints(x, { min: minX, max: maxX })
+            }
+            if (snapY) {
+                y = 0
+                minY = 0
+                maxY = 0
+            } else if (constraints && applyY) {
+                y = applyFloatConstraints(y, { min: minY, max: maxY })
+            }
+            if (constraints)
+                pwLog('[drag] settle (no momentum) clamped', { el: EL_ID, out: { x, y } })
             pwLog('[drag] settle (no momentum)', {
                 el: EL_ID,
                 target: { x, y },
@@ -1262,9 +1276,9 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 pwLog('❌ settle (no momentum) cancelled')
                 running = false
                 for (const animation of animations) animation.stop()
-                const { tx, ty } = parseMatrixTranslate(getComputedStyle(el).transform)
-                if (applyX) applied.x = tx
-                if (applyY) applied.y = ty
+                if (applyX) applied.x = latestX
+                if (applyY) applied.y = latestY
+                setXYImmediate(applied.x, applied.y)
                 postReleaseAnimationActive = false
                 maybeStopTransformComposer()
                 stopInertia = null

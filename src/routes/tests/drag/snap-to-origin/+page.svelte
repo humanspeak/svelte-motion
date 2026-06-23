@@ -40,5 +40,31 @@
                 whileDrag={{ scale: 1.03, cursor: 'grabbing' }}
             />
         </section>
+        <section style="display:grid; place-items:center; gap:8px;">
+            <p style="font: 12px system-ui; color:#666; margin:0;">x only, no momentum</p>
+            <motion.div
+                data-testid="snap-origin-x-no-momentum-box"
+                drag
+                dragMomentum={false}
+                dragSnapToOrigin="x"
+                dragConstraints={{ left: -60, right: 60, top: -30, bottom: 30 }}
+                dragElastic={0.5}
+                style="width: 84px; height: 84px; background:#2dd4bf; border-radius: 10px; border:2px solid #0f766e;"
+                whileDrag={{ scale: 1.03, cursor: 'grabbing' }}
+            />
+        </section>
+        <section style="display:grid; place-items:center; gap:8px;">
+            <p style="font: 12px system-ui; color:#666; margin:0;">y only, no momentum</p>
+            <motion.div
+                data-testid="snap-origin-y-no-momentum-box"
+                drag
+                dragMomentum={false}
+                dragSnapToOrigin="y"
+                dragConstraints={{ left: -60, right: 60, top: -30, bottom: 30 }}
+                dragElastic={0.5}
+                style="width: 84px; height: 84px; background:#facc15; border-radius: 10px; border:2px solid #a16207;"
+                whileDrag={{ scale: 1.03, cursor: 'grabbing' }}
+            />
+        </section>
     </div>
 </div>
