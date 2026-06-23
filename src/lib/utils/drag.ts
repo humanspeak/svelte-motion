@@ -151,6 +151,43 @@ const calcConstraintProgress = (value: number, min: number, max: number): number
     return clamp((value - min) / (max - min), 0, 1)
 }
 
+const getElasticFactor = (
+    elastic: { min: number; max: number } | number | undefined,
+    side: 'min' | 'max'
+): number => {
+    if (elastic == null) return 0
+    const value = typeof elastic === 'number' ? elastic : elastic[side]
+    return clampElastic(value)
+}
+
+const applyDragOriginConstraints = (
+    value: number,
+    dragOrigin: number,
+    range: { min: number; max: number },
+    elastic: { min: number; max: number } | number | undefined
+): number => {
+    const hasMin = Number.isFinite(range.min)
+    const hasMax = Number.isFinite(range.max)
+
+    if (hasMax && dragOrigin > range.max) {
+        if (value >= dragOrigin) {
+            return dragOrigin + (value - dragOrigin) * getElasticFactor(elastic, 'max')
+        }
+        if (!hasMin || value >= range.min) return value
+        return applyFloatConstraints(value, range, elastic)
+    }
+
+    if (hasMin && dragOrigin < range.min) {
+        if (value <= dragOrigin) {
+            return dragOrigin + (value - dragOrigin) * getElasticFactor(elastic, 'min')
+        }
+        if (!hasMax || value <= range.max) return value
+        return applyFloatConstraints(value, range, elastic)
+    }
+
+    return applyFloatConstraints(value, range, elastic)
+}
+
 /**
  * Resolve drag constraints into pixel offsets relative to the dragged element's origin.
  *
@@ -852,8 +889,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 bounds: { minX, maxX, minY, maxY },
                 preClamp
             })
-            x = applyFloatConstraints(x, { min: minX, max: maxX }, elastic.x)
-            y = applyFloatConstraints(y, { min: minY, max: maxY }, elastic.y)
+            x = applyDragOriginConstraints(x, origin.x, { min: minX, max: maxX }, elastic.x)
+            y = applyDragOriginConstraints(y, origin.y, { min: minY, max: maxY }, elastic.y)
             pwLog('[drag] constrain+elastic', {
                 el: EL_ID,
                 preClamp,
