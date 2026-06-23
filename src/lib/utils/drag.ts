@@ -151,6 +151,16 @@ const calcConstraintProgress = (value: number, min: number, max: number): number
     return clamp((value - min) / (max - min), 0, 1)
 }
 
+/**
+ * Resolves a per-side elastic factor and clamps it to the valid range.
+ * @param elastic Either a uniform elastic value, side-specific factors, or undefined.
+ * @param side The constrained side whose factor should be read.
+ * @returns The elastic factor clamped between 0 and 1.
+ * @example
+ * ```ts
+ * getElasticFactor({ min: 0.2, max: 0.5 }, 'max') // 0.5
+ * ```
+ */
 const getElasticFactor = (
     elastic: { min: number; max: number } | number | undefined,
     side: 'min' | 'max'
@@ -160,6 +170,25 @@ const getElasticFactor = (
     return clampElastic(value)
 }
 
+/**
+ * Applies constraints while preserving continuity for a drag that starts outside bounds.
+ *
+ * When the drag origin is already beyond a constraint edge, additional movement farther
+ * beyond that same edge stretches from the caught origin rather than recalculating from
+ * the original boundary. Movement back through the valid range falls back to normal
+ * float-safe constraint handling.
+ *
+ * @param value The unconstrained target value for the current pointer position.
+ * @param dragOrigin The applied transform at the start of the current drag.
+ * @param range Constraint bounds for the current axis.
+ * @param elastic Either a uniform elastic value, side-specific factors, or undefined.
+ * @returns The constrained value to render for the active drag frame.
+ * @example
+ * ```ts
+ * applyDragOriginConstraints(220, 180, { min: -120, max: 120 }, { min: 0, max: 0.5 })
+ * // 200: starts outside the max bound at 180 and stretches halfway toward 220.
+ * ```
+ */
 const applyDragOriginConstraints = (
     value: number,
     dragOrigin: number,

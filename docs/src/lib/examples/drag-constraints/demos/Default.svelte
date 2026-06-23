@@ -27,7 +27,7 @@
                     whileDrag={{ scale: 1.08, cursor: 'grabbing' }}
                     transition={{ type: 'spring', stiffness: 420, damping: 32 }}
                     aria-label="Draggable constrained card"
-                    style={styleString(() => ({
+                    style={styleString({
                         width: 'clamp(76px, 13vw, 112px)',
                         aspectRatio: '1',
                         borderRadius: '8px',
@@ -36,7 +36,7 @@
                         background: 'var(--drag-card-bg)',
                         border: 'var(--drag-card-border)',
                         boxShadow: 'var(--drag-card-shadow)'
-                    }))}
+                    })}
                 >
                     <span class="tile-mark">SM</span>
                     <span class="tile-grip" aria-hidden="true">

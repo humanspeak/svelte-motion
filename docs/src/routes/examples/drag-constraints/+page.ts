@@ -1,5 +1,9 @@
 import type { PageLoad } from './$types'
 
+/**
+ * Loads page metadata for the drag constraints example.
+ * @returns Page metadata with title and description.
+ */
 export const load: PageLoad = () => ({
     title: 'Drag Constraints',
     description:
