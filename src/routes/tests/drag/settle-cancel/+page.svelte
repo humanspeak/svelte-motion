@@ -116,8 +116,10 @@
                 authored 40px base transform.
             </p>
         </div>
-        <div class="demo-lane">
-            <span class="lane-marker lane-marker-home">authored +40px</span>
+        <div class="demo-lane demo-lane-authored">
+            <span class="lane-marker lane-marker-authored-left">left limit</span>
+            <span class="lane-marker lane-marker-authored-origin">authored +40px</span>
+            <span class="lane-marker lane-marker-authored-right">right limit</span>
             <motion.div
                 class="drag-card drag-card-teal"
                 drag="x"
@@ -280,6 +282,27 @@
     .lane-marker-boundary {
         left: calc(50% + 120px);
         background: rgb(255 177 95 / 0.65);
+    }
+
+    .lane-marker-authored-left {
+        left: calc(50% + 40px - 160px);
+        background: rgb(255 177 95 / 0.65);
+    }
+
+    .lane-marker-authored-origin {
+        left: calc(50% + 40px);
+        top: -18px;
+        align-content: start;
+        padding-top: 0;
+        padding-bottom: 0;
+        text-indent: -42px;
+        z-index: 2;
+    }
+
+    .lane-marker-authored-right {
+        left: calc(50% + 40px + 160px);
+        background: rgb(255 177 95 / 0.65);
+        text-indent: -52px;
     }
 
     :global(.drag-card) {
