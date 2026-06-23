@@ -109,8 +109,8 @@ const config = {
 export default config
 ```
 
-If you already have other preprocessors that change CSS, keep `scopedProps()` after
-those style preprocessors so it sees the same CSS Svelte will hash.
+If your docs pipeline also processes non-Svelte files, wrap `scopedProps()` so it
+only transforms `.svelte` markup, then run your usual preprocessors afterward.
 
 ## How it works
 

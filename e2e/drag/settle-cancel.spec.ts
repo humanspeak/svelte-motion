@@ -143,7 +143,9 @@ test.describe('drag/settle-cancel', () => {
         await page.mouse.move(cx + 400, cy, { steps: 8 })
         await page.mouse.up()
 
-        await page.waitForTimeout(420)
+        await expect
+            .poll(async () => readTranslateX(page, '[data-testid="settle-card"]'))
+            .toBeGreaterThan(130)
         const caughtRect = await card.boundingBox()
         if (!caughtRect) throw new Error('no caught bbox')
         const caughtCx = caughtRect.x + caughtRect.width / 2
