@@ -152,6 +152,72 @@ const calcConstraintProgress = (value: number, min: number, max: number): number
 }
 
 /**
+ * Resolves a per-side elastic factor and clamps it to the valid range.
+ * @param elastic Either a uniform elastic value, side-specific factors, or undefined.
+ * @param side The constrained side whose factor should be read.
+ * @returns The elastic factor clamped between 0 and 1.
+ * @example
+ * ```ts
+ * getElasticFactor({ min: 0.2, max: 0.5 }, 'max') // 0.5
+ * ```
+ */
+const getElasticFactor = (
+    elastic: { min: number; max: number } | number | undefined,
+    side: 'min' | 'max'
+): number => {
+    if (elastic == null) return 0
+    const value = typeof elastic === 'number' ? elastic : elastic[side]
+    return clampElastic(value)
+}
+
+/**
+ * Applies constraints while preserving continuity for a drag that starts outside bounds.
+ *
+ * When the drag origin is already beyond a constraint edge, additional movement farther
+ * beyond that same edge stretches from the caught origin rather than recalculating from
+ * the original boundary. Movement back through the valid range falls back to normal
+ * float-safe constraint handling.
+ *
+ * @param value The unconstrained target value for the current pointer position.
+ * @param dragOrigin The applied transform at the start of the current drag.
+ * @param range Constraint bounds for the current axis.
+ * @param elastic Either a uniform elastic value, side-specific factors, or undefined.
+ * @returns The constrained value to render for the active drag frame.
+ * @example
+ * ```ts
+ * applyDragOriginConstraints(220, 180, { min: -120, max: 120 }, { min: 0, max: 0.5 })
+ * // 200: starts outside the max bound at 180 and stretches halfway toward 220.
+ * ```
+ */
+const applyDragOriginConstraints = (
+    value: number,
+    dragOrigin: number,
+    range: { min: number; max: number },
+    elastic: { min: number; max: number } | number | undefined
+): number => {
+    const hasMin = Number.isFinite(range.min)
+    const hasMax = Number.isFinite(range.max)
+
+    if (hasMax && dragOrigin > range.max) {
+        if (value >= dragOrigin) {
+            return dragOrigin + (value - dragOrigin) * getElasticFactor(elastic, 'max')
+        }
+        if (!hasMin || value >= range.min) return value
+        return applyFloatConstraints(value, range, elastic)
+    }
+
+    if (hasMin && dragOrigin < range.min) {
+        if (value <= dragOrigin) {
+            return dragOrigin + (value - dragOrigin) * getElasticFactor(elastic, 'min')
+        }
+        if (!hasMax || value <= range.max) return value
+        return applyFloatConstraints(value, range, elastic)
+    }
+
+    return applyFloatConstraints(value, range, elastic)
+}
+
+/**
  * Resolve drag constraints into pixel offsets relative to the dragged element's origin.
  *
  * - HTMLElement: Constrains the element to the bounding box of the provided element.
@@ -507,6 +573,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         requestAnimationFrame(() => {
             if (dragging || postReleaseAnimationActive || whileDragRestoreActive) return
             setXYImmediate(applied.x, applied.y)
+            stopTransformComposer()
             markDragTransformActive(false)
         })
     }
@@ -851,8 +918,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 bounds: { minX, maxX, minY, maxY },
                 preClamp
             })
-            x = applyFloatConstraints(x, { min: minX, max: maxX }, elastic.x)
-            y = applyFloatConstraints(y, { min: minY, max: maxY }, elastic.y)
+            x = applyDragOriginConstraints(x, origin.x, { min: minX, max: maxX }, elastic.x)
+            y = applyDragOriginConstraints(y, origin.y, { min: minY, max: maxY }, elastic.y)
             pwLog('[drag] constrain+elastic', {
                 el: EL_ID,
                 preClamp,
@@ -1108,9 +1175,9 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 pwLog('❌ MOMENTUM CANCELLED')
                 running = false
                 for (const animation of animations) animation.stop()
-                const { tx, ty } = parseMatrixTranslate(getComputedStyle(el).transform)
-                if (applyX) applied.x = tx
-                if (applyY) applied.y = ty
+                if (applyX) applied.x = latestX
+                if (applyY) applied.y = latestY
+                setXYImmediate(applied.x, applied.y)
                 postReleaseAnimationActive = false
                 maybeStopTransformComposer()
                 pwLog('[drag] inertia cancelled → sync applied', {
@@ -1145,10 +1212,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             if (lockAxis === 'x') y = origin.y
             if (lockAxis === 'y') x = origin.x
 
-            if (opts.snapToOrigin) {
-                if (opts.snapToOrigin === true || opts.snapToOrigin === 'x') x = 0
-                if (opts.snapToOrigin === true || opts.snapToOrigin === 'y') y = 0
-            } else if (constraints) {
+            if (constraints) {
                 minX = constraintsBase.x + (constraints.left ?? -Infinity)
                 maxX = constraintsBase.x + (constraints.right ?? Infinity)
                 minY = constraintsBase.y + (constraints.top ?? -Infinity)
@@ -1159,10 +1223,26 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                     bounds: { minX, maxX, minY, maxY },
                     preClamp: { x, y }
                 })
-                x = applyFloatConstraints(x, { min: minX, max: maxX })
-                y = applyFloatConstraints(y, { min: minY, max: maxY })
-                pwLog('[drag] settle (no momentum) clamped', { el: EL_ID, out: { x, y } })
             }
+
+            const snapX = opts.snapToOrigin === true || opts.snapToOrigin === 'x'
+            const snapY = opts.snapToOrigin === true || opts.snapToOrigin === 'y'
+            if (snapX) {
+                x = 0
+                minX = 0
+                maxX = 0
+            } else if (constraints && applyX) {
+                x = applyFloatConstraints(x, { min: minX, max: maxX })
+            }
+            if (snapY) {
+                y = 0
+                minY = 0
+                maxY = 0
+            } else if (constraints && applyY) {
+                y = applyFloatConstraints(y, { min: minY, max: maxY })
+            }
+            if (constraints)
+                pwLog('[drag] settle (no momentum) clamped', { el: EL_ID, out: { x, y } })
             pwLog('[drag] settle (no momentum)', {
                 el: EL_ID,
                 target: { x, y },
@@ -1262,9 +1342,9 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 pwLog('❌ settle (no momentum) cancelled')
                 running = false
                 for (const animation of animations) animation.stop()
-                const { tx, ty } = parseMatrixTranslate(getComputedStyle(el).transform)
-                if (applyX) applied.x = tx
-                if (applyY) applied.y = ty
+                if (applyX) applied.x = latestX
+                if (applyY) applied.y = latestY
+                setXYImmediate(applied.x, applied.y)
                 postReleaseAnimationActive = false
                 maybeStopTransformComposer()
                 stopInertia = null

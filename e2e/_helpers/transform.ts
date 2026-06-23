@@ -40,3 +40,22 @@ export const readTranslate = async (page: Page, selector = '[data-testid="drag-c
     const t = await readTransform(page, selector)
     return { tx: t.tx, ty: t.ty }
 }
+
+/**
+ * Read the drag-owned transform channel from the test element.
+ * Unlike the computed matrix, this excludes authored/base transforms.
+ */
+export const readDragTranslate = (
+    page: Page,
+    selector: string
+): Promise<{ tx: number; ty: number }> =>
+    page.evaluate((sel) => {
+        const el = document.querySelector(sel) as HTMLElement | null
+        const transform = el?.dataset.svelteMotionDragTransform ?? ''
+        const read = (axis: 'X' | 'Y') => {
+            const match = transform.match(new RegExp(`translate${axis}\\((-?[0-9.]+)px\\)`))
+            return match ? Number.parseFloat(match[1]) : 0
+        }
+
+        return { tx: read('X'), ty: read('Y') }
+    }, selector)
