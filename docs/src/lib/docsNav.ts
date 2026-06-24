@@ -87,7 +87,8 @@ export const docsSections: NavSection[] = [
             { title: 'useSpring', href: '/docs/use-spring', icon: Activity },
             { title: 'useTime', href: '/docs/use-time', icon: Timer },
             { title: 'useTransform', href: '/docs/use-transform', icon: SlidersHorizontal },
-            { title: 'useVelocity', href: '/docs/use-velocity', icon: Gauge }
+            { title: 'useVelocity', href: '/docs/use-velocity', icon: Gauge },
+            { title: 'useWillChange', href: '/docs/use-will-change', icon: Zap }
         ]
     },
     {

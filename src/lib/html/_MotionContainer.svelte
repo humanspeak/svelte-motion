@@ -67,6 +67,7 @@
         mergeInlineStyles,
         serializeMotionStyle
     } from '$lib/utils/style'
+    import { isWillChangeMotionValue } from '$lib/utils/willChange.svelte'
     import { isNativelyFocusable } from '$lib/utils/a11y'
     import {
         getAnimatePresenceContext,
@@ -780,6 +781,24 @@
                 transitionOverride ?? mergeTransitions(mergedTransition ?? {}, transition ?? {}),
             transitionEnd
         }
+    }
+
+    /**
+     * Notify a `useWillChange()` value carried in object-form `style` that the
+     * given keys are animating, so it can promote the element to its own
+     * compositor layer. Mirrors framer-motion wiring the will-change value into
+     * the animation pipeline. `add()` self-filters to transform/accelerated
+     * keys, so passing the full key set is safe.
+     *
+     * @param {string[]} keys The property keys about to animate.
+     */
+    const notifyWillChange = (keys: string[]) => {
+        // Widen to `unknown` first: narrowing the motion-dom `MotionValue` union
+        // directly against `WillChangeMotionValue` collapses to `never` (the
+        // augmented public `current` clashes with the base's private one).
+        const willChange: unknown = collectMotionStyleValues(styleProp)?.willChange
+        if (!isWillChangeMotionValue(willChange)) return
+        for (const key of keys) willChange.add(key)
     }
 
     const applyAnimateRestingStyle = () => {
@@ -1737,6 +1756,8 @@
             payload,
             transitionAnimate
         })
+
+        notifyWillChange(Object.keys(payload as Record<string, unknown>))
 
         // A fresh run owns the transform again until it completes.
         enterAnimationSettled = false
