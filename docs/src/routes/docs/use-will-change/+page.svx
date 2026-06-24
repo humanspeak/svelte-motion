@@ -11,7 +11,7 @@ description: 'Auto-managed CSS will-change that starts at auto and latches to tr
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'useWillChange | Docs | Svelte Motion'
-      seo.description = 'A MotionValue for CSS will-change that flips to "transform" only while a transform or accelerated property animates.'
+      seo.description = 'A MotionValue for CSS will-change that starts at "auto" and latches to "transform" after the first transform or accelerated animation.'
       seo.ogTitle = 'useWillChange'
       seo.ogTagline = 'Promote once it animates, then stay latched'
       seo.ogFeatures = ['MotionValue', 'will-change', 'Performance', 'Motion Parity']
