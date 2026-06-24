@@ -559,17 +559,28 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         // value would clobber it (#421). Otherwise this is the unchanged no-lag
         // write path (#379) — note a no-bound drag always has a translate, so
         // `liveTransform` is non-empty and the write always runs.
-        if (liveTransform) {
+        // Also write when `liveTransform` is empty but a previous frame wrote a
+        // drag transform (tracked via the dataset): that flushes the now-empty
+        // value so a stale `scale(...)`/translate left over from earlier in the
+        // gesture doesn't linger once styleEffect takes over the bound axis.
+        if (liveTransform || el.dataset.svelteMotionDragTransform) {
             el.dataset.svelteMotionDragTransform = liveTransform
             const writeComposedTransform = () => {
-                if (el.dataset.svelteMotionDragTransform !== liveTransform) return
+                if ((el.dataset.svelteMotionDragTransform ?? '') !== liveTransform) return
                 const baseTransform = opts.getBaseTransform?.() ?? ''
                 el.style.transform = [liveTransform, baseTransform].filter(Boolean).join(' ')
             }
 
             writeComposedTransform()
             queueMicrotask(writeComposedTransform)
-            requestAnimationFrame(writeComposedTransform)
+            requestAnimationFrame(() => {
+                writeComposedTransform()
+                // Once flushed empty, drop the marker so the next non-empty write
+                // starts clean (and we don't keep re-entering this branch).
+                if (!liveTransform && el.dataset.svelteMotionDragTransform === '') {
+                    delete el.dataset.svelteMotionDragTransform
+                }
+            })
         }
         if (dragX) applied.x = x
         if (dragY) applied.y = y
@@ -845,6 +856,18 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         el.dispatchEvent(new CustomEvent('svelte-motion:drag-start'))
         markDragTransformActive(true)
         lockAxis = null
+        // A bound `style` MotionValue may have been moved externally since the
+        // last drag (e.g. `animate(y, …)`), which leaves `applied` stale. Adopt
+        // the value's current position so this drag's origin/constraints start
+        // from where the element actually is, not where it was last dragged (#421).
+        if (boundX) {
+            const v = boundX.get()
+            if (Number.isFinite(v)) applied.x = v
+        }
+        if (boundY) {
+            const v = boundY.get()
+            if (Number.isFinite(v)) applied.y = v
+        }
         // Start from current applied transform, not viewport rect
         origin = { x: applied.x, y: applied.y }
         startPoint = { x: e.clientX, y: e.clientY }

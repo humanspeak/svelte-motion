@@ -326,6 +326,14 @@
 
     const serializedStyleProp = $derived(serializeMotionStyle(styleProp, transformTemplateProp))
     const userBaseTransform = $derived(extractTransform(styleProp))
+    // Bound `style` x/y MotionValues (e.g. `style={{ y }}`) used to sync the
+    // drag gesture with the value (#421). Split into per-axis `$derived`s so
+    // each resolves to a stable MotionValue *identity* (or `undefined`) — the
+    // drag effect reads these, so it re-attaches only when the bound value is
+    // added/removed/swapped, not on every `styleProp` content change.
+    const boundStyleMotionValues = $derived(collectMotionStyleValues(styleProp))
+    const boundDragStyleX = $derived(boundStyleMotionValues?.x as MotionValue<number> | undefined)
+    const boundDragStyleY = $derived(boundStyleMotionValues?.y as MotionValue<number> | undefined)
     let liveGestureTransform = $state<string | null>(null)
     const liveGestureComposedTransform = $derived.by(() => {
         if (!liveGestureTransform) return null
@@ -1528,22 +1536,7 @@
             baselineSources: {
                 initial: (initialKeyframes ?? {}) as Record<string, unknown>,
                 animate: (resolvedAnimate ?? {}) as Record<string, unknown>
-            },
-            // Bound `style` MotionValues (e.g. `style={{ y }}`) for the dragged
-            // axes, so the gesture writes through to them and `y.get()` /
-            // `animate(y, …)` stay in sync with the drag (#421). Read inside
-            // `untrack` so the drag effect doesn't re-run (re-attaching the
-            // gesture) every time `styleProp` changes — e.g. an object-style
-            // `rotate` derived from a $state updates each frame mid-drag.
-            boundMotionValues: (() => {
-                // collectMotionStyleValues already filters to MotionValues only.
-                const styleValues = collectMotionStyleValues(styleProp)
-                if (!styleValues) return undefined
-                const bound: { x?: MotionValue<number>; y?: MotionValue<number> } = {}
-                if (styleValues.x) bound.x = styleValues.x as MotionValue<number>
-                if (styleValues.y) bound.y = styleValues.y as MotionValue<number>
-                return bound.x || bound.y ? bound : undefined
-            })()
+            }
         }))
         const opts = {
             axis,
@@ -1572,7 +1565,15 @@
             getBaseTransform: () => splitSerializedTransform(serializedStyleProp).transform,
             propagation: !!dragPropagationProp,
             snapToOrigin: dragSnapToOriginProp as boolean | 'x' | 'y' | undefined,
-            boundMotionValues: dragRuntimeOptions.boundMotionValues
+            // Bound `style` MotionValues for the dragged axes (#421). Read the
+            // identity-stable `$derived`s (not `styleProp`) so the drag effect
+            // re-attaches when the x/y MotionValue is added/removed/swapped, but
+            // NOT when other `styleProp` content (e.g. an object-style `rotate`
+            // from a $state) changes every frame mid-drag.
+            boundMotionValues:
+                boundDragStyleX || boundDragStyleY
+                    ? { x: boundDragStyleX, y: boundDragStyleY }
+                    : undefined
         }
 
         // Attach and hold teardown so we can re-attach if props change

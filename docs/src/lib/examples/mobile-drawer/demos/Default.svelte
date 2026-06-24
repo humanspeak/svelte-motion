@@ -39,6 +39,17 @@
         // Reset for the next open (the MotionValue outlives the {#if} block).
         y.set(0)
     }
+
+    // Keyboard escape hatch: the handle/backdrop are pointer-driven, so without
+    // this the sheet would be a keyboard trap (openable but not closable).
+    $effect(() => {
+        if (!open) return
+        const onKeydown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') handleClose()
+        }
+        window.addEventListener('keydown', onKeydown)
+        return () => window.removeEventListener('keydown', onKeydown)
+    })
 </script>
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
