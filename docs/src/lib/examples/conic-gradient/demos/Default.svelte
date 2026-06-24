@@ -1,24 +1,24 @@
 <script lang="ts">
-    import { writable } from 'svelte/store'
-    import { motion, styleString, useTransform } from '@humanspeak/svelte-motion'
+    import { motion, styleString, useMotionValue, useTransform } from '@humanspeak/svelte-motion'
 
-    // Pointer-tracking conic gradient. `useTransform` derives the
-    // background string from two motion values; `styleString` glues
-    // it onto the inline `style` attribute. Move the cursor across the
-    // box and the gradient pivot follows.
-    // Ported from the motion.dev conic-gradient example.
+    // Pointer-tracking conic gradient. Two motion values hold the pivot, and
+    // `useTransform`'s compute form derives the background string from them —
+    // the `.get()` reads are auto-tracked, so the value recomputes whenever a
+    // pointer move updates them; `styleString` glues it onto the inline `style`
+    // attribute. Move the cursor across the box and the gradient pivot follows.
+    // Ported 1:1 from the motion.dev conic-gradient example (useMotionValue +
+    // .get()).
 
     let el: HTMLElement | undefined = $state(undefined)
     let width = $state(400)
     let height = $state(400)
 
-    const gradientX = writable(0.5)
-    const gradientY = writable(0.5)
+    const gradientX = useMotionValue(0.5)
+    const gradientY = useMotionValue(0.5)
 
     const background = useTransform(
         () =>
-            `conic-gradient(at ${$gradientX * 100}% ${$gradientY * 100}%, #0cdcf7, #ff0088, #fff312, #0cdcf7)`,
-        [gradientX, gradientY]
+            `conic-gradient(at ${gradientX.get() * 100}% ${gradientY.get() * 100}%, #0cdcf7, #ff0088, #fff312, #0cdcf7)`
     )
 
     function handlePointerMove(e: PointerEvent) {
