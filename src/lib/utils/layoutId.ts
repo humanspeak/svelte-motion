@@ -26,6 +26,20 @@ export type LayoutIdRegistry = {
  */
 const entries = new Map<string, LayoutIdEntry>()
 
+/**
+ * The global singleton `LayoutIdRegistry` shared across the component tree.
+ *
+ * Bridges `layoutId` shared-element transitions: an unmounting element calls
+ * `snapshot` to store its last-known rect, and a newly mounted element with the
+ * same id calls `consume` to read and clear it (one-shot). Prefer
+ * {@link getLayoutIdRegistry} at call sites for indirection.
+ *
+ * @example
+ * ```ts
+ * layoutIdRegistry.snapshot('hero', element.getBoundingClientRect())
+ * const entry = layoutIdRegistry.consume('hero') // returns and deletes
+ * ```
+ */
 export const layoutIdRegistry: LayoutIdRegistry = {
     snapshot(id, rect, transition) {
         entries.set(id, { rect, transition })

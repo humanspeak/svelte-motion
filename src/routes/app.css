@@ -106,12 +106,14 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100%;
+    min-height: 100%;
+    height: auto;
     width: 100%;
 }
 
 .container {
-    height: 100vh;
+    min-height: 100vh;
+    height: auto;
     width: 100%;
     display: flex;
     margin: 0;

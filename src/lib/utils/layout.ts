@@ -385,6 +385,38 @@ export const setCompositorHints = (el: HTMLElement, enabled: boolean): void => {
 }
 
 /**
+ * Select the reactive dependencies that gate `layout` (FLIP) measurement.
+ *
+ * When `layoutDependency` is provided — any value, including falsy ones like
+ * `0`, `''`, or `null` — measurement is gated on *only* that value, so a
+ * frequently-rerendering `layout` element stops re-measuring on every render
+ * that merely touches `class`, `style`, `layoutId`, or `transition`. When it is
+ * `undefined`, the lazily-evaluated `fallback` dependencies drive measurement,
+ * matching framer-motion's default behavior.
+ *
+ * `fallback` is a thunk so its values are read (and, in a reactive context,
+ * tracked) only when gating is off — that laziness is what makes the
+ * optimization effective. Mirrors framer-motion's `MeasureLayout`, which calls
+ * `willUpdate()` only when `layoutDependency` changed or is `undefined`.
+ *
+ * @param layoutDependency The user-supplied `layoutDependency` prop value.
+ * @param fallback Thunk returning the default dependency list, evaluated only
+ *   when `layoutDependency` is `undefined`.
+ * @returns The dependency list the measurement effects should track.
+ * @example
+ * ```ts
+ * // Gated: only re-measures when `order` changes.
+ * selectLayoutDependencies(order, () => [klass, style]) // => [order]
+ * // Default: tracks the fallback deps.
+ * selectLayoutDependencies(undefined, () => [klass, style]) // => [klass, style]
+ * ```
+ */
+export const selectLayoutDependencies = (
+    layoutDependency: unknown,
+    fallback: () => unknown[]
+): unknown[] => (layoutDependency !== undefined ? [layoutDependency] : fallback())
+
+/**
  * Observe size/attribute changes that commonly trigger layout changes.
  *
  * Returns a cleanup function that disconnects observers. The callback is called

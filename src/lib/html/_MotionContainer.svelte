@@ -56,6 +56,7 @@
         finishFlipAnimations,
         setCompositorHints,
         observeLayoutChanges,
+        selectLayoutDependencies,
         type RectLike
     } from '$lib/utils/layout'
     import type { SvelteHTMLElements } from 'svelte/elements'
@@ -192,6 +193,7 @@
         layout: layoutProp,
         layoutId: layoutIdProp,
         layoutScroll: layoutScrollProp,
+        layoutDependency: layoutDependencyProp,
         onProjectionUpdate: onProjectionUpdateProp,
         ref: element = $bindable(null),
         ...rest
@@ -2035,12 +2037,23 @@
 
     let explicitLayoutSnapshot: RectLike | null = null
     let lastRect: RectLike | null = null
-    const trackLayoutProjectionDependencies = () => [
-        classProp,
-        styleProp,
-        scopedLayoutId,
-        mergedTransition
-    ]
+    // Reactive deps the measure effects read to decide when to re-snapshot and
+    // FLIP. When `layoutDependency` is set, gate measurement on *only* that
+    // value so frequent renders that touch class/style/etc. no longer force a
+    // re-measure. The fallback list stays a thunk so those props are tracked
+    // only when gating is off. See `selectLayoutDependencies` for the contract.
+    //
+    // Drag escape hatch: upstream `MeasureLayout` also forces a snapshot while a
+    // drag is active, regardless of `layoutDependency` (MeasureLayout.tsx:92).
+    // We mirror that by ignoring the gate while `drag` is set, so a draggable
+    // `layout` element keeps measuring as the user moves it.
+    const trackLayoutProjectionDependencies = () =>
+        selectLayoutDependencies(dragProp ? undefined : layoutDependencyProp, () => [
+            classProp,
+            styleProp,
+            scopedLayoutId,
+            mergedTransition
+        ])
 
     $effect.pre(() => {
         const shouldProject = element && layoutProp && isLoaded === 'ready' && hasLayoutFeatures
