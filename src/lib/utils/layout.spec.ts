@@ -591,5 +591,15 @@ describe('utils/layout', () => {
             expect(selectLayoutDependencies(false, fallback)).toEqual([false])
             expect(fallback).not.toHaveBeenCalled()
         })
+
+        it('treats objects and arrays as gating dependencies', () => {
+            const fallback = vi.fn(() => ['class'])
+            const obj = { foo: 'bar' }
+            const arr = [1, 2, 3]
+
+            expect(selectLayoutDependencies(obj, fallback)).toEqual([obj])
+            expect(selectLayoutDependencies(arr, fallback)).toEqual([arr])
+            expect(fallback).not.toHaveBeenCalled()
+        })
     })
 })
