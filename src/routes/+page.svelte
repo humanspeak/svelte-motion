@@ -88,6 +88,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/conic-gradient') + searchParams}
+                    >
+                        useTransform (conic gradient / compute form)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/will-change') + searchParams}
                     >
                         useWillChange
