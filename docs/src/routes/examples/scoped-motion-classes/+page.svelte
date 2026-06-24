@@ -24,6 +24,7 @@
         seo.description =
             'A live Svelte Motion example using @humanspeak/svelte-scoped-props to keep component-scoped CSS selectors alive on motion components.'
         seo.ogTitle = 'Scoped Motion Classes'
+        seo.h1 = { title: 'Scoped Motion Classes', mode: 'sr-only' }
         seo.ogTagline = 'Parent-scoped CSS on motion components'
         seo.ogFeatures = ['scoped:class', 'motion.h2', 'Svelte CSS', 'Compiler Safe']
         seo.ogSlug = 'examples-scoped-motion-classes'

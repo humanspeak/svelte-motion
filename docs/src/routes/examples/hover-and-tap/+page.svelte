@@ -24,6 +24,7 @@
         seo.description =
             'Gesture-driven animations for hover and tap interactions using Svelte Motion. Create responsive, interactive elements with spring physics.'
         seo.ogTitle = 'Hover and Tap'
+        seo.h1 = { title: 'Hover and Tap', mode: 'sr-only' }
         seo.ogTagline =
             'Gesture-driven animations for hover and tap interactions using Svelte Motion'
         seo.ogFeatures = ['whileHover', 'whileTap', 'Spring Physics', 'Gesture Events']

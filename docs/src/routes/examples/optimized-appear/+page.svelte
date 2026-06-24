@@ -24,6 +24,7 @@
         seo.description =
             'Use optimized appear animations to start SSR entrance motion before hydration.'
         seo.ogTitle = 'Optimized appear'
+        seo.h1 = { title: 'Optimized appear', mode: 'sr-only' }
         seo.ogTagline = 'SSR entrance animations without the flash'
         seo.ogFeatures = ['SSR', 'Hydration', 'WAAPI', 'Appear handoff']
         seo.ogSlug = 'examples-optimized-appear'

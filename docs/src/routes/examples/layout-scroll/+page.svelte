@@ -24,6 +24,7 @@
         seo.description =
             'Use layoutScroll to keep FLIP layout animations anchored when the user scrolls the parent container mid-animation. Side-by-side demo of the drift vs the fix.'
         seo.ogTitle = 'layoutScroll'
+        seo.h1 = { title: 'layoutScroll', mode: 'sr-only' }
         seo.ogTagline = 'Keep layout animations anchored across container scroll'
         seo.ogFeatures = ['FLIP layout', 'layoutScroll', 'Scroll containers', 'Anchored animations']
         seo.ogSlug = 'examples-layout-scroll'

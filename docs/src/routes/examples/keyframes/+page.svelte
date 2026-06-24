@@ -21,6 +21,7 @@
         seo.description =
             'Multi-property keyframe animation with scale, rotate, and borderRadius using Svelte Motion.'
         seo.ogTitle = 'Keyframes'
+        seo.h1 = { title: 'Keyframes', mode: 'sr-only' }
         seo.ogTagline =
             'Multi-property keyframe animation with scale, rotate, and borderRadius using Svelte Motion'
         seo.ogFeatures = ['Multi-Property', 'Scale & Rotate', 'Border Radius', 'Sequence Animation']

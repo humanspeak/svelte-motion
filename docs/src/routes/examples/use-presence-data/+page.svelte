@@ -23,6 +23,7 @@
         seo.title = 'usePresenceData | Examples | Svelte Motion'
         seo.description = 'Read AnimatePresence custom data from an entering or exiting child.'
         seo.ogTitle = 'usePresenceData'
+        seo.h1 = { title: 'usePresenceData', mode: 'sr-only' }
         seo.ogTagline = 'Presence custom data inside exiting children'
         seo.ogFeatures = ['AnimatePresence', 'custom', 'usePresenceData', 'popLayout']
         seo.ogSlug = 'examples-use-presence-data'

@@ -24,6 +24,7 @@
         seo.description =
             'Animate elements when they receive keyboard focus using Svelte Motion whileFocus. Enhance accessibility with visual feedback on focus events.'
         seo.ogTitle = 'While Focus'
+        seo.h1 = { title: 'While Focus', mode: 'sr-only' }
         seo.ogTagline =
             'Animate elements when they receive keyboard focus using Svelte Motion whileFocus'
         seo.ogFeatures = ['whileFocus', 'Accessibility', 'Keyboard Focus', 'Visual Feedback']

@@ -25,6 +25,7 @@
         seo.description =
             'Use LazyMotion, m, domMin, domAnimation, and domMax to choose the motion feature bundle for a subtree.'
         seo.ogTitle = 'LazyMotion'
+        seo.h1 = { title: 'LazyMotion', mode: 'sr-only' }
         seo.ogTagline = 'Feature bundles for Svelte Motion'
         seo.ogFeatures = ['LazyMotion', 'm namespace', 'domAnimation', 'domMax']
         seo.ogSlug = 'examples-lazy-motion'

@@ -26,6 +26,7 @@
         seo.description =
             'Production-style armed archive and delete wait button microinteractions built with Svelte Motion, AnimatePresence, and spring transitions.'
         seo.ogTitle = 'Armed Buttons'
+        seo.h1 = { title: 'Armed Buttons', mode: 'sr-only' }
         seo.ogTagline = 'Destructive action microinteractions built with Svelte Motion'
         seo.ogFeatures = ['AnimatePresence', 'Armed State', 'Countdown Wait', 'Spring Feedback']
         seo.ogSlug = 'examples-armed-buttons'

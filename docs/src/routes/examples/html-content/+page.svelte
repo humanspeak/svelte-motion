@@ -24,6 +24,7 @@
         seo.description =
             'Animate HTML content with smooth enter and exit transitions using Svelte Motion. Demonstrates AnimatePresence with dynamic HTML elements.'
         seo.ogTitle = 'HTML Content'
+        seo.h1 = { title: 'HTML Content', mode: 'sr-only' }
         seo.ogTagline =
             'Animate HTML content with smooth enter and exit transitions using Svelte Motion'
         seo.ogFeatures = ['AnimatePresence', 'Enter/Exit', 'Dynamic HTML', 'Smooth Transitions']

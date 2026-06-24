@@ -21,6 +21,7 @@
         seo.description =
             'Detect viewport entry from a Svelte store with useInView. Reactive boolean store, IntersectionObserver-backed, with optional once-latch.'
         seo.ogTitle = 'useInView'
+        seo.h1 = { title: 'useInView', mode: 'sr-only' }
         seo.ogTagline = 'Detect viewport entry from a Svelte store'
         seo.ogFeatures = ['Reactive Store', 'IntersectionObserver', 'Once Latch', 'SSR Safe']
         seo.ogSlug = 'examples-use-in-view'

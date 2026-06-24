@@ -24,6 +24,7 @@
         seo.description =
             'Gate layout measurement so FLIP only recomputes when a dependency changes.'
         seo.ogTitle = 'layoutDependency'
+        seo.h1 = { title: 'layoutDependency', mode: 'sr-only' }
         seo.ogTagline = 'Re-measure only when it matters'
         seo.ogFeatures = ['layoutDependency', 'Layout Animations', 'FLIP', 'Performance']
         seo.ogSlug = 'examples-layout-dependency'

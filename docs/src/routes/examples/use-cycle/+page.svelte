@@ -21,6 +21,7 @@
         seo.description =
             'Cycle through animation variants in Svelte. useCycle returns a $state-backed { current, cycle } object for toggling motion states with Svelte 5 runes.'
         seo.ogTitle = 'useCycle'
+        seo.h1 = { title: 'useCycle', mode: 'sr-only' }
         seo.ogTagline = 'Cycle through animation states'
         seo.ogFeatures = ['Variants', 'State Toggle', 'Svelte 5 Runes', 'SSR Safe']
         seo.ogSlug = 'examples-use-cycle'

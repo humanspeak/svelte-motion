@@ -24,6 +24,7 @@
         seo.description =
             'Animate components when they are added to or removed from the DOM using Svelte Motion. Smooth enter and exit transitions made easy.'
         seo.ogTitle = 'AnimatePresence'
+        seo.h1 = { title: 'AnimatePresence', mode: 'sr-only' }
         seo.ogTagline =
             'Animate components when they are added to or removed from the DOM using Svelte Motion'
         seo.ogFeatures = [

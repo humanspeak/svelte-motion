@@ -24,6 +24,7 @@
         seo.description =
             'Animated tab selector using layoutId for a shared indicator that slides between tabs in Svelte Motion.'
         seo.ogTitle = 'Tab Select'
+        seo.h1 = { title: 'Tab Select', mode: 'sr-only' }
         seo.ogTagline =
             'Animated tab selector using layoutId for a shared indicator that slides between tabs'
         seo.ogFeatures = ['layoutId', 'Shared Indicator', 'Tab Navigation', 'Slide Animation']

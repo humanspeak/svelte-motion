@@ -24,6 +24,7 @@
         seo.description =
             'A polished constrained-drag stage showing elastic overdrag, ref bounds, and spring settling with Svelte Motion.'
         seo.ogTitle = 'Drag Constraints'
+        seo.h1 = { title: 'Drag Constraints', mode: 'sr-only' }
         seo.ogTagline = 'Elastic drag constrained to a measured ref'
         seo.ogFeatures = ['Drag', 'Constraints', 'Elasticity', 'Spring Settling']
         seo.ogSlug = 'examples-drag-constraints'

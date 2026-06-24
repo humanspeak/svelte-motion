@@ -24,6 +24,7 @@
         seo.description =
             'Run animations on every frame with Svelte Motion useAnimationFrame. Access delta time and elapsed time for smooth, frame-based effects.'
         seo.ogTitle = 'useAnimationFrame'
+        seo.h1 = { title: 'useAnimationFrame', mode: 'sr-only' }
         seo.ogTagline = 'Run animations on every frame with Svelte Motion useAnimationFrame'
         seo.ogFeatures = ['Delta Time', 'Elapsed Time', 'Frame Callback', 'Smooth Effects']
         seo.ogSlug = 'examples-use-animation-frame'

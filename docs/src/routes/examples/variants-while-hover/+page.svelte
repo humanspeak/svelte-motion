@@ -25,6 +25,7 @@
         seo.description =
             'Pass a variant key (or array) to whileHover, whileTap, whileFocus, whileDrag, or whileInView to reuse named animation states across gestures.'
         seo.ogTitle = 'whileHover variant keys'
+        seo.h1 = { title: 'whileHover variant keys', mode: 'sr-only' }
         seo.ogTagline = 'Reuse named variants across gesture props'
         seo.ogFeatures = ['Variants', 'whileHover', 'whileTap', 'String keys']
         seo.ogSlug = 'examples-variants-while-hover'
