@@ -643,8 +643,11 @@ export type MotionProps = {
      * render, matching framer-motion. Mirrors framer-motion's `layoutDependency`.
      *
      * The gate is bypassed while `drag` is active (a dragged `layout` element
-     * keeps measuring), matching upstream `MeasureLayout`. Layout changes driven
-     * by `AnimatePresence` enter/exit are still measured regardless of the gate.
+     * keeps measuring), matching upstream `MeasureLayout`. The gate only
+     * suppresses render-driven re-measurement; real layout changes detected by
+     * the observer system — element resize, structural/child mutations, and
+     * `AnimatePresence` enter/exit — are still measured so the element keeps
+     * animating genuine moves.
      *
      * @example
      * ```svelte
