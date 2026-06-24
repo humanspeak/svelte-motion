@@ -1,0 +1,89 @@
+---
+title: 'layoutDependency'
+description: 'Gate layout measurement so FLIP only recomputes when a dependency changes.'
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte';
+  import LayoutDependencyExample from '$lib/examples/layout-dependency/demos/Default.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'layoutDependency | Docs | Svelte Motion'
+      seo.description = 'Gate layout (FLIP) measurement so a frequently-rerendering element only re-measures when a dependency changes.'
+      seo.ogTitle = 'layoutDependency'
+      seo.ogTagline = 'Re-measure only when it matters'
+      seo.ogFeatures = ['Layout Animations', 'FLIP', 'Performance', 'Motion Parity']
+      seo.ogSlug = 'docs-layout-dependency'
+  }
+</script>
+
+# layoutDependency
+
+`layoutDependency` tells a `layout` element when to re-measure. By default a
+`layout` element recomputes its FLIP box on every render that touches its
+`class`, `style`, `layoutId`, or `transition`. When you pass
+`layoutDependency`, measurement is gated on **only that value** — the element
+stops re-measuring on unrelated renders and only snapshots when the dependency
+changes.
+
+It's a performance optimization for `layout` elements that re-render often but
+rarely change box.
+
+```svelte
+<script lang="ts">
+  import { motion } from '@humanspeak/svelte-motion'
+
+  // `order` changes only when the list is actually reordered.
+  let { order } = $props()
+</script>
+
+<motion.div layout layoutDependency={order} />
+```
+
+<Example isSmall exampleUrl="/examples/layout-dependency">
+  <LayoutDependencyExample />
+</Example>
+
+In the example above, both boxes re-render constantly (their color cycles). The
+left box re-measures on every render — its measure counter climbs. The right
+box passes `layoutDependency={dep}`, so its counter stays flat until **Reflow**
+bumps the dependency.
+
+## When to use it
+
+Reach for `layoutDependency` when a `layout` element:
+
+- re-renders frequently (live text, streaming values, a ticking clock), **and**
+- only changes layout box on a specific, known signal.
+
+Pass a value that changes **exactly when the layout should be re-measured** —
+commonly a counter, a sorted key, or the array length / order of a list.
+
+```svelte
+<motion.ul layout layoutDependency={items.length}>
+  {#each items as item (item.id)}
+    <motion.li layout layoutDependency={items.length}>{item.label}</motion.li>
+  {/each}
+</motion.ul>
+```
+
+Any defined value gates — including falsy ones like `0`, `''`, or `null`. Leave
+it `undefined` (the default) to keep framer-motion's "measure on every render"
+behavior.
+
+## API Reference
+
+### `layoutDependency`
+
+```ts
+layoutDependency?: unknown
+```
+
+Pass any value to a `layout` `motion.*` component. While it is defined,
+measurement is gated on changes to this value; while it is `undefined`,
+measurement follows the default render-driven behavior. Requires `layout` to be
+enabled.
+
+Based on [Motion's layoutDependency prop](https://motion.dev/docs/react-motion-component#layoutdependency).

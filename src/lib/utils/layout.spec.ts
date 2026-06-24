@@ -4,6 +4,7 @@ import {
     measureRect,
     observeLayoutChanges,
     runFlipAnimation,
+    selectLayoutDependencies,
     setCompositorHints
 } from './layout.js'
 
@@ -553,5 +554,42 @@ describe('utils/layout', () => {
         ;(window as unknown as { requestAnimationFrame?: unknown }).requestAnimationFrame =
             originalRaf
         vi.unstubAllGlobals()
+    })
+
+    describe('selectLayoutDependencies (#314 layoutDependency)', () => {
+        it('gates on only the dependency when one is provided', () => {
+            expect(selectLayoutDependencies('order-key', () => ['class', 'style'])).toEqual([
+                'order-key'
+            ])
+        })
+
+        it('does NOT evaluate the fallback when gated (laziness is the optimization)', () => {
+            const fallback = vi.fn(() => ['class', 'style'])
+            const deps = selectLayoutDependencies(42, fallback)
+
+            expect(deps).toEqual([42])
+            // The whole point: fallback props are never read while gating is on,
+            // so they cannot register as reactive dependencies and force a
+            // re-measure.
+            expect(fallback).not.toHaveBeenCalled()
+        })
+
+        it('uses the (lazily evaluated) fallback deps when dependency is undefined', () => {
+            const fallback = vi.fn(() => ['class', 'style', 'layoutId'])
+            const deps = selectLayoutDependencies(undefined, fallback)
+
+            expect(deps).toEqual(['class', 'style', 'layoutId'])
+            expect(fallback).toHaveBeenCalledTimes(1)
+        })
+
+        it('treats falsy-but-defined values (0, "", null, false) as gating', () => {
+            const fallback = vi.fn(() => ['class'])
+
+            expect(selectLayoutDependencies(0, fallback)).toEqual([0])
+            expect(selectLayoutDependencies('', fallback)).toEqual([''])
+            expect(selectLayoutDependencies(null, fallback)).toEqual([null])
+            expect(selectLayoutDependencies(false, fallback)).toEqual([false])
+            expect(fallback).not.toHaveBeenCalled()
+        })
     })
 })

@@ -631,6 +631,28 @@ export type MotionProps = {
      * ```
      */
     layoutScroll?: boolean
+    /**
+     * Gates `layout` measurement so FLIP only recomputes when this value
+     * changes, instead of on every render that touches `class`, `style`,
+     * `layoutId`, or `transition`. Use it as a performance optimization when a
+     * frequently-rerendering `layout` element only changes box rarely — pass a
+     * value (e.g. a counter or the sorted key) that changes exactly when the
+     * layout should be re-measured.
+     *
+     * When `undefined` (the default), measurement runs on every layout-affecting
+     * render, matching framer-motion. Mirrors framer-motion's `layoutDependency`.
+     *
+     * The gate is bypassed while `drag` is active (a dragged `layout` element
+     * keeps measuring), matching upstream `MeasureLayout`. Layout changes driven
+     * by `AnimatePresence` enter/exit are still measured regardless of the gate.
+     *
+     * @example
+     * ```svelte
+     * <!-- Re-measures only when `order` changes, not on every tick -->
+     * <motion.div layout layoutDependency={order} />
+     * ```
+     */
+    layoutDependency?: unknown
     /** Ref to the element */
     ref?: HTMLElement | null
     /** Enable drag gestures. true for both axes, or lock to 'x'/'y'. */
