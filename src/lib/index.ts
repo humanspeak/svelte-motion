@@ -98,6 +98,8 @@ export { useIsPresent, usePresence, usePresenceData } from '$lib/utils/usePresen
 export type { UsePresenceState } from '$lib/utils/usePresence'
 export { useVelocity } from '$lib/utils/velocity.svelte'
 export type { VelocitySource } from '$lib/utils/velocity.svelte'
+export { useWillChange } from '$lib/utils/willChange.svelte'
+export type { WillChangeMotionValue } from '$lib/utils/willChange.svelte'
 /**
  * @deprecated Use `styleString` instead for reactive styles with automatic unit handling.
  */

@@ -1,0 +1,72 @@
+---
+title: 'useWillChange'
+description: 'Auto-managed CSS will-change that starts at auto and latches to transform after a qualifying animation.'
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte';
+  import UseWillChangeExample from '$lib/examples/use-will-change/demos/Default.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'useWillChange | Docs | Svelte Motion'
+      seo.description = 'A MotionValue for CSS will-change that starts at "auto" and latches to "transform" after the first transform or accelerated animation.'
+      seo.ogTitle = 'useWillChange'
+      seo.ogTagline = 'Promote once it animates, then stay latched'
+      seo.ogFeatures = ['MotionValue', 'will-change', 'Performance', 'Motion Parity']
+      seo.ogSlug = 'docs-use-will-change'
+  }
+</script>
+
+# useWillChange
+
+`useWillChange()` returns a MotionValue you assign to an element's
+`style.willChange`. It manages its own value: it stays `auto` until a transform
+or accelerated property animates on that element, then flips to `transform`.
+
+Setting `will-change` permanently forces the browser to keep an element on its
+own compositor layer — which costs memory. `useWillChange` starts at `auto` and
+flips to `transform` when a transform or accelerated property animates, then
+stays latched — avoiding eager promotion before first use while still capturing
+the compositor win once it's needed. Mirrors framer-motion's `useWillChange`.
+
+```svelte
+<script lang="ts">
+  import { motion, useWillChange } from '@humanspeak/svelte-motion'
+
+  const willChange = useWillChange()
+</script>
+
+<motion.div style={{ willChange }} animate={{ x: 100 }} />
+```
+
+<Example isSmall exampleUrl="/examples/use-will-change">
+  <UseWillChangeExample />
+</Example>
+
+## How it works
+
+Assign the value through object-form `style`. As animations start, the motion
+runtime notifies the value which keys are animating:
+
+- A transform shortcut (`x`, `y`, `scale`, `rotate`, …) or an accelerated value
+  (e.g. `opacity`) flips `will-change` to `transform`.
+- Any other property (e.g. `backgroundColor`) leaves it at `auto`.
+
+Once flipped, the hint stays `transform` — there's no benefit to thrashing it
+back to `auto` between animations.
+
+## API Reference
+
+### `useWillChange`
+
+```ts
+function useWillChange(): WillChangeMotionValue
+```
+
+Returns a `MotionValue<string>` (so it composes with object-form `style`) with
+an extra `add(name)` method the runtime calls as animations start. Assign it to
+`style.willChange`.
+
+Based on [Motion's useWillChange hook](https://motion.dev/docs/react-use-will-change).

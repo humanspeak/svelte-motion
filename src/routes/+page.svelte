@@ -88,6 +88,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/will-change') + searchParams}
+                    >
+                        useWillChange
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout-dependency') + searchParams}
                     >
                         layoutDependency

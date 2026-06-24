@@ -60,6 +60,7 @@ import type {
     AugmentedMotionValue,
     SpringMotionValue,
     UseSpringOptions,
+    WillChangeMotionValue,
 
     // useTransform
     TransformOptions,
