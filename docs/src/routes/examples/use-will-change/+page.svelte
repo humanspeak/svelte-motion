@@ -22,9 +22,9 @@
     if (seo) {
         seo.title = 'useWillChange | Examples | Svelte Motion'
         seo.description =
-            'Auto-managed CSS will-change that promotes an element only while it animates.'
+            'Auto-managed CSS will-change that starts at auto and latches to transform after a qualifying animation.'
         seo.ogTitle = 'useWillChange'
-        seo.ogTagline = 'Promote only while it animates'
+        seo.ogTagline = 'Promote once it animates, then stay latched'
         seo.ogFeatures = ['useWillChange', 'MotionValue', 'will-change', 'Performance']
         seo.ogSlug = 'examples-use-will-change'
     }
@@ -38,7 +38,7 @@
             tag: 'PERFORMANCE',
             title: { prefix: 'will-change, ', accent: 'only when needed', end: '.' },
             description:
-                'The card starts at `will-change: auto`. Animating `x` flips it to `transform` so the browser promotes it to its own compositor layer — only while it actually animates.',
+                'The card starts at `will-change: auto`. Animating `x` flips it to `transform`, promoting it to its own compositor layer; once flipped it stays latched for subsequent animations.',
             snippet: defaultSection,
             codeSnippet: defaultCode,
             notes: defaultNotes,

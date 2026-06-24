@@ -1,10 +1,20 @@
 <script lang="ts">
-    import { motion, useWillChange } from '$lib'
+    import { motion, useAnimationControls, useWillChange } from '$lib'
 
     // Auto-managed will-change: starts "auto", flips to "transform" once a
     // transform/accelerated prop animates on the element it's attached to.
     const transformWillChange = useWillChange()
     const colorWillChange = useWillChange()
+    const controlsWillChange = useWillChange()
+
+    // Imperative animation controls path: animating a transform via
+    // controls.start() should flip will-change just like declarative animate.
+    const controls = useAnimationControls()
+    let controlsMoved = false
+    const runControls = () => {
+        controlsMoved = !controlsMoved
+        controls.start({ x: controlsMoved ? 220 : 0 }, { duration: 0.5 })
+    }
 
     let started = $state(false)
     let moved = $state(false)
@@ -87,6 +97,31 @@
             </div>
             <button type="button" data-testid="recolor" onclick={() => (recolored = !recolored)}>
                 {recolored ? 'Reset' : 'Animate color'}
+            </button>
+        </article>
+
+        <article>
+            <h2>Imperative controls</h2>
+            <p class="expectation">
+                Animating <code>x</code> through <code>useAnimationControls()</code> flips
+                will-change to <code>transform</code> too.
+            </p>
+            <p class="readout" data-testid="controls-value">
+                value: {controlsWillChange.current}
+            </p>
+            <div class="track">
+                <motion.div
+                    class="orb cyan"
+                    data-testid="controls-box"
+                    style={{ willChange: controlsWillChange }}
+                    initial={false}
+                    animate={controls}
+                >
+                    I
+                </motion.div>
+            </div>
+            <button type="button" data-testid="run-controls" onclick={runControls}>
+                Run controls
             </button>
         </article>
     </section>

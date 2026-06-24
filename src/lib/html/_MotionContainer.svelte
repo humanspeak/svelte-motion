@@ -1262,6 +1262,10 @@
             svgPathFinished.length > 0 ? stripSVGPathKeyframes(target) : target
         ) as Record<string, unknown>
 
+        // Imperative controls (useAnimationControls/useAnimate) animate transforms
+        // too — notify will-change here just like the declarative path does.
+        notifyWillChange(Object.keys(payload))
+
         const controlsGeneration = ++animationControlsGeneration
         enterAnimationSettled = false
         onAnimationStartProp?.(definition as unknown as DOMKeyframesDefinition)

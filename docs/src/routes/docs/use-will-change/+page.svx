@@ -1,6 +1,6 @@
 ---
 title: 'useWillChange'
-description: 'Auto-managed CSS will-change that promotes an element only while it animates.'
+description: 'Auto-managed CSS will-change that starts at auto and latches to transform after a qualifying animation.'
 ---
 
 <script>
@@ -13,7 +13,7 @@ description: 'Auto-managed CSS will-change that promotes an element only while i
       seo.title = 'useWillChange | Docs | Svelte Motion'
       seo.description = 'A MotionValue for CSS will-change that flips to "transform" only while a transform or accelerated property animates.'
       seo.ogTitle = 'useWillChange'
-      seo.ogTagline = 'Promote only while it animates'
+      seo.ogTagline = 'Promote once it animates, then stay latched'
       seo.ogFeatures = ['MotionValue', 'will-change', 'Performance', 'Motion Parity']
       seo.ogSlug = 'docs-use-will-change'
   }
@@ -26,10 +26,10 @@ description: 'Auto-managed CSS will-change that promotes an element only while i
 or accelerated property animates on that element, then flips to `transform`.
 
 Setting `will-change` permanently forces the browser to keep an element on its
-own compositor layer — which costs memory. `useWillChange` only applies the
-hint while the element is actually animating, then leaves it in place, so you
-get the paint/compositing win without the standing cost. Mirrors
-framer-motion's `useWillChange`.
+own compositor layer — which costs memory. `useWillChange` starts at `auto` and
+flips to `transform` when a transform or accelerated property animates, then
+stays latched — avoiding eager promotion before first use while still capturing
+the compositor win once it's needed. Mirrors framer-motion's `useWillChange`.
 
 ```svelte
 <script lang="ts">

@@ -31,6 +31,13 @@ export type WillChangeMotionValue = AugmentedMotionValue<string> & {
  *
  * @param value Any value to test.
  * @returns Whether `value` is a will-change MotionValue.
+ *
+ * @example
+ * ```ts
+ * const willChange = useWillChange()
+ * isWillChangeMotionValue(willChange) // true
+ * isWillChangeMotionValue(motionValue('auto')) // false
+ * ```
  */
 export const isWillChangeMotionValue = (value: unknown): value is WillChangeMotionValue =>
     !!value && typeof (value as { add?: unknown }).add === 'function'

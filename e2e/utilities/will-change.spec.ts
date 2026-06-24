@@ -43,5 +43,36 @@ test.describe('useWillChange (#327)', () => {
         await page.getByTestId('recolor').click()
         await expect.poll(computedWillChange(page, 'color-box')).toBe('auto')
         await expect.poll(valueText(page, 'color-value')).toBe('value: auto')
+
+        // Edge: repeated non-transform animations still must not promote.
+        await page.getByTestId('recolor').click()
+        await expect.poll(computedWillChange(page, 'color-box')).toBe('auto')
+        await expect.poll(valueText(page, 'color-value')).toBe('value: auto')
+    })
+
+    test('flips will-change via imperative animation controls', async ({ page }) => {
+        await page.goto(URL)
+        await waitForMotionReady(page, 'controls-box')
+
+        await expect.poll(valueText(page, 'controls-value')).toBe('value: auto')
+        await expect.poll(computedWillChange(page, 'controls-box')).toBe('auto')
+
+        // controls.start({ x }) animates a transform → will-change becomes "transform".
+        await page.getByTestId('run-controls').click()
+        await expect.poll(valueText(page, 'controls-value')).toBe('value: transform')
+        await expect.poll(computedWillChange(page, 'controls-box')).toBe('transform')
+    })
+
+    test('triggers the transform flip via keyboard activation', async ({ page }) => {
+        await page.goto(URL)
+        await waitForMotionReady(page, 'transform-box')
+
+        await expect.poll(valueText(page, 'transform-value')).toBe('value: auto')
+
+        // The control is a native button — Enter must drive the same animation.
+        await page.getByTestId('move').focus()
+        await page.keyboard.press('Enter')
+        await expect.poll(valueText(page, 'transform-value')).toBe('value: transform')
+        await expect.poll(computedWillChange(page, 'transform-box')).toBe('transform')
     })
 })
