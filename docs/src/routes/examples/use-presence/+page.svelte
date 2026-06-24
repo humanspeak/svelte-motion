@@ -24,6 +24,7 @@
         seo.description =
             'Custom exit animations from inside the child. PresenceChild holds the component rendered until your safeToRemove() fires.'
         seo.ogTitle = 'usePresence'
+        seo.h1 = { title: 'usePresence', mode: 'sr-only' }
         seo.ogTagline = 'Custom exit animations from the child'
         seo.ogFeatures = ['Custom Exit', 'PresenceChild', 'safeToRemove', 'AnimatePresence']
         seo.ogSlug = 'examples-use-presence'

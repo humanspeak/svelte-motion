@@ -24,6 +24,7 @@
         seo.description =
             'Imperative animation with a scoped CSS-selector API. Sequenced staggered list with a follow-up beat on a target button.'
         seo.ogTitle = 'useAnimate'
+        seo.h1 = { title: 'useAnimate', mode: 'sr-only' }
         seo.ogTagline = 'Imperative animation with scoped selectors'
         seo.ogFeatures = ['Imperative API', 'Scoped Selectors', 'Sequences', 'Auto Cleanup']
         seo.ogSlug = 'examples-use-animate'

@@ -24,6 +24,7 @@
         seo.description =
             'Propagate variant animations through nested component trees with Svelte Motion. Parent state changes automatically cascade to child elements.'
         seo.ogTitle = 'Variants Propagation'
+        seo.h1 = { title: 'Variants Propagation', mode: 'sr-only' }
         seo.ogTagline =
             'Propagate variant animations through nested component trees with Svelte Motion'
         seo.ogFeatures = ['Parent Cascade', 'Nested Trees', 'Auto Propagation', 'Variant States']

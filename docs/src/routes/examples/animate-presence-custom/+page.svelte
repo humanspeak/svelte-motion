@@ -25,6 +25,7 @@
         seo.description =
             'Directional exit animations powered by AnimatePresence custom data and dynamic variants.'
         seo.ogTitle = 'AnimatePresence custom'
+        seo.h1 = { title: 'AnimatePresence custom', mode: 'sr-only' }
         seo.ogTagline = 'Directional exits from parent presence data'
         seo.ogFeatures = ['AnimatePresence', 'custom', 'Dynamic Variants', 'Directional Exit']
         seo.ogSlug = 'examples-animate-presence-custom'

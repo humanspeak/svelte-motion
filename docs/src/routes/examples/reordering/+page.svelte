@@ -24,6 +24,7 @@
         seo.description =
             'Drag-to-reorder list items with smooth layout animations using Svelte Motion. Demonstrates drag gestures and automatic layout transitions.'
         seo.ogTitle = 'Reordering'
+        seo.h1 = { title: 'Reordering', mode: 'sr-only' }
         seo.ogTagline =
             'Drag-to-reorder list items with smooth layout animations using Svelte Motion'
         seo.ogFeatures = ['Drag Gestures', 'Layout Animation', 'List Reorder', 'Smooth FLIP']

@@ -24,6 +24,7 @@
         seo.description =
             'Synchronized time-based animations across multiple elements using a shared Svelte Motion useTime store for coordinated motion effects.'
         seo.ogTitle = 'useTime (Synced)'
+        seo.h1 = { title: 'useTime (Synced)', mode: 'sr-only' }
         seo.ogTagline =
             'Synchronized time-based animations across multiple elements using a shared useTime store'
         seo.ogFeatures = ['Shared Store', 'Synchronized', 'Multi-Element', 'Coordinated Motion']

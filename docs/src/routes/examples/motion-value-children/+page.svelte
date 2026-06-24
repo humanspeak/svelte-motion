@@ -23,6 +23,7 @@
         seo.title = 'MotionValue children | Examples | Svelte Motion'
         seo.description = 'Render MotionValue values as live text in motion elements.'
         seo.ogTitle = 'MotionValue children'
+        seo.h1 = { title: 'MotionValue children', mode: 'sr-only' }
         seo.ogTagline = 'Live text powered directly by MotionValue'
         seo.ogFeatures = ['MotionValue', 'useTransform', 'Live Text', 'Telemetry']
         seo.ogSlug = 'examples-motion-value-children'

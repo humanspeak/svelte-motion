@@ -47,10 +47,14 @@ src/lib/github-stats.json
 # Generated per-doc markdown mirrors (LLM citation surface)
 static/docs/
 
+# Generated example markdown mirrors (docs-kit's exampleMirrorsPlugin —
+# index + per-example source served as an LLM citation surface)
+static/examples.md
+static/examples/
+
 # Generated llms.txt + llms-full.txt (docs-kit's llmsPlugin / llmsFullPlugin —
 # discovery index + concatenated dump for LLM agents)
-static/llms.txt
-static/llms-full.txt
+static/llms*.txt
 
 .dev.vars*
 !.dev.vars.example

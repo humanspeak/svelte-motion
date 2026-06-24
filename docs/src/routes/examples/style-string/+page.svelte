@@ -24,6 +24,7 @@
         seo.description =
             'Reactive style strings with automatic unit handling via the Svelte Motion styleString utility. Simplifies dynamic inline styles in components.'
         seo.ogTitle = 'styleString'
+        seo.h1 = { title: 'styleString', mode: 'sr-only' }
         seo.ogTagline =
             'Reactive style strings with automatic unit handling via the Svelte Motion styleString utility'
         seo.ogFeatures = ['Auto Units', 'Reactive CSS', 'Dynamic Styles', 'Style Objects']

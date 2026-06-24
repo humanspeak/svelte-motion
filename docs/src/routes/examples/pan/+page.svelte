@@ -22,6 +22,7 @@
         seo.description =
             'A swipe-to-dismiss bottom sheet — the canonical pan-gesture pattern. Pull the sheet down past a threshold or flick fast to dismiss; otherwise it springs back. Velocity-aware release.'
         seo.ogTitle = 'Pan'
+        seo.h1 = { title: 'Pan', mode: 'sr-only' }
         seo.ogTagline = 'Swipe to dismiss, flick to confirm'
         seo.ogFeatures = ['Pan', 'Swipe', 'Velocity', 'Sheet']
         seo.ogSlug = 'examples-pan'

@@ -24,6 +24,7 @@
         seo.description =
             'Resolve the reduced-motion policy by combining a parent <MotionConfig reducedMotion> override with the OS preference. Reactive via Svelte 5 runes.'
         seo.ogTitle = 'useReducedMotionConfig'
+        seo.h1 = { title: 'useReducedMotionConfig', mode: 'sr-only' }
         seo.ogTagline = 'Combine MotionConfig override + OS preference'
         seo.ogFeatures = ['Accessibility', 'MotionConfig', 'Policy Resolution', 'SSR Safe']
         seo.ogSlug = 'examples-use-reduced-motion-config'

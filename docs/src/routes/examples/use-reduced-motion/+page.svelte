@@ -24,6 +24,7 @@
         seo.description =
             "Honor the user's prefers-reduced-motion accessibility setting with Svelte Motion useReducedMotion. A reactive store that updates live when the OS preference changes."
         seo.ogTitle = 'useReducedMotion'
+        seo.h1 = { title: 'useReducedMotion', mode: 'sr-only' }
         seo.ogTagline = "Honor the user's reduced-motion preference"
         seo.ogFeatures = ['Accessibility', 'Reactive Store', 'Live Updates', 'SSR Safe']
         seo.ogSlug = 'examples-use-reduced-motion'

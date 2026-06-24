@@ -24,6 +24,7 @@
         seo.description =
             'Heart button with animated particle burst on press and hold using Svelte Motion.'
         seo.ogTitle = 'Fancy Like Button'
+        seo.h1 = { title: 'Fancy Like Button', mode: 'sr-only' }
         seo.ogTagline =
             'Heart button with animated particle burst on press and hold using Svelte Motion'
         seo.ogFeatures = ['Particle Burst', 'Press & Hold', 'Heart Animation', 'Spring Physics']

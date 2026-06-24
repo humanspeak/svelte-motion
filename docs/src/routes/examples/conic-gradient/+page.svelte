@@ -24,6 +24,7 @@
         seo.description =
             'Pointer-tracking conic gradient example using Svelte Motion useTransform and writable stores.'
         seo.ogTitle = 'Conic Gradient'
+        seo.h1 = { title: 'Conic Gradient', mode: 'sr-only' }
         seo.ogTagline = 'Pointer-tracking conic gradient example using Svelte Motion useTransform'
         seo.ogFeatures = ['Pointer Tracking', 'useTransform', 'Writable Stores', 'CSS Gradients']
         seo.ogSlug = 'examples-conic-gradient'

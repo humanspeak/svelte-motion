@@ -24,6 +24,7 @@
         seo.description =
             'Legacy imperative animation controls for coordinating one or more motion components with start, set, and stop.'
         seo.ogTitle = 'useAnimationControls'
+        seo.h1 = { title: 'useAnimationControls', mode: 'sr-only' }
         seo.ogTagline = 'Coordinate motion components imperatively'
         seo.ogFeatures = ['Imperative Controls', 'Variants', 'Sequencing', 'Shared Subscribers']
         seo.ogSlug = 'examples-use-animation-controls'

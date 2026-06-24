@@ -24,6 +24,7 @@
         seo.description =
             'Wrap regions in <LayoutGroup id> to keep identical layoutId values in sibling subtrees from cross-animating. Side-by-side tab strips demo.'
         seo.ogTitle = 'LayoutGroup'
+        seo.h1 = { title: 'LayoutGroup', mode: 'sr-only' }
         seo.ogTagline = 'Scope shared-layout animations to a subtree'
         seo.ogFeatures = ['Shared layout', 'LayoutGroup', 'layoutId scoping', 'Tab strips']
         seo.ogSlug = 'examples-layout-group'

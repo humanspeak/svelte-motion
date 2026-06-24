@@ -24,6 +24,7 @@
         seo.description =
             'A theme-aware drag-to-close bottom sheet built with drag, a bound y MotionValue, and dragControls in Svelte Motion.'
         seo.ogTitle = 'Mobile Drawer'
+        seo.h1 = { title: 'Mobile Drawer', mode: 'sr-only' }
         seo.ogTagline = 'Drag-to-close bottom sheet with a bound MotionValue'
         seo.ogFeatures = ['Drag', 'Drag Controls', 'MotionValue', 'Elasticity']
         seo.ogSlug = 'examples-mobile-drawer'

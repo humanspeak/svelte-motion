@@ -24,6 +24,7 @@
         seo.description =
             'Six follower motion values driven by a single pointer source — each with a different transition (spring variants and tweens) so the trail visually shows how each animation type feels.'
         seo.ogTitle = 'useFollowValue'
+        seo.h1 = { title: 'useFollowValue', mode: 'sr-only' }
         seo.ogTagline = 'One source, six personalities'
         seo.ogFeatures = ['Spring', 'Tween', 'Wobble', 'Mixed types']
         seo.ogSlug = 'examples-use-follow-value'

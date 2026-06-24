@@ -24,6 +24,7 @@
         seo.description =
             'Interactive path morphing animation using SVG shape interpolation with Svelte Motion.'
         seo.ogTitle = 'Path Morphing'
+        seo.h1 = { title: 'Path Morphing', mode: 'sr-only' }
         seo.ogTagline =
             'Interactive path morphing animation using SVG shape interpolation with Svelte Motion'
         seo.ogFeatures = ['SVG Morphing', 'Shape Interpolation', 'useMotionValue', 'useTransform']

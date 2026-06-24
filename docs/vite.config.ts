@@ -1,6 +1,8 @@
 import {
     demoManifestPlugin,
     docMirrorsPlugin,
+    exampleMirrorsPlugin,
+    indexNowPlugin,
     llmsFullPlugin,
     llmsPlugin,
     sitemapManifestPlugin,
@@ -25,6 +27,12 @@ const compareSocialFeatures = [
     'Migration Guide',
     'Honest Verdict'
 ]
+
+// IndexNow verification key. The matching `static/<key>.txt` file is served
+// verbatim at `https://motion.svelte.page/<key>.txt` so IndexNow can confirm
+// we own the host before accepting URL-change submissions. Unique per domain —
+// do not reuse the svelte-markdown key here.
+const indexNowKey = 'f56cc8a9-a818-41b2-b47c-52f658061fbc'
 
 export default defineConfig({
     plugins: [
@@ -56,6 +64,18 @@ export default defineConfig({
         // `siteUrl` controls the `<!-- Source: ... -->` header in each
         // mirror, which is the citation surface for ChatGPT / Perplexity.
         docMirrorsPlugin({ siteUrl: docsConfig.url }),
+        // Scans `src/routes/examples/**/+page.svelte` plus the matching
+        // `src/lib/examples/<slug>/demos/*.svelte` files, then emits
+        // `static/examples.md` (the index) and `static/examples/<slug>.md`
+        // per page — the live example prose, notes, and fenced Svelte demo
+        // source. This is the examples-gallery counterpart to
+        // `docMirrorsPlugin`: an LLM-readable citation surface served at
+        // `https://motion.svelte.page/examples/<slug>.md`. `sourceBaseUrl`
+        // links each fenced demo back to its source file on GitHub.
+        exampleMirrorsPlugin({
+            siteUrl: docsConfig.url,
+            sourceBaseUrl: 'https://github.com/humanspeak/svelte-motion/blob/main/docs'
+        }),
         // Emits `static/llms.txt` (the llmstxt.org-convention discovery
         // index) and `static/llms-full.txt` (concatenated dump for
         // "paste the whole library" workflows like Claude Code / Cursor).
@@ -104,6 +124,18 @@ export default defineConfig({
                     ogFeatures: compareSocialFeatures
                 }))
             ]
+        }),
+        // Submits changed URLs to IndexNow (Bing, Yandex, et al.) after a
+        // production build so crawlers learn about publications without
+        // waiting for a sitemap re-crawl. Gated on `productionMode: 'indexnow'`
+        // — submission only fires for `vite build --mode indexnow` (the
+        // `build:indexnow` script the `deploy` task runs), never for plain
+        // `vite build` or `vite dev`. The `static/<key>.txt` file is the
+        // ownership proof IndexNow fetches before accepting submissions.
+        indexNowPlugin({
+            siteUrl: docsConfig.url,
+            key: indexNowKey,
+            productionMode: 'indexnow'
         }),
         svelteMotionOptimize(),
         tailwindcss(),

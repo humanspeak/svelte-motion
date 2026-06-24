@@ -24,6 +24,7 @@
         seo.description =
             'A badge component that cycles through idle, processing, success, and error states with smooth animated transitions in Svelte Motion.'
         seo.ogTitle = 'Multi-State Badge'
+        seo.h1 = { title: 'Multi-State Badge', mode: 'sr-only' }
         seo.ogTagline =
             'A badge component that cycles through idle, processing, success, and error states'
         seo.ogFeatures = [

@@ -24,6 +24,7 @@
         seo.description =
             'Spring-based animated tabs with a sliding indicator powered by svelte-motion layoutId and bits-ui.'
         seo.ogTitle = 'Animated Tabs'
+        seo.h1 = { title: 'Animated Tabs', mode: 'sr-only' }
         seo.ogTagline =
             'Spring-based animated tabs with a sliding indicator powered by svelte-motion layoutId'
         seo.ogFeatures = ['layoutId', 'Sliding Indicator', 'Spring Physics', 'bits-ui']

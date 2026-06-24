@@ -24,6 +24,7 @@
         seo.description =
             'Smooth color transitions between multiple color values using Svelte Motion. Demonstrates interpolation across the full color spectrum.'
         seo.ogTitle = 'Color Interpolation'
+        seo.h1 = { title: 'Color Interpolation', mode: 'sr-only' }
         seo.ogTagline = 'Smooth color transitions between multiple color values using Svelte Motion'
         seo.ogFeatures = [
             'Color Transitions',

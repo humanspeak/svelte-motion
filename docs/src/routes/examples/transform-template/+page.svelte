@@ -23,6 +23,7 @@
         seo.title = 'transformTemplate | Examples | Svelte Motion'
         seo.description = 'Customize generated Motion transform strings with transformTemplate.'
         seo.ogTitle = 'transformTemplate'
+        seo.h1 = { title: 'transformTemplate', mode: 'sr-only' }
         seo.ogTagline = 'Reshape generated transform strings'
         seo.ogFeatures = [
             'transformTemplate',

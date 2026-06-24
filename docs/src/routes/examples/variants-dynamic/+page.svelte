@@ -24,6 +24,7 @@
         seo.description =
             'Per-instance variants using the custom prop and function-form factories in Svelte Motion. Staggered list reveals with index-driven delays.'
         seo.ogTitle = 'Variants Dynamic (custom)'
+        seo.h1 = { title: 'Variants Dynamic (custom)', mode: 'sr-only' }
         seo.ogTagline = 'Per-instance variants using the custom prop and function-form factories'
         seo.ogFeatures = ['Variants', 'custom prop', 'Staggered list', 'Function-form variants']
         seo.ogSlug = 'examples-variants-dynamic'

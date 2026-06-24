@@ -24,6 +24,7 @@
         seo.description =
             'Interactive scroll progress animation example using Svelte Motion useScroll and useSpring.'
         seo.ogTitle = 'Scroll Progress'
+        seo.h1 = { title: 'Scroll Progress', mode: 'sr-only' }
         seo.ogTagline =
             'Interactive scroll progress animation example using Svelte Motion useScroll and useSpring'
         seo.ogFeatures = ['useScroll', 'useSpring', 'Progress Bar', 'Scroll-Linked']

@@ -24,6 +24,7 @@
         seo.description =
             'Auto-managed CSS will-change that starts at auto and latches to transform after a qualifying animation.'
         seo.ogTitle = 'useWillChange'
+        seo.h1 = { title: 'useWillChange', mode: 'sr-only' }
         seo.ogTagline = 'Promote once it animates, then stay latched'
         seo.ogFeatures = ['useWillChange', 'MotionValue', 'will-change', 'Performance']
         seo.ogSlug = 'examples-use-will-change'

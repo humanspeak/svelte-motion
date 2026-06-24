@@ -24,6 +24,7 @@
         seo.description =
             'Animated toggle switch with spring physics built using Svelte Motion. Demonstrates layout animations and gesture-driven state transitions.'
         seo.ogTitle = 'Toggle Switch'
+        seo.h1 = { title: 'Toggle Switch', mode: 'sr-only' }
         seo.ogTagline = 'Animated toggle switch with spring physics built using Svelte Motion'
         seo.ogFeatures = ['Layout Animation', 'Spring Physics', 'Gesture Driven', 'State Toggle']
         seo.ogSlug = 'examples-toggle-switch'

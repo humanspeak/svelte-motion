@@ -24,6 +24,7 @@
         seo.description =
             'Define and switch between named animation states with Svelte Motion variants. Create reusable, declarative animation presets for components.'
         seo.ogTitle = 'Variants Basic'
+        seo.h1 = { title: 'Variants Basic', mode: 'sr-only' }
         seo.ogTagline =
             'Define and switch between named animation states with Svelte Motion variants'
         seo.ogFeatures = ['Named States', 'Declarative', 'Reusable Presets', 'State Switching']

@@ -24,6 +24,7 @@
         seo.description =
             'Animate elements between positions using layoutId for smooth shared layout transitions in Svelte Motion.'
         seo.ogTitle = 'Shared Layout Animation'
+        seo.h1 = { title: 'Shared Layout Animation', mode: 'sr-only' }
         seo.ogTagline =
             'Animate elements between positions using layoutId for smooth shared layout transitions'
         seo.ogFeatures = ['layoutId', 'FLIP Animation', 'Shared Transitions', 'Position Morph']
