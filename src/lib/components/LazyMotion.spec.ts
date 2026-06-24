@@ -1,6 +1,6 @@
 import { domAnimation, domMin } from '$lib'
+import { flushTimers } from '$lib/__tests__/flushTimers'
 import { render, screen } from '@testing-library/svelte'
-import { tick } from 'svelte'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LazyMotionProbe from './__tests__/LazyMotionProbe.svelte'
 
@@ -21,13 +21,6 @@ afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
 })
-
-const flushTimers = async () => {
-    vi.runAllTimers()
-    await Promise.resolve()
-    await Promise.resolve()
-    await tick()
-}
 
 const createDeferred = <T>() => {
     let resolve!: (value: T) => void

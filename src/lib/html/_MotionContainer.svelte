@@ -195,9 +195,31 @@
         layoutScroll: layoutScrollProp,
         layoutDependency: layoutDependencyProp,
         onProjectionUpdate: onProjectionUpdateProp,
-        ref: element = $bindable(null),
+        // trunk-ignore(eslint/no-useless-assignment): `ref` is write-only here — mirrored from the internal `element` node via the effect below
+        ref = $bindable(),
         ...rest
     }: Props = $props()
+    // The public `ref` bindable defaults to `undefined` so consumers can bind a
+    // freshly-declared `$state()` (the idiomatic element ref, initially
+    // `undefined`) without tripping Svelte's `props_invalid_value` (#417).
+    //
+    // Internally we keep a separate `element` ref that defaults to `null`. The
+    // animate effects below rely on the exact reactive update timing of this
+    // node going `null → element`; defaulting it to `undefined` instead subtly
+    // reorders effect runs and breaks re-running animations on prop change. We
+    // therefore decouple the internal node from the public bindable and mirror
+    // one into the other.
+    let element = $state<HTMLElement | null>(null)
+    $effect(() => {
+        ref = element
+        // Reset on teardown so `bind:ref` consumers see `null` when the element
+        // unmounts (matching native `bind:this`). The mirror effect is disposed
+        // before `element` itself goes null, so without this the consumer would
+        // otherwise keep a stale node reference after unmount.
+        return () => {
+            ref = null
+        }
+    })
     let isLoaded = $state<'mounting' | 'initial' | 'ready' | 'animated'>('mounting')
     // True once the enter/animate animation has COMPLETED. Until then the
     // WAAPI animation owns the transform; flipping the inline baseline to

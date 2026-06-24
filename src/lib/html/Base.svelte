@@ -2,7 +2,7 @@
     import MotionContainer from '$lib/html/_MotionContainer.svelte'
     import type { HTMLVoidElementProps } from '$lib/types'
 
-    let { ref = $bindable(null), ...rest }: HTMLVoidElementProps = $props()
+    let { ref = $bindable(), ...rest }: HTMLVoidElementProps = $props()
 </script>
 
 <MotionContainer bind:ref tag="base" {...rest} />
