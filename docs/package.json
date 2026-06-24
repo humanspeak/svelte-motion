@@ -5,10 +5,11 @@
     "type": "module",
     "scripts": {
         "build": "tsx ./scripts/fetch-github-stats.ts && node ./scripts/generate-registry.mjs && vite build",
+        "build:indexnow": "tsx ./scripts/fetch-github-stats.ts && node ./scripts/generate-registry.mjs && vite build --mode indexnow",
         "cf-typegen": "wrangler types src/worker-configuration.d.ts",
         "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
         "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-        "deploy": "pnpm run build && wrangler deploy",
+        "deploy": "pnpm run build:indexnow && wrangler deploy",
         "dev": "vite dev",
         "examples-catalog:sync": "node ./scripts/sync-examples-catalog.mjs",
         "examples-catalog:watch": "chokidar 'src/routes/examples/**/+page.ts' --ignore 'src/routes/examples/+page.ts' -c 'node ./scripts/sync-examples-catalog.mjs' --initial --silent",
@@ -24,7 +25,7 @@
     "dependencies": {
         "@fontsource-variable/inter": "^5.2.8",
         "@fontsource-variable/jetbrains-mono": "^5.2.8",
-        "@humanspeak/docs-kit": "github:humanspeak/docs-kit#2026.6.9",
+        "@humanspeak/docs-kit": "github:humanspeak/docs-kit#2026.6.16",
         "@humanspeak/svelte-markdown": "^1.5.3",
         "@humanspeak/svelte-motion": "workspace:*",
         "@humanspeak/svelte-scoped-props": "^0.1.1",

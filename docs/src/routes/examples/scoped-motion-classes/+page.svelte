@@ -1,5 +1,10 @@
 <script lang="ts">
-    import { CodeReferenceV2, ExampleV2 } from '@humanspeak/docs-kit'
+    import {
+        CodeReferenceV2,
+        ExampleV2,
+        type ExampleSection,
+        formatSheetLabel
+    } from '@humanspeak/docs-kit'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import { demoCodeSample } from '$lib/demo-loaders'
@@ -24,32 +29,55 @@
         seo.ogSlug = 'examples-scoped-motion-classes'
     }
 
-    const demoKey = 'scoped-motion-classes/demos/Default.svelte' as Parameters<
-        typeof demoCodeSample
-    >[0]
+    const sections: ExampleSection[] = [
+        {
+            figId: 'FIG-001',
+            tag: 'SCOPED CSS',
+            title: { prefix: 'motion ', accent: 'classes', end: '.' },
+            description:
+                'A parent-scoped `.headline` selector styles both a native heading and a `motion.h2`. The motion component uses `scoped:class` so Svelte sees the selector as used and keeps the generated CSS.',
+            snippet: defaultSection,
+            codeSnippet: defaultCode,
+            barCells: [
+                { k: 'syntax', v: 'scoped:class' },
+                { k: 'element', v: 'motion.h2' },
+                { k: 'package', v: '@humanspeak/svelte-scoped-props' }
+            ],
+            sourceUrl: exampleSourceUrl('scoped-motion-classes/demos/Default.svelte')
+        }
+    ]
 </script>
 
-{#snippet scopedCode()}
+{#snippet defaultSection()}
+    <ScopedMotionClassesDefault />
+{/snippet}
+{#snippet defaultCode()}
     <CodeReferenceV2
-        samples={[demoCodeSample(demoKey, 'scoped-motion-classes-default', 'Default.svelte')]}
+        samples={[
+            demoCodeSample(
+                'scoped-motion-classes/demos/Default.svelte',
+                'scoped-motion-classes-default',
+                'Default.svelte'
+            )
+        ]}
         columns={1}
     />
 {/snippet}
 
-<ExampleV2
-    figId="FIG-001"
-    tag="SCOPED CSS"
-    title={{ prefix: 'motion ', accent: 'classes', end: '.' }}
-    description="A parent-scoped `.headline` selector styles both a native heading and a `motion.h2`. The motion component uses `scoped:class` so Svelte sees the selector as used and keeps the generated CSS."
-    sheetLabel="SHEET 01 / 01"
-    barCells={[
-        { k: 'syntax', v: 'scoped:class' },
-        { k: 'element', v: 'motion.h2' },
-        { k: 'package', v: '@humanspeak/svelte-scoped-props' }
-    ]}
-    sourceUrl={exampleSourceUrl('scoped-motion-classes/demos/Default.svelte')}
-    codeSnippet={scopedCode}
-    codeLabel="show code"
->
-    <ScopedMotionClassesDefault />
-</ExampleV2>
+{#each sections as section, i (section.figId)}
+    <ExampleV2
+        figId={section.figId}
+        tag={section.tag}
+        title={section.title}
+        description={section.description}
+        mode={section.mode ?? 'live'}
+        sheetLabel={formatSheetLabel(i, sections.length)}
+        barCells={section.barCells}
+        sourceUrl={section.sourceUrl}
+        codeSnippet={section.codeSnippet}
+        codeLabel="show code"
+        notes={section.notes}
+    >
+        {@render section.snippet()}
+    </ExampleV2>
+{/each}
