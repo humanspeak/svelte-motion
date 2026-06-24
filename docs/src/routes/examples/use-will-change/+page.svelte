@@ -38,7 +38,7 @@
             tag: 'PERFORMANCE',
             title: { prefix: 'will-change, ', accent: 'only when needed', end: '.' },
             description:
-                'The card starts at `will-change: auto`. Animating `x` flips it to `transform`, promoting it to its own compositor layer; once flipped it stays latched for subsequent animations.',
+                '`will-change` is an invisible hint — the motion looks identical with or without it, so watch each box’s badge. Both start at `auto`. The left box animates `x` (a transform) and latches to `transform`; the right box animates `backgroundColor` (paint only) and stays at `auto` — no needless layer promotion.',
             snippet: defaultSection,
             codeSnippet: defaultCode,
             notes: defaultNotes,
