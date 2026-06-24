@@ -1,3 +1,4 @@
+import { flushTimers } from '$lib/__tests__/flushTimers'
 import { animationControls } from '$lib/utils/animationControls.svelte'
 import { fireEvent, render } from '@testing-library/svelte'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -63,13 +64,6 @@ beforeEach(() => {
 afterEach(() => {
     vi.unstubAllGlobals()
 })
-
-async function flushTimers() {
-    // Run any queued RAF timeouts
-    vi.runAllTimers()
-    // Flush microtasks
-    await Promise.resolve()
-}
 
 describe('_MotionContainer', () => {
     it('does not add tabindex when element is natively focusable', async () => {
