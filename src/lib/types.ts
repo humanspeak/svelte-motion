@@ -642,12 +642,14 @@ export type MotionProps = {
      * When `undefined` (the default), measurement runs on every layout-affecting
      * render, matching framer-motion. Mirrors framer-motion's `layoutDependency`.
      *
-     * The gate is bypassed while `drag` is active (a dragged `layout` element
-     * keeps measuring), matching upstream `MeasureLayout`. The gate only
-     * suppresses render-driven re-measurement; real layout changes detected by
-     * the observer system — element resize, structural/child mutations, and
-     * `AnimatePresence` enter/exit — are still measured so the element keeps
-     * animating genuine moves.
+     * Enabling `drag` opts the element out of `layoutDependency` gating
+     * entirely — a `layout` element with `drag` set re-measures like an ungated
+     * one whether or not a drag is in progress, matching upstream
+     * `MeasureLayout` (which keys off the `drag` prop, not active-gesture
+     * state). The gate only suppresses render-driven re-measurement; real
+     * layout changes detected by the observer system — element resize,
+     * structural/child mutations, and `AnimatePresence` enter/exit — are still
+     * measured so the element keeps animating genuine moves.
      *
      * @example
      * ```svelte
