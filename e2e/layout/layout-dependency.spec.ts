@@ -12,6 +12,10 @@ const waitForMotionReady = async (page: Page, testId: string) => {
     await expect(page.getByTestId(testId)).toHaveAttribute('data-is-loaded', 'ready')
 }
 
+const render = async (page: Page, times: number) => {
+    for (let i = 0; i < times; i++) await page.getByTestId('tick').click()
+}
+
 test.describe('layoutDependency (#314)', () => {
     test('gated box does not re-measure on unrelated renders; ungated box does', async ({
         page
@@ -27,9 +31,7 @@ test.describe('layoutDependency (#314)', () => {
 
         // Five unrelated renders (color ticks). The ungated box re-measures
         // each time; the gated box (dep unchanged) must not.
-        for (let i = 0; i < 5; i++) {
-            await page.getByTestId('tick').click()
-        }
+        await render(page, 5)
 
         await expect.poll(readCount(page, 'default-measures')).toBeGreaterThanOrEqual(5)
         await expect.poll(readCount(page, 'gated-measures')).toBe(0)
@@ -43,9 +45,7 @@ test.describe('layoutDependency (#314)', () => {
         await expect.poll(readCount(page, 'gated-measures')).toBe(0)
 
         // Render a few times — still gated.
-        for (let i = 0; i < 3; i++) {
-            await page.getByTestId('tick').click()
-        }
+        await render(page, 3)
         await expect.poll(readCount(page, 'gated-measures')).toBe(0)
 
         // Bumping the dependency lets the gated box measure (and FLIP).
@@ -72,9 +72,7 @@ test.describe('layoutDependency escape hatches', () => {
         await expect.poll(readCount(page, 'drag-measures')).toBe(0)
         await expect.poll(readCount(page, 'nodrag-measures')).toBe(0)
 
-        for (let i = 0; i < 5; i++) {
-            await page.getByTestId('tick').click()
-        }
+        await render(page, 5)
 
         // drag overrides the gate → re-measures every render.
         await expect.poll(readCount(page, 'drag-measures')).toBeGreaterThanOrEqual(5)
@@ -97,9 +95,7 @@ test.describe('layoutDependency escape hatches', () => {
         await expect.poll(readCount(page, 'presence-measures')).toBe(0)
 
         // Renders alone must not measure the gated box.
-        for (let i = 0; i < 4; i++) {
-            await page.getByTestId('tick').click()
-        }
+        await render(page, 4)
         await expect.poll(readCount(page, 'presence-measures')).toBe(0)
 
         const boxTop = () =>

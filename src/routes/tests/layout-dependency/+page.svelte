@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { onMount } from 'svelte'
     import { AnimatePresence, motion } from '$lib'
 
     // A high-frequency render driver. Each tick changes both boxes' inline
@@ -59,13 +58,13 @@
         siblingPresent = !siblingPresent
     }
 
-    onMount(() => {
-        let raf = 0
-        const loop = () => {
-            if (autoTicking) tick += 1
+    // Only spin the rAF loop while auto-render is on.
+    $effect(() => {
+        if (!autoTicking) return
+        let raf = requestAnimationFrame(function loop() {
+            tick += 1
             raf = requestAnimationFrame(loop)
-        }
-        raf = requestAnimationFrame(loop)
+        })
         return () => cancelAnimationFrame(raf)
     })
 </script>
