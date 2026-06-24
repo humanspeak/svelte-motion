@@ -1528,7 +1528,22 @@
             baselineSources: {
                 initial: (initialKeyframes ?? {}) as Record<string, unknown>,
                 animate: (resolvedAnimate ?? {}) as Record<string, unknown>
-            }
+            },
+            // Bound `style` MotionValues (e.g. `style={{ y }}`) for the dragged
+            // axes, so the gesture writes through to them and `y.get()` /
+            // `animate(y, …)` stay in sync with the drag (#421). Read inside
+            // `untrack` so the drag effect doesn't re-run (re-attaching the
+            // gesture) every time `styleProp` changes — e.g. an object-style
+            // `rotate` derived from a $state updates each frame mid-drag.
+            boundMotionValues: (() => {
+                // collectMotionStyleValues already filters to MotionValues only.
+                const styleValues = collectMotionStyleValues(styleProp)
+                if (!styleValues) return undefined
+                const bound: { x?: MotionValue<number>; y?: MotionValue<number> } = {}
+                if (styleValues.x) bound.x = styleValues.x as MotionValue<number>
+                if (styleValues.y) bound.y = styleValues.y as MotionValue<number>
+                return bound.x || bound.y ? bound : undefined
+            })()
         }))
         const opts = {
             axis,
@@ -1556,7 +1571,8 @@
             baselineSources: dragRuntimeOptions.baselineSources,
             getBaseTransform: () => splitSerializedTransform(serializedStyleProp).transform,
             propagation: !!dragPropagationProp,
-            snapToOrigin: dragSnapToOriginProp as boolean | 'x' | 'y' | undefined
+            snapToOrigin: dragSnapToOriginProp as boolean | 'x' | 'y' | undefined,
+            boundMotionValues: dragRuntimeOptions.boundMotionValues
         }
 
         // Attach and hold teardown so we can re-attach if props change

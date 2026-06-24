@@ -32,7 +32,7 @@ import {
 import { deriveBoundaryPhysics } from '$lib/utils/dragParams'
 import { computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
-import { animateValue, type AnimationPlaybackControlsWithThen } from 'motion-dom'
+import { animateValue, type AnimationPlaybackControlsWithThen, type MotionValue } from 'motion-dom'
 
 type Rect = {
     top: number
@@ -83,6 +83,15 @@ export type AttachDragOptions = {
     getBaseTransform?: () => string
     propagation?: boolean
     snapToOrigin?: boolean | 'x' | 'y'
+    /**
+     * Bound `style` MotionValues for the dragged axes (e.g. `style={{ y }}`).
+     * The gesture dual-writes these alongside the synchronous transform so
+     * `y.get()` / `style={{ y }}` reflect the live drag offset and a follow-up
+     * `animate(y, …)` continues from the dragged position — matching
+     * framer-motion, where the gesture drives the MotionValue and the transform
+     * is derived from it (#421).
+     */
+    boundMotionValues?: { x?: MotionValue<number>; y?: MotionValue<number> }
 }
 
 /**
@@ -391,6 +400,13 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         propagation: opts.propagation
     })
     const axis = opts.axis
+    const dragX = axis === true || axis === 'x'
+    const dragY = axis === true || axis === 'y'
+    // Bound `style` MotionValues for the dragged axes (e.g. `style={{ y }}`).
+    // Constant for this gesture's lifetime, so resolved once here rather than
+    // per `setXYImmediate` frame (#421).
+    const boundX = dragX ? opts.boundMotionValues?.x : undefined
+    const boundY = dragY ? opts.boundMotionValues?.y : undefined
     const directionLock = !!opts.directionLock
     const listenerEnabled = opts.listener !== false
     const elastic = resolveDragElastic(opts.elastic)
@@ -524,26 +540,43 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
      * `adjustOrigin` hook below.
      */
     const setXYImmediate = (x: number, y: number) => {
+        // An axis backed by a bound MotionValue is rendered through motion-dom's
+        // styleEffect (and reflected in `getBaseTransform()`). Emitting a translate
+        // for it here too would apply the offset twice (#421), so only non-bound
+        // axes get the synchronous, no-lag translate write (#379).
         const parts: string[] = []
-        if (axis === true || axis === 'x') parts.push(`translateX(${x}px)`)
-        if (axis === true || axis === 'y') parts.push(`translateY(${y}px)`)
+        if (dragX && !boundX) parts.push(`translateX(${x}px)`)
+        if (dragY && !boundY) parts.push(`translateY(${y}px)`)
         const scalePart =
             managedScaleActive && Math.abs(managedScale - 1) > 0.0001
                 ? `scale(${managedScale})`
                 : ''
         const liveTransform = [...parts, scalePart].filter(Boolean).join(' ')
-        el.dataset.svelteMotionDragTransform = liveTransform
-        const writeComposedTransform = () => {
-            if (el.dataset.svelteMotionDragTransform !== liveTransform) return
-            const baseTransform = opts.getBaseTransform?.() ?? ''
-            el.style.transform = [liveTransform, baseTransform].filter(Boolean).join(' ')
-        }
 
-        writeComposedTransform()
-        queueMicrotask(writeComposedTransform)
-        requestAnimationFrame(writeComposedTransform)
-        if (axis === true || axis === 'x') applied.x = x
-        if (axis === true || axis === 'y') applied.y = y
+        // `liveTransform` is empty only when every dragged axis is
+        // MotionValue-backed and there's no managed scale — i.e. nothing here to
+        // write, so styleEffect owns the transform and writing an empty/stale
+        // value would clobber it (#421). Otherwise this is the unchanged no-lag
+        // write path (#379) — note a no-bound drag always has a translate, so
+        // `liveTransform` is non-empty and the write always runs.
+        if (liveTransform) {
+            el.dataset.svelteMotionDragTransform = liveTransform
+            const writeComposedTransform = () => {
+                if (el.dataset.svelteMotionDragTransform !== liveTransform) return
+                const baseTransform = opts.getBaseTransform?.() ?? ''
+                el.style.transform = [liveTransform, baseTransform].filter(Boolean).join(' ')
+            }
+
+            writeComposedTransform()
+            queueMicrotask(writeComposedTransform)
+            requestAnimationFrame(writeComposedTransform)
+        }
+        if (dragX) applied.x = x
+        if (dragY) applied.y = y
+        // Dual-write the bound MotionValue(s) so `y.get()`, `style={{ y }}`, and a
+        // follow-up `animate(y, …)` stay in sync with the drag (#421).
+        if (boundX && boundX.get() !== x) boundX.set(x)
+        if (boundY && boundY.get() !== y) boundY.set(y)
         opts.callbacks?.onVisualUpdate?.(liveTransform)
     }
 

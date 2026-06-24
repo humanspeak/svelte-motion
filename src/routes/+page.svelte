@@ -306,6 +306,14 @@
                         Drag: Brutalist Stage (docs FIG-002 repro)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/mobile-drawer') + searchParams}
+                    >
+                        Drag Close Drawer (mobile drawer)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

@@ -75,6 +75,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'LazyMotion',
         description: 'Load Svelte Motion feature bundles with LazyMotion and the m namespace.'
     },
+    'mobile-drawer': {
+        title: 'Mobile Drawer',
+        description:
+            'A theme-aware drag-to-close bottom sheet built with drag, a bound y MotionValue, and dragControls.'
+    },
     'motion-path': {
         title: 'Motion Path',
         description: 'Interactive motion path animation example using Svelte Motion.'
