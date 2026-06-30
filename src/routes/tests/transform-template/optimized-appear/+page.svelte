@@ -42,7 +42,7 @@
     onMount(() => {
         // The optimized-appear store only populates on a full server render (the SSR
         // <script> bootstrap). It is empty after client-side (SPA) navigation.
-        fullyLoaded = (window.__SvelteMotionAppear?.started.length ?? 0) > 0
+        fullyLoaded = (window.__SvelteMotionAppear?.started?.length ?? 0) > 0
 
         let raf = 0
         const tick = () => {
