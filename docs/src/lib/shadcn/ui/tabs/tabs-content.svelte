@@ -54,10 +54,8 @@
             {@const { hidden: _hidden, style: panelStyle, ...safeProps } = panelProps}
             <div
                 {...safeProps}
-                class={cn(
-                    'mt-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-                    className
-                )}
+                data-slot="tabs-content"
+                class={cn('flex-1 text-sm outline-none', className)}
                 style="{panelStyle ?? ''}{isActive ? '' : ';display:none'}"
             >
                 {#key ctx.value()}
@@ -76,10 +74,8 @@
     <TabsPrimitive.Content
         bind:ref
         {value}
-        class={cn(
-            'mt-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-            className
-        )}
+        data-slot="tabs-content"
+        class={cn('flex-1 text-sm outline-none', className)}
         {...restProps}
     >
         {@render children?.()}

@@ -55,6 +55,13 @@
     })
 </script>
 
-<TabsPrimitive.Root bind:ref bind:value {onValueChange} class={cn(className)} {...restProps}>
+<TabsPrimitive.Root
+    bind:ref
+    bind:value
+    {onValueChange}
+    data-slot="tabs"
+    class={cn('group/tabs flex flex-col gap-2 data-[orientation=horizontal]:flex-col', className)}
+    {...restProps}
+>
     {@render children?.()}
 </TabsPrimitive.Root>
