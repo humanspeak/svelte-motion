@@ -251,6 +251,85 @@ test.describe('transformTemplate', () => {
         expect(templatedIntermediateFrame).toBeTruthy()
     })
 
+    test('controls.stop() freezes an in-flight templated transform animation', async ({ page }) => {
+        await page.goto(URL)
+        await waitForMotionReady(page, 'template-controls-animated')
+
+        const readX = async (): Promise<number | null> => {
+            const style =
+                (await page.getByTestId('template-controls-animated').getAttribute('style')) ?? ''
+            const match = style.match(/translateX\(([-\d.]+)px\)/)
+            return match ? Number.parseFloat(match[1]) : null
+        }
+
+        await page.getByTestId('template-controls-animated-toggle').click()
+
+        // The controls animation is a 2.4s linear run to x:120 — let it reach mid-flight.
+        await expect
+            .poll(
+                async () => {
+                    const x = await readX()
+                    return x !== null && x > 20 && x < 100
+                },
+                { timeout: 3000 }
+            )
+            .toBe(true)
+
+        await page.getByTestId('template-controls-animated-stop').click()
+        const atStop = await readX()
+        expect(atStop).not.toBeNull()
+
+        await page.waitForTimeout(350)
+        const afterStop = await readX()
+
+        // A still-running linear 2.4s animation would advance ~17px in 350ms; a stopped
+        // one stays put. This is the #402 regression: controls.stop() must also stop the
+        // separate templated-transform MotionValue animation, not just DOM animations.
+        expect(Math.abs((afterStop ?? 0) - (atStop ?? 0))).toBeLessThan(5)
+        // It must freeze in place rather than snap to the x:120 target...
+        expect(afterStop).toBeLessThan(110)
+        // ...and the transformTemplate stays applied after stopping.
+        const styleAfter =
+            (await page.getByTestId('template-controls-animated').getAttribute('style')) ?? ''
+        expect(styleAfter).toContain('translateY(')
+    })
+
+    test('suppresses optimized appear for templated transform animations', async ({ page }) => {
+        const response = await page.request.get(URL)
+        const html = await response.text()
+
+        const openingTag = (testId: string): string =>
+            html.match(new RegExp(`<[a-zA-Z]+[^>]*data-testid="${testId}"[^>]*>`))?.[0] ?? ''
+
+        const appearTag = openingTag('template-appear')
+        expect(appearTag).not.toBe('')
+        // Transform-animating appear under a template must skip the WAAPI bootstrap so it
+        // can never paint an untemplated transform before hydration/handoff (#402).
+        expect(appearTag).not.toContain('data-framer-appear-id')
+        // The first painted frame is already the templated transform.
+        expect(appearTag).toContain('translateY(0px)')
+
+        // Opacity-only appear under a template animates no transform, so acceleration stays on.
+        const opacityTag = openingTag('template-appear-opacity')
+        expect(opacityTag).not.toBe('')
+        expect(opacityTag).toContain('data-framer-appear-id')
+    })
+
+    test('settles a templated optimized-appear element on the templated transform', async ({
+        page
+    }) => {
+        await page.goto(URL)
+
+        await waitForMotionReady(page, 'template-appear')
+        await expect
+            .poll(readStyleAttribute(page, 'template-appear'))
+            .toContain('translateY(120px)')
+        await expect
+            .poll(readStyleAttribute(page, 'template-appear'))
+            .toContain('translateX(120px)')
+        await expect.poll(readStyleAttribute(page, 'template-appear')).toContain('opacity: 1')
+    })
+
     test('preserves style transforms during templated target animations', async ({ page }) => {
         await page.goto(URL)
 
@@ -345,9 +424,8 @@ test.describe('transformTemplate', () => {
 
     test('is linked from the root test index', async ({ page }) => {
         await page.goto('/?@isPlaywright=true')
-        await expect(page.getByRole('link', { name: 'transformTemplate' })).toHaveAttribute(
-            'href',
-            /\/tests\/transform-template/
-        )
+        await expect(
+            page.getByRole('link', { name: 'transformTemplate', exact: true })
+        ).toHaveAttribute('href', /\/tests\/transform-template/)
     })
 })

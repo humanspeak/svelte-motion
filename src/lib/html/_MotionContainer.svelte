@@ -755,19 +755,31 @@
             reducedMotion
         )
     )
-    const optimizedAppearId = $derived(
-        effectiveInitialProp !== false &&
-            isNotEmpty(initialKeyframes) &&
-            isNotEmpty(animateKeyframes)
-            ? `svelte-motion-${componentHydrationId}`
-            : undefined
-    )
     const optimizedAppearEntries = $derived(
         createOptimizedAppearData(
             initialKeyframes as Record<string, unknown> | undefined,
             animateKeyframes as Record<string, unknown> | undefined,
             mergedTransition
         )
+    )
+    // Upstream never WAAPI-accelerates `transform` while a `transformTemplate`
+    // is present (motion-dom waapi.ts: `name !== "transform" || !transformTemplate`).
+    // Our optimized-appear handoff is all-or-nothing per element, so when the
+    // appear animation would include a transform under a template we suppress the
+    // bootstrap entirely and let the main-thread enter animation run the templated
+    // transform. That prevents an untemplated transform from painting before
+    // hydration/handoff. Opacity-only appears are unaffected and stay accelerated. (#402)
+    const optimizedAppearSuppressedByTransformTemplate = $derived(
+        !!transformTemplateProp &&
+            optimizedAppearEntries.some((entry) => entry.name === 'transform')
+    )
+    const optimizedAppearId = $derived(
+        effectiveInitialProp !== false &&
+            isNotEmpty(initialKeyframes) &&
+            isNotEmpty(animateKeyframes) &&
+            !optimizedAppearSuppressedByTransformTemplate
+            ? `svelte-motion-${componentHydrationId}`
+            : undefined
     )
     const optimizedAppearScript = $derived(
         createOptimizedAppearScript(optimizedAppearId, optimizedAppearEntries)
@@ -1231,6 +1243,13 @@
     const stopAnimationControlsAnimations = () => {
         animationControlsHasReceivedCommand = true
         animationControlsGeneration += 1
+
+        // The templated-transform path animates MotionValues that are not part of
+        // `activeAnimationControls` and never surface in `element.getAnimations()`,
+        // so a public `controls.stop()` would otherwise leak a running templated
+        // transform animation (and its style-effect cleanup). Upstream stops a
+        // VisualElement by stopping all of its values; mirror that here. (#402)
+        cleanupTemplatedTransformAnimations()
 
         for (const control of activeAnimationControls) {
             if (typeof control.stop === 'function') {
