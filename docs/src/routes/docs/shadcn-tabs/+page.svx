@@ -71,7 +71,7 @@ Alternatively, copy the component source directly from [GitHub](https://github.c
 
 Click the tabs to see the sliding indicator:
 
-<div class="not-prose my-8 flex flex-col gap-8">
+<div class="tabs-demos not-prose my-8 flex flex-col gap-8">
 
 ### Default (Animated)
 
@@ -215,3 +215,17 @@ Styled wrapper for the trigger container. Accepts all standard HTML div attribut
 | `initial` | `object` | `{ opacity: 0, y: 8 }` | Override the content entrance initial state |
 | `animate` | `object` | `{ opacity: 1, y: 0 }` | Override the content entrance animate target |
 | `transition` | `object` | `{ duration: 0.3, ease: 'easeOut' }` | Override the content entrance transition |
+
+<style>
+    /*
+      docs-kit's prose-v2 applies `.prose-v2 h3 { margin-top: 1.8em }`, and
+      `not-prose` does not reset `.prose-v2` — so that ~31px top margin leaks
+      into the demo cards and floors the heading. Reset it for these demo cards
+      only. Page-local: the `.tabs-demos` wrapper exists solely on this page,
+      and `:global` is only needed because the heading is slotted inside the
+      <Tabs.Content> component. The registry component is untouched.
+    */
+    .tabs-demos :global([data-slot='tabs-content'] h3) {
+        margin-top: 0;
+    }
+</style>
