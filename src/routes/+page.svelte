@@ -88,6 +88,22 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/transform-template/stop') + searchParams}
+                    >
+                        transformTemplate — controls.stop() freeze (#402)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/transform-template/optimized-appear') + searchParams}
+                    >
+                        transformTemplate — optimized appear suppression (#402)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/conic-gradient') + searchParams}
                     >
                         useTransform (conic gradient / compute form)

@@ -110,6 +110,10 @@
         )
     }
 
+    function stopControlsAnimation() {
+        controls.stop()
+    }
+
     function toggleStyleAnimation() {
         styleAnimated = !styleAnimated
     }
@@ -320,6 +324,13 @@
                 >
                     {controlsSent ? 'Back' : 'Send'}
                 </button>
+                <button
+                    type="button"
+                    data-testid="template-controls-animated-stop"
+                    onclick={stopControlsAnimation}
+                >
+                    Stop
+                </button>
             </div>
         </article>
 
@@ -412,6 +423,46 @@
                 transformTemplate={perspectiveTemplate}
             >
                 lens
+            </motion.div>
+        </article>
+
+        <article>
+            <h2>Optimized appear under template (transform)</h2>
+            <p class="expectation">
+                Animates <code>x</code> on mount under a template. Optimized appear must be
+                suppressed (no <code>data-framer-appear-id</code>) so the WAAPI bootstrap never
+                paints an untemplated transform. First frame: <code>translateY(0px)</code>; settles
+                at <code>translateY(120px) translateX(120px)</code>.
+            </p>
+            <motion.div
+                class="orb slate"
+                data-testid="template-appear"
+                initial={{ opacity: 0, x: 0 }}
+                animate={{ opacity: 1, x: 120 }}
+                transformTemplate={xMirrorTemplate}
+                transition={{ duration: 0.4, ease: 'linear' }}
+            >
+                appear
+            </motion.div>
+        </article>
+
+        <article>
+            <h2>Optimized appear under template (opacity only)</h2>
+            <p class="expectation">
+                Animates only <code>opacity</code> on mount under a fixed template. No transform is
+                accelerated, so optimized appear stays on (keeps
+                <code>data-framer-appear-id</code>) while the template still renders
+                <code>translateY(20px)</code>.
+            </p>
+            <motion.div
+                class="orb mint"
+                data-testid="template-appear-opacity"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transformTemplate={fixedTemplate}
+                transition={{ duration: 0.4, ease: 'linear' }}
+            >
+                fade
             </motion.div>
         </article>
 
