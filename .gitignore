@@ -42,3 +42,4 @@ docs/src/lib/sitemap-manifest.json
 mprocs.log
 SEO.md
 .claude/scheduled_tasks.lock
+docs/test-results/
