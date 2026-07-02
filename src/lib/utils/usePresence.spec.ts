@@ -1,4 +1,5 @@
 import AnimatePresenceDataHarness from '$lib/components/__tests__/AnimatePresenceDataHarness.svelte'
+import MidHoldDestroyHarness from '$lib/components/__tests__/MidHoldDestroyHarness.svelte'
 import PresenceDataProbe from '$lib/components/__tests__/PresenceDataProbe.svelte'
 import PresenceHarness from '$lib/components/__tests__/PresenceHarness.svelte'
 import PresenceProbe from '$lib/components/__tests__/PresenceProbe.svelte'
@@ -9,7 +10,7 @@ import {
 } from '$lib/components/__tests__/StalePresenceProbe.svelte'
 import { render, screen } from '@testing-library/svelte'
 import { tick } from 'svelte'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 const probe = () => screen.getByTestId('probe')
 const presenceDataProbe = () => screen.getByTestId('presence-data-probe')
@@ -143,6 +144,28 @@ describe('utils/usePresence', () => {
             await tick()
             expect(screen.queryByTestId('probe')).not.toBeNull()
             expect(probe().getAttribute('data-is-present')).toBe('true')
+        })
+
+        it('settles exit accounting when the wrapper unmounts mid-hold (motion#3707 analogue)', async () => {
+            const onExitComplete = vi.fn()
+            const { rerender } = render(MidHoldDestroyHarness, {
+                props: { outer: true, inner: true, onExitComplete }
+            })
+            expect(screen.queryByTestId('held-child')).not.toBeNull()
+
+            // Start a held exit; the consumer never calls safeToRemove.
+            await rerender({ outer: true, inner: false, onExitComplete })
+            await tick()
+            expect(screen.queryByTestId('held-child')).not.toBeNull()
+            expect(onExitComplete).not.toHaveBeenCalled()
+
+            // Destroy the PresenceChild while it's holding. The wrapper must
+            // settle its in-flight exit on the way out — otherwise the
+            // AnimatePresence counter leaks and mode='wait' blocks sibling
+            // enters forever.
+            await rerender({ outer: false, inner: false, onExitComplete })
+            await vi.advanceTimersByTimeAsync(100)
+            expect(onExitComplete).toHaveBeenCalledTimes(1)
         })
     })
 })

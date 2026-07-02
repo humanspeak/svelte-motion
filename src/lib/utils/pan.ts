@@ -407,13 +407,18 @@ class PanSession {
         const moveHandler = (e: PointerEvent) => this.handlePointerMove(e)
         const upHandler = (e: PointerEvent) => this.handlePointerUp(e)
 
-        this.contextWindow.addEventListener('pointermove', moveHandler)
-        this.contextWindow.addEventListener('pointerup', upHandler)
-        this.contextWindow.addEventListener('pointercancel', upHandler)
+        // Capture phase so a descendant calling stopPropagation() (e.g.
+        // in its own pointerup handler) can't prevent the gesture from
+        // ending; passive because the handlers never call
+        // preventDefault. Mirrors upstream PanSession (motion#3731).
+        const eventOptions: AddEventListenerOptions = { passive: true, capture: true }
+        this.contextWindow.addEventListener('pointermove', moveHandler, eventOptions)
+        this.contextWindow.addEventListener('pointerup', upHandler, eventOptions)
+        this.contextWindow.addEventListener('pointercancel', upHandler, eventOptions)
         this.removeListeners = () => {
-            this.contextWindow.removeEventListener('pointermove', moveHandler)
-            this.contextWindow.removeEventListener('pointerup', upHandler)
-            this.contextWindow.removeEventListener('pointercancel', upHandler)
+            this.contextWindow.removeEventListener('pointermove', moveHandler, eventOptions)
+            this.contextWindow.removeEventListener('pointerup', upHandler, eventOptions)
+            this.contextWindow.removeEventListener('pointercancel', upHandler, eventOptions)
         }
 
         if (this.element) this.startScrollTracking(this.element)
