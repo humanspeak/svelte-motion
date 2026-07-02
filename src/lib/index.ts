@@ -67,6 +67,13 @@ export type {
 } from '$lib/types'
 export { useAnimate } from '$lib/utils/animate.svelte'
 export type { AnimationScope } from '$lib/utils/animate.svelte'
+export { animateView } from '$lib/utils/animateView'
+export type {
+    AnimateViewBuilder,
+    ViewTransitionOptions,
+    ViewTransitionTarget,
+    ViewTransitionTargetDefinition
+} from '$lib/utils/animateView'
 export {
     animationControls,
     isAnimationControls,

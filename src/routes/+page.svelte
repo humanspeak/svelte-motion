@@ -224,6 +224,35 @@
             </ul>
         </div>
         <div>
+            <h2 class="mb-3 text-xl font-medium">View Transitions</h2>
+            <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/view/basic') + searchParams}
+                    >
+                        animateView Basic (root crossfade)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/view/shared-element') + searchParams}
+                    >
+                        animateView Shared Element (thumb → hero morph)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/view/filter-gallery') + searchParams}
+                    >
+                        animateView Filter Gallery (enter/exit)
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div>
             <h2 class="mb-3 text-xl font-medium">Reorder</h2>
             <ul class="list-disc space-y-2 pl-5">
                 <li>

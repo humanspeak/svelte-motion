@@ -109,6 +109,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'Drag-to-reorder lists with Reorder.Group and Reorder.Item — FLIP siblings and edge auto-scroll.'
     },
+    view: {
+        title: 'View Transitions',
+        description:
+            'Shared-element morphs and enter/exit view layers with animateView and the native View Transitions API.'
+    },
     reordering: {
         title: 'Reordering',
         description: 'Interactive Reordering animation example using Svelte Motion.'

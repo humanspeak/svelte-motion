@@ -11,15 +11,19 @@ export default defineConfig({
     retries: process.env.CI ? 1 : 0,
     reporter: [['junit', { outputFile: 'junit-playwright.xml' }]],
     webServer: {
-        command: 'npm run build && npm run preview',
-        port: 4173,
+        // Project-specific port: vite's default preview port (4173) is
+        // shared by every repo on the machine, so concurrent e2e sessions
+        // in sibling projects reuse-then-kill each other's servers
+        // mid-run (reuseExistingServer can't tell whose server it is).
+        command: 'npm run build && npm run preview -- --port 4198',
+        port: 4198,
         timeout: 120000,
         reuseExistingServer: !process.env.CI,
         stdout: 'pipe',
         stderr: 'pipe'
     },
     use: {
-        baseURL: 'http://localhost:4173',
+        baseURL: 'http://localhost:4198',
         trace: 'on-first-retry',
         screenshot: 'on',
         // Force fresh context per test to prevent state leakage

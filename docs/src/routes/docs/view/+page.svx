@@ -1,0 +1,149 @@
+---
+title: View Transitions
+description: Animate between two DOM states with the browser View Transitions API — crossfades, shared-element morphs, and enter/exit animations via animateView
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte'
+  import ViewExample from '$lib/examples/ViewExample.svelte'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'View Transitions | Docs | Svelte Motion'
+      seo.description = 'Animate between two DOM states with animateView and the browser View Transitions API — crossfades, shared-element morphs, and enter/exit animations with spring timing.'
+      seo.ogTitle = 'View Transitions'
+      seo.ogTagline = 'Shared-element morphs and page transitions with animateView'
+      seo.ogFeatures = ['Shared Element Morphs', 'Spring Timing', 'Enter/Exit Layers', 'Native Browser API']
+      seo.ogSlug = 'docs-view'
+  }
+</script>
+
+# View Transitions
+
+`animateView` animates between two DOM states using the browser's native [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transition_API) — whole-page crossfades, shared-element morphs (a thumbnail flying into a hero), and enter/exit animations for appearing and disappearing elements, all driven by Motion's spring-capable timing.
+
+```svelte
+<script lang="ts">
+    import { animateView } from '@humanspeak/svelte-motion'
+
+    let selected = $state<Item | null>(null)
+
+    const open = (item: Item) => {
+        animateView(() => {
+            selected = item
+        }).add(`[data-thumb="${item.id}"]`, '[data-hero]')
+    }
+</script>
+```
+
+<Example isSmall>
+  <ViewExample />
+</Example>
+
+## How it works
+
+`animateView(update, options?)` takes an **update callback** that performs the state change producing the new view. The browser snapshots the page before and after the update, then animates between the snapshots.
+
+Svelte `$state` mutations made inside `update` are flushed to the DOM synchronously before the new snapshot is captured — plain assignment just works, no `tick()` ceremony:
+
+```ts
+animateView(() => (showDetail = true))
+```
+
+The returned builder is **thenable** — `await` it for completion:
+
+```ts
+await animateView(() => (items = shuffle(items))).add('[data-card]')
+console.log('transition finished')
+```
+
+## Opting the page in
+
+A bare call with no chained subject swaps **instantly by design** — nothing is captured unless something opts in. Chain `.layout()` on the implicit root subject for a whole-page crossfade:
+
+```ts
+animateView(() => (theme = 'dark'), { duration: 0.5 }).layout()
+```
+
+## Shared-element morphs
+
+`.add(oldTarget, newTarget)` pairs two different elements as one layer: the first resolves in the **old** snapshot, the second in the **new** one, and the browser morphs between them — the "now playing" pattern:
+
+```ts
+// Thumbnail grows into the detail hero…
+animateView(() => (selected = album)).add(`[data-thumb="${album.id}"]`, '[data-hero]')
+
+// …and morphs back on close.
+animateView(() => (selected = null)).add('[data-hero]', `[data-thumb="${album.id}"]`)
+```
+
+Targets can be CSS selectors or `Element`s. `view-transition-name`s are generated, applied, and cleaned up automatically.
+
+With a single argument, `.add(target)` registers every matched element — survivors morph to their new positions, and pure newcomers/leavers can animate via `.enter()` / `.exit()`:
+
+```ts
+animateView(() => (filter = 'circles'))
+    .add('[data-item]')
+    .enter({ opacity: [0, 1], scale: [0.6, 1] })
+    .exit({ opacity: [1, 0], scale: [1, 0.6] })
+```
+
+`.new()` and `.old()` are the ungated variants — they animate the new/old view of a layer whenever it exists, including survivors, for crossfades and slide-throughs.
+
+## Matching corner radii across morph endpoints
+
+View-transition snapshots are paints of the live DOM, so an element's corner rounding is **baked into its snapshot as transparency**. If the two ends of a shared-element morph have different *proportional* rounding, the outgoing snapshot's corners ghost through during the crossfade.
+
+Give both endpoints the **same percentage radius** so the silhouettes coincide at every scale:
+
+```css
+.thumb,
+.hero {
+    border-radius: 12%; /* not 14px on one and 20px on the other */
+}
+```
+
+For morphs whose **aspect ratio changes**, this is handled automatically — the layer is cropped with `object-fit: cover` and its clip radius animates from the old radius to the new. `.crop(true)` / `.crop(false)` overrides the automatic behavior.
+
+## Options
+
+The second argument sets default transition options for every layer (a subject's own `.layout()` / `.enter()` / … options win), plus `interrupt`:
+
+```ts
+animateView(update, {
+    type: 'spring',
+    visualDuration: 0.4,
+    bounce: 0.2,
+    interrupt: 'immediate' // skip an in-flight transition; 'wait' (default) queues
+})
+```
+
+## Browser support
+
+Browsers without `document.startViewTransition` still run the update — the view swaps instantly and the returned promise resolves, so no feature-gating is needed at call sites. As of 2026 the API is supported in Chromium and Safari 18+; Firefox support is in development.
+
+## Builder API
+
+| Method | Description |
+|--------|-------------|
+| `.add(target, newTarget?)` | Register elements by selector/Element; a second target pairs two elements into one shared-element morph |
+| `.layout(options?)` | Customize the morph timing; on the root subject, opts the page into the crossfade |
+| `.enter(keyframes, options?)` | Animate a pure newcomer's new view |
+| `.exit(keyframes, options?)` | Animate a pure leaver's old view |
+| `.new(keyframes, options?)` | Animate the new view of any layer, including survivors |
+| `.old(keyframes, options?)` | Animate the old view of any layer, including survivors |
+| `.crop(enabled?)` | Force the clip + animated corner radii on or off |
+| `.class(name)` | Tag the layer with a `view-transition-class` for CSS targeting |
+| `.group(enabled?)` | Opt out of DOM-hierarchy layer nesting so the layer escapes an ancestor's clip |
+| `await builder` | Resolves when the transition completes |
+
+## Related
+
+- [Layout Animations](/docs/layout-animations) — FLIP-based morphs for elements that persist in the DOM
+- [AnimatePresence](/docs/animate-presence) — component-level exit animations
+- [Motion values](/docs/motion-values) — drive styles imperatively
+
+---
+
+Based on [Motion's animateView](https://motion.dev/docs/view) API.
