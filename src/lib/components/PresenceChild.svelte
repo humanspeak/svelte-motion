@@ -190,6 +190,17 @@
 
     onDestroy(() => {
         cancelWaitEnterBlock()
+        // Settle a pending exit when the wrapper itself unmounts mid-hold
+        // (an outer conditional removed us before the consumer called
+        // safeToRemove). Without this the parent AnimatePresence's
+        // in-flight exit counter leaks: onExitComplete never fires and
+        // mode='wait' blocks sibling enters forever. Analogue of
+        // upstream's PresenceChild register-cleanup fix (motion#3707).
+        if (phase === 'holding') {
+            phase = 'completed'
+            currentSafeToRemove = noopSafeToRemove
+            animatePresence?.notifyExitComplete()
+        }
     })
 </script>
 
