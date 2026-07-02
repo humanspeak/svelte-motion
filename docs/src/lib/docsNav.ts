@@ -22,6 +22,7 @@ import {
     ShieldCheck,
     Signal,
     SlidersHorizontal,
+    Sparkles,
     Timer,
     Wand,
     Zap
@@ -58,7 +59,8 @@ export const docsSections: NavSection[] = [
             { title: 'Layout Animations', href: '/docs/layout-animations', icon: Move },
             { title: 'layoutDependency', href: '/docs/layout-dependency', icon: Gauge },
             { title: 'transformTemplate', href: '/docs/transform-template', icon: Code },
-            { title: 'Variants', href: '/docs/variants', icon: Layers }
+            { title: 'Variants', href: '/docs/variants', icon: Layers },
+            { title: 'View Transitions', href: '/docs/view', icon: Sparkles }
         ]
     },
     {
