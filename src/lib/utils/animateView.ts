@@ -8,6 +8,13 @@ import { flushSync } from 'svelte'
 
 export type { ViewTransitionTarget, ViewTransitionTargetDefinition } from 'motion-dom'
 export type { ViewTransitionOptions }
+
+/**
+ * The chainable, awaitable builder returned by {@link animateView} —
+ * motion-dom's `ViewTransitionBuilder` under a stable local name.
+ * Chain `.add()`, `.enter()`/`.exit()`, `.new()`/`.old()`, `.layout()`,
+ * `.crop()`, `.class()` and `.group()`; `await` it for completion.
+ */
 export type AnimateViewBuilder = ViewTransitionBuilder
 
 /**
@@ -19,19 +26,7 @@ export type AnimateViewBuilder = ViewTransitionBuilder
  * view. Unlike calling motion-dom's `animateView` directly, Svelte
  * `$state` mutations made inside `update` are flushed to the DOM
  * synchronously (via `flushSync`) before the new snapshot is captured —
- * so plain state assignment "just works":
- *
- * ```svelte
- * <script lang="ts">
- *     import { animateView } from '@humanspeak/svelte-motion'
- *
- *     let showDetail = $state(false)
- *     const open = () => {
- *         animateView(() => (showDetail = true))
- *             .add('.thumbnail', '.detail-hero')
- *     }
- * </script>
- * ```
+ * so plain state assignment "just works".
  *
  * Returns motion-dom's thenable {@link ViewTransitionBuilder}: chain
  * `.add()` (shared-element pairs), `.enter()` / `.exit()` (pure
@@ -40,12 +35,8 @@ export type AnimateViewBuilder = ViewTransitionBuilder
  * `await` it for completion.
  *
  * A bare call with no chained subject swaps INSTANTLY by design —
- * motion-dom suppresses the root capture unless something opts in.
- * Chain `.layout()` to opt the page into the root crossfade:
- *
- * ```ts
- * animateView(() => (theme = 'dark')).layout()
- * ```
+ * motion-dom suppresses the root capture unless something opts in;
+ * chain `.layout()` to opt the page into the root crossfade.
  *
  * Browsers without `document.startViewTransition` (or with reduced
  * motion forcing it off) still run `update` — the view swaps instantly
@@ -59,6 +50,23 @@ export type AnimateViewBuilder = ViewTransitionBuilder
  *     `'wait'` (default) queues behind an in-flight transition,
  *     `'immediate'` skips it to its end state and starts this one.
  * @returns The chainable, awaitable view-transition builder.
+ * @example
+ * ```svelte
+ * <script lang="ts">
+ *     import { animateView } from '@humanspeak/svelte-motion'
+ *
+ *     let showDetail = $state(false)
+ *     const open = () => {
+ *         animateView(() => (showDetail = true))
+ *             .add('.thumbnail', '.detail-hero')
+ *     }
+ * </script>
+ * ```
+ * @example
+ * ```ts
+ * // Whole-page crossfade: opt the root in with .layout()
+ * await animateView(() => (theme = 'dark'), { duration: 0.5 }).layout()
+ * ```
  */
 export const animateView = (
     update: () => void | Promise<void>,

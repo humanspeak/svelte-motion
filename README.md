@@ -278,15 +278,14 @@ The package also re-exports core helpers from `motion` (for example `animate`, `
 
 Validated against current source and test suite (local run):
 
-- Unit/component tests: `259 passed`
-- E2E tests: `78 passed`, `1 skipped`
+- Unit/component tests: `676 passed`
+- E2E tests: `290 passed`, `2 skipped`
 
 ## Known gaps vs Framer Motion
 
-- No pan gesture API (`whilePan`, `onPan*`).
 - `whileInView` does not yet expose Framer-style viewport options.
 - `MotionConfig` currently only provides `transition` defaults.
-- `reducedMotion`, `features`, and `transformPagePoint` are not implemented.
+- `reducedMotion`, `features`, and `transformPagePoint` are not implemented as `MotionConfig` props.
 
 ## External dependencies
 

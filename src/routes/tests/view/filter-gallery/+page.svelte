@@ -37,6 +37,7 @@
             <button
                 data-testid={`filter-${kind}`}
                 class:active={filter === kind}
+                aria-pressed={filter === kind}
                 onclick={() => setFilter(kind)}
             >
                 {kind}

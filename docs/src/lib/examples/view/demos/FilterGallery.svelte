@@ -31,7 +31,11 @@
     <div class="stack">
         <div class="filters">
             {#each ['all', 'circle', 'square'] as const as kind (kind)}
-                <button class:active={filter === kind} onclick={() => setFilter(kind)}>
+                <button
+                    class:active={filter === kind}
+                    aria-pressed={filter === kind}
+                    onclick={() => setFilter(kind)}
+                >
                     {kind}
                 </button>
             {/each}
