@@ -224,6 +224,59 @@
             </ul>
         </div>
         <div>
+            <h2 class="mb-3 text-xl font-medium">Reorder</h2>
+            <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/basic') + searchParams}
+                    >
+                        Reorder Basic (motion.dev parity)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/axis-x') + searchParams}
+                    >
+                        Reorder Axis X
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/siblings-flip') + searchParams}
+                    >
+                        Reorder Siblings FLIP (live drag)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/custom-drag') + searchParams}
+                    >
+                        Reorder Custom Drag (both axes)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/scrollable') + searchParams}
+                    >
+                        Reorder in Scrollable Container (layoutScroll + auto-scroll)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/page-scroll') + searchParams}
+                    >
+                        Reorder with Window Scroll (below the fold)
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div>
             <h2 class="mb-3 text-xl font-medium">Drag</h2>
             <ul class="list-disc space-y-2 pl-5">
                 <li>

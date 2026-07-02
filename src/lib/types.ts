@@ -437,10 +437,29 @@ export type ProjectionUpdatePayload = {
 /**
  * Fires after each layout change to a `motion.*` element that has
  * `layout` enabled, with the FLIP delta between the pre- and
- * post-change layout boxes. Mirrors framer-motion's `onLayoutMeasure`
- * surface. Wired through the element's internal `ProjectionNode`.
+ * post-change layout boxes. Wired through the element's internal
+ * `ProjectionNode`.
  */
 export type MotionOnProjectionUpdate = ((data: ProjectionUpdatePayload) => void) | undefined
+
+/**
+ * Layout box delivered to `onLayoutMeasure` — the element's viewport
+ * position with motion-applied transforms (drag offset, in-flight FLIP)
+ * stripped, i.e. its layout slot. Structurally identical to the
+ * `layout`/`snapshot` halves of {@link ProjectionUpdatePayload}.
+ */
+export type LayoutMeasurePayload = {
+    x: { min: number; max: number }
+    y: { min: number; max: number }
+}
+
+/**
+ * Fires every time the element's projection node (re)measures its
+ * layout box: once at mount to seed the baseline, then on every
+ * observed layout change. Mirrors framer-motion's `onLayoutMeasure`.
+ * `Reorder.Item` uses this to keep its slot registered with the group.
+ */
+export type MotionOnLayoutMeasure = ((box: LayoutMeasurePayload) => void) | undefined
 
 export type DragAxis = boolean | 'x' | 'y'
 export type DragConstraints =
@@ -609,10 +628,16 @@ export type MotionProps = {
     layout?: boolean | 'position' | 'size' | 'preserve-aspect'
     /**
      * Fires after each `layout`-driven change with the FLIP delta from
-     * the element's internal projection node. Mirrors framer-motion's
-     * `onLayoutMeasure`. Requires `layout` to be enabled.
+     * the element's internal projection node. Requires `layout` to be
+     * enabled.
      */
     onProjectionUpdate?: MotionOnProjectionUpdate
+    /**
+     * Fires with the element's layout box on every projection
+     * (re)measure — at mount and after each observed layout change.
+     * Mirrors framer-motion's `onLayoutMeasure`.
+     */
+    onLayoutMeasure?: MotionOnLayoutMeasure
     /** Shared layout animation identifier. Elements with matching layoutId animate between positions. */
     layoutId?: string
     /**

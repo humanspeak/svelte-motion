@@ -76,7 +76,7 @@
         setPresenceDepth
     } from '$lib/utils/presence'
     import { getInitialKeyframes } from '$lib/utils/initial'
-    import { attachDrag } from '$lib/utils/drag'
+    import { attachDrag, type AttachDragCleanup } from '$lib/utils/drag'
     import { attachPan, type AttachPanCleanup } from '$lib/utils/pan'
     import { ProjectionNode } from '$lib/utils/projection'
     import { getProjectionParent, setProjectionParent } from '$lib/components/projection.context'
@@ -196,6 +196,7 @@
         layoutScroll: layoutScrollProp,
         layoutDependency: layoutDependencyProp,
         onProjectionUpdate: onProjectionUpdateProp,
+        onLayoutMeasure: onLayoutMeasureProp,
         // trunk-ignore(eslint/no-useless-assignment): `ref` is write-only here — mirrored from the internal `element` node via the effect below
         ref = $bindable(),
         ...rest
@@ -1524,7 +1525,7 @@
     //   overwriting transforms (check computed style for `transform`).
     // - If second drags "jump", ensure `attachDrag` syncs the internal `applied` origin
     //   after any non-zero duration settle animation.
-    let teardownDrag: (() => void) | null = null
+    let teardownDrag: AttachDragCleanup | null = null
     $effect(() => {
         if (!(element && isLoaded === 'ready' && hasDragFeatures)) return
         // Only attach if drag enabled
@@ -2210,6 +2211,27 @@
         }
     })
 
+    // Subscribe the consumer's `onLayoutMeasure` callback to projection
+    // `measure` events. The mount effect above runs first in source
+    // order and already seeded `latestLayout`, so that seed measurement
+    // is replayed here — otherwise a subscriber would only hear about
+    // the element's slot after its first layout CHANGE, and consumers
+    // like `Reorder.Item` need the initial slot too.
+    $effect(() => {
+        if (!(element && onLayoutMeasureProp)) return
+        const off = projection.addEventListener('measure', (box) => onLayoutMeasureProp(box))
+        const seed = projection.latestLayout
+        if (seed) {
+            onLayoutMeasureProp({
+                x: { min: seed.x.min, max: seed.x.max },
+                y: { min: seed.y.min, max: seed.y.max }
+            })
+        }
+        return () => {
+            off()
+        }
+    })
+
     // Upstream layout projection via motion-dom. Svelte runes mode doesn't
     // expose the React-style pre/post render hook pair used upstream, so the
     // component snapshots committed layout changes through DOM observers while
@@ -2262,10 +2284,20 @@
                 return
             }
 
+            // An actively dragged element must NOT take the viewport-scroll
+            // early-out: its slot change still needs the `adjustOrigin`
+            // compensation below (measurements are page-coordinate, so the
+            // delta is scroll-clean). Skipping it leaves the gesture's
+            // transform uncompensated, which re-triggers Reorder's
+            // checkReorder and double-fires the swap after any scroll.
+            const isDragActiveElement =
+                element!.dataset.svelteMotionDragActive === 'true' && !!teardownDrag
+
             if (
-                wasViewportScrolledSinceLastLayout ||
-                wasViewportOffscreenSinceLastLayout ||
-                isViewportOffscreen(element!.getBoundingClientRect())
+                !isDragActiveElement &&
+                (wasViewportScrolledSinceLastLayout ||
+                    wasViewportOffscreenSinceLastLayout ||
+                    isViewportOffscreen(element!.getBoundingClientRect()))
             ) {
                 lastRect = measureLayoutRect()
                 motionDomProjection?.finishAnimation()
@@ -2280,6 +2312,26 @@
                 const previous = lastRect
                 const shouldCommitMotionDomLayout = hasRectChanged(lastRect, next)
                 if (shouldCommitMotionDomLayout) {
+                    // A live drag whose layout slot just moved (e.g. Reorder
+                    // swapped the dragged item's DOM position): a FLIP here
+                    // would fight the gesture, so instead shift the drag
+                    // origin by the slot delta — the element stays pinned
+                    // under the cursor and `dragSnapToOrigin` settles into
+                    // the NEW slot on release. `seedLayout` re-syncs the
+                    // motion-dom projection cache so the skipped commit
+                    // can't replay as a stale delta later.
+                    if (isDragActiveElement && teardownDrag) {
+                        teardownDrag.adjustOrigin(
+                            previous.left - next.left,
+                            previous.top - next.top
+                        )
+                        motionDomProjection?.seedLayout()
+                        lastRect = next
+                        wasViewportScrolledSinceLastLayout = false
+                        wasViewportOffscreenSinceLastLayout = false
+                        return
+                    }
+
                     const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
                     const shouldUseSizeCorrectedFallback =
                         transforms.shouldScale && hasSizeCorrectionTarget

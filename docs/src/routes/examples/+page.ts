@@ -104,6 +104,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Path Morphing',
         description: 'Interactive path morphing animation example using Svelte Motion.'
     },
+    reorder: {
+        title: 'Reorder',
+        description:
+            'Drag-to-reorder lists with Reorder.Group and Reorder.Item — FLIP siblings and edge auto-scroll.'
+    },
     reordering: {
         title: 'Reordering',
         description: 'Interactive Reordering animation example using Svelte Motion.'

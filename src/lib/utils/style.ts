@@ -332,7 +332,13 @@ const mergeRenderStateIntoStyle = (base: Record<string, string>, state: HTMLRend
     }
 }
 
-const parseStyleString = (style: string): Record<string, string> => {
+/**
+ * Parse an inline CSS string into a property → value record. Property
+ * names are kept verbatim (kebab-case stays kebab-case), which is a
+ * valid object-form style — `Reorder.Item` uses this to merge its
+ * `x`/`y`/`zIndex` MotionValues into a consumer's string `style`.
+ */
+export const parseStyleString = (style: string): Record<string, string> => {
     const out: Record<string, string> = {}
     style
         .split(';')
