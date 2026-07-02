@@ -12,11 +12,11 @@ importers:
         specifier: ^8.16.0
         version: 8.16.0
       motion:
-        specifier: ^12.40.0
-        version: 12.40.0
+        specifier: ^12.42.0
+        version: 12.42.1
       motion-dom:
-        specifier: ^12.40.0
-        version: 12.40.0
+        specifier: ^12.42.0
+        version: 12.42.1
     devDependencies:
       '@changesets/cli':
         specifier: ^2.31.0
@@ -2543,8 +2543,8 @@ packages:
     resolution: {integrity: sha512-vKatAh4SlVfgbv+YtmhiRjhEMJsYpsG1Y2rMQtR+SVSbytsSD1YGzDIcrAJmdFec88u/+VoGmxnl+80gL1tRCQ==}
     engines: {node: '>= 6'}
 
-  framer-motion@12.40.0:
-    resolution: {integrity: sha512-uaBd3qC1v3KQqBEjwTUd183K6PbS+j0yR9w9VmEOLWA/tnUcSn8Xa3uck7t4dgpDoUss8xQTcj8W2L07lrnLFg==}
+  framer-motion@12.42.1:
+    resolution: {integrity: sha512-Q2rHK14w8lavWk3MiF1wihcV1sCVsSYrRSaoqJ5eChG7CUNTKxDUgoMesiUSmMBjFpBRPWGrLvzymRrm0jnwFA==}
     peerDependencies:
       '@emotion/is-prop-valid': '*'
       react: ^18.0.0 || ^19.0.0
@@ -3148,14 +3148,14 @@ packages:
     peerDependencies:
       svelte: ^5.27.0
 
-  motion-dom@12.40.0:
-    resolution: {integrity: sha512-HxU3ZaBwNPVQUBQf1xxgq+7JrPNZvjLVxgbpEZL7RrWJnsxOf0/OM+yrHG9ogLQ31Do/r57Oz2gQWPK+6q62mg==}
+  motion-dom@12.42.1:
+    resolution: {integrity: sha512-dnBr0vtpJLvTVm+SIi8o7yh8jD57Bv7++nkkoeq85QW+QJqM+RIIoyvu5LyZ186dILUMHzkxv5sQveTxuOcOBw==}
 
   motion-utils@12.39.0:
     resolution: {integrity: sha512-8nadJAJjTtqRkmRF36FoJTrywK9nnFmnPwnSMyxaOCU7GDjN9RTMJIxx9De8ErM+vpPhMccr/6fo5WciyQLnMQ==}
 
-  motion@12.40.0:
-    resolution: {integrity: sha512-yjrHUrBFW6kQvjJwRsoiPSAhC5tRwRqNGJWmiJ4CrGnbKp0V88AdzkhBmDoqIsIPfarOe0Uddd37Xq43/gIocA==}
+  motion@12.42.1:
+    resolution: {integrity: sha512-6NaaSbSKvTpHm3dcm0+NJX6UNlpgkdnva09C0+L7uDfGOd4+P1gE4aS5M8NqLGxmFGnKZGfnvhyV6wVnwvMccg==}
     peerDependencies:
       '@emotion/is-prop-valid': '*'
       react: ^18.0.0 || ^19.0.0
@@ -6532,9 +6532,9 @@ snapshots:
       hasown: 2.0.4
       mime-types: 2.1.35
 
-  framer-motion@12.40.0:
+  framer-motion@12.42.1:
     dependencies:
-      motion-dom: 12.40.0
+      motion-dom: 12.42.1
       motion-utils: 12.39.0
       tslib: 2.8.1
 
@@ -7125,15 +7125,15 @@ snapshots:
       svelte: 5.56.0(@typescript-eslint/types@8.60.0)
       svelte-toolbelt: 0.7.1(svelte@5.56.0(@typescript-eslint/types@8.60.0))
 
-  motion-dom@12.40.0:
+  motion-dom@12.42.1:
     dependencies:
       motion-utils: 12.39.0
 
   motion-utils@12.39.0: {}
 
-  motion@12.40.0:
+  motion@12.42.1:
     dependencies:
-      framer-motion: 12.40.0
+      framer-motion: 12.42.1
       tslib: 2.8.1
 
   mprocs@0.9.5: {}
