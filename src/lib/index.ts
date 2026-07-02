@@ -4,12 +4,18 @@ import LazyMotion from '$lib/components/LazyMotion.svelte'
 import MotionConfig from '$lib/components/MotionConfig.svelte'
 import PresenceChild from '$lib/components/PresenceChild.svelte'
 
+export type {
+    ReorderElementTag,
+    ReorderGroupProps,
+    ReorderItemProps
+} from '$lib/components/Reorder/types'
 export type { FeatureBundle, LazyFeatureBundle } from '$lib/features'
 export { domAnimation } from '$lib/features/domAnimation'
 export { domMax } from '$lib/features/domMax'
 export { domMin } from '$lib/features/domMin'
 export { m } from '$lib/m'
 export { motion } from '$lib/motion'
+export { Reorder } from '$lib/reorder'
 
 // Re-export core animation functions from motion
 export { animate, delay, hover, inView, press, resize, scroll, stagger, transform } from 'motion'

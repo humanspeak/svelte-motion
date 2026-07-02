@@ -1,0 +1,188 @@
+---
+title: Reorder
+description: Drag-to-reorder lists with automatic layout animations, axis locking, and edge auto-scroll
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte'
+  import ReorderExample from '$lib/examples/ReorderExample.svelte'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'Reorder | Docs | Svelte Motion'
+      seo.description = 'Drag-to-reorder lists with automatic layout animations using Svelte Motion. Framer Motion-compatible Reorder.Group and Reorder.Item components.'
+      seo.ogTitle = 'Reorder'
+      seo.ogTagline = 'Drag-to-reorder lists with automatic layout animations'
+      seo.ogFeatures = ['Drag To Reorder', 'FLIP Siblings', 'Axis Locking', 'Edge Auto-Scroll']
+      seo.ogSlug = 'docs-reorder'
+  }
+</script>
+
+# Reorder
+
+`Reorder.Group` and `Reorder.Item` create drag-to-reorder lists — sortable tabs, to-do items, playlists — with a couple of lines of markup. Dragged items lock to the list axis and stay pinned under the cursor while their siblings spring out of the way.
+
+```svelte
+<script lang="ts">
+    import { Reorder } from '@humanspeak/svelte-motion'
+
+    let items = $state([0, 1, 2, 3])
+</script>
+
+<Reorder.Group axis="y" values={items} onReorder={(next) => (items = next)}>
+    {#each items as item (item)}
+        <Reorder.Item value={item}>{item}</Reorder.Item>
+    {/each}
+</Reorder.Group>
+```
+
+<Example isSmall>
+  <ReorderExample />
+</Example>
+
+## Usage
+
+Every reorderable list needs three things wired together:
+
+1. **`values`** — the array driving the list, passed to `Reorder.Group`.
+2. **`onReorder`** — a callback that receives the new order. Assign it back to the state that renders the list.
+3. **`value`** — each `Reorder.Item` declares which entry it represents. Use the same value as the `{#each}` key.
+
+```svelte
+<script lang="ts">
+    import { Reorder } from '@humanspeak/svelte-motion'
+
+    let tabs = $state(['Home', 'Search', 'Library'])
+</script>
+
+<Reorder.Group axis="x" values={tabs} onReorder={(next) => (tabs = next)}>
+    {#each tabs as tab (tab)}
+        <Reorder.Item value={tab}>{tab}</Reorder.Item>
+    {/each}
+</Reorder.Group>
+```
+
+The group renders a `ul` and items render `li` by default. Change either with `as`:
+
+```svelte
+<Reorder.Group as="div" values={items} onReorder={handleReorder}>
+    <Reorder.Item as="article" value={item} />
+</Reorder.Group>
+```
+
+## Axis
+
+Lists reorder along one axis — `"y"` by default, `"x"` for horizontal lists — and items drag-lock to it. To let an item move freely on both axes while still reordering on the list axis, pass `drag` to the item:
+
+```svelte
+<Reorder.Item value={item} drag>{item}</Reorder.Item>
+```
+
+## Layout animations
+
+Items carry `layout` automatically, so displaced siblings FLIP to their new slots while the drag is live, and the dragged item springs into its new slot on release. If an item changes size while reordering, pass `layout="position"` to skip size projection:
+
+```svelte
+<Reorder.Item value={item} layout="position">{item}</Reorder.Item>
+```
+
+Items float above their siblings while dragging via an automatic `z-index`. To make that work, items default to `position: relative` — override it via `style` if your layout needs something else, but keep items positioned so the floating z-index applies.
+
+## Scrollable lists
+
+Lists taller than their container work out of the box — dragging an item near the container's edge auto-scrolls it, so long lists can be traversed in a single gesture.
+
+Mark the scrollable container with `layoutScroll` so layout measurements stay correct while it scrolls:
+
+```svelte
+<script lang="ts">
+    import { motion, Reorder } from '@humanspeak/svelte-motion'
+
+    let items = $state([...Array(20).keys()])
+</script>
+
+<motion.div layoutScroll style="height: 300px; overflow-y: scroll">
+    <Reorder.Group values={items} onReorder={(next) => (items = next)}>
+        {#each items as item (item)}
+            <Reorder.Item value={item}>{item}</Reorder.Item>
+        {/each}
+    </Reorder.Group>
+</motion.div>
+```
+
+The window works as the scroll container too — lists below the fold reorder correctly at any scroll position, and dragging near the viewport edge scrolls the page.
+
+## Observing the drag offset
+
+Items accept external MotionValues for `x`/`y` through `style`, so you can observe or drive the live drag offset — for example to fade a shadow in while an item is lifted:
+
+```svelte
+<script lang="ts">
+    import { Reorder, useMotionValue, useTransform } from '@humanspeak/svelte-motion'
+
+    const y = useMotionValue(0)
+    const boxShadow = useTransform(y, (latest) =>
+        `0 ${Math.min(Math.abs(latest) / 4, 8)}px 16px rgba(0,0,0,0.2)`
+    )
+</script>
+
+<Reorder.Item value={item} style={{ y, boxShadow }}>{item}</Reorder.Item>
+```
+
+## Drag props and callbacks
+
+Items are motion components underneath — every [drag prop](/docs/drag) (`whileDrag`, `dragListener`, `dragControls`, `onDragStart`, …) passes straight through:
+
+```svelte
+<Reorder.Item
+    value={item}
+    whileDrag={{ scale: 1.03 }}
+    onDragStart={() => (grabbed = item)}
+    onDragEnd={() => (grabbed = null)}
+>
+    {item}
+</Reorder.Item>
+```
+
+`dragSnapToOrigin` is managed by Reorder itself — the "origin" an item snaps back to is its current slot, which updates as the order changes.
+
+## Notes
+
+- Reordering swaps values only while the pointer moves — a swap fires when the dragged item's edge crosses the midpoint of its neighbor.
+- `values` can hold any type — strings, numbers, or objects (compared by reference). Keep the `{#each}` key and the item `value` in sync.
+- Wrap-around grids (an `x` drag causing a `y` slot shift) aren't supported yet — reordering is single-axis, matching Framer Motion.
+
+## Props
+
+### Reorder.Group
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `values` | `V[]` | — | The current order of item values (required) |
+| `onReorder` | `(newOrder: V[]) => void` | — | Fires with the new order after a swap (required) |
+| `axis` | `'x' \| 'y'` | `'y'` | The axis to reorder along |
+| `as` | `string` | `'ul'` | The HTML element to render |
+
+All other motion props are forwarded to the underlying motion element.
+
+### Reorder.Item
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `value` | `V` | — | The entry in `values` this item represents (required) |
+| `as` | `string` | `'li'` | The HTML element to render |
+| `layout` | `true \| 'position'` | `true` | Layout animation mode while slots shuffle |
+| `drag` | `boolean \| 'x' \| 'y'` | group axis | Override the axis lock (e.g. `drag` frees both axes) |
+
+All other motion props — including every drag prop and callback — are forwarded to the underlying motion element.
+
+## Related
+
+- [Drag](/docs/drag) — The gesture system Reorder builds on
+- [Layout Animations](/docs/layout-animations) — How siblings FLIP between slots
+- [Motion values](/docs/motion-values) — Observe the live drag offset
+
+---
+
+Based on [Motion's Reorder](https://motion.dev/docs/react-reorder) API.

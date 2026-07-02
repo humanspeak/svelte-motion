@@ -47,7 +47,8 @@ export const docsSections: NavSection[] = [
                 icon: ArrowUpDown
             },
             { title: 'LazyMotion', href: '/docs/lazy-motion', icon: Zap },
-            { title: 'MotionConfig', href: '/docs/motion-config', icon: Settings }
+            { title: 'MotionConfig', href: '/docs/motion-config', icon: Settings },
+            { title: 'Reorder', href: '/docs/reorder', icon: ArrowUpDown }
         ]
     },
     {
