@@ -2,7 +2,7 @@ packages:
     - .
     - docs
 allowBuilds:
-    '@humanspeak/docs-kit': true
+    '@humanspeak/docs-kit@https://codeload.github.com/humanspeak/docs-kit/tar.gz/30c325691f170eb5877519a4aac2f32015d02a5e': false
     core-js: true
     esbuild: true
     sharp: true
@@ -10,16 +10,6 @@ allowBuilds:
 minimumReleaseAge: 2880
 minimumReleaseAgeExclude:
     - '@humanspeak/*'
-    - '@vitest/browser@4.1.8'
-    - '@vitest/coverage-v8@4.1.8'
-    - '@vitest/expect@4.1.8'
-    - '@vitest/mocker@4.1.8'
-    - '@vitest/pretty-format@4.1.8'
-    - '@vitest/runner@4.1.8'
-    - '@vitest/snapshot@4.1.8'
-    - '@vitest/spy@4.1.8'
-    - '@vitest/utils@4.1.8'
-    - prettier-plugin-svelte@4.1.0
-    - svelte-check@4.5.0
-    - vite@8.0.16
-    - vitest@4.1.8
+    - framer-motion
+    - motion
+    - motion-dom
