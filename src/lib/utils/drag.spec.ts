@@ -60,4 +60,59 @@ describe('utils/drag', () => {
         expect(el.style.transform).toContain('translateY(20px)')
         cleanup()
     })
+
+    it('attachDrag: ends the gesture when a child stops pointerup propagation (motion#3731)', () => {
+        const el = document.createElement('div')
+        const child = document.createElement('button')
+        el.appendChild(child)
+        document.body.appendChild(el)
+        // A descendant swallowing pointerup (common for buttons inside
+        // draggable/reorderable items) must not trap the gesture: the
+        // window session listeners are capture-phase, so they see the
+        // event before the child's bubble handler stops it.
+        child.addEventListener('pointerup', (event) => event.stopPropagation())
+
+        const callbacks = { onStart: vi.fn(), onMove: vi.fn(), onEnd: vi.fn() }
+        const cleanup = attachDrag(el, {
+            axis: true,
+            mergedTransition: { duration: 0 },
+            callbacks
+        } as unknown as Parameters<typeof attachDrag>[1])
+
+        el.dispatchEvent(
+            new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 1 })
+        )
+        child.dispatchEvent(
+            new PointerEvent('pointermove', {
+                clientX: 25,
+                clientY: 25,
+                pointerId: 1,
+                bubbles: true
+            })
+        )
+        child.dispatchEvent(
+            new PointerEvent('pointerup', {
+                clientX: 25,
+                clientY: 25,
+                pointerId: 1,
+                bubbles: true
+            })
+        )
+
+        expect(callbacks.onEnd).toHaveBeenCalled()
+
+        // A fresh gesture still starts cleanly afterwards — the previous
+        // session's listeners were fully removed despite the swallowed event.
+        el.dispatchEvent(
+            new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 2 })
+        )
+        window.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: 30, clientY: 30, pointerId: 2 })
+        )
+        window.dispatchEvent(
+            new PointerEvent('pointerup', { clientX: 30, clientY: 30, pointerId: 2 })
+        )
+        expect(callbacks.onEnd).toHaveBeenCalledTimes(2)
+        cleanup()
+    })
 })

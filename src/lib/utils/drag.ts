@@ -385,6 +385,14 @@ export type AttachDragCleanup = (() => void) & {
  * cleanup()
  * ```
  */
+/**
+ * Options for the window-level gesture-session listeners. Capture phase
+ * guarantees the gesture ends even when a descendant stops propagation
+ * of `pointerup`/`pointercancel`; passive because the handlers never
+ * call `preventDefault`. Mirrors upstream PanSession (motion#3731).
+ */
+const sessionListenerOptions: AddEventListenerOptions = { passive: true, capture: true }
+
 export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDragCleanup => {
     const EL_ID = el.getAttribute('data-testid') || el.id || el.tagName
     pwLog('[drag] attach', {
@@ -872,13 +880,24 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         startWhileDrag()
         opts.callbacks?.onStart?.(e, computeInfo())
 
-        // Listen on element (to receive captured events) and window as fallback
+        // Listen on element (to receive captured events) and window as fallback.
+        // Window listeners run in the CAPTURE phase so a descendant calling
+        // stopPropagation() (e.g. in its own pointerup handler) can't prevent
+        // the gesture from ending. Mirrors upstream PanSession (motion#3731).
         el.addEventListener('pointermove', onPointerMove as EventListener)
         el.addEventListener('pointerup', onPointerUp as EventListener)
         el.addEventListener('pointercancel', onPointerCancel as EventListener)
-        window.addEventListener('pointermove', onPointerMove as EventListener)
-        window.addEventListener('pointerup', onPointerUp as EventListener)
-        window.addEventListener('pointercancel', onPointerCancel as EventListener)
+        window.addEventListener(
+            'pointermove',
+            onPointerMove as EventListener,
+            sessionListenerOptions
+        )
+        window.addEventListener('pointerup', onPointerUp as EventListener, sessionListenerOptions)
+        window.addEventListener(
+            'pointercancel',
+            onPointerCancel as EventListener,
+            sessionListenerOptions
+        )
     }
 
     /**
@@ -1024,9 +1043,21 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         el.removeEventListener('pointermove', onPointerMove as EventListener)
         el.removeEventListener('pointerup', onPointerUp as EventListener)
         el.removeEventListener('pointercancel', onPointerCancel as EventListener)
-        window.removeEventListener('pointermove', onPointerMove as EventListener)
-        window.removeEventListener('pointerup', onPointerUp as EventListener)
-        window.removeEventListener('pointercancel', onPointerCancel as EventListener)
+        window.removeEventListener(
+            'pointermove',
+            onPointerMove as EventListener,
+            sessionListenerOptions
+        )
+        window.removeEventListener(
+            'pointerup',
+            onPointerUp as EventListener,
+            sessionListenerOptions
+        )
+        window.removeEventListener(
+            'pointercancel',
+            onPointerCancel as EventListener,
+            sessionListenerOptions
+        )
 
         // Momentum/inertia with boundary handoff: inertia until crossing, then spring to boundary.
         // Pointer-cancel forces a no-momentum settle (clamp into constraints, no fling) since the
@@ -1439,9 +1470,21 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         el.removeEventListener('pointermove', onPointerMove as EventListener)
         el.removeEventListener('pointerup', onPointerUp as EventListener)
         el.removeEventListener('pointercancel', onPointerCancel as EventListener)
-        window.removeEventListener('pointermove', onPointerMove as EventListener)
-        window.removeEventListener('pointerup', onPointerUp as EventListener)
-        window.removeEventListener('pointercancel', onPointerCancel as EventListener)
+        window.removeEventListener(
+            'pointermove',
+            onPointerMove as EventListener,
+            sessionListenerOptions
+        )
+        window.removeEventListener(
+            'pointerup',
+            onPointerUp as EventListener,
+            sessionListenerOptions
+        )
+        window.removeEventListener(
+            'pointercancel',
+            onPointerCancel as EventListener,
+            sessionListenerOptions
+        )
     }
 
     return Object.assign(teardown, { adjustOrigin }) as AttachDragCleanup
