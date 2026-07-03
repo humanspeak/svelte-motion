@@ -47,6 +47,10 @@ Motion values:
 - Are **SSR-safe** — on the server they return static values with no timers
 - Implement Svelte's `Readable` store contract via a `.subscribe` shim, so `$x` template syntax, `svelte/store`'s `get()`, and `derived()` keep working
 
+## Outside components: the vanilla layer
+
+Every hook has a component-free counterpart — `motionValue`, `springValue`, `transformValue`, `mapValue` — plus `styleEffect` for binding values straight to plain elements and `toMotionValue` for turning `$state`/`$derived` (or any readable) into a motion value. Same augmented shape, manual lifecycle. See [Vanilla motion values](/docs/vanilla-values).
+
 ## Hooks at a glance
 
 | Hook | Returns | Read pattern |

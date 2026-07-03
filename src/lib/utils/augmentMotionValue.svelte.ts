@@ -77,6 +77,22 @@ export const sampleSource = <T>(source: T | MotionValue<T> | Readable<T>): T => 
 }
 
 /**
+ * Whether a `MotionValue` has already been through
+ * {@link augmentMotionValue} — its `current` is an accessor rather
+ * than a plain data field. Lives HERE, next to the representation it
+ * sniffs, so a change to how augmentation marks values updates the
+ * detector in the same edit. Augmenting mutates in place and must only
+ * happen once; pass-through code paths check this first.
+ *
+ * @param value The motion value to test.
+ * @returns Whether the value is already augmented.
+ */
+export const isAugmentedMotionValue = <T>(
+    value: MotionValue<T>
+): value is MotionValue<T> & AugmentedMotionValue<T> =>
+    typeof Object.getOwnPropertyDescriptor(value, 'current')?.get === 'function'
+
+/**
  * Layer Svelte 5 affordances onto a motion-dom `MotionValue`:
  *
  * 1. A `$state`-tracked `.current` accessor. motion-dom writes to its own

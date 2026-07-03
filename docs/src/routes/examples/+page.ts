@@ -109,6 +109,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'Drag-to-reorder lists with Reorder.Group and Reorder.Item — FLIP siblings and edge auto-scroll.'
     },
+    'vanilla-values': {
+        title: 'Vanilla Values',
+        description:
+            'Motion values without motion components — runes driving plain elements through styleEffect.'
+    },
     view: {
         title: 'View Transitions',
         description:
