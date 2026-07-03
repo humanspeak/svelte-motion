@@ -77,6 +77,7 @@ export const docsSections: NavSection[] = [
         icon: Signal,
         items: [
             { title: 'Overview', href: '/docs/motion-values', icon: Signal },
+            { title: 'Vanilla values', href: '/docs/vanilla-values', icon: Zap },
             { title: 'MotionValue children', href: '/docs/motion-value-children', icon: Code },
             {
                 title: 'Object style MotionValues',

@@ -48,6 +48,7 @@ Goal: Framer Motion API parity for Svelte where common React examples can be tra
 | Shared layout (`layoutId`, `LayoutGroup`, `layoutScroll`)              | Supported                                  |
 | Reorder (`Reorder.Group`, `Reorder.Item`, edge auto-scroll)            | Supported                                  |
 | View Transitions (`animateView`, shared-element morphs)                | Supported                                  |
+| Vanilla values (`motionValue`, `styleEffect`, `toMotionValue` bridge)  | Supported                                  |
 | Pan gesture API (`onPan*`, `onPanSessionStart`)                        | Supported                                  |
 | `MotionConfig` parity beyond `transition`                              | Partial                                    |
 | `reducedMotion`, `features`, `transformPagePoint`                      | Not yet supported                          |

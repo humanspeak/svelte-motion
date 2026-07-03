@@ -1,0 +1,138 @@
+---
+title: Vanilla motion values
+description: Component-free motion values — motionValue, springValue, transformValue, mapValue, styleEffect and the toMotionValue rune bridge
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte'
+  import VanillaValuesExample from '$lib/examples/VanillaValuesExample.svelte'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'Vanilla motion values | Docs | Svelte Motion'
+      seo.description = 'Component-free motion values for Svelte — motionValue, springValue, transformValue, mapValue, element effects, and the toMotionValue bridge that turns runes into motion values.'
+      seo.ogTitle = 'Vanilla Motion Values'
+      seo.ogTagline = 'Motion values anywhere — module scope, stores, event handlers'
+      seo.ogFeatures = ['No Components Needed', 'Rune Bridge', 'Element Effects', 'Manual Lifecycle']
+      seo.ogSlug = 'docs-vanilla-values'
+  }
+</script>
+
+# Vanilla motion values
+
+Everything the `use*` motion-value hooks do, **without a component**: create values in module scope, `.svelte.ts` stores, or event handlers, and bind them straight to plain DOM elements with `styleEffect` — mirroring Motion's "vanilla JavaScript" API.
+
+```ts
+// stores/scroll.svelte.ts — impossible with useMotionValue
+import { motionValue } from '@humanspeak/svelte-motion'
+
+export const scrollProgress = motionValue(0)
+```
+
+<Example isSmall>
+  <VanillaValuesExample />
+</Example>
+
+## Hooks vs vanilla
+
+Both layers return the **same augmented value**: a real motion-dom `MotionValue` (passes `isMotionValue`, works with `animate()`) with a rune-reactive `.current` and a store `.subscribe`. The only difference is lifecycle:
+
+| | `use*` hooks | Vanilla factories |
+|---|---|---|
+| Where they work | Component init only | Anywhere |
+| Cleanup | Automatic on unmount | Manual `.destroy()` |
+| Examples | `useMotionValue`, `useSpring`, `useTransform` | `motionValue`, `springValue`, `transformValue`, `mapValue` |
+
+Values that live for the app's lifetime (module-scope stores) never need destroying. Values created per-interaction should be destroyed when done — a getter-bridged value holds a live Svelte effect until then.
+
+## The factories
+
+```ts
+import { mapValue, motionValue, springValue, transformValue } from '@humanspeak/svelte-motion'
+
+const x = motionValue(0)
+
+// Range mapping — numbers, colors, unit strings
+const opacity = mapValue(x, [0, 200], [1, 0])
+const color = mapValue(x, [0, 200], ['#ff0088', '#00ccff'])
+
+// Springs toward a source (values or unit strings)
+const smooth = springValue(x, { stiffness: 300, damping: 30 })
+
+// Computed from .get() reads — dependencies auto-tracked
+const label = transformValue(() => `${Math.round(x.get())}px`)
+```
+
+`springValue` and `mapValue` accept any source kind: a `MotionValue`, a Svelte readable store, or a reactive getter.
+
+## `toMotionValue` — the rune bridge
+
+Turn **any** Svelte state into a motion value. The getter form tracks `$state` / `$derived` reads (and other augmented values' `.current`):
+
+```svelte
+<script lang="ts">
+    import { styleEffect, toMotionValue } from '@humanspeak/svelte-motion'
+
+    let progress = $state(0)
+    const opacity = toMotionValue(() => progress / 100)
+
+    let el = $state<HTMLElement | null>(null)
+    $effect(() => {
+        if (!el) return
+        const stop = styleEffect(el, { opacity })
+        return () => stop()
+    })
+</script>
+
+<input type="range" bind:value={progress} />
+<div bind:this={el}>Fades with the slider</div>
+```
+
+Passing an existing `MotionValue` returns the same value; passing a readable store returns a mirroring value. Getter-driven updates flush on Svelte's effect schedule (a microtask), matching template timing.
+
+The hooks understand getters too — `useSpring(() => target)` and `useTransform(() => count, [0, 10], [0, 100])` track rune state the same way.
+
+## Element effects
+
+Bind values directly to elements — no motion component in sight:
+
+```ts
+import { attrEffect, styleEffect, svgEffect } from '@humanspeak/svelte-motion'
+
+const stop = styleEffect('.box', { x, opacity })      // inline styles
+attrEffect(input, { value: count })                    // attributes
+svgEffect(path, { pathLength: progress })              // SVG attributes
+```
+
+Each returns an unbind function. Import them from this package (not `motion`) so both raw and augmented values type-check.
+
+## Scheduler, generators, config
+
+The rest of Motion's vanilla toolkit re-exports directly:
+
+```ts
+import {
+    cancelFrame,
+    frame,            // frameloop scheduler: frame.read / frame.update / frame.render
+    MotionGlobalConfig, // e.g. skipAnimations for tests
+    scrollInfo,
+    spring            // spring generator for WAAPI / custom drivers
+} from '@humanspeak/svelte-motion'
+
+frame.render(() => {
+    // runs on Motion's render step this frame
+})
+```
+
+Plus the `steps`, `mirrorEasing`, and `reverseEasing` easing helpers alongside the existing easing exports.
+
+## Related
+
+- [Motion values overview](/docs/motion-values) — the hook layer and the augmented value shape
+- [useTransform](/docs/use-transform) / [useSpring](/docs/use-spring) — component-scoped counterparts
+- [Motion component](/docs) — object-form `style` accepts these values directly
+
+---
+
+Based on [Motion's vanilla motion value](https://motion.dev/docs/motion-value) API.
