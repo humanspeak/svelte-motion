@@ -1,18 +1,12 @@
 // Utilities for building and validating transform strings
 
+import { type MotionValue, type TransformOptions } from 'motion-dom'
+import { type AugmentedMotionValue } from './augmentMotionValue.svelte.js'
+import { resolveMotionValueSource, type MotionValueSource } from './toMotionValue.svelte.js'
 import {
-    isMotionValue,
-    mapValue,
-    transformValue,
-    type MotionValue,
-    type TransformOptions
-} from 'motion-dom'
-import { type Readable } from 'svelte/store'
-import {
-    augmentMotionValue,
-    bridgeReadableToMotionValue,
-    type AugmentedMotionValue
-} from './augmentMotionValue.svelte.js'
+    mapValue as createMapValue,
+    transformValue as createTransformValue
+} from './vanillaValues.svelte.js'
 
 export type TransformValues = Partial<{
     x: number
@@ -138,27 +132,14 @@ export type { TransformOptions }
 export type AnyMotionValue<T> = MotionValue<T> | AugmentedMotionValue<T>
 
 /**
- * A source for {@link useTransform}'s mapping form: any motion value or a
- * Svelte readable store. Svelte readables are bridged into a `MotionValue`
- * internally so motion-dom's `mapValue` / `transformValue` can track them.
+ * A source for {@link useTransform}'s mapping form: any motion value, a
+ * Svelte readable store, or a reactive getter (`$state` / `$derived`
+ * reads inside it are tracked). Extends {@link MotionValueSource} with
+ * the augmented value shape so both flavors type-check at call sites;
+ * non-motion-value sources are bridged internally (via
+ * `resolveMotionValueSource`) so motion-dom can track them.
  */
-export type TransformSource<T> = AnyMotionValue<T> | Readable<T>
-
-/**
- * Normalizes a `TransformSource<T>` into a `MotionValue<T>`. Returns the
- * source as-is for any motion-value input (no bridge), or a bridge
- * `MotionValue` + cleanup for `Readable` inputs. The cast at the
- * motion-value branch is safe — both `MotionValue` and `AugmentedMotionValue`
- * are the same instance at runtime.
- */
-const toMotionValue = <T>(
-    source: TransformSource<T>
-): { value: MotionValue<T>; dispose: VoidFunction } => {
-    if (isMotionValue(source)) {
-        return { value: source as unknown as MotionValue<T>, dispose: () => undefined }
-    }
-    return bridgeReadableToMotionValue<T>(source as Readable<T>)
-}
+export type TransformSource<T> = AugmentedMotionValue<T> | MotionValueSource<T>
 
 /**
  * Single-input transformer signature: `(latest) => output`.
@@ -177,38 +158,46 @@ export type TransformOutputMap<O> = { [key: string]: O[] }
 
 /**
  * Creates an augmented `MotionValue<O>` derived from one or more `MotionValue`s
- * (or Svelte readables), composed via a range mapping or a compute function.
+ * (or Svelte readables / reactive getters), composed via a range mapping or a
+ * compute function.
  *
  * Mirrors framer-motion's `useTransform` 1:1 with five forms:
  *
  * - **Mapping form** — `useTransform(source, input, output, options?)` maps a
  *   numeric source's value across `input → output` stops with clamp, easing,
- *   and a pluggable mixer for non-numeric outputs. Delegates to motion-dom's
- *   `mapValue` (which is itself `transformValue` over the curried mapper).
+ *   and a pluggable mixer for non-numeric outputs. The source may be a motion
+ *   value, a Svelte readable, or a reactive getter (`$state` / `$derived`
+ *   reads inside it are tracked). Delegates to motion-dom's `mapValue`.
  * - **Multi-output mapping form** — `useTransform(source, input, outputMap, options?)`
  *   produces an object of motion values, one per key in `outputMap`. Each
- *   value is the same mapping form applied to that key's output stops.
- * - **Single-transformer form** — `useTransform(mv, (latest) => O)` recomputes
- *   on every change of `mv`. Auto-tracks via `transformValue`.
+ *   value is the same mapping form applied to that key's output stops; all
+ *   keys share one source bridge.
+ * - **Single-transformer form** — `useTransform(source, (latest) => O)`
+ *   recomputes on every change of the source (motion value, readable, or
+ *   getter). Auto-tracks via `transformValue`.
  * - **Multi-transformer form** — `useTransform([mv1, mv2, …], ([latest, …]) => O)`
  *   recomputes on every change of any input. Auto-tracks via `transformValue`.
  * - **Compute form** — `useTransform(() => compute)` recomputes whenever any
- *   `MotionValue` referenced inside `compute` (via `.get()` or `.current`)
- *   changes. Auto-tracks via `transformValue` — no explicit deps array; the
+ *   `MotionValue` referenced inside `compute` via `.get()` changes.
+ *   Auto-tracks via `transformValue` — no explicit deps array; the
  *   `collectMotionValues` session inside `transformValue` discovers them.
+ *
+ * Dispatch rule for functions: a BARE function argument is the compute form;
+ * a function accompanied by range/transformer arguments is a reactive getter
+ * SOURCE for the other forms.
  *
  * Returns an {@link AugmentedMotionValue<O>} — a real motion-dom `MotionValue`
  * (composes with `useSpring`, `useVelocity`, `animate()`, etc.) plus a
  * `$state`-backed `.current` getter and a Svelte readable `.subscribe` shim.
  *
  * Lifecycle: must be called during component initialization. Source
- * subscriptions, the underlying motion value, and any Svelte-readable bridges
+ * subscriptions, the underlying motion value, and any readable/getter bridges
  * are torn down when the surrounding `$effect` scope unmounts.
  *
  * @template O Output value type.
- * @param sourceOrCompute A motion value / readable (mapping forms), a single
- *   `MotionValue` (single-transformer form), an array of `MotionValue`s
- *   (multi-transformer form), or a compute function (compute form).
+ * @param sourceOrCompute A motion value / readable / reactive getter (mapping
+ *   and single-transformer forms), an array of `MotionValue`s
+ *   (multi-transformer form), or a bare compute function (compute form).
  * @param inputOrTransformer Input stops `number[]` (mapping forms) or a
  *   transformer function (`(latest) => O` / `(latest[]) => O`).
  * @param outputOrOutputMap Output stops `O[]` (single-output mapping) or an
@@ -265,7 +254,7 @@ export function useTransform<T extends TransformOutputMap<unknown>>(
     options?: TransformOptions<T[keyof T][number]>
 ): { [K in keyof T]: AugmentedMotionValue<T[K][number]> }
 export function useTransform<I, O>(
-    source: AnyMotionValue<I>,
+    source: TransformSource<I>,
     transformer: SingleTransformer<I, O>
 ): AugmentedMotionValue<O>
 export function useTransform<I, O>(
@@ -283,42 +272,49 @@ export function useTransform<O>(
     outputOrOutputMap?: O[] | TransformOutputMap<unknown>,
     options?: TransformOptions<unknown>
 ): AugmentedMotionValue<O> | { [key: string]: AugmentedMotionValue<O> } {
-    // Compute form: useTransform(() => compute).
-    if (typeof sourceOrCompute === 'function') {
-        const compute = sourceOrCompute as () => O
-        const value = transformValue<O>(compute)
+    // Compute form: useTransform(() => compute). A bare function with NO
+    // range arguments — a function WITH ranges is a getter SOURCE for the
+    // mapping forms below.
+    if (typeof sourceOrCompute === 'function' && inputOrTransformer === undefined) {
+        const value = createTransformValue<O>(sourceOrCompute as () => O)
         $effect(() => () => value.destroy())
-        return augmentMotionValue(value)
+        return value
     }
 
     // Multi-input list form: useTransform([mv, mv, …], ([a, b, …]) => O).
     if (Array.isArray(sourceOrCompute) && typeof inputOrTransformer === 'function') {
         const sources = sourceOrCompute as ReadonlyArray<AnyMotionValue<unknown>>
         const transformer = inputOrTransformer as MultiTransformer<unknown, O>
-        const value = transformValue<O>(() => {
+        const value = createTransformValue<O>(() => {
             const latest: unknown[] = []
             for (let i = 0; i < sources.length; i++) {
-                latest.push((sources[i] as unknown as MotionValue<unknown>).get())
+                latest.push(sources[i].get())
             }
             return transformer(latest)
         })
         $effect(() => () => value.destroy())
-        return augmentMotionValue(value)
+        return value
     }
 
-    // Single-MV transformer form: useTransform(mv, (latest) => O).
+    // Single-source transformer form: useTransform(source, (latest) => O).
+    // Resolved through the shared source machinery so readable/getter
+    // sources work here just like in the mapping forms — without this,
+    // an untyped getter call would crash on `source.get`.
     if (typeof inputOrTransformer === 'function') {
-        const source = sourceOrCompute as unknown as MotionValue<unknown>
+        const { value: source, dispose } = resolveMotionValueSource(
+            sourceOrCompute as MotionValueSource<unknown>
+        )
         const transformer = inputOrTransformer as SingleTransformer<unknown, O>
-        const value = transformValue<O>(() => transformer(source.get()))
-        $effect(() => () => value.destroy())
-        return augmentMotionValue(value)
+        const value = createTransformValue<O>(() => transformer(source.get()))
+        $effect(() => () => {
+            value.destroy()
+            dispose()
+        })
+        return value
     }
 
-    // Mapping forms (single output array or output map).
     const source = sourceOrCompute as TransformSource<number>
     const input = (inputOrTransformer as number[]) ?? []
-    const { value: numericSource, dispose: disposeBridge } = toMotionValue(source)
 
     // Multi-output mapping form: useTransform(source, [range], { key: [out], … }, options).
     // The `outputOrOutputMap !== null` check is load-bearing — `typeof null`
@@ -330,40 +326,41 @@ export function useTransform<O>(
         !Array.isArray(outputOrOutputMap) &&
         typeof outputOrOutputMap === 'object'
     ) {
-        const outputMap = outputOrOutputMap as TransformOutputMap<unknown>
+        // Resolve the source ONCE so all keys share a single bridge (a
+        // readable/getter source must not be subscribed per key).
+        const { value: numericSource, dispose: disposeBridge } = resolveMotionValueSource(
+            source as MotionValueSource<number>
+        )
+        const outputMap = outputOrOutputMap as TransformOutputMap<O>
         const keys = Object.keys(outputMap)
         const result: { [key: string]: AugmentedMotionValue<O> } = {}
-        const inners: MotionValue<unknown>[] = []
         for (const key of keys) {
-            const inner = mapValue<unknown>(
+            result[key] = createMapValue(
                 numericSource,
                 input,
                 outputMap[key],
-                options as TransformOptions<unknown> | undefined
+                options as TransformOptions<O> | undefined
             )
-            inners.push(inner)
-            result[key] = augmentMotionValue(inner) as unknown as AugmentedMotionValue<O>
         }
         // One cleanup effect for all per-key MVs plus the shared bridge —
         // saves N effect nodes vs. registering one per key.
         $effect(() => () => {
-            for (const inner of inners) inner.destroy()
+            for (const key of keys) result[key].destroy()
             disposeBridge()
         })
         return result
     }
 
     // Single-output mapping form: useTransform(source, [range], [out], options).
+    // The vanilla factory resolves the source (bridging readables/getters)
+    // and chains that bridge's teardown onto the value's own destroy.
     const output = (outputOrOutputMap as O[]) ?? []
-    const value = mapValue<O>(
-        numericSource,
+    const value = createMapValue(
+        source as MotionValueSource<number>,
         input,
         output,
         options as TransformOptions<O> | undefined
     )
-    $effect(() => () => {
-        value.destroy()
-        disposeBridge()
-    })
-    return augmentMotionValue(value)
+    $effect(() => () => value.destroy())
+    return value
 }

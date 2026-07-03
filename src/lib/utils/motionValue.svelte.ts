@@ -1,5 +1,6 @@
-import { motionValue, type MotionValue as MotionDomMotionValue } from 'motion-dom'
-import { augmentMotionValue, type AugmentedMotionValue } from './augmentMotionValue.svelte.js'
+import { type MotionValue as MotionDomMotionValue } from 'motion-dom'
+import { type AugmentedMotionValue } from './augmentMotionValue.svelte.js'
+import { motionValue } from './vanillaValues.svelte.js'
 
 /**
  * The shape returned by {@link useMotionValue}: a real motion-dom
@@ -62,7 +63,9 @@ export type RawMotionValue<T = number> = MotionDomMotionValue<T>
  * @see https://motion.dev/docs/react-motion-value
  */
 export const useMotionValue = <T = number>(initial: T): MotionValue<T> => {
+    // Lifecycle variant of the vanilla factory: same construction path,
+    // plus auto-destroy bound to the surrounding component.
     const value = motionValue<T>(initial)
     $effect(() => () => value.destroy())
-    return augmentMotionValue(value)
+    return value
 }

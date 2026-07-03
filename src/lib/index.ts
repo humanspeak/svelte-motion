@@ -17,8 +17,40 @@ export { m } from '$lib/m'
 export { motion } from '$lib/motion'
 export { Reorder } from '$lib/reorder'
 
-// Re-export core animation functions from motion
-export { animate, delay, hover, inView, press, resize, scroll, stagger, transform } from 'motion'
+// Re-export core animation functions plus the vanilla (component-free)
+// layer — element effects, the frameloop scheduler, generators, global
+// config — straight from motion.
+export {
+    MotionGlobalConfig,
+    animate,
+    cancelFrame,
+    delay,
+    frame,
+    frameData,
+    hover,
+    inView,
+    isMotionValue,
+    press,
+    resize,
+    scroll,
+    scrollInfo,
+    spring,
+    stagger,
+    transform
+} from 'motion'
+
+// Element effects re-typed to accept both raw and Svelte-augmented
+// motion values (runtime passthrough to motion's implementations).
+export { attrEffect, propEffect, styleEffect, svgEffect } from '$lib/utils/effects'
+export type { EffectValues } from '$lib/utils/effects'
+
+// Svelte-augmented vanilla value factories (reactive .current, store
+// .subscribe, manual lifecycle) and the rune/readable → MotionValue
+// bridge. Their `use*` hook counterparts add component auto-cleanup.
+export { toMotionValue } from '$lib/utils/toMotionValue.svelte'
+export type { MotionValueSource } from '$lib/utils/toMotionValue.svelte'
+export { mapValue, motionValue, springValue, transformValue } from '$lib/utils/vanillaValues.svelte'
+export type { SpringValueOptions } from '$lib/utils/vanillaValues.svelte'
 
 // Re-export easing functions
 export {
@@ -32,7 +64,10 @@ export {
     cubicBezier,
     easeIn,
     easeInOut,
-    easeOut
+    easeOut,
+    mirrorEasing,
+    reverseEasing,
+    steps
 } from 'motion'
 
 // Re-export utility functions

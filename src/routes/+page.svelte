@@ -224,6 +224,19 @@
             </ul>
         </div>
         <div>
+            <h2 class="mb-3 text-xl font-medium">Vanilla Values</h2>
+            <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/vanilla-values') + searchParams}
+                    >
+                        Vanilla motion values (styleEffect, toMotionValue, no components)
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div>
             <h2 class="mb-3 text-xl font-medium">View Transitions</h2>
             <ul class="list-disc space-y-2 pl-5">
                 <li>

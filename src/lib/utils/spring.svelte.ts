@@ -85,14 +85,21 @@ export function useSpring(
     source: MotionValue<string>,
     options?: UseSpringOptions
 ): SpringMotionValue<string>
-// Generic readable overload preserves the concrete T from the source so callers
-// passing `Readable<number>` get `SpringMotionValue<number>` back.
+// Generic source overload preserves the concrete T from the source so callers
+// passing `Readable<T>` or a reactive getter `() => T` get
+// `SpringMotionValue<T>` back.
 export function useSpring<T extends number | string>(
-    source: Readable<T>,
+    source: Readable<T> | (() => T),
     options?: UseSpringOptions
 ): SpringMotionValue<T>
 export function useSpring(
-    source: number | string | MotionValue<number> | MotionValue<string> | Readable<number | string>,
+    source:
+        | number
+        | string
+        | MotionValue<number>
+        | MotionValue<string>
+        | Readable<number | string>
+        | (() => number | string),
     options: UseSpringOptions = {}
 ): SpringMotionValue<number> | SpringMotionValue<string> {
     // Cast through `unknown` because TypeScript can't narrow the multi-form

@@ -1,17 +1,11 @@
-import {
-    attachFollow,
-    isMotionValue,
-    motionValue,
-    type FollowValueOptions,
-    type MotionValue
-} from 'motion-dom'
+import { attachFollow, motionValue, type FollowValueOptions, type MotionValue } from 'motion-dom'
 import { type Readable } from 'svelte/store'
 import {
     augmentMotionValue,
-    isSvelteReadable,
     sampleSource,
     type AugmentedMotionValue
 } from './augmentMotionValue.svelte.js'
+import { resolveMotionValueSource, type MotionValueSource } from './toMotionValue.svelte.js'
 
 /**
  * Options accepted by {@link useFollowValue}. Mirrors framer-motion's
@@ -58,7 +52,8 @@ export type FollowMotionValue<T extends number | string> = AugmentedMotionValue<
  * the server-rendered snapshot.
  *
  * @template T The value type — `number` or `string` (unit strings preserved).
- * @param source Initial value, a `MotionValue` to follow, or a Svelte readable.
+ * @param source Initial value, a `MotionValue` to follow, a Svelte readable,
+ *     or a reactive getter (`$state` / `$derived` reads inside it are tracked).
  * @param options Transition + follow configuration (`type: 'spring' | 'tween' | 'inertia' | 'keyframes'`, plus the corresponding per-type options).
  * @returns A `MotionValue<T>` with `.current` and `.subscribe`.
  *
@@ -107,14 +102,14 @@ export function useFollowValue(
     source: MotionValue<string>,
     options?: UseFollowValueOptions
 ): FollowMotionValue<string>
-// Generic readable overload preserves the concrete T from the source so
-// callers passing `Readable<number>` get `FollowMotionValue<number>` back.
+// Generic source overload preserves the concrete T from the source so
+// callers passing `Readable<T>` or `() => T` get `FollowMotionValue<T>` back.
 export function useFollowValue<T extends number | string>(
-    source: Readable<T>,
+    source: Readable<T> | (() => T),
     options?: UseFollowValueOptions
 ): FollowMotionValue<T>
 export function useFollowValue(
-    source: number | string | MotionValue<number> | MotionValue<string> | Readable<number | string>,
+    source: number | string | MotionValueSource<number> | MotionValueSource<string>,
     options: UseFollowValueOptions = {}
 ): FollowMotionValue<number> | FollowMotionValue<string> {
     type T = number | string
@@ -123,7 +118,10 @@ export function useFollowValue(
     // best-effort initial value; .set / .jump become no-ops to avoid drifting
     // away from the server-rendered snapshot.
     if (typeof window === 'undefined') {
-        const initial = sampleSource(source as T | MotionValue<T> | Readable<T>)
+        const initial =
+            typeof source === 'function'
+                ? (source as () => T)()
+                : sampleSource(source as T | MotionValue<T> | Readable<T>)
         const ssrValue = motionValue<T>(initial)
         ssrValue.set = () => undefined
         ssrValue.jump = () => undefined
@@ -132,30 +130,25 @@ export function useFollowValue(
             | FollowMotionValue<string>
     }
 
-    // Resolve initial + follow source. Svelte readables get bridged into a
-    // motion-dom MotionValue so `attachFollow` can subscribe to their emits.
+    // Resolve the follow source through the shared machinery: MotionValues
+    // pass through, readables and reactive getters are bridged (a readable's
+    // synchronous initial emit is inert — the bridge skips it, and motion-dom
+    // ignores same-value writes — so no explicit guard is needed here).
     let followSource: T | MotionValue<T>
-    let cleanupReadableBridge: VoidFunction | undefined
-    let svelteBridge: MotionValue<T> | undefined
+    let disposeBridge: VoidFunction = () => undefined
 
-    if (isMotionValue(source)) {
-        followSource = source as MotionValue<T>
-    } else if (isSvelteReadable<T>(source)) {
-        const initialFromReadable = sampleSource(source as Readable<T>)
-        svelteBridge = motionValue<T>(initialFromReadable)
-        cleanupReadableBridge = source.subscribe((v) => {
-            // Svelte readable contract emits synchronously on subscribe. Skip
-            // the initial emit (already seeded above) so attachFollow doesn't
-            // fire an animation on attach.
-            if (svelteBridge!.get() === v) return
-            svelteBridge!.set(v as T)
-        })
-        followSource = svelteBridge
+    if (typeof source === 'number' || typeof source === 'string') {
+        followSource = source
     } else {
-        followSource = source as T
+        const resolved = resolveMotionValueSource(source as MotionValueSource<T>)
+        followSource = resolved.value
+        disposeBridge = resolved.dispose
     }
 
-    const initial: T = isMotionValue(followSource) ? (followSource.get() as T) : (followSource as T)
+    const initial: T =
+        typeof followSource === 'number' || typeof followSource === 'string'
+            ? followSource
+            : (followSource.get() as T)
 
     const value = motionValue<T>(initial)
     // Default transition is `spring` — matches React framer-motion's
@@ -164,8 +157,7 @@ export function useFollowValue(
 
     const dispose = () => {
         stopFollow?.()
-        cleanupReadableBridge?.()
-        svelteBridge?.destroy()
+        disposeBridge()
     }
 
     $effect(() => () => value.destroy())
