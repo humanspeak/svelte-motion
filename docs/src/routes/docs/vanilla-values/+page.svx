@@ -129,6 +129,7 @@ Plus the `steps`, `mirrorEasing`, and `reverseEasing` easing helpers alongside t
 
 ## Related
 
+- [Vanilla Values example](/examples/vanilla-values) — this page's demo with full source
 - [Motion values overview](/docs/motion-values) — the hook layer and the augmented value shape
 - [useTransform](/docs/use-transform) / [useSpring](/docs/use-spring) — component-scoped counterparts
 - [Motion component](/docs) — object-form `style` accepts these values directly
