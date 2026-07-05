@@ -95,17 +95,54 @@ export const attachWhileTap = (
         onTapCancel?: () => void
         hoverDef?: Record<string, unknown> | undefined
         hoverFallbackTransition?: AnimationOptions | undefined
+        /** The component's resolved `transition` (or `<MotionConfig>` transition) —
+         *  honored for the tap gesture (framer parity). When empty, the gesture
+         *  passes no transition so motion-dom applies its per-value defaults. */
+        tapTransition?: AnimationOptions | undefined
     }
 ): (() => void) => {
     if (!whileTap) return () => {}
 
     pwLog('[tap] attached', { whileTap, initial, animateDef, hasHoverDef: !!callbacks?.hoverDef })
 
-    // Tween transitions prevent spring velocity accumulation during rapid
-    // press/release cycles. Cubic-bezier with slight overshoot mimics the
-    // reference spring feel (~275ms settle, ~7% overshoot).
-    const pressTransition: AnimationOptions = { duration: 0.25, ease: [0.22, 1.1, 0.36, 1] }
-    const releaseTransition: AnimationOptions = { duration: 0.3, ease: [0.22, 1.1, 0.36, 1] }
+    // Split any inline `transition` out of the whileTap definition (mirrors
+    // splitHoverDefinition) so it never leaks into the animated keyframes and
+    // can be honored as the press transition.
+    const { transition: inlineTapTransition, ...tapKeyframes } = whileTap as {
+        transition?: AnimationOptions
+    } & Record<string, unknown>
+
+    // Resolve the gesture transition with framer-motion's precedence:
+    //   1. inline `whileTap.transition` — configures entering the tap state (press only)
+    //   2. the component's resolved `transition` / <MotionConfig> (via `tapTransition`)
+    //   3. undefined → motion-dom applies its own per-value defaults:
+    //        scale           → spring(stiffness 550, damping 30)  (mild ~7% overshoot)
+    //        x / y / rotate… → spring(stiffness 500, damping 25)
+    //        everything else → ease [0.25, 0.1, 0.35, 1] over 0.3s
+    //      Passing no transition is exact framer parity (including the intended
+    //      spring overshoot on transforms) and inherits future upstream tuning
+    //      for free. See upstream:
+    //        motion-dom/src/animation/utils/default-transitions.ts        (getDefaultTransition)
+    //        motion-dom/src/animation/interfaces/motion-value.ts          (per-value application)
+    //        motion-dom/src/animation/interfaces/visual-element-target.ts (component-transition precedence)
+    //      The historical spring "runaway" (see git history around the old
+    //      hardcoded tweens) does not recur: every animate() call reuses the
+    //      same motion values, so velocity is continuous and rapid press/release
+    //      interrupts cleanly instead of accumulating. Covered by a rapid-tap e2e.
+    const componentTapTransition =
+        callbacks?.tapTransition && Object.keys(callbacks.tapTransition).length > 0
+            ? callbacks.tapTransition
+            : undefined
+    // Press honors an inline whileTap.transition (framer applies it only when
+    // entering the tap state). Release animates back to the BASE variant, so
+    // upstream resolves ITS inline transition (`animate={{ ..., transition }}`)
+    // first, then the component transition, then the per-value defaults.
+    const animateInlineTransition = (animateDef as { transition?: AnimationOptions } | undefined)
+        ?.transition
+    const pressTransition: AnimationOptions | undefined =
+        (inlineTapTransition as AnimationOptions | undefined) ?? componentTapTransition
+    const releaseTransition: AnimationOptions | undefined =
+        animateInlineTransition ?? componentTapTransition
 
     // Motion's animate() returns AnimationPlaybackControls (not native Animation).
     type GestureCtl = {
@@ -149,7 +186,7 @@ export const attachWhileTap = (
         callbacks?.onTapStart?.()
         gestureCtl = animate(
             el,
-            whileTap as unknown as DOMKeyframesDefinition,
+            tapKeyframes as unknown as DOMKeyframesDefinition,
             pressTransition
         ) as unknown as GestureCtl
         Promise.resolve(gestureCtl?.finished)
@@ -181,16 +218,21 @@ export const attachWhileTap = (
             pwLog('[tap] hover-reapply-skip', { reason: 'matches threw' })
             return false
         }
-        const { keyframes } = splitHoverDefinition(callbacks.hoverDef as Record<string, unknown>)
+        const { keyframes, transition: hoverTransition } = splitHoverDefinition(
+            callbacks.hoverDef as Record<string, unknown>
+        )
         pwLog('[tap] hover-reapply', {
             keyframes,
             transform: getComputedStyle(el).transform,
             w: el.getBoundingClientRect().width
         })
+        // Reapplying hover after a tap animates to the hover state, so it should
+        // use the hover definition's own transition when provided, falling back
+        // to the release transition (component prop → per-value defaults).
         gestureCtl = animate(
             el,
             keyframes as unknown as DOMKeyframesDefinition,
-            releaseTransition
+            hoverTransition ?? releaseTransition
         ) as unknown as GestureCtl
         Promise.resolve(gestureCtl?.finished)
             .then(() =>
@@ -219,7 +261,7 @@ export const attachWhileTap = (
         // If still hovering after a successful tap, animate to hover state
         if (success && reapplyHoverIfActive()) return
 
-        const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, whileTap ?? {})
+        const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, tapKeyframes)
         pwLog('[tap] reset-record', resetRecord)
         if (Object.keys(resetRecord).length > 0) {
             gestureCtl = animate(

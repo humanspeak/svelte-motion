@@ -112,6 +112,102 @@ describe('utils/interaction', () => {
         expect(animateMock.mock.calls.length).toBe(callsAfterCleanup)
     })
 
+    it('attachWhileTap: delegates to motion per-value defaults when no transition is set', async () => {
+        const el = document.createElement('div')
+        animateMock.mockClear()
+        const cleanup = attachWhileTap(el, { scale: 0.95 }, { scale: 1 }, {})
+
+        const onPressEnd = pressCallback!(el, new PointerEvent('pointerdown'))
+        onPressEnd!(new PointerEvent('pointerup'), { success: true })
+        await Promise.resolve()
+
+        // With no inline / component / <MotionConfig> transition, we must pass
+        // NONE through so motion-dom applies its own per-value defaults (spring
+        // for scale + other transforms, ease for the rest) — exact framer parity.
+        // Injecting a hand-rolled ease here would diverge from upstream tuning.
+        expect(animateMock.mock.calls.length).toBeGreaterThanOrEqual(2)
+        for (const call of animateMock.mock.calls) {
+            const t = call[2] as Record<string, unknown> | undefined
+            expect(t == null || Object.keys(t).length === 0).toBe(true)
+        }
+        cleanup()
+    })
+
+    it('attachWhileTap: honors the component transition prop for press and release', async () => {
+        const el = document.createElement('div')
+        animateMock.mockClear()
+        // Represents a component `transition` prop or a page-wide <MotionConfig>
+        // transition (mergedTransition) — framer retimes taps with it.
+        const tapTransition = { type: 'tween' as const, duration: 0.12 }
+        const cleanup = attachWhileTap(el, { scale: 0.95 }, { scale: 1 }, {}, { tapTransition })
+
+        const onPressEnd = pressCallback!(el, new PointerEvent('pointerdown'))
+        expect(animateMock.mock.calls.at(-1)?.[2]).toMatchObject(tapTransition)
+        onPressEnd!(new PointerEvent('pointerup'), { success: true })
+        await Promise.resolve()
+        expect(animateMock.mock.calls.at(-1)?.[2]).toMatchObject(tapTransition)
+        cleanup()
+    })
+
+    it('attachWhileTap: inline whileTap.transition drives the press and beats the component prop', async () => {
+        const el = document.createElement('div')
+        animateMock.mockClear()
+        const inline = { type: 'spring' as const, stiffness: 700 }
+        const tapTransition = { type: 'tween' as const, duration: 0.5 }
+        const cleanup = attachWhileTap(
+            el,
+            { scale: 0.95, transition: inline } as unknown as Record<string, unknown>,
+            { scale: 1 },
+            {},
+            { tapTransition }
+        )
+
+        const onPressEnd = pressCallback!(el, new PointerEvent('pointerdown'))
+        await Promise.resolve()
+        const press = animateMock.mock.calls.at(-1)
+        // Inline transition wins for the press (entering the tap state)...
+        expect(press?.[2]).toMatchObject(inline)
+        // ...and the inline `transition` key must not leak into the keyframes.
+        expect((press?.[1] as Record<string, unknown>).transition).toBeUndefined()
+        expect(press?.[1]).toMatchObject({ scale: 0.95 })
+
+        // Release animates back to the base variant → uses the component
+        // transition, not the inline (tap-entry) one.
+        onPressEnd!(new PointerEvent('pointerup'), { success: true })
+        await Promise.resolve()
+        expect(animateMock.mock.calls.at(-1)?.[2]).toMatchObject(tapTransition)
+        cleanup()
+    })
+
+    it("attachWhileTap: release honors the base variant's inline transition over the component prop", async () => {
+        const el = document.createElement('div')
+        animateMock.mockClear()
+        const animateInline = { type: 'spring' as const, bounce: 0, visualDuration: 0.2 }
+        const tapTransition = { type: 'tween' as const, duration: 0.5 }
+        const cleanup = attachWhileTap(
+            el,
+            { scale: 0.95 },
+            { scale: 1 },
+            { scale: 1, transition: animateInline } as unknown as Record<string, unknown>,
+            { tapTransition }
+        )
+
+        const onPressEnd = pressCallback!(el, new PointerEvent('pointerdown'))
+        // Press has no inline whileTap.transition → component prop applies.
+        expect(animateMock.mock.calls.at(-1)?.[2]).toMatchObject(tapTransition)
+
+        onPressEnd!(new PointerEvent('pointerup'), { success: true })
+        await Promise.resolve()
+        const release = animateMock.mock.calls.at(-1)
+        // Release returns to the base (animate) variant, so ITS inline
+        // transition wins — this is how a consumer pins a no-overshoot
+        // return (e.g. bounce: 0) without changing the press feel.
+        expect(release?.[2]).toMatchObject(animateInline)
+        // The base variant's `transition` key must not leak into the reset keyframes.
+        expect((release?.[1] as Record<string, unknown>).transition).toBeUndefined()
+        cleanup()
+    })
+
     it('attachWhileTap: negative - no-op when whileTap is undefined', () => {
         const el = document.createElement('div')
         const cleanup = attachWhileTap(el, undefined)
@@ -284,8 +380,8 @@ describe('utils/interaction', () => {
         await Promise.resolve()
         const last = animateMock.mock.calls.at(-1)
         expect(last?.[1]).toMatchObject({ scale: 1.2 })
-        // Uses releaseTransition (tween with overshoot) to prevent velocity accumulation
-        expect(last?.[2]).toMatchObject({ duration: 0.3 })
+        // Reapplying hover uses the hover definition's own transition.
+        expect(last?.[2]).toMatchObject({ duration: 0.12 })
         cleanup()
         vi.unstubAllGlobals()
     })
@@ -470,8 +566,8 @@ describe('utils/interaction', () => {
         await Promise.resolve()
         const last = animateMock.mock.calls.at(-1)
         expect(last?.[1]).toMatchObject({ scale: 1.2 })
-        // Uses releaseTransition (tween with overshoot) to prevent velocity accumulation
-        expect(last?.[2]).toMatchObject({ duration: 0.3 })
+        // Reapplying hover uses the hover definition's own transition.
+        expect(last?.[2]).toMatchObject({ duration: 0.12 })
         cleanup()
         vi.unstubAllGlobals()
     })

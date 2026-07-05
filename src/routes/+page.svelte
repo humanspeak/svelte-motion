@@ -144,6 +144,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/rapid-tap') + searchParams}
+                    >
+                        Rapid Tap (spring runaway guard)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/while-focus') + searchParams}
                     >
                         While Focus

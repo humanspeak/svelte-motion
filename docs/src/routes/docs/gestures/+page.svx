@@ -75,6 +75,21 @@ Animate while the element is being pressed.
 
 `onTap` fires only when the press completes on the element. If the pointer drags off before release, `onTapCancel` fires instead.
 
+### Tuning the tap transition
+
+Without a transition, taps use Motion's per-value defaults — a spring for transforms, which intentionally overshoots rest by a hair on release (the "springy" Framer feel). The resolution order matches Framer: an inline `whileTap.transition` shapes the press, the base variant's `transition` shapes the release, the component `transition` prop (or `<MotionConfig>`) covers both, and per-value defaults fill the rest.
+
+If a transform must **never pass its resting value** — e.g. a `scale` press on an element where any growth is visible — pin the release with a critically damped spring (`bounce: 0`) or an ease-out tween:
+
+```svelte
+<motion.button
+    whileTap={{ scale: 0.95 }}
+    animate={{ scale: 1, transition: { type: 'spring', visualDuration: 0.2, bounce: 0 } }}
+>
+    No overshoot on release
+</motion.button>
+```
+
 ## `whileFocus`
 
 Animate while the element has keyboard focus.

@@ -2468,7 +2468,8 @@
                 hoverDef: isNotEmpty(resolvedWhileHover ?? {})
                     ? ((resolvedWhileHover ?? {}) as Record<string, unknown>)
                     : undefined,
-                hoverFallbackTransition: (mergedTransition ?? {}) as AnimationOptions
+                hoverFallbackTransition: (mergedTransition ?? {}) as AnimationOptions,
+                tapTransition: (mergedTransition ?? {}) as AnimationOptions
             }
         )
     })
