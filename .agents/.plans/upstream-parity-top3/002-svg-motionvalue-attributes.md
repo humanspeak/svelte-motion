@@ -1,4 +1,4 @@
-# Plan 001: Bind MotionValues to SVG presentation attributes and add attrX/attrY/attrScale
+# Plan 002: Bind MotionValues to SVG presentation attributes and add attrX/attrY/attrScale
 
 > **Executor instructions**: Follow this plan step by step. Run every
 > verification command and confirm the expected result before moving to the

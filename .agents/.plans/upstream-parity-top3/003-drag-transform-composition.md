@@ -1,4 +1,4 @@
-# Plan 002: Compose the full transform during drag via upstream buildTransform semantics
+# Plan 003: Compose the full transform during drag via upstream buildTransform semantics
 
 > **Executor instructions**: Follow this plan step by step. Run every
 > verification command and confirm the expected result before moving to the
@@ -16,7 +16,7 @@
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: MED
-- **Depends on**: none (Plan 003 builds on the writer introduced here)
+- **Depends on**: none (Plan 004 builds on the writer introduced here)
 - **Category**: bug (upstream parity / correctness)
 - **Planned at**: commit `634983b`, 2026-07-08
 - **Issue**: <https://github.com/humanspeak/svelte-motion/issues/436>
@@ -126,7 +126,7 @@ e2e preview server is pinned to port 4198 — do not change.
 **Out of scope**:
 
 - The projection/FLIP measurement system (`projection.ts`,
-  `motionDomProjection.ts`, the observer bridge) — that is Plan 003.
+  `motionDomProjection.ts`, the observer bridge) — that is Plan 004.
 - Drag physics/inertia (`motion-dom` handles it; landed in #399).
 - The MotionValue dual-write behavior (#421) and the synchronous no-lag write
   (#379) — these must be **preserved**, not redesigned.
@@ -247,14 +247,14 @@ Stop and report back if:
 - Preserving the same-frame pin (#379) is impossible through the new writer —
   i.e. `siblings-flip.spec.ts` drift sampling regresses twice after fix attempts.
 - The fix requires modifying the projection measurement path
-  (`projection.ts`/`motionDomProjection.ts`) — that's Plan 003; report the
+  (`projection.ts`/`motionDomProjection.ts`) — that's Plan 004; report the
   coupling instead.
 - `buildTransform` is not importable from `motion-dom` AND mirroring its
   ordering requires >50 lines of duplication — report for a maintainer decision.
 
 ## Maintenance notes
 
-- Plan 003 (projection consolidation) will route dragged-node pinning through
+- Plan 004 (projection consolidation) will route dragged-node pinning through
   motion-dom `didUpdate` deltas; the writer introduced here is the seam it will
   write into. Keep the writer's values-map API small and documented.
 - Reviewer should scrutinize: frame-timing (no added frame of drag lag — compare

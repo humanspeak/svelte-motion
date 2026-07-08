@@ -1,4 +1,4 @@
-# Plan 003: Make the motion-dom projection node authoritative (page-space measurement, retire the legacy FLIP path)
+# Plan 004: Make the motion-dom projection node authoritative (page-space measurement, retire the legacy FLIP path)
 
 > **Executor instructions**: Follow this plan step by step. Run every
 > verification command and confirm the expected result before moving to the
@@ -17,10 +17,10 @@
 
 ## Status
 
-- **Priority**: P1 (execute LAST — after 001 and 002)
+- **Priority**: P1 (execute LAST — after 001, 002 and 003)
 - **Effort**: L
 - **Risk**: HIGH
-- **Depends on**: 002-drag-transform-composition.md (the drag writer is the seam
+- **Depends on**: 003-drag-transform-composition.md (the drag writer is the seam
   the projection deltas paint through)
 - **Category**: tech-debt / migration (upstream parity)
 - **Planned at**: commit `634983b`, 2026-07-08
@@ -155,7 +155,7 @@ e2e preview server pinned to port 4198. Full e2e is the gate for Steps 4-6.
 
 **Out of scope**:
 
-- `src/lib/utils/drag.ts` internals beyond consuming Plan 002's writer API.
+- `src/lib/utils/drag.ts` internals beyond consuming Plan 003's writer API.
 - AnimatePresence exit/enter sequencing (`presence.ts`) — the presence-hold
   attributes are consumed here but their semantics must not change.
 - Adding new public props (`layoutRoot`, `layout="x"`, `layoutAnchor`) — those
@@ -241,7 +241,7 @@ Replace the slot-change `adjustOrigin(previous-next)` computation
 (~2302-2333) with the motion-dom node's `didUpdate` delta for the dragged
 element (upstream: `VisualElementDragControls.ts:742-758` applies
 `delta[axis].translate` to origin + axis value on both axes). The paint goes
-through Plan 002's writer. Keep the Reorder double-fire guard semantics
+through Plan 003's writer. Keep the Reorder double-fire guard semantics
 (comment ~2287-2292) — the reorder e2e suite is the gate.
 
 **Verify**: `pnpm exec playwright test e2e/reorder e2e/drag` → green, including
@@ -285,7 +285,7 @@ report instead of deleting.
 
 Stop and report back if:
 
-- Plan 002 is not DONE in the batch README — this plan depends on its writer.
+- Plan 003 is not DONE in the batch README — this plan depends on its writer.
 - The spike (Step 2) shows the motion-dom adapter cannot express the presence
   hold/placeholder flows (AnimatePresence early-outs at ~2266-2285) — the
   presence interaction needs a maintainer decision, not improvisation.
