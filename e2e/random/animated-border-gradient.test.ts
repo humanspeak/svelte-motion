@@ -17,7 +17,7 @@ test.describe('Animated Border Gradient', () => {
         const readDeg = async () => {
             const style = (await border.getAttribute('style')) || ''
             const match = style.match(/\bfrom\s+([-+]?\d*\.?\d+)deg\b/i)
-            return match ? Number.parseFloat(match[1]!) : NaN
+            return match ? Number.parseFloat(match[1]) : NaN
         }
 
         const startDeg = await readDeg()
@@ -42,7 +42,7 @@ test.describe('Animated Border Gradient', () => {
             .poll(
                 async () => {
                     const currentDeg = await readDeg()
-                    return currentDeg - (startDeg as number)
+                    return currentDeg - startDeg
                 },
                 { timeout: 3000 }
             )

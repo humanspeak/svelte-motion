@@ -50,7 +50,6 @@ export const createDragControls = (): DragControls => {
             target = el
         }
     }
-
     // Internal hook used by attachDrag to wire controls to the element
     ;(
         controls as unknown as {

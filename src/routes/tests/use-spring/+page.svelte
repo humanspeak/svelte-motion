@@ -17,11 +17,11 @@
     const targets = [0, 100, 200, 300]
     let cursor = $state(0)
     let nextIdx = $derived((cursor + 1) % targets.length)
-    let nextTarget = $derived(targets[nextIdx]!)
+    let nextTarget = $derived(targets[nextIdx])
 
     const cycle = () => {
         cursor = nextIdx
-        const next = targets[cursor]!
+        const next = targets[cursor]
         x.set(next)
         y.set(next)
         rotate.set(`${next * 1.5}deg`)

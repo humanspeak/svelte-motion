@@ -34,10 +34,7 @@ describe('svg utilities', () => {
     beforeEach(() => {
         // Create a real SVGPathElement
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-        mockPathElement = document.createElementNS(
-            'http://www.w3.org/2000/svg',
-            'path'
-        ) as SVGPathElement
+        mockPathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path')
         svg.appendChild(mockPathElement)
         document.body.appendChild(svg)
 

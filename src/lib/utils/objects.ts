@@ -15,7 +15,7 @@ import type { DOMKeyframesDefinition } from 'motion'
  */
 export const isEmpty = (obj: Record<string, unknown> | DOMKeyframesDefinition | undefined) => {
     if (!obj) return true
-    return Object.keys(obj as Record<string, unknown>).length === 0
+    return Object.keys(obj).length === 0
 }
 
 /**

@@ -15,7 +15,7 @@ export const readTransform = (
     selector: string
 ): Promise<{ tx: number; ty: number; a: number; b: number; c: number; d: number }> =>
     page.evaluate((sel) => {
-        const el = document.querySelector(sel) as HTMLElement | null
+        const el = document.querySelector<HTMLElement>(sel)
         if (!el) return { tx: 0, ty: 0, a: 1, b: 0, c: 0, d: 1 }
         const t = window.getComputedStyle(el).transform
         const m = t.match(/matrix\(([^)]+)\)/)
@@ -50,7 +50,7 @@ export const readDragTranslate = (
     selector: string
 ): Promise<{ tx: number; ty: number }> =>
     page.evaluate((sel) => {
-        const el = document.querySelector(sel) as HTMLElement | null
+        const el = document.querySelector<HTMLElement>(sel)
         const transform = el?.dataset.svelteMotionDragTransform ?? ''
         const read = (axis: 'X' | 'Y') => {
             const match = transform.match(new RegExp(`translate${axis}\\((-?[0-9.]+)px\\)`))

@@ -150,7 +150,7 @@ export const resolvePopLayoutStyles = (
         height: `${snapshot.height}px`,
         [xProperty]: `${xValue}px`,
         [yProperty]: `${yValue}px`
-    } as Partial<CSSStyleDeclaration>
+    }
 }
 
 /**

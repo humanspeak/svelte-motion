@@ -41,7 +41,7 @@ describe('utils/drag', () => {
             axis: true,
             mergedTransition: { duration: 0 },
             callbacks
-        } as unknown as Parameters<typeof attachDrag>[1])
+        })
 
         el.dispatchEvent(
             new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 1 })
@@ -77,7 +77,7 @@ describe('utils/drag', () => {
             axis: true,
             mergedTransition: { duration: 0 },
             callbacks
-        } as unknown as Parameters<typeof attachDrag>[1])
+        })
 
         el.dispatchEvent(
             new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 1 })

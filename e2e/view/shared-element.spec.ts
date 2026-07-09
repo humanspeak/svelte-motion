@@ -33,7 +33,7 @@ test.describe('view/shared-element', () => {
         await expect
             .poll(() =>
                 page.evaluate(() => {
-                    const hero = document.querySelector('[data-hero]') as HTMLElement | null
+                    const hero = document.querySelector<HTMLElement>('[data-hero]')
                     return hero?.style.viewTransitionName || ''
                 })
             )

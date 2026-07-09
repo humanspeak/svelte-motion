@@ -18,12 +18,12 @@ test.describe('Hover + Tap', () => {
                     const raw = t.slice('matrix3d('.length, -1)
                     const nums = raw.split(',').map((v) => parseFloat(v.trim()))
                     if (nums.length !== 16 || nums.some((n) => Number.isNaN(n))) return 1
-                    const m11 = nums[0]!
-                    const m12 = nums[1]!
-                    const m13 = nums[2]!
-                    const m21 = nums[4]!
-                    const m22 = nums[5]!
-                    const m23 = nums[6]!
+                    const m11 = nums[0]
+                    const m12 = nums[1]
+                    const m13 = nums[2]
+                    const m21 = nums[4]
+                    const m22 = nums[5]
+                    const m23 = nums[6]
                     const scaleX = Math.hypot(m11, m12, m13)
                     const scaleY = Math.hypot(m21, m22, m23)
                     return (scaleX + scaleY) / 2
@@ -32,10 +32,10 @@ test.describe('Hover + Tap', () => {
                     const raw = t.slice('matrix('.length, -1)
                     const nums = raw.split(',').map((v) => parseFloat(v.trim()))
                     if (nums.length < 4 || nums.slice(0, 4).some((n) => Number.isNaN(n))) return 1
-                    const a = nums[0]!
-                    const b = nums[1]!
-                    const c = nums[2]!
-                    const d = nums[3]!
+                    const a = nums[0]
+                    const b = nums[1]
+                    const c = nums[2]
+                    const d = nums[3]
                     const scaleX = Math.hypot(a, b)
                     const scaleY = Math.hypot(c, d)
                     return (scaleX + scaleY) / 2

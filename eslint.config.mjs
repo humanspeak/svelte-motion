@@ -110,15 +110,7 @@ export default [
         // No type info here (plain JS, root config files outside every tsconfig,
         // and docs/** when its generated config is absent) — typed rules off,
         // untyped recommended still applies.
-        files: [
-            '**/*.js',
-            '**/*.mjs',
-            '**/*.cjs',
-            'docs/**',
-            '*.ts',
-            '*.d.ts',
-            'scripts/**/*.ts'
-        ],
+        files: ['**/*.js', '**/*.mjs', '**/*.cjs', 'docs/**', '*.ts', '*.d.ts', 'scripts/**/*.ts'],
         ...ts.configs.disableTypeChecked
     },
     {

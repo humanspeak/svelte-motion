@@ -105,7 +105,7 @@ const toNativeOptions = (transition: AnimationOptions | undefined): KeyframeAnim
         fill: 'both'
     }
 
-    const easing = mapEasingToNativeEasing(transition?.ease as NativeEasing, durationMs)
+    const easing = mapEasingToNativeEasing(transition?.ease, durationMs)
     if (Array.isArray(easing)) {
         options.easing = easing[0] ?? 'linear'
     } else if (easing) {

@@ -21,7 +21,7 @@ test.describe('AnimatePresence exit animation', () => {
         // This is required - AnimatePresence only works if you wait for enter to finish
         await page.waitForFunction(
             () => {
-                const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+                const el = document.querySelector<HTMLElement>('[data-testid="box"]')
                 if (!el) return false
 
                 const rect = el.getBoundingClientRect()
@@ -93,7 +93,7 @@ test.describe('AnimatePresence exit animation', () => {
 
         // Capture clone properties as soon as it appears (before it animates out)
         const cloneData = await page.evaluate(() => {
-            const clone = document.querySelector('[data-clone="true"]') as HTMLElement
+            const clone = document.querySelector<HTMLElement>('[data-clone="true"]')
             if (!clone) return null
 
             const rect = clone.getBoundingClientRect()
@@ -135,7 +135,7 @@ test.describe('AnimatePresence exit animation', () => {
         while (Date.now() - start < 1500 && !sawAnimation) {
             try {
                 const animationData = await page.evaluate(() => {
-                    const cloneEl = document.querySelector('[data-clone="true"]') as HTMLElement
+                    const cloneEl = document.querySelector<HTMLElement>('[data-clone="true"]')
                     if (!cloneEl) return null
                     const cs = getComputedStyle(cloneEl)
                     return { opacity: cs.opacity, transform: cs.transform }

@@ -76,7 +76,7 @@ export type TransformTemplate = MotionTransformTemplate
 export const mergeInlineStyles = (
     existingStyle: unknown,
     initial: Record<string, unknown> | null | undefined,
-    animateFallback?: Record<string, unknown> | null | undefined,
+    animateFallback?: Record<string, unknown> | null,
     transformTemplate?: TransformTemplate
 ): string => {
     const base: Record<string, string> = parseStyleString(

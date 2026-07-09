@@ -21,6 +21,6 @@ describe('utils/promise', () => {
 
     it('hasFinishedPromise: negative when finished missing or non-promise', () => {
         expect(hasFinishedPromise({})).toBe(false)
-        expect(hasFinishedPromise({ finished: 123 as unknown })).toBe(false)
+        expect(hasFinishedPromise({ finished: 123 })).toBe(false)
     })
 })

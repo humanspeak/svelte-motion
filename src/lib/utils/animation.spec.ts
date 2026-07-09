@@ -27,17 +27,11 @@ describe('utils/animation', () => {
         animateMock.mockClear()
 
         const frames = { opacity: 1 }
-        animateWithLifecycle(el, frames as unknown as import('motion').DOMKeyframesDefinition, {
+        animateWithLifecycle(el, frames, {
             duration: 0.1
         })
 
-        animateWithLifecycle(
-            el,
-            frames as unknown as import('motion').DOMKeyframesDefinition,
-            { duration: 0.1 },
-            onStart,
-            onComplete
-        )
+        animateWithLifecycle(el, frames, { duration: 0.1 }, onStart, onComplete)
         await Promise.resolve()
 
         expect(onStart).toHaveBeenCalledWith(frames)
@@ -50,13 +44,7 @@ describe('utils/animation', () => {
         const onComplete = vi.fn()
         // One call returns a thenable (Promise) to hit the thenable branch
         animateMock.mockImplementationOnce(() => Promise.resolve())
-        animateWithLifecycle(
-            el,
-            { scale: 1 } as unknown as import('motion').DOMKeyframesDefinition,
-            { duration: 0.05 },
-            undefined,
-            onComplete
-        )
+        animateWithLifecycle(el, { scale: 1 }, { duration: 0.05 }, undefined, onComplete)
         await Promise.resolve()
         expect(onComplete).toHaveBeenCalled()
     })

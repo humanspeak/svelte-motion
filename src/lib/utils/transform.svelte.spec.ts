@@ -203,7 +203,7 @@ describe('utils/transform - useTransform', () => {
             const src = useMotionValue(0)
             const out = useTransform(src, [0, 0, 1], [0, 1, 2])
             src.set(0)
-            expect(Number.isNaN(out.current as unknown as number)).toBe(false)
+            expect(Number.isNaN(out.current)).toBe(false)
         })
     })
 

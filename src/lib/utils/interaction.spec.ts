@@ -61,7 +61,7 @@ describe('utils/interaction', () => {
         const initial = { x: 10 }
         const animate = {}
         const whileTap = { x: 0 }
-        const reset = buildTapResetRecord(initial, animate as unknown as typeof initial, whileTap)
+        const reset = buildTapResetRecord(initial, animate, whileTap)
         expect(reset).toMatchObject({ x: 10 })
     })
 

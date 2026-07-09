@@ -79,7 +79,7 @@ const toMillisecondsTransition = (
     const valueTransition = { ...((transition ?? {}) as Record<string, unknown>) }
     for (const key of ['duration', 'delay', 'repeatDelay']) {
         if (typeof valueTransition[key] === 'number') {
-            valueTransition[key] = (valueTransition[key] as number) * 1000
+            valueTransition[key] = valueTransition[key] * 1000
         }
     }
     return valueTransition

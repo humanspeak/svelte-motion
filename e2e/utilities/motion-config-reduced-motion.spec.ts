@@ -7,7 +7,7 @@ const readBoxTransform = (locator: Locator) =>
 
 const waitForAnimationsToFinish = (page: Page) =>
     page.waitForFunction(() => {
-        const el = document.querySelector('[data-testid="motion-box"]') as HTMLElement | null
+        const el = document.querySelector<HTMLElement>('[data-testid="motion-box"]')
         if (!el) return false
         const anims = el.getAnimations()
         if (anims.length > 0 && anims.some((a) => a.playState === 'running')) return false

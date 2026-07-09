@@ -16,8 +16,8 @@ test.describe('whileFocus', () => {
                     const raw = t.slice('matrix('.length, -1)
                     const nums = raw.split(',').map((v) => parseFloat(v.trim()))
                     if (nums.length < 4 || nums.slice(0, 4).some((n) => Number.isNaN(n))) return 1
-                    const a = nums[0]!
-                    const b = nums[1]!
+                    const a = nums[0]
+                    const b = nums[1]
                     const scaleX = Math.hypot(a, b)
                     return scaleX
                 }

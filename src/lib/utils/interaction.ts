@@ -64,7 +64,7 @@ export const buildTapResetRecord = (
         } else if (has(initial, k)) {
             resetRecord[k] = initial[k]
         } else {
-            resetRecord[k] = undefined as unknown as never
+            resetRecord[k] = undefined
         }
     }
     return resetRecord

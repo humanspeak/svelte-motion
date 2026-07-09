@@ -38,7 +38,7 @@ test.describe('layoutId shared layout animation', () => {
         // Wait for new underline to appear under tab 1
         await page.waitForFunction(
             (tab1Left) => {
-                const el = document.querySelector('[data-testid="underline"]') as HTMLElement | null
+                const el = document.querySelector<HTMLElement>('[data-testid="underline"]')
                 if (!el) return false
                 const rect = el.getBoundingClientRect()
                 // The underline should be positioned within tab 1's bounds
@@ -57,9 +57,7 @@ test.describe('layoutId shared layout animation', () => {
 
         await page.waitForFunction(
             () => {
-                const underline = document.querySelector(
-                    '[data-testid="underline"]'
-                ) as HTMLElement | null
+                const underline = document.querySelector<HTMLElement>('[data-testid="underline"]')
                 if (!underline) return false
 
                 return getComputedStyle(underline).transform !== 'none'

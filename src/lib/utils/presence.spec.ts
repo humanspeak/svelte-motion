@@ -120,7 +120,7 @@ describe('presence context', () => {
         ctx.unregisterChild('k')
 
         // Clone should be added then removed after animation finishes
-        const clone = document.querySelector('[data-clone="true"]') as HTMLElement | null
+        const clone = document.querySelector<HTMLElement>('[data-clone="true"]')
         expect(clone).toBeTruthy()
     })
 
@@ -183,13 +183,13 @@ describe('presence context', () => {
         ctx.unregisterChild('k')
 
         // Clone should appear synchronously after unregister
-        let clone = document.querySelector('[data-clone="true"]') as HTMLElement | null
+        let clone = document.querySelector<HTMLElement>('[data-clone="true"]')
         expect(clone).toBeTruthy()
 
         // After finished promise resolves, clone should be removed
         await Promise.resolve()
         await Promise.resolve()
-        clone = document.querySelector('[data-clone="true"]') as HTMLElement | null
+        clone = document.querySelector<HTMLElement>('[data-clone="true"]')
         expect(clone).toBeFalsy()
     })
 })
@@ -541,7 +541,7 @@ describe('AnimatePresence modes', () => {
 
             ctx.unregisterChild('k1')
 
-            const clone = parent.querySelector('[data-clone="true"]') as HTMLElement | null
+            const clone = parent.querySelector<HTMLElement>('[data-clone="true"]')
             expect(clone).toBeTruthy()
             expect(clone?.style.top).toBe('64px')
             expect(clone?.style.left).toBe('32px')
@@ -609,9 +609,9 @@ describe('AnimatePresence modes', () => {
             ctx.registerChild('k1', el, { opacity: 0 })
             ctx.unregisterChild('k1')
 
-            const placeholder = document.querySelector(
+            const placeholder = document.querySelector<HTMLElement>(
                 '[data-presence-placeholder="true"]'
-            ) as HTMLElement | null
+            )
 
             expect(placeholder).toBeTruthy()
             expect(placeholder?.style.gridColumnStart).toBe('1')
