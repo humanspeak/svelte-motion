@@ -37,6 +37,15 @@
 > `element = hydrating ? element : create_element(next_tag, ns)`), so a
 > first-paint assertion after `page.goto` passes with **or without** the fix.
 > See the tag-casing test-plan bullet.
+>
+> Revision 2026-07-09 (c): **plan defect, corrected after the work passed.** Step 4
+> told the executor to run `pnpm --filter docs sitemap:manifest`; that script does
+> not exist. `docs/src/lib/sitemap-manifest.json` is gitignored
+> (`docs/.gitignore:36`) and emitted by a docs vite plugin at build time. The
+> criterion's intent — the new routes appear in the sitemap — was verified
+> independently (manifest contains `svg-animation`, 2 entries) **before** the PASS
+> was granted, so this edit records reality; it did not lower a bar to reach a
+> verdict. Step 4 and done-criterion 5 reworded.
 
 ## Status
 
@@ -45,8 +54,8 @@
 - **Risk**: MED
 - **Depends on**: none
 - **Category**: direction (upstream parity)
-- **Planned at**: commit `9557778`, 2026-07-09 (re-stamped on revision (b);
-  previously `af90f5a`; originally `634983b`, 2026-07-08)
+- **Planned at**: commit `599372b`, 2026-07-09 (re-stamped on revision (c);
+  previously `9557778`, `af90f5a`; originally `634983b`, 2026-07-08)
 - **Issue**: <https://github.com/humanspeak/svelte-motion/issues/435>
 
 ## Why this matters
@@ -247,7 +256,10 @@ Create `e2e/svg/motion-value-attributes.spec.ts` (model after an existing spec i
   `docs/src/lib/examples/svg-animation/`, example route under
   `docs/src/routes/examples/svg-animation/`, nav entry in
   `docs/src/lib/docsNav.ts`.
-- Regenerate sitemap: `pnpm --filter docs sitemap:manifest`.
+- Sitemap: nothing to run. `docs/src/lib/sitemap-manifest.json` is gitignored
+  (`docs/.gitignore:36`) and emitted by a docs vite plugin on build; the
+  `sitemap:manifest` script this plan originally named no longer exists. Confirm
+  the built manifest contains the new routes.
 - Match the structure of an existing docs page, e.g.
   `docs/src/routes/docs/transform-template/`.
 
@@ -291,7 +303,8 @@ clean; `pnpm exec playwright test e2e/svg` → pass.
 - [ ] `pnpm test` exits 0; new svg.spec.ts cases exist and pass
 - [ ] `pnpm exec playwright test e2e/svg` exits 0 incl. new spec
 - [ ] Demo route exists and is linked from `src/routes/+page.svelte`
-- [ ] Docs page exists with nav entry; sitemap regenerated
+- [ ] Docs page exists with nav entry; the build-generated sitemap manifest
+      contains the new routes (see Step 4 — there is no `sitemap:manifest` script)
 - [ ] `git status` shows no modified files outside the in-scope list
 - [ ] Batch README status row updated
 - [ ] Tag-casing assertion runs against a **client-created** element (post-remount),

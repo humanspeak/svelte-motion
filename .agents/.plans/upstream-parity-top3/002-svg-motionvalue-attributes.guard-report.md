@@ -112,20 +112,30 @@ src/lib/utils/svg.ts` → **0**), 8 (tag test asserted on a parser-created node)
 
 ## Plan defect 1 — criterion 5's sitemap command no longer exists (not executor drift)
 
-Step 4 says `pnpm --filter docs sitemap:manifest`; no such script exists.
+Step 4 said `pnpm --filter docs sitemap:manifest`; no such script exists.
 `docs/src/lib/sitemap-manifest.json` is gitignored (`docs/.gitignore:36`) and emitted by
 a docs vite plugin at build. Verified on intent: the manifest contains `svg-animation`
-(2 entries) and docs check is clean. Plan text is stale, the work is not. **Not amended**
-— nothing needed lowering to reach PASS.
+(2 entries) and docs check is clean. Plan text was stale, the work was not.
 
-## Environment hazard worth fixing (outside this plan)
+**Amended after the verdict** (revision (c), `Planned at` → `599372b`), with the
+operator's agreement. The sequence is the point: the criterion's intent was verified
+independently and PASS was granted _first_, with the defect recorded as "PASS on intent".
+The plan was then corrected to describe the repo as it is. No bar was lowered to reach a
+verdict — that inversion is the one thing this process exists to prevent.
 
-`playwright.config.ts:21` sets `reuseExistingServer: !process.env.CI`. During this gate,
-a stale preview server left over on port 4198 caused a worktree run with the fix
-**reverted** to pass — it was silently served the old, fixed build. Guard caught it via
-`lsof` and re-ran with `CI=1`, which produced the correct failures. Any local e2e run can
-be validated against a stale build this way. The port pin (4198) prevents cross-repo
-collisions but not stale-server reuse.
+## Environment hazard — found at this gate, now fixed (`1fca5bb`)
+
+`playwright.config.ts:21` set `reuseExistingServer: !process.env.CI`, which
+short-circuits the rebuild in the webServer `command`. During this gate a stale preview
+server on port 4198 caused a worktree run with the fix **reverted** to pass — it was
+silently served the old, fixed build. Guard caught it via `lsof` and re-ran under `CI=1`
+to get the true failures. Any local e2e run could be validated against a stale build this
+way; the 4198 pin prevents cross-repo collisions but not stale-server reuse.
+
+Reuse is now opt-in (`PW_REUSE_SERVER=1`); unset with the port occupied, the run aborts
+with "already used". CI is unaffected. `playwright.config.ts` is **outside** plan 002's
+in-scope list — included at the operator's request, authored by a dispatched executor,
+reviewed by guard. Recorded so the scope-audit exception is explicit, not silent.
 
 ## Quality notes
 

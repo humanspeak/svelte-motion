@@ -498,3 +498,39 @@ PR #441 was opened under the earlier PASS and is now re-validated at `1f593e2`.
 Guard stops. Merging is the operator's call.
 
 ---
+
+## Checkpoint 2026-07-09 — `guard parity 2` — PLAN AMENDED (rev (c)) + infra fix
+
+- **Verdict**: PLAN AMENDED. The PASS at `1f593e2` stands, unchanged.
+- **Snapshot**: `1fca5bb`.
+
+### Revision (c) — plan defect corrected _after_ the verdict, not to reach it
+
+Step 4 instructed `pnpm --filter docs sitemap:manifest`; no such script exists.
+`docs/src/lib/sitemap-manifest.json` is gitignored (`docs/.gitignore:36`) and emitted by
+a docs vite plugin at build. Step 4 and done-criterion 5 now describe that reality.
+
+The ordering matters and is the whole reason this is not laundering: criterion 5's
+**intent** was verified independently (built manifest contains `svg-animation`, 2
+entries; docs check 0 errors) _before_ PASS was granted, with the criterion recorded as
+"PASS on intent" and the defect named. The plan text was wrong about the repo; the work
+was not wrong about the plan. `Planned at` re-stamped `9557778` → `599372b`.
+
+### e2e stale-server hazard — fixed (out of scope, operator-approved)
+
+`playwright.config.ts:21` had `reuseExistingServer: !process.env.CI`, which
+short-circuits the rebuild in the webServer `command`. A stale preview on 4198 is
+reused, so the suite validates against **old code**. Reproduced at this plan's own final
+gate: a worktree run with the fix reverted **passed**, served the previous fixed build;
+`lsof` found the leftover server, and `CI=1` produced the true failures.
+
+Reuse is now opt-in via `PW_REUSE_SERVER=1`. Unset + occupied port → the run aborts with
+"already used" rather than quietly lying. CI behavior is unchanged (it never set the new
+var, and previously derived `false` from the CI check). Test-infra only; no library code.
+
+`playwright.config.ts` is **not** in plan 002's in-scope list. It is included at the
+operator's request and recorded here so the scope audit's exception is explicit rather
+than silent. Authored by a dispatched executor and reviewed by guard, per separation of
+powers.
+
+---
