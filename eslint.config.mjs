@@ -28,7 +28,7 @@ export default [
         ]
     },
     js.configs.recommended,
-    ...ts.configs.recommended,
+    ...ts.configs.recommendedTypeChecked,
     ...svelte.configs['flat/recommended'],
     prettier,
     ...svelte.configs['flat/prettier'],
@@ -85,6 +85,54 @@ export default [
         },
         rules: {
             'prefer-const': ['off']
+        }
+    },
+    {
+        // Type-aware parsing — root package only, never docs/** (docs has its
+        // own generated ESLint config owned by docs-kit).
+        //
+        // Only paths reachable by a real tsconfig are listed. Root config files
+        // (`vitest.config.ts`, `playwright.config.ts`, `global.d.ts`, …) and
+        // `scripts/**` live in no tsconfig, and `projectService.allowDefaultProject`
+        // cannot rescue them here: Trunk runs ESLint against a temp sandbox copy of
+        // each file, so the sandboxed path never matches a glob resolved against
+        // `tsconfigRootDir`. They fall through to the disableTypeChecked guard below.
+        files: ['src/**/*.ts', 'src/**/*.svelte', 'src/**/*.svelte.ts', 'e2e/**/*.ts'],
+        languageOptions: {
+            parserOptions: {
+                projectService: true,
+                tsconfigRootDir: import.meta.dirname,
+                extraFileExtensions: ['.svelte']
+            }
+        }
+    },
+    {
+        // No type info here (plain JS, root config files outside every tsconfig,
+        // and docs/** when its generated config is absent) — typed rules off,
+        // untyped recommended still applies.
+        files: [
+            '**/*.js',
+            '**/*.mjs',
+            '**/*.cjs',
+            'docs/**',
+            '*.ts',
+            '*.d.ts',
+            'scripts/**/*.ts'
+        ],
+        ...ts.configs.disableTypeChecked
+    },
+    {
+        // Tests + internal demo routes deliberately bridge motion-dom internals
+        // through `any`; the unsafe-* family is noise there — now and for
+        // future test code. Library source (src/lib non-spec) keeps these rules.
+        files: ['**/*.spec.ts', '**/*.test.ts', '**/__tests__/**', 'src/routes/tests/**', 'e2e/**'],
+        rules: {
+            '@typescript-eslint/no-explicit-any': 'off',
+            '@typescript-eslint/no-unsafe-argument': 'off',
+            '@typescript-eslint/no-unsafe-assignment': 'off',
+            '@typescript-eslint/no-unsafe-call': 'off',
+            '@typescript-eslint/no-unsafe-member-access': 'off',
+            '@typescript-eslint/no-unsafe-return': 'off'
         }
     },
     {
