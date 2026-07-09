@@ -80,16 +80,18 @@ primitives, no.
 
 The plan existed because a `MotionValue` passed as any non-path SVG attribute
 was spread raw and stringified as `[object Object]`, and because `attrX/attrY/attrScale`
-did not exist. Both are closed, and the e2e asserts the absence of `[object Object]`
-in the hydrated DOM _and_ in the raw SSR payload (`request.get`, not a hydrated
-snapshot). Scroll-linked rings, chart lines, and filter primitives now work.
+did not exist. The `attr*` family is closed, and the e2e asserts the absence of
+`[object Object]` in the hydrated DOM _and_ in the raw SSR payload (`request.get`, not a
+hydrated snapshot) — but only for the keys the demo exercises. Scroll-linked rings and
+chart lines work. Filter primitives work **only** through `attrScale`; a bare
+`stdDeviation={mv}` still stringifies (Blocker 1).
 
 The work also exceeded the plan in one way that matters: it fixed SVG **tag-name**
 casing (revision (b), operator-approved). `motion.fedisplacementmap` was rendering an
 inert generic `SVGElement` — the filter primitive was silently ignored. That was never
 in the original plan and would have blocked Plan 005.
 
-## Done criteria — every one re-run at `8f51399`, not trusted
+## Done criteria — every one re-run at `8f51399` (all green, and insufficient — see Blocker 1)
 
 | #   | Criterion                                           | Result                                                        |
 | --- | --------------------------------------------------- | ------------------------------------------------------------- |
