@@ -376,3 +376,27 @@ remount. Now normative in the plan's test plan and a new done criterion.
   that point 5 stayed unbuilt.
 
 ---
+
+## Checkpoint 2026-07-09 — `guard parity 2 final` — PASS
+
+- **Verdict**: **PASS** — close-out report written to
+  `002-svg-motionvalue-attributes.guard-report.md`; PR #441 opened.
+- **Snapshot**: `54b7620` (source gates at `8f51399`; `54b7620` is docs-only).
+- **Drift check** `9557778..HEAD` on in-scope source → empty.
+- **Scope audit** `3b16d0a...54b7620` → every file in the plan's in-scope list.
+- **Done criteria, all re-run**: check 0 errors; unit 745/745; full e2e 315 passed /
+  2 skipped (both pre-existing, in untouched files) / 0 failed; docs check 0 errors;
+  `trunk check` clean; demo linked; README row DONE; tag-casing asserted post-remount.
+- **Finding 8 closed by experiment** — in a throwaway worktree the fix was reverted
+  (`this={renderTag}` → `this={tag}`) and the tag test **failed** at `spec.ts:186`.
+  The test is genuinely non-vacuous. Real tree never mutated; worktree removed.
+- **Findings 1-7 closed**; point 5 respected (`grep -c getAttribute svg.ts` → 0, no
+  dead read-back path built).
+- **Plan defect 1** (criterion 5's `sitemap:manifest` script no longer exists; manifest
+  is gitignored + vite-plugin-generated, and contains `svg-animation`) — verified on
+  intent, **not amended**. No criterion was weakened to reach PASS.
+- **Late edit caught at PR preflight**: tree went dirty after the gates; publication was
+  stopped, the diff read (docs-only, 0 files under `src/`/`e2e/`), snapshotted as
+  `54b7620`, and the two affected gates re-run before pushing.
+
+---
