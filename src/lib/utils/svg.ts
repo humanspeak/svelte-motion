@@ -619,9 +619,9 @@ export const computeNormalizedSVGInitialAttrs = (
         return s.startsWith('-') ? s : /^[\d.]+(px)?$/i.test(s) ? `-${s.replace(/px$/i, '')}` : s
     }
 
-    const len = (initial as Record<string, unknown>).pathLength ?? 0
-    const spa = (initial as Record<string, unknown>).pathSpacing ?? 1
-    const off = (initial as Record<string, unknown>).pathOffset ?? 0
+    const len = initial.pathLength ?? 0
+    const spa = initial.pathSpacing ?? 1
+    const off = initial.pathOffset ?? 0
 
     const dashArray = `${toUnitless(len)} ${toUnitless(spa)}`
     const dashOffset = negate(off)

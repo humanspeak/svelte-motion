@@ -20,7 +20,7 @@ test.describe('drag/pointer-cancel', () => {
         // lets the card overdrag visibly). Then fire pointercancel
         // directly from JS — simulating an OS interrupt mid-drag.
         const result = await page.evaluate(async () => {
-            const el = document.querySelector('[data-testid="drag-card"]') as HTMLElement | null
+            const el = document.querySelector<HTMLElement>('[data-testid="drag-card"]')
             if (!el) throw new Error('no card')
             const r = el.getBoundingClientRect()
             const cx = r.left + r.width / 2

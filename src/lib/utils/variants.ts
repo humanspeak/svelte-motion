@@ -136,7 +136,7 @@ export const resolveInitial = (
     if (initial === undefined) return undefined
     if (typeof initial === 'string' || Array.isArray(initial))
         return resolveVariantList(variants, initial, custom)
-    return initial as DOMKeyframesDefinition
+    return initial
 }
 
 /**
@@ -169,7 +169,7 @@ export const resolveAnimate = (
     if (animate === undefined) return undefined
     if (typeof animate === 'string' || Array.isArray(animate))
         return resolveVariantList(variants, animate, custom)
-    return animate as DOMKeyframesDefinition
+    return animate
 }
 
 /**

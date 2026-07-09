@@ -122,10 +122,10 @@ describe('utils/augmentMotionValue:bridgeReadableToMotionValue', () => {
         const { value: bridge, dispose } = bridgeReadableToMotionValue(w)
         // Wrap the bridge's set to count post-construction writes.
         const originalSet = bridge.set.bind(bridge)
-        bridge.set = ((v: number) => {
+        bridge.set = (v: number) => {
             setCount++
             originalSet(v)
-        }) as typeof bridge.set
+        }
         // The constructor's initial readable emit must NOT have called set
         // (it would have run during bridgeReadableToMotionValue's body, but
         // even ignoring that we want subsequent emits to be the only writes

@@ -68,7 +68,7 @@ test.describe('drag/mobile-drawer', () => {
         await expect(page.getByTestId('drawer')).toBeVisible()
         const settledY = await readY(page)
         expect(settledY).not.toBeNull()
-        expect(Math.abs(settledY as number)).toBeLessThan(5)
+        expect(Math.abs(settledY)).toBeLessThan(5)
     })
 
     test('the bound y MotionValue is elastic-damped, not double-applied', async ({ page }) => {
@@ -82,8 +82,8 @@ test.describe('drag/mobile-drawer', () => {
         const yAtRelease = await dragHandleBy(page, 280)
 
         expect(yAtRelease).not.toBeNull()
-        expect(yAtRelease as number).toBeGreaterThan(110)
-        expect(yAtRelease as number).toBeLessThan(180)
+        expect(yAtRelease).toBeGreaterThan(110)
+        expect(yAtRelease).toBeLessThan(180)
     })
 
     test('clicking the backdrop closes the drawer', async ({ page }) => {

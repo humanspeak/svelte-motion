@@ -147,7 +147,7 @@ describe('_MotionContainer', () => {
 
     it('whileHover accepts a variant key string and resolves it against `variants` (#349)', async () => {
         // Enable true-hover environment so the whileHover effect attaches.
-        vi.stubGlobal('matchMedia', ((query: string) => {
+        vi.stubGlobal('matchMedia', (query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
             return {
                 matches,
@@ -161,7 +161,7 @@ describe('_MotionContainer', () => {
                     return false
                 }
             } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
+        })
 
         const variants = { hover: { scale: 1.2 } }
 
@@ -189,7 +189,7 @@ describe('_MotionContainer', () => {
     })
 
     it('whileHover accepts an array of variant keys, merging later-wins (#349)', async () => {
-        vi.stubGlobal('matchMedia', ((query: string) => {
+        vi.stubGlobal('matchMedia', (query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
             return {
                 matches,
@@ -203,7 +203,7 @@ describe('_MotionContainer', () => {
                     return false
                 }
             } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
+        })
 
         // Two variants colliding on `color` — `muted` is later in the
         // array, so its color wins. `hover`'s `scale` is preserved.
@@ -240,7 +240,7 @@ describe('_MotionContainer', () => {
         // undefined → `isNotEmpty` gate skips attach. The hover path
         // never installs listeners, so no animate call follows
         // pointerEnter.
-        vi.stubGlobal('matchMedia', ((query: string) => {
+        vi.stubGlobal('matchMedia', (query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
             return {
                 matches,
@@ -254,7 +254,7 @@ describe('_MotionContainer', () => {
                     return false
                 }
             } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
+        })
 
         /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
@@ -439,7 +439,7 @@ describe('_MotionContainer', () => {
             observe() {}
             disconnect() {}
         }
-        vi.stubGlobal('ResizeObserver', FakeResizeObserver as unknown as typeof ResizeObserver)
+        vi.stubGlobal('ResizeObserver', FakeResizeObserver)
 
         // Mock element rects to simulate size change
         let currentRect = {
@@ -501,7 +501,7 @@ describe('_MotionContainer', () => {
             observe() {}
             disconnect() {}
         }
-        vi.stubGlobal('ResizeObserver', FakeResizeObserver as unknown as typeof ResizeObserver)
+        vi.stubGlobal('ResizeObserver', FakeResizeObserver)
 
         let currentRect = {
             left: 0,
@@ -544,7 +544,7 @@ describe('_MotionContainer', () => {
 
     it('whileHover animates on enter/leave, uses nested transition, and fires callbacks', async () => {
         // Enable true-hover environment
-        vi.stubGlobal('matchMedia', ((query: string) => {
+        vi.stubGlobal('matchMedia', (query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
             return {
                 matches,
@@ -558,7 +558,7 @@ describe('_MotionContainer', () => {
                     return false
                 }
             } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
+        })
 
         const onHoverStart = vi.fn()
         const onHoverEnd = vi.fn()

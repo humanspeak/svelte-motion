@@ -118,11 +118,11 @@ export const computeHoverBaseline = (
     }
 ): Record<string, unknown> => {
     const baseline: Record<string, unknown> = {}
-    const initialRecord = (opts.initial ?? {}) as Record<string, unknown>
-    const animateRecord = (opts.animate ?? {}) as Record<string, unknown>
-    const whileHoverRecordRaw = (opts.whileHover ?? {}) as Record<string, unknown>
+    const initialRecord = opts.initial ?? {}
+    const animateRecord = opts.animate ?? {}
+    const whileHoverRecordRaw = opts.whileHover ?? {}
     const whileHoverRecord = { ...whileHoverRecordRaw } as Record<string, unknown>
-    delete (whileHoverRecord as Record<string, unknown>).transition
+    delete whileHoverRecord.transition
 
     const neutralTransformDefaults: Record<string, unknown> = {
         x: 0,
@@ -171,7 +171,7 @@ export const computeHoverBaseline = (
             baseline[key] = animateRecord[key]
         } else if (Object.prototype.hasOwnProperty.call(initialRecord, key)) {
             baseline[key] = initialRecord[key]
-        } else if (key in (neutralTransformDefaults as Record<string, unknown>)) {
+        } else if (key in neutralTransformDefaults) {
             baseline[key] = neutralTransformDefaults[key]
         } else {
             // Check if inline style has a CSS variable for this property
@@ -179,7 +179,7 @@ export const computeHoverBaseline = (
             if (inlineValue) {
                 baseline[key] = inlineValue
             } else if (key in (cs as unknown as Record<string, unknown>)) {
-                baseline[key] = (cs as unknown as Record<string, unknown>)[key] as string
+                baseline[key] = (cs as unknown as Record<string, unknown>)[key]
             }
         }
     }
@@ -264,7 +264,7 @@ export const attachWhileHover = (
             animate(
                 el,
                 nativeKeyframes as unknown as DOMKeyframesDefinition,
-                (transition ?? mergedTransition) as AnimationOptions
+                transition ?? mergedTransition
             )
         }
 

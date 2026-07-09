@@ -177,7 +177,7 @@ export const collectMotionStyleValues = (
     const values: Record<string, MotionValue> = {}
     for (const [key, value] of Object.entries(style)) {
         if (isMotionValue(value)) {
-            values[key] = value as MotionValue
+            values[key] = value
         }
     }
 

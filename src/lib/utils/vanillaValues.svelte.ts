@@ -85,7 +85,7 @@ export function springValue<T extends number | string>(
     options?: SpringValueOptions
 ): AugmentedMotionValue<T> {
     if (typeof source === 'number' || typeof source === 'string') {
-        return augmentMotionValue(springValueCore<T>(source as T, options))
+        return augmentMotionValue(springValueCore<T>(source, options))
     }
     const { value, dispose } = resolveMotionValueSource(source)
     return augmentMotionValue(springValueCore<T>(value, options), dispose)

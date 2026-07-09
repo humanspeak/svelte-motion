@@ -442,10 +442,7 @@
 
     // Compute merged transition without mutating props to avoid effect write loops
     const mergedTransition = $derived<AnimationOptions>(
-        mergeTransitions(
-            (motionConfig?.transition ?? {}) as AnimationOptions,
-            (transitionProp ?? {}) as AnimationOptions
-        )
+        mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {})
     )
 
     // Register onDestroy at component level (guaranteed to work in Svelte 5)
@@ -500,11 +497,7 @@
         return () => {
             cancelAnimationFrame(rafId)
             if (layoutIdLastRect && scopedLayoutId) {
-                layoutIdRegistry.snapshot(
-                    scopedLayoutId,
-                    layoutIdLastRect,
-                    (mergedTransition ?? {}) as AnimationOptions
-                )
+                layoutIdRegistry.snapshot(scopedLayoutId, layoutIdLastRect, mergedTransition ?? {})
             }
         }
     })
@@ -529,7 +522,7 @@
                 presenceKey,
                 element,
                 filteredExit,
-                mergedTransition as unknown as MotionTransition,
+                mergedTransition,
                 resolvePresenceExit
             )
         }
@@ -762,7 +755,7 @@
     const optimizedAppearEntries = $derived(
         createOptimizedAppearData(
             initialKeyframes as Record<string, unknown> | undefined,
-            animateKeyframes as Record<string, unknown> | undefined,
+            animateKeyframes,
             mergedTransition
         )
     )
@@ -1042,8 +1035,8 @@
 
     const getTemplatedTransformInitialValue = (key: string, target: unknown): unknown => {
         const fromInitial =
-            initialKeyframes && key in (initialKeyframes as Record<string, unknown>)
-                ? getFirstKeyframeValue((initialKeyframes as Record<string, unknown>)[key])
+            initialKeyframes && key in initialKeyframes
+                ? getFirstKeyframeValue(initialKeyframes[key])
                 : undefined
         if (fromInitial != null) return fromInitial
 
@@ -1224,10 +1217,7 @@
         } as DOMKeyframesDefinition) as Record<string, unknown> | undefined
         if (!finalTarget) return
 
-        const transformedTarget = transformSVGPathProperties(element, finalTarget) as Record<
-            string,
-            unknown
-        >
+        const transformedTarget = transformSVGPathProperties(element, finalTarget)
         if (!transformTemplateProp) {
             animate(element, transformedTarget as DOMKeyframesDefinition, { duration: 0 })
         }
@@ -1305,7 +1295,7 @@
         const payload = transformSVGPathProperties(
             element,
             svgPathFinished.length > 0 ? stripSVGPathKeyframes(target) : target
-        ) as Record<string, unknown>
+        )
 
         // Imperative controls (useAnimationControls/useAnimate) animate transforms
         // too — notify will-change here just like the declarative path does.
@@ -1319,14 +1309,13 @@
         if (isNotEmpty(payload)) {
             const shouldAnimateThroughTransformTemplate =
                 !!transformTemplateProp &&
-                splitTemplatedTransformPayload(payload as Record<string, unknown>)
-                    .hasTemplatePayload
+                splitTemplatedTransformPayload(payload).hasTemplatePayload
 
             if (shouldAnimateThroughTransformTemplate) {
                 promises.push(
                     animateTemplatedTransformPayload(
                         payload,
-                        transitionAnimate as unknown as AnimationOptions,
+                        transitionAnimate,
                         () => {},
                         () => {}
                     )
@@ -1335,11 +1324,7 @@
                 cleanupTemplatedTransformAnimations()
                 promises.push(
                     trackAnimationControlsControl(
-                        animate(
-                            element,
-                            payload as DOMKeyframesDefinition,
-                            transitionAnimate as AnimationOptions
-                        )
+                        animate(element, payload as DOMKeyframesDefinition, transitionAnimate)
                     )
                 )
             }
@@ -1437,9 +1422,7 @@
             // its from-value and we promote to 'ready' — see the lifecycle
             // around the enter rAF). mergeInlineStyles prefers this slot when
             // non-empty, so it wins over the animate slot below in these phases.
-            isLoaded === 'mounting' || isLoaded === 'initial'
-                ? (initialKeyframes as unknown as Record<string, unknown>)
-                : undefined,
+            isLoaded === 'mounting' || isLoaded === 'initial' ? initialKeyframes : undefined,
             // The "target" slot. Only AFTER the enter animation completes does
             // the target become the inline baseline, so the element holds it
             // once WAAPI surrenders the property (default fill:'none' would
@@ -1457,12 +1440,12 @@
                 : animateControls &&
                     !animationControlsHasReceivedCommand &&
                     isNotEmpty(initialKeyframes)
-                  ? (initialKeyframes as unknown as Record<string, unknown>)
+                  ? initialKeyframes
                   : animateControls && animationControlsHasReceivedCommand
                     ? lastAnimationControlsTarget
                     : isNotEmpty(initialKeyframes)
                       ? !effectiveAnimate
-                          ? (initialKeyframes as unknown as Record<string, unknown>)
+                          ? initialKeyframes
                           : undefined
                       : renderedAnimateBaseline,
             transformTemplateProp
@@ -1547,9 +1530,7 @@
         // Compute via svg utils (no dynamic import in SSR/derived expressions)
         ...(() => {
             if (!initialKeyframes) return {}
-            const attrs = computeNormalizedSVGInitialAttrs(
-                initialKeyframes as Record<string, unknown>
-            )
+            const attrs = computeNormalizedSVGInitialAttrs(initialKeyframes)
             if (attrs) {
                 return attrs
             }
@@ -1585,12 +1566,12 @@
         // defer attaching drag until the ref exists to avoid an unconstrained first drag.
         if (dragConstraintsProp === null) return
 
-        const controls = dragControlsProp as DragControls | undefined
+        const controls = dragControlsProp
         const dragRuntimeOptions = untrack(() => ({
-            whileDrag: resolvedWhileDrag as MotionWhileDrag,
-            mergedTransition: (mergedTransition ?? {}) as AnimationOptions,
+            whileDrag: resolvedWhileDrag,
+            mergedTransition: mergedTransition ?? {},
             baselineSources: {
-                initial: (initialKeyframes ?? {}) as Record<string, unknown>,
+                initial: initialKeyframes ?? {},
                 animate: (resolvedAnimate ?? {}) as Record<string, unknown>
             },
             // Bound `style` MotionValues (e.g. `style={{ y }}`) for the dragged
@@ -1611,10 +1592,10 @@
         }))
         const opts = {
             axis,
-            constraints: dragConstraintsProp as DragConstraints | undefined,
-            elastic: dragElasticProp as DragElastic | undefined,
-            momentum: dragMomentumProp as boolean | undefined,
-            transition: dragTransitionProp as DragTransition | undefined,
+            constraints: dragConstraintsProp,
+            elastic: dragElasticProp,
+            momentum: dragMomentumProp,
+            transition: dragTransitionProp,
             directionLock: !!dragDirectionLockProp,
             listener: dragListenerProp !== false,
             controls,
@@ -1626,7 +1607,7 @@
                 onEnd: onDragEndProp as (e: PointerEvent, info: DragInfo) => void,
                 onDirectionLock: onDirectionLockProp as (axis: 'x' | 'y') => void,
                 onTransitionEnd: () => {
-                    ;(onDragTransitionEndProp as (() => void) | undefined)?.()
+                    onDragTransitionEndProp?.()
                 },
                 onVisualUpdate: (transform: string) => {
                     liveGestureTransform = transform || null
@@ -1635,7 +1616,7 @@
             baselineSources: dragRuntimeOptions.baselineSources,
             getBaseTransform: () => splitSerializedTransform(serializedStyleProp).transform,
             propagation: !!dragPropagationProp,
-            snapToOrigin: dragSnapToOriginProp as boolean | 'x' | 'y' | undefined,
+            snapToOrigin: dragSnapToOriginProp,
             boundMotionValues: dragRuntimeOptions.boundMotionValues
         }
 
@@ -1721,7 +1702,7 @@
                 // inline writes (cursor, pointer-events) since the baseline
                 // sniffs `animate` → `initial` → computed style → inline style.
                 whilePanBaseline = computeHoverBaseline(element, {
-                    initial: (initialKeyframes ?? {}) as Record<string, unknown>,
+                    initial: initialKeyframes ?? {},
                     animate: (resolvedAnimate ?? {}) as Record<string, unknown>,
                     whileHover: (resolvedWhilePan ?? {}) as Record<string, unknown>
                 })
@@ -1732,7 +1713,7 @@
                 animateWithLifecycle(
                     element,
                     keyframes as unknown as DOMKeyframesDefinition,
-                    (transition ?? mergedTransition ?? {}) as unknown as AnimationOptions
+                    transition ?? mergedTransition ?? {}
                 )
             }
             onPanStartProp?.(event, info)
@@ -1743,7 +1724,7 @@
                 animateWithLifecycle(
                     element,
                     whilePanBaseline as unknown as DOMKeyframesDefinition,
-                    (mergedTransition ?? {}) as unknown as AnimationOptions
+                    mergedTransition ?? {}
                 )
             }
             activeWhilePanKeyframes = null
@@ -1835,27 +1816,22 @@
         const rawPayload = filterReducedMotionKeyframes(
             $state.snapshot(resolvedAnimate) as Record<string, unknown>,
             reducedMotion
-        ) as Record<string, unknown>
+        )
         const { target: rawTarget, transition: transitionAnimate } =
             extractTargetTransition(rawPayload)
         const svgPathFinished =
             isSVGPathElement(element) && hasSVGPathProperties(rawTarget)
                 ? animateSVGPathAttributes(element, rawTarget, transitionAnimate)
                 : []
-        let payload = (
-            svgPathFinished.length > 0 ? stripSVGPathKeyframes(rawTarget) : rawTarget
-        ) as typeof rawTarget
+        let payload = svgPathFinished.length > 0 ? stripSVGPathKeyframes(rawTarget) : rawTarget
 
         // Transform SVG path properties (pathLength, pathOffset) to their CSS equivalents
-        payload = transformSVGPathProperties(
-            element,
-            payload as Record<string, unknown>
-        ) as typeof payload
+        payload = transformSVGPathProperties(element, payload)
 
         // Ensure dash properties aren't pinned as inline styles
-        if (element && (element as HTMLElement).style) {
-            ;(element as HTMLElement).style.removeProperty('stroke-dasharray')
-            ;(element as HTMLElement).style.removeProperty('stroke-dashoffset')
+        if (element && element.style) {
+            element.style.removeProperty('stroke-dasharray')
+            element.style.removeProperty('stroke-dashoffset')
         }
 
         pwLog('[motion] executeAnimation animating', {
@@ -1863,7 +1839,7 @@
             transitionAnimate
         })
 
-        notifyWillChange(Object.keys(payload as Record<string, unknown>))
+        notifyWillChange(Object.keys(payload))
 
         // A fresh run owns the transform again until it completes.
         enterAnimationSettled = false
@@ -1879,28 +1855,23 @@
             onAnimationCompleteProp?.(def)
         }
         const shouldAnimateThroughTransformTemplate =
-            !!transformTemplateProp &&
-            splitTemplatedTransformPayload(payload as Record<string, unknown>).hasTemplatePayload
+            !!transformTemplateProp && splitTemplatedTransformPayload(payload).hasTemplatePayload
 
         if (isNotEmpty(payload) && shouldAnimateThroughTransformTemplate) {
             animateTemplatedTransformPayload(
-                payload as Record<string, unknown>,
-                transitionAnimate as unknown as AnimationOptions,
-                (def) =>
-                    onAnimationStartProp?.(def as unknown as DOMKeyframesDefinition | undefined),
-                (def) =>
-                    completeEnterAnimation(def as unknown as DOMKeyframesDefinition | undefined)
+                payload,
+                transitionAnimate,
+                (def) => onAnimationStartProp?.(def as DOMKeyframesDefinition | undefined),
+                (def) => completeEnterAnimation(def as DOMKeyframesDefinition | undefined)
             )
         } else if (isNotEmpty(payload)) {
             cleanupTemplatedTransformAnimations()
             animateWithLifecycle(
                 element,
                 payload as unknown as DOMKeyframesDefinition,
-                transitionAnimate as unknown as AnimationOptions,
-                (def) =>
-                    onAnimationStartProp?.(def as unknown as DOMKeyframesDefinition | undefined),
-                (def) =>
-                    completeEnterAnimation(def as unknown as DOMKeyframesDefinition | undefined)
+                transitionAnimate,
+                (def) => onAnimationStartProp?.(def as DOMKeyframesDefinition | undefined),
+                (def) => completeEnterAnimation(def as DOMKeyframesDefinition | undefined)
             )
         } else if (svgPathFinished.length > 0) {
             onAnimationStartProp?.(rawPayload as unknown as DOMKeyframesDefinition)
@@ -1913,7 +1884,7 @@
         if (isJsdomRuntime()) {
             window.setTimeout(
                 () => completeEnterAnimation(),
-                getTransitionFallbackMs(transitionAnimate as AnimationOptions)
+                getTransitionFallbackMs(transitionAnimate)
             )
         }
     }
@@ -2068,7 +2039,7 @@
                     if (initialKeyframes && element) {
                         const transformedInitial = transformSVGPathProperties(
                             element,
-                            initialKeyframes as Record<string, unknown>
+                            initialKeyframes
                         )
                         animate(element, transformedInitial as DOMKeyframesDefinition, {
                             duration: 0
@@ -2487,11 +2458,7 @@
         const transforms = computeFlipTransforms(prev.rect, next, true)
 
         setCompositorHints(element, true)
-        runFlipAnimation(
-            element,
-            transforms,
-            (prev.transition ?? mergedTransition ?? {}) as AnimationOptions
-        )
+        runFlipAnimation(element, transforms, prev.transition ?? mergedTransition ?? {})
     })
 
     // whileTap handling via motion-dom's press()
@@ -2512,8 +2479,8 @@
                 hoverDef: isNotEmpty(resolvedWhileHover ?? {})
                     ? ((resolvedWhileHover ?? {}) as Record<string, unknown>)
                     : undefined,
-                hoverFallbackTransition: (mergedTransition ?? {}) as AnimationOptions,
-                tapTransition: (mergedTransition ?? {}) as AnimationOptions
+                hoverFallbackTransition: mergedTransition ?? {},
+                tapTransition: mergedTransition ?? {}
             }
         )
     })
@@ -2665,11 +2632,8 @@
                         extractTargetTransition(exitPayload)
 
                     pwLog('[motion] key transition: running exit', { exitKeyframes })
-                    await animate(
-                        element,
-                        exitKeyframes as DOMKeyframesDefinition,
-                        exitTransition as AnimationOptions
-                    ).finished
+                    await animate(element, exitKeyframes as DOMKeyframesDefinition, exitTransition)
+                        .finished
                 }
 
                 pwLog('[motion] key transition: exit done', {
@@ -2682,10 +2646,7 @@
 
                 // 2. Snap to initial state
                 if (initialKeyframes && element) {
-                    const transformedInitial = transformSVGPathProperties(
-                        element,
-                        initialKeyframes as Record<string, unknown>
-                    )
+                    const transformedInitial = transformSVGPathProperties(element, initialKeyframes)
                     pwLog('[motion] key transition: snapping to initial', { transformedInitial })
                     animate(element, transformedInitial as DOMKeyframesDefinition, { duration: 0 })
                 }
@@ -2848,9 +2809,7 @@
                             applyAnimateRestingStyle()
                             enterAnimationSettled = true
                             isLoaded = 'ready'
-                            onAnimationCompleteProp?.(
-                                resolvedAnimate as DOMKeyframesDefinition | undefined
-                            )
+                            onAnimationCompleteProp?.(resolvedAnimate)
                         })
                         .catch(() => {
                             isLoaded = 'ready'

@@ -66,8 +66,7 @@ describe('animateView', () => {
             // flushSync runs after this callback returns, inside the
             // wrapper — capture on the microtask right after.
         }).then(() => {
-            textDuringUpdate = host.querySelector('[data-testid="view-probe"]')
-                ?.textContent as string
+            textDuringUpdate = host.querySelector('[data-testid="view-probe"]')?.textContent
         })
         expect(textDuringUpdate).toBe('b')
 

@@ -133,8 +133,8 @@ const matchesPreset = (offset: ScrollOffset, preset: ProgressIntersection[]): bo
     const normalised = normaliseOffset(offset)
     if (!normalised) return false
     for (let i = 0; i < 2; i++) {
-        const o = normalised[i]!
-        const p = preset[i]!
+        const o = normalised[i]
+        const p = preset[i]
         if (o[0] !== p[0] || o[1] !== p[1]) return false
     }
     return true

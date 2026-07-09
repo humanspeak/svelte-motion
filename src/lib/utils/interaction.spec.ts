@@ -156,7 +156,7 @@ describe('utils/interaction', () => {
         const tapTransition = { type: 'tween' as const, duration: 0.5 }
         const cleanup = attachWhileTap(
             el,
-            { scale: 0.95, transition: inline } as unknown as Record<string, unknown>,
+            { scale: 0.95, transition: inline },
             { scale: 1 },
             {},
             { tapTransition }
@@ -188,7 +188,7 @@ describe('utils/interaction', () => {
             el,
             { scale: 0.95 },
             { scale: 1 },
-            { scale: 1, transition: animateInline } as unknown as Record<string, unknown>,
+            { scale: 1, transition: animateInline },
             { tapTransition }
         )
 
@@ -339,7 +339,7 @@ describe('utils/interaction', () => {
             matches: (_sel: string) => boolean
         }
         // Pretend environment is hover-capable
-        vi.stubGlobal('matchMedia', ((query: string) => {
+        vi.stubGlobal('matchMedia', (query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
             return {
                 matches,
@@ -353,7 +353,7 @@ describe('utils/interaction', () => {
                     return false
                 }
             } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
+        })
 
         // Simulate :hover state
         Object.defineProperty(el, 'matches', { value: (sel: string) => sel === ':hover' })
@@ -391,7 +391,7 @@ describe('utils/interaction', () => {
             matches: (_sel: string) => boolean
         }
         // Hover capable, but element not hovered
-        vi.stubGlobal('matchMedia', ((query: string) => {
+        vi.stubGlobal('matchMedia', (query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
             return {
                 matches,
@@ -405,7 +405,7 @@ describe('utils/interaction', () => {
                     return false
                 }
             } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
+        })
 
         Object.defineProperty(el, 'matches', { value: () => false })
 
@@ -434,7 +434,7 @@ describe('utils/interaction', () => {
             matches: (_sel: string) => boolean
         }
         // Hover capable
-        vi.stubGlobal('matchMedia', ((query: string) => {
+        vi.stubGlobal('matchMedia', (query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
             return {
                 matches,
@@ -448,7 +448,7 @@ describe('utils/interaction', () => {
                     return false
                 }
             } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
+        })
 
         // Throwing matches simulates environments where selector isn't supported
         Object.defineProperty(el, 'matches', {
@@ -482,7 +482,7 @@ describe('utils/interaction', () => {
         const el = document.createElement('div') as HTMLElement & {
             matches: (_sel: string) => boolean
         }
-        vi.stubGlobal('matchMedia', ((query: string) => {
+        vi.stubGlobal('matchMedia', (query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
             return {
                 matches,
@@ -496,7 +496,7 @@ describe('utils/interaction', () => {
                     return false
                 }
             } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
+        })
 
         Object.defineProperty(el, 'matches', { value: (sel: string) => sel === ':hover' })
 
@@ -526,7 +526,7 @@ describe('utils/interaction', () => {
         const el = document.createElement('div') as HTMLElement & {
             matches: (_sel: string) => boolean
         }
-        vi.stubGlobal('matchMedia', ((query: string) => {
+        vi.stubGlobal('matchMedia', (query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
             return {
                 matches,
@@ -540,7 +540,7 @@ describe('utils/interaction', () => {
                     return false
                 }
             } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
+        })
 
         Object.defineProperty(el, 'matches', { value: (sel: string) => sel === ':hover' })
 

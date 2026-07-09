@@ -69,7 +69,7 @@ test.describe('reorder/siblings-flip', () => {
         const topAtPointer = await page.evaluate(
             ([x, y]) =>
                 document
-                    .elementFromPoint(x as number, y as number)
+                    .elementFromPoint(x, y)
                     ?.closest('[data-testid]')
                     ?.getAttribute('data-testid'),
             [cx, pointerY]

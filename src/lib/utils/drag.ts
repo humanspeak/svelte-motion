@@ -245,7 +245,7 @@ export const resolveConstraints = (
     if (!constraints) return null
     if (isDomElement(constraints)) {
         if (!el) return null
-        const c = getRect(constraints as unknown as HTMLElement)
+        const c = getRect(constraints)
         const e = getRect(el)
         if (!c || !e) return null
         // Allow element to move within container bounds
@@ -420,7 +420,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     const elastic = resolveDragElastic(opts.elastic)
     const maxElastic = getMaxElastic(elastic)
     const momentum = opts.momentum !== false
-    const mergedTransition = (opts.mergedTransition ?? {}) as AnimationOptions
+    const mergedTransition = opts.mergedTransition ?? {}
 
     let constraints = resolveConstraints(el, opts.constraints)
     // Anchor constraints base:
@@ -483,7 +483,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
 
     const scalePositionWithinConstraints = () => {
         if (dragging || !constraints) return
-        const isElementRefConstraint = isDomElement(opts.constraints as unknown)
+        const isElementRefConstraint = isDomElement(opts.constraints)
         if (!isElementRefConstraint) return
 
         const oldBounds = getConstraintBounds(constraintsBase, constraints)
@@ -522,11 +522,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     }
 
     const stopConstraintResizeObserver =
-        isDomElement(opts.constraints as unknown) && typeof ResizeObserver !== 'undefined'
+        isDomElement(opts.constraints) && typeof ResizeObserver !== 'undefined'
             ? (() => {
                   const observer = new ResizeObserver(() => scalePositionWithinConstraints())
                   observer.observe(el)
-                  observer.observe(opts.constraints as unknown as HTMLElement)
+                  observer.observe(opts.constraints)
                   return () => observer.disconnect()
               })()
             : null
@@ -739,11 +739,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         const { scale, ...nativeKeyframes } = keyframes
         if (scale != null) animateManagedScale(scale, transition)
         if (Object.keys(nativeKeyframes).length > 0) {
-            animate(
-                el,
-                nativeKeyframes as DOMKeyframesDefinition,
-                (transition ?? mergedTransition) as AnimationOptions
-            )
+            animate(el, nativeKeyframes as DOMKeyframesDefinition, transition ?? mergedTransition)
         }
     }
 
@@ -830,7 +826,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         constraints = resolveConstraints(el, opts.constraints)
         pwLog('[drag] constraints (px)', { el: EL_ID, constraints })
         if (constraints) {
-            if (opts.constraints && !isDomElement(opts.constraints as unknown)) {
+            if (opts.constraints && !isDomElement(opts.constraints)) {
                 // Pixel constraints: always relative to original origin
                 constraintsBase = { x: 0, y: 0 }
             } else {
@@ -842,10 +838,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 base: { ...constraintsBase },
                 applied: { ...applied },
                 origin: { ...origin },
-                kind:
-                    opts.constraints && !isDomElement(opts.constraints as unknown)
-                        ? 'pixel'
-                        : 'element'
+                kind: opts.constraints && !isDomElement(opts.constraints) ? 'pixel' : 'element'
             })
         }
 
@@ -1487,5 +1480,5 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         )
     }
 
-    return Object.assign(teardown, { adjustOrigin }) as AttachDragCleanup
+    return Object.assign(teardown, { adjustOrigin })
 }

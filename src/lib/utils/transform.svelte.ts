@@ -328,9 +328,7 @@ export function useTransform<O>(
     ) {
         // Resolve the source ONCE so all keys share a single bridge (a
         // readable/getter source must not be subscribed per key).
-        const { value: numericSource, dispose: disposeBridge } = resolveMotionValueSource(
-            source as MotionValueSource<number>
-        )
+        const { value: numericSource, dispose: disposeBridge } = resolveMotionValueSource(source)
         const outputMap = outputOrOutputMap as TransformOutputMap<O>
         const keys = Object.keys(outputMap)
         const result: { [key: string]: AugmentedMotionValue<O> } = {}
@@ -355,12 +353,7 @@ export function useTransform<O>(
     // The vanilla factory resolves the source (bridging readables/getters)
     // and chains that bridge's teardown onto the value's own destroy.
     const output = (outputOrOutputMap as O[]) ?? []
-    const value = createMapValue(
-        source as MotionValueSource<number>,
-        input,
-        output,
-        options as TransformOptions<O> | undefined
-    )
+    const value = createMapValue(source, input, output, options as TransformOptions<O> | undefined)
     $effect(() => () => value.destroy())
     return value
 }

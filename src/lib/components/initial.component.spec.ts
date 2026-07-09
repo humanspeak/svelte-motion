@@ -16,7 +16,7 @@ describe('motion component with initial={false}', () => {
             }
         })
 
-        const element = container.querySelector('[data-testid="test-element"]') as HTMLElement
+        const element = container.querySelector<HTMLElement>('[data-testid="test-element"]')!
         expect(element).toBeTruthy()
 
         await vi.runAllTimersAsync()
@@ -32,7 +32,7 @@ describe('motion component with initial={false}', () => {
             }
         })
 
-        const element = container.querySelector('[data-testid="test-element"]') as HTMLElement
+        const element = container.querySelector<HTMLElement>('[data-testid="test-element"]')!
         expect(element).toBeTruthy()
 
         await vi.runAllTimersAsync()
@@ -48,7 +48,7 @@ describe('motion component with initial={false}', () => {
             }
         })
 
-        const element = container.querySelector('[data-testid="list-item"]') as HTMLElement
+        const element = container.querySelector<HTMLElement>('[data-testid="list-item"]')!
         expect(element).toBeTruthy()
         expect(element.tagName.toLowerCase()).toBe('li')
 
@@ -73,7 +73,7 @@ describe('motion component with initial={false}', () => {
             }
         })
 
-        const element = container.querySelector('[data-testid="complex-element"]') as HTMLElement
+        const element = container.querySelector<HTMLElement>('[data-testid="complex-element"]')!
         expect(element).toBeTruthy()
 
         await vi.runAllTimersAsync()
@@ -89,7 +89,7 @@ describe('motion component with initial={false}', () => {
             }
         })
 
-        const element = container.querySelector('[data-testid="test-element"]') as HTMLElement
+        const element = container.querySelector<HTMLElement>('[data-testid="test-element"]')!
         expect(element).toBeTruthy()
 
         await vi.runAllTimersAsync()
@@ -116,7 +116,7 @@ describe('transform shortcut persists after animation (#377)', () => {
                 'data-testid': 'persist-scalex'
             }
         })
-        const el = container.querySelector('[data-testid="persist-scalex"]') as HTMLElement
+        const el = container.querySelector<HTMLElement>('[data-testid="persist-scalex"]')!
 
         await vi.runAllTimersAsync()
 
@@ -135,7 +135,7 @@ describe('transform shortcut persists after animation (#377)', () => {
                 'data-testid': 'persist-rotate'
             }
         })
-        const el = container.querySelector('[data-testid="persist-rotate"]') as HTMLElement
+        const el = container.querySelector<HTMLElement>('[data-testid="persist-rotate"]')!
 
         await vi.runAllTimersAsync()
 
@@ -151,7 +151,7 @@ describe('transform shortcut persists after animation (#377)', () => {
                 'data-testid': 'persist-array'
             }
         })
-        const el = container.querySelector('[data-testid="persist-array"]') as HTMLElement
+        const el = container.querySelector<HTMLElement>('[data-testid="persist-array"]')!
 
         await vi.runAllTimersAsync()
 

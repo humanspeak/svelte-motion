@@ -244,8 +244,8 @@ describe('utils/layout', () => {
         expect(call?.[0]).toBe(el)
         const keyframes = call?.[1] as Record<string, unknown>
         expect(keyframes).toMatchObject({ scaleX: [1.2, 1], scaleY: [1.1, 1] })
-        expect('x' in (keyframes as Record<string, unknown>)).toBe(false)
-        expect('y' in (keyframes as Record<string, unknown>)).toBe(false)
+        expect('x' in keyframes).toBe(false)
+        expect('y' in keyframes).toBe(false)
     })
 
     it('runFlipAnimation: animates box size when scaling would distort layout descendants', async () => {
@@ -322,11 +322,8 @@ describe('utils/layout', () => {
             }
             disconnect() {}
         }
-        vi.stubGlobal('ResizeObserver', FakeResizeObserver as unknown as typeof ResizeObserver)
-        vi.stubGlobal(
-            'MutationObserver',
-            FakeMutationObserver as unknown as typeof MutationObserver
-        )
+        vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+        vi.stubGlobal('MutationObserver', FakeMutationObserver)
 
         const cleanup = observeLayoutChanges(el, cb)
         expect(cb).toHaveBeenCalled()
@@ -411,22 +408,19 @@ describe('utils/layout', () => {
             }
             disconnect() {}
         }
-        vi.stubGlobal('ResizeObserver', FakeResizeObserver as unknown as typeof ResizeObserver)
-        vi.stubGlobal(
-            'MutationObserver',
-            FakeMutationObserver as unknown as typeof MutationObserver
-        )
+        vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+        vi.stubGlobal('MutationObserver', FakeMutationObserver)
 
         const cleanup = observeLayoutChanges(el, cb)
 
         // Trigger multiple observer callbacks within the same frame
         const ro = new (
             window as unknown as { ResizeObserver: typeof ResizeObserver }
-        ).ResizeObserver((() => {}) as unknown as ResizeObserverCallback)
+        ).ResizeObserver(() => {})
         ro.observe(el)
         const mo = new (
             window as unknown as { MutationObserver: typeof MutationObserver }
-        ).MutationObserver((() => {}) as unknown as MutationCallback)
+        ).MutationObserver(() => {})
         mo.observe(el, { attributes: true })
         mo.observe(el, { attributes: true })
 
@@ -478,11 +472,8 @@ describe('utils/layout', () => {
             }
             disconnect() {}
         }
-        vi.stubGlobal('ResizeObserver', FakeResizeObserver as unknown as typeof ResizeObserver)
-        vi.stubGlobal(
-            'MutationObserver',
-            FakeMutationObserver as unknown as typeof MutationObserver
-        )
+        vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+        vi.stubGlobal('MutationObserver', FakeMutationObserver)
 
         const cleanup = observeLayoutChanges(el, cb)
 
@@ -529,18 +520,15 @@ describe('utils/layout', () => {
             observe() {}
             disconnect() {}
         }
-        vi.stubGlobal('ResizeObserver', FakeResizeObserver as unknown as typeof ResizeObserver)
-        vi.stubGlobal(
-            'MutationObserver',
-            FakeMutationObserver as unknown as typeof MutationObserver
-        )
+        vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+        vi.stubGlobal('MutationObserver', FakeMutationObserver)
 
         const cleanup = observeLayoutChanges(el, cb)
 
         // Trigger once; leading-edge calls cb immediately and sets a timeout token
         const ro2 = new (
             window as unknown as { ResizeObserver: typeof ResizeObserver }
-        ).ResizeObserver((() => {}) as unknown as ResizeObserverCallback)
+        ).ResizeObserver(() => {})
         ro2.observe(el)
         expect(cb).toHaveBeenCalledTimes(1)
 

@@ -74,8 +74,8 @@ async function samplePresenceDataSquareLayers(
 
         const getSample = () => {
             const elements = Array.from(
-                document.querySelectorAll('[data-testid="presence-data-square"]')
-            ) as HTMLElement[]
+                document.querySelectorAll<HTMLElement>('[data-testid="presence-data-square"]')
+            )
             const visible = elements
                 .map((element) => {
                     const rect = element.getBoundingClientRect()
@@ -412,7 +412,7 @@ async function clickAndSamplePresenceDataSquareVerticalAlignment(
             if (!trigger) throw new Error(`Missing ${targetTriggerTestId}`)
 
             const readButtonCenterY = () => {
-                const buttons = Array.from(container.querySelectorAll('button')) as HTMLElement[]
+                const buttons = Array.from(container.querySelectorAll<HTMLElement>('button'))
                 const centers = buttons.map((button) => {
                     const rect = button.getBoundingClientRect()
 

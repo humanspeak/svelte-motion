@@ -72,7 +72,7 @@ export const isSvelteReadable = <T = unknown>(value: unknown): value is Readable
  */
 export const sampleSource = <T>(source: T | MotionValue<T> | Readable<T>): T => {
     if (isMotionValue(source)) return (source as MotionValue<T>).get()
-    if (isSvelteReadable<T>(source)) return get(source) as T
+    if (isSvelteReadable<T>(source)) return get(source)
     return source as T
 }
 
@@ -225,7 +225,7 @@ export const bridgeReadableToMotionValue = <TIn, TOut = TIn>(
     source: Readable<TIn>,
     coerce: (v: TIn) => TOut = (v) => v as unknown as TOut
 ): { value: MotionValue<TOut>; dispose: VoidFunction } => {
-    const bridge = motionValue<TOut>(coerce(get(source) as TIn))
+    const bridge = motionValue<TOut>(coerce(get(source)))
     let seenInitial = false
     const unsub = source.subscribe((v) => {
         if (!seenInitial) {

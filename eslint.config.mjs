@@ -114,6 +114,28 @@ export default [
         ...ts.configs.disableTypeChecked
     },
     {
+        // `no-unnecessary-type-assertion` is unusable inside `.svelte` files.
+        //
+        // svelte-eslint-parser's type program narrows a `$state` variable across
+        // closure boundaries; `tsc`/svelte-check (correctly) does not. So for
+        //
+        //     let element = $state<HTMLElement | null>(null)
+        //     $effect(() => {
+        //         if (!element) return
+        //         const cb = () => element!.getBoundingClientRect()  // <- required
+        //     })
+        //
+        // ESLint calls the `!` unnecessary and its autofix deletes it, after which
+        // `pnpm check` reports "'element' is possibly 'null'". Measured at the time
+        // of writing: 19 such false positives in `_MotionContainer.svelte`, 0 true
+        // positives left in `.svelte` after the one-time autofix. The `as`-style
+        // assertions the rule found in `.svelte` files were real and are removed.
+        files: ['**/*.svelte'],
+        rules: {
+            '@typescript-eslint/no-unnecessary-type-assertion': 'off'
+        }
+    },
+    {
         // Tests + internal demo routes deliberately bridge motion-dom internals
         // through `any`; the unsafe-* family is noise there — now and for
         // future test code. Library source (src/lib non-spec) keeps these rules.

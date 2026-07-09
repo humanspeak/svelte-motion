@@ -71,7 +71,7 @@ describe('presence context', () => {
             width: 100,
             height: 100,
             toJSON: () => {}
-        } as unknown as DOMRect)
+        })
 
         vi.spyOn(parent, 'getBoundingClientRect').mockReturnValue({
             x: 0,
@@ -83,19 +83,17 @@ describe('presence context', () => {
             width: 200,
             height: 200,
             toJSON: () => {}
-        } as unknown as DOMRect)
+        })
 
         vi.spyOn(window, 'getComputedStyle').mockImplementation(() =>
             mockComputedStyle({ borderRadius: '8px', boxSizing: 'border-box' })
         )
 
         // Ensure rAF callbacks run synchronously in tests so exit cleanup executes
-        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(((
-            cb: FrameRequestCallback
-        ) => {
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
             cb(0)
-            return 1 as unknown as number
-        }) as unknown as typeof requestAnimationFrame)
+            return 1
+        })
     })
 
     it('registers and updates child state', () => {
@@ -237,18 +235,16 @@ describe('AnimatePresence modes', () => {
             width: 200,
             height: 200,
             toJSON: () => {}
-        } as unknown as DOMRect)
+        })
 
         vi.spyOn(window, 'getComputedStyle').mockImplementation(() =>
             mockComputedStyle({ borderRadius: '8px', boxSizing: 'border-box', display: 'block' })
         )
 
-        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(((
-            cb: FrameRequestCallback
-        ) => {
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
             cb(0)
-            return 1 as unknown as number
-        }) as unknown as typeof requestAnimationFrame)
+            return 1
+        })
     })
 
     describe('mode property', () => {
@@ -537,7 +533,7 @@ describe('AnimatePresence modes', () => {
                 width: 120,
                 height: 80,
                 toJSON: () => {}
-            } as unknown as DOMRect)
+            })
 
             ctx.unregisterChild('k1')
 

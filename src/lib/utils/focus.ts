@@ -34,11 +34,11 @@ export const computeFocusBaseline = (
     }
 ): Record<string, unknown> => {
     const baseline: Record<string, unknown> = {}
-    const initialRecord = (opts.initial ?? {}) as Record<string, unknown>
-    const animateRecord = (opts.animate ?? {}) as Record<string, unknown>
-    const whileFocusRecordRaw = (opts.whileFocus ?? {}) as Record<string, unknown>
+    const initialRecord = opts.initial ?? {}
+    const animateRecord = opts.animate ?? {}
+    const whileFocusRecordRaw = opts.whileFocus ?? {}
     const whileFocusRecord = { ...whileFocusRecordRaw } as Record<string, unknown>
-    delete (whileFocusRecord as Record<string, unknown>).transition
+    delete whileFocusRecord.transition
 
     const neutralTransformDefaults: Record<string, unknown> = {
         x: 0,
@@ -64,7 +64,7 @@ export const computeFocusBaseline = (
             baseline[key] = animateRecord[key]
         } else if (Object.prototype.hasOwnProperty.call(initialRecord, key)) {
             baseline[key] = initialRecord[key]
-        } else if (key in (neutralTransformDefaults as Record<string, unknown>)) {
+        } else if (key in neutralTransformDefaults) {
             baseline[key] = neutralTransformDefaults[key]
         } else {
             // Convert camelCase to kebab-case for CSS property access
@@ -115,11 +115,7 @@ export const attachWhileFocus = (
         })
         callbacks?.onStart?.()
         const { keyframes, transition } = splitFocusDefinition(whileFocus)
-        animate(
-            el,
-            keyframes as unknown as DOMKeyframesDefinition,
-            (transition ?? mergedTransition) as AnimationOptions
-        )
+        animate(el, keyframes as unknown as DOMKeyframesDefinition, transition ?? mergedTransition)
     }
 
     const handleBlur = () => {

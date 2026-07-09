@@ -42,7 +42,7 @@ test.describe('layoutId shared layout animation', () => {
                 if (!el) return false
                 const rect = el.getBoundingClientRect()
                 // The underline should be positioned within tab 1's bounds
-                return Math.abs(rect.left - tab1Left!) < 20
+                return Math.abs(rect.left - tab1Left) < 20
             },
             tab1Rect!.x,
             { timeout: 3000 }
