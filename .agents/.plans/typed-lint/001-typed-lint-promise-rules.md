@@ -7,14 +7,35 @@
 > in `.agents/.plans/typed-lint/README.md`.
 >
 > **Drift check (run first)**:
-> `git diff --stat 8491bd3..HEAD -- eslint.config.mjs tsconfig.json e2e/tsconfig.json src/lib/utils/drag.ts src/lib/utils/layout.ts src/lib/utils/optimizedAppear.ts src/lib/utils/svg.ts src/lib/html/_MotionContainer.svelte`
+> `git diff --stat 21d869c..HEAD -- eslint.config.mjs tsconfig.json e2e/tsconfig.json src/lib/utils/drag.ts src/lib/utils/layout.ts src/lib/utils/optimizedAppear.ts src/lib/utils/svg.ts src/lib/html/_MotionContainer.svelte`
 > On any change, compare the "Current state" excerpts against live code;
 > mismatch ⇒ STOP.
+>
+> **Revision 2026-07-09 (guard, with operator agreement)**: Three plan defects
+> surfaced during execution and are corrected here.
+> (1) **Scope**: `.coderabbit.yaml` is added to the in-scope list. The old list
+> was exhaustive and excluded it, yet the done criterion `trunk check --all`
+> exits 0 _requires_ touching it — `.trunk/configs/.yamllint.yaml` sets
+> `quoted-strings: required: only-when-needed`, so the pre-existing
+> `labels: ['coderabbit']` is a yamllint error. The two clauses contradicted
+> each other; scope yields. Operator accepted the edit 2026-07-09.
+> (2) **Baseline**: the old `Planned at` / drift-check SHA `8491bd3` is not an
+> ancestor of `chore/typed-lint-recommended` — it lives on the sibling branch
+> `feat/svg-motion-value-attributes`, so the drift check diffed against
+> unrelated work and was never meaningful. Re-stamped to `21d869c`. The
+> violation counts in the inventory below were measured at `8491bd3` and are
+> retained as historical leads, not live figures.
+> (3) **A self-defeating done criterion**: this plan file was committed to the
+> branch (`561c9b8`) in a state that `prettier` and `markdownlint/MD060` both
+> reject, so `trunk check --all` could not exit 0 while it existed — the plan
+> made its own criterion unsatisfiable, and the executor may not edit the plan
+> to fix it. Guard has run `trunk fmt` over this file and the guard artifacts.
+> Formatting only; no wording changed by that pass.
 >
 > **Revision 2026-07-09 (operator)**: The first draft enabled only three
 > typed promise rules and deferred the full preset. The operator overruled:
 > adopt `ts.configs.recommendedTypeChecked` wholesale, suppress the
-> *deliberate* violations (the `any`-bridging into motion-dom internals), and
+> _deliberate_ violations (the `any`-bridging into motion-dom internals), and
 > make the suppression mechanism hide **future** occurrences of those
 > deliberate patterns too — i.e. scoped config-level rule-offs on test globs,
 > not per-site ignore comments. All violation counts below were re-measured at
@@ -34,7 +55,8 @@
 - **Risk**: MED
 - **Depends on**: none
 - **Category**: dx
-- **Planned at**: commit `8491bd3`, 2026-07-09
+- **Planned at**: commit `21d869c`, 2026-07-09 (re-stamped by guard; the
+  original `8491bd3` was on a sibling branch — see Revision note above)
 
 ## Why this matters
 
@@ -101,22 +123,22 @@ Conventions that apply:
   `eslint-disable` comments. Exemplars: `src/lib/html/_MotionContainer.svelte:203`
   and `src/lib/utils/style.spec.ts:68`. There is exactly one legacy
   `eslint-disable-next-line` in the repo (`src/lib/utils/animateValue.spec.ts:51`);
-  the dry run flags it as an *unused* directive — Step 5 removes it.
+  the dry run flags it as an _unused_ directive — Step 5 removes it.
 - Conventional commits (`chore(lint): …`, `fix(drag): …` — see `git log`).
 - CI lint gate is `.github/workflows/trunk-check.yml` (Trunk annotations).
 
 ### Dry-run violation inventory (full `recommendedTypeChecked`, commit `8491bd3`, all of `src/`)
 
-| Rule | Count | Disposition |
-| ---- | ----- | ----------- |
-| `no-unnecessary-type-assertion` | 241 (137 `.ts` + 104 `.svelte`; 103 of the `.svelte` hits are in `_MotionContainer.svelte`) | **Autofix** (Step 4) |
+| Rule                                                                                              | Count                                                                                                                                                                                                                                                                                                                        | Disposition                                                                                                |
+| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `no-unnecessary-type-assertion`                                                                   | 241 (137 `.ts` + 104 `.svelte`; 103 of the `.svelte` hits are in `_MotionContainer.svelte`)                                                                                                                                                                                                                                  | **Autofix** (Step 4)                                                                                       |
 | `no-unsafe-member-access` / `-assignment` / `-call` / `-argument` / `-return` + `no-explicit-any` | ~113 — of which ~95 in `*.spec.ts` files (top: `projection.spec.ts` ×32, `_MotionContainer.spec.ts` ×17, `hookVanillaParity.svelte.spec.ts` ×10), ~11 in internal demo routes (`src/routes/tests/**`), ~14 in library source (`_MotionContainer.svelte` ~10, plus 1 each in `hover.ts`, `style.ts`, `svg.ts`, `variants.ts`) | **Scoped off** for tests/demo routes (Step 2); **fix or trunk-ignore per site** in library source (Step 5) |
-| `no-floating-promises` / `no-misused-promises` | 13 (site list below) | **Fix** (Step 5) |
-| `no-base-to-string` | 4 (`svg.ts` ×3, `motionTemplate.svelte.ts` ×1) | Triage: real stringification bug vs. type with meaningful `toString` (Step 5) |
-| `require-await` | 3 (spec files) | Drop `async` or add `await` (Step 5) |
-| `unbound-method` | 2 (`svg.spec.ts`) | Wrap in arrow fn (Step 5) |
-| `await-thenable` | 1 (`optimizedAppear.ts`) | Fix (Step 5) |
-| `no-duplicate-type-constituents` | 1 (`style.ts`) | Mechanical (Step 5) |
+| `no-floating-promises` / `no-misused-promises`                                                    | 13 (site list below)                                                                                                                                                                                                                                                                                                         | **Fix** (Step 5)                                                                                           |
+| `no-base-to-string`                                                                               | 4 (`svg.ts` ×3, `motionTemplate.svelte.ts` ×1)                                                                                                                                                                                                                                                                               | Triage: real stringification bug vs. type with meaningful `toString` (Step 5)                              |
+| `require-await`                                                                                   | 3 (spec files)                                                                                                                                                                                                                                                                                                               | Drop `async` or add `await` (Step 5)                                                                       |
+| `unbound-method`                                                                                  | 2 (`svg.spec.ts`)                                                                                                                                                                                                                                                                                                            | Wrap in arrow fn (Step 5)                                                                                  |
+| `await-thenable`                                                                                  | 1 (`optimizedAppear.ts`)                                                                                                                                                                                                                                                                                                     | Fix (Step 5)                                                                                               |
+| `no-duplicate-type-constituents`                                                                  | 1 (`style.ts`)                                                                                                                                                                                                                                                                                                               | Mechanical (Step 5)                                                                                        |
 
 Note: ~9 of the `no-explicit-any` hits (e.g. `style.spec.ts`) already carry
 `trunk-ignore` comments today — raw ESLint counts them, Trunk filters them.
@@ -130,32 +152,32 @@ Promise-rule sites (line numbers are leads from `8491bd3`; re-derive from your
 own lint run). Library-source fixes should be flagged prominently in your
 report — they are latent-bug fixes, not cosmetics:
 
-| Site | Rule | What's there / suggested fix |
-| ---- | ---- | ---------------------------- |
-| `src/lib/utils/drag.ts:794` | no-floating-promises | `Promise.allSettled(restorePromises).then(finishRestore)` — allSettled never rejects; prefix `void` with one-line rationale |
-| `src/lib/utils/layout.ts:40` | no-floating-promises | `animation.finished?.finally(() => {…})` — the returned promise is dropped; prefix `void` |
-| `src/lib/utils/optimizedAppear.ts:253` | no-misused-promises | `if (readyAnimation.ready)` — truthiness test on a Promise used as feature detection; change to `if (readyAnimation.ready !== undefined)` |
-| `src/lib/html/_MotionContainer.svelte:1886` | no-floating-promises | `animateTemplatedTransformPayload(…)` call statement drops its promise; `void` + rationale (fire-and-forget enter animation) |
-| `src/lib/html/_MotionContainer.svelte:2707` | no-floating-promises | `runKeyTransition()` async fn called bare inside `$effect`; `void` + rationale ($effect can't await) |
-| `src/lib/html/_MotionContainer.svelte:2900,2972` | no-misused-promises | `requestAnimationFrame(async () => {…})` — async callback where void expected; see Step 5 for the sanctioned options |
-| `src/routes/tests/will-change/+page.svelte:16` | no-floating-promises | `controls.start(…)` unawaited → `void` |
-| `src/routes/tests/mobile-drawer/DragCloseDrawer.svelte:71` | no-floating-promises | `handleClose()` in `onDragEnd` → `void` |
-| `src/lib/utils/hookVanillaParity.svelte.spec.ts:151,166` | no-floating-promises | Svelte's `unmount()` returns a Promise → `void unmount(probe)` |
-| `src/lib/utils/animateView.spec.ts:74` | no-floating-promises | same `unmount()` pattern |
-| `src/lib/utils/animation.spec.ts:52` | no-misused-promises | `animateMock.mockImplementationOnce(() => Promise.resolve())` returns a Promise where the mock signature expects void; fix the mock's typing, don't suppress |
+| Site                                                       | Rule                 | What's there / suggested fix                                                                                                                                 |
+| ---------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/lib/utils/drag.ts:794`                                | no-floating-promises | `Promise.allSettled(restorePromises).then(finishRestore)` — allSettled never rejects; prefix `void` with one-line rationale                                  |
+| `src/lib/utils/layout.ts:40`                               | no-floating-promises | `animation.finished?.finally(() => {…})` — the returned promise is dropped; prefix `void`                                                                    |
+| `src/lib/utils/optimizedAppear.ts:253`                     | no-misused-promises  | `if (readyAnimation.ready)` — truthiness test on a Promise used as feature detection; change to `if (readyAnimation.ready !== undefined)`                    |
+| `src/lib/html/_MotionContainer.svelte:1886`                | no-floating-promises | `animateTemplatedTransformPayload(…)` call statement drops its promise; `void` + rationale (fire-and-forget enter animation)                                 |
+| `src/lib/html/_MotionContainer.svelte:2707`                | no-floating-promises | `runKeyTransition()` async fn called bare inside `$effect`; `void` + rationale ($effect can't await)                                                         |
+| `src/lib/html/_MotionContainer.svelte:2900,2972`           | no-misused-promises  | `requestAnimationFrame(async () => {…})` — async callback where void expected; see Step 5 for the sanctioned options                                         |
+| `src/routes/tests/will-change/+page.svelte:16`             | no-floating-promises | `controls.start(…)` unawaited → `void`                                                                                                                       |
+| `src/routes/tests/mobile-drawer/DragCloseDrawer.svelte:71` | no-floating-promises | `handleClose()` in `onDragEnd` → `void`                                                                                                                      |
+| `src/lib/utils/hookVanillaParity.svelte.spec.ts:151,166`   | no-floating-promises | Svelte's `unmount()` returns a Promise → `void unmount(probe)`                                                                                               |
+| `src/lib/utils/animateView.spec.ts:74`                     | no-floating-promises | same `unmount()` pattern                                                                                                                                     |
+| `src/lib/utils/animation.spec.ts:52`                       | no-misused-promises  | `animateMock.mockImplementationOnce(() => Promise.resolve())` returns a Promise where the mock signature expects void; fix the mock's typing, don't suppress |
 
 ## Commands you will need
 
-| Purpose            | Command                                    | Expected on success |
-| ------------------ | ------------------------------------------ | ------------------- |
-| Lint (changed)     | `trunk fmt && trunk check`                 | exit 0              |
-| Lint one file      | `trunk check <path>`                       | exit 0              |
-| Lint all           | `trunk check --all`                        | exit 0              |
-| Lint autofix       | `trunk check --fix <path…>`                | fixes applied       |
-| Typecheck          | `pnpm check`                               | 0 errors            |
-| Unit tests         | `pnpm test:only`                           | all pass            |
-| e2e transpile+list | `pnpm exec playwright test --list`         | lists tests, exit 0 |
-| e2e smoke (1 file) | `pnpm exec playwright test e2e/view/basic.spec.ts` | passes      |
+| Purpose            | Command                                            | Expected on success |
+| ------------------ | -------------------------------------------------- | ------------------- |
+| Lint (changed)     | `trunk fmt && trunk check`                         | exit 0              |
+| Lint one file      | `trunk check <path>`                               | exit 0              |
+| Lint all           | `trunk check --all`                                | exit 0              |
+| Lint autofix       | `trunk check --fix <path…>`                        | fixes applied       |
+| Typecheck          | `pnpm check`                                       | 0 errors            |
+| Unit tests         | `pnpm test:only`                                   | all pass            |
+| e2e transpile+list | `pnpm exec playwright test --list`                 | lists tests, exit 0 |
+| e2e smoke (1 file) | `pnpm exec playwright test e2e/view/basic.spec.ts` | passes              |
 
 Never run `pnpm lint` / raw `eslint` / raw `prettier` — Trunk is the source of
 truth. Plain `trunk check` inspects files changed vs upstream (covers new
@@ -170,6 +192,9 @@ repos at once.
 
 - `eslint.config.mjs` — preset switch, projectService wiring, carve-out blocks.
 - `e2e/tsconfig.json` — **create** (new file).
+- `.coderabbit.yaml` — quoting only, and only if `trunk check --all` demands it
+  (yamllint `quoted-strings: only-when-needed`). Added by guard revision
+  2026-07-09; no semantic changes to this file are in scope.
 - Files with violations per the inventory above, plus whatever the e2e/full
   passes surface — minimal, mechanical fixes only (autofix, add `await`/`void`,
   fix a mock type, change a truthiness check, delete dead trunk-ignore
@@ -183,7 +208,7 @@ repos at once.
 - `tsconfig.json` and `.svelte-kit/**` — the build's type story must not change.
 - `.trunk/trunk.yaml` — no linter version bumps or new linters.
 - Prettier config, `package.json` scripts.
-- Re-typing the motion-dom bridges to *eliminate* the `any`s (that's the
+- Re-typing the motion-dom bridges to _eliminate_ the `any`s (that's the
   deliberate pattern being carved out, not a bug to fix here).
 - Rewriting tests or refactoring animation logic beyond what a violation
   strictly requires.
@@ -193,7 +218,7 @@ repos at once.
 - Branch: `chore/typed-lint-recommended` off `main` (repo uses
   `feat/…`/`chore/…` conventional branch names).
 - Three commits: (1) `chore(lint): adopt recommendedTypeChecked with scoped
-  test carve-outs`, (2) `chore(lint): autofix unnecessary type assertions`,
+test carve-outs`, (2) `chore(lint): autofix unnecessary type assertions`,
   (3) `fix(lint): resolve typed-lint violations in library source and specs`.
 - Do NOT push or open a PR unless instructed. The maintainer signs off live
   before any PR (house rule).

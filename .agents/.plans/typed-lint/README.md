@@ -13,21 +13,26 @@ starting, honor its STOP conditions, and update your row when done.
 
 ## Execution order & status
 
-| Plan | Title                                                                | Priority | Effort | Depends on | Status         |
-| ---- | -------------------------------------------------------------------- | -------- | ------ | ---------- | -------------- |
-| 001  | Adopt recommendedTypeChecked with scoped carve-outs for any-bridging | P2       | L      | —          | GUARD: NO-PASS |
+| Plan | Title                                                                | Priority | Effort | Depends on | Status      |
+| ---- | -------------------------------------------------------------------- | -------- | ------ | ---------- | ----------- |
+| 001  | Adopt recommendedTypeChecked with scoped carve-outs for any-bridging | P2       | L      | —          | GUARD: PASS |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
 
-- 001: **GUARD: NO-PASS** 2026-07-09 — see `001-typed-lint-promise-rules.guard-report.md`.
-  Substance verified and sound; two done criteria fail on the record, not the
-  code: three `void unmount(...)` promises lack the required rationale comment,
-  and the `.svelte` rule-off comment at `eslint.config.mjs:117-138` makes two
-  false claims (14 `as`-style assertions remain flagged; "19" was the count of
-  `pnpm check` errors, not false positives). Plan amended by guard with operator
-  agreement: `.coderabbit.yaml` accepted into scope, `Planned at` re-stamped to
-  `ac7c6da` (the old SHA was on a sibling branch). Executor's own notes follow.
+- 001: **GUARD: PASS** 2026-07-09 at `21d869c` — see
+  `001-typed-lint-promise-rules.guard-report.md`. Every done criterion re-run and
+  reproduced, exit codes read directly. The two checkpoint-1 findings were closed
+  at the source, not by relaxing a criterion: the three `void unmount(...)`
+  promises got rationales, and the `.svelte` rule-off comment was corrected after
+  the executor removed the 11 `as`-style assertions it had wrongly claimed were
+  already gone. Verified column-accurately: 35 flagged, all non-null `!`, 0
+  `as`-style. Plan amended by guard with operator agreement for three plan
+  defects: `.coderabbit.yaml` admitted to scope, `Planned at` re-stamped to
+  `21d869c` (the old SHA was on a sibling branch), and the plan file itself
+  formatted — it violated prettier/MD060, which made its own `trunk check --all`
+  criterion unsatisfiable. No PR opened: the plan requires maintainer sign-off
+  first. Executor's own notes follow.
 - 001: executor report, 2026-07-09. `trunk check --all` exits 0; `pnpm check` 0 errors;
   `pnpm test:only` 752/752; `playwright test --list` 319 tests. Four deviations
   and three additional rule-offs, all forced by tooling divergences rather than
