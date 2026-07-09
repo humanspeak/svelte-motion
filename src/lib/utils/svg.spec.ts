@@ -11,8 +11,11 @@ import {
     isSVGMotionValueAttribute,
     isSVGPathElement,
     resolveSVGAttrKey,
+    resolveSVGTagName,
     SVG_ATTRIBUTE_PROPERTIES,
     SVG_PATH_PROPERTIES,
+    SVG_TAG_CASING,
+    SVG_TAGS,
     transformInitialSVGPathProperties,
     transformSVGPathProperties
 } from './svg'
@@ -204,6 +207,57 @@ describe('svg utilities', () => {
                 'stroke-dashoffset': '0'
             })
         })
+    })
+})
+
+describe('resolveSVGTagName', () => {
+    it('should restore the spec casing of filter primitives', () => {
+        // SVG tag names are case-sensitive; `fedisplacementmap` in the SVG namespace
+        // is an inert SVGElement, so its `scale` attribute does nothing.
+        expect(resolveSVGTagName('fedisplacementmap')).toBe('feDisplacementMap')
+        expect(resolveSVGTagName('feturbulence')).toBe('feTurbulence')
+        expect(resolveSVGTagName('fegaussianblur')).toBe('feGaussianBlur')
+        expect(resolveSVGTagName('fefunca')).toBe('feFuncA')
+    })
+
+    it('should restore the spec casing of non-filter camelCase elements', () => {
+        expect(resolveSVGTagName('clippath')).toBe('clipPath')
+        expect(resolveSVGTagName('lineargradient')).toBe('linearGradient')
+        expect(resolveSVGTagName('radialgradient')).toBe('radialGradient')
+        expect(resolveSVGTagName('textpath')).toBe('textPath')
+        expect(resolveSVGTagName('foreignobject')).toBe('foreignObject')
+        expect(resolveSVGTagName('animatetransform')).toBe('animateTransform')
+    })
+
+    it('should pass through all-lowercase SVG tags and non-SVG tags', () => {
+        expect(resolveSVGTagName('circle')).toBe('circle')
+        expect(resolveSVGTagName('path')).toBe('path')
+        expect(resolveSVGTagName('div')).toBe('div')
+    })
+
+    it('should be idempotent on already-correct casing', () => {
+        expect(resolveSVGTagName('feDisplacementMap')).toBe('feDisplacementMap')
+        expect(resolveSVGTagName('clipPath')).toBe('clipPath')
+    })
+
+    it('should only map tags that are recognized SVG elements', () => {
+        for (const lower of Object.keys(SVG_TAG_CASING)) {
+            expect(SVG_TAGS.has(lower)).toBe(true)
+        }
+    })
+
+    it('should produce a canonical name that lowercases back to its key', () => {
+        for (const [lower, canonical] of Object.entries(SVG_TAG_CASING)) {
+            expect(canonical.toLowerCase()).toBe(lower)
+        }
+    })
+
+    it('should create a live element for a canonicalized filter primitive', () => {
+        const el = document.createElementNS(
+            'http://www.w3.org/2000/svg',
+            resolveSVGTagName('fedisplacementmap')
+        )
+        expect(el.tagName).toBe('feDisplacementMap')
     })
 })
 

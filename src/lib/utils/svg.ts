@@ -289,6 +289,68 @@ export const isSVGTag = (tag: string): boolean => {
 }
 
 /**
+ * Canonical casing for the SVG elements whose tag names are not all-lowercase.
+ *
+ * SVG tag names are **case-sensitive**, unlike HTML. Creating
+ * `fedisplacementmap` in the SVG namespace yields an inert generic `SVGElement`
+ * rather than an `SVGFEDisplacementMapElement`, so the filter primitive is
+ * ignored and its attributes (`scale`, `stdDeviation`, …) do nothing.
+ *
+ * Keys are the lowercase forms our components pass as `tag`; values are the
+ * spec spellings. See the SVG 2 element index.
+ */
+export const SVG_TAG_CASING: Record<string, string> = {
+    animatemotion: 'animateMotion',
+    animatetransform: 'animateTransform',
+    clippath: 'clipPath',
+    feblend: 'feBlend',
+    fecolormatrix: 'feColorMatrix',
+    fecomponenttransfer: 'feComponentTransfer',
+    fecomposite: 'feComposite',
+    feconvolvematrix: 'feConvolveMatrix',
+    fediffuselighting: 'feDiffuseLighting',
+    fedisplacementmap: 'feDisplacementMap',
+    fedistantlight: 'feDistantLight',
+    fedropshadow: 'feDropShadow',
+    feflood: 'feFlood',
+    fefunca: 'feFuncA',
+    fefuncb: 'feFuncB',
+    fefuncg: 'feFuncG',
+    fefuncr: 'feFuncR',
+    fegaussianblur: 'feGaussianBlur',
+    feimage: 'feImage',
+    femerge: 'feMerge',
+    femergenode: 'feMergeNode',
+    femorphology: 'feMorphology',
+    feoffset: 'feOffset',
+    fepointlight: 'fePointLight',
+    fespecularlighting: 'feSpecularLighting',
+    fespotlight: 'feSpotLight',
+    fetile: 'feTile',
+    feturbulence: 'feTurbulence',
+    foreignobject: 'foreignObject',
+    lineargradient: 'linearGradient',
+    radialgradient: 'radialGradient',
+    textpath: 'textPath'
+}
+
+/**
+ * Resolves an SVG tag name to its case-sensitive spec spelling.
+ *
+ * Non-SVG tags and already-correct names are returned unchanged.
+ *
+ * @param {string} tag The tag name to canonicalize.
+ * @returns {string} The spec-cased SVG tag name.
+ * @example
+ * resolveSVGTagName('fedisplacementmap') // 'feDisplacementMap'
+ * resolveSVGTagName('circle') // 'circle'
+ * resolveSVGTagName('div') // 'div'
+ */
+export const resolveSVGTagName = (tag: string): string => {
+    return SVG_TAG_CASING[tag.toLowerCase()] ?? tag
+}
+
+/**
  * Check if an element is an SVG path element.
  */
 /**

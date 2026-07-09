@@ -111,6 +111,7 @@
         hasSVGPathProperties,
         isSVGPathElement,
         isSVGTag,
+        resolveSVGTagName,
         SVG_NAMESPACE
     } from '$lib/utils/svg'
     import {
@@ -1467,6 +1468,11 @@
             transformTemplateProp
         )
     )
+
+    // SVG tag names are case-sensitive: our components pass `tag` all-lowercase, but
+    // `fedisplacementmap` in the SVG namespace is an inert generic SVGElement, not an
+    // SVGFEDisplacementMapElement. Canonicalize before rendering.
+    const renderTag = $derived(isSVGTag(String(tag)) ? resolveSVGTagName(String(tag)) : tag)
 
     // MotionValue-bound SVG attributes (`cx`, `stroke-width`, `attrX`, …) must be
     // pulled out of `rest` before it reaches the raw spread below, or they
@@ -2978,7 +2984,12 @@
 
 {#if isVoidTag}
     {#if isSVGTag(String(tag))}
-        <svelte:element this={tag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs} />
+        <svelte:element
+            this={renderTag}
+            bind:this={element}
+            xmlns={SVG_NAMESPACE}
+            {...derivedAttrs}
+        />
         <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
         {@html renderedOptimizedAppearScript}
     {:else}
@@ -2987,7 +2998,7 @@
         {@html renderedOptimizedAppearScript}
     {/if}
 {:else if isSVGTag(String(tag))}
-    <svelte:element this={tag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs}>
+    <svelte:element this={renderTag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs}>
         {#if motionValueChild}
             {motionValueChildText ?? motionValueChildInitialText}
         {:else}

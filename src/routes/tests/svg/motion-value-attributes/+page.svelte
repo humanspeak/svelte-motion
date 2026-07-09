@@ -15,10 +15,19 @@
     const RING_CIRCUMFERENCE = 2 * Math.PI * 30
     const dashOffset = motionValue(RING_CIRCUMFERENCE * 0.35)
 
-    /** Attribute-routed: rendered as the `x` / `y` / `scale` attributes. */
+    /** Attribute-routed: rendered as the `x` / `y` attributes on the rect. */
     const attrX = motionValue(10)
     const attrY = motionValue(10)
-    const attrScale = motionValue(1)
+
+    /**
+     * Attribute-routed. `scale` is not a presentation attribute on shape elements —
+     * writing it to a rect is inert, which is upstream's behavior too. It is a real
+     * attribute on `<feDisplacementMap>`, where it drives the warp below.
+     *
+     * `attrScale` exists because a plain `scale` prop would collide with the CSS
+     * transform property and be style-routed.
+     */
+    const attrScale = motionValue(12)
 
     // Buttons (used by e2e) and sliders both drive the same MotionValues.
     const bumpCx = () => cx.set(Math.min(280, cx.get() + 20))
@@ -32,7 +41,7 @@
         dashOffset.set(RING_CIRCUMFERENCE * 0.35)
         attrX.set(10)
         attrY.set(10)
-        attrScale.set(1)
+        attrScale.set(12)
     }
 
     /** Toggle: unmount/remount the whole SVG to exercise subscription teardown. */
@@ -56,7 +65,12 @@
         { testid: 'chart-line', label: 'line', prop: 'x2', channel: 'attribute' },
         { testid: 'attr-rect', label: 'rect (attrX)', prop: 'x', channel: 'attribute' },
         { testid: 'attr-rect', label: 'rect (attrY)', prop: 'y', channel: 'attribute' },
-        { testid: 'attr-rect', label: 'rect (attrScale)', prop: 'scale', channel: 'attribute' }
+        {
+            testid: 'displacement-map',
+            label: 'feDisplacementMap (attrScale)',
+            prop: 'scale',
+            channel: 'attribute'
+        }
     ]
 
     $effect(() => {
@@ -203,14 +217,14 @@
             </label>
 
             <label class="block text-sm">
-                <span class="mb-1 block">attrScale → scale attribute</span>
+                <span class="mb-1 block">attrScale → feDisplacementMap warp</span>
                 <input
                     data-testid="slider-attr-scale"
                     type="range"
-                    min="0.5"
-                    max="3"
-                    step="0.1"
-                    value="1"
+                    min="0"
+                    max="40"
+                    step="1"
+                    value="12"
                     class="w-full"
                     oninput={(e) => attrScale.set(Number(e.currentTarget.value))}
                 />
@@ -341,7 +355,7 @@
 
                 <div>
                     <h3 class="mb-1 text-sm font-medium text-slate-300">
-                        Attribute-routed: attrX / attrY / attrScale
+                        Attribute-routed: attrX / attrY (the rect's x / y attributes)
                     </h3>
                     <svg
                         width="300"
@@ -353,10 +367,58 @@
                             data-testid="attr-rect"
                             {attrX}
                             {attrY}
-                            {attrScale}
                             width={40}
                             height={40}
                             fill="#a78bfa"
+                        />
+                    </svg>
+                </div>
+
+                <div>
+                    <h3 class="mb-1 text-sm font-medium text-slate-300">
+                        Attribute-routed: attrScale (feDisplacementMap's scale)
+                    </h3>
+                    <p class="mb-2 max-w-md text-xs text-slate-400">
+                        <code class="rounded bg-slate-800 px-1">scale</code> is inert on a
+                        <code class="rounded bg-slate-800 px-1">&lt;rect&gt;</code> — it is not a
+                        presentation attribute there. On
+                        <code class="rounded bg-slate-800 px-1">&lt;feDisplacementMap&gt;</code> it
+                        is real, and drives this warp. A plain
+                        <code class="rounded bg-slate-800 px-1">scale</code> prop would be routed to
+                        the CSS transform instead, so
+                        <code class="rounded bg-slate-800 px-1">attrScale</code> is the only way to reach
+                        it. Drag the slider to 0 to flatten the warp.
+                    </p>
+                    <svg
+                        width="300"
+                        height="120"
+                        viewBox="0 0 300 120"
+                        class="rounded bg-slate-800"
+                    >
+                        <filter id="warp" x="-20%" y="-20%" width="140%" height="140%">
+                            <feTurbulence
+                                type="turbulence"
+                                baseFrequency="0.04"
+                                numOctaves="2"
+                                result="noise"
+                            />
+                            <motion.fedisplacementmap
+                                data-testid="displacement-map"
+                                in="SourceGraphic"
+                                in2="noise"
+                                {attrScale}
+                                xChannelSelector="R"
+                                yChannelSelector="G"
+                            />
+                        </filter>
+                        <rect
+                            x="40"
+                            y="25"
+                            width="220"
+                            height="70"
+                            rx="8"
+                            fill="#38bdf8"
+                            filter="url(#warp)"
                         />
                     </svg>
                 </div>

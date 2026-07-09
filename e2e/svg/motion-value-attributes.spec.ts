@@ -152,15 +152,57 @@ test.describe('SVG MotionValue attributes', () => {
             .toBeGreaterThan(before)
     })
 
-    test('renders attrScale as the scale attribute', async ({ page }) => {
+    test('renders camelCase SVG tags with their case-sensitive spec spelling', async ({ page }) => {
         await page.goto(ROUTE)
 
-        const rect = page.getByTestId('attr-rect')
-        await expect(rect).toBeVisible()
+        const map = page.getByTestId('displacement-map')
+        await expect(map).toBeAttached()
 
-        const scale = await rect.getAttribute('scale')
+        // SVG tag names are case-sensitive. A lowercase `fedisplacementmap` parses as
+        // an inert generic SVGElement, so the filter primitive is silently ignored.
+        const info = await map.evaluate((el) => ({
+            tagName: el.tagName,
+            ctor: el.constructor.name
+        }))
+        expect(info.tagName).toBe('feDisplacementMap')
+        expect(info.ctor).toBe('SVGFEDisplacementMapElement')
+    })
+
+    test('renders attrScale as the scale attribute on feDisplacementMap', async ({ page }) => {
+        await page.goto(ROUTE)
+
+        // `scale` is inert on shape elements — it is only a real presentation
+        // attribute on <feDisplacementMap>. It is also a CSS transform property, so
+        // a plain `scale` prop would be style-routed; `attrScale` is the escape hatch.
+        const map = page.getByTestId('displacement-map')
+        await expect(map).toBeAttached()
+
+        const scale = await map.getAttribute('scale')
         expect(scale).not.toBeNull()
         expect(Number.isFinite(Number(scale))).toBe(true)
+
+        // No px unit: `scale` has a unitless entry in numberValueTypes.
+        expect(scale).not.toContain('px')
+    })
+
+    test('updates the feDisplacementMap scale attribute when attrScale changes', async ({
+        page
+    }) => {
+        await page.goto(ROUTE)
+
+        const map = page.getByTestId('displacement-map')
+        await expect(map).toBeAttached()
+        expect(await attrNumber(map, 'scale')).toBe(12)
+
+        await page.getByTestId('slider-attr-scale').fill('30')
+
+        await expect.poll(async () => attrNumber(map, 'scale'), { timeout: 5000 }).toBe(30)
+
+        // The live SVG DOM sees it, not just the attribute string.
+        const baseVal = await map.evaluate(
+            (el) => (el as SVGFEDisplacementMapElement).scale.baseVal
+        )
+        expect(baseVal).toBe(30)
     })
 
     test('updates x2 on the attribute channel for a non-attr-prefixed key', async ({ page }) => {
