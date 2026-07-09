@@ -292,3 +292,85 @@ Stop and report back (do not improvise) if:
   subscription overhead.
 - Deferred: MotionValue-driven `transform` attribute on SVG (upstream handles
   via transform box tricks); `useMotionValueEvent`-style attr listeners.
+
+## Amendment — Upstream ruling on Step 2.3 SSR attribute casing (2026-07-09)
+
+**Question put to the plan author**: Step 2.3 requires SSR to emit DOM
+attribute names (`strokeDashoffset` → `stroke-dashoffset`), but naive
+dash-casing breaks `viewBox` → `view-box` (inert). The executor gated
+dash-casing on motion-dom's exported `camelCaseAttributes` set and pinned
+tests for `viewBox` (unchanged), `strokeDashoffset` (kebab), and
+`'stroke-width'` (untouched), plus an SSR e2e asserting the payload contains
+`stroke-dashoffset="…"` and not `strokeDashoffset=`.
+
+**Ruling: APPROVED — the gate is upstream's own mechanism, verbatim.**
+Verified against `~/Github/motion` at v12.42.2:
+
+1. **Write path** — `packages/motion-dom/src/render/svg/utils/render.ts:15-19`:
+   every rendered SVG attr goes through
+   `!camelCaseAttributes.has(key) ? camelToDash(key) : key`. Dash-case
+   everything except the allowlist. This is the exact semantic Step 2.3's SSR
+   emitter must mirror.
+2. **The allowlist** — `packages/motion-dom/src/render/svg/utils/camel-case-attrs.ts:4-28`
+   (**23 entries** — verified against both the source and the installed
+   package's `camelCaseAttributes.size`; use 23 as the drift-check reference on
+   version bumps): `viewBox`, `baseFrequency`, `numOctaves`, `stdDeviation`,
+   `gradientTransform`, `pathLength`, `markerWidth/Height`,
+   `keySplines`/`keyTimes`, `textLength`, …. It is a deliberate public export
+   (`motion-dom/src/index.ts:302`, confirmed reachable at the installed
+   version) — **import it; do not vendor a copy**, so upstream additions track
+   automatically on version bumps. **`camelToDash` is likewise a public
+   motion-dom export (verified on the installed package) — import it too;
+   hand-rolling the dash-caser is the same vendoring mistake one function
+   over.** Note the filter-primitive entries (`baseFrequency`, `numOctaves`,
+   `stdDeviation`) are exactly what Plan 005's `feTurbulence` work will drive
+   through this path.
+3. **Already-kebab keys are safe by construction** —
+   `packages/motion-dom/src/render/dom/utils/camel-to-dash.ts` is a pure
+   uppercase-letter replacer; `'stroke-width'` passes through unchanged. The
+   pinned test matches upstream behavior.
+4. **NEW NORMATIVE REQUIREMENT — gate ordering vs `attr` prefix.** The casing
+   gate MUST run **after** `resolveSVGAttrKey` strips the `attr` prefix, never
+   before. `attrX` is not in `camelCaseAttributes`, so gating it first emits
+   the inert attribute `attr-x` instead of `x` (probed on the installed
+   package: `attrX → attr-x`, `attrScale → attr-scale`). This is upstream's
+   own ordering: `buildSVGAttrs`
+   (`packages/motion-dom/src/render/svg/utils/build-attrs.ts:23-25,82-85`)
+   destructures `attrX/attrY/attrScale` into `attrs.x/y/scale` _before_
+   `renderSVG` ever applies the gate. Both orderings pass a naive
+   `strokeDashoffset` test, so this needs its own unit case:
+   `attrX` through resolve-then-gate → `x` (and never `attr-x`).
+5. **Read-path symmetry (conditional).** Upstream applies the _same_ gate
+   before reading: `packages/motion-dom/src/render/svg/SVGVisualElement.ts:39`
+   runs the gate before `instance.getAttribute(key)`. **This plan's current
+   scope has no attribute read-back path** (the only SVG-attribute
+   `getAttribute` calls in `src/lib/` are hardcoded kebab strings in the
+   path pipeline, `_MotionContainer.svelte:882,888`, out of scope here) — so
+   no read-back code or test is required. The requirement is conditional: IF
+   the implementation introduces any attribute read-back (initial-value
+   resolution, SSR/hydration reconciliation), it MUST apply the identical
+   gate, after `attr`-prefix resolution per point 4, or a value written as
+   `stroke-dashoffset` read back via `getAttribute('strokeDashoffset')`
+   returns `null`. Do not build a read-back path just to satisfy this point.
+
+Context: upstream never needs this conversion in its _React SSR_ path because
+React JSX normalizes SVG attribute casing at the framework layer; motion-dom's
+imperative `renderSVG` is the upstream analogue of our Svelte SSR emitter, so
+its semantics are the correct reference.
+
+**Correction record (v2, 2026-07-09, same day):** the guard verified the v1
+ruling and found three defects, all confirmed by the plan author against
+source and the installed package before this revision: (a) the allowlist has
+23 entries, not 26 as v1 stated; (b) v1 omitted that `camelToDash` is itself
+a public export — now in point 2; (c) v1 missed the gate-vs-`attr`-prefix
+ordering hazard — now normative point 4 with its own unit case; and v1's
+read-path requirement mandated a unit test for a read-back path that does not
+exist in scope — now conditional point 5. Points 1-3's citations were
+verified exact by the guard.
+
+— _Ruled by the plan author (Claude Fable 5, advisor session of 2026-07-08/09),
+against upstream source `~/Github/motion` v12.42.2, at maintainer request;
+v2 corrections adopted after independent guard verification. The guard should
+treat points 1-3 as confirmation of the executor's current implementation,
+point 4 as a new requirement (with unit case) to verify before DONE, and
+point 5 as conditional-only._

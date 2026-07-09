@@ -27,6 +27,13 @@ REJECTED (with one-line rationale)
 - 002: red tests landed; plan amended 2026-07-09 (two DOM channels — style vs
   attribute; kebab-case allowlist). Executor to revise tests, then implement.
   See `002-svg-motionvalue-attributes.guard.md`.
+- 002: upstream ruling 2026-07-09 appended to the plan ("Amendment — Upstream
+  ruling on Step 2.3 SSR attribute casing"), **corrected to v2 same day after
+  guard verification**: `camelCaseAttributes` gate APPROVED as
+  upstream-verbatim (23 entries; import `camelToDash` too). NEW normative
+  point 4 — the gate runs AFTER `attr`-prefix resolution (`attrX` must never
+  emit `attr-x`), with its own unit case. Point 5 (read-path symmetry) is
+  conditional-only; no read-back path exists in scope.
 
 ## Dependency notes
 
