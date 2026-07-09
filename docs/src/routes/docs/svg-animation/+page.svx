@@ -37,7 +37,7 @@ component re-render when the value changes.
 </svg>
 ```
 
-<Example isSmall exampleUrl="/examples/svg-animation">
+<Example exampleUrl="/examples/svg-animation">
   <SvgAnimationExample />
 </Example>
 

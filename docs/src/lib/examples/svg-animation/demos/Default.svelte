@@ -24,6 +24,11 @@
     }
 </script>
 
+<!--
+  Uses <span> rather than <strong>/<code>: docs pages wrap embedded demos in
+  `.prose-v2`, whose `strong`/`code` rules match this markup at equal specificity
+  and win on cascade order, repainting the text in the page's ink colour.
+-->
 <!-- dk-strip: docs-kit positioning shell - stripped from the published code. -->
 <div class="dk-demo-shell">
     <div class="toolbar" aria-label="Progress controls">
@@ -41,17 +46,22 @@
 
     <div class="stage">
         <div class="intro">
-            <span>one MotionValue</span>
-            <strong>Bound straight to SVG attributes — no keyframes</strong>
+            <span class="eyebrow">one MotionValue</span>
+            <span class="title">Bound straight to SVG attributes — no keyframes</span>
         </div>
 
         <div class="panels">
             <section class="panel">
                 <div class="panel-head">
-                    <span>stroke-dashoffset</span>
-                    <strong>progress ring</strong>
+                    <span class="eyebrow">stroke-dashoffset</span>
+                    <span class="panel-title">progress ring</span>
                 </div>
-                <svg viewBox="0 0 140 140" class="ring" role="img" aria-label="{percent}% complete">
+                <svg
+                    viewBox="0 0 140 140"
+                    class="progress-ring"
+                    role="img"
+                    aria-label="{percent}% complete"
+                >
                     <circle cx="70" cy="70" r={RADIUS} class="ring-track" />
                     <motion.circle
                         cx={70}
@@ -68,8 +78,8 @@
 
             <section class="panel">
                 <div class="panel-head">
-                    <span>cx &amp; x2</span>
-                    <strong>both DOM channels</strong>
+                    <span class="eyebrow">cx &amp; x2</span>
+                    <span class="panel-title">both DOM channels</span>
                 </div>
                 <svg viewBox="0 0 300 90" class="track" role="presentation">
                     <line x1="16" y1="62" x2="284" y2="62" class="track-rail" />
@@ -77,9 +87,10 @@
                     <motion.circle cx={dotCx} cy={62} r={9} class="track-dot" />
                 </svg>
                 <p class="hint">
-                    <code>cx</code> is a CSS property, so Motion writes it to
-                    <code>element.style</code>. <code>x2</code> is not, so it is written with
-                    <code>setAttribute</code>. Same MotionValue, different channels.
+                    <span class="mono">cx</span> is a CSS property, so Motion writes it to
+                    <span class="mono">element.style</span>. <span class="mono">x2</span> is not, so
+                    it is written with <span class="mono">setAttribute</span>. Same MotionValue,
+                    different channels.
                 </p>
             </section>
         </div>
@@ -88,14 +99,53 @@
 
 <style>
     .dk-demo-shell {
+        /* Light theme by default; overridden under `html.dark` below. */
+        --demo-bg: #f1f5f9;
+        --demo-stage-bg: #ffffff;
+        --demo-grid: rgba(15, 118, 110, 0.08);
+        --demo-panel-bg: rgba(248, 250, 252, 0.9);
+        --demo-border: #cbd5e1;
+        --demo-panel-border: #d5dee7;
+        --demo-ink: #0f172a;
+        --demo-ink-soft: #475569;
+        --demo-accent: #0f766e;
+        --demo-ring: #0d9488;
+        --demo-line: #0284c7;
+        --demo-dot: #e11d48;
+        --demo-rail: rgba(15, 23, 42, 0.14);
+        --demo-track: rgba(15, 23, 42, 0.1);
+        --demo-btn-bg: #ffffff;
+        --demo-btn-border: #cbd5e1;
+        --demo-glow: transparent;
+
         width: 100%;
         min-height: clamp(420px, calc(100vh - 240px), 560px);
         display: flex;
         flex-direction: column;
         gap: 14px;
         padding: 18px;
-        background: #0d1518;
-        color: #eef6fb;
+        background: var(--demo-bg);
+        color: var(--demo-ink);
+    }
+
+    :global(html.dark) .dk-demo-shell {
+        --demo-bg: #0d1518;
+        --demo-stage-bg: #071114;
+        --demo-grid: rgba(94, 234, 212, 0.1);
+        --demo-panel-bg: rgba(13, 27, 33, 0.74);
+        --demo-border: #2b4650;
+        --demo-panel-border: rgba(134, 184, 199, 0.42);
+        --demo-ink: #ecfeff;
+        --demo-ink-soft: #9fb9c4;
+        --demo-accent: #67e8f9;
+        --demo-ring: #5eead4;
+        --demo-line: #38bdf8;
+        --demo-dot: #fb7185;
+        --demo-rail: rgba(186, 230, 253, 0.24);
+        --demo-track: rgba(186, 230, 253, 0.16);
+        --demo-btn-bg: #142127;
+        --demo-btn-border: #46616a;
+        --demo-glow: rgba(94, 234, 212, 0.45);
     }
 
     .toolbar {
@@ -111,18 +161,24 @@
         align-items: center;
         gap: 7px;
         padding: 0 14px;
-        border: 1px solid #46616a;
+        border: 1px solid var(--demo-btn-border);
         border-radius: 6px;
-        background: #142127;
-        color: #eef6fb;
+        background: var(--demo-btn-bg);
+        color: var(--demo-ink);
         font-size: 13px;
         font-weight: 780;
         cursor: pointer;
     }
 
     button.primary {
-        border-color: #5eead4;
+        border-color: var(--demo-ring);
+        background: var(--demo-accent);
+        color: #f0fdfa;
+    }
+
+    :global(html.dark) button.primary {
         background: #0f766e;
+        color: #ecfeff;
     }
 
     .stage {
@@ -134,10 +190,10 @@
         gap: 18px;
         padding: 20px;
         overflow: hidden;
-        border: 1px solid #2b4650;
+        border: 1px solid var(--demo-border);
         background:
-            linear-gradient(90deg, rgba(94, 234, 212, 0.1) 1px, transparent 1px),
-            linear-gradient(0deg, rgba(94, 234, 212, 0.1) 1px, transparent 1px), #071114;
+            linear-gradient(90deg, var(--demo-grid) 1px, transparent 1px),
+            linear-gradient(0deg, var(--demo-grid) 1px, transparent 1px), var(--demo-stage-bg);
         background-size: 44px 44px;
     }
 
@@ -150,18 +206,18 @@
         gap: 6px 12px;
     }
 
-    .intro span,
-    .panel-head span {
-        color: #67e8f9;
+    .eyebrow {
+        color: var(--demo-accent);
         font-size: 11px;
         font-weight: 850;
         letter-spacing: 0.16em;
         text-transform: uppercase;
     }
 
-    .intro strong {
-        color: #ecfeff;
+    .title {
+        color: var(--demo-ink);
         font-size: 18px;
+        font-weight: 750;
         line-height: 1.1;
     }
 
@@ -183,8 +239,8 @@
         flex-direction: column;
         gap: 12px;
         padding: 16px;
-        border: 1px solid rgba(134, 184, 199, 0.42);
-        background: rgba(13, 27, 33, 0.74);
+        border: 1px solid var(--demo-panel-border);
+        background: var(--demo-panel-bg);
     }
 
     .panel-head {
@@ -195,13 +251,14 @@
         gap: 4px 12px;
     }
 
-    .panel-head strong {
-        color: #ecfeff;
+    .panel-title {
+        color: var(--demo-ink);
         font-size: 16px;
+        font-weight: 750;
         line-height: 1.05;
     }
 
-    .ring {
+    .progress-ring {
         width: 100%;
         max-width: 190px;
         margin: auto;
@@ -209,35 +266,34 @@
 
     .ring-track {
         fill: none;
-        stroke: rgba(186, 230, 253, 0.16);
+        stroke: var(--demo-track);
         stroke-width: 12;
     }
 
     .ring-label {
-        fill: #ecfeff;
+        fill: var(--demo-ink);
         font-size: 24px;
         font-weight: 800;
         text-anchor: middle;
     }
 
     /* motion.* render their own elements, so Svelte's scoping never reaches them. */
-    :global(.ring-value) {
+    .dk-demo-shell :global(.ring-value) {
         fill: none;
-        stroke: #5eead4;
+        stroke: var(--demo-ring);
         stroke-width: 12;
         stroke-linecap: round;
-        filter: drop-shadow(0 0 12px rgba(94, 234, 212, 0.45));
+        filter: drop-shadow(0 0 12px var(--demo-glow));
     }
 
-    :global(.track-fill) {
-        stroke: #38bdf8;
+    .dk-demo-shell :global(.track-fill) {
+        stroke: var(--demo-line);
         stroke-width: 4;
         stroke-linecap: round;
     }
 
-    :global(.track-dot) {
-        fill: #fb7185;
-        filter: drop-shadow(0 0 10px rgba(251, 113, 133, 0.5));
+    .dk-demo-shell :global(.track-dot) {
+        fill: var(--demo-dot);
     }
 
     .track {
@@ -246,20 +302,25 @@
     }
 
     .track-rail {
-        stroke: rgba(186, 230, 253, 0.24);
+        stroke: var(--demo-rail);
         stroke-width: 4;
         stroke-linecap: round;
     }
 
     .hint {
         margin: 0;
-        color: #9fb9c4;
+        color: var(--demo-ink-soft);
         font-size: 12px;
-        line-height: 1.5;
+        line-height: 1.6;
     }
 
-    .hint code {
-        color: #5eead4;
+    .mono {
+        padding: 1px 4px;
+        border-radius: 3px;
+        background: var(--demo-track);
+        color: var(--demo-ring);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
     }
 
     @media (max-width: 900px) {
