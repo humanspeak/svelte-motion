@@ -487,6 +487,89 @@ describe('extractSVGMotionValueAttributes', () => {
     })
 })
 
+describe('filter-primitive attributes', () => {
+    // Plan 005 drives feTurbulence/feOffset/feGaussianBlur from MotionValues. An
+    // unclaimed key falls through to the raw spread and renders `[object Object]`,
+    // the exact failure this feature exists to eliminate.
+
+    it('should claim the camelCase filter keys that upstream lists', () => {
+        // Resolved against motion-dom's exported `camelCaseAttributes` rather than a
+        // hand-written list, so upstream additions track on version bumps.
+        for (const key of ['stdDeviation', 'baseFrequency', 'numOctaves']) {
+            expect(camelCaseAttributes.has(key)).toBe(true)
+            expect(isSVGMotionValueAttribute(key)).toBe(true)
+        }
+    })
+
+    it('should claim the lowercase filter keys upstream cannot cover', () => {
+        // `camelCaseAttributes` only lists camelCase names, so these need adding
+        // explicitly — they are not in it.
+        for (const key of ['dx', 'dy', 'radius']) {
+            expect(camelCaseAttributes.has(key)).toBe(false)
+            expect(isSVGMotionValueAttribute(key)).toBe(true)
+        }
+    })
+
+    it('should route filter keys into motionValueAttrs, never the raw spread', () => {
+        const values = {
+            stdDeviation: motionValue(4),
+            baseFrequency: motionValue(0.05),
+            numOctaves: motionValue(2),
+            dx: motionValue(3),
+            dy: motionValue(3),
+            radius: motionValue(1)
+        }
+        const { motionValueAttrs, staticAttrs } = extractSVGMotionValueAttributes({ ...values })
+
+        expect(Object.keys(motionValueAttrs).sort()).toEqual(Object.keys(values).sort())
+        expect(staticAttrs).toEqual({})
+    })
+
+    it('should still refuse pathLength even though camelCaseAttributes lists it', () => {
+        // `pathLength` IS in camelCaseAttributes. Resolving against that set must not
+        // hand the path pipeline's props to svgEffect's attribute writer, or
+        // stroke-dasharray gets written twice.
+        expect(camelCaseAttributes.has('pathLength')).toBe(true)
+        expect(isSVGMotionValueAttribute('pathLength')).toBe(false)
+
+        const pathLength = motionValue(0.5)
+        const { motionValueAttrs, staticAttrs } = extractSVGMotionValueAttributes({ pathLength })
+
+        expect(motionValueAttrs).toEqual({})
+        expect(staticAttrs).toEqual({ pathLength })
+    })
+
+    it('should keep static filter values out of motionValueAttrs', () => {
+        const { motionValueAttrs, staticAttrs } = extractSVGMotionValueAttributes({
+            stdDeviation: 4,
+            dx: 3
+        })
+
+        expect(motionValueAttrs).toEqual({})
+        expect(staticAttrs).toEqual({ stdDeviation: 4, dx: 3 })
+    })
+
+    it('should still reject unrelated keys that hold MotionValues', () => {
+        const custom = motionValue(1)
+        const { motionValueAttrs, staticAttrs } = extractSVGMotionValueAttributes({ custom })
+
+        expect(motionValueAttrs).toEqual({})
+        expect(staticAttrs).toEqual({ custom })
+    })
+
+    it('should SSR filter keys with their camelCase names preserved', () => {
+        const { motionValueAttrs } = extractSVGMotionValueAttributes({
+            stdDeviation: motionValue(4),
+            dx: motionValue(3)
+        })
+
+        expect(computeSSRSVGAttrValues(motionValueAttrs)).toEqual({
+            stdDeviation: '4',
+            dx: '3'
+        })
+    })
+})
+
 describe('computeSSRSVGAttrValues', () => {
     it('should render the current value of each MotionValue as a string', () => {
         expect(computeSSRSVGAttrValues({ cx: motionValue(10), r: motionValue(4.5) })).toEqual({
@@ -548,13 +631,21 @@ describe('computeSSRSVGAttrValues', () => {
         // Guards against vendoring a hand-written copy of the allowlist: these
         // filter-primitive keys only survive if motion-dom's own
         // `camelCaseAttributes` is the gate (camel-case-attrs.ts:4-28).
-        expect(
-            computeSSRSVGAttrValues({
-                stdDeviation: motionValue(2),
-                baseFrequency: motionValue(0.05),
-                numOctaves: motionValue(3)
-            })
-        ).toEqual({ stdDeviation: '2', baseFrequency: '0.05', numOctaves: '3' })
+        //
+        // Routed through `extractSVGMotionValueAttributes` on purpose. Handing the
+        // keys straight to the SSR helper bypasses classification, which is how a
+        // filter primitive rendering `[object Object]` survived a fully green suite.
+        const { motionValueAttrs } = extractSVGMotionValueAttributes({
+            stdDeviation: motionValue(2),
+            baseFrequency: motionValue(0.05),
+            numOctaves: motionValue(3)
+        })
+
+        expect(computeSSRSVGAttrValues(motionValueAttrs)).toEqual({
+            stdDeviation: '2',
+            baseFrequency: '0.05',
+            numOctaves: '3'
+        })
     })
 
     it('should never emit [object Object]', () => {

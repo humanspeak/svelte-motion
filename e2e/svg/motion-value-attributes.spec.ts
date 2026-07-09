@@ -336,8 +336,55 @@ test.describe('SVG MotionValue attributes', () => {
         // Force a Svelte re-render of the attribute spread via an unrelated class change.
         await page.getByTestId('toggle-highlight').check()
 
+        // The toggle must re-render the subtree containing the element under test.
+        // Highlighting an unrelated <svg> leaves this test passing even if the bug
+        // returns, because `attr-rect`'s spread is never re-evaluated.
+        await expect
+            .poll(async () => rect.evaluate((el) => !!el.closest('[data-highlight="true"]')), {
+                timeout: 2000
+            })
+            .toBe(true)
+
         // svgEffect owns `x`; the spread must not reset it to the initial seed.
         await expect.poll(async () => attrNumber(rect, 'x'), { timeout: 2000 }).toBe(25)
+    })
+
+    test('binds a MotionValue to a filter primitive attribute', async ({ page }) => {
+        await page.goto(ROUTE)
+
+        const blur = page.getByTestId('blur-filter')
+        await expect(blur).toBeAttached()
+
+        // Plan 005 drives feTurbulence/feOffset/feGaussianBlur from MotionValues.
+        // An unclaimed key falls through to the raw spread and stringifies.
+        expect(await blur.getAttribute('stdDeviation')).not.toBe('[object Object]')
+
+        const before = await attrNumber(blur, 'stdDeviation')
+        expect(Number.isFinite(before)).toBe(true)
+
+        await page.getByTestId('slider-blur').fill('6')
+        await expect.poll(async () => attrNumber(blur, 'stdDeviation'), { timeout: 5000 }).toBe(6)
+
+        // The live SVG DOM parses it, not just the attribute string.
+        const baseVal = await blur.evaluate(
+            (el) => (el as SVGFEGaussianBlurElement).stdDeviationX.baseVal
+        )
+        expect(baseVal).toBe(6)
+    })
+
+    test('server-renders a filter primitive attribute without stringifying it', async ({
+        request
+    }) => {
+        const response = await request.get(ROUTE)
+        expect(response.ok()).toBe(true)
+
+        const html = await response.text()
+        const blur = html.match(/<feGaussianBlur[^>]*data-testid="blur-filter"[^>]*>/)?.[0]
+
+        expect(blur, 'blur-filter should be present in the SSR payload').toBeTruthy()
+        expect(blur).not.toMatch(STRINGIFIED_MOTION_VALUE)
+        // camelCase must survive the SSR casing gate: `std-deviation` is inert.
+        expect(blur).toMatch(/stdDeviation="[\d.]+"/)
     })
 
     test('reattaches cleanly after unmount and remount', async ({ page }) => {
