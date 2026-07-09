@@ -22,7 +22,6 @@ export { Reorder } from '$lib/reorder'
 // config — straight from motion.
 export {
     MotionGlobalConfig,
-    animate,
     cancelFrame,
     delay,
     frame,
@@ -39,8 +38,10 @@ export {
     transform
 } from 'motion'
 
-// Element effects re-typed to accept both raw and Svelte-augmented
-// motion values (runtime passthrough to motion's implementations).
+// `animate` and the element effects re-typed to accept both raw and
+// Svelte-augmented motion values (runtime passthrough to motion's
+// implementations — no behavior change, only widened types).
+export { animate } from '$lib/utils/animateValue'
 export { attrEffect, propEffect, styleEffect, svgEffect } from '$lib/utils/effects'
 export type { EffectValues } from '$lib/utils/effects'
 

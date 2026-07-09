@@ -1,12 +1,6 @@
 <script lang="ts">
     import { ChevronDown, LoaderCircle } from '@lucide/svelte'
-    import {
-        animate,
-        motion,
-        useMotionTemplate,
-        useMotionValue,
-        type RawMotionValue
-    } from '@humanspeak/svelte-motion'
+    import { animate, motion, useMotionTemplate, useMotionValue } from '@humanspeak/svelte-motion'
 
     // AI Gradient Animation Card — a rotating conic-gradient border with a
     // masked glow spill. A single `turn` motion value sweeps 0 → 1 on an
@@ -24,7 +18,7 @@
     const turn = useMotionValue(0)
 
     $effect(() => {
-        const controls = animate(turn as unknown as RawMotionValue<number>, [0, 1], {
+        const controls = animate(turn, [0, 1], {
             ease: 'linear',
             duration,
             repeat: Infinity

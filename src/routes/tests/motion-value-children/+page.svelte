@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { animate, motion, useMotionValue, useTransform, type RawMotionValue } from '$lib'
+    import { animate, motion, useMotionValue, useTransform } from '$lib'
 
     const progress = useMotionValue(0)
     const score = useTransform(progress, [0, 1], [1200, 9800])
@@ -16,7 +16,7 @@
     async function play(target = 1) {
         run += 1
         progress.jump(0)
-        await animate(progress as unknown as RawMotionValue<number>, target, {
+        await animate(progress, target, {
             duration: 0.7,
             ease: 'easeOut'
         })

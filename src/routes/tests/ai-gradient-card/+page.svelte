@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { animate, motion, useMotionTemplate, useMotionValue, type RawMotionValue } from '$lib'
+    import { animate, motion, useMotionTemplate, useMotionValue } from '$lib'
 
     // Coverage for the AI Gradient Card example: a single `turn` motion value
     // sweeps 0 → 1 on an infinite linear loop, and `useMotionTemplate` composes
@@ -15,7 +15,7 @@
 
     $effect(() => {
         if (!running) return
-        const controls = animate(turn as unknown as RawMotionValue<number>, [0, 1], {
+        const controls = animate(turn, [0, 1], {
             ease: 'linear',
             duration: 2,
             repeat: Infinity
