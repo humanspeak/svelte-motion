@@ -68,7 +68,7 @@ const readTransformRotation = (el: HTMLElement): string | undefined => {
 }
 
 const getFinalNumber = (value: unknown): number | null => {
-    const raw = Array.isArray(value) ? value[value.length - 1] : value
+    const raw: unknown = Array.isArray(value) ? value[value.length - 1] : value
     const parsed = typeof raw === 'number' ? raw : Number.parseFloat(String(raw))
     return Number.isFinite(parsed) ? parsed : null
 }

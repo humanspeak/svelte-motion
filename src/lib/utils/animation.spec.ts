@@ -1,12 +1,22 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
 import { animateWithLifecycle, mergeTransitions } from './animation.js'
 
 vi.mock('motion', () => {
     const animateMock = vi.fn(() => ({ finished: Promise.resolve() }))
     return { animate: animateMock }
 })
+/**
+ * The mock stands in for `animate`, which returns animation controls. Typing it
+ * as a bare `vi.fn()` implies a void return, so handing
+ * `mockImplementationOnce` a Promise trips `no-misused-promises`.
+ */
+type AnimateResult = { finished: Promise<void> } | Promise<void>
+
 const { animate: animateMock } = (await import('motion')) as unknown as {
-    animate: ReturnType<typeof vi.fn> & { mockClear: () => void; mock: { calls: unknown[][] } }
+    animate: Mock<(...args: unknown[]) => AnimateResult> & {
+        mockClear: () => void
+        mock: { calls: unknown[][] }
+    }
 }
 
 describe('utils/animation', () => {

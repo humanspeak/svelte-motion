@@ -291,7 +291,7 @@ const resolveLatestStyleValues = (
     const latestValues: Record<string, AnyResolvedKeyframe> = {}
 
     for (const [key, value] of Object.entries(source)) {
-        const latest = Array.isArray(value) ? value[0] : value
+        const latest: unknown = Array.isArray(value) ? value[0] : value
         if (
             latest == null ||
             shouldSkipInlineStyleKey(key) ||

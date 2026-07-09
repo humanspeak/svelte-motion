@@ -98,7 +98,7 @@ export const resolveVariantList = (
         // prototype to be `Object.prototype` (or `null` for objects
         // created via `Object.create(null)`).
         if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue
-        const proto = Object.getPrototypeOf(entry)
+        const proto: unknown = Object.getPrototypeOf(entry)
         if (proto !== Object.prototype && proto !== null) continue
         const obj = entry as Record<string, unknown>
         merged = merged ? { ...merged, ...obj } : { ...obj }

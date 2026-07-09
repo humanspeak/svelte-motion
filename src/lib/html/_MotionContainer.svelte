@@ -17,11 +17,6 @@
         AnimationControlsDefinition,
         AnimationControlsSubscriber,
         DragAxis,
-        DragConstraints,
-        DragControls,
-        DragElastic,
-        DragTransition,
-        MotionWhileDrag,
         DragInfo,
         MotionOnPan,
         MotionOnPanEnd,
@@ -1858,7 +1853,9 @@
             !!transformTemplateProp && splitTemplatedTransformPayload(payload).hasTemplatePayload
 
         if (isNotEmpty(payload) && shouldAnimateThroughTransformTemplate) {
-            animateTemplatedTransformPayload(
+            // Fire-and-forget: the enter animation drives its own lifecycle
+            // callbacks; nothing here awaits its completion.
+            void animateTemplatedTransformPayload(
                 payload,
                 transitionAnimate,
                 (def) => onAnimationStartProp?.(def as DOMKeyframesDefinition | undefined),
@@ -2665,7 +2662,9 @@
             }
         }
 
-        runKeyTransition()
+        // Fire-and-forget: `$effect` bodies cannot be async, and the transition
+        // manages its own cancellation via the cleanup returned below.
+        void runKeyTransition()
 
         // Cleanup on unmount
         return () => {
@@ -2856,7 +2855,9 @@
                 dataPath = 1
 
                 // Then promote to ready and run the enter animation
-                requestAnimationFrame(async () => {
+                // rAF expects a void return; an async callback hands it a Promise that
+                // nothing can await. Name the work and mark it fire-and-forget.
+                const runEnterAnimation = async () => {
                     if (isPlaywright) {
                         await sleep(10)
                     }
@@ -2887,7 +2888,8 @@
                             isLoaded = 'ready'
                         })
                     }
-                })
+                }
+                requestAnimationFrame(() => void runEnterAnimation())
             } else {
                 pwLog('[motion] path: no initialKeyframes, skip to ready')
                 dataPath = 2
@@ -2928,12 +2930,15 @@
             )
             dataPath = 3
             isLoaded = 'initial'
-            requestAnimationFrame(async () => {
+            // rAF expects a void return; an async callback hands it a Promise that
+            // nothing can await. Name the work and mark it fire-and-forget.
+            const promoteToReady = async () => {
                 if (isPlaywright) {
                     await sleep(10)
                 }
                 isLoaded = 'ready'
-            })
+            }
+            requestAnimationFrame(() => void promoteToReady())
         } else {
             dataPath = 4
             isLoaded = 'ready'

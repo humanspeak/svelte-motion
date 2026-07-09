@@ -21,19 +21,17 @@
      * @prop mode Controls enter/exit coordination: 'sync' (default), 'wait', or 'popLayout'.
      * @prop onExitComplete Optional callback invoked once all exits complete.
      */
-    let {
-        children,
-        custom,
-        initial = true,
-        mode = 'sync',
-        onExitComplete
-    } = $props<{
+    type Props = {
         children?: Snippet
         custom?: unknown
         initial?: boolean
         mode?: AnimatePresenceMode
         onExitComplete?: () => void
-    }>()
+    }
+
+    // `$props<T>()` is the removed Svelte 4-era form: Svelte 5's `$props()` takes
+    // no type argument, so it resolved to `any` and these props were untyped.
+    let { children, custom, initial = true, mode = 'sync', onExitComplete }: Props = $props()
 
     pwLog('[AnimatePresence] mounting', {
         initial,

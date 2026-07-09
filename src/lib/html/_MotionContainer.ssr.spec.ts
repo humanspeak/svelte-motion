@@ -13,7 +13,6 @@ describe('_MotionContainer SSR styles', () => {
     })
 
     it('reflects initial styles in SSR output (opacity/borderRadius)', () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -30,7 +29,6 @@ describe('_MotionContainer SSR styles', () => {
     })
 
     it('falls back to first animate keyframe when initial is empty', () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -47,7 +45,6 @@ describe('_MotionContainer SSR styles', () => {
     })
 
     it('does not emit invalid styles for null/undefined initial props', () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -63,7 +60,6 @@ describe('_MotionContainer SSR styles', () => {
     })
 
     it('emits optimized appear handoff metadata for SSR enter animations', () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',

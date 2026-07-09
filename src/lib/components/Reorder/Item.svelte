@@ -15,7 +15,7 @@
      */
     import { isMotionValue } from 'motion-dom'
     import MotionContainer from '$lib/html/_MotionContainer.svelte'
-    import type { DragInfo } from '$lib/types'
+    import type { DragInfo, LayoutMeasurePayload } from '$lib/types'
     import { useMotionValue } from '$lib/utils/motionValue.svelte'
     import { isMotionValueChild } from '$lib/utils/motionValueChild'
     import { parseStyleString } from '$lib/utils/style'
@@ -105,7 +105,7 @@
     {layout}
     onDrag={handleDrag}
     onDragEnd={handleDragEnd}
-    onLayoutMeasure={(box) => context.registerItem(value, box)}
+    onLayoutMeasure={(box: LayoutMeasurePayload) => context.registerItem(value, box)}
     {motionValueChild}
 >
     {@render childSnippet?.()}

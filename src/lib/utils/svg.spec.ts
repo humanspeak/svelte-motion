@@ -22,6 +22,9 @@ import {
 
 describe('svg utilities', () => {
     let mockPathElement: SVGPathElement
+    // Hold the spy rather than referencing `mockPathElement.setAttribute` at the
+    // assertion site, which passes an unbound method.
+    let setAttributeSpy: ReturnType<typeof vi.spyOn>
 
     beforeAll(() => {
         // Ensure SVG constructors are available in the test environment
@@ -38,7 +41,7 @@ describe('svg utilities', () => {
         svg.appendChild(mockPathElement)
         document.body.appendChild(svg)
 
-        vi.spyOn(mockPathElement, 'setAttribute')
+        setAttributeSpy = vi.spyOn(mockPathElement, 'setAttribute')
     })
 
     describe('isSVGPathElement', () => {
@@ -83,7 +86,7 @@ describe('svg utilities', () => {
             expect(result).not.toHaveProperty('pathLength')
             expect(result).toHaveProperty('stroke-dasharray', '1 1')
             expect(result).toHaveProperty('stroke-dashoffset', '0')
-            expect(mockPathElement.setAttribute).toHaveBeenCalledWith('pathLength', '1')
+            expect(setAttributeSpy).toHaveBeenCalledWith('pathLength', '1')
         })
 
         it('should transform pathLength array to normalized unitless dasharray array', () => {
@@ -115,7 +118,7 @@ describe('svg utilities', () => {
 
             expect(result).toHaveProperty('stroke-dasharray', '1 1')
             expect(result).toHaveProperty('stroke-dashoffset', '-0.5')
-            expect(mockPathElement.setAttribute).toHaveBeenCalledWith('pathLength', '1')
+            expect(setAttributeSpy).toHaveBeenCalledWith('pathLength', '1')
         })
 
         it('should preserve other properties', () => {

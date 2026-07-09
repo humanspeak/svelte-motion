@@ -68,7 +68,8 @@
             dragControls={controls}
             onDragEnd={() => {
                 if (y.get() >= 100) {
-                    handleClose()
+                    // Fire-and-forget: onDragEnd expects a void return.
+                    void handleClose()
                 }
             }}
             dragListener={false}

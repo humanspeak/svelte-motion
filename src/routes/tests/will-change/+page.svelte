@@ -13,7 +13,8 @@
     let controlsMoved = false
     const runControls = () => {
         controlsMoved = !controlsMoved
-        controls.start({ x: controlsMoved ? 220 : 0 }, { duration: 0.5 })
+        // Fire-and-forget: demo page, nothing awaits the animation.
+        void controls.start({ x: controlsMoved ? 220 : 0 }, { duration: 0.5 })
     }
 
     let started = $state(false)

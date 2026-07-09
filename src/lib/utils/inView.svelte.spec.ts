@@ -216,7 +216,7 @@ describe('attachWhileInView viewport options', () => {
         expect(io.instances()[0].init?.threshold).toBe(0)
     })
 
-    it('latches on first entry when once: true — no exit animation, no re-entry', async () => {
+    it('latches on first entry when once: true — no exit animation, no re-entry', () => {
         const el = document.createElement('div')
         const onStart = vi.fn()
         const onEnd = vi.fn()

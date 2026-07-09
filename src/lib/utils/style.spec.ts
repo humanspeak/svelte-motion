@@ -65,14 +65,12 @@ describe('mergeInlineStyles', () => {
     })
 
     it('ignores null/undefined values and unknown complex keys', () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const out = mergeInlineStyles('', { opacity: undefined, fooBarBaz: { x: 1 } }, null)
         expect(out).not.toContain('opacity')
         expect(out).not.toContain('foo-bar-baz')
     })
 
     it('handles empty arrays gracefully (no style written)', () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const out = mergeInlineStyles('', { rotate: [] }, null)
         expect(out).not.toContain('transform')
     })
@@ -83,7 +81,6 @@ describe('mergeInlineStyles', () => {
     })
 
     it('maps unknown flat keys to kebab-case CSS props', () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const out = mergeInlineStyles('', { backgroundSize: 'cover' }, null)
         expect(out).toContain('background-size: cover')
     })
@@ -95,22 +92,18 @@ describe('mergeInlineStyles', () => {
     })
 
     it('does not set prop when first keyframe is undefined (setProp v==null)', () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const out = mergeInlineStyles('', { opacity: [undefined as any] }, null)
         expect(out).not.toContain('opacity')
     })
 
     it('does not set width when null or [undefined] (setPx guards)', () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const out1 = mergeInlineStyles('', { width: null }, null)
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const out2 = mergeInlineStyles('', { width: [undefined as any] as any }, null)
         expect(out1).not.toContain('width:')
         expect(out2).not.toContain('width:')
     })
 
     it('ignores transform when value is null (addTransform value==null)', () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const out = mergeInlineStyles('', { scale: null }, null)
         expect(out).not.toContain('transform')
     })

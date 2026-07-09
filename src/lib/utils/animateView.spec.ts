@@ -70,7 +70,7 @@ describe('animateView', () => {
         })
         expect(textDuringUpdate).toBe('b')
 
-        unmount(component)
+        void unmount(component)
         host.remove()
     })
 })

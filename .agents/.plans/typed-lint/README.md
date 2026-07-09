@@ -13,12 +13,37 @@ starting, honor its STOP conditions, and update your row when done.
 
 ## Execution order & status
 
-| Plan | Title                                                                   | Priority | Effort | Depends on | Status |
-| ---- | ----------------------------------------------------------------------- | -------- | ------ | ---------- | ------ |
-| 001  | Adopt recommendedTypeChecked with scoped carve-outs for any-bridging    | P2       | L      | —          | TODO   |
+| Plan | Title                                                                | Priority | Effort | Depends on | Status |
+| ---- | -------------------------------------------------------------------- | -------- | ------ | ---------- | ------ |
+| 001  | Adopt recommendedTypeChecked with scoped carve-outs for any-bridging | P2       | L      | —          | DONE   |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
+
+- 001: **DONE** 2026-07-09. `trunk check --all` exits 0; `pnpm check` 0 errors;
+  `pnpm test:only` 752/752; `playwright test --list` 319 tests. Four deviations
+  and three additional rule-offs, all forced by tooling divergences rather than
+  by the code — see the commits on `chore/typed-lint-recommended`: 1. `projectService.allowDefaultProject` cannot work under Trunk, which lints
+  a temp sandbox copy whose path never matches a glob resolved against
+  `tsconfigRootDir`. Root config files + `scripts/**` moved to the
+  `disableTypeChecked` guard. 2. `no-unnecessary-type-assertion` autofix is NOT behavior-neutral. It
+  deletes `querySelector(sel) as HTMLElement | null`, whose assertion is
+  what makes TS infer the generic `E = HTMLElement`. 49 such sites were
+  pre-converted to `querySelector<HTMLElement>(sel)`. 3. Trunk's ESLint fixer will not write to `.svelte` files, so `trunk check
+--fix` stalls at 219 remaining assertions. Finished with an
+  operator-approved one-time raw `npx eslint --fix`. 4. Step 4's expectation that the autofix touches only `src/**` is wrong now
+  that `e2e/**` is typed-linted; it edits e2e specs too.
+  Additional rule-offs beyond Step 2(d), each with its count: - `no-unnecessary-type-assertion` off for `**/*.svelte` — 19 false positives
+  in `_MotionContainer.svelte`; svelte-eslint-parser narrows `$state` across
+  closure boundaries, svelte-check (correctly) does not. 0 true positives. - `no-unsafe-assignment` off for `**/*.svelte` — 9 false positives, all on
+  `let { … } = $props()` lines, reported only by `trunk check --all` and not
+  by targeted `trunk check <file>` nor raw `npx eslint`. 0 true positives.
+  Real bugs fixed in library source (not cosmetics): - `layout.ts` dropped a `finished.finally()` promise whose rejection (WAAPI
+  cancel) went unhandled. - `optimizedAppear.ts` tested a Promise for truthiness as feature detection
+  (`if (readyAnimation.ready)`), which is always true once the property
+  exists; and fed `undefined` into `Promise.all`. - `svg.ts` could write a literal `[object Object]` into `stroke-dashoffset`
+  via `String(offset)` on a non-primitive. - `motionTemplate.svelte.ts` could interpolate `[object Object]` likewise. - `AnimatePresence.svelte` and `PresenceChild.svelte` used the removed
+  Svelte 4 `$props<T>()` generic form, so **their props were untyped `any`**.
 
 ## Dependency notes
 
@@ -40,9 +65,9 @@ REJECTED (with one-line rationale)
   in spec files and internal demo routes; only ~14 are in library source,
   which keeps the rules on (fix-or-trunk-ignore per site).
 - **Per-site suppression for test `any`-bridges** — rejected (operator): per
-  site comments don't hide *future* occurrences of the deliberate pattern;
+  site comments don't hide _future_ occurrences of the deliberate pattern;
   scoped config blocks do.
 - **Typed linting for `docs/**`** — separate workspace with a generated,
-  gitignored ESLint config owned by docs-kit; out of this repo's lint story
-  (the plan adds a `disableTypeChecked` guard so root config can never apply
+gitignored ESLint config owned by docs-kit; out of this repo's lint story
+(the plan adds a `disableTypeChecked` guard so root config can never apply
   typed rules there).

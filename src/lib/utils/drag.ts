@@ -787,7 +787,9 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         }
 
         if (restorePromises.length > 0) {
-            Promise.allSettled(restorePromises).then(finishRestore)
+            // Fire-and-forget: `allSettled` never rejects, and the caller must not
+            // block on the restore animations finishing.
+            void Promise.allSettled(restorePromises).then(finishRestore)
             return
         }
 

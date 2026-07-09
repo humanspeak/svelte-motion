@@ -148,7 +148,7 @@ describe('useTransform — rune getter sources (unlocked by the unification)', (
         await vi.advanceTimersByTimeAsync(100)
         expect(probe.mapped.get()).toBe(50)
 
-        unmount(probe)
+        void unmount(probe)
         host.remove()
     })
 
@@ -163,7 +163,7 @@ describe('useTransform — rune getter sources (unlocked by the unification)', (
         await vi.advanceTimersByTimeAsync(2000)
         expect(probe.smooth.get()).toBeGreaterThan(0)
 
-        unmount(probe)
+        void unmount(probe)
         host.remove()
     })
 })

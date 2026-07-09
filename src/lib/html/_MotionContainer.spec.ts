@@ -67,7 +67,6 @@ afterEach(() => {
 
 describe('_MotionContainer', () => {
     it('does not add tabindex when element is natively focusable', async () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'a',
@@ -81,7 +80,6 @@ describe('_MotionContainer', () => {
     })
 
     it('adds tabindex=0 for non-focusable elements with whileTap', async () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: { tag: 'div', whileTap: { scale: 0.95 } }
         })
@@ -93,7 +91,6 @@ describe('_MotionContainer', () => {
         const onStart = vi.fn()
         const onComplete = vi.fn()
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -122,7 +119,6 @@ describe('_MotionContainer', () => {
         const animate = { scale: 1.1, backgroundColor: '#000' }
         const whileTap = { scale: 0.9, backgroundColor: '#f00' }
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: { tag: 'div', initial, animate, whileTap }
         })
@@ -165,7 +161,6 @@ describe('_MotionContainer', () => {
 
         const variants = { hover: { scale: 1.2 } }
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -212,7 +207,6 @@ describe('_MotionContainer', () => {
             muted: { color: 'gray' }
         }
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -256,7 +250,6 @@ describe('_MotionContainer', () => {
             } as unknown as MediaQueryList
         })
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -276,7 +269,6 @@ describe('_MotionContainer', () => {
     })
 
     it('re-runs animate when animate prop changes', async () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const result = render(MotionContainer as unknown as any, {
             props: { tag: 'div', animate: { opacity: 0.5 } }
         })
@@ -297,7 +289,6 @@ describe('_MotionContainer', () => {
         const controls = animationControls()
         const cleanup = controls.mount()
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -330,7 +321,6 @@ describe('_MotionContainer', () => {
         const controls = animationControls()
         const cleanup = controls.mount()
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -362,7 +352,6 @@ describe('_MotionContainer', () => {
         const controls = animationControls()
         const cleanup = controls.mount()
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -407,7 +396,6 @@ describe('_MotionContainer', () => {
     it('keeps initial variants applied after mounting with animate controls', async () => {
         const controls = animationControls()
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -455,7 +443,6 @@ describe('_MotionContainer', () => {
             )
             .mockImplementation(() => currentRect)
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container, unmount } = render(MotionContainer as unknown as any, {
             props: { tag: 'div', layout: true }
         })
@@ -516,7 +503,6 @@ describe('_MotionContainer', () => {
             )
             .mockImplementation(() => currentRect)
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: { tag: 'div', layout: 'position' }
         })
@@ -563,7 +549,6 @@ describe('_MotionContainer', () => {
         const onHoverStart = vi.fn()
         const onHoverEnd = vi.fn()
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -600,7 +585,6 @@ describe('_MotionContainer', () => {
 
     it('passes own custom prop into a function-form variant on animate', async () => {
         animateMock.mockClear()
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -659,7 +643,6 @@ describe('_MotionContainer', () => {
     })
 
     it('whileHover is gated to hover-capable devices', async () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: { tag: 'div', whileHover: { scale: 1.05 } }
         })

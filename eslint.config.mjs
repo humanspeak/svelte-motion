@@ -130,9 +130,16 @@ export default [
         // of writing: 19 such false positives in `_MotionContainer.svelte`, 0 true
         // positives left in `.svelte` after the one-time autofix. The `as`-style
         // assertions the rule found in `.svelte` files were real and are removed.
+        // `no-unsafe-assignment` is likewise unreliable in `.svelte` under Trunk.
+        // Running `trunk check --all` reports 9 hits, every one of them on a
+        // `let { … } = $props()` destructuring line. The same files report zero when
+        // checked individually (`trunk check <file>`) and zero under a raw
+        // `npx eslint` run, so the type info for `$props()` degrades in Trunk's
+        // batched, sandboxed invocation. `.ts` files keep the whole unsafe family.
         files: ['**/*.svelte'],
         rules: {
-            '@typescript-eslint/no-unnecessary-type-assertion': 'off'
+            '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+            '@typescript-eslint/no-unsafe-assignment': 'off'
         }
     },
     {

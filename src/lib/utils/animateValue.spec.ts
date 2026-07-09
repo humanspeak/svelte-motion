@@ -48,7 +48,6 @@ describe('utils/animateValue - animate', () => {
  * overload (numbers, strings, elements, sequences) must compile, and the
  * `@ts-expect-error` cases must stay errors.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function typeAssertions() {
     const numMv = motionValue(0)
     const strMv = motionValue('0px')
@@ -67,3 +66,6 @@ function typeAssertions() {
     // @ts-expect-error a boolean is not a valid animation subject
     animate(true, 1)
 }
+
+// Compile-time only: referenced so the checker keeps it, and lint sees a use.
+void typeAssertions

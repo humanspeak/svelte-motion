@@ -26,7 +26,7 @@ describe('utils/drag', () => {
         expect(c).toMatchObject({ top: -10, left: -5, right: 5, bottom: 10 })
     })
 
-    it('attachDrag: attaches pointerdown and animates during move', async () => {
+    it('attachDrag: attaches pointerdown and animates during move', () => {
         const el = document.createElement('div')
         el.style.width = '100px'
         el.style.height = '100px'
