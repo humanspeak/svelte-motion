@@ -13,7 +13,7 @@ test.describe('AnimatePresence re-entry animation', () => {
         // Wait for element to be at full size (no animation, just immediate appearance)
         await page.waitForFunction(
             () => {
-                const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+                const el = document.querySelector<HTMLElement>('[data-testid="box"]')
                 if (!el) return false
                 const rect = el.getBoundingClientRect()
                 const styles = getComputedStyle(el)
@@ -45,7 +45,7 @@ test.describe('AnimatePresence re-entry animation', () => {
         // Capture initial state - should start from initial values (opacity: 0, scale: 0)
         // We need to capture this quickly before animation completes
         const initialState = await page.evaluate(() => {
-            const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+            const el = document.querySelector<HTMLElement>('[data-testid="box"]')
             if (!el) return null
             const styles = getComputedStyle(el)
             return {
@@ -65,7 +65,7 @@ test.describe('AnimatePresence re-entry animation', () => {
         // Wait for animation to complete
         await page.waitForFunction(
             () => {
-                const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+                const el = document.querySelector<HTMLElement>('[data-testid="box"]')
                 if (!el) return false
                 const styles = getComputedStyle(el)
                 const opacity = parseFloat(styles.opacity)
@@ -96,7 +96,7 @@ test.describe('AnimatePresence re-entry animation', () => {
 
         // Verify animation completed - element should be fully visible
         const finalState = await page.evaluate(() => {
-            const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+            const el = document.querySelector<HTMLElement>('[data-testid="box"]')
             if (!el) return null
             const styles = getComputedStyle(el)
             return {
@@ -117,7 +117,7 @@ test.describe('AnimatePresence re-entry animation', () => {
         // Initial appearance (no animation due to initial={false})
         await page.waitForFunction(
             () => {
-                const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+                const el = document.querySelector<HTMLElement>('[data-testid="box"]')
                 if (!el) return false
                 const styles = getComputedStyle(el)
                 return parseFloat(styles.opacity) >= 0.99
@@ -140,7 +140,7 @@ test.describe('AnimatePresence re-entry animation', () => {
 
         while (Date.now() - startTime < 1500 && samples.length < 20) {
             const sample = await page.evaluate(() => {
-                const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+                const el = document.querySelector<HTMLElement>('[data-testid="box"]')
                 if (!el) return null
                 const styles = getComputedStyle(el)
                 const opacity = parseFloat(styles.opacity)
@@ -204,7 +204,7 @@ test.describe('AnimatePresence re-entry animation', () => {
         // Initial appearance (no animation due to initial={false})
         await page.waitForFunction(
             () => {
-                const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+                const el = document.querySelector<HTMLElement>('[data-testid="box"]')
                 if (!el) return false
                 const styles = getComputedStyle(el)
                 return parseFloat(styles.opacity) >= 0.99
@@ -229,7 +229,7 @@ test.describe('AnimatePresence re-entry animation', () => {
 
             while (Date.now() - startTime < 1000 && samples.length < 15) {
                 const sample = await page.evaluate(() => {
-                    const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+                    const el = document.querySelector<HTMLElement>('[data-testid="box"]')
                     if (!el) return null
                     const styles = getComputedStyle(el)
                     const opacity = parseFloat(styles.opacity)
@@ -269,7 +269,7 @@ test.describe('AnimatePresence re-entry animation', () => {
             // Wait for animation to complete before next cycle
             await page.waitForFunction(
                 () => {
-                    const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+                    const el = document.querySelector<HTMLElement>('[data-testid="box"]')
                     if (!el) return false
                     const styles = getComputedStyle(el)
                     return parseFloat(styles.opacity) >= 0.99
@@ -287,7 +287,7 @@ test.describe('AnimatePresence re-entry animation', () => {
         // 1. Initial load - verify 1 box
         await page.waitForFunction(
             () => {
-                const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+                const el = document.querySelector<HTMLElement>('[data-testid="box"]')
                 if (!el) return false
                 const styles = getComputedStyle(el)
                 return parseFloat(styles.opacity) >= 0.99

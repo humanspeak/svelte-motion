@@ -61,7 +61,7 @@ export const animateWithLifecycle = (
             .catch(() => {})
         return
     }
-    if (isPromiseLike(controls as unknown)) {
+    if (isPromiseLike(controls)) {
         ;(controls as unknown as Promise<unknown>).then(() => onComplete?.(payload)).catch(() => {})
     }
 }

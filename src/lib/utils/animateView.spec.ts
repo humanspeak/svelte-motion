@@ -66,12 +66,13 @@ describe('animateView', () => {
             // flushSync runs after this callback returns, inside the
             // wrapper — capture on the microtask right after.
         }).then(() => {
-            textDuringUpdate = host.querySelector('[data-testid="view-probe"]')
-                ?.textContent as string
+            textDuringUpdate = host.querySelector('[data-testid="view-probe"]')?.textContent
         })
         expect(textDuringUpdate).toBe('b')
 
-        unmount(component)
+        // Svelte's `unmount()` returns a Promise that only settles after outro
+        // transitions; the test tears down synchronously and never awaits it.
+        void unmount(component)
         host.remove()
     })
 })

@@ -127,7 +127,7 @@ export function useCycle<T>(...args: [CycleItemsGetter<T>] | T[]): CycleState<T>
             // `cycle(99)`, or items shrinking under us in the getter form)
             // resolve to the nearest valid edge instead of `undefined`.
             const safeIndex = index < 0 ? 0 : index >= items.length ? items.length - 1 : index
-            return items[safeIndex] as T
+            return items[safeIndex]
         },
         cycle: (next?: number) => {
             const items = getItems()

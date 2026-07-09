@@ -81,9 +81,13 @@ export const useMotionTemplate = (
                 output += String(value.get())
             } else if (value && typeof value === 'object' && 'subscribe' in (value as object)) {
                 output += String(sampleSource(value as Readable<number | string>))
-            } else {
+            } else if (typeof value === 'string') {
+                output += value
+            } else if (typeof value === 'number') {
                 output += String(value)
             }
+            // Anything else is outside MotionTemplateInput; skip it rather than
+            // interpolating a literal "[object Object]" into the template.
         }
         return output
     }

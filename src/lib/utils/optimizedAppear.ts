@@ -29,8 +29,6 @@ type SvelteMotionAppearStore = {
     startFrameTime?: number
 }
 
-type NativeEasing = Parameters<typeof mapEasingToNativeEasing>[0]
-
 declare global {
     interface Window {
         __SvelteMotionAppear?: SvelteMotionAppearStore
@@ -105,7 +103,7 @@ const toNativeOptions = (transition: AnimationOptions | undefined): KeyframeAnim
         fill: 'both'
     }
 
-    const easing = mapEasingToNativeEasing(transition?.ease as NativeEasing, durationMs)
+    const easing = mapEasingToNativeEasing(transition?.ease, durationMs)
     if (Array.isArray(easing)) {
         options.easing = easing[0] ?? 'linear'
     } else if (easing) {
@@ -250,7 +248,9 @@ export const startOptimizedAppearAnimation = (
 
     store.complete.set(id, false)
     const readyAnimation = store.readyAnimation
-    if (readyAnimation.ready) {
+    // Feature detection, not a completion check: `ready` is a Promise, so a bare
+    // truthiness test is always true once the property exists.
+    if (readyAnimation.ready !== undefined) {
         readyAnimation.ready.then(startAnimation).catch(() => {})
     } else {
         startAnimation()
@@ -317,9 +317,13 @@ export const finishOptimizedAppearAnimation = async (
     let entries = [...store.animations].filter(([key]) => key.startsWith(`${elementId}: `))
     if (!entries.length) return false
 
+    // `flatMap` rather than `map`: the old form fed `undefined` into `Promise.all`
+    // for every entry that had nothing to wait on.
     await Promise.all(
-        entries.map(([, data]) =>
-            data.startTime === null ? data.animation.ready?.catch(() => undefined) : undefined
+        entries.flatMap(([, data]) =>
+            data.startTime === null && data.animation.ready !== undefined
+                ? [data.animation.ready.catch(() => undefined)]
+                : []
         )
     )
 

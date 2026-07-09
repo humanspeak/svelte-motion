@@ -21,7 +21,7 @@ test.describe('Rapid tap (spring runaway guard)', () => {
                     .split(',')
                     .map((v) => parseFloat(v.trim()))
                 if (nums.length < 4 || nums.slice(0, 4).some((n) => Number.isNaN(n))) return 1
-                return (Math.hypot(nums[0]!, nums[1]!) + Math.hypot(nums[2]!, nums[3]!)) / 2
+                return (Math.hypot(nums[0], nums[1]) + Math.hypot(nums[2], nums[3])) / 2
             }
             if (t.startsWith('matrix3d(')) {
                 const nums = t
@@ -30,8 +30,8 @@ test.describe('Rapid tap (spring runaway guard)', () => {
                     .map((v) => parseFloat(v.trim()))
                 if (nums.length !== 16 || nums.some((n) => Number.isNaN(n))) return 1
                 return (
-                    (Math.hypot(nums[0]!, nums[1]!, nums[2]!) +
-                        Math.hypot(nums[4]!, nums[5]!, nums[6]!)) /
+                    (Math.hypot(nums[0], nums[1], nums[2]) +
+                        Math.hypot(nums[4], nums[5], nums[6])) /
                     2
                 )
             }

@@ -139,7 +139,7 @@ describe('utils/scroll - useScroll', () => {
         // queueMicrotask — drain the queue.
         await drainMicrotasks()
         expect(scrollMock).toHaveBeenCalledTimes(1)
-        const [, opts] = scrollMock.mock.calls[0]!
+        const [, opts] = scrollMock.mock.calls[0]
         expect((opts as { container?: HTMLElement }).container).toBe(container)
         expect((opts as { target?: HTMLElement }).target).toBe(target)
         expect((opts as { axis?: string }).axis).toBe('x')
@@ -149,7 +149,7 @@ describe('utils/scroll - useScroll', () => {
         const ctx = inRoot(() => useScroll())
         flushSync()
         await drainMicrotasks()
-        const [cb] = scrollMock.mock.calls[0]!
+        const [cb] = scrollMock.mock.calls[0]
         cb(0.5, {
             x: { current: 100, progress: 0.5 },
             y: { current: 250, progress: 0.25 }

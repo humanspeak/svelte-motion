@@ -11,7 +11,7 @@ class FakeResizeObserver {
 }
 
 beforeAll(() => {
-    vi.stubGlobal('ResizeObserver', FakeResizeObserver as unknown as typeof ResizeObserver)
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver)
 })
 
 afterAll(() => {

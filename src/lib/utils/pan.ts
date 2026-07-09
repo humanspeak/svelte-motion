@@ -289,7 +289,7 @@ export const attachPan = (
 ): AttachPanCleanup => {
     if (typeof window === 'undefined') {
         const noop = () => {}
-        return Object.assign(noop, { update: () => {} }) as AttachPanCleanup
+        return Object.assign(noop, { update: () => {} })
     }
 
     const contextWindow = options.contextWindow ?? el.ownerDocument?.defaultView ?? window
@@ -355,7 +355,7 @@ export const attachPan = (
         el.removeEventListener('pointerdown', onPointerDown)
     }
 
-    return Object.assign(teardown, { update }) as AttachPanCleanup
+    return Object.assign(teardown, { update })
 }
 
 interface PanSessionInternalOptions {

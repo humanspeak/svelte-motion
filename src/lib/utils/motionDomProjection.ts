@@ -127,9 +127,9 @@ export class MotionDomProjectionAdapter {
                 props: {},
                 presenceContext: null,
                 visualState: createVisualState()
-            } as never,
-            { allowProjection: true } as never
-        ) as ProjectionVisualElement
+            },
+            { allowProjection: true }
+        )
         this.projection = new HTMLProjectionNode(
             this.visualElement.latestValues,
             parent?.projection as unknown as IProjectionNode | undefined

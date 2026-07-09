@@ -51,7 +51,7 @@ describe('utils/hover', () => {
         hoverCallback = null
         hoverCleanup = null
         // default to hover-capable environment
-        vi.stubGlobal('matchMedia', ((query: string) => {
+        vi.stubGlobal('matchMedia', (query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
             return {
                 matches,
@@ -65,7 +65,7 @@ describe('utils/hover', () => {
                     return false
                 }
             } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
+        })
     })
 
     it('isHoverCapable: positive on hover+fine pointer', () => {
@@ -73,7 +73,7 @@ describe('utils/hover', () => {
     })
 
     it('isHoverCapable: negative on non-hover env', () => {
-        vi.stubGlobal('matchMedia', ((query: string) => {
+        vi.stubGlobal('matchMedia', (query: string) => {
             return {
                 matches: false,
                 media: query,
@@ -86,14 +86,14 @@ describe('utils/hover', () => {
                     return false
                 }
             } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
+        })
         expect(isHoverCapable()).toBe(false)
     })
 
     it('isHoverCapable: returns false when matchMedia throws', () => {
-        vi.stubGlobal('matchMedia', (() => {
+        vi.stubGlobal('matchMedia', () => {
             throw new Error('matchMedia not supported')
-        }) as unknown as typeof window.matchMedia)
+        })
         expect(isHoverCapable()).toBe(false)
     })
 

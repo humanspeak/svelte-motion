@@ -1,12 +1,22 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
 import { animateWithLifecycle, mergeTransitions } from './animation.js'
 
 vi.mock('motion', () => {
     const animateMock = vi.fn(() => ({ finished: Promise.resolve() }))
     return { animate: animateMock }
 })
+/**
+ * The mock stands in for `animate`, which returns animation controls. Typing it
+ * as a bare `vi.fn()` implies a void return, so handing
+ * `mockImplementationOnce` a Promise trips `no-misused-promises`.
+ */
+type AnimateResult = { finished: Promise<void> } | Promise<void>
+
 const { animate: animateMock } = (await import('motion')) as unknown as {
-    animate: ReturnType<typeof vi.fn> & { mockClear: () => void; mock: { calls: unknown[][] } }
+    animate: Mock<(...args: unknown[]) => AnimateResult> & {
+        mockClear: () => void
+        mock: { calls: unknown[][] }
+    }
 }
 
 describe('utils/animation', () => {
@@ -27,17 +37,11 @@ describe('utils/animation', () => {
         animateMock.mockClear()
 
         const frames = { opacity: 1 }
-        animateWithLifecycle(el, frames as unknown as import('motion').DOMKeyframesDefinition, {
+        animateWithLifecycle(el, frames, {
             duration: 0.1
         })
 
-        animateWithLifecycle(
-            el,
-            frames as unknown as import('motion').DOMKeyframesDefinition,
-            { duration: 0.1 },
-            onStart,
-            onComplete
-        )
+        animateWithLifecycle(el, frames, { duration: 0.1 }, onStart, onComplete)
         await Promise.resolve()
 
         expect(onStart).toHaveBeenCalledWith(frames)
@@ -50,13 +54,7 @@ describe('utils/animation', () => {
         const onComplete = vi.fn()
         // One call returns a thenable (Promise) to hit the thenable branch
         animateMock.mockImplementationOnce(() => Promise.resolve())
-        animateWithLifecycle(
-            el,
-            { scale: 1 } as unknown as import('motion').DOMKeyframesDefinition,
-            { duration: 0.05 },
-            undefined,
-            onComplete
-        )
+        animateWithLifecycle(el, { scale: 1 }, { duration: 0.05 }, undefined, onComplete)
         await Promise.resolve()
         expect(onComplete).toHaveBeenCalled()
     })

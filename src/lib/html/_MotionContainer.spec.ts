@@ -67,7 +67,6 @@ afterEach(() => {
 
 describe('_MotionContainer', () => {
     it('does not add tabindex when element is natively focusable', async () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'a',
@@ -81,7 +80,6 @@ describe('_MotionContainer', () => {
     })
 
     it('adds tabindex=0 for non-focusable elements with whileTap', async () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: { tag: 'div', whileTap: { scale: 0.95 } }
         })
@@ -93,7 +91,6 @@ describe('_MotionContainer', () => {
         const onStart = vi.fn()
         const onComplete = vi.fn()
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -122,7 +119,6 @@ describe('_MotionContainer', () => {
         const animate = { scale: 1.1, backgroundColor: '#000' }
         const whileTap = { scale: 0.9, backgroundColor: '#f00' }
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: { tag: 'div', initial, animate, whileTap }
         })
@@ -147,7 +143,7 @@ describe('_MotionContainer', () => {
 
     it('whileHover accepts a variant key string and resolves it against `variants` (#349)', async () => {
         // Enable true-hover environment so the whileHover effect attaches.
-        vi.stubGlobal('matchMedia', ((query: string) => {
+        vi.stubGlobal('matchMedia', (query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
             return {
                 matches,
@@ -161,11 +157,10 @@ describe('_MotionContainer', () => {
                     return false
                 }
             } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
+        })
 
         const variants = { hover: { scale: 1.2 } }
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -189,7 +184,7 @@ describe('_MotionContainer', () => {
     })
 
     it('whileHover accepts an array of variant keys, merging later-wins (#349)', async () => {
-        vi.stubGlobal('matchMedia', ((query: string) => {
+        vi.stubGlobal('matchMedia', (query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
             return {
                 matches,
@@ -203,7 +198,7 @@ describe('_MotionContainer', () => {
                     return false
                 }
             } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
+        })
 
         // Two variants colliding on `color` — `muted` is later in the
         // array, so its color wins. `hover`'s `scale` is preserved.
@@ -212,7 +207,6 @@ describe('_MotionContainer', () => {
             muted: { color: 'gray' }
         }
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -240,7 +234,7 @@ describe('_MotionContainer', () => {
         // undefined → `isNotEmpty` gate skips attach. The hover path
         // never installs listeners, so no animate call follows
         // pointerEnter.
-        vi.stubGlobal('matchMedia', ((query: string) => {
+        vi.stubGlobal('matchMedia', (query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
             return {
                 matches,
@@ -254,9 +248,8 @@ describe('_MotionContainer', () => {
                     return false
                 }
             } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
+        })
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -276,7 +269,6 @@ describe('_MotionContainer', () => {
     })
 
     it('re-runs animate when animate prop changes', async () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const result = render(MotionContainer as unknown as any, {
             props: { tag: 'div', animate: { opacity: 0.5 } }
         })
@@ -297,7 +289,6 @@ describe('_MotionContainer', () => {
         const controls = animationControls()
         const cleanup = controls.mount()
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -330,7 +321,6 @@ describe('_MotionContainer', () => {
         const controls = animationControls()
         const cleanup = controls.mount()
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -362,7 +352,6 @@ describe('_MotionContainer', () => {
         const controls = animationControls()
         const cleanup = controls.mount()
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -407,7 +396,6 @@ describe('_MotionContainer', () => {
     it('keeps initial variants applied after mounting with animate controls', async () => {
         const controls = animationControls()
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -439,7 +427,7 @@ describe('_MotionContainer', () => {
             observe() {}
             disconnect() {}
         }
-        vi.stubGlobal('ResizeObserver', FakeResizeObserver as unknown as typeof ResizeObserver)
+        vi.stubGlobal('ResizeObserver', FakeResizeObserver)
 
         // Mock element rects to simulate size change
         let currentRect = {
@@ -455,7 +443,6 @@ describe('_MotionContainer', () => {
             )
             .mockImplementation(() => currentRect)
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container, unmount } = render(MotionContainer as unknown as any, {
             props: { tag: 'div', layout: true }
         })
@@ -501,7 +488,7 @@ describe('_MotionContainer', () => {
             observe() {}
             disconnect() {}
         }
-        vi.stubGlobal('ResizeObserver', FakeResizeObserver as unknown as typeof ResizeObserver)
+        vi.stubGlobal('ResizeObserver', FakeResizeObserver)
 
         let currentRect = {
             left: 0,
@@ -516,7 +503,6 @@ describe('_MotionContainer', () => {
             )
             .mockImplementation(() => currentRect)
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: { tag: 'div', layout: 'position' }
         })
@@ -544,7 +530,7 @@ describe('_MotionContainer', () => {
 
     it('whileHover animates on enter/leave, uses nested transition, and fires callbacks', async () => {
         // Enable true-hover environment
-        vi.stubGlobal('matchMedia', ((query: string) => {
+        vi.stubGlobal('matchMedia', (query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
             return {
                 matches,
@@ -558,12 +544,11 @@ describe('_MotionContainer', () => {
                     return false
                 }
             } as unknown as MediaQueryList
-        }) as unknown as typeof window.matchMedia)
+        })
 
         const onHoverStart = vi.fn()
         const onHoverEnd = vi.fn()
 
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -600,7 +585,6 @@ describe('_MotionContainer', () => {
 
     it('passes own custom prop into a function-form variant on animate', async () => {
         animateMock.mockClear()
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -659,7 +643,6 @@ describe('_MotionContainer', () => {
     })
 
     it('whileHover is gated to hover-capable devices', async () => {
-        /* trunk-ignore(eslint/@typescript-eslint/no-explicit-any) */
         const { container } = render(MotionContainer as unknown as any, {
             props: { tag: 'div', whileHover: { scale: 1.05 } }
         })

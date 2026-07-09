@@ -213,7 +213,8 @@ export const computeSSRSVGAttrValues = (
     const attrs: Record<string, string> = {}
 
     for (const [key, value] of Object.entries(motionValueAttrs)) {
-        const current = value.get()
+        // `MotionValue.get()` is `any`; narrow before stringifying.
+        const current = value.get() as string | number | null | undefined
         if (current === null || current === undefined) continue
         attrs[toSVGDOMAttrName(key)] = String(current)
     }
@@ -462,12 +463,14 @@ export const transformSVGPathProperties = (
             void 0
         }
 
-        const toNum = (v: unknown): number | undefined =>
-            typeof v === 'number'
-                ? v
-                : v != null && /^-?\d+(\.\d+)?(px)?$/i.test(String(v).trim())
-                  ? parseFloat(String(v))
-                  : undefined
+        const toNum = (v: unknown): number | undefined => {
+            if (typeof v === 'number') return v
+            // Only strings can parse. Stringifying anything else would just test
+            // "[object Object]" against the regex and fall through to undefined.
+            if (typeof v !== 'string') return undefined
+            const s = v.trim()
+            return /^-?\d+(\.\d+)?(px)?$/i.test(s) ? parseFloat(s) : undefined
+        }
         const length = ((): unknown => {
             const v = (transformed as Record<string, unknown>).pathLength
             const n = toNum(v)
@@ -535,9 +538,12 @@ export const transformSVGPathProperties = (
             })
             ;(transformed as Record<string, unknown>).strokeDashoffset = offs
             ;(transformed as Record<string, unknown>)['stroke-dashoffset'] = offs
-        } else if (offset !== undefined) {
+        } else if (typeof offset === 'number' || typeof offset === 'string') {
+            // Only primitives are stringified. `String(offset)` on an object wrote a
+            // literal "[object Object]" into stroke-dashoffset; anything non-primitive
+            // now falls through to the "0" default below.
             const n = toNum(offset)
-            const off = n !== undefined ? `${-n}` : String(offset)
+            const off = n !== undefined ? `${-n}` : offset
             ;(transformed as Record<string, unknown>).strokeDashoffset = off
             ;(transformed as Record<string, unknown>)['stroke-dashoffset'] = off
         } else if (!('stroke-dashoffset' in transformed)) {
@@ -619,9 +625,9 @@ export const computeNormalizedSVGInitialAttrs = (
         return s.startsWith('-') ? s : /^[\d.]+(px)?$/i.test(s) ? `-${s.replace(/px$/i, '')}` : s
     }
 
-    const len = (initial as Record<string, unknown>).pathLength ?? 0
-    const spa = (initial as Record<string, unknown>).pathSpacing ?? 1
-    const off = (initial as Record<string, unknown>).pathOffset ?? 0
+    const len = initial.pathLength ?? 0
+    const spa = initial.pathSpacing ?? 1
+    const off = initial.pathOffset ?? 0
 
     const dashArray = `${toUnitless(len)} ${toUnitless(spa)}`
     const dashOffset = negate(off)

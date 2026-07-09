@@ -98,7 +98,7 @@ export const resolveVariantList = (
         // prototype to be `Object.prototype` (or `null` for objects
         // created via `Object.create(null)`).
         if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue
-        const proto = Object.getPrototypeOf(entry)
+        const proto: unknown = Object.getPrototypeOf(entry)
         if (proto !== Object.prototype && proto !== null) continue
         const obj = entry as Record<string, unknown>
         merged = merged ? { ...merged, ...obj } : { ...obj }
@@ -136,7 +136,7 @@ export const resolveInitial = (
     if (initial === undefined) return undefined
     if (typeof initial === 'string' || Array.isArray(initial))
         return resolveVariantList(variants, initial, custom)
-    return initial as DOMKeyframesDefinition
+    return initial
 }
 
 /**
@@ -169,7 +169,7 @@ export const resolveAnimate = (
     if (animate === undefined) return undefined
     if (typeof animate === 'string' || Array.isArray(animate))
         return resolveVariantList(variants, animate, custom)
-    return animate as DOMKeyframesDefinition
+    return animate
 }
 
 /**

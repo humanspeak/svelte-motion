@@ -76,7 +76,7 @@ export type TransformTemplate = MotionTransformTemplate
 export const mergeInlineStyles = (
     existingStyle: unknown,
     initial: Record<string, unknown> | null | undefined,
-    animateFallback?: Record<string, unknown> | null | undefined,
+    animateFallback?: Record<string, unknown> | null,
     transformTemplate?: TransformTemplate
 ): string => {
     const base: Record<string, string> = parseStyleString(
@@ -177,7 +177,7 @@ export const collectMotionStyleValues = (
     const values: Record<string, MotionValue> = {}
     for (const [key, value] of Object.entries(style)) {
         if (isMotionValue(value)) {
-            values[key] = value as MotionValue
+            values[key] = value
         }
     }
 
@@ -291,7 +291,7 @@ const resolveLatestStyleValues = (
     const latestValues: Record<string, AnyResolvedKeyframe> = {}
 
     for (const [key, value] of Object.entries(source)) {
-        const latest = Array.isArray(value) ? value[0] : value
+        const latest: unknown = Array.isArray(value) ? value[0] : value
         if (
             latest == null ||
             shouldSkipInlineStyleKey(key) ||

@@ -71,7 +71,7 @@ describe('presence context', () => {
             width: 100,
             height: 100,
             toJSON: () => {}
-        } as unknown as DOMRect)
+        })
 
         vi.spyOn(parent, 'getBoundingClientRect').mockReturnValue({
             x: 0,
@@ -83,19 +83,17 @@ describe('presence context', () => {
             width: 200,
             height: 200,
             toJSON: () => {}
-        } as unknown as DOMRect)
+        })
 
         vi.spyOn(window, 'getComputedStyle').mockImplementation(() =>
             mockComputedStyle({ borderRadius: '8px', boxSizing: 'border-box' })
         )
 
         // Ensure rAF callbacks run synchronously in tests so exit cleanup executes
-        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(((
-            cb: FrameRequestCallback
-        ) => {
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
             cb(0)
-            return 1 as unknown as number
-        }) as unknown as typeof requestAnimationFrame)
+            return 1
+        })
     })
 
     it('registers and updates child state', () => {
@@ -120,7 +118,7 @@ describe('presence context', () => {
         ctx.unregisterChild('k')
 
         // Clone should be added then removed after animation finishes
-        const clone = document.querySelector('[data-clone="true"]') as HTMLElement | null
+        const clone = document.querySelector<HTMLElement>('[data-clone="true"]')
         expect(clone).toBeTruthy()
     })
 
@@ -183,13 +181,13 @@ describe('presence context', () => {
         ctx.unregisterChild('k')
 
         // Clone should appear synchronously after unregister
-        let clone = document.querySelector('[data-clone="true"]') as HTMLElement | null
+        let clone = document.querySelector<HTMLElement>('[data-clone="true"]')
         expect(clone).toBeTruthy()
 
         // After finished promise resolves, clone should be removed
         await Promise.resolve()
         await Promise.resolve()
-        clone = document.querySelector('[data-clone="true"]') as HTMLElement | null
+        clone = document.querySelector<HTMLElement>('[data-clone="true"]')
         expect(clone).toBeFalsy()
     })
 })
@@ -237,18 +235,16 @@ describe('AnimatePresence modes', () => {
             width: 200,
             height: 200,
             toJSON: () => {}
-        } as unknown as DOMRect)
+        })
 
         vi.spyOn(window, 'getComputedStyle').mockImplementation(() =>
             mockComputedStyle({ borderRadius: '8px', boxSizing: 'border-box', display: 'block' })
         )
 
-        vi.spyOn(window, 'requestAnimationFrame').mockImplementation(((
-            cb: FrameRequestCallback
-        ) => {
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
             cb(0)
-            return 1 as unknown as number
-        }) as unknown as typeof requestAnimationFrame)
+            return 1
+        })
     })
 
     describe('mode property', () => {
@@ -537,11 +533,11 @@ describe('AnimatePresence modes', () => {
                 width: 120,
                 height: 80,
                 toJSON: () => {}
-            } as unknown as DOMRect)
+            })
 
             ctx.unregisterChild('k1')
 
-            const clone = parent.querySelector('[data-clone="true"]') as HTMLElement | null
+            const clone = parent.querySelector<HTMLElement>('[data-clone="true"]')
             expect(clone).toBeTruthy()
             expect(clone?.style.top).toBe('64px')
             expect(clone?.style.left).toBe('32px')
@@ -609,9 +605,9 @@ describe('AnimatePresence modes', () => {
             ctx.registerChild('k1', el, { opacity: 0 })
             ctx.unregisterChild('k1')
 
-            const placeholder = document.querySelector(
+            const placeholder = document.querySelector<HTMLElement>(
                 '[data-presence-placeholder="true"]'
-            ) as HTMLElement | null
+            )
 
             expect(placeholder).toBeTruthy()
             expect(placeholder?.style.gridColumnStart).toBe('1')

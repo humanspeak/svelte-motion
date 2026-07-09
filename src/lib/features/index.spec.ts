@@ -5,7 +5,7 @@ import { isLazyFeatureBundle, normalizeLazyFeatureBundle } from './index'
 
 describe('LazyMotion feature helpers', () => {
     it('detects async lazy feature bundles', () => {
-        const loadFeatures = async () => domAnimation
+        const loadFeatures = () => Promise.resolve(domAnimation)
 
         expect(isLazyFeatureBundle(loadFeatures)).toBe(true)
         expect(isLazyFeatureBundle(domMin)).toBe(false)

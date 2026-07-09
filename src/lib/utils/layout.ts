@@ -37,13 +37,18 @@ const rememberFlipAnimation = (
         }
     }
     animations.add(tracked)
-    animation.finished?.finally(() => {
-        tracked.cleanup()
-        const current = activeFlipAnimations.get(el)
-        if (current !== animations) return
-        current.delete(tracked)
-        if (current.size === 0) activeFlipAnimations.delete(el)
-    })
+    // Fire-and-forget: the caller does not await the FLIP animation. `finished`
+    // rejects when an animation is cancelled, and `.finally()` re-raises that, so
+    // swallow it — the cleanup has already run by then.
+    void animation.finished
+        ?.finally(() => {
+            tracked.cleanup()
+            const current = activeFlipAnimations.get(el)
+            if (current !== animations) return
+            current.delete(tracked)
+            if (current.size === 0) activeFlipAnimations.delete(el)
+        })
+        .catch(() => undefined)
 }
 
 /**

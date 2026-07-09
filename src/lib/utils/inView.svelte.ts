@@ -119,11 +119,11 @@ export const computeInViewBaseline = (
     }
 ): Record<string, unknown> => {
     const baseline: Record<string, unknown> = {}
-    const initialRecord = (opts.initial ?? {}) as Record<string, unknown>
-    const animateRecord = (opts.animate ?? {}) as Record<string, unknown>
-    const whileInViewRecordRaw = (opts.whileInView ?? {}) as Record<string, unknown>
+    const initialRecord = opts.initial ?? {}
+    const animateRecord = opts.animate ?? {}
+    const whileInViewRecordRaw = opts.whileInView ?? {}
     const whileInViewRecord = { ...whileInViewRecordRaw } as Record<string, unknown>
-    delete (whileInViewRecord as Record<string, unknown>).transition
+    delete whileInViewRecord.transition
 
     const neutralTransformDefaults: Record<string, unknown> = {
         x: 0,
@@ -149,14 +149,14 @@ export const computeInViewBaseline = (
             baseline[key] = animateRecord[key]
         } else if (Object.prototype.hasOwnProperty.call(initialRecord, key)) {
             baseline[key] = initialRecord[key]
-        } else if (key in (neutralTransformDefaults as Record<string, unknown>)) {
+        } else if (key in neutralTransformDefaults) {
             baseline[key] = neutralTransformDefaults[key]
         } else {
             const inlineValue = getInlineCssFunction(el, key)
             if (inlineValue) {
                 baseline[key] = inlineValue
             } else if (key in (cs as unknown as Record<string, unknown>)) {
-                baseline[key] = (cs as unknown as Record<string, unknown>)[key] as string
+                baseline[key] = (cs as unknown as Record<string, unknown>)[key]
             }
         }
     }
@@ -251,7 +251,7 @@ export const attachWhileInView = (
             const animation = animate(
                 el,
                 keyframes as unknown as DOMKeyframesDefinition,
-                (transition ?? mergedTransition) as AnimationOptions
+                transition ?? mergedTransition
             )
             animation.finished
                 .then(() => {
@@ -373,7 +373,7 @@ export const useInView = (target: ElementOrGetter, options: UseInViewOptions = {
         isLatched: () => latched,
         onAttach: ({ target: el, root }, stop) =>
             motionInView(
-                el!,
+                el,
                 () => {
                     set(true)
                     if (options.once) {

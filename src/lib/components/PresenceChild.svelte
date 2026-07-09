@@ -22,10 +22,14 @@
      *     mounted with `isPresent = false` until `safeToRemove` fires.
      * @prop children Snippet rendered while present or held.
      */
-    const { present = true, children } = $props<{
+    type Props = {
         present?: boolean
         children?: Snippet
-    }>()
+    }
+
+    // `$props<T>()` is the removed Svelte 4-era form: Svelte 5's `$props()` takes
+    // no type argument, so it resolved to `any` and these props were untyped.
+    const { present = true, children }: Props = $props()
 
     const animatePresence = getAnimatePresenceContext()
     const presenceDepth = getPresenceDepth()

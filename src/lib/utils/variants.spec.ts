@@ -145,7 +145,7 @@ describe('utils/variants - resolveExit', () => {
 
     it('forwards custom to function-form variants', () => {
         const variants: Variants = {
-            hidden: (direction) => ({ x: (direction as number) > 0 ? 200 : -200 }) as never
+            hidden: (direction) => ({ x: (direction as number) > 0 ? 200 : -200 })
         }
         expect(resolveExit('hidden', variants, 1)).toEqual({ x: 200 })
         expect(resolveExit('hidden', variants, -1)).toEqual({ x: -200 })
@@ -207,8 +207,8 @@ describe('utils/variants - resolveVariantList', () => {
 
     it('forwards custom to function-form entries per-key', () => {
         const variants: Variants = {
-            base: (i) => ({ x: (i as number) * 10 }) as never,
-            delta: (i) => ({ y: (i as number) * 5 }) as never
+            base: (i) => ({ x: (i as number) * 10 }),
+            delta: (i) => ({ y: (i as number) * 5 })
         }
         expect(resolveVariantList(variants, ['base', 'delta'], 4)).toEqual({
             x: 40,
@@ -289,7 +289,7 @@ describe('utils/variants - resolveWhile', () => {
 
     it('forwards custom to function-form variants', () => {
         const variants: Variants = {
-            hover: (i) => ({ scale: 1 + (i as number) * 0.1 }) as never
+            hover: (i) => ({ scale: 1 + (i as number) * 0.1 })
         }
         expect(resolveWhile('hover', variants, 3)).toEqual({ scale: 1.3 })
     })
@@ -297,25 +297,27 @@ describe('utils/variants - resolveWhile', () => {
 
 describe('utils/variants - resolveRestingValues', () => {
     it('collapses a keyframe array to its last element (the resting value)', () => {
-        expect(resolveRestingValues({ x: [0, 100, 50] } as never)).toEqual({ x: 50 })
+        expect(resolveRestingValues({ x: [0, 100, 50] })).toEqual({ x: 50 })
     })
 
     it('leaves scalar values untouched', () => {
-        expect(resolveRestingValues({ opacity: 0.5, scaleX: 1 } as never)).toEqual({
+        expect(resolveRestingValues({ opacity: 0.5, scaleX: 1 })).toEqual({
             opacity: 0.5,
             scaleX: 1
         })
     })
 
     it('handles a mix of scalars and arrays', () => {
-        expect(
-            resolveRestingValues({ x: [0, 120, 60], rotate: 45, scaleY: [0, 1] } as never)
-        ).toEqual({ x: 60, rotate: 45, scaleY: 1 })
+        expect(resolveRestingValues({ x: [0, 120, 60], rotate: 45, scaleY: [0, 1] })).toEqual({
+            x: 60,
+            rotate: 45,
+            scaleY: 1
+        })
     })
 
     it('omits keys whose value is an empty array (no resting value)', () => {
-        expect(resolveRestingValues({ x: [], y: 5 } as never)).toEqual({ y: 5 })
-        expect(resolveRestingValues({ x: [] } as never)).toEqual({})
+        expect(resolveRestingValues({ x: [], y: 5 })).toEqual({ y: 5 })
+        expect(resolveRestingValues({ x: [] })).toEqual({})
     })
 
     it('returns undefined when given undefined', () => {

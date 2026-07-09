@@ -16,7 +16,7 @@ import { expect, test } from '@playwright/test'
 
 const readRect = (page: import('@playwright/test').Page, selector: string) =>
     page.evaluate((sel) => {
-        const el = document.querySelector(sel) as HTMLElement | null
+        const el = document.querySelector<HTMLElement>(sel)
         if (!el) return null
         const r = el.getBoundingClientRect()
         return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width }

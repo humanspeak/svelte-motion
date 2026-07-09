@@ -5,8 +5,8 @@
     let {
         values = [0, 1, 2],
         axis = 'y',
-        as = 'ul' as ReorderElementTag,
-        itemAs = 'li' as ReorderElementTag,
+        as = 'ul',
+        itemAs = 'li',
         groupStyle,
         onReorder = () => {}
     }: {

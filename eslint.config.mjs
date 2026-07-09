@@ -28,7 +28,7 @@ export default [
         ]
     },
     js.configs.recommended,
-    ...ts.configs.recommended,
+    ...ts.configs.recommendedTypeChecked,
     ...svelte.configs['flat/recommended'],
     prettier,
     ...svelte.configs['flat/prettier'],
@@ -85,6 +85,89 @@ export default [
         },
         rules: {
             'prefer-const': ['off']
+        }
+    },
+    {
+        // Type-aware parsing — root package only, never docs/** (docs has its
+        // own generated ESLint config owned by docs-kit).
+        //
+        // Only paths reachable by a real tsconfig are listed. Root config files
+        // (`vitest.config.ts`, `playwright.config.ts`, `global.d.ts`, …) and
+        // `scripts/**` live in no tsconfig, and `projectService.allowDefaultProject`
+        // cannot rescue them here: Trunk runs ESLint against a temp sandbox copy of
+        // each file, so the sandboxed path never matches a glob resolved against
+        // `tsconfigRootDir`. They fall through to the disableTypeChecked guard below.
+        files: ['src/**/*.ts', 'src/**/*.svelte', 'src/**/*.svelte.ts', 'e2e/**/*.ts'],
+        languageOptions: {
+            parserOptions: {
+                projectService: true,
+                tsconfigRootDir: import.meta.dirname,
+                extraFileExtensions: ['.svelte']
+            }
+        }
+    },
+    {
+        // No type info here (plain JS, root config files outside every tsconfig,
+        // and docs/** when its generated config is absent) — typed rules off,
+        // untyped recommended still applies.
+        files: ['**/*.js', '**/*.mjs', '**/*.cjs', 'docs/**', '*.ts', '*.d.ts', 'scripts/**/*.ts'],
+        ...ts.configs.disableTypeChecked
+    },
+    {
+        // `no-unnecessary-type-assertion` is off here because it cannot distinguish
+        // a redundant non-null assertion from a required one in `.svelte`.
+        //
+        // svelte-eslint-parser's type program narrows a `$state` variable across
+        // closure boundaries; `tsc`/svelte-check (correctly) does not. So for
+        //
+        //     let element = $state<HTMLElement | null>(null)
+        //     $effect(() => {
+        //         if (!element) return
+        //         const cb = () => element!.getBoundingClientRect()  // <- required
+        //     })
+        //
+        // ESLint calls the `!` unnecessary and its autofix deletes it, after which
+        // svelte-check reports "'element' is possibly 'null'".
+        //
+        // Measured on this branch by forcing the rule back on with
+        //   npx eslint 'src/**/*.svelte' \
+        //     --rule '{"@typescript-eslint/no-unnecessary-type-assertion":"error"}'
+        //
+        //   - 35 lines flagged, all in `_MotionContainer.svelte`, all non-null `!`.
+        //   - Applying every one of those 35 autofixes yields 19 svelte-check
+        //     errors. (19 is the error count, NOT the number of flagged lines —
+        //     not all 35 removals break the build, but the rule gives no way to
+        //     tell which do.)
+        //   - 0 `as`-style hits remain: those were genuine and have been removed.
+        //
+        // Re-run that command before deciding this rail can come back up. It will
+        // stay red until either the parser stops narrowing across closures, or the
+        // `$state` element ref is hoisted into a local `const` after its guard.
+        //
+        // `no-unsafe-assignment` is off for a different reason: it is unreliable in
+        // `.svelte` under Trunk specifically. `trunk check --all` reports 9 hits,
+        // every one on a `let { … } = $props()` destructuring line. The same files
+        // report zero under targeted `trunk check <file>` and zero under a raw
+        // `npx eslint` run, so type info for `$props()` degrades in Trunk's batched,
+        // sandboxed invocation. `.ts` files keep the whole unsafe family.
+        files: ['**/*.svelte'],
+        rules: {
+            '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+            '@typescript-eslint/no-unsafe-assignment': 'off'
+        }
+    },
+    {
+        // Tests + internal demo routes deliberately bridge motion-dom internals
+        // through `any`; the unsafe-* family is noise there — now and for
+        // future test code. Library source (src/lib non-spec) keeps these rules.
+        files: ['**/*.spec.ts', '**/*.test.ts', '**/__tests__/**', 'src/routes/tests/**', 'e2e/**'],
+        rules: {
+            '@typescript-eslint/no-explicit-any': 'off',
+            '@typescript-eslint/no-unsafe-argument': 'off',
+            '@typescript-eslint/no-unsafe-assignment': 'off',
+            '@typescript-eslint/no-unsafe-call': 'off',
+            '@typescript-eslint/no-unsafe-member-access': 'off',
+            '@typescript-eslint/no-unsafe-return': 'off'
         }
     },
     {

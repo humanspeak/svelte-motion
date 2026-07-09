@@ -91,7 +91,7 @@ export const useVelocity = (source: VelocitySource): AugmentedMotionValue<number
     if (isMotionValue(source)) {
         const initial = (source as unknown as MotionValue<number | string>).get()
         if (typeof initial === 'number') {
-            tracker = source as unknown as MotionValue<number>
+            tracker = source
         } else if (typeof window !== 'undefined') {
             const bridge = motionValue<number>(parseNumeric(initial))
             const unsub = (source as unknown as MotionValue<number | string>).on('change', (v) => {

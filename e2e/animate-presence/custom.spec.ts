@@ -13,9 +13,9 @@ async function scrollTestIdIntoView(page: Page, testId: string) {
 
 async function scrollNestedPresenceDataViewport(page: Page) {
     await page.evaluate(() => {
-        const viewport = document.querySelector(
+        const viewport = document.querySelector<HTMLElement>(
             '[data-testid="presence-data-nested-scroll-viewport"]'
-        ) as HTMLElement | null
+        )
 
         if (!viewport) throw new Error('Missing presence-data-nested-scroll-viewport')
 
@@ -27,9 +27,7 @@ async function scrollNestedPresenceDataViewport(page: Page) {
 async function waitForSettledSlide(page: Page, slide: string) {
     await page.waitForFunction(
         (expectedSlide) => {
-            const el = document.querySelector(
-                '[data-testid="presence-custom-slide"]'
-            ) as HTMLElement | null
+            const el = document.querySelector<HTMLElement>('[data-testid="presence-custom-slide"]')
             if (!el || el.getAttribute('data-slide') !== expectedSlide) return false
             const style = getComputedStyle(el)
             return parseFloat(style.opacity) > 0.98 && style.transform !== ''
@@ -43,7 +41,7 @@ async function waitForExitingCloneX(page: Page, direction: 'left' | 'right') {
     const threshold = direction === 'left' ? -20 : 20
     await page.waitForFunction(
         ({ threshold: expectedThreshold, direction: expectedDirection }) => {
-            const clone = document.querySelector('[data-clone="true"]') as HTMLElement | null
+            const clone = document.querySelector<HTMLElement>('[data-clone="true"]')
             if (!clone) return false
             const matrix = new DOMMatrixReadOnly(getComputedStyle(clone).transform)
             return expectedDirection === 'left'
@@ -68,16 +66,16 @@ async function samplePresenceDataSquareLayers(
             rects: Array<{ x: number; width: number; opacity: number; clone: boolean }>
         }> = []
 
-        const container = document.querySelector(
+        const container = document.querySelector<HTMLElement>(
             `[data-testid="${targetContainerTestId}"]`
-        ) as HTMLElement | null
+        )
         if (!container) throw new Error(`Missing ${targetContainerTestId}`)
         const containerRect = container.getBoundingClientRect()
 
         const getSample = () => {
             const elements = Array.from(
-                document.querySelectorAll('[data-testid="presence-data-square"]')
-            ) as HTMLElement[]
+                document.querySelectorAll<HTMLElement>('[data-testid="presence-data-square"]')
+            )
             const visible = elements
                 .map((element) => {
                     const rect = element.getBoundingClientRect()
@@ -135,18 +133,18 @@ async function clickAndSampleExitingPresenceDataSquare(
     return page.evaluate(
         async ({ sampleDurationMs, targetTriggerTestId }) => {
             const samples: Array<{ elapsed: number; x: number; opacity: number }> = []
-            const trigger = document.querySelector(
+            const trigger = document.querySelector<HTMLElement>(
                 `[data-testid="${targetTriggerTestId}"]`
-            ) as HTMLElement | null
+            )
             if (!trigger) throw new Error(`Missing ${targetTriggerTestId}`)
 
             const start = performance.now()
             trigger.click()
 
             while (performance.now() - start < sampleDurationMs) {
-                const clone = document.querySelector(
+                const clone = document.querySelector<HTMLElement>(
                     '[data-testid="presence-data-square"][data-clone="true"]'
-                ) as HTMLElement | null
+                )
 
                 if (clone) {
                     const style = getComputedStyle(clone)
@@ -192,9 +190,9 @@ async function sampleIncomingPresenceDataSquare(
                 return values?.[4] ?? 0
             }
 
-            const container = document.querySelector(
+            const container = document.querySelector<HTMLElement>(
                 `[data-testid="${targetContainerTestId}"]`
-            ) as HTMLElement | null
+            )
             if (!container) throw new Error(`Missing ${targetContainerTestId}`)
             const containerRect = container.getBoundingClientRect()
             const samples: Array<{
@@ -258,9 +256,9 @@ async function readSettledPresenceDataSquareBounds(
     containerTestId = 'presence-data-container'
 ) {
     return page.evaluate((targetContainerTestId) => {
-        const container = document.querySelector(
+        const container = document.querySelector<HTMLElement>(
             `[data-testid="${targetContainerTestId}"]`
-        ) as HTMLElement | null
+        )
         if (!container) throw new Error(`Missing ${targetContainerTestId}`)
 
         const containerRect = container.getBoundingClientRect()
@@ -326,13 +324,13 @@ async function clickAndSamplePresenceDataSquareOccupancy(
                 }>
                 container: { top: number; bottom: number; left: number; right: number }
             }> = []
-            const container = document.querySelector(
+            const container = document.querySelector<HTMLElement>(
                 `[data-testid="${targetContainerTestId}"]`
-            ) as HTMLElement | null
+            )
             if (!container) throw new Error(`Missing ${targetContainerTestId}`)
-            const trigger = document.querySelector(
+            const trigger = document.querySelector<HTMLElement>(
                 `[data-testid="${targetTriggerTestId}"]`
-            ) as HTMLElement | null
+            )
             if (!trigger) throw new Error(`Missing ${targetTriggerTestId}`)
 
             const start = performance.now()
@@ -403,18 +401,18 @@ async function clickAndSamplePresenceDataSquareVerticalAlignment(
 ) {
     return page.evaluate(
         async ({ sampleDurationMs, targetContainerTestId, targetTriggerTestId }) => {
-            const container = document.querySelector(
+            const container = document.querySelector<HTMLElement>(
                 `[data-testid="${targetContainerTestId}"]`
-            ) as HTMLElement | null
-            const trigger = document.querySelector(
+            )
+            const trigger = document.querySelector<HTMLElement>(
                 `[data-testid="${targetTriggerTestId}"]`
-            ) as HTMLElement | null
+            )
 
             if (!container) throw new Error(`Missing ${targetContainerTestId}`)
             if (!trigger) throw new Error(`Missing ${targetTriggerTestId}`)
 
             const readButtonCenterY = () => {
-                const buttons = Array.from(container.querySelectorAll('button')) as HTMLElement[]
+                const buttons = Array.from(container.querySelectorAll<HTMLElement>('button'))
                 const centers = buttons.map((button) => {
                     const rect = button.getBoundingClientRect()
 

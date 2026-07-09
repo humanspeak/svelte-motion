@@ -434,7 +434,7 @@ const rewriteViaAst = (content: string, tagToLocal: Map<string, string>): string
     const edits: Array<{ start: number; end: number; replacement: string }> = []
 
     const visit = (node: Node | null | undefined) => {
-        if (!node || typeof node !== 'object' || typeof (node as Node).type !== 'string') return
+        if (!node || typeof node !== 'object' || typeof node.type !== 'string') return
         if (
             isMemberExpression(node) &&
             !node.computed &&

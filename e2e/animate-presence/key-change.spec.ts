@@ -6,7 +6,7 @@ const URL = '/tests/animate-presence/key-change?@isPlaywright=true'
 async function waitForBoxVisible(page: import('@playwright/test').Page, expectedState?: string) {
     await page.waitForFunction(
         (state) => {
-            const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+            const el = document.querySelector<HTMLElement>('[data-testid="box"]')
             if (!el) return false
             if (state && el.getAttribute('data-state') !== state) return false
             const cs = getComputedStyle(el)
@@ -71,7 +71,7 @@ test.describe('AnimatePresence key-change transitions', () => {
         const start = Date.now()
         while (Date.now() - start < 1500 && samples.length < 30) {
             const sample = await page.evaluate(() => {
-                const el = document.querySelector('[data-testid="box"]') as HTMLElement | null
+                const el = document.querySelector<HTMLElement>('[data-testid="box"]')
                 if (!el) return null
                 const cs = getComputedStyle(el)
                 return {

@@ -64,7 +64,7 @@ export const buildTapResetRecord = (
         } else if (has(initial, k)) {
             resetRecord[k] = initial[k]
         } else {
-            resetRecord[k] = undefined as unknown as never
+            resetRecord[k] = undefined
         }
     }
     return resetRecord
@@ -140,7 +140,7 @@ export const attachWhileTap = (
     const animateInlineTransition = (animateDef as { transition?: AnimationOptions } | undefined)
         ?.transition
     const pressTransition: AnimationOptions | undefined =
-        (inlineTapTransition as AnimationOptions | undefined) ?? componentTapTransition
+        inlineTapTransition ?? componentTapTransition
     const releaseTransition: AnimationOptions | undefined =
         animateInlineTransition ?? componentTapTransition
 
@@ -218,9 +218,7 @@ export const attachWhileTap = (
             pwLog('[tap] hover-reapply-skip', { reason: 'matches threw' })
             return false
         }
-        const { keyframes, transition: hoverTransition } = splitHoverDefinition(
-            callbacks.hoverDef as Record<string, unknown>
-        )
+        const { keyframes, transition: hoverTransition } = splitHoverDefinition(callbacks.hoverDef)
         pwLog('[tap] hover-reapply', {
             keyframes,
             transform: getComputedStyle(el).transform,

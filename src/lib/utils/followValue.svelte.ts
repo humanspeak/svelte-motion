@@ -148,7 +148,7 @@ export function useFollowValue(
     const initial: T =
         typeof followSource === 'number' || typeof followSource === 'string'
             ? followSource
-            : (followSource.get() as T)
+            : followSource.get()
 
     const value = motionValue<T>(initial)
     // Default transition is `spring` — matches React framer-motion's

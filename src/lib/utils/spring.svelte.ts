@@ -108,5 +108,5 @@ export function useSpring(
     return useFollowValue(
         source as unknown as number,
         { type: 'spring', ...options } as FollowValueOptions
-    ) as SpringMotionValue<number> | SpringMotionValue<string>
+    )
 }

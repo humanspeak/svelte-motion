@@ -150,7 +150,7 @@ export const resolvePopLayoutStyles = (
         height: `${snapshot.height}px`,
         [xProperty]: `${xValue}px`,
         [yProperty]: `${yValue}px`
-    } as Partial<CSSStyleDeclaration>
+    }
 }
 
 /**
@@ -837,7 +837,7 @@ export const createAnimatePresenceContext = (context: {
         if (!popLayoutSnapshot) {
             const parentPosition = getComputedStyle(positioningParent).position
             if (parentPosition === 'static') {
-                ;(positioningParent as HTMLElement).style.position = 'relative'
+                positioningParent.style.position = 'relative'
             }
         }
 
@@ -862,8 +862,8 @@ export const createAnimatePresenceContext = (context: {
             if (popStyles.bottom) clone.style.bottom = popStyles.bottom
         } else {
             clone.style.position = 'absolute'
-            clone.style.top = `${rect.top - parentRect!.top + ((parent as HTMLElement).scrollTop ?? 0)}px`
-            clone.style.left = `${rect.left - parentRect!.left + ((parent as HTMLElement).scrollLeft ?? 0)}px`
+            clone.style.top = `${rect.top - parentRect!.top + (parent.scrollTop ?? 0)}px`
+            clone.style.left = `${rect.left - parentRect!.left + (parent.scrollLeft ?? 0)}px`
             clone.style.width = `${rect.width}px`
             clone.style.height = `${rect.height}px`
         }
@@ -934,8 +934,8 @@ export const createAnimatePresenceContext = (context: {
             const exitObj = (resolvedExit ?? {}) as unknown as { transition?: MotionTransition }
             const finalTransition = mergeTransitions(
                 { duration: 0.35 } as AnimationOptions,
-                (child.mergedTransition ?? {}) as AnimationOptions,
-                (exitObj.transition ?? {}) as AnimationOptions,
+                child.mergedTransition ?? {},
+                exitObj.transition ?? {},
                 exitEase ? ({ ease: exitEase } as AnimationOptions) : {}
             )
 
