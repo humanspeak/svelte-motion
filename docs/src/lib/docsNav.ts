@@ -58,6 +58,7 @@ export const docsSections: NavSection[] = [
         items: [
             { title: 'Layout Animations', href: '/docs/layout-animations', icon: Move },
             { title: 'layoutDependency', href: '/docs/layout-dependency', icon: Gauge },
+            { title: 'SVG Animation', href: '/docs/svg-animation', icon: Wand },
             { title: 'transformTemplate', href: '/docs/transform-template', icon: Code },
             { title: 'Variants', href: '/docs/variants', icon: Layers },
             { title: 'View Transitions', href: '/docs/view', icon: Sparkles }

@@ -1,0 +1,192 @@
+---
+title: 'SVG Animation'
+description: 'Bind MotionValues to SVG presentation attributes, draw paths, and use attrX/attrY/attrScale.'
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte';
+  import SvgAnimationExample from '$lib/examples/svg-animation/demos/Default.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'SVG Animation | Docs | Svelte Motion'
+      seo.description = 'Drive SVG presentation attributes with MotionValues, animate pathLength, and reach SVG attributes with attrX, attrY, and attrScale.'
+      seo.ogTitle = 'SVG Animation'
+      seo.ogTagline = 'MotionValues bound straight to SVG attributes'
+      seo.ogFeatures = ['SVG', 'MotionValue', 'pathLength', 'attrX']
+      seo.ogSlug = 'docs-svg-animation'
+  }
+</script>
+
+# SVG Animation
+
+Any `MotionValue` can drive an SVG presentation attribute directly. Pass it as a
+prop and Motion subscribes to it — no `animate` prop, no keyframes, and no
+component re-render when the value changes.
+
+```svelte
+<script lang="ts">
+  import { motion, useSpring } from '@humanspeak/svelte-motion'
+
+  const cx = useSpring(40)
+</script>
+
+<svg viewBox="0 0 300 120">
+  <motion.circle {cx} cy={60} r={12} fill="#60a5fa" />
+</svg>
+```
+
+<Example exampleUrl="/examples/svg-animation">
+  <SvgAnimationExample />
+</Example>
+
+## Two DOM channels
+
+Motion writes a bound attribute to one of two places, chosen per key at runtime:
+
+- Keys that are **CSS properties** in the browser — `cx`, `cy`, `r`, `rx`, `ry`,
+  `width`, `height`, `d`, and the `stroke-*` family — are written to
+  `element.style`.
+- Everything else — `points`, `viewBox`, `x1`/`y1`/`x2`/`y2` — is written with
+  `setAttribute`.
+
+This matters when you inspect the DOM or write a test. A bound `cx` never
+changes the element's `cx` **attribute**; it moves the computed style instead.
+The attribute you see in devtools is the initial server-rendered value.
+
+```ts
+// After cx.set(60):
+getComputedStyle(circle).cx    // "60px"  <- the live value
+circle.getAttribute('cx')      // "40"    <- the SSR seed, frozen
+```
+
+Both render identically. CSS geometry properties win over the matching
+presentation attribute, which is exactly why the initial attribute can stay put.
+
+## Prop names use the DOM spelling
+
+Svelte templates take the DOM spelling of hyphenated attributes, so write
+`stroke-width`, not `strokeWidth`:
+
+```svelte
+<script lang="ts">
+  import { motion, useSpring } from '@humanspeak/svelte-motion'
+
+  const strokeWidth = useSpring(4)
+</script>
+
+<svg viewBox="0 0 120 120">
+  <motion.circle
+    cx={60}
+    cy={60}
+    r={20}
+    fill="none"
+    stroke="#5eead4"
+    stroke-width={strokeWidth}
+  />
+</svg>
+```
+
+Both spellings are accepted, but the kebab-case form is the one you would write
+for a plain `<circle>`, and it is what the rendered markup uses.
+
+## Server rendering
+
+A bound attribute is server-rendered with the MotionValue's current value, so
+the first paint is correct and nothing flashes on hydration. Attribute names are
+emitted with their DOM spelling — `strokeDashoffset` becomes
+`stroke-dashoffset`, while genuinely camelCase names like `viewBox` are left
+alone.
+
+## attrX, attrY, and attrScale
+
+`x`, `y`, and `scale` are ambiguous: each is both an SVG attribute and a CSS
+transform that Motion already owns. Passing `x` moves the element with a
+transform. To reach the **attribute** instead, use `attrX`, `attrY`, or
+`attrScale`:
+
+```svelte
+<script lang="ts">
+  import { motion, useMotionValue } from '@humanspeak/svelte-motion'
+
+  const attrX = useMotionValue(10)
+</script>
+
+<svg viewBox="0 0 300 120">
+  <!-- renders x="10", not transform: translateX(10px) -->
+  <motion.rect {attrX} attrY={10} width={40} height={40} />
+</svg>
+```
+
+<div class="not-prose my-6 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
+
+**`scale` is not a presentation attribute on shape elements.** `attrScale` on a
+`<rect>` writes the attribute faithfully, and the rect ignores it — nothing
+moves. It is a real attribute on `<feDisplacementMap>`, where it drives the
+displacement amount. This mirrors Framer Motion's behavior.
+
+</div>
+
+## Drawing paths
+
+`pathLength`, `pathSpacing`, and `pathOffset` are handled separately, as
+normalized 0–1 values. They animate the underlying `stroke-dasharray` and
+`stroke-dashoffset` for you:
+
+```svelte
+<motion.path
+  d="M 10 100 Q 100 10 190 100"
+  stroke="#5eead4"
+  fill="none"
+  initial={{ pathLength: 0 }}
+  animate={{ pathLength: 1 }}
+  transition={{ duration: 1.5 }}
+/>
+```
+
+Set `pathLength` to `0.5` and half the path is drawn, regardless of its actual
+length in user units.
+
+## Filter primitives
+
+SVG tag names are case-sensitive, and motion components are addressed in
+lowercase. `motion.fedisplacementmap` renders a correctly-cased
+`<feDisplacementMap>`:
+
+```svelte
+<script lang="ts">
+  import { motion, useSpring } from '@humanspeak/svelte-motion'
+
+  const warp = useSpring(12)
+</script>
+
+<svg viewBox="0 0 300 120">
+  <filter id="warp">
+    <feTurbulence type="turbulence" baseFrequency="0.04" numOctaves="2" result="noise" />
+    <motion.fedisplacementmap in="SourceGraphic" in2="noise" attrScale={warp} />
+  </filter>
+  <rect x="40" y="25" width="220" height="70" fill="#38bdf8" filter="url(#warp)" />
+</svg>
+```
+
+Filter-primitive attributes are bindable like any other. `stdDeviation`,
+`baseFrequency`, `numOctaves`, `dx`, `dy`, and `radius` all take a MotionValue:
+
+```svelte
+<script lang="ts">
+  import { motion, useSpring } from '@humanspeak/svelte-motion'
+
+  const blur = useSpring(2)
+</script>
+
+<svg viewBox="0 0 300 120">
+  <filter id="soften">
+    <motion.fegaussianblur in="SourceGraphic" stdDeviation={blur} />
+  </filter>
+  <rect x="40" y="25" width="220" height="70" fill="#4ade80" filter="url(#soften)" />
+</svg>
+```
+
+The same holds for `motion.lineargradient`, `motion.clippath`,
+`motion.textpath`, and the rest of the camelCase SVG elements.

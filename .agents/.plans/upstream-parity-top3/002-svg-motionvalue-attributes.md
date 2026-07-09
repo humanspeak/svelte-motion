@@ -7,10 +7,45 @@
 > in the `README.md` that sits alongside this plan file
 > (`.agents/.plans/upstream-parity-top3/README.md`).
 >
-> **Drift check (run first)**: `git diff --stat 634983b..HEAD -- src/lib/utils/svg.ts src/lib/html/_MotionContainer.svelte src/lib/types.ts`
+> **Drift check (run first)**: `git diff --stat af90f5a..HEAD -- src/lib/utils/svg.ts src/lib/html/_MotionContainer.svelte src/lib/types.ts`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> Revision 2026-07-09: `svgEffect` writes MotionValue-bound props to **two
+> different DOM channels**, and the original plan wrongly implied a single
+> "attribute" one. Verified in Chromium: `cx cy r rx ry x y width height d`
+> and `stroke-*`/`*Opacity`/`stopColor`/`offset` are CSS properties, so
+> `key in element.style` is true and they are written to `element.style` —
+> `getAttribute('cx')` never changes. Only `points viewBox x1 y1 x2 y2` and the
+> `attrX/attrY/attrScale` family are written with `setAttribute`. Amended:
+> (a) the allowlist must carry kebab-case DOM spellings, not just React's
+> camelCase; (b) Step 1's attr-key wording; (c) the test plan now asserts on the
+> **bound channel** rather than assuming an attribute. See
+> `002-svg-motionvalue-attributes.guard.md`, checkpoint 2026-07-09.
+>
+> Revision 2026-07-09 (b): **scope addition, operator-approved.** SVG tag names
+> are case-sensitive, but our generated components hardcode a lowercase `tag`
+> (`Fedisplacementmap.svelte:11` → `tag="fedisplacementmap"`), so
+> `createElementNS(NS, 'fedisplacementmap')` returns an inert generic
+> `SVGElement` instead of `SVGFEDisplacementMapElement` and the filter primitive
+> is silently ignored. Now in scope: `SVG_TAG_CASING` + `resolveSVGTagName` in
+> `svg.ts`, applied in `_MotionContainer.svelte` before render. **The fix is only
+> observable on client-created elements** — the HTML parser auto-corrects SVG tag
+> case, and Svelte reuses the parsed node when hydrating
+> (`svelte/src/internal/client/dom/blocks/svelte-element.js:74`:
+> `element = hydrating ? element : create_element(next_tag, ns)`), so a
+> first-paint assertion after `page.goto` passes with **or without** the fix.
+> See the tag-casing test-plan bullet.
+>
+> Revision 2026-07-09 (c): **plan defect, corrected after the work passed.** Step 4
+> told the executor to run `pnpm --filter docs sitemap:manifest`; that script does
+> not exist. `docs/src/lib/sitemap-manifest.json` is gitignored
+> (`docs/.gitignore:36`) and emitted by a docs vite plugin at build time. The
+> criterion's intent — the new routes appear in the sitemap — was verified
+> independently (manifest contains `svg-animation`, 2 entries) **before** the PASS
+> was granted, so this edit records reality; it did not lower a bar to reach a
+> verdict. Step 4 and done-criterion 5 reworded.
 
 ## Status
 
@@ -19,7 +54,8 @@
 - **Risk**: MED
 - **Depends on**: none
 - **Category**: direction (upstream parity)
-- **Planned at**: commit `634983b`, 2026-07-08
+- **Planned at**: commit `599372b`, 2026-07-09 (re-stamped on revision (c);
+  previously `9557778`, `af90f5a`; originally `634983b`, 2026-07-08)
 - **Issue**: <https://github.com/humanspeak/svelte-motion/issues/435>
 
 ## Why this matters
@@ -101,7 +137,8 @@ do not change the port config).
 
 **In scope** (the only files you should modify/create):
 
-- `src/lib/utils/svg.ts` (attribute classification helpers)
+- `src/lib/utils/svg.ts` (attribute classification helpers; plus `SVG_TAG_CASING` /
+  `resolveSVGTagName` per revision (b))
 - `src/lib/utils/svg.spec.ts` (extend)
 - `src/lib/html/_MotionContainer.svelte` (MotionValue-attr subscription + attrX/Y/Scale mapping)
 - `src/lib/types.ts` (attrX/attrY/attrScale types)
@@ -133,19 +170,33 @@ do not change the port config).
 
 Add to `src/lib/utils/svg.ts`:
 
-- An `SVG_ATTRIBUTE_PROPERTIES` set covering the attribute-animatable keys
-  upstream supports: `cx, cy, r, rx, ry, x, y, x1, y1, x2, y2, width, height,
-points, d, offset, stopColor, stopOpacity, fillOpacity, strokeOpacity,
-strokeWidth, viewBox` (cross-check against upstream
-  `build-attrs.ts`/`camel-case-attrs.ts` and include what upstream includes —
-  cite the upstream file in the JSDoc).
+- An `SVG_ATTRIBUTE_PROPERTIES` set covering the animatable keys upstream
+  supports: `cx, cy, r, rx, ry, x, y, x1, y1, x2, y2, width, height, points, d,
+offset, stopColor, stopOpacity, fillOpacity, strokeOpacity, strokeWidth,
+viewBox` (cross-check against upstream `build-attrs.ts`/`camel-case-attrs.ts`
+  and include what upstream includes — cite the upstream file in the JSDoc).
+- **The set must also carry the kebab-case DOM spellings** of every hyphenated
+  key — `stop-color, stop-opacity, fill-opacity, stroke-opacity, stroke-width,
+stroke-dashoffset, stroke-dasharray` — or normalize the key before lookup.
+  Upstream's list is React-facing; Svelte templates take the DOM spelling, so a
+  user writes `<motion.circle stroke-width={mv}>`. A kebab key that misses the
+  allowlist is never claimed out of the raw spread and renders
+  `stroke-width="[object Object]"` — the exact bug this plan exists to kill.
+  (`'stroke-width' in element.style` is `true` in Chromium, so once claimed it
+  routes correctly through `svgEffect` with no extra work.)
 - A helper `extractSVGMotionValueAttributes(rest: Record<string, unknown>)` that
   returns `{ motionValueAttrs, staticAttrs }` — splitting entries whose value is
-  a MotionValue from plain values. Include `attrX`/`attrY`/`attrScale` mapping to
-  `x`/`y`/`scale` here.
+  a MotionValue from plain values.
+  **Do not rename `attrX`/`attrY`/`attrScale` on the MotionValue side.**
+  `svgEffect` does its own `/^attr([A-Z])/` conversion
+  (`effects/svg/index.ts:44-62`); pre-renaming `attrScale` → `scale` makes it hit
+  the `key in element.style` branch and become a CSS style instead of an
+  attribute. Expose the rename as a separate `resolveSVGAttrKey(key)` helper, and
+  apply it only to **static** attr-prefixed props and to SSR output.
 
 **Verify**: `pnpm test src/lib/utils/svg.spec.ts` → passes (write the unit tests
-in the same step: classification, attrX→x mapping, non-MotionValue passthrough).
+in the same step: classification incl. at least one kebab-case key, attrX→x
+mapping via `resolveSVGAttrKey`, non-MotionValue passthrough).
 
 ### Step 2: Subscribe MotionValue attributes in `_MotionContainer.svelte`
 
@@ -161,7 +212,12 @@ In the SVG branch of `_MotionContainer.svelte`:
    `styleEffect` in the file, ~line 617).
 3. SSR: render the MotionValue's **current** value as the initial attribute so
    server output is correct and hydration doesn't flash (`[object Object]` must
-   never appear in SSR output either).
+   never appear in SSR output either). Emit the **DOM attribute name**: strip the
+   `attr` prefix (`attrX` → `x`) and use the kebab spelling for hyphenated keys
+   (`strokeDashoffset` → `stroke-dashoffset`). SVG attribute names are
+   case-sensitive, so a `strokeDashoffset` attribute is inert and the value will
+   flash on hydration. Style-routed keys (`cx`, `r`, …) SSR correctly as
+   presentation attributes: the client-set CSS property simply wins afterwards.
 
 **Verify**: `pnpm check` → 0 errors. Then the demo (Step 3) shows a moving circle.
 
@@ -176,8 +232,19 @@ Create `src/routes/tests/svg/motion-value-attributes/+page.svelte`:
 Create `e2e/svg/motion-value-attributes.spec.ts` (model after an existing spec in
 `e2e/svg/`):
 
-- Assert the rendered attribute is numeric (never `[object Object]`).
-- Mutate the MotionValue (click the button), poll the attribute, assert it changes.
+- Assert the rendered value is numeric (never `[object Object]`).
+- Mutate the MotionValue (click the button), poll the **bound channel**, assert it
+  changes. Read the channel the key actually routes to — `getAttribute(key)` for
+  `points`/`viewBox`/`x1..y2`/`attrX`/`attrY`/`attrScale`, and
+  `getComputedStyle(el)[key]` for `cx`/`cy`/`r`/`x`/`y`/`width`/`height`/`d`/
+  `stroke-*`. Polling `getAttribute('cx')` will never observe a change and the
+  test will hang until timeout.
+- Computed styles carry units (`getComputedStyle(el).strokeDashoffset` → `"12.5px"`).
+  Parse with `parseFloat`, not `Number` — `Number("12.5px")` is `NaN`, and
+  `expect(NaN).not.toBe(NaN)` **fails** because `toBe` is `Object.is`.
+- The "plain numeric attribute stays static" assertion must read the same channel
+  the live element uses; asserting `getAttribute('cx')` is unchanged passes
+  vacuously even when the subscription is entirely broken.
 
 **Verify**: `pnpm exec playwright test e2e/svg` → all pass.
 
@@ -189,7 +256,10 @@ Create `e2e/svg/motion-value-attributes.spec.ts` (model after an existing spec i
   `docs/src/lib/examples/svg-animation/`, example route under
   `docs/src/routes/examples/svg-animation/`, nav entry in
   `docs/src/lib/docsNav.ts`.
-- Regenerate sitemap: `pnpm --filter docs sitemap:manifest`.
+- Sitemap: nothing to run. `docs/src/lib/sitemap-manifest.json` is gitignored
+  (`docs/.gitignore:36`) and emitted by a docs vite plugin on build; the
+  `sitemap:manifest` script this plan originally named no longer exists. Confirm
+  the built manifest contains the new routes.
 - Match the structure of an existing docs page, e.g.
   `docs/src/routes/docs/transform-template/`.
 
@@ -202,12 +272,28 @@ clean; `pnpm exec playwright test e2e/svg` → pass.
 
 ## Test plan
 
-- Unit (`src/lib/utils/svg.spec.ts`): attribute classification; attrX/attrY/attrScale
-  → x/y/scale mapping; MotionValue extraction leaves static attrs untouched;
-  path props are NOT claimed by the new set (no double handling).
+- Unit (`src/lib/utils/svg.spec.ts`): attribute classification, **including at least
+  one kebab-case key (`stroke-width`)**; attrX/attrY/attrScale → x/y/scale mapping
+  via `resolveSVGAttrKey`; MotionValue-side keys stay un-renamed so `svgEffect` can
+  route them; MotionValue extraction leaves static attrs untouched; path props are
+  NOT claimed by the new set (no double handling); SSR helper emits DOM attribute
+  names (`strokeDashoffset` → `stroke-dashoffset`, `attrX` → `x`).
 - e2e (`e2e/svg/motion-value-attributes.spec.ts`): no `[object Object]` in DOM;
-  attribute updates when MotionValue changes; SSR/hydration initial value correct
-  (load page with JS, assert first paint attribute is numeric).
+  **the bound channel updates** when the MotionValue changes (attribute for
+  attr-routed keys, computed style for style-routed keys — see Step 3);
+  SSR/hydration initial value correct (fetch the route server-side, assert the
+  payload carries a numeric value).
+- Cover at least one key from each channel, so a regression in either routing
+  branch is caught: `attrX` (attribute) and `cx` (style).
+- **Tag casing (revision (b)) must be asserted on a client-created element.** The
+  HTML parser silently corrects `<fedisplacementmap>` → `feDisplacementMap` when
+  it parses SSR markup, and Svelte's hydration reuses that node rather than
+  calling `create_element` (`svelte-element.js:74`). So `page.goto(ROUTE)` then
+  reading `tagName` passes **even with the fix reverted** — a vacuous assertion.
+  Assert after the `{#if mounted}` toggle round-trips (the remount path calls
+  `createElementNS` with the tag verbatim), checking `tagName`,
+  `constructor.name === 'SVGFEDisplacementMapElement'`, and that the `scale` IDL
+  property exists — a lowercase tag yields a generic `SVGElement` with no `scale`.
 - Pattern: model unit tests after existing `src/lib/utils/svg.spec.ts` blocks;
   e2e after `e2e/svg/` existing specs.
 
@@ -217,9 +303,12 @@ clean; `pnpm exec playwright test e2e/svg` → pass.
 - [ ] `pnpm test` exits 0; new svg.spec.ts cases exist and pass
 - [ ] `pnpm exec playwright test e2e/svg` exits 0 incl. new spec
 - [ ] Demo route exists and is linked from `src/routes/+page.svelte`
-- [ ] Docs page exists with nav entry; sitemap regenerated
+- [ ] Docs page exists with nav entry; the build-generated sitemap manifest
+      contains the new routes (see Step 4 — there is no `sitemap:manifest` script)
 - [ ] `git status` shows no modified files outside the in-scope list
 - [ ] Batch README status row updated
+- [ ] Tag-casing assertion runs against a **client-created** element (post-remount),
+      not first paint — see the test plan
 
 ## STOP conditions
 
@@ -242,3 +331,85 @@ Stop and report back (do not improvise) if:
   subscription overhead.
 - Deferred: MotionValue-driven `transform` attribute on SVG (upstream handles
   via transform box tricks); `useMotionValueEvent`-style attr listeners.
+
+## Amendment — Upstream ruling on Step 2.3 SSR attribute casing (2026-07-09)
+
+**Question put to the plan author**: Step 2.3 requires SSR to emit DOM
+attribute names (`strokeDashoffset` → `stroke-dashoffset`), but naive
+dash-casing breaks `viewBox` → `view-box` (inert). The executor gated
+dash-casing on motion-dom's exported `camelCaseAttributes` set and pinned
+tests for `viewBox` (unchanged), `strokeDashoffset` (kebab), and
+`'stroke-width'` (untouched), plus an SSR e2e asserting the payload contains
+`stroke-dashoffset="…"` and not `strokeDashoffset=`.
+
+**Ruling: APPROVED — the gate is upstream's own mechanism, verbatim.**
+Verified against `~/Github/motion` at v12.42.2:
+
+1. **Write path** — `packages/motion-dom/src/render/svg/utils/render.ts:15-19`:
+   every rendered SVG attr goes through
+   `!camelCaseAttributes.has(key) ? camelToDash(key) : key`. Dash-case
+   everything except the allowlist. This is the exact semantic Step 2.3's SSR
+   emitter must mirror.
+2. **The allowlist** — `packages/motion-dom/src/render/svg/utils/camel-case-attrs.ts:4-28`
+   (**23 entries** — verified against both the source and the installed
+   package's `camelCaseAttributes.size`; use 23 as the drift-check reference on
+   version bumps): `viewBox`, `baseFrequency`, `numOctaves`, `stdDeviation`,
+   `gradientTransform`, `pathLength`, `markerWidth/Height`,
+   `keySplines`/`keyTimes`, `textLength`, …. It is a deliberate public export
+   (`motion-dom/src/index.ts:302`, confirmed reachable at the installed
+   version) — **import it; do not vendor a copy**, so upstream additions track
+   automatically on version bumps. **`camelToDash` is likewise a public
+   motion-dom export (verified on the installed package) — import it too;
+   hand-rolling the dash-caser is the same vendoring mistake one function
+   over.** Note the filter-primitive entries (`baseFrequency`, `numOctaves`,
+   `stdDeviation`) are exactly what Plan 005's `feTurbulence` work will drive
+   through this path.
+3. **Already-kebab keys are safe by construction** —
+   `packages/motion-dom/src/render/dom/utils/camel-to-dash.ts` is a pure
+   uppercase-letter replacer; `'stroke-width'` passes through unchanged. The
+   pinned test matches upstream behavior.
+4. **NEW NORMATIVE REQUIREMENT — gate ordering vs `attr` prefix.** The casing
+   gate MUST run **after** `resolveSVGAttrKey` strips the `attr` prefix, never
+   before. `attrX` is not in `camelCaseAttributes`, so gating it first emits
+   the inert attribute `attr-x` instead of `x` (probed on the installed
+   package: `attrX → attr-x`, `attrScale → attr-scale`). This is upstream's
+   own ordering: `buildSVGAttrs`
+   (`packages/motion-dom/src/render/svg/utils/build-attrs.ts:23-25,82-85`)
+   destructures `attrX/attrY/attrScale` into `attrs.x/y/scale` _before_
+   `renderSVG` ever applies the gate. Both orderings pass a naive
+   `strokeDashoffset` test, so this needs its own unit case:
+   `attrX` through resolve-then-gate → `x` (and never `attr-x`).
+5. **Read-path symmetry (conditional).** Upstream applies the _same_ gate
+   before reading: `packages/motion-dom/src/render/svg/SVGVisualElement.ts:39`
+   runs the gate before `instance.getAttribute(key)`. **This plan's current
+   scope has no attribute read-back path** (the only SVG-attribute
+   `getAttribute` calls in `src/lib/` are hardcoded kebab strings in the
+   path pipeline, `_MotionContainer.svelte:882,888`, out of scope here) — so
+   no read-back code or test is required. The requirement is conditional: IF
+   the implementation introduces any attribute read-back (initial-value
+   resolution, SSR/hydration reconciliation), it MUST apply the identical
+   gate, after `attr`-prefix resolution per point 4, or a value written as
+   `stroke-dashoffset` read back via `getAttribute('strokeDashoffset')`
+   returns `null`. Do not build a read-back path just to satisfy this point.
+
+Context: upstream never needs this conversion in its _React SSR_ path because
+React JSX normalizes SVG attribute casing at the framework layer; motion-dom's
+imperative `renderSVG` is the upstream analogue of our Svelte SSR emitter, so
+its semantics are the correct reference.
+
+**Correction record (v2, 2026-07-09, same day):** the guard verified the v1
+ruling and found three defects, all confirmed by the plan author against
+source and the installed package before this revision: (a) the allowlist has
+23 entries, not 26 as v1 stated; (b) v1 omitted that `camelToDash` is itself
+a public export — now in point 2; (c) v1 missed the gate-vs-`attr`-prefix
+ordering hazard — now normative point 4 with its own unit case; and v1's
+read-path requirement mandated a unit test for a read-back path that does not
+exist in scope — now conditional point 5. Points 1-3's citations were
+verified exact by the guard.
+
+— _Ruled by the plan author (Claude Fable 5, advisor session of 2026-07-08/09),
+against upstream source `~/Github/motion` v12.42.2, at maintainer request;
+v2 corrections adopted after independent guard verification. The guard should
+treat points 1-3 as confirmation of the executor's current implementation,
+point 4 as a new requirement (with unit case) to verify before DONE, and
+point 5 as conditional-only._

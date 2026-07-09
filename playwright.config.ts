@@ -18,7 +18,15 @@ export default defineConfig({
         command: 'npm run build && npm run preview -- --port 4198',
         port: 4198,
         timeout: 120000,
-        reuseExistingServer: !process.env.CI,
+        // Do not reuse an existing server by default. reuseExistingServer
+        // short-circuits the rebuild in `command`: a stale preview on 4198
+        // would silently validate the suite against OLD code, so a reverted
+        // fix can appear to pass — exactly when trustworthy results matter
+        // most. Instead, if 4198 is occupied the run fails fast with an
+        // "already used" error rather than rebuilding; kill the stale server
+        // (`pkill -f "vite preview"`). Set PW_REUSE_SERVER=1 to reuse a
+        // server you know is current and skip the rebuild.
+        reuseExistingServer: !!process.env.PW_REUSE_SERVER,
         stdout: 'pipe',
         stderr: 'pipe'
     },

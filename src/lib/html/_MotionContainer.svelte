@@ -106,9 +106,12 @@
     import {
         transformSVGPathProperties,
         computeNormalizedSVGInitialAttrs,
+        computeSSRSVGAttrValues,
+        extractSVGMotionValueAttributes,
         hasSVGPathProperties,
         isSVGPathElement,
         isSVGTag,
+        resolveSVGTagName,
         SVG_NAMESPACE
     } from '$lib/utils/svg'
     import {
@@ -1466,9 +1469,50 @@
         )
     )
 
+    // SVG tag names are case-sensitive: our components pass `tag` all-lowercase, but
+    // `fedisplacementmap` in the SVG namespace is an inert generic SVGElement, not an
+    // SVGFEDisplacementMapElement. Canonicalize before rendering.
+    const renderTag = $derived(isSVGTag(String(tag)) ? resolveSVGTagName(String(tag)) : tag)
+
+    // MotionValue-bound SVG attributes (`cx`, `stroke-width`, `attrX`, …) must be
+    // pulled out of `rest` before it reaches the raw spread below, or they
+    // stringify as `[object Object]`. `svgEffect` drives them on the client;
+    // `computeSSRSVGAttrValues` seeds the server payload so hydration doesn't flash.
+    const svgAttrSplit = $derived(
+        isSVGTag(String(tag))
+            ? extractSVGMotionValueAttributes(rest as Record<string, unknown>)
+            : null
+    )
+    const svgMotionValueAttrs = $derived(svgAttrSplit?.motionValueAttrs ?? {})
+    const spreadAttrs = $derived<Record<string, unknown>>(
+        svgAttrSplit
+            ? {
+                  ...svgAttrSplit.staticAttrs,
+                  // `untrack`: this library's MotionValues are Svelte-augmented, so a
+                  // tracked `.get()` here would make the whole attribute spread a
+                  // dependency of every value change — re-rendering each frame of an
+                  // animation and letting Svelte race `svgEffect` on attr-routed keys.
+                  // The seed only needs to be correct at render time; `svgEffect` owns
+                  // the DOM afterwards.
+                  ...untrack(() => computeSSRSVGAttrValues(svgAttrSplit.motionValueAttrs))
+              }
+            : (rest as Record<string, unknown>)
+    )
+
+    $effect(() => {
+        if (!element) return
+
+        const values = svgMotionValueAttrs
+        if (!isNotEmpty(values)) return
+
+        // Keys stay verbatim: svgEffect applies its own `attr`-prefix conversion
+        // and picks the style-vs-attribute channel per key.
+        return svgEffect(element, values)
+    })
+
     // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
     const derivedAttrs = $derived<Record<string, unknown>>({
-        ...(rest as Record<string, unknown>),
+        ...spreadAttrs,
         // Gate on the *resolved* whileTap, not the raw prop. With
         // variant-label support a truthy-but-unresolved value (unknown
         // key, empty array) would otherwise add `tabindex=0` for an
@@ -2940,7 +2984,12 @@
 
 {#if isVoidTag}
     {#if isSVGTag(String(tag))}
-        <svelte:element this={tag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs} />
+        <svelte:element
+            this={renderTag}
+            bind:this={element}
+            xmlns={SVG_NAMESPACE}
+            {...derivedAttrs}
+        />
         <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
         {@html renderedOptimizedAppearScript}
     {:else}
@@ -2949,7 +2998,7 @@
         {@html renderedOptimizedAppearScript}
     {/if}
 {:else if isSVGTag(String(tag))}
-    <svelte:element this={tag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs}>
+    <svelte:element this={renderTag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs}>
         {#if motionValueChild}
             {motionValueChildText ?? motionValueChildInitialText}
         {:else}
