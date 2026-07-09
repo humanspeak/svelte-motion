@@ -13,13 +13,13 @@ the A2 projection issues) — see "Superseded issues" below.
 
 ## Execution order & status
 
-| Plan | Title                                                                | Priority   | Effort | Depends on | Docs update?                                                               | Status      |
-| ---- | -------------------------------------------------------------------- | ---------- | ------ | ---------- | -------------------------------------------------------------------------- | ----------- |
-| 001  | Re-type `animate` for AugmentedMotionValue (kill all 10 casts)       | P1 — FIRST | S–M    | —          | Small — delete casts from docs examples; check prose                       | DONE        |
-| 002  | SVG MotionValue attribute binding + attrX/attrY/attrScale            | P1         | M      | —          | **YES — new docs page** (`docs/svg-animation`)                             | IN PROGRESS |
-| 003  | Full transform composition during drag (buildTransform semantics)    | P1         | M      | —          | No public docs; in-code decision comments must be updated                  | TODO        |
-| 004  | Motion-dom projection authoritative (page-space, retire legacy FLIP) | P1         | L      | 003        | **YES — update** `docs/layout-animations`; shared-layout page as follow-up | TODO        |
-| 005  | Apple Intelligence wavy glow border — flagship example (smooth)      | P2 — LAST  | M      | 002        | **YES — new example page** (`examples/ai-glow-border`) + nav + sitemap     | TODO        |
+| Plan | Title                                                                | Priority   | Effort | Depends on | Docs update?                                                               | Status |
+| ---- | -------------------------------------------------------------------- | ---------- | ------ | ---------- | -------------------------------------------------------------------------- | ------ |
+| 001  | Re-type `animate` for AugmentedMotionValue (kill all 10 casts)       | P1 — FIRST | S–M    | —          | Small — delete casts from docs examples; check prose                       | DONE   |
+| 002  | SVG MotionValue attribute binding + attrX/attrY/attrScale            | P1         | M      | —          | **YES — new docs page** (`docs/svg-animation`)                             | DONE   |
+| 003  | Full transform composition during drag (buildTransform semantics)    | P1         | M      | —          | No public docs; in-code decision comments must be updated                  | TODO   |
+| 004  | Motion-dom projection authoritative (page-space, retire legacy FLIP) | P1         | L      | 003        | **YES — update** `docs/layout-animations`; shared-layout page as follow-up | TODO   |
+| 005  | Apple Intelligence wavy glow border — flagship example (smooth)      | P2 — LAST  | M      | 002        | **YES — new example page** (`examples/ai-glow-border`) + nav + sitemap     | TODO   |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
@@ -35,9 +35,16 @@ REJECTED (with one-line rationale)
   emit `attr-x`), with its own unit case. Point 5 (read-path symmetry) is
   conditional-only; no read-back path exists in scope.
 - 002: revision (b) 2026-07-09, operator-approved scope addition — SVG tag-name
-  casing (`fedisplacementmap` → `feDisplacementMap`). Steps 1-3 implemented and
-  green; Step 4 (docs page) outstanding. 005 depends on this: `feTurbulence` /
-  `feDisplacementMap` were unreachable before the fix.
+  casing (`fedisplacementmap` → `feDisplacementMap`). 005 depends on this:
+  `feTurbulence` / `feDisplacementMap` were unreachable before the fix.
+- 002: **DONE** 2026-07-09. All five steps complete. Step 4 shipped
+  `docs/svg-animation` (+ `examples/svg-animation`, nav entry under Animation);
+  the sitemap manifest and demo loaders are gitignored and regenerate from the
+  docs vite plugins on build, so the plan's `sitemap:manifest` command no longer
+  exists. Final gates: `pnpm check` 0 errors, unit 745/745, full e2e 314 passed
+  / 2 skipped (both skips pre-existing), docs check 0 errors, `trunk check`
+  clean. Guard Finding 8 addressed — the tag-casing e2e now asserts after the
+  `{#if mounted}` remount and was confirmed to FAIL with the fix reverted.
 
 ## Dependency notes
 
