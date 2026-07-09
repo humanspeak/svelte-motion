@@ -1,6 +1,13 @@
 <script lang="ts">
     import { ChevronDown, LoaderCircle } from '@lucide/svelte'
-    import { animate, motion, useMotionTemplate, useMotionValue } from '@humanspeak/svelte-motion'
+    import {
+        animate,
+        motion,
+        useMotionTemplate,
+        useMotionValue,
+        useTransform
+    } from '@humanspeak/svelte-motion'
+    import { onMount } from 'svelte'
 
     // AI Gradient Animation Card — a rotating conic-gradient border with a
     // masked glow spill. A single `turn` motion value sweeps 0 → 1 on an
@@ -10,20 +17,48 @@
     //   2. a blurred, radially-masked glow that bleeds a soft halo of the same
     //      gradient out from under the card edges.
     //
+    // Entrance: the card SSRs with both gradient layers fully transparent
+    // (`glowOpacity` starts at 0, serialized into the markup), so first paint
+    // never shows a frozen gradient during hydration. Once hydrated, the spin
+    // is already running while the glow warms up from transparent — fading
+    // into motion, so there is no visible moment where a static gradient
+    // starts to move.
+    //
     // Ported to Svelte 5 (useMotionValue + animate + useMotionTemplate) from
     // the "AI Gradient Animation Card" by hover.dev:
     // https://www.hover.dev/components/cards#ai-gradient-animation-card
 
     const duration = 3
     const turn = useMotionValue(0)
+    const glowOpacity = useMotionValue(0)
+    // The spill's resting opacity is 0.7 (a soft halo, not a full-strength
+    // duplicate), so it tracks the shared entrance value scaled down.
+    const spillOpacity = useTransform(() => glowOpacity.get() * 0.7)
 
-    $effect(() => {
-        const controls = animate(turn, [0, 1], {
+    // onMount, not $effect: `animate(glowOpacity, 1, …)` with a scalar target
+    // reads the value's current value to derive its start keyframe, and the
+    // augmented motion value's read is reactive — inside `$effect` that makes
+    // the animation's own per-frame writes re-trigger the effect, which
+    // restarts the animation forever. `onMount` runs once and tracks nothing.
+    onMount(() => {
+        // Reduced motion: light the gradient up immediately, skip the spin.
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            glowOpacity.set(1)
+            return
+        }
+
+        // Both run concurrently: the gradient is never visible while static.
+        const spin = animate(turn, [0, 1], {
             ease: 'linear',
             duration,
             repeat: Infinity
         })
-        return () => controls.stop()
+        const enter = animate(glowOpacity, 1, { duration: 1.2, ease: 'easeOut' })
+
+        return () => {
+            spin.stop()
+            enter.stop()
+        }
     })
 
     const gradient = useMotionTemplate`conic-gradient(from ${turn}turn, transparent 0%, #f472b600 5%, #f472b6 10%, #c084fc 18%, #818cf8 26%, #38bdf8 34%, #2dd4bf 42%, #fbbf24 46%, #fbbf2400 52%, transparent 56%)`
@@ -33,7 +68,10 @@
 <div class="dk-demo-shell">
     <!-- Animated gradient border -->
     <div class="ai-border">
-        <motion.div class="ai-border-ring" style={{ backgroundImage: gradient }} />
+        <motion.div
+            class="ai-border-ring"
+            style={{ backgroundImage: gradient, opacity: glowOpacity }}
+        />
 
         <div class="ai-border-inner">
             <div class="ai-card-body">
@@ -79,7 +117,7 @@
             <motion.div
                 class="ai-glow-spill"
                 aria-hidden="true"
-                style={{ backgroundImage: gradient }}
+                style={{ backgroundImage: gradient, opacity: spillOpacity }}
             />
         </div>
     </div>
@@ -151,7 +189,7 @@
         inset: -40%;
         z-index: 10;
         overflow: hidden;
-        opacity: 0.7;
+        /* Opacity is animated inline (entrance fade → 0.7 resting halo). */
         filter: blur(40px);
         pointer-events: none;
         /* Radial spill mask: transparent through the centre, opaque toward the
