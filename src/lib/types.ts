@@ -632,9 +632,26 @@ export type MotionProps = {
      * ```
      */
     attrX?: MotionStyleValue
-    /** Renders as the SVG `y` **attribute**, distinct from the CSS `y` transform. */
+    /**
+     * Renders as the SVG `y` **attribute**, distinct from the CSS `y` transform.
+     * Use on SVG elements where `y` would otherwise be claimed as a transform.
+     *
+     * @example
+     * ```svelte
+     * <motion.rect attrX={xValue} attrY={yValue} />
+     * ```
+     */
     attrY?: MotionStyleValue
-    /** Renders as the SVG `scale` **attribute**, distinct from the CSS `scale` transform. */
+    /**
+     * Renders as the SVG `scale` **attribute**, distinct from the CSS `scale`
+     * transform. Only meaningful on `<feDisplacementMap>`, where it drives the
+     * displacement amount; on shape elements the attribute is inert.
+     *
+     * @example
+     * ```svelte
+     * <motion.fedisplacementmap in="SourceGraphic" in2="noise" attrScale={warp} />
+     * ```
+     */
     attrScale?: MotionStyleValue
     /** CSS classes */
     class?: string

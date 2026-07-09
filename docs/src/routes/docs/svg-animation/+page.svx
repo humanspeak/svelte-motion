@@ -70,6 +70,12 @@ Svelte templates take the DOM spelling of hyphenated attributes, so write
 `stroke-width`, not `strokeWidth`:
 
 ```svelte
+<script lang="ts">
+  import { motion, useSpring } from '@humanspeak/svelte-motion'
+
+  const strokeWidth = useSpring(4)
+</script>
+
 <motion.circle cx={60} cy={60} r={20} stroke-width={strokeWidth} />
 ```
 
@@ -140,6 +146,12 @@ lowercase. `motion.fedisplacementmap` renders a correctly-cased
 `<feDisplacementMap>`:
 
 ```svelte
+<script lang="ts">
+  import { motion, useSpring } from '@humanspeak/svelte-motion'
+
+  const warp = useSpring(12)
+</script>
+
 <filter id="warp">
   <feTurbulence type="turbulence" baseFrequency="0.04" numOctaves="2" result="noise" />
   <motion.fedisplacementmap in="SourceGraphic" in2="noise" attrScale={warp} />

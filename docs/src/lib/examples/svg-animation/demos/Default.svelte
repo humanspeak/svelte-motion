@@ -31,7 +31,7 @@
 -->
 <!-- dk-strip: docs-kit positioning shell - stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div class="toolbar" aria-label="Progress controls">
+    <div class="toolbar" role="toolbar" aria-label="Progress controls">
         <button type="button" onclick={() => setProgress(0.25)}>25%</button>
         <button type="button" onclick={() => setProgress(0.5)}>50%</button>
         <button type="button" class="primary" onclick={() => setProgress(1)}>
