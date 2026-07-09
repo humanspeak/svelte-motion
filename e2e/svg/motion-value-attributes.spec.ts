@@ -209,5 +209,13 @@ test.describe('SVG MotionValue attributes', () => {
         expect(ring).toBeTruthy()
         expect(ring).toMatch(/stroke-dashoffset="[\d.-]+"/)
         expect(ring).not.toMatch(/strokeDashoffset=/)
+
+        // Gate ordering: `attrX` must resolve to `x` before dash-casing, never
+        // to the inert `attr-x`.
+        const rect = html.match(/<rect[^>]*data-testid="attr-rect"[^>]*>/)?.[0]
+        expect(rect).toBeTruthy()
+        expect(rect).toMatch(/\sx="[\d.]+"/)
+        expect(rect).not.toMatch(/attr-x=/)
+        expect(rect).not.toMatch(/attrX=/)
     })
 })

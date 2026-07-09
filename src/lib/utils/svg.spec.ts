@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { motionValue } from 'motion-dom'
+import { camelCaseAttributes, camelToDash, motionValue } from 'motion-dom'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
     computeNormalizedSVGInitialAttrs,
@@ -204,6 +204,26 @@ describe('svg utilities', () => {
                 'stroke-dashoffset': '0'
             })
         })
+    })
+})
+
+describe('motion-dom casing primitives', () => {
+    it('should expose camelToDash and camelCaseAttributes as public exports', () => {
+        // Plan 002 amendment, point 2: import both; do not vendor a copy, so
+        // upstream additions track automatically on version bumps.
+        expect(typeof camelToDash).toBe('function')
+        expect(camelCaseAttributes).toBeInstanceOf(Set)
+    })
+
+    it('should carry 23 camelCase attribute entries (drift reference for version bumps)', () => {
+        // motion-dom v12.42.2, camel-case-attrs.ts:4-28. A change here means
+        // upstream extended the allowlist — re-verify the SSR casing gate.
+        expect(camelCaseAttributes.size).toBe(23)
+        expect(camelCaseAttributes.has('viewBox')).toBe(true)
+    })
+
+    it('should not dash-case an already-kebab key', () => {
+        expect(camelToDash('stroke-width')).toBe('stroke-width')
     })
 })
 
@@ -450,6 +470,37 @@ describe('computeSSRSVGAttrValues', () => {
         expect(computeSSRSVGAttrValues({ viewBox: motionValue('0 0 10 10') })).toEqual({
             viewBox: '0 0 10 10'
         })
+    })
+
+    it('should strip the attr prefix BEFORE applying the casing gate', () => {
+        // Plan 002 amendment, normative point 4. `attrX` is not in
+        // `camelCaseAttributes`, so gating first dash-cases it to the inert
+        // `attr-x`. Upstream's `buildSVGAttrs` destructures attrX/attrY/attrScale
+        // into attrs.x/y/scale *before* `renderSVG` applies the gate
+        // (build-attrs.ts:23-25,82-85 -> render.ts:15-19).
+        const attrs = computeSSRSVGAttrValues({
+            attrX: motionValue(3),
+            attrY: motionValue(4),
+            attrScale: motionValue(2)
+        })
+
+        expect(attrs).toEqual({ x: '3', y: '4', scale: '2' })
+        expect(attrs).not.toHaveProperty('attr-x')
+        expect(attrs).not.toHaveProperty('attr-y')
+        expect(attrs).not.toHaveProperty('attr-scale')
+    })
+
+    it('should honor upstream camelCase entries beyond the ones we hand-picked', () => {
+        // Guards against vendoring a hand-written copy of the allowlist: these
+        // filter-primitive keys only survive if motion-dom's own
+        // `camelCaseAttributes` is the gate (camel-case-attrs.ts:4-28).
+        expect(
+            computeSSRSVGAttrValues({
+                stdDeviation: motionValue(2),
+                baseFrequency: motionValue(0.05),
+                numOctaves: motionValue(3)
+            })
+        ).toEqual({ stdDeviation: '2', baseFrequency: '0.05', numOctaves: '3' })
     })
 
     it('should never emit [object Object]', () => {
