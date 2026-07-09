@@ -1498,7 +1498,7 @@
         // unintended tab stop. (#349 CR feedback)
         ...(hasGestureFeatures &&
         isNotEmpty(resolvedWhileTap) &&
-        !isNativelyFocusable(tag, rest as Record<string, unknown>) &&
+        !isNativelyFocusable(tag, rest) &&
         ((rest as Record<string, unknown>)?.tabindex ??
             (rest as Record<string, unknown>)?.tabIndex ??
             undefined) === undefined
@@ -2183,11 +2183,7 @@
                 } else {
                     const flipLayoutMode = layoutProp === 'position' ? 'position' : true
                     const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
-                    runFlipAnimation(
-                        element!,
-                        transforms,
-                        (mergedTransition ?? {}) as AnimationOptions
-                    )
+                    runFlipAnimation(element!, transforms, mergedTransition ?? {})
                     lastRect = next
                 }
             }
@@ -2352,11 +2348,7 @@
                         motionDomProjection.commitObservedLayoutChange(previous)
                     } else {
                         finishFlipAnimations(element!)
-                        runFlipAnimation(
-                            element!,
-                            transforms,
-                            (mergedTransition ?? {}) as AnimationOptions
-                        )
+                        runFlipAnimation(element!, transforms, mergedTransition ?? {})
                     }
                 }
                 lastRect = next
@@ -2396,7 +2388,7 @@
                 (!motionDomProjection || shouldUseSizeCorrectedFallback)
             ) {
                 finishFlipAnimations(element!)
-                runFlipAnimation(element!, transforms, (mergedTransition ?? {}) as AnimationOptions)
+                runFlipAnimation(element!, transforms, mergedTransition ?? {})
             }
             wasViewportScrolledSinceLastLayout = false
             wasViewportOffscreenSinceLastLayout = false
@@ -2496,7 +2488,7 @@
         return attachWhileHover(
             element!,
             (resolvedWhileHover ?? {}) as Record<string, unknown>,
-            (mergedTransition ?? {}) as AnimationOptions,
+            mergedTransition ?? {},
             { onStart: onHoverStartProp, onEnd: onHoverEndProp },
             {
                 initial: (resolvedInitial ?? {}) as Record<string, unknown>,
@@ -2519,7 +2511,7 @@
         return attachWhileFocus(
             element!,
             (resolvedWhileFocus ?? {}) as Record<string, unknown>,
-            (mergedTransition ?? {}) as AnimationOptions,
+            mergedTransition ?? {},
             { onStart: onFocusStartProp, onEnd: onFocusEndProp },
             {
                 initial: (resolvedInitial ?? {}) as Record<string, unknown>,
@@ -2542,7 +2534,7 @@
         return attachWhileInView(
             element!,
             (resolvedWhileInView ?? {}) as Record<string, unknown>,
-            (mergedTransition ?? {}) as AnimationOptions,
+            mergedTransition ?? {},
             {
                 onStart: onInViewStartProp,
                 onEnd: onInViewEndProp,
@@ -2817,10 +2809,7 @@
                 }
                 pwLog('[motion] path: has initialKeyframes, will animate to target')
                 // Apply initial instantly BEFORE exposing 'initial' state
-                const transformedInitial = transformSVGPathProperties(
-                    element!,
-                    initialKeyframes as Record<string, unknown>
-                )
+                const transformedInitial = transformSVGPathProperties(element!, initialKeyframes)
 
                 // For SVG paths, apply initial state truly synchronously to prevent flash
                 const hasSVGProps =
@@ -2840,7 +2829,7 @@
                     // no-op
                 }
                 // Avoid pinning: strip stroke dash props from the animate(0) payload
-                const initialForAnimate = { ...(transformedInitial as Record<string, unknown>) }
+                const initialForAnimate = { ...transformedInitial }
                 delete (initialForAnimate as Record<string, unknown>).strokeDasharray
                 delete (initialForAnimate as Record<string, unknown>)['stroke-dasharray']
                 delete (initialForAnimate as Record<string, unknown>).strokeDashoffset
@@ -2915,15 +2904,12 @@
             }
         } else if (isNotEmpty(initialKeyframes)) {
             // Apply initial instantly BEFORE exposing 'initial' state
-            const transformedInitial = transformSVGPathProperties(
-                element!,
-                initialKeyframes as Record<string, unknown>
-            )
+            const transformedInitial = transformSVGPathProperties(element!, initialKeyframes)
             element!.setAttribute(
                 'style',
                 mergeInlineStyles(
                     element!.getAttribute('style') ?? '',
-                    transformedInitial as Record<string, unknown>,
+                    transformedInitial,
                     undefined,
                     transformTemplateProp
                 )

@@ -148,6 +148,8 @@ describe('useTransform — rune getter sources (unlocked by the unification)', (
         await vi.advanceTimersByTimeAsync(100)
         expect(probe.mapped.get()).toBe(50)
 
+        // Svelte's `unmount()` returns a Promise that only settles after outro
+        // transitions; the test tears down synchronously and never awaits it.
         void unmount(probe)
         host.remove()
     })
@@ -163,6 +165,8 @@ describe('useTransform — rune getter sources (unlocked by the unification)', (
         await vi.advanceTimersByTimeAsync(2000)
         expect(probe.smooth.get()).toBeGreaterThan(0)
 
+        // Svelte's `unmount()` returns a Promise that only settles after outro
+        // transitions; the test tears down synchronously and never awaits it.
         void unmount(probe)
         host.remove()
     })

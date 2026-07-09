@@ -13,14 +13,22 @@ starting, honor its STOP conditions, and update your row when done.
 
 ## Execution order & status
 
-| Plan | Title                                                                | Priority | Effort | Depends on | Status |
-| ---- | -------------------------------------------------------------------- | -------- | ------ | ---------- | ------ |
-| 001  | Adopt recommendedTypeChecked with scoped carve-outs for any-bridging | P2       | L      | —          | DONE   |
+| Plan | Title                                                                | Priority | Effort | Depends on | Status         |
+| ---- | -------------------------------------------------------------------- | -------- | ------ | ---------- | -------------- |
+| 001  | Adopt recommendedTypeChecked with scoped carve-outs for any-bridging | P2       | L      | —          | GUARD: NO-PASS |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
 
-- 001: **DONE** 2026-07-09. `trunk check --all` exits 0; `pnpm check` 0 errors;
+- 001: **GUARD: NO-PASS** 2026-07-09 — see `001-typed-lint-promise-rules.guard-report.md`.
+  Substance verified and sound; two done criteria fail on the record, not the
+  code: three `void unmount(...)` promises lack the required rationale comment,
+  and the `.svelte` rule-off comment at `eslint.config.mjs:117-138` makes two
+  false claims (14 `as`-style assertions remain flagged; "19" was the count of
+  `pnpm check` errors, not false positives). Plan amended by guard with operator
+  agreement: `.coderabbit.yaml` accepted into scope, `Planned at` re-stamped to
+  `ac7c6da` (the old SHA was on a sibling branch). Executor's own notes follow.
+- 001: executor report, 2026-07-09. `trunk check --all` exits 0; `pnpm check` 0 errors;
   `pnpm test:only` 752/752; `playwright test --list` 319 tests. Four deviations
   and three additional rule-offs, all forced by tooling divergences rather than
   by the code — see the commits on `chore/typed-lint-recommended`: 1. `projectService.allowDefaultProject` cannot work under Trunk, which lints
@@ -33,9 +41,13 @@ REJECTED (with one-line rationale)
 --fix` stalls at 219 remaining assertions. Finished with an
   operator-approved one-time raw `npx eslint --fix`. 4. Step 4's expectation that the autofix touches only `src/**` is wrong now
   that `e2e/**` is typed-linted; it edits e2e specs too.
-  Additional rule-offs beyond Step 2(d), each with its count: - `no-unnecessary-type-assertion` off for `**/*.svelte` — 19 false positives
-  in `_MotionContainer.svelte`; svelte-eslint-parser narrows `$state` across
-  closure boundaries, svelte-check (correctly) does not. 0 true positives. - `no-unsafe-assignment` off for `**/*.svelte` — 9 false positives, all on
+  Additional rule-offs beyond Step 2(d), each with its count: - `no-unnecessary-type-assertion` off for `**/*.svelte` — with the rule
+  forced back on, 35 lines flag, all in `_MotionContainer.svelte`, all
+  non-null `!` assertions; applying all 35 autofixes yields 19 svelte-check
+  errors (19 is the error count, not the flagged-line count). 0 `as`-style
+  hits remain — those were genuine and are removed. svelte-eslint-parser
+  narrows `$state` across closure boundaries; svelte-check (correctly)
+  does not. - `no-unsafe-assignment` off for `**/*.svelte` — 9 false positives, all on
   `let { … } = $props()` lines, reported only by `trunk check --all` and not
   by targeted `trunk check <file>` nor raw `npx eslint`. 0 true positives.
   Real bugs fixed in library source (not cosmetics): - `layout.ts` dropped a `finished.finally()` promise whose rejection (WAAPI

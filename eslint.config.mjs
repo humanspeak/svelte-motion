@@ -114,7 +114,8 @@ export default [
         ...ts.configs.disableTypeChecked
     },
     {
-        // `no-unnecessary-type-assertion` is unusable inside `.svelte` files.
+        // `no-unnecessary-type-assertion` is off here because it cannot distinguish
+        // a redundant non-null assertion from a required one in `.svelte`.
         //
         // svelte-eslint-parser's type program narrows a `$state` variable across
         // closure boundaries; `tsc`/svelte-check (correctly) does not. So for
@@ -126,16 +127,29 @@ export default [
         //     })
         //
         // ESLint calls the `!` unnecessary and its autofix deletes it, after which
-        // `pnpm check` reports "'element' is possibly 'null'". Measured at the time
-        // of writing: 19 such false positives in `_MotionContainer.svelte`, 0 true
-        // positives left in `.svelte` after the one-time autofix. The `as`-style
-        // assertions the rule found in `.svelte` files were real and are removed.
-        // `no-unsafe-assignment` is likewise unreliable in `.svelte` under Trunk.
-        // Running `trunk check --all` reports 9 hits, every one of them on a
-        // `let { … } = $props()` destructuring line. The same files report zero when
-        // checked individually (`trunk check <file>`) and zero under a raw
-        // `npx eslint` run, so the type info for `$props()` degrades in Trunk's
-        // batched, sandboxed invocation. `.ts` files keep the whole unsafe family.
+        // svelte-check reports "'element' is possibly 'null'".
+        //
+        // Measured on this branch by forcing the rule back on with
+        //   npx eslint 'src/**/*.svelte' \
+        //     --rule '{"@typescript-eslint/no-unnecessary-type-assertion":"error"}'
+        //
+        //   - 35 lines flagged, all in `_MotionContainer.svelte`, all non-null `!`.
+        //   - Applying every one of those 35 autofixes yields 19 svelte-check
+        //     errors. (19 is the error count, NOT the number of flagged lines —
+        //     not all 35 removals break the build, but the rule gives no way to
+        //     tell which do.)
+        //   - 0 `as`-style hits remain: those were genuine and have been removed.
+        //
+        // Re-run that command before deciding this rail can come back up. It will
+        // stay red until either the parser stops narrowing across closures, or the
+        // `$state` element ref is hoisted into a local `const` after its guard.
+        //
+        // `no-unsafe-assignment` is off for a different reason: it is unreliable in
+        // `.svelte` under Trunk specifically. `trunk check --all` reports 9 hits,
+        // every one on a `let { … } = $props()` destructuring line. The same files
+        // report zero under targeted `trunk check <file>` and zero under a raw
+        // `npx eslint` run, so type info for `$props()` degrades in Trunk's batched,
+        // sandboxed invocation. `.ts` files keep the whole unsafe family.
         files: ['**/*.svelte'],
         rules: {
             '@typescript-eslint/no-unnecessary-type-assertion': 'off',

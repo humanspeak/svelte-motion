@@ -70,6 +70,8 @@ describe('animateView', () => {
         })
         expect(textDuringUpdate).toBe('b')
 
+        // Svelte's `unmount()` returns a Promise that only settles after outro
+        // transitions; the test tears down synchronously and never awaits it.
         void unmount(component)
         host.remove()
     })
