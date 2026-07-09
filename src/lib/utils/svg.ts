@@ -1,10 +1,206 @@
-import { buildSVGPath } from 'motion-dom'
+import {
+    buildSVGPath,
+    camelCaseAttributes,
+    camelToDash,
+    isMotionValue,
+    type MotionValue
+} from 'motion-dom'
 
 /**
  * SVG-specific properties that need special handling during animation.
  * These properties are not standard CSS properties and need to be transformed.
  */
 export const SVG_PATH_PROPERTIES = new Set(['pathLength', 'pathOffset', 'pathSpacing'])
+
+/**
+ * SVG props that may be driven by a `MotionValue`.
+ *
+ * Mirrors the animatable surface of upstream's `buildSVGAttrs`
+ * (`motion-dom/src/render/svg/utils/build-attrs.ts`). Upstream is React-facing
+ * and only lists JSX camelCase spellings, so the hyphenated keys appear here in
+ * *both* forms: a Svelte template takes the DOM spelling, and a user writing
+ * `<motion.circle stroke-width={mv}>` must have that prop claimed out of the raw
+ * attribute spread or it renders `stroke-width="[object Object]"`.
+ *
+ * Membership means only "pull this out of the raw spread". It does **not** mean
+ * "this is a DOM attribute": `svgEffect` decides that per key at runtime via
+ * `key in element.style ? addStyleValue : addAttrValue`
+ * (`motion-dom/src/effects/svg/index.ts`). In Chromium `cx`, `r`, `width` and the
+ * `stroke-*` family are CSS properties and route to `element.style`, while
+ * `points`, `viewBox` and `x1`/`y1`/`x2`/`y2` route to `setAttribute`.
+ *
+ * Path props are deliberately excluded — the path pipeline owns them.
+ */
+export const SVG_ATTRIBUTE_PROPERTIES = new Set([
+    // Geometry
+    'cx',
+    'cy',
+    'r',
+    'rx',
+    'ry',
+    'x',
+    'y',
+    'x1',
+    'y1',
+    'x2',
+    'y2',
+    'width',
+    'height',
+    'points',
+    'd',
+    'offset',
+    'viewBox',
+    // Presentation (React/JSX camelCase spellings)
+    'stopColor',
+    'stopOpacity',
+    'fillOpacity',
+    'strokeOpacity',
+    'strokeWidth',
+    'strokeDashoffset',
+    'strokeDasharray',
+    // Presentation (DOM kebab spellings, as written in a Svelte template)
+    'stop-color',
+    'stop-opacity',
+    'fill-opacity',
+    'stroke-opacity',
+    'stroke-width',
+    'stroke-dashoffset',
+    'stroke-dasharray'
+])
+
+/**
+ * Strips the `attr` prefix from `attrX`/`attrY`/`attrScale`, yielding the SVG
+ * attribute name upstream renders them as (`x`/`y`/`scale`).
+ *
+ * Mirrors upstream's `/^attr([A-Z])/` conversion in
+ * `motion-dom/src/effects/svg/index.ts`, and the `attrX -> attrs.x` destructuring
+ * in `build-attrs.ts:23-25,82-85`.
+ *
+ * Apply this to **static** props and to SSR output only. MotionValue-bound props
+ * must reach `svgEffect` un-renamed, because it performs this conversion itself;
+ * pre-renaming `attrScale` to `scale` would instead make it match the
+ * `key in element.style` branch and become a CSS style.
+ *
+ * @param {string} key The incoming prop name.
+ * @returns {string} The resolved SVG attribute name.
+ * @example
+ * resolveSVGAttrKey('attrX') // 'x'
+ * resolveSVGAttrKey('attribute') // 'attribute' — prefix needs an uppercase char
+ */
+export const resolveSVGAttrKey = (key: string): string => {
+    return key.replace(/^attr([A-Z])/, (_, firstChar: string) => firstChar.toLowerCase())
+}
+
+/**
+ * Determines whether a prop may be bound to a `MotionValue` on an SVG element.
+ *
+ * Path props return false: they are owned by the path-drawing pipeline, and
+ * claiming them here would double-write `stroke-dasharray`.
+ *
+ * @param {string} key The prop name to test.
+ * @returns {boolean} True when the prop is attribute-bindable.
+ * @example
+ * isSVGMotionValueAttribute('cx') // true
+ * isSVGMotionValueAttribute('attrScale') // true
+ * isSVGMotionValueAttribute('pathLength') // false
+ */
+export const isSVGMotionValueAttribute = (key: string): boolean => {
+    if (SVG_PATH_PROPERTIES.has(key)) return false
+    if (/^attr[A-Z]/.test(key)) return true
+    return SVG_ATTRIBUTE_PROPERTIES.has(key)
+}
+
+/**
+ * Splits an SVG element's leftover props into MotionValue-bound attributes and
+ * plain static attributes.
+ *
+ * MotionValue keys are returned **verbatim** so `svgEffect` can apply its own
+ * `attr`-prefix conversion and style-vs-attribute routing. Static attr-prefixed
+ * props are renamed eagerly, matching upstream's `buildSVGAttrs`.
+ *
+ * @param {Record<string, unknown>} rest The element's unclaimed props.
+ * @returns {{motionValueAttrs: Record<string, MotionValue>, staticAttrs: Record<string, unknown>}}
+ *   The MotionValue-bound attrs to subscribe, and the static attrs to spread.
+ * @example
+ * const { motionValueAttrs, staticAttrs } = extractSVGMotionValueAttributes({
+ *   cx: motionValue(10),
+ *   attrX: 4
+ * })
+ * // motionValueAttrs -> { cx: MotionValue }   (un-renamed, for svgEffect)
+ * // staticAttrs      -> { x: 4 }              (renamed, for the spread)
+ */
+export const extractSVGMotionValueAttributes = (
+    rest: Record<string, unknown>
+): {
+    motionValueAttrs: Record<string, MotionValue>
+    staticAttrs: Record<string, unknown>
+} => {
+    const motionValueAttrs: Record<string, MotionValue> = {}
+    const staticAttrs: Record<string, unknown> = {}
+
+    for (const [key, value] of Object.entries(rest)) {
+        if (isMotionValue(value) && isSVGMotionValueAttribute(key)) {
+            motionValueAttrs[key] = value
+        } else if (!isMotionValue(value) && /^attr[A-Z]/.test(key)) {
+            staticAttrs[resolveSVGAttrKey(key)] = value
+        } else {
+            staticAttrs[key] = value
+        }
+    }
+
+    return { motionValueAttrs, staticAttrs }
+}
+
+/**
+ * Converts a MotionValue-bound prop name into the DOM attribute name to emit
+ * during SSR.
+ *
+ * The `attr` prefix is stripped **before** the casing gate is applied. `attrX` is
+ * not a member of `camelCaseAttributes`, so gating first would dash-case it into
+ * the inert `attr-x`. Upstream imposes the same ordering: `buildSVGAttrs`
+ * destructures `attrX` into `attrs.x` before `renderSVG`
+ * (`motion-dom/src/render/svg/utils/render.ts:15-19`) applies
+ * `!camelCaseAttributes.has(key) ? camelToDash(key) : key`.
+ *
+ * @param {string} key The incoming prop name.
+ * @returns {string} The DOM attribute name.
+ */
+const toSVGDOMAttrName = (key: string): string => {
+    const resolved = resolveSVGAttrKey(key)
+    return camelCaseAttributes.has(resolved) ? resolved : camelToDash(resolved)
+}
+
+/**
+ * Resolves MotionValue-bound SVG attributes to their current values for server
+ * rendering, keyed by DOM attribute name.
+ *
+ * SSR must emit the MotionValue's current value so the server payload is correct
+ * and hydration doesn't flash. SVG attribute names are case-sensitive, so the
+ * emitted names go through upstream's casing gate: `strokeDashoffset` becomes
+ * `stroke-dashoffset`, while `viewBox` and the filter primitives stay camelCase.
+ *
+ * Style-routed keys (`cx`, `r`, …) SSR correctly as presentation attributes; the
+ * client-set CSS property simply wins once `svgEffect` subscribes.
+ *
+ * @param {Record<string, MotionValue>} motionValueAttrs MotionValue-bound attrs.
+ * @returns {Record<string, string>} DOM attribute names mapped to string values.
+ * @example
+ * computeSSRSVGAttrValues({ attrX: motionValue(3) }) // { x: '3' }
+ * computeSSRSVGAttrValues({ strokeDashoffset: motionValue(4) }) // { 'stroke-dashoffset': '4' }
+ */
+export const computeSSRSVGAttrValues = (
+    motionValueAttrs: Record<string, MotionValue>
+): Record<string, string> => {
+    const attrs: Record<string, string> = {}
+
+    for (const [key, value] of Object.entries(motionValueAttrs)) {
+        const current = value.get()
+        if (current === null || current === undefined) continue
+        attrs[toSVGDOMAttrName(key)] = String(current)
+    }
+
+    return attrs
+}
 
 /**
  * The SVG namespace URI.

@@ -573,6 +573,14 @@
                         SVG Namespace Test
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/svg/motion-value-attributes') + searchParams}
+                    >
+                        SVG MotionValue Attributes
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

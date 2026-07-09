@@ -29,13 +29,29 @@ const computed = (locator: Locator, property: string): Promise<string> =>
 const computedNumber = async (locator: Locator, property: string): Promise<number> =>
     parseFloat(await computed(locator, property))
 
+/**
+ * Attribute values can carry units too. `addAttrValue` writes through
+ * `getValueAsType(v, numberValueTypes[key])`, and `numberValueTypes.x` is a px
+ * type — so `attrX` renders `x="25px"` (a valid SVG length). Keys with no entry,
+ * like `x2` and `scale`, stay unitless.
+ */
+const attrNumber = async (locator: Locator, name: string): Promise<number> =>
+    parseFloat((await locator.getAttribute(name)) ?? '')
+
+/**
+ * Matches a stringified MotionValue in *attribute position*. The demo page names
+ * the failure mode in its own prose, so a bare substring check on the document
+ * would trip over the copy rather than a real defect.
+ */
+const STRINGIFIED_MOTION_VALUE = /="\[object Object\]"/
+
 test.describe('SVG MotionValue attributes', () => {
     test('never stringifies a MotionValue into the DOM', async ({ page }) => {
         await page.goto(ROUTE)
         await expect(page.getByTestId('mv-circle')).toBeVisible()
 
         const html = await page.content()
-        expect(html).not.toContain('[object Object]')
+        expect(html).not.toMatch(STRINGIFIED_MOTION_VALUE)
     })
 
     test('renders a numeric cx on first paint', async ({ page }) => {
@@ -126,13 +142,13 @@ test.describe('SVG MotionValue attributes', () => {
         const rect = page.getByTestId('attr-rect')
         await expect(rect).toBeVisible()
 
-        const before = Number(await rect.getAttribute('x'))
+        const before = await attrNumber(rect, 'x')
         expect(Number.isFinite(before)).toBe(true)
 
         await page.getByTestId('bump-attr-x').click()
 
         await expect
-            .poll(async () => Number(await rect.getAttribute('x')), { timeout: 5000 })
+            .poll(async () => attrNumber(rect, 'x'), { timeout: 5000 })
             .toBeGreaterThan(before)
     })
 
@@ -151,17 +167,19 @@ test.describe('SVG MotionValue attributes', () => {
         await page.goto(ROUTE)
 
         const line = page.getByTestId('chart-line')
-        await expect(line).toBeVisible()
+        // A horizontal line has a zero-height bounding box, so Playwright reports it
+        // as hidden. Attachment is the meaningful check here.
+        await expect(line).toBeAttached()
 
         // x1/y1/x2/y2 are not in element.style, so svgEffect writes them via
         // setAttribute even though they carry no `attr` prefix.
-        const before = Number(await line.getAttribute('x2'))
+        const before = await attrNumber(line, 'x2')
         expect(Number.isFinite(before)).toBe(true)
 
         await page.getByTestId('bump-cx').click()
 
         await expect
-            .poll(async () => Number(await line.getAttribute('x2')), { timeout: 5000 })
+            .poll(async () => attrNumber(line, 'x2'), { timeout: 5000 })
             .toBeGreaterThan(before)
     })
 
@@ -192,12 +210,65 @@ test.describe('SVG MotionValue attributes', () => {
         expect(await computedNumber(staticCircle, 'cx')).toBe(5)
     })
 
+    test('does not re-render the attribute spread when a bound value changes', async ({ page }) => {
+        await page.goto(ROUTE)
+
+        const circle = page.getByTestId('mv-circle')
+        await expect(circle).toBeVisible()
+
+        // `cx` is style-routed, so its attribute is a one-time SSR seed. If the
+        // spread tracked the MotionValue (this library's values are Svelte-augmented,
+        // so a tracked `.get()` would), the attribute would follow the style and the
+        // whole attrs object would recompute every frame of an animation.
+        const seed = await circle.getAttribute('cx')
+
+        await page.getByTestId('bump-cx').click()
+        await expect.poll(async () => computedNumber(circle, 'cx'), { timeout: 5000 }).toBe(60)
+
+        expect(await circle.getAttribute('cx')).toBe(seed)
+    })
+
+    test('an unrelated re-render does not clobber attribute-routed values', async ({ page }) => {
+        await page.goto(ROUTE)
+
+        const rect = page.getByTestId('attr-rect')
+        await expect(rect).toBeVisible()
+
+        await page.getByTestId('bump-attr-x').click()
+        await expect.poll(async () => attrNumber(rect, 'x'), { timeout: 5000 }).toBe(25)
+
+        // Force a Svelte re-render of the attribute spread via an unrelated class change.
+        await page.getByTestId('toggle-highlight').check()
+
+        // svgEffect owns `x`; the spread must not reset it to the initial seed.
+        await expect.poll(async () => attrNumber(rect, 'x'), { timeout: 2000 }).toBe(25)
+    })
+
+    test('reattaches cleanly after unmount and remount', async ({ page }) => {
+        await page.goto(ROUTE)
+        await expect(page.getByTestId('mv-circle')).toBeVisible()
+
+        await page.getByTestId('toggle-mounted').uncheck()
+        await expect(page.getByTestId('mv-circle')).toHaveCount(0)
+
+        await page.getByTestId('toggle-mounted').check()
+        const circle = page.getByTestId('mv-circle')
+        await expect(circle).toBeVisible()
+
+        expect(await page.content()).not.toMatch(STRINGIFIED_MOTION_VALUE)
+        await expect.poll(async () => computedNumber(circle, 'cx'), { timeout: 5000 }).toBe(40)
+
+        // Subscriptions survive the remount.
+        await page.getByTestId('bump-cx').click()
+        await expect.poll(async () => computedNumber(circle, 'cx'), { timeout: 5000 }).toBe(60)
+    })
+
     test('server-rendered markup carries the resolved attribute values', async ({ request }) => {
         const response = await request.get(ROUTE)
         expect(response.ok()).toBe(true)
 
         const html = await response.text()
-        expect(html).not.toContain('[object Object]')
+        expect(html).not.toMatch(STRINGIFIED_MOTION_VALUE)
 
         // The SSR payload must already carry a numeric cx so hydration doesn't flash.
         const circle = html.match(/<circle[^>]*data-testid="mv-circle"[^>]*>/)?.[0]

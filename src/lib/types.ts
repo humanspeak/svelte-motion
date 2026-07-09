@@ -1,5 +1,5 @@
 import type { MotionValueChild } from '$lib/utils/motionValueChild'
-import type { MotionStyle, TransformTemplate } from '$lib/utils/style'
+import type { MotionStyle, MotionStyleValue, TransformTemplate } from '$lib/utils/style'
 import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
 import type { Snippet } from 'svelte'
 
@@ -622,6 +622,20 @@ export type MotionProps = {
     onPanEnd?: MotionOnPanEnd
     /** Inline styles as a CSS string or Motion-style object with live MotionValue entries. */
     style?: string | MotionStyle
+    /**
+     * Renders as the SVG `x` **attribute**, distinct from the CSS `x` transform.
+     * Use on SVG elements where `x` would otherwise be claimed as a transform.
+     *
+     * @example
+     * ```svelte
+     * <motion.rect attrX={xValue} attrY={yValue} />
+     * ```
+     */
+    attrX?: MotionStyleValue
+    /** Renders as the SVG `y` **attribute**, distinct from the CSS `y` transform. */
+    attrY?: MotionStyleValue
+    /** Renders as the SVG `scale` **attribute**, distinct from the CSS `scale` transform. */
+    attrScale?: MotionStyleValue
     /** CSS classes */
     class?: string
     /** Enable FLIP layout animations; string values select the upstream projection animation type. */
