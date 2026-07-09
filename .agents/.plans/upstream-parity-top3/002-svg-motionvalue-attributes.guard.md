@@ -447,3 +447,54 @@ for them.
   doc comment at `spec.ts:33-36`, and missing `@example` JSDoc on `attrY`/`attrScale`.
 
 ---
+
+## Checkpoint 2026-07-09 — `guard parity 2 final` (re-run) — PASS
+
+- **Verdict**: **PASS**. Supersedes the same-day NO-PASS; both blockers closed.
+- **Snapshot**: `1f593e2`. Tree clean at gate time — nothing to snapshot.
+- **Drift** `9557778..HEAD` on in-scope source → only `svg.ts` + `types.ts`, both the
+  fix itself. **Scope audit** `3b16d0a...1f593e2` → every file in the in-scope list.
+- **Done criteria, all re-run**: check 0 errors; unit **752/752** (+7); full e2e
+  **317 passed / 2 skipped (pre-existing) / 0 failed**; docs check 0 errors; trunk clean;
+  demo linked; README DONE; tag-casing non-vacuous (verified at the prior gate).
+
+### Blocker 1 closed — verified by reverting the fix
+
+`isSVGMotionValueAttribute` resolves path-props → `attr`-prefix → **imported**
+`camelCaseAttributes` → local allowlist. Order is load-bearing: `pathLength` is in
+`camelCaseAttributes`, so the path rejection must come first; pinned at
+`svg.spec.ts:528` and passing. No vendored copy (`baseFrequency` appears once, in JSDoc).
+`dx`/`dy`/`radius` added explicitly, with a unit case asserting they are _absent_ from
+the upstream set so nobody later assumes the import covers them.
+
+Worktree revert (lookup + 3 keys removed) → both new e2e tests **failed**. Non-vacuous.
+
+### Blocker 2 closed — both tests verified non-vacuous
+
+SSR unit case now routes through `extractSVGMotionValueAttributes` (red at `22ed10e`,
+green after the fix). The clobber e2e marks `attr-rect`'s subtree with `data-highlight`
+and **asserts its own premise** via `closest('[data-highlight="true"]')` before checking
+`x`; reverting only the fixture makes it fail.
+
+### A relaxed assertion, examined and accepted
+
+The SSR check was widened to case-insensitive. Guard verified the justification instead
+of the diff: Svelte's SSR spread really does lowercase attribute names (live payload:
+`<feGaussianBlur … stddeviation="2">`), and Chromium's HTML parser maps it back
+(`getAttributeNames() -> [...,'stdDeviation']`, `stdDeviationX.baseVal === 2`). No inert
+attribute, no flash. The test still forbids `std-deviation=`, the casing nothing rescues.
+Property preserved, only the over-specific spelling dropped. Accepted.
+
+### Environment hazard (outside the plan)
+
+`playwright.config.ts:21` — `reuseExistingServer: !process.env.CI`. A stale preview
+server on 4198 made a _fix-reverted_ worktree run **pass**, serving the old fixed build.
+Caught with `lsof`; re-ran under `CI=1` to get the true failures. Local e2e can silently
+validate against a stale build. Worth hardening; not a 002 blocker.
+
+### Publication
+
+PR #441 was opened under the earlier PASS and is now re-validated at `1f593e2`.
+Guard stops. Merging is the operator's call.
+
+---

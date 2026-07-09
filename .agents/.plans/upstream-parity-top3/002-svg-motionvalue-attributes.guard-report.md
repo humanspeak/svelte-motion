@@ -1,220 +1,155 @@
 # Guard close-out report — 002 Bind MotionValues to SVG presentation attributes
 
-- **Verdict**: **NO-PASS** — retracted from PASS on 2026-07-09 after a CodeRabbit
-  review surfaced a functional bug that every done criterion missed. See
-  **Blocker 1**. PR #441 is open but **must not merge** until it is fixed.
-- **Date**: 2026-07-09 (revised same day)
+- **Verdict**: **PASS**
+- **Date**: 2026-07-09 (supersedes the same-day NO-PASS; both blockers closed)
 - **Plan**: `002-svg-motionvalue-attributes.md` (`Planned at` `9557778`, revision (b))
-- **Snapshot reviewed**: `54b7620` on `feat/svg-motion-value-attributes`
-  (source gates run at `8f51399`; `54b7620` is a docs-only follow-up — see Late edit)
+- **Snapshot reviewed**: `1f593e2` on `feat/svg-motion-value-attributes`
 - **Base**: `3b16d0a` (merge-base with `main`)
 - **PR**: <https://github.com/humanspeak/svelte-motion/pull/441> (open, unmerged)
 
-## Blocker 1 — filter-primitive attributes still render `[object Object]`
-
-**This is the exact failure `Why this matters` exists to eliminate, on the exact
-elements Plan 005 depends on.** Found by CodeRabbit, reproduced by guard.
-
-`SVG_ATTRIBUTE_PROPERTIES` (`svg.ts:34-69`) never claims the filter-primitive
-attributes, so a `MotionValue` on one falls through to `staticAttrs` and hits the raw
-spread. Reproduced against the real module:
-
-```text
-stdDeviation    claimed: false      numOctaves  claimed: false
-baseFrequency   claimed: false      dx / dy     claimed: false   (feOffset)
-radius          claimed: false      cx          claimed: true
-
-extractSVGMotionValueAttributes({ stdDeviation: motionValue(4) })
-  motionValueAttrs: []
-  staticAttrs     : ['stdDeviation']
-  rendered as     : stdDeviation="[object Object]"
-```
-
-Why every gate missed it: the demo drives `feDisplacementMap` through **`attrScale`**,
-which takes the `attr`-prefix branch and works. No demo, e2e, or unit case ever passes a
-MotionValue on a bare filter-primitive key through classification.
-
-The plan's own v2 ruling named these keys: _"the filter-primitive entries
-(`baseFrequency`, `numOctaves`, `stdDeviation`) are exactly what Plan 005's
-`feTurbulence` work will drive through this path."_ They reach the SSR casing gate
-correctly and were unit-tested there — but they never get **claimed**, so the gate is
-never called for them.
-
-**Fix**: extend the allowlist with the filter-primitive keys, or resolve against
-`camelCaseAttributes` before the final `isSVGMotionValueAttribute` check.
-
-## Blocker 2 — two tests create false confidence
-
-- `svg.spec.ts:547` ("should honor upstream camelCase entries beyond the ones we
-  hand-picked") passes `stdDeviation`/`baseFrequency`/`numOctaves` **directly** to
-  `computeSSRSVGAttrValues`, bypassing `extractSVGMotionValueAttributes`. It reads as
-  filter-primitive coverage and is why Blocker 1 hid in plain sight. Route the same keys
-  through classification.
-- `+page.svelte:297` binds the `highlight` class to the **`mv-circle`** `<svg>`, while
-  `attr-rect` lives in a separate `<svg>` at `:374-390`. The e2e
-  _"an unrelated re-render does not clobber attribute-routed values"_
-  (`spec.ts:~330-337`) toggles it and then asserts on `attr-rect` — so it can pass even
-  if the clobbering bug returns. Move the class onto the `attr-rect` subtree or a shared
-  ancestor.
-
-Non-blocking nits from the same review: `role="toolbar"` missing on the demo's
-`aria-label`led `div`; docs snippets aren't copy-paste self-contained; an SSR doc comment
-at `spec.ts:33-36` describes output that `computeSSRSVGAttrValues` doesn't produce;
-`attrY`/`attrScale` lack the JSDoc `@example` that `attrX` has (repo convention requires
-`@param`/`@returns`/`@example` on `src/lib/utils/*.ts`).
-
-## What guard got wrong
-
-Every done criterion passed and the work still fails `Why this matters` on filter
-primitives. That is "in-scope but beside the point," and the final gate did not catch
-it: guard verified the _channel split_ and the _casing gate_ exhaustively, and checked
-that `attrScale` reached `feDisplacementMap`, but never asked whether a bare
-filter-primitive key survives classification. The `attrScale` demo made the filter path
-look covered. A green suite is not coverage — this is the same lesson Findings 3 and 8
-taught, missed a third time.
-
 ## Does it deliver `Why this matters`?
 
-Partially — see Blocker 1. For shape geometry and the `attr*` family, yes. For filter
-primitives, no.
+Yes, now including the case that broke the previous gate. A `MotionValue` bound to any
+non-path SVG attribute reaches its element instead of stringifying as `[object Object]`
+— shape geometry (`cx`, `r`, `x2`), the `stroke-*` family, `attrX/attrY/attrScale`, and
+**filter primitives** (`stdDeviation`, `baseFrequency`, `numOctaves`, `dx`, `dy`,
+`radius`). Plan 005's `feTurbulence`/`feOffset` dependency is unblocked.
 
-The plan existed because a `MotionValue` passed as any non-path SVG attribute
-was spread raw and stringified as `[object Object]`, and because `attrX/attrY/attrScale`
-did not exist. The `attr*` family is closed, and the e2e asserts the absence of
-`[object Object]` in the hydrated DOM _and_ in the raw SSR payload (`request.get`, not a
-hydrated snapshot) — but only for the keys the demo exercises. Scroll-linked rings and
-chart lines work. Filter primitives work **only** through `attrScale`; a bare
-`stdDeviation={mv}` still stringifies (Blocker 1).
+Beyond the original plan, the work also fixed case-sensitive SVG **tag names**
+(revision (b)): `motion.fedisplacementmap` had been rendering an inert generic
+`SVGElement`, silently discarding every filter primitive created client-side.
 
-The work also exceeded the plan in one way that matters: it fixed SVG **tag-name**
-casing (revision (b), operator-approved). `motion.fedisplacementmap` was rendering an
-inert generic `SVGElement` — the filter primitive was silently ignored. That was never
-in the original plan and would have blocked Plan 005.
+## Done criteria — every one re-run at `1f593e2`, not trusted
 
-## Done criteria — every one re-run at `8f51399` (all green, and insufficient — see Blocker 1)
+| #   | Criterion                                       | Result                                                 |
+| --- | ----------------------------------------------- | ------------------------------------------------------ |
+| 1   | `pnpm check` exits 0                            | **PASS** — 0 errors, 32 pre-existing warnings          |
+| 2   | `pnpm test`; new `svg.spec.ts` cases pass       | **PASS** — 66 files, 752/752 (+7 since the NO-PASS)    |
+| 3   | `pnpm exec playwright test e2e/svg`             | **PASS** — full suite: 317 passed, 2 skipped, 0 failed |
+| 4   | Demo route exists and is linked                 | **PASS**                                               |
+| 5   | Docs page + nav entry; sitemap regenerated      | **PASS on intent** — see Plan defect 1                 |
+| 6   | No modified files outside the in-scope list     | **PASS** — scope audit `3b16d0a...1f593e2` exact       |
+| 7   | Batch README status row updated                 | **PASS** — 002 → DONE                                  |
+| 8   | Tag-casing asserted on a client-created element | **PASS** — verified non-vacuous at the prior gate      |
 
-| #   | Criterion                                           | Result                                                        |
-| --- | --------------------------------------------------- | ------------------------------------------------------------- |
-| 1   | `pnpm check` exits 0                                | **PASS** — 0 errors, 32 pre-existing warnings                 |
-| 2   | `pnpm test`; new `svg.spec.ts` cases pass           | **PASS** — 66 files, 745/745                                  |
-| 3   | `pnpm exec playwright test e2e/svg`                 | **PASS** — full suite re-run: 315 passed, 2 skipped, 0 failed |
-| 4   | Demo route exists and is linked                     | **PASS** — `src/routes/+page.svelte`                          |
-| 5   | Docs page exists w/ nav entry; sitemap regenerated  | **PASS on intent** — see Plan defect 1                        |
-| 6   | No modified files outside the in-scope list         | **PASS** — scope audit `3b16d0a...8f51399` exact              |
-| 7   | Batch README status row updated                     | **PASS** — 002 → DONE                                         |
-| 8   | Tag-casing asserted on a **client-created** element | **PASS** — independently verified non-vacuous (below)         |
+The 2 e2e skips are pre-existing (`e2e/drag/single-frame.spec.ts:20`,
+`e2e/motion/svg-path-length.test.ts:149`), in files this branch never touched.
+`pnpm --filter docs check` → 0 errors. `trunk check` → no issues, 17 files.
 
-The 2 e2e skips (`e2e/drag/single-frame.spec.ts:20` `test.fixme`,
-`e2e/motion/svg-path-length.test.ts:149` `test.skip`) are pre-existing — neither file
-is touched by this branch. `trunk check` → no issues across 16 modified files.
+## Blocker 1 — closed, and the fix was verified by reverting it
 
-## Finding 8 (prior checkpoint) — verified closed, by experiment
+`isSVGMotionValueAttribute` (`svg.ts:107-115`) now resolves in a deliberate order:
 
-The earlier checkpoint found the tag-casing tests vacuous: they asserted on the
-first-paint node, which the HTML parser creates and silently case-corrects, and which
-Svelte reuses when hydrating
-(`svelte/src/internal/client/dom/blocks/svelte-element.js:74`).
+1. path props rejected **first**;
+2. `attr`-prefixed props accepted;
+3. **motion-dom's exported `camelCaseAttributes`** consulted;
+4. local allowlist last, for the lowercase/kebab names upstream cannot express.
 
-The executor's fix adds `await remount(page)` before asserting. Guard did **not** take
-that on trust. In a throwaway `git worktree` (the real tree untouched), the fix was
-reverted (`this={renderTag}` → `this={tag}`, 4 sites) and the test re-run:
+Step 1 preceding step 3 is load-bearing — `pathLength` is a member of
+`camelCaseAttributes`, and claiming it would double-write `stroke-dasharray`. This is
+pinned by `svg.spec.ts:528` ("should still refuse pathLength even though
+camelCaseAttributes lists it"), which passes.
+
+No vendored copy: `grep baseFrequency src/lib/utils/svg.ts` → one hit, in a JSDoc line.
+The set itself is imported. `dx`/`dy`/`radius` are added explicitly because upstream's
+set holds camelCase names only — pinned by a unit case asserting they are **absent**
+from `camelCaseAttributes`, so nobody later assumes the import covers them.
+
+Guard did not take the fix on trust. In a throwaway worktree the `camelCaseAttributes`
+lookup and the three lowercase keys were removed, and both new e2e tests **failed**:
+
+```text
+2 failed
+  › binds a MotionValue to a filter primitive attribute
+  › server-renders a filter primitive attribute without stringifying it
+```
+
+## Blocker 2 — closed, both tests verified non-vacuous
+
+- The SSR unit case now routes filter keys through `extractSVGMotionValueAttributes`
+  rather than straight into `computeSSRSVGAttrValues`. It went red without the fix
+  (5 failures at `22ed10e`), green with it.
+- The clobber e2e now marks `attr-rect`'s subtree with `data-highlight` and changes the
+  motion element's own `class`, and **asserts its own premise**
+  (`rect.closest('[data-highlight="true"]')`) before checking `x`. Reverting only the
+  fixture makes it fail:
 
 ```text
 1 failed
-  › renders camelCase SVG tags with their case-sensitive spec spelling
-  expect(info.tagName).toBe('feDisplacementMap')   // spec.ts:186
+  › an unrelated re-render does not clobber attribute-routed values
 ```
 
-The test now genuinely detects the bug it was written for. Worktree removed; the real
-working tree was never modified.
+That self-assertion is the durable part: the old test lied because nothing forced the
+toggle to reach the element under test.
 
-## Findings 1-7 — all closed
+## A relaxed assertion, examined and accepted
 
-- **1, 2** (e2e polled `getAttribute('cx')` for style-routed keys; `Number("12.5px")`
-  → `NaN`): fixed. e2e reads `getComputedStyle(...).getPropertyValue(prop)` and
-  `parseFloat` throughout.
-- **3** (vacuous static-attribute assertion): fixed with the reasoning inlined —
-  `spec.ts:292-294` reads the style channel and comments _"Asserting the attribute is
-  unchanged would pass even if the subscription were broken."_
-- **4** (React camelCase allowlist would let `stroke-width={mv}` render
-  `[object Object]`): fixed; kebab spellings allowlisted and unit-tested.
-- **5** (SSR emitted inert `strokeDashoffset`): fixed via the upstream casing gate.
-- **6** (gate-vs-`attr`-prefix ordering — `attrX` must never emit `attr-x`): fixed at
-  `svg.ts:169-170`, `resolveSVGAttrKey` **then** the gate; unit-pinned at
-  `svg.spec.ts:542-544` (`not.toHaveProperty('attr-x')`).
-- **7** (v1 ruling mandated a read-back test with no caller): respected —
-  `grep -c getAttribute src/lib/utils/svg.ts` → **0**. No dead read-back path was built.
+The executor widened the SSR check from `/stdDeviation="[\d.]+"/` to a case-insensitive
+match, with a story attached. Weakening a test to fit observed output is the classic
+laundering move, so guard verified the story rather than the diff.
 
-## Upstream fidelity
+It holds. Svelte's SSR spread lowercases attribute names — the live payload really is
+`<feGaussianBlur ... stddeviation="2">` (tag name preserved, attribute lowercased). The
+HTML parser's SVG attribute-adjustment table maps it back, confirmed in Chromium:
 
-`camelCaseAttributes` and `camelToDash` are **imported from `motion-dom`**
-(`svg.ts:1-7`), not vendored, so upstream additions track on version bumps — exactly
-what the v2 ruling required. Installed `motion-dom` is `12.42.2`, the version the
-ruling was made against.
+```text
+setContent('<svg><filter><feGaussianBlur stddeviation="2">…')
+  getAttributeNames() -> ['data-testid','in','stdDeviation']
+  stdDeviationX.baseVal -> 2      (also baseFrequency, numOctaves)
+```
+
+So there is no inert attribute and no hydration flash. The test still forbids
+`std-deviation=`, the one casing no parser would rescue, and the client-DOM test asserts
+`stdDeviationX.baseVal` after a live update. The property under test survived; only the
+over-specific spelling was dropped. Accepted.
+
+## Findings 1-8 — all closed
+
+1, 2 (wrong DOM channel; `Number("12.5px")` → `NaN`), 3 (vacuous static assertion),
+4 (React camelCase allowlist), 5 (inert `strokeDashoffset` in SSR), 6 (`attrX` → `attr-x`
+ordering), 7 (read-back path with no caller — respected: `grep -c getAttribute
+src/lib/utils/svg.ts` → **0**), 8 (tag test asserted on a parser-created node).
 
 ## Plan defect 1 — criterion 5's sitemap command no longer exists (not executor drift)
 
-Step 4 says `Regenerate sitemap: pnpm --filter docs sitemap:manifest`. That script is
-gone: `docs/package.json` has no sitemap script, `docs/src/lib/sitemap-manifest.json`
-is gitignored (`docs/.gitignore:36`) and emitted by a docs vite plugin at build time.
+Step 4 says `pnpm --filter docs sitemap:manifest`; no such script exists.
+`docs/src/lib/sitemap-manifest.json` is gitignored (`docs/.gitignore:36`) and emitted by
+a docs vite plugin at build. Verified on intent: the manifest contains `svg-animation`
+(2 entries) and docs check is clean. Plan text is stale, the work is not. **Not amended**
+— nothing needed lowering to reach PASS.
 
-Guard verified the **intent** rather than the command: the on-disk manifest contains
-`svg-animation` (2 entries — docs + examples), and `pnpm --filter docs check` → 0
-errors. So the criterion's purpose is satisfied and no work is missing. The plan text
-is stale, not the work. Not amended — guard does not amend without operator agreement,
-and nothing here needed lowering to reach PASS.
+## Environment hazard worth fixing (outside this plan)
 
-**Recommended (optional) amendment**: reword criterion 5 to "docs page + nav entry
-exist; sitemap manifest regenerates on build and contains the new routes."
+`playwright.config.ts:21` sets `reuseExistingServer: !process.env.CI`. During this gate,
+a stale preview server left over on port 4198 caused a worktree run with the fix
+**reverted** to pass — it was silently served the old, fixed build. Guard caught it via
+`lsof` and re-ran with `CI=1`, which produced the correct failures. Any local e2e run can
+be validated against a stale build this way. The port pin (4198) prevents cross-repo
+collisions but not stale-server reuse.
 
-## Quality notes (unprompted improvements worth keeping)
+## Quality notes
 
-- The old `renders attrScale as the scale attribute` test asserted `scale` on a
-  `<rect>`, where the attribute is inert. Replaced with a `feDisplacementMap` case that
-  reads `scale.baseVal` through the SVG IDL, plus `expect(scale).not.toContain('px')`
-  pinning the unitless `numberValueTypes` entry.
-- The docs page teaches the two-channel split honestly, including the devtools trap:
-  _"the attribute you see in devtools is the initial server-rendered value"_
-  (`+page.svx:46-65`). A user debugging a "stuck" `cx` will find the answer.
-- `SVG_TAG_CASING` covers the full SVG 2 case-sensitive element set; the omitted names
-  (`altGlyph*`, `glyphRef`, `font-face-*`) are SVG 1.1 elements removed from SVG 2.
+- `attrScale`'s JSDoc example correctly uses `<feDisplacementMap>`, the only element
+  where the attribute means anything.
+- CodeRabbit's SSR doc-comment finding was a **false positive**, rejected with evidence:
+  SSR emits `x="10"` (raw stringify) while the client's `addAttrValue` applies the px
+  value type (`x="10px"`). The comment sits on the client reader and was already right.
+  The executor then improved it to document both.
 
 ## Process notes
 
-- The plan was twice amended by the **advisor** rather than guard (the "upstream
-  ruling"). Not tampering — the executor never touched the plan, and the operator
-  surfaced both. Recorded because v1 of that ruling shipped three defects that only
-  independent verification caught (a wrong entry count, an omitted public export, and
-  the `attr-x` ordering bug).
-- Two commits were made with `--no-verify` (`af90f5a`, `b932936`) under explicit
-  operator authorization, because the repo's pre-commit `svelte-check` cannot pass on a
-  knowingly-red test-first commit. Both messages record the reason.
-- `8f51399` was committed by the maintainer concurrently with guard's checkpoint rather
-  than by guard. No content impact — the snapshot is complete and the tree is clean.
-
-### Late edit — caught at the PR preflight
-
-After the gates passed at `8f51399`, the `pr` preflight found the tree dirty again: two
-docs files had been edited under guard. Publication was stopped rather than pushed over
-unreviewed work. The diff was read (`docs/.../demos/Default.svelte`,
-`docs/.../svg-animation/+page.svx`): cosmetic typography only — `<strong>`/`<code>` in
-the embedded demo were losing to `.prose-v2`'s rules on cascade order, plus dropping
-`isSmall`. `git diff --name-only -- src/ e2e/` → **0 files**, so no source gate was
-invalidated. Snapshotted as `54b7620`; the two gates it could affect were re-run:
-`pnpm --filter docs check` → 0 errors, `trunk check` → no issues (17 files).
+- Two commits used `--no-verify` (`af90f5a`, `b932936`, plus `22ed10e`) under explicit
+  operator authorization: the pre-commit `svelte-check` cannot pass on a knowingly-red
+  test-first commit. Each message records the reason.
+- The plan was twice amended by the advisor rather than guard. Not tampering — the
+  executor never edited the plan. Recorded because v1 of that "upstream ruling" shipped
+  three defects that only independent verification caught.
+- The CodeRabbit nits were fixed by a dispatched executor, not by guard, preserving the
+  separation that lets guard gate the result.
 
 ## Publication
 
-Work is committed at `54b7620` and published as
-[PR #441](https://github.com/humanspeak/svelte-motion/pull/441) (`Closes #435`).
-The PR was opened under the original PASS and is **now blocked** — do not merge until
-Blockers 1 and 2 are resolved.
-
-**What flips this back to PASS**: the allowlist claims filter-primitive attributes
-(`stdDeviation`, `baseFrequency`, `numOctaves`, `dx`, `dy`, `radius`, …) — ideally by
-resolving against `camelCaseAttributes` rather than another hand-maintained list — with
-a unit case driving them through `extractSVGMotionValueAttributes` (not just the SSR
-helper), an e2e asserting a MotionValue-driven `stdDeviation` never renders
-`[object Object]`, and the `highlight` toggle moved onto the `attr-rect` subtree.
-
-Guard stops here and does not fix the code. **Merging remains the operator's call.**
+Work is committed at `1f593e2` and published as
+[PR #441](https://github.com/humanspeak/svelte-motion/pull/441) (`Closes #435`), opened
+under the earlier PASS and now re-validated. Guard stops here.
+**Merging remains the operator's call.**
