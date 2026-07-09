@@ -189,3 +189,84 @@ Row 002 `TODO` → `IN PROGRESS`, with a pointer to this log.
 - `guard parity 2` again once implementation lands; `final` gates the PR.
 
 ---
+
+## Checkpoint 2026-07-09 — `guard parity 2` (casing ruling v2 + executor test fixes)
+
+- **Verdict**: ON TRACK (still pre-implementation)
+- **Snapshots**: `5c307fe` (plan ruling v2 + README), `b932936` (executor's test
+  fixes). `b932936` used `--no-verify` under the same standing operator
+  authorization as `af90f5a` — tests remain knowingly red (29 failed / 22 passed,
+  all on absent `svg.ts` helpers), so pre-commit `svelte-check` cannot pass.
+- **Plan `Planned at`**: `af90f5a`. Drift check → empty; `svg.ts` still untouched.
+
+### Plan amendment authored outside guard — process note, not a violation
+
+The "Upstream ruling on Step 2.3 SSR attribute casing" was written into the plan
+by the **advisor** (plan author), not by guard and not by the operator. Per
+separation of powers only guard amends the plan, with operator agreement. This is
+**not tampering**: the executor did not touch the plan (its edits are confined to
+`svg.spec.ts` + the e2e spec, both in scope), and the operator surfaced the ruling
+deliberately. Recorded because a ruling that arrives pre-approved invites adoption
+without re-derivation — and v1 of this one carried three defects.
+
+### Guard verification of the ruling (evidence, not assertion)
+
+Every v1 citation re-read against `~/Github/motion` and the **installed** package
+(`node_modules/motion-dom` → `12.42.2`, matching the version ruled against):
+
+| Claim                                                                          | Result                                                                                                                                              |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `renderSVG` gates writes on `!camelCaseAttributes.has(k) ? camelToDash(k) : k` | CONFIRMED — `render/svg/utils/render.ts:15-19`, verbatim                                                                                            |
+| `SVGVisualElement.readValueFromInstance` applies the same gate                 | CONFIRMED — `SVGVisualElement.ts:39-40`                                                                                                             |
+| `camelToDash` is a pure uppercase replacer; `'stroke-width'` untouched         | CONFIRMED — `render/dom/utils/camel-to-dash.ts:1-3`                                                                                                 |
+| `camelCaseAttributes` is a public export                                       | CONFIRMED — `index.ts:302`; **and reachable from the installed package** (`import { camelCaseAttributes } from 'motion-dom'` → `.size === 23`)      |
+| "26 entries"                                                                   | **FALSE — 23.** Source count and live `.size` agree                                                                                                 |
+| `camelToDash` also exported                                                    | **OMITTED by v1** — it is (`'camelToDash' in md` → true); without this the executor hand-rolls the dash-caser, the exact vendoring v1 warns against |
+
+### Finding 6 (guard-found, now normative point 4) — gate-vs-prefix ordering
+
+The gate MUST run **after** `resolveSVGAttrKey` strips the `attr` prefix. Probed
+against the real exports:
+
+```text
+attrX -> attr-x      attrScale -> attr-scale      viewBox -> viewBox
+strokeDashoffset -> stroke-dashoffset             stroke-width -> stroke-width
+```
+
+`attrX` is not in `camelCaseAttributes`, so gating first emits the inert attribute
+`attr-x` instead of `x`. Both orderings pass a naive `strokeDashoffset` test, so
+nothing in the prior test plan caught it. Now point 4 with its own unit case.
+
+### Finding 7 (guard-found, now conditional point 5) — v1 mandated dead code
+
+v1's read-path requirement ("add a unit case covering one read-back through the
+gate") had no caller to test: `svg.ts` is unimplemented, and the only
+SVG-attribute `getAttribute` calls in `src/lib/` are hardcoded kebab strings in
+the out-of-scope path pipeline (`_MotionContainer.svelte:882,888`). Requiring the
+test would have forced the executor to build a read-back path it does not need.
+Now conditional: the invariant binds _if_ a read-back is introduced, and the plan
+explicitly says not to build one to satisfy the point.
+
+All three corrections were adopted by the advisor into ruling **v2** (`5c307fe`),
+which credits the guard verification. Points 1-3 stand as confirmation.
+
+### Executor status — Findings 1-3 resolved
+
+- e2e now reads the bound channel: `getComputedStyle(...).getPropertyValue(prop)`
+  for `cx`/`r`/`stroke-*`, `getAttribute` for the `attr*` family; `parseFloat`
+  replaces `Number` throughout (`motion-value-attributes.spec.ts`).
+- First-paint assertion tightened `!Number.isNaN(...)` → `Number.isFinite(...)`.
+- Unit: kebab-case allowlist cases added; SSR emitter cases pin `viewBox`
+  unchanged and `strokeDashoffset` → `stroke-dashoffset`.
+- Finding 3's vacuous static assertion — **not yet re-verified**; check at `final`
+  that it reads the same channel the live element uses.
+
+### Next after v2
+
+- Executor implements Steps 1-5. `svg.ts` must import both `camelCaseAttributes`
+  and `camelToDash` from `motion-dom` (no vendored copies), and order
+  resolve-then-gate.
+- At `final`: confirm Finding 3's fix, the point-4 ordering unit case exists, and
+  that point 5 stayed unbuilt (no gratuitous read-back path).
+
+---
