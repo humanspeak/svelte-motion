@@ -148,6 +148,13 @@ Add a case: `computeSSRSVGAttrValues({ strokeWidth: motionValue(4) })` →
   does not otherwise pass guardrails.
 - **`Planned at`** re-stamped `634983b` → `af90f5a`, so the drift check
   re-baselines against the amended intent.
+- **Evidence preserved**: `assets/svg-channel-probe.mjs` — the Chromium probe
+  behind this amendment, runnable from the repo root. Re-run it if a Chromium
+  bump is suspected of moving a key between channels. Output on Chromium
+  149.0.7827.55: `cx cy r rx ry x y width height d` + `stroke-*`/`*Opacity`/
+  `stopColor`/`offset` style-routed; `points viewBox x1 y1 x2 y2` attr-routed;
+  `element.style.cx = '40px'` leaves `getAttribute('cx') === "5"`;
+  `Number("12.5px") === NaN`.
 
 ### What changed in the plan, and why
 
