@@ -246,6 +246,24 @@ describe('SVG_ATTRIBUTE_PROPERTIES', () => {
         }
     })
 
+    it('should include the kebab-case DOM spellings a Svelte template actually uses', () => {
+        // Upstream's list is React-facing (JSX camelCase). Svelte templates take the
+        // DOM spelling, so `<motion.circle stroke-width={mv}>` is the common form. A
+        // kebab key missing from the allowlist is never claimed out of the raw spread
+        // and renders stroke-width="[object Object]" — the bug this feature kills.
+        for (const key of [
+            'stop-color',
+            'stop-opacity',
+            'fill-opacity',
+            'stroke-opacity',
+            'stroke-width',
+            'stroke-dashoffset',
+            'stroke-dasharray'
+        ]) {
+            expect(SVG_ATTRIBUTE_PROPERTIES.has(key)).toBe(true)
+        }
+    })
+
     it('should not overlap with SVG_PATH_PROPERTIES (no double handling)', () => {
         const overlap = [...SVG_PATH_PROPERTIES].filter((key) => SVG_ATTRIBUTE_PROPERTIES.has(key))
         expect(overlap).toEqual([])
@@ -285,6 +303,12 @@ describe('isSVGMotionValueAttribute', () => {
         expect(isSVGMotionValueAttribute('cx')).toBe(true)
         expect(isSVGMotionValueAttribute('attrX')).toBe(true)
         expect(isSVGMotionValueAttribute('attrScale')).toBe(true)
+    })
+
+    it('should accept kebab-case DOM spellings', () => {
+        expect(isSVGMotionValueAttribute('stroke-width')).toBe(true)
+        expect(isSVGMotionValueAttribute('stroke-dashoffset')).toBe(true)
+        expect(isSVGMotionValueAttribute('stop-color')).toBe(true)
     })
 
     it('should reject path props so the path pipeline keeps ownership', () => {
@@ -335,6 +359,18 @@ describe('extractSVGMotionValueAttributes', () => {
         expect(motionValueAttrs).toEqual({})
         expect(staticAttrs).toEqual({ x: 10, y: 20 })
         expect(staticAttrs).not.toHaveProperty('attrX')
+    })
+
+    it('should claim kebab-case keys without renaming them', () => {
+        // `'stroke-width' in element.style` is true in Chromium, so svgEffect routes
+        // the kebab key correctly on its own once we hand it over.
+        const strokeWidth = motionValue(2)
+        const { motionValueAttrs, staticAttrs } = extractSVGMotionValueAttributes({
+            'stroke-width': strokeWidth
+        })
+
+        expect(motionValueAttrs).toEqual({ 'stroke-width': strokeWidth })
+        expect(staticAttrs).toEqual({})
     })
 
     it('should not claim path props even when they hold MotionValues', () => {
@@ -389,6 +425,31 @@ describe('computeSSRSVGAttrValues', () => {
         expect(
             computeSSRSVGAttrValues({ attrX: motionValue(3), attrScale: motionValue(2) })
         ).toEqual({ x: '3', scale: '2' })
+    })
+
+    it('should emit kebab-case DOM names for hyphenated camelCase keys', () => {
+        // SVG attribute names are case-sensitive: a `strokeDashoffset` attribute is
+        // inert, so the value would flash on hydration.
+        expect(
+            computeSSRSVGAttrValues({
+                strokeDashoffset: motionValue(4),
+                stopColor: motionValue('red')
+            })
+        ).toEqual({ 'stroke-dashoffset': '4', 'stop-color': 'red' })
+    })
+
+    it('should leave already-kebab keys untouched', () => {
+        expect(computeSSRSVGAttrValues({ 'stroke-width': motionValue(2) })).toEqual({
+            'stroke-width': '2'
+        })
+    })
+
+    it('should preserve camelCase attribute names that must stay camelCase', () => {
+        // motion-dom's `camelCaseAttributes` set: naive dash-casing would emit the
+        // inert `view-box`.
+        expect(computeSSRSVGAttrValues({ viewBox: motionValue('0 0 10 10') })).toEqual({
+            viewBox: '0 0 10 10'
+        })
     })
 
     it('should never emit [object Object]', () => {
