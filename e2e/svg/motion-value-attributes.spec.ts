@@ -1,4 +1,4 @@
-import { expect, type Locator, test } from '@playwright/test'
+import { expect, type Locator, type Page, test } from '@playwright/test'
 
 const ROUTE = '/tests/svg/motion-value-attributes'
 
@@ -152,31 +152,47 @@ test.describe('SVG MotionValue attributes', () => {
             .toBeGreaterThan(before)
     })
 
+    /**
+     * Forces the element to be created by `createElementNS` rather than by the HTML
+     * parser.
+     *
+     * The parser silently case-corrects `<fedisplacementmap>` when it reads SSR
+     * markup, and Svelte's hydration reuses that node instead of calling
+     * `create_element` (`svelte-element.js:74`). A `page.goto` + `tagName` check
+     * therefore passes even with the tag-casing fix reverted — verified by reverting
+     * it. Only the remount path runs `createElementNS` with the tag verbatim.
+     */
+    const remount = async (page: Page): Promise<void> => {
+        await page.getByTestId('toggle-mounted').uncheck()
+        await expect(page.getByTestId('displacement-map')).toHaveCount(0)
+        await page.getByTestId('toggle-mounted').check()
+        await expect(page.getByTestId('displacement-map')).toBeAttached()
+    }
+
     test('renders camelCase SVG tags with their case-sensitive spec spelling', async ({ page }) => {
         await page.goto(ROUTE)
+        await remount(page)
 
-        const map = page.getByTestId('displacement-map')
-        await expect(map).toBeAttached()
-
-        // SVG tag names are case-sensitive. A lowercase `fedisplacementmap` parses as
-        // an inert generic SVGElement, so the filter primitive is silently ignored.
-        const info = await map.evaluate((el) => ({
+        // SVG tag names are case-sensitive. A lowercase `fedisplacementmap` built by
+        // createElementNS is an inert generic SVGElement: the filter primitive is
+        // silently ignored and its `scale` does nothing.
+        const info = await page.getByTestId('displacement-map').evaluate((el) => ({
             tagName: el.tagName,
-            ctor: el.constructor.name
+            ctor: el.constructor.name,
+            // The IDL attribute only exists on the real interface.
+            hasScaleIDL: 'scale' in el
         }))
+
         expect(info.tagName).toBe('feDisplacementMap')
         expect(info.ctor).toBe('SVGFEDisplacementMapElement')
+        expect(info.hasScaleIDL).toBe(true)
     })
 
     test('renders attrScale as the scale attribute on feDisplacementMap', async ({ page }) => {
         await page.goto(ROUTE)
+        await remount(page)
 
-        // `scale` is inert on shape elements — it is only a real presentation
-        // attribute on <feDisplacementMap>. It is also a CSS transform property, so
-        // a plain `scale` prop would be style-routed; `attrScale` is the escape hatch.
         const map = page.getByTestId('displacement-map')
-        await expect(map).toBeAttached()
-
         const scale = await map.getAttribute('scale')
         expect(scale).not.toBeNull()
         expect(Number.isFinite(Number(scale))).toBe(true)
@@ -189,20 +205,58 @@ test.describe('SVG MotionValue attributes', () => {
         page
     }) => {
         await page.goto(ROUTE)
+        await remount(page)
 
         const map = page.getByTestId('displacement-map')
-        await expect(map).toBeAttached()
-        expect(await attrNumber(map, 'scale')).toBe(12)
+        await expect.poll(async () => attrNumber(map, 'scale'), { timeout: 5000 }).toBe(12)
 
         await page.getByTestId('slider-attr-scale').fill('30')
-
         await expect.poll(async () => attrNumber(map, 'scale'), { timeout: 5000 }).toBe(30)
 
-        // The live SVG DOM sees it, not just the attribute string.
+        // The live SVG DOM parses it, not just the attribute string. On an inert
+        // SVGElement `scale` is undefined, which is the point of the tag-casing fix.
         const baseVal = await map.evaluate(
             (el) => (el as SVGFEDisplacementMapElement).scale.baseVal
         )
         expect(baseVal).toBe(30)
+    })
+
+    test('writes attrScale to the rect but leaves the rect visually unchanged', async ({
+        page
+    }) => {
+        await page.goto(ROUTE)
+
+        const rect = page.getByTestId('attr-rect')
+        await expect(rect).toBeVisible()
+
+        const geometry = () =>
+            rect.evaluate((el) => {
+                const box = (el as SVGGraphicsElement).getBBox()
+                return {
+                    width: box.width,
+                    height: box.height,
+                    transform: getComputedStyle(el).transform,
+                    cssScale: getComputedStyle(el).scale
+                }
+            })
+
+        const before = await geometry()
+        expect(before.width).toBe(40)
+        expect(before.height).toBe(40)
+
+        await page.getByTestId('slider-attr-scale').fill('30')
+
+        // The attribute tracks the MotionValue...
+        await expect.poll(async () => attrNumber(rect, 'scale'), { timeout: 5000 }).toBe(30)
+
+        // ...but `scale` is not a presentation attribute on shape elements, so the
+        // rect ignores it. This is upstream's behavior: attrScale reaches the
+        // attribute channel and never becomes a CSS transform.
+        const after = await geometry()
+        expect(after.width).toBe(before.width)
+        expect(after.height).toBe(before.height)
+        expect(after.transform === 'none' || after.transform === '').toBe(true)
+        expect(after.cssScale === 'none' || after.cssScale === '').toBe(true)
     })
 
     test('updates x2 on the attribute channel for a non-attr-prefixed key', async ({ page }) => {

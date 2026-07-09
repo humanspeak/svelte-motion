@@ -66,6 +66,12 @@
         { testid: 'attr-rect', label: 'rect (attrX)', prop: 'x', channel: 'attribute' },
         { testid: 'attr-rect', label: 'rect (attrY)', prop: 'y', channel: 'attribute' },
         {
+            testid: 'attr-rect',
+            label: 'rect (attrScale) — inert',
+            prop: 'scale',
+            channel: 'attribute'
+        },
+        {
             testid: 'displacement-map',
             label: 'feDisplacementMap (attrScale)',
             prop: 'scale',
@@ -355,8 +361,16 @@
 
                 <div>
                     <h3 class="mb-1 text-sm font-medium text-slate-300">
-                        Attribute-routed: attrX / attrY (the rect's x / y attributes)
+                        Attribute-routed: attrX / attrY / attrScale
                     </h3>
+                    <p class="mb-2 max-w-md text-xs text-slate-400">
+                        <code class="rounded bg-slate-800 px-1">attrX</code> and
+                        <code class="rounded bg-slate-800 px-1">attrY</code> move the rect.
+                        <code class="rounded bg-slate-800 px-1">attrScale</code> writes a
+                        <code class="rounded bg-slate-800 px-1">scale</code> attribute that the rect
+                        <strong class="text-amber-300">deliberately ignores</strong> — watch it track
+                        in the table while the box never resizes.
+                    </p>
                     <svg
                         width="300"
                         height="120"
@@ -367,6 +381,7 @@
                             data-testid="attr-rect"
                             {attrX}
                             {attrY}
+                            {attrScale}
                             width={40}
                             height={40}
                             fill="#a78bfa"
