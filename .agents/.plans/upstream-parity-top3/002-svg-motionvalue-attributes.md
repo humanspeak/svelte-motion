@@ -7,10 +7,22 @@
 > in the `README.md` that sits alongside this plan file
 > (`.agents/.plans/upstream-parity-top3/README.md`).
 >
-> **Drift check (run first)**: `git diff --stat 634983b..HEAD -- src/lib/utils/svg.ts src/lib/html/_MotionContainer.svelte src/lib/types.ts`
+> **Drift check (run first)**: `git diff --stat af90f5a..HEAD -- src/lib/utils/svg.ts src/lib/html/_MotionContainer.svelte src/lib/types.ts`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> Revision 2026-07-09: `svgEffect` writes MotionValue-bound props to **two
+> different DOM channels**, and the original plan wrongly implied a single
+> "attribute" one. Verified in Chromium: `cx cy r rx ry x y width height d`
+> and `stroke-*`/`*Opacity`/`stopColor`/`offset` are CSS properties, so
+> `key in element.style` is true and they are written to `element.style` —
+> `getAttribute('cx')` never changes. Only `points viewBox x1 y1 x2 y2` and the
+> `attrX/attrY/attrScale` family are written with `setAttribute`. Amended:
+> (a) the allowlist must carry kebab-case DOM spellings, not just React's
+> camelCase; (b) Step 1's attr-key wording; (c) the test plan now asserts on the
+> **bound channel** rather than assuming an attribute. See
+> `002-svg-motionvalue-attributes.guard.md`, checkpoint 2026-07-09.
 
 ## Status
 
@@ -19,7 +31,8 @@
 - **Risk**: MED
 - **Depends on**: none
 - **Category**: direction (upstream parity)
-- **Planned at**: commit `634983b`, 2026-07-08
+- **Planned at**: commit `af90f5a`, 2026-07-09 (re-stamped on the 2026-07-09 revision;
+  originally `634983b`, 2026-07-08)
 - **Issue**: <https://github.com/humanspeak/svelte-motion/issues/435>
 
 ## Why this matters
@@ -133,19 +146,33 @@ do not change the port config).
 
 Add to `src/lib/utils/svg.ts`:
 
-- An `SVG_ATTRIBUTE_PROPERTIES` set covering the attribute-animatable keys
-  upstream supports: `cx, cy, r, rx, ry, x, y, x1, y1, x2, y2, width, height,
-points, d, offset, stopColor, stopOpacity, fillOpacity, strokeOpacity,
-strokeWidth, viewBox` (cross-check against upstream
-  `build-attrs.ts`/`camel-case-attrs.ts` and include what upstream includes —
-  cite the upstream file in the JSDoc).
+- An `SVG_ATTRIBUTE_PROPERTIES` set covering the animatable keys upstream
+  supports: `cx, cy, r, rx, ry, x, y, x1, y1, x2, y2, width, height, points, d,
+offset, stopColor, stopOpacity, fillOpacity, strokeOpacity, strokeWidth,
+viewBox` (cross-check against upstream `build-attrs.ts`/`camel-case-attrs.ts`
+  and include what upstream includes — cite the upstream file in the JSDoc).
+- **The set must also carry the kebab-case DOM spellings** of every hyphenated
+  key — `stop-color, stop-opacity, fill-opacity, stroke-opacity, stroke-width,
+stroke-dashoffset, stroke-dasharray` — or normalize the key before lookup.
+  Upstream's list is React-facing; Svelte templates take the DOM spelling, so a
+  user writes `<motion.circle stroke-width={mv}>`. A kebab key that misses the
+  allowlist is never claimed out of the raw spread and renders
+  `stroke-width="[object Object]"` — the exact bug this plan exists to kill.
+  (`'stroke-width' in element.style` is `true` in Chromium, so once claimed it
+  routes correctly through `svgEffect` with no extra work.)
 - A helper `extractSVGMotionValueAttributes(rest: Record<string, unknown>)` that
   returns `{ motionValueAttrs, staticAttrs }` — splitting entries whose value is
-  a MotionValue from plain values. Include `attrX`/`attrY`/`attrScale` mapping to
-  `x`/`y`/`scale` here.
+  a MotionValue from plain values.
+  **Do not rename `attrX`/`attrY`/`attrScale` on the MotionValue side.**
+  `svgEffect` does its own `/^attr([A-Z])/` conversion
+  (`effects/svg/index.ts:44-62`); pre-renaming `attrScale` → `scale` makes it hit
+  the `key in element.style` branch and become a CSS style instead of an
+  attribute. Expose the rename as a separate `resolveSVGAttrKey(key)` helper, and
+  apply it only to **static** attr-prefixed props and to SSR output.
 
 **Verify**: `pnpm test src/lib/utils/svg.spec.ts` → passes (write the unit tests
-in the same step: classification, attrX→x mapping, non-MotionValue passthrough).
+in the same step: classification incl. at least one kebab-case key, attrX→x
+mapping via `resolveSVGAttrKey`, non-MotionValue passthrough).
 
 ### Step 2: Subscribe MotionValue attributes in `_MotionContainer.svelte`
 
@@ -161,7 +188,12 @@ In the SVG branch of `_MotionContainer.svelte`:
    `styleEffect` in the file, ~line 617).
 3. SSR: render the MotionValue's **current** value as the initial attribute so
    server output is correct and hydration doesn't flash (`[object Object]` must
-   never appear in SSR output either).
+   never appear in SSR output either). Emit the **DOM attribute name**: strip the
+   `attr` prefix (`attrX` → `x`) and use the kebab spelling for hyphenated keys
+   (`strokeDashoffset` → `stroke-dashoffset`). SVG attribute names are
+   case-sensitive, so a `strokeDashoffset` attribute is inert and the value will
+   flash on hydration. Style-routed keys (`cx`, `r`, …) SSR correctly as
+   presentation attributes: the client-set CSS property simply wins afterwards.
 
 **Verify**: `pnpm check` → 0 errors. Then the demo (Step 3) shows a moving circle.
 
@@ -176,8 +208,19 @@ Create `src/routes/tests/svg/motion-value-attributes/+page.svelte`:
 Create `e2e/svg/motion-value-attributes.spec.ts` (model after an existing spec in
 `e2e/svg/`):
 
-- Assert the rendered attribute is numeric (never `[object Object]`).
-- Mutate the MotionValue (click the button), poll the attribute, assert it changes.
+- Assert the rendered value is numeric (never `[object Object]`).
+- Mutate the MotionValue (click the button), poll the **bound channel**, assert it
+  changes. Read the channel the key actually routes to — `getAttribute(key)` for
+  `points`/`viewBox`/`x1..y2`/`attrX`/`attrY`/`attrScale`, and
+  `getComputedStyle(el)[key]` for `cx`/`cy`/`r`/`x`/`y`/`width`/`height`/`d`/
+  `stroke-*`. Polling `getAttribute('cx')` will never observe a change and the
+  test will hang until timeout.
+- Computed styles carry units (`getComputedStyle(el).strokeDashoffset` → `"12.5px"`).
+  Parse with `parseFloat`, not `Number` — `Number("12.5px")` is `NaN`, and
+  `expect(NaN).not.toBe(NaN)` **fails** because `toBe` is `Object.is`.
+- The "plain numeric attribute stays static" assertion must read the same channel
+  the live element uses; asserting `getAttribute('cx')` is unchanged passes
+  vacuously even when the subscription is entirely broken.
 
 **Verify**: `pnpm exec playwright test e2e/svg` → all pass.
 
@@ -202,12 +245,19 @@ clean; `pnpm exec playwright test e2e/svg` → pass.
 
 ## Test plan
 
-- Unit (`src/lib/utils/svg.spec.ts`): attribute classification; attrX/attrY/attrScale
-  → x/y/scale mapping; MotionValue extraction leaves static attrs untouched;
-  path props are NOT claimed by the new set (no double handling).
+- Unit (`src/lib/utils/svg.spec.ts`): attribute classification, **including at least
+  one kebab-case key (`stroke-width`)**; attrX/attrY/attrScale → x/y/scale mapping
+  via `resolveSVGAttrKey`; MotionValue-side keys stay un-renamed so `svgEffect` can
+  route them; MotionValue extraction leaves static attrs untouched; path props are
+  NOT claimed by the new set (no double handling); SSR helper emits DOM attribute
+  names (`strokeDashoffset` → `stroke-dashoffset`, `attrX` → `x`).
 - e2e (`e2e/svg/motion-value-attributes.spec.ts`): no `[object Object]` in DOM;
-  attribute updates when MotionValue changes; SSR/hydration initial value correct
-  (load page with JS, assert first paint attribute is numeric).
+  **the bound channel updates** when the MotionValue changes (attribute for
+  attr-routed keys, computed style for style-routed keys — see Step 3);
+  SSR/hydration initial value correct (fetch the route server-side, assert the
+  payload carries a numeric value).
+- Cover at least one key from each channel, so a regression in either routing
+  branch is caught: `attrX` (attribute) and `cx` (style).
 - Pattern: model unit tests after existing `src/lib/utils/svg.spec.ts` blocks;
   e2e after `e2e/svg/` existing specs.
 

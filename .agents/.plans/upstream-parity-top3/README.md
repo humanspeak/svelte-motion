@@ -13,16 +13,20 @@ the A2 projection issues) — see "Superseded issues" below.
 
 ## Execution order & status
 
-| Plan | Title                                                                | Priority   | Effort | Depends on | Docs update?                                                               | Status |
-| ---- | -------------------------------------------------------------------- | ---------- | ------ | ---------- | -------------------------------------------------------------------------- | ------ |
-| 001  | Re-type `animate` for AugmentedMotionValue (kill all 10 casts)       | P1 — FIRST | S–M    | —          | Small — delete casts from docs examples; check prose                       | DONE   |
-| 002  | SVG MotionValue attribute binding + attrX/attrY/attrScale            | P1         | M      | —          | **YES — new docs page** (`docs/svg-animation`)                             | TODO   |
-| 003  | Full transform composition during drag (buildTransform semantics)    | P1         | M      | —          | No public docs; in-code decision comments must be updated                  | TODO   |
-| 004  | Motion-dom projection authoritative (page-space, retire legacy FLIP) | P1         | L      | 003        | **YES — update** `docs/layout-animations`; shared-layout page as follow-up | TODO   |
-| 005  | Apple Intelligence wavy glow border — flagship example (smooth)      | P2 — LAST  | M      | 002        | **YES — new example page** (`examples/ai-glow-border`) + nav + sitemap     | TODO   |
+| Plan | Title                                                                | Priority   | Effort | Depends on | Docs update?                                                               | Status      |
+| ---- | -------------------------------------------------------------------- | ---------- | ------ | ---------- | -------------------------------------------------------------------------- | ----------- |
+| 001  | Re-type `animate` for AugmentedMotionValue (kill all 10 casts)       | P1 — FIRST | S–M    | —          | Small — delete casts from docs examples; check prose                       | DONE        |
+| 002  | SVG MotionValue attribute binding + attrX/attrY/attrScale            | P1         | M      | —          | **YES — new docs page** (`docs/svg-animation`)                             | IN PROGRESS |
+| 003  | Full transform composition during drag (buildTransform semantics)    | P1         | M      | —          | No public docs; in-code decision comments must be updated                  | TODO        |
+| 004  | Motion-dom projection authoritative (page-space, retire legacy FLIP) | P1         | L      | 003        | **YES — update** `docs/layout-animations`; shared-layout page as follow-up | TODO        |
+| 005  | Apple Intelligence wavy glow border — flagship example (smooth)      | P2 — LAST  | M      | 002        | **YES — new example page** (`examples/ai-glow-border`) + nav + sitemap     | TODO        |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
+
+- 002: red tests landed; plan amended 2026-07-09 (two DOM channels — style vs
+  attribute; kebab-case allowlist). Executor to revise tests, then implement.
+  See `002-svg-motionvalue-attributes.guard.md`.
 
 ## Dependency notes
 

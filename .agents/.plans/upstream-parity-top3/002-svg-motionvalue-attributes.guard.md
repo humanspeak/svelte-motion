@@ -136,3 +136,49 @@ Add a case: `computeSSRSVGAttrValues({ strokeWidth: motionValue(4) })` →
   test files. Both are in the plan's in-scope list (`002-...md:105,110`).
 
 ---
+
+## Checkpoint 2026-07-09 — `guard parity 2` — PLAN AMENDED
+
+- **Verdict**: PLAN AMENDED (operator agreed)
+- **Snapshot**: `af90f5a` — the executor's red tests, committed with `--no-verify`
+  under **explicit operator authorization**, overriding the block recorded in the
+  previous entry. The pre-commit `svelte-check` fails by design on a test-first
+  commit (helpers not yet exported from `svg.ts`); the operator judged this a
+  known-red snapshot and directed guard to bypass. Recorded here because guard
+  does not otherwise pass guardrails.
+- **`Planned at`** re-stamped `634983b` → `af90f5a`, so the drift check
+  re-baselines against the amended intent.
+
+### What changed in the plan, and why
+
+Root cause of Findings 1-5: the plan spoke of a single "attribute" channel.
+`svgEffect` has two (`effects/svg/index.ts:44-52`), and the split is decided by
+`key in element.style` — which is `true` for `cx cy r rx ry x y width height d`
+and the `stroke-*`/`*Opacity`/`stopColor`/`offset` family in Chromium. Those are
+written to `element.style`; only `points viewBox x1..y2` and `attr*` reach
+`setAttribute`. Every wrong-channel test traced back to plan text.
+
+| Plan section       | Amendment                                                                                                                              | Finding         |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| Step 1 (allowlist) | Must carry kebab-case DOM spellings (`stroke-width`, …), not just React's camelCase                                                    | 4               |
+| Step 1 (attr keys) | Do **not** rename `attr*` on the MotionValue side; expose `resolveSVGAttrKey` for static + SSR use only                                | (was imprecise) |
+| Step 2.3 (SSR)     | Emit DOM attribute names; kebab for hyphenated keys, else the attribute is inert and flashes on hydration                              | 5               |
+| Step 3 (e2e)       | Poll the **bound channel**; `parseFloat` not `Number` on computed styles; static-attr assertion must not read a channel nothing writes | 1, 2, 3         |
+| Test plan          | Cover one key per channel (`attrX` + `cx`); require a kebab-case unit case                                                             | 1-5             |
+
+Findings 1-3 and 5 remain **executor-side test fixes** — the amendment tells the
+executor what to assert, it does not lower any bar. No done criterion was
+weakened, none removed. Finding 4 widened the _implementation_ requirement
+(more keys must be claimed), which is a strictly higher bar than the original.
+
+### Batch README
+
+Row 002 `TODO` → `IN PROGRESS`, with a pointer to this log.
+
+### Next after amendment
+
+- Executor picks up the revised plan: rewrite the three wrong-channel e2e tests,
+  add the kebab-case unit cases, then implement Steps 1-5.
+- `guard parity 2` again once implementation lands; `final` gates the PR.
+
+---
