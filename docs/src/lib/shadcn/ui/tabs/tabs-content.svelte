@@ -10,7 +10,12 @@
 -->
 <script lang="ts">
     import { cn, type WithoutChildrenOrChild } from '$lib/shadcn/utils'
-    import { MotionDiv } from '@humanspeak/svelte-motion'
+    import {
+        MotionDiv,
+        type MotionAnimate,
+        type MotionInitial,
+        type MotionTransition
+    } from '@humanspeak/svelte-motion'
     import { Tabs as TabsPrimitive, type TabsContentProps as BitsTabsContentProps } from 'bits-ui'
     import { getContext } from 'svelte'
     import { TABS_CTX, type TabsContext } from './tabs.svelte'
@@ -19,11 +24,11 @@
         /** Override animation for this panel. Inherits from Root when unset. */
         animated?: boolean
         /** Override the content entrance initial state. Default: `{ opacity: 0, y: 8 }` */
-        initial?: Record<string, unknown>
+        initial?: MotionInitial
         /** Override the content entrance animate target. Default: `{ opacity: 1, y: 0 }` */
-        animate?: Record<string, unknown>
+        animate?: MotionAnimate
         /** Override the content entrance transition. Default: `{ duration: 0.3, ease: 'easeOut' }` */
-        transition?: Record<string, unknown>
+        transition?: MotionTransition
     }
 
     let {
@@ -42,9 +47,9 @@
     const isActive = $derived(ctx.value() === value)
     const isAnimated = $derived(animated ?? ctx.animated)
 
-    const defaultInitial = { opacity: 0, y: 8 }
-    const defaultAnimate = { opacity: 1, y: 0 }
-    const defaultTransition = { duration: 0.3, ease: 'easeOut' }
+    const defaultInitial: MotionInitial = { opacity: 0, y: 8 }
+    const defaultAnimate: MotionAnimate = { opacity: 1, y: 0 }
+    const defaultTransition: MotionTransition = { duration: 0.3, ease: 'easeOut' }
 </script>
 
 {#if isAnimated}
