@@ -1,16 +1,84 @@
 # Guard close-out report — 002 Bind MotionValues to SVG presentation attributes
 
-- **Verdict**: **PASS**
-- **Date**: 2026-07-09
+- **Verdict**: **NO-PASS** — retracted from PASS on 2026-07-09 after a CodeRabbit
+  review surfaced a functional bug that every done criterion missed. See
+  **Blocker 1**. PR #441 is open but **must not merge** until it is fixed.
+- **Date**: 2026-07-09 (revised same day)
 - **Plan**: `002-svg-motionvalue-attributes.md` (`Planned at` `9557778`, revision (b))
 - **Snapshot reviewed**: `54b7620` on `feat/svg-motion-value-attributes`
   (source gates run at `8f51399`; `54b7620` is a docs-only follow-up — see Late edit)
 - **Base**: `3b16d0a` (merge-base with `main`)
 - **PR**: <https://github.com/humanspeak/svelte-motion/pull/441> (open, unmerged)
 
+## Blocker 1 — filter-primitive attributes still render `[object Object]`
+
+**This is the exact failure `Why this matters` exists to eliminate, on the exact
+elements Plan 005 depends on.** Found by CodeRabbit, reproduced by guard.
+
+`SVG_ATTRIBUTE_PROPERTIES` (`svg.ts:34-69`) never claims the filter-primitive
+attributes, so a `MotionValue` on one falls through to `staticAttrs` and hits the raw
+spread. Reproduced against the real module:
+
+```text
+stdDeviation    claimed: false      numOctaves  claimed: false
+baseFrequency   claimed: false      dx / dy     claimed: false   (feOffset)
+radius          claimed: false      cx          claimed: true
+
+extractSVGMotionValueAttributes({ stdDeviation: motionValue(4) })
+  motionValueAttrs: []
+  staticAttrs     : ['stdDeviation']
+  rendered as     : stdDeviation="[object Object]"
+```
+
+Why every gate missed it: the demo drives `feDisplacementMap` through **`attrScale`**,
+which takes the `attr`-prefix branch and works. No demo, e2e, or unit case ever passes a
+MotionValue on a bare filter-primitive key through classification.
+
+The plan's own v2 ruling named these keys: _"the filter-primitive entries
+(`baseFrequency`, `numOctaves`, `stdDeviation`) are exactly what Plan 005's
+`feTurbulence` work will drive through this path."_ They reach the SSR casing gate
+correctly and were unit-tested there — but they never get **claimed**, so the gate is
+never called for them.
+
+**Fix**: extend the allowlist with the filter-primitive keys, or resolve against
+`camelCaseAttributes` before the final `isSVGMotionValueAttribute` check.
+
+## Blocker 2 — two tests create false confidence
+
+- `svg.spec.ts:547` ("should honor upstream camelCase entries beyond the ones we
+  hand-picked") passes `stdDeviation`/`baseFrequency`/`numOctaves` **directly** to
+  `computeSSRSVGAttrValues`, bypassing `extractSVGMotionValueAttributes`. It reads as
+  filter-primitive coverage and is why Blocker 1 hid in plain sight. Route the same keys
+  through classification.
+- `+page.svelte:297` binds the `highlight` class to the **`mv-circle`** `<svg>`, while
+  `attr-rect` lives in a separate `<svg>` at `:374-390`. The e2e
+  _"an unrelated re-render does not clobber attribute-routed values"_
+  (`spec.ts:~330-337`) toggles it and then asserts on `attr-rect` — so it can pass even
+  if the clobbering bug returns. Move the class onto the `attr-rect` subtree or a shared
+  ancestor.
+
+Non-blocking nits from the same review: `role="toolbar"` missing on the demo's
+`aria-label`led `div`; docs snippets aren't copy-paste self-contained; an SSR doc comment
+at `spec.ts:33-36` describes output that `computeSSRSVGAttrValues` doesn't produce;
+`attrY`/`attrScale` lack the JSDoc `@example` that `attrX` has (repo convention requires
+`@param`/`@returns`/`@example` on `src/lib/utils/*.ts`).
+
+## What guard got wrong
+
+Every done criterion passed and the work still fails `Why this matters` on filter
+primitives. That is "in-scope but beside the point," and the final gate did not catch
+it: guard verified the _channel split_ and the _casing gate_ exhaustively, and checked
+that `attrScale` reached `feDisplacementMap`, but never asked whether a bare
+filter-primitive key survives classification. The `attrScale` demo made the filter path
+look covered. A green suite is not coverage — this is the same lesson Findings 3 and 8
+taught, missed a third time.
+
 ## Does it deliver `Why this matters`?
 
-Yes. The plan existed because a `MotionValue` passed as any non-path SVG attribute
+Partially — see Blocker 1. For shape geometry and the `attr*` family, yes. For filter
+primitives, no.
+
+The plan existed because a `MotionValue` passed as any non-path SVG attribute
 was spread raw and stringified as `[object Object]`, and because `attrX/attrY/attrScale`
 did not exist. Both are closed, and the e2e asserts the absence of `[object Object]`
 in the hydrated DOM _and_ in the raw SSR payload (`request.get`, not a hydrated
@@ -137,4 +205,14 @@ invalidated. Snapshotted as `54b7620`; the two gates it could affect were re-run
 
 Work is committed at `54b7620` and published as
 [PR #441](https://github.com/humanspeak/svelte-motion/pull/441) (`Closes #435`).
-Guard stops here. **Merging remains the operator's call.**
+The PR was opened under the original PASS and is **now blocked** — do not merge until
+Blockers 1 and 2 are resolved.
+
+**What flips this back to PASS**: the allowlist claims filter-primitive attributes
+(`stdDeviation`, `baseFrequency`, `numOctaves`, `dx`, `dy`, `radius`, …) — ideally by
+resolving against `camelCaseAttributes` rather than another hand-maintained list — with
+a unit case driving them through `extractSVGMotionValueAttributes` (not just the SSR
+helper), an e2e asserting a MotionValue-driven `stdDeviation` never renders
+`[object Object]`, and the `highlight` toggle moved onto the `attr-rect` subtree.
+
+Guard stops here and does not fix the code. **Merging remains the operator's call.**

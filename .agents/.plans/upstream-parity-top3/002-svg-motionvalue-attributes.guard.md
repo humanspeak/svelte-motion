@@ -400,3 +400,50 @@ remount. Now normative in the plan's test plan and a new done criterion.
   `54b7620`, and the two affected gates re-run before pushing.
 
 ---
+
+## Checkpoint 2026-07-09 — `guard parity 2 final` (revised) — NO-PASS, PASS RETRACTED
+
+- **Verdict**: **NO-PASS**. The prior PASS is retracted. PR #441 stays open but must
+  not merge.
+- **Trigger**: a CodeRabbit review (`--base main`, 17 files) reported 1 major +
+  4 minor + 3 trivial findings. Guard reproduced the major one and two minors.
+- **Blocker 1 (major, reproduced)**: `SVG_ATTRIBUTE_PROPERTIES` (`svg.ts:34-69`) never
+  claims filter-primitive attributes. Against the real module:
+
+```text
+extractSVGMotionValueAttributes({ stdDeviation: motionValue(4) })
+  motionValueAttrs: []          staticAttrs: ['stdDeviation']
+  rendered as: stdDeviation="[object Object]"
+isSVGMotionValueAttribute -> stdDeviation:false baseFrequency:false numOctaves:false
+                             dx:false dy:false radius:false   (cx:true)
+```
+
+This is the plan's headline failure mode, on precisely the elements Plan 005 needs.
+The v2 ruling had even named `baseFrequency`/`numOctaves`/`stdDeviation` as 005's
+path. They pass the SSR casing gate but are never _claimed_, so the gate never runs
+for them.
+
+- **Blocker 2 (two masking tests, both reproduced)**:
+    - `svg.spec.ts:547` feeds those keys straight to `computeSSRSVGAttrValues`, bypassing
+      classification — it looks like filter-primitive coverage and is why Blocker 1
+      survived the gate.
+    - `+page.svelte:297` binds `highlight` to the `mv-circle` `<svg>`; `attr-rect` is a
+      separate `<svg>` at `:374-390`. The "unrelated re-render does not clobber" e2e
+      toggles the former and asserts on the latter, so it passes even if the bug returns.
+
+- **Guard's own miss**: all 8 done criteria passed and the work still fails
+  `Why this matters` for filter primitives — textbook "in-scope but beside the point."
+  The `attrScale` → `feDisplacementMap` demo made the filter path look exercised; no
+  test ever pushed a bare filter-primitive key through classification. Third time this
+  plan produced a green check standing in for an unverified property (cf. Findings 3, 8).
+
+- **Flips to PASS when**: the allowlist claims filter-primitive attrs (preferably by
+  resolving against `camelCaseAttributes` instead of another hand-maintained list); a
+  unit case drives them through `extractSVGMotionValueAttributes`; an e2e asserts a
+  MotionValue-driven `stdDeviation` never renders `[object Object]`; the `highlight`
+  toggle moves onto the `attr-rect` subtree.
+
+- Non-blocking: missing `role="toolbar"`, non-self-contained docs snippets, a wrong SSR
+  doc comment at `spec.ts:33-36`, and missing `@example` JSDoc on `attrY`/`attrScale`.
+
+---
