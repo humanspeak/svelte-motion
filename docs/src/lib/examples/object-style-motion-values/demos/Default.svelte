@@ -5,8 +5,7 @@
         motion,
         useMotionTemplate,
         useMotionValue,
-        useTransform,
-        type RawMotionValue
+        useTransform
     } from '@humanspeak/svelte-motion'
 
     const progress = useMotionValue(0)
@@ -35,7 +34,7 @@
         const id = ++runId
         phase = 'routing'
         progress.jump(0)
-        const animation = animate(progress as unknown as RawMotionValue<number>, 1, {
+        const animation = animate(progress, 1, {
             duration: 0.95,
             ease: [0.22, 1, 0.36, 1]
         })
@@ -49,7 +48,7 @@
         stopActiveAnimation()
         const id = ++runId
         phase = 'routing'
-        const animation = animate(progress as unknown as RawMotionValue<number>, 0, {
+        const animation = animate(progress, 0, {
             duration: 0.95,
             ease: [0.22, 1, 0.36, 1]
         })

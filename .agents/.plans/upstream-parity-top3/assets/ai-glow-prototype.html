@@ -1,0 +1,549 @@
+<title>AI Glow — Wavy Border Prototype</title>
+<style>
+    :root {
+        --bg: #08080d;
+        --surface: #101016;
+        --surface-2: #16161e;
+        --text: #f5f5fa;
+        --muted: #86868e;
+        --hairline: rgba(255, 255, 255, 0.08);
+        /* Apple Intelligence canonical palette */
+        --p1: #bc82f3;
+        --p2: #f5b9ea;
+        --p3: #8d9fff;
+        --p4: #aa6eee;
+        --p5: #ff6778;
+        --p6: #ffba71;
+        --p7: #c686ff;
+        /* animated channels (JS-driven) */
+        --angle: 0deg;
+        --b1x: 20%;
+        --b1y: 0%;
+        --b2x: 80%;
+        --b2y: 100%;
+        --b3x: 0%;
+        --b3y: 60%;
+        --b4x: 100%;
+        --b4y: 30%;
+        --glow-opacity: 0.9;
+    }
+
+    * {
+        margin: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+            -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 48px 24px 64px;
+    }
+
+    .page {
+        width: 100%;
+        max-width: 720px;
+        display: flex;
+        flex-direction: column;
+        gap: 40px;
+    }
+
+    header h1 {
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        text-wrap: balance;
+    }
+    header p {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.5;
+        max-width: 60ch;
+    }
+
+    /* ---------- Stage ---------- */
+
+    .stage {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 72px 24px;
+    }
+
+    .frame {
+        position: relative;
+        width: min(520px, 100%);
+        transform: scale(var(--pulse, 1));
+    }
+
+    /* The glow layers sit behind the card, slightly oversized so the
+     glow lives OUTSIDE the card edge. All three share the same
+     animated background; they differ in band width, blur and blend. */
+    .glow {
+        position: absolute;
+        inset: -14px;
+        border-radius: 36px;
+        pointer-events: none;
+        background:
+            radial-gradient(140px 110px at var(--b1x) var(--b1y), var(--p5), transparent 70%),
+            radial-gradient(160px 130px at var(--b2x) var(--b2y), var(--p3), transparent 70%),
+            radial-gradient(130px 100px at var(--b3x) var(--b3y), var(--p6), transparent 70%),
+            radial-gradient(150px 120px at var(--b4x) var(--b4y), var(--p2), transparent 70%),
+            conic-gradient(
+                from var(--angle),
+                var(--p1),
+                var(--p3),
+                var(--p4),
+                var(--p5),
+                var(--p6),
+                var(--p2),
+                var(--p7),
+                var(--p1)
+            );
+        padding: var(--band, 16px);
+        -webkit-mask:
+            linear-gradient(#000 0 0) content-box,
+            linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+        mask:
+            linear-gradient(#000 0 0) content-box,
+            linear-gradient(#000 0 0);
+        mask-composite: exclude;
+        opacity: var(--glow-opacity);
+    }
+
+    /* Displaced first (wavy contour), softened after. */
+    .glow.base {
+        --band: 14px;
+        filter: url(#aiWave) blur(9px) saturate(1.3);
+    }
+    .glow.bloom {
+        --band: 22px;
+        inset: -20px;
+        filter: url(#aiWave) blur(26px) saturate(1.2);
+        mix-blend-mode: screen;
+        opacity: calc(var(--glow-opacity) * 0.75);
+    }
+    .glow.haze {
+        --band: 30px;
+        inset: -30px;
+        filter: blur(58px);
+        mix-blend-mode: screen;
+        opacity: calc(var(--glow-opacity) * 0.4);
+    }
+
+    .card {
+        position: relative;
+        background: linear-gradient(180deg, var(--surface-2), var(--surface));
+        border-radius: 28px;
+        padding: 22px 24px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        cursor: pointer;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+    /* crisp inner hairline — the detail that sells the depth */
+    .card::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 28px;
+        border: 1px solid var(--hairline);
+        pointer-events: none;
+    }
+
+    .spark {
+        flex: none;
+        width: 26px;
+        height: 26px;
+    }
+    .spark path {
+        fill: url(#sparkGrad);
+    }
+
+    .prompt {
+        flex: 1;
+        min-width: 0;
+    }
+    .prompt .ask {
+        font-size: 17px;
+        font-weight: 500;
+        color: var(--text);
+    }
+    .prompt .hint {
+        margin-top: 3px;
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .state {
+        flex: none;
+        font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        border: 1px solid var(--hairline);
+        border-radius: 999px;
+        padding: 5px 10px;
+        transition:
+            color 0.4s,
+            border-color 0.4s;
+    }
+    .frame.active .state {
+        color: var(--p2);
+        border-color: rgba(245, 185, 234, 0.35);
+    }
+
+    /* ---------- Controls ---------- */
+
+    .controls {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px 24px;
+        background: var(--surface);
+        border: 1px solid var(--hairline);
+        border-radius: 16px;
+        padding: 18px 20px;
+    }
+    @media (max-width: 560px) {
+        .controls {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .control label {
+        display: flex;
+        justify-content: space-between;
+        font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 8px;
+    }
+    .control output {
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+    }
+    .control input[type='range'] {
+        width: 100%;
+        accent-color: var(--p4);
+    }
+    .control input[type='range']:focus-visible {
+        outline: 2px solid var(--p4);
+        outline-offset: 3px;
+    }
+
+    /* ---------- Recipe ---------- */
+
+    .recipe h2 {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 14px;
+    }
+    .recipe ol {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 0;
+    }
+    .recipe li {
+        display: grid;
+        grid-template-columns: 118px 1fr;
+        gap: 16px;
+        font-size: 13.5px;
+        line-height: 1.55;
+        color: var(--muted);
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--hairline);
+    }
+    .recipe li:last-child {
+        border-bottom: none;
+    }
+    .recipe .tag {
+        font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        color: var(--text);
+        padding-top: 2px;
+    }
+    .recipe strong {
+        color: var(--text);
+        font-weight: 500;
+    }
+
+    footer {
+        font-size: 12.5px;
+        color: var(--muted);
+        line-height: 1.6;
+        max-width: 62ch;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .frame {
+            transform: none !important;
+        }
+    }
+</style>
+
+<!-- The wavy-edge filter: two identical noise fields scrolled in opposite
+     directions and merged, so the displacement flows continuously with no
+     visible loop seam. JS animates the feOffset dy values. -->
+<svg width="0" height="0" aria-hidden="true" style="position: absolute">
+    <defs>
+        <linearGradient id="sparkGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#f5b9ea" />
+            <stop offset="0.5" stop-color="#aa6eee" />
+            <stop offset="1" stop-color="#8d9fff" />
+        </linearGradient>
+        <filter
+            id="aiWave"
+            x="-25%"
+            y="-25%"
+            width="150%"
+            height="150%"
+            color-interpolation-filters="sRGB"
+        >
+            <feTurbulence
+                type="fractalNoise"
+                baseFrequency="0.011 0.014"
+                numOctaves="2"
+                seed="7"
+                result="n1"
+            />
+            <feOffset in="n1" dx="0" dy="0" result="o1" />
+            <feTurbulence
+                type="fractalNoise"
+                baseFrequency="0.011 0.014"
+                numOctaves="2"
+                seed="7"
+                result="n2"
+            />
+            <feOffset in="n2" dx="0" dy="0" result="o2" />
+            <feComposite in="o1" in2="o2" operator="over" result="mergedNoise" />
+            <feDisplacementMap
+                in="SourceGraphic"
+                in2="mergedNoise"
+                scale="26"
+                xChannelSelector="R"
+                yChannelSelector="G"
+            />
+        </filter>
+    </defs>
+</svg>
+
+<div class="page">
+    <header>
+        <h1>The wavy Apple Intelligence border</h1>
+        <p>
+            Five layers, one filter, and independent orbital motion per hot-spot. Click the card (or
+            press its button) to enter the listening state.
+        </p>
+    </header>
+
+    <div class="stage">
+        <div class="frame" id="frame">
+            <div class="glow haze" aria-hidden="true"></div>
+            <div class="glow bloom" aria-hidden="true"></div>
+            <div class="glow base" aria-hidden="true"></div>
+            <button
+                class="card"
+                id="card"
+                aria-pressed="false"
+                style="border: none; width: 100%; text-align: left; font: inherit; color: inherit"
+            >
+                <svg class="spark" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                        d="M12 1.5c.6 4.9 4 8.4 9 9-5 .6-8.4 4.1-9 9-.6-4.9-4-8.4-9-9 5-.6 8.4-4.1 9-9Z"
+                    />
+                </svg>
+                <span class="prompt">
+                    <span class="ask">Ask anything…</span>
+                    <span class="hint">Summarize, rewrite, or generate — on-device</span>
+                </span>
+                <span class="state" id="stateChip">idle</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="control">
+            <label for="speed">Flow <output id="speedOut">1.0×</output></label>
+            <input type="range" id="speed" min="0.2" max="3" step="0.1" value="1" />
+        </div>
+        <div class="control">
+            <label for="wave">Waviness <output id="waveOut">26</output></label>
+            <input type="range" id="wave" min="0" max="80" step="1" value="26" />
+        </div>
+        <div class="control">
+            <label for="bloom">Bloom <output id="bloomOut">0.90</output></label>
+            <input type="range" id="bloom" min="0.2" max="1.4" step="0.05" value="0.9" />
+        </div>
+    </div>
+
+    <section class="recipe">
+        <h2>Layer recipe (for the svelte-motion port)</h2>
+        <ol>
+            <li>
+                <span class="tag">color field</span
+                ><span
+                    >A <strong>conic-gradient</strong> of the 7-color palette, angle drifting slowly
+                    — the base color travel.</span
+                >
+            </li>
+            <li>
+                <span class="tag">hot spots</span
+                ><span
+                    >Four <strong>radial-gradient blobs</strong> orbiting the perimeter at
+                    incommensurate speeds with sinusoidal wobble — this is what makes brightness
+                    travel unevenly, like the real thing. Each channel maps to a MotionValue.</span
+                >
+            </li>
+            <li>
+                <span class="tag">wavy edge</span
+                ><span
+                    >An SVG <strong>feTurbulence → feDisplacementMap</strong> pair; two
+                    counter-scrolling copies of the same noise merged so the flow never visibly
+                    loops. Displace <em>first</em>, blur <em>after</em> — the order is what keeps
+                    the waves soft instead of crunchy.</span
+                >
+            </li>
+            <li>
+                <span class="tag">bloom</span
+                ><span
+                    >Three copies of the ring at increasing band width and blur (9 / 26 / 58px),
+                    upper two on <strong>mix-blend-mode: screen</strong>.</span
+                >
+            </li>
+            <li>
+                <span class="tag">hairline</span
+                ><span
+                    >A crisp 1px inner border on the card — the contrast between sharp edge and soft
+                    glow sells the depth.</span
+                >
+            </li>
+        </ol>
+    </section>
+
+    <footer>
+        Prototype for a svelte-motion docs example. Every animated channel here (gradient angle,
+        four blob positions, noise scroll, displacement scale, pulse) is a single number per frame —
+        a one-to-one mapping onto MotionValues and springs.
+    </footer>
+</div>
+
+<script>
+    const frame = document.getElementById('frame')
+    const card = document.getElementById('card')
+    const stateChip = document.getElementById('stateChip')
+    const offsets = document.querySelectorAll('#aiWave feOffset')
+    const dispMap = document.querySelector('#aiWave feDisplacementMap')
+    const root = document.documentElement
+
+    const controls = {
+        speed: document.getElementById('speed'),
+        wave: document.getElementById('wave'),
+        bloom: document.getElementById('bloom')
+    }
+    const outs = {
+        speed: document.getElementById('speedOut'),
+        wave: document.getElementById('waveOut'),
+        bloom: document.getElementById('bloomOut')
+    }
+
+    let active = false
+    card.addEventListener('click', () => {
+        active = !active
+        frame.classList.toggle('active', active)
+        card.setAttribute('aria-pressed', String(active))
+        stateChip.textContent = active ? 'listening' : 'idle'
+    })
+
+    // Blobs orbit an ellipse at incommensurate angular speeds so the
+    // combined pattern never repeats. Radius and size wobble add the
+    // organic, non-mechanical quality.
+    const blobs = [
+        { v: 'b1', speed: 0.21, phase: 0.0, wob: 0.13 },
+        { v: 'b2', speed: -0.16, phase: 2.1, wob: 0.19 },
+        { v: 'b3', speed: 0.12, phase: 4.2, wob: 0.11 },
+        { v: 'b4', speed: -0.26, phase: 1.3, wob: 0.16 }
+    ]
+
+    // simple critically-damped-ish lerp toward targets (spring stand-in;
+    // becomes a real motion spring in the port)
+    const lerp = (a, b, t) => a + (b - a) * t
+
+    let angle = 0
+    let noiseScroll = 0
+    let dispScale = 26
+    let glowOpacity = 0.9
+    let pulse = 1
+    let last = performance.now()
+
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    function tick(now) {
+        const dt = Math.min((now - last) / 1000, 0.05)
+        last = now
+        const t = now / 1000
+
+        const userSpeed = parseFloat(controls.speed.value)
+        const userWave = parseFloat(controls.wave.value)
+        const userBloom = parseFloat(controls.bloom.value)
+
+        // active state boosts everything together, smoothly
+        const boost = active ? 1 : 0
+        const speed = userSpeed * lerp(1, 1.9, boost)
+        dispScale = lerp(dispScale, userWave * lerp(1, 1.55, boost), 1 - Math.exp(-6 * dt))
+        glowOpacity = lerp(glowOpacity, userBloom * lerp(1, 1.25, boost), 1 - Math.exp(-6 * dt))
+        pulse = lerp(pulse, active ? 1.008 + Math.sin(t * 2.2) * 0.006 : 1, 1 - Math.exp(-4 * dt))
+
+        angle += dt * speed * 24 // deg/s
+        root.style.setProperty('--angle', angle.toFixed(2) + 'deg')
+
+        for (const b of blobs) {
+            const a = b.phase + t * b.speed * speed * 2 * Math.PI * 0.15
+            const wobble = Math.sin(t * (0.7 + b.wob) + b.phase) * 12
+            const x = 50 + Math.cos(a) * (52 + wobble)
+            const y = 50 + Math.sin(a) * (58 + wobble)
+            root.style.setProperty('--' + b.v + 'x', x.toFixed(1) + '%')
+            root.style.setProperty('--' + b.v + 'y', y.toFixed(1) + '%')
+        }
+
+        noiseScroll += dt * speed * 38
+        if (offsets.length >= 2) {
+            offsets[0].setAttribute('dy', (noiseScroll % 900).toFixed(1))
+            offsets[1].setAttribute('dy', (-(noiseScroll % 900)).toFixed(1))
+        }
+        dispMap.setAttribute('scale', dispScale.toFixed(1))
+        root.style.setProperty('--glow-opacity', glowOpacity.toFixed(3))
+        frame.style.setProperty('--pulse', pulse.toFixed(4))
+
+        outs.speed.textContent = userSpeed.toFixed(1) + '×'
+        outs.wave.textContent = Math.round(userWave)
+        outs.bloom.textContent = userBloom.toFixed(2)
+
+        if (!reduceMotion) requestAnimationFrame(tick)
+    }
+
+    if (reduceMotion) {
+        // one static, pleasant frame
+        tick(performance.now())
+    } else {
+        requestAnimationFrame(tick)
+    }
+</script>

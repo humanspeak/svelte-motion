@@ -1,10 +1,5 @@
 <script lang="ts">
-    import {
-        animate,
-        useMotionValue,
-        useTransform,
-        type RawMotionValue
-    } from '@humanspeak/svelte-motion'
+    import { animate, useMotionValue, useTransform } from '@humanspeak/svelte-motion'
     import { interpolate } from 'flubber'
     import { onDestroy, untrack } from 'svelte'
 
@@ -65,7 +60,7 @@
         animation?.stop()
 
         animation = untrack(() =>
-            animate(progress as unknown as RawMotionValue<number>, target, {
+            animate(progress, target, {
                 duration: 1.0,
                 ease: 'easeInOut',
                 onComplete: () => {

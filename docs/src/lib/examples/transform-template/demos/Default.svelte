@@ -1,6 +1,12 @@
 <script lang="ts">
     import { ArrowLeft, ArrowRight, RotateCcw, Sparkles } from '@lucide/svelte'
-    import { animate, motion, useMotionValue, useTransform } from '@humanspeak/svelte-motion'
+    import {
+        animate,
+        motion,
+        useMotionValue,
+        useTransform,
+        type TransformTemplate
+    } from '@humanspeak/svelte-motion'
 
     const travel = 700
     const progress = useMotionValue(0)
@@ -10,7 +16,7 @@
     let activeAnimation: { stop: () => void } | null = null
     let runId = 0
 
-    const transformTemplate = ({ x }: Record<string, string | number>, generated: string) => {
+    const transformTemplate: TransformTemplate = ({ x }, generated) => {
         const distance = Number.parseFloat(String(x ?? 0)) || 0
         const amount = Math.max(0, Math.min(distance / travel, 1))
         const lift = Math.sin(amount * Math.PI) * -70

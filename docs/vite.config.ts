@@ -9,13 +9,13 @@ import {
     socialCardsPlugin
 } from '@humanspeak/docs-kit/vite'
 import { svelteMotionOptimize } from '@humanspeak/svelte-motion/vite'
-import { paraglideVitePlugin } from '@inlang/paraglide-js'
 import { sveltekit } from '@sveltejs/kit/vite'
 import tailwindcss from '@tailwindcss/vite'
 // import path from 'node:path'
 // import { fileURLToPath } from 'node:url'
-import { defineConfig } from 'vite'
+import { playwright } from '@vitest/browser-playwright'
 import devtoolsJson from 'vite-plugin-devtools-json'
+import { defineConfig } from 'vitest/config'
 import { competitors } from './src/lib/compare-data'
 import { docsConfig } from './src/lib/docs-config'
 
@@ -140,13 +140,7 @@ export default defineConfig({
         svelteMotionOptimize(),
         tailwindcss(),
         sveltekit(),
-        devtoolsJson(),
-        paraglideVitePlugin({
-            project: './project.inlang',
-            outdir: './src/lib/paraglide',
-            strategy: ['url', 'cookie', 'baseLocale'],
-            disableAsyncLocalStorage: true
-        })
+        devtoolsJson()
     ],
     // docs-kit and the workspace package ship .svelte/source entrypoints that
     // should be compiled by vite-plugin-svelte. If Vite pre-bundles docs-kit
@@ -172,7 +166,6 @@ export default defineConfig({
             output: {
                 manualChunks(id) {
                     if (id.includes('@humanspeak/svelte-motion')) return 'svelte-motion'
-                    if (id.includes('paraglide')) return 'paraglide'
                     if (id.includes('mode-watcher')) return 'mode-watcher'
                 }
             }
@@ -193,7 +186,7 @@ export default defineConfig({
                     environment: 'browser',
                     browser: {
                         enabled: true,
-                        provider: 'playwright',
+                        provider: playwright(),
                         instances: [{ browser: 'chromium' }]
                     },
                     include: ['src/**/*.svelte.{test,spec}.{js,ts}'],

@@ -66,9 +66,6 @@ const config = {
         paths: {
             relative: false
         },
-        alias: {
-            $msgs: 'src/lib/paraglide/messages.js'
-        },
         csp: {
             mode: 'hash',
             directives: {

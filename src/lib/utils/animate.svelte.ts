@@ -3,6 +3,7 @@ import type {
     AnimationPlaybackControlsWithThen,
     AnimationScope as MotionAnimationScope
 } from 'motion-dom'
+import type { SvelteMotionAnimate } from './animateValue.js'
 
 /**
  * The scope returned by {@link useAnimate}. Functions as a Svelte 5
@@ -70,7 +71,7 @@ export type AnimationScope<T extends Element = HTMLElement> = ((node: T) => () =
  */
 export const useAnimate = <T extends Element = HTMLElement>(): [
     AnimationScope<T>,
-    ReturnType<typeof createScopedAnimate>
+    SvelteMotionAnimate
 ] => {
     const scope = ((node: T) => {
         scope.current = node
@@ -87,7 +88,7 @@ export const useAnimate = <T extends Element = HTMLElement>(): [
 
     const animate = createScopedAnimate({
         scope: scope as MotionAnimationScope<T>
-    })
+    }) as SvelteMotionAnimate
 
     return [scope, animate]
 }

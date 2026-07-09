@@ -23,7 +23,6 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 # Paraglide
-src/lib/paraglide
 
 # Generated registry data
 src/lib/generated

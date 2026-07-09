@@ -4,7 +4,7 @@
 
     const controls = useAnimationControls()
 
-    let state = $state<'ready' | 'launching' | 'verified' | 'paused'>('ready')
+    let status = $state<'ready' | 'launching' | 'verified' | 'paused'>('ready')
     let count = $state(0)
     let sequenceId = 0
 
@@ -35,10 +35,10 @@
     const run = async () => {
         const id = ++sequenceId
         count += 1
-        state = 'launching'
+        status = 'launching'
         await controls.start('launch', { duration: 0.55, ease: 'easeOut' })
         if (id !== sequenceId) return
-        state = 'verified'
+        status = 'verified'
         await controls.start('verified', { duration: 0.42, ease: 'easeInOut' })
         if (id !== sequenceId) return
     }
@@ -46,19 +46,19 @@
     const setVerified = () => {
         sequenceId += 1
         count += 1
-        state = 'verified'
+        status = 'verified'
         controls.set('verified')
     }
 
     const stop = () => {
         sequenceId += 1
-        state = 'paused'
+        status = 'paused'
         controls.stop()
     }
 
     const reset = () => {
         sequenceId += 1
-        state = 'ready'
+        status = 'ready'
         controls.set('ready')
     }
 </script>
@@ -89,7 +89,7 @@
             <div class="ship-top">
                 <Wand2 size={24} />
                 <motion.div class="status" initial="ready" animate={controls} variants={text}>
-                    {state}
+                    {status}
                 </motion.div>
             </div>
             <motion.div class="beam" initial="ready" animate={controls} variants={beam} />

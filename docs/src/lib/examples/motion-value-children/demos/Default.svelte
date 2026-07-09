@@ -1,11 +1,5 @@
 <script lang="ts">
-    import {
-        animate,
-        motion,
-        useMotionValue,
-        useTransform,
-        type RawMotionValue
-    } from '@humanspeak/svelte-motion'
+    import { animate, motion, useMotionValue, useTransform } from '@humanspeak/svelte-motion'
 
     const progress = useMotionValue(0)
     const packets = useTransform(progress, [0, 1], [1840, 24680])
@@ -24,7 +18,7 @@
     async function sweep() {
         run += 1
         progress.jump(0)
-        await animate(progress as unknown as RawMotionValue<number>, 1, {
+        await animate(progress, 1, {
             duration: 0.9,
             ease: 'easeOut'
         })

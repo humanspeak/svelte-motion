@@ -1,12 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte'
-    import {
-        animate,
-        motion,
-        useAnimationControls,
-        useMotionValue,
-        type RawMotionValue
-    } from '$lib'
+    import { animate, motion, useAnimationControls, useMotionValue } from '$lib'
     import type { TransformTemplate } from 'motion-dom'
 
     const liveX = useMotionValue(24)
@@ -75,7 +69,7 @@
     async function toggleLive() {
         liveAnimation?.stop()
         moved = !moved
-        const animation = animate(liveX as unknown as RawMotionValue<number>, moved ? 180 : 24, {
+        const animation = animate(liveX, moved ? 180 : 24, {
             duration: 0.35,
             ease: [0.22, 1, 0.36, 1]
         })

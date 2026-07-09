@@ -1,17 +1,7 @@
-import { paraglideMiddleware } from '$lib/paraglide/server'
 import { getPostHogClient } from '$lib/server/posthog'
 import { createSecurityHeadersHandle } from '@humanspeak/docs-kit/hooks'
 import type { Handle, HandleServerError } from '@sveltejs/kit'
 import { sequence } from '@sveltejs/kit/hooks'
-
-const handleParaglide: Handle = ({ event, resolve }) =>
-    paraglideMiddleware(event.request, ({ request, locale }) => {
-        event.request = request
-
-        return resolve(event, {
-            transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', locale)
-        })
-    })
 
 const handlePostHogProxy: Handle = async ({ event, resolve }) => {
     const { pathname } = event.url
@@ -50,11 +40,7 @@ const handlePostHogProxy: Handle = async ({ event, resolve }) => {
     return resolve(event)
 }
 
-export const handle: Handle = sequence(
-    handlePostHogProxy,
-    handleParaglide,
-    createSecurityHeadersHandle()
-)
+export const handle: Handle = sequence(handlePostHogProxy, createSecurityHeadersHandle())
 
 export const handleError: HandleServerError = async ({ error, status, message }) => {
     const posthog = getPostHogClient()

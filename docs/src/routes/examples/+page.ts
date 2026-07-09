@@ -28,6 +28,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Animated Tabs',
         description: 'Interactive animated tabs animation example using Svelte Motion.'
     },
+    'ai-gradient-card': {
+        title: 'AI Gradient Card',
+        description:
+            'A rotating conic-gradient border with a masked glow spill, built with useMotionValue, animate, and useMotionTemplate.'
+    },
     'characters-remaining': {
         title: 'Characters Remaining',
         description: 'Interactive characters remaining animation example using Svelte Motion.'

@@ -4,8 +4,7 @@
         createDragControls,
         motion,
         useAnimate,
-        useMotionValue,
-        type RawMotionValue
+        useMotionValue
     } from '@humanspeak/svelte-motion'
 
     let open = $state(false)
@@ -30,7 +29,7 @@
         // …and slide the sheet down by its own height, continuing from wherever
         // the drag left it.
         const height = sheetRef?.offsetHeight ?? 0
-        await animate(y as unknown as RawMotionValue<number>, height, {
+        await animate(y, height, {
             duration: 0.3,
             ease: 'easeInOut'
         })

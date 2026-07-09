@@ -1,12 +1,5 @@
 <script lang="ts">
-    import {
-        animate,
-        motion,
-        useMotionTemplate,
-        useMotionValue,
-        useTransform,
-        type RawMotionValue
-    } from '$lib'
+    import { animate, motion, useMotionTemplate, useMotionValue, useTransform } from '$lib'
 
     const x = useMotionValue(24)
     const opacity = useTransform(x, [24, 168], [0.58, 1])
@@ -19,7 +12,7 @@
 
     async function toggle() {
         moved = !moved
-        await animate(x as unknown as RawMotionValue<number>, moved ? 168 : 24, {
+        await animate(x, moved ? 168 : 24, {
             duration: 0.45,
             ease: [0.22, 1, 0.36, 1]
         })

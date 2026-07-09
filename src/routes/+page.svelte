@@ -112,6 +112,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/ai-gradient-card') + searchParams}
+                    >
+                        useMotionTemplate (AI gradient card / animated conic)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/will-change') + searchParams}
                     >
                         useWillChange
