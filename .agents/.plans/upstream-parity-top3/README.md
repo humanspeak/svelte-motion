@@ -34,6 +34,10 @@ REJECTED (with one-line rationale)
   point 4 — the gate runs AFTER `attr`-prefix resolution (`attrX` must never
   emit `attr-x`), with its own unit case. Point 5 (read-path symmetry) is
   conditional-only; no read-back path exists in scope.
+- 002: revision (b) 2026-07-09, operator-approved scope addition — SVG tag-name
+  casing (`fedisplacementmap` → `feDisplacementMap`). Steps 1-3 implemented and
+  green; Step 4 (docs page) outstanding. 005 depends on this: `feTurbulence` /
+  `feDisplacementMap` were unreachable before the fix.
 
 ## Dependency notes
 

@@ -23,6 +23,20 @@
 > camelCase; (b) Step 1's attr-key wording; (c) the test plan now asserts on the
 > **bound channel** rather than assuming an attribute. See
 > `002-svg-motionvalue-attributes.guard.md`, checkpoint 2026-07-09.
+>
+> Revision 2026-07-09 (b): **scope addition, operator-approved.** SVG tag names
+> are case-sensitive, but our generated components hardcode a lowercase `tag`
+> (`Fedisplacementmap.svelte:11` → `tag="fedisplacementmap"`), so
+> `createElementNS(NS, 'fedisplacementmap')` returns an inert generic
+> `SVGElement` instead of `SVGFEDisplacementMapElement` and the filter primitive
+> is silently ignored. Now in scope: `SVG_TAG_CASING` + `resolveSVGTagName` in
+> `svg.ts`, applied in `_MotionContainer.svelte` before render. **The fix is only
+> observable on client-created elements** — the HTML parser auto-corrects SVG tag
+> case, and Svelte reuses the parsed node when hydrating
+> (`svelte/src/internal/client/dom/blocks/svelte-element.js:74`:
+> `element = hydrating ? element : create_element(next_tag, ns)`), so a
+> first-paint assertion after `page.goto` passes with **or without** the fix.
+> See the tag-casing test-plan bullet.
 
 ## Status
 
@@ -31,8 +45,8 @@
 - **Risk**: MED
 - **Depends on**: none
 - **Category**: direction (upstream parity)
-- **Planned at**: commit `af90f5a`, 2026-07-09 (re-stamped on the 2026-07-09 revision;
-  originally `634983b`, 2026-07-08)
+- **Planned at**: commit `9557778`, 2026-07-09 (re-stamped on revision (b);
+  previously `af90f5a`; originally `634983b`, 2026-07-08)
 - **Issue**: <https://github.com/humanspeak/svelte-motion/issues/435>
 
 ## Why this matters
@@ -114,7 +128,8 @@ do not change the port config).
 
 **In scope** (the only files you should modify/create):
 
-- `src/lib/utils/svg.ts` (attribute classification helpers)
+- `src/lib/utils/svg.ts` (attribute classification helpers; plus `SVG_TAG_CASING` /
+  `resolveSVGTagName` per revision (b))
 - `src/lib/utils/svg.spec.ts` (extend)
 - `src/lib/html/_MotionContainer.svelte` (MotionValue-attr subscription + attrX/Y/Scale mapping)
 - `src/lib/types.ts` (attrX/attrY/attrScale types)
@@ -258,6 +273,15 @@ clean; `pnpm exec playwright test e2e/svg` → pass.
   payload carries a numeric value).
 - Cover at least one key from each channel, so a regression in either routing
   branch is caught: `attrX` (attribute) and `cx` (style).
+- **Tag casing (revision (b)) must be asserted on a client-created element.** The
+  HTML parser silently corrects `<fedisplacementmap>` → `feDisplacementMap` when
+  it parses SSR markup, and Svelte's hydration reuses that node rather than
+  calling `create_element` (`svelte-element.js:74`). So `page.goto(ROUTE)` then
+  reading `tagName` passes **even with the fix reverted** — a vacuous assertion.
+  Assert after the `{#if mounted}` toggle round-trips (the remount path calls
+  `createElementNS` with the tag verbatim), checking `tagName`,
+  `constructor.name === 'SVGFEDisplacementMapElement'`, and that the `scale` IDL
+  property exists — a lowercase tag yields a generic `SVGElement` with no `scale`.
 - Pattern: model unit tests after existing `src/lib/utils/svg.spec.ts` blocks;
   e2e after `e2e/svg/` existing specs.
 
@@ -270,6 +294,8 @@ clean; `pnpm exec playwright test e2e/svg` → pass.
 - [ ] Docs page exists with nav entry; sitemap regenerated
 - [ ] `git status` shows no modified files outside the in-scope list
 - [ ] Batch README status row updated
+- [ ] Tag-casing assertion runs against a **client-created** element (post-remount),
+      not first paint — see the test plan
 
 ## STOP conditions
 

@@ -270,3 +270,109 @@ which credits the guard verification. Points 1-3 stand as confirmation.
   that point 5 stayed unbuilt (no gratuitous read-back path).
 
 ---
+
+## Checkpoint 2026-07-09 — `guard parity 2` — PLAN AMENDED (tag-casing scope addition)
+
+- **Verdict**: PLAN AMENDED + ON TRACK, with one coverage finding (Finding 8).
+- **Snapshot**: `9557778` — implementation, demo, e2e, tag-casing fix.
+- **`Planned at`** re-stamped `af90f5a` → `9557778` (revision (b)).
+- **Done criteria re-run at the snapshot** (not trusted, re-executed):
+
+| Criterion                                  | Result                                      |
+| ------------------------------------------ | ------------------------------------------- |
+| `pnpm check`                               | PASS — 0 errors, 32 pre-existing warnings   |
+| `pnpm test src/lib/utils/svg.spec.ts`      | PASS — 63/63                                |
+| `pnpm exec playwright test e2e/svg`        | PASS — 22/22                                |
+| Demo linked from `src/routes/+page.svelte` | PASS — 1 reference                          |
+| Docs page + nav + sitemap                  | **NOT DONE** — Step 4 not started           |
+| No files outside in-scope list             | PASS — scope audit `af90f5a..9557778` exact |
+| README row updated                         | PASS                                        |
+
+### Scope addition — operator-approved, recorded as revision (b)
+
+Operator approved fixing SVG tag-name casing inside 002. Cause confirmed at
+source: `src/lib/html/Fedisplacementmap.svelte:11` hardcodes
+`tag="fedisplacementmap"` (all 32 case-sensitive SVG elements have the same
+generated shape). All touched files were already in 002's in-scope list, so this
+is a behavior addition, not an out-of-scope edit. Plan Scope, Test plan, and
+Done criteria amended to match; `SVG_TAG_CASING` + `resolveSVGTagName` named.
+
+### Evidence — the bug and the fix are both real
+
+Probed in Chromium (`createElementNS`, SVG namespace):
+
+```text
+createElementNS(NS,'fedisplacementmap') -> SVGElement                  ('scale' in el === false)
+createElementNS(NS,'feDisplacementMap') -> SVGFEDisplacementMapElement ('scale' in el === true)
+```
+
+Live probe against the preview build at `9557778`, marking the first-paint node
+with an expando and toggling `{#if mounted}`:
+
+```text
+first paint (parser-created): {"tag":"feDisplacementMap","ctor":"SVGFEDisplacementMapElement","scale":"12"}
+after remount (JS-created)  : {"tag":"feDisplacementMap","ctor":"SVGFEDisplacementMapElement","freshNode":true,"baseVal":12}
+```
+
+`freshNode: true` proves the remounted element is created by `createElementNS`,
+not reused — and it comes back correctly cased with a working `scale.baseVal`.
+The fix works on the path that matters.
+
+### Finding 8 — the three new tag-casing e2e tests are vacuous as written
+
+`e2e/svg/motion-value-attributes.spec.ts:155,168,190` all begin `page.goto(ROUTE)`
+and assert on the **first-paint** node. That node is created by the HTML parser,
+not by Svelte, and the parser silently corrects SVG tag case:
+
+```text
+div.innerHTML = '<svg><filter><fedisplacementmap/></filter></svg>'
+  -> children[0].constructor.name === 'SVGFEDisplacementMapElement'   (tagName 'feDisplacementMap')
+```
+
+Svelte then **reuses** that node rather than re-creating it —
+`node_modules/svelte/src/internal/client/dom/blocks/svelte-element.js:74`:
+
+```js
+element = hydrating ? /** @type {Element} */ (element) : create_element(next_tag, ns)
+```
+
+The route has no `ssr`/`csr` override, so `page.goto` always SSRs then hydrates.
+Consequence: **revert `renderTag` and all three tests still pass.** They assert
+the HTML parser's behavior, not ours. This is the same class as Finding 3 — a
+green check standing in for a problem it cannot detect.
+
+The fix costs almost nothing: `displacement-map` already lives inside the
+`{#if mounted}` block (`+page.svelte:282-430`), and the existing
+`reattaches cleanly after unmount and remount` test (`spec.ts:289`) already
+round-trips that toggle — it just asserts on `mv-circle` only. Assert `tagName`,
+`constructor.name`, and the presence of the `scale` IDL property **after** the
+remount. Now normative in the plan's test plan and a new done criterion.
+
+### On track at this checkpoint
+
+- `resolveSVGTagName` unit cases (`svg.spec.ts`) cover filter primitives, `clipPath`,
+  `linearGradient`, `radialGradient`, `textPath`, `foreignObject`,
+  `animateTransform`, plus lowercase/non-SVG/already-cased passthrough. Real
+  assertions. All 32 map keys are reachable through `isSVGTag` (verified — no key
+  is stranded behind a false `isSVGTag` check).
+- `SVG_TAG_CASING` covers the full SVG 2 case-sensitive element set; the omitted
+  names (`altGlyph*`, `glyphRef`, `color-profile`, `font-face-*`) are SVG 1.1
+  elements removed from SVG 2. Correct omission.
+- Replacing the old `renders attrScale as the scale attribute` test (which asserted
+  `scale` on a `<rect>`, where it is inert) with a `feDisplacementMap` case is a
+  genuine improvement: `scale` is only a real presentation attribute there, and the
+  test now checks `scale.baseVal` through the SVG IDL, not just the string.
+- The `expect(scale).not.toContain('px')` assertion correctly pins the unitless
+  `numberValueTypes` entry — a real regression guard against style-routing.
+- SSR payload verified live: `curl` of the route returns `feDisplacementMap` ×5,
+  so the server emitter is correct independently of the parser's forgiveness.
+- Scope audit `af90f5a..9557778` — all 7 touched files in the plan's in-scope list.
+
+### Next after revision (b)
+
+- Executor: fold the tag assertion into the remount test (Finding 8), then Step 4
+  (docs page + nav + sitemap), the only remaining unmet done criterion.
+- At `final`: re-check Finding 3, Finding 8, the point-4 ordering unit case, and
+  that point 5 stayed unbuilt.
+
+---
