@@ -2,7 +2,7 @@
 
 **Recommendation: PASS** — every done criterion re-run and reproduced green, both prior findings closed at the source rather than papered over, and the diff delivers the plan's intent with real latent bugs fixed.
 **Reviewed at** `21d869c` · 2026-07-09 18:40 · **Plan planned at** `21d869c` (re-stamped; the original `8491bd3` was on a sibling branch)
-**Integrated** — **no PR opened.** Not a preflight failure: the plan's own Git workflow says "Do NOT push or open a PR unless instructed. The maintainer signs off live before any PR (house rule)." Guard does not force past that guardrail. The work is committed on `chore/typed-lint-recommended` and awaits the operator's explicit go.
+**Integrated** — PR <https://github.com/humanspeak/svelte-motion/pull/442> opened via the `pr` skill for the reviewed snapshot (`21d869c`, plus guard's own artifacts). The plan's Git workflow requires maintainer sign-off before any PR; the operator gave that instruction explicitly on 2026-07-09, and guard opened the PR then, not before. **Merging remains the operator's call — guard never merges.**
 
 ## Done criteria
 
