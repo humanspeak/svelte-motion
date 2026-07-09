@@ -65,7 +65,12 @@ export const SVG_ATTRIBUTE_PROPERTIES = new Set([
     'stroke-opacity',
     'stroke-width',
     'stroke-dashoffset',
-    'stroke-dasharray'
+    'stroke-dasharray',
+    // Filter-primitive attributes whose names are all-lowercase, so
+    // `camelCaseAttributes` cannot cover them (see isSVGMotionValueAttribute).
+    'dx',
+    'dy',
+    'radius'
 ])
 
 /**
@@ -94,19 +99,33 @@ export const resolveSVGAttrKey = (key: string): string => {
 /**
  * Determines whether a prop may be bound to a `MotionValue` on an SVG element.
  *
- * Path props return false: they are owned by the path-drawing pipeline, and
- * claiming them here would double-write `stroke-dasharray`.
+ * Resolution order matters:
+ *
+ * 1. Path props return false first. They are owned by the path-drawing pipeline,
+ *    and claiming them here would double-write `stroke-dasharray`. This check
+ *    must precede the `camelCaseAttributes` lookup, because `pathLength` is a
+ *    member of that set.
+ * 2. `attr`-prefixed props are always bindable.
+ * 3. motion-dom's exported `camelCaseAttributes` covers every camelCase SVG
+ *    attribute name upstream knows about — `stdDeviation`, `baseFrequency`,
+ *    `numOctaves`, `gradientTransform`, `textLength`, and so on. Deferring to it
+ *    means upstream additions track automatically on version bumps, rather than
+ *    silently falling through to the raw spread as `[object Object]`.
+ * 4. Finally the local allowlist, which carries the lowercase and kebab-case
+ *    names `camelCaseAttributes` cannot express (`cx`, `dx`, `stroke-width`, …).
  *
  * @param {string} key The prop name to test.
  * @returns {boolean} True when the prop is attribute-bindable.
  * @example
  * isSVGMotionValueAttribute('cx') // true
+ * isSVGMotionValueAttribute('stdDeviation') // true — via camelCaseAttributes
  * isSVGMotionValueAttribute('attrScale') // true
- * isSVGMotionValueAttribute('pathLength') // false
+ * isSVGMotionValueAttribute('pathLength') // false — the path pipeline owns it
  */
 export const isSVGMotionValueAttribute = (key: string): boolean => {
     if (SVG_PATH_PROPERTIES.has(key)) return false
     if (/^attr[A-Z]/.test(key)) return true
+    if (camelCaseAttributes.has(key)) return true
     return SVG_ATTRIBUTE_PROPERTIES.has(key)
 }
 

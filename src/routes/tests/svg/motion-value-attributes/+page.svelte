@@ -29,6 +29,13 @@
      */
     const attrScale = motionValue(12)
 
+    /**
+     * Attribute-routed camelCase filter key. `stdDeviation` is claimed via
+     * motion-dom's `camelCaseAttributes`, not our hand-written allowlist — an
+     * unclaimed key would render `stdDeviation="[object Object]"`.
+     */
+    const blurStdDeviation = motionValue(2)
+
     // Buttons (used by e2e) and sliders both drive the same MotionValues.
     const bumpCx = () => cx.set(Math.min(280, cx.get() + 20))
     const bumpStrokeWidth = () => strokeWidth.set(Math.min(20, strokeWidth.get() + 3))
@@ -42,6 +49,7 @@
         attrX.set(10)
         attrY.set(10)
         attrScale.set(12)
+        blurStdDeviation.set(2)
     }
 
     /** Toggle: unmount/remount the whole SVG to exercise subscription teardown. */
@@ -75,6 +83,12 @@
             testid: 'displacement-map',
             label: 'feDisplacementMap (attrScale)',
             prop: 'scale',
+            channel: 'attribute'
+        },
+        {
+            testid: 'blur-filter',
+            label: 'feGaussianBlur',
+            prop: 'stdDeviation',
             channel: 'attribute'
         }
     ]
@@ -236,6 +250,20 @@
                 />
             </label>
 
+            <label class="block text-sm">
+                <span class="mb-1 block">stdDeviation → feGaussianBlur</span>
+                <input
+                    data-testid="slider-blur"
+                    type="range"
+                    min="0"
+                    max="10"
+                    step="1"
+                    value="2"
+                    class="w-full"
+                    oninput={(e) => blurStdDeviation.set(Number(e.currentTarget.value))}
+                />
+            </label>
+
             <div class="grid grid-cols-2 gap-2 pt-2">
                 <button
                     data-testid="bump-cx"
@@ -294,7 +322,7 @@
                         width="300"
                         height="120"
                         viewBox="0 0 300 120"
-                        class="rounded bg-slate-800 {highlight ? 'ring-2 ring-yellow-400' : ''}"
+                        class="rounded bg-slate-800"
                     >
                         <motion.circle data-testid="mv-circle" {cx} cy={45} r={12} fill="#60a5fa" />
                         <motion.circle
@@ -371,11 +399,19 @@
                         <strong class="text-amber-300">deliberately ignores</strong> — watch it track
                         in the table while the box never resizes.
                     </p>
+                    <!--
+                      The highlight toggle must re-render the element under test.
+                      `data-highlight` marks the subtree for the e2e assertion, and the
+                      `class` prop on the motion element is what actually re-evaluates
+                      its attribute spread — a class change on an ancestor alone would
+                      leave `attr-rect`'s props untouched, and the clobber test vacuous.
+                    -->
                     <svg
                         width="300"
                         height="120"
                         viewBox="0 0 300 120"
-                        class="rounded bg-slate-800"
+                        data-highlight={highlight}
+                        class="rounded bg-slate-800 {highlight ? 'ring-2 ring-yellow-400' : ''}"
                     >
                         <motion.rect
                             data-testid="attr-rect"
@@ -385,6 +421,7 @@
                             width={40}
                             height={40}
                             fill="#a78bfa"
+                            class={highlight ? 'opacity-80' : ''}
                         />
                     </svg>
                 </div>
@@ -434,6 +471,44 @@
                             rx="8"
                             fill="#38bdf8"
                             filter="url(#warp)"
+                        />
+                    </svg>
+                </div>
+
+                <div>
+                    <h3 class="mb-1 text-sm font-medium text-slate-300">
+                        Attribute-routed: stdDeviation (feGaussianBlur)
+                    </h3>
+                    <p class="mb-2 max-w-md text-xs text-slate-400">
+                        <code class="rounded bg-slate-800 px-1">stdDeviation</code> is claimed via
+                        motion-dom's
+                        <code class="rounded bg-slate-800 px-1">camelCaseAttributes</code>, not a
+                        hand-written list. Before that, it fell through to the raw spread and
+                        rendered
+                        <code class="rounded bg-slate-800 px-1">[object Object]</code>. Drag the
+                        slider to 0 for a sharp edge.
+                    </p>
+                    <svg
+                        width="300"
+                        height="120"
+                        viewBox="0 0 300 120"
+                        class="rounded bg-slate-800"
+                    >
+                        <filter id="soften" x="-20%" y="-20%" width="140%" height="140%">
+                            <motion.fegaussianblur
+                                data-testid="blur-filter"
+                                in="SourceGraphic"
+                                stdDeviation={blurStdDeviation}
+                            />
+                        </filter>
+                        <rect
+                            x="40"
+                            y="25"
+                            width="220"
+                            height="70"
+                            rx="8"
+                            fill="#4ade80"
+                            filter="url(#soften)"
                         />
                     </svg>
                 </div>

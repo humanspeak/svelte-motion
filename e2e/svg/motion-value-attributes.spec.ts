@@ -30,10 +30,15 @@ const computedNumber = async (locator: Locator, property: string): Promise<numbe
     parseFloat(await computed(locator, property))
 
 /**
- * Attribute values can carry units too. `addAttrValue` writes through
- * `getValueAsType(v, numberValueTypes[key])`, and `numberValueTypes.x` is a px
- * type — so `attrX` renders `x="25px"` (a valid SVG length). Keys with no entry,
- * like `x2` and `scale`, stay unitless.
+ * Attribute values can carry units once the client takes over. `addAttrValue`
+ * writes through `getValueAsType(v, numberValueTypes[key])`, and
+ * `numberValueTypes.x` is a px type — so after hydration `attrX` reads
+ * `x="25px"` (a valid SVG length). Keys with no entry, like `x2`, `scale` and
+ * `stdDeviation`, stay unitless.
+ *
+ * The SSR seed is different: `computeSSRSVGAttrValues` stringifies the raw
+ * MotionValue and never appends a unit, so the server payload carries `x="10"`.
+ * Hence `parseFloat` rather than `Number` — it reads both.
  */
 const attrNumber = async (locator: Locator, name: string): Promise<number> =>
     parseFloat((await locator.getAttribute(name)) ?? '')
@@ -379,12 +384,20 @@ test.describe('SVG MotionValue attributes', () => {
         expect(response.ok()).toBe(true)
 
         const html = await response.text()
-        const blur = html.match(/<feGaussianBlur[^>]*data-testid="blur-filter"[^>]*>/)?.[0]
+        const blur = html.match(/<feGaussianBlur[^>]*data-testid="blur-filter"[^>]*>/i)?.[0]
 
         expect(blur, 'blur-filter should be present in the SSR payload').toBeTruthy()
         expect(blur).not.toMatch(STRINGIFIED_MOTION_VALUE)
-        // camelCase must survive the SSR casing gate: `std-deviation` is inert.
-        expect(blur).toMatch(/stdDeviation="[\d.]+"/)
+
+        // Svelte's SSR spread lowercases attribute names, so the payload carries
+        // `stddeviation="2"`. That is harmless: the HTML parser case-corrects SVG
+        // attribute names on the way in — the same adjustment table that fixes tag
+        // names — so the hydrated element exposes `stdDeviation` and a live
+        // `stdDeviationX.baseVal`. The client-DOM test above asserts that. What
+        // matters here is that a number, not a MotionValue, reaches the payload.
+        expect(blur).toMatch(/stddeviation="[\d.]+"/i)
+        // And never the dash-cased form, which no parser would rescue.
+        expect(blur).not.toMatch(/std-deviation=/i)
     })
 
     test('reattaches cleanly after unmount and remount', async ({ page }) => {

@@ -76,7 +76,16 @@ Svelte templates take the DOM spelling of hyphenated attributes, so write
   const strokeWidth = useSpring(4)
 </script>
 
-<motion.circle cx={60} cy={60} r={20} stroke-width={strokeWidth} />
+<svg viewBox="0 0 120 120">
+  <motion.circle
+    cx={60}
+    cy={60}
+    r={20}
+    fill="none"
+    stroke="#5eead4"
+    stroke-width={strokeWidth}
+  />
+</svg>
 ```
 
 Both spellings are accepted, but the kebab-case form is the one you would write
@@ -152,10 +161,31 @@ lowercase. `motion.fedisplacementmap` renders a correctly-cased
   const warp = useSpring(12)
 </script>
 
-<filter id="warp">
-  <feTurbulence type="turbulence" baseFrequency="0.04" numOctaves="2" result="noise" />
-  <motion.fedisplacementmap in="SourceGraphic" in2="noise" attrScale={warp} />
-</filter>
+<svg viewBox="0 0 300 120">
+  <filter id="warp">
+    <feTurbulence type="turbulence" baseFrequency="0.04" numOctaves="2" result="noise" />
+    <motion.fedisplacementmap in="SourceGraphic" in2="noise" attrScale={warp} />
+  </filter>
+  <rect x="40" y="25" width="220" height="70" fill="#38bdf8" filter="url(#warp)" />
+</svg>
+```
+
+Filter-primitive attributes are bindable like any other. `stdDeviation`,
+`baseFrequency`, `numOctaves`, `dx`, `dy`, and `radius` all take a MotionValue:
+
+```svelte
+<script lang="ts">
+  import { motion, useSpring } from '@humanspeak/svelte-motion'
+
+  const blur = useSpring(2)
+</script>
+
+<svg viewBox="0 0 300 120">
+  <filter id="soften">
+    <motion.fegaussianblur in="SourceGraphic" stdDeviation={blur} />
+  </filter>
+  <rect x="40" y="25" width="220" height="70" fill="#4ade80" filter="url(#soften)" />
+</svg>
 ```
 
 The same holds for `motion.lineargradient`, `motion.clippath`,
