@@ -76,3 +76,23 @@ No evidence the executor edited the plan or this log.
   `001-animate-augmented-motion-value.guard-report.md`.
 - **Flip to PASS**: operator agrees to amend criterion 4 → guard amends plan,
   re-stamps `Planned at`, logs `PLAN AMENDED`, flips report to PASS, opens PR.
+
+---
+
+## Checkpoint 2026-07-08 — `guard parity 1 final` (re-run)
+
+- **Verdict**: PASS
+- **Plan-001 snapshot**: `65ef75f` (unchanged). **Branch tip**: `5fd3b38`.
+- **What changed since last gate**: criterion 4 (`docs check`) was the sole blocker
+  (plan defect — pre-existing unrelated errors). Maintainer resolved it by fixing
+  the real errors in separate out-of-scope commits `7d1e0b2` (build: drop paraglide,
+  bump docs-kit, vitest browser-playwright) + `5fd3b38` (fix: docs type errors).
+  No plan amendment made — criterion 4 now passes literally.
+- **Done criteria (re-run at branch tip)**: all 7 PASS. Root `src/` byte-identical
+  to 65ef75f (`git diff 65ef75f..HEAD -- src/` empty), so the prior root check
+  (0 errors), unit spec (3/3), and e2e (123 passed / 0 failed) hold verbatim;
+  `pnpm --filter docs check` re-run → **0 errors** (was 10); casts → 0.
+- **Publication**: PR held pending operator base decision — branch is stacked on
+  the unmerged `feat/ai-gradient-animation-card` (`73a8524`) + parity plans, so a
+  PR to `main` bundles more than the animate fix. Guard opens the PR via the `pr`
+  skill on the base call and records the URL in the report.
