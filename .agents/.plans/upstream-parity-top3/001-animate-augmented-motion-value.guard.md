@@ -58,3 +58,21 @@ No evidence the executor edited the plan or this log.
 
 - Amend criterion 4 on operator agreement, then re-stamp `Planned at` + log `PLAN AMENDED`.
 - `guard parity 1 final` to run the e2e regression gate and open the PR.
+
+---
+
+## Checkpoint 2026-07-08 — `guard parity 1 final`
+
+- **Verdict**: NO-PASS (single blocker — plan defect on criterion 4; see report)
+- **Snapshot**: `65ef75f` (unchanged; tree clean at gate time).
+- **Done criteria (re-run at gate)**: 1 PASS (`pnpm check` 0 errors), 2 PASS
+  (spec 3/3), 3 PASS (0 casts), 4 FAIL (`docs check` 10 pre-existing/unrelated
+  errors), 5 PASS (**e2e 123 passed, 1 skipped, 0 failed** — the deferred runtime
+  gate, incl. a fresh package build), 6 PASS (scope audit exact: `45203c4...65ef75f`
+  = in-scope only), 7 PASS (README 001→DONE).
+- **Decision**: work is faithful to intent with zero runtime change (e2e + identity
+  test). Sole failure is the criterion-4 plan defect; guard did NOT amend (no operator
+  agreement) and did NOT open a PR. Close-out report written:
+  `001-animate-augmented-motion-value.guard-report.md`.
+- **Flip to PASS**: operator agrees to amend criterion 4 → guard amends plan,
+  re-stamps `Planned at`, logs `PLAN AMENDED`, flips report to PASS, opens PR.
