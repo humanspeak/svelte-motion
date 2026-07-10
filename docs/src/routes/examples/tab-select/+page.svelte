@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Tab Select | Examples | Svelte Motion'
+        seo.title = 'Tab Select | Svelte Motion'
         seo.description =
             'Animated tab selector using layoutId for a shared indicator that slides between tabs in Svelte Motion.'
         seo.ogTitle = 'Tab Select'

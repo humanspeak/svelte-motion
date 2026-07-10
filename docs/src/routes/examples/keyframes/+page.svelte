@@ -17,7 +17,7 @@
         breadcrumbs.breadcrumbs = [{ title: 'Examples', href: '/examples' }, { title: 'Keyframes' }]
     }
     if (seo) {
-        seo.title = 'Keyframes | Examples | Svelte Motion'
+        seo.title = 'Keyframes | Svelte Motion'
         seo.description =
             'Multi-property keyframe animation with scale, rotate, and borderRadius using Svelte Motion.'
         seo.ogTitle = 'Keyframes'

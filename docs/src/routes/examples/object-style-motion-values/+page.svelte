@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Object style MotionValues | Examples | Svelte Motion'
+        seo.title = 'Object style MotionValues | Svelte Motion'
         seo.description = 'Drive object-form style props with live MotionValues.'
         seo.ogTitle = 'Object style MotionValues'
         seo.h1 = { title: 'Object style MotionValues', mode: 'sr-only' }

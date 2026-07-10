@@ -21,7 +21,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'LazyMotion | Examples | Svelte Motion'
+        seo.title = 'LazyMotion | Svelte Motion'
         seo.description =
             'Use LazyMotion, m, domMin, domAnimation, and domMax to choose the motion feature bundle for a subtree.'
         seo.ogTitle = 'LazyMotion'

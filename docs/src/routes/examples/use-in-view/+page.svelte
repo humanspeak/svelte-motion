@@ -17,7 +17,7 @@
         breadcrumbs.breadcrumbs = [{ title: 'Examples', href: '/examples' }, { title: 'useInView' }]
     }
     if (seo) {
-        seo.title = 'useInView | Examples | Svelte Motion'
+        seo.title = 'useInView | Svelte Motion'
         seo.description =
             'Detect viewport entry from a Svelte store with useInView. Reactive boolean store, IntersectionObserver-backed, with optional once-latch.'
         seo.ogTitle = 'useInView'

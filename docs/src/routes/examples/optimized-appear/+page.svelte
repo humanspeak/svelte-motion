@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Optimized appear | Examples | Svelte Motion'
+        seo.title = 'Optimized appear | Svelte Motion'
         seo.description =
             'Use optimized appear animations to start SSR entrance motion before hydration.'
         seo.ogTitle = 'Optimized appear'

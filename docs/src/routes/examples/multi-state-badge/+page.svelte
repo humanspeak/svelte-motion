@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Multi-State Badge | Examples | Svelte Motion'
+        seo.title = 'Multi-State Badge | Svelte Motion'
         seo.description =
             'A badge component that cycles through idle, processing, success, and error states with smooth animated transitions in Svelte Motion.'
         seo.ogTitle = 'Multi-State Badge'

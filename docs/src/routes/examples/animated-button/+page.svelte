@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Animated Button | Examples | Svelte Motion'
+        seo.title = 'Animated Button | Svelte Motion'
         seo.description =
             'Build a spring-based animated button with Svelte Motion featuring press feedback, hover lift, and smooth transitions for interactive UIs.'
         seo.ogTitle = 'Animated Button'

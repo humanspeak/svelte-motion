@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Variants Dynamic — custom prop | Examples | Svelte Motion'
+        seo.title = 'Variants Dynamic — custom prop | Svelte Motion'
         seo.description =
             'Per-instance variants using the custom prop and function-form factories in Svelte Motion. Staggered list reveals with index-driven delays.'
         seo.ogTitle = 'Variants Dynamic (custom)'

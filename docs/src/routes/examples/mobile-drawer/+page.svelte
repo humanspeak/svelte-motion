@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Mobile Drawer | Examples | Svelte Motion'
+        seo.title = 'Mobile Drawer | Svelte Motion'
         seo.description =
             'A theme-aware drag-to-close bottom sheet built with drag, a bound y MotionValue, and dragControls in Svelte Motion.'
         seo.ogTitle = 'Mobile Drawer'

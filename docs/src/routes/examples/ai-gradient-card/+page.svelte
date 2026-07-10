@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'AI Gradient Card | Examples | Svelte Motion'
+        seo.title = 'AI Gradient Card | Svelte Motion'
         seo.description =
             'Animated conic-gradient border with a masked glow spill, built with Svelte Motion useMotionValue, animate, and useMotionTemplate.'
         seo.ogTitle = 'AI Gradient Card'

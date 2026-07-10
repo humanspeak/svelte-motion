@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Vanilla Values | Examples | Svelte Motion'
+        seo.title = 'Vanilla Values | Svelte Motion'
         seo.description =
             'Motion values without motion components — a $state slider driving a plain div through toMotionValue, mapValue, springValue, and styleEffect.'
         seo.ogTitle = 'Vanilla Values'

@@ -24,7 +24,7 @@
 
     const seo = getSeoContext()
     if (seo) {
-        seo.title = 'Svelte Motion · Framer Motion-compatible animation library for Svelte 5'
+        seo.title = 'Svelte Motion — Framer Motion API for Svelte 5'
         seo.description =
             'Framer Motion-compatible animation library for Svelte 5 — motion components, AnimatePresence, gestures, variants, layout, springs, and scroll.'
         seo.ogTitle = 'Svelte Motion'

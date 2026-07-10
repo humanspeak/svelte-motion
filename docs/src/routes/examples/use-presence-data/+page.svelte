@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'usePresenceData | Examples | Svelte Motion'
+        seo.title = 'usePresenceData | Svelte Motion'
         seo.description = 'Read AnimatePresence custom data from an entering or exiting child.'
         seo.ogTitle = 'usePresenceData'
         seo.h1 = { title: 'usePresenceData', mode: 'sr-only' }

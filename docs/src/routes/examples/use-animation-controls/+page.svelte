@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'useAnimationControls | Examples | Svelte Motion'
+        seo.title = 'useAnimationControls | Svelte Motion'
         seo.description =
             'Legacy imperative animation controls for coordinating one or more motion components with start, set, and stop.'
         seo.ogTitle = 'useAnimationControls'

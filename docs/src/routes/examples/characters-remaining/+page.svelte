@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Characters Remaining | Examples | Svelte Motion'
+        seo.title = 'Characters Remaining | Svelte Motion'
         seo.description =
             'Character counter with spring-based bounce animation and color-mapped feedback built with Svelte Motion for smooth, reactive UI updates.'
         seo.ogTitle = 'Characters Remaining'

@@ -21,7 +21,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'AnimatePresence custom | Examples | Svelte Motion'
+        seo.title = 'AnimatePresence custom | Svelte Motion'
         seo.description =
             'Directional exit animations powered by AnimatePresence custom data and dynamic variants.'
         seo.ogTitle = 'AnimatePresence custom'

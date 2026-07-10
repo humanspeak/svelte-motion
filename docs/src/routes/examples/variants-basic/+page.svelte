@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Variants Basic | Examples | Svelte Motion'
+        seo.title = 'Variants Basic | Svelte Motion'
         seo.description =
             'Define and switch between named animation states with Svelte Motion variants. Create reusable, declarative animation presets for components.'
         seo.ogTitle = 'Variants Basic'

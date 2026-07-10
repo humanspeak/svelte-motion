@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Toggle Switch | Examples | Svelte Motion'
+        seo.title = 'Toggle Switch | Svelte Motion'
         seo.description =
             'Animated toggle switch with spring physics built using Svelte Motion. Demonstrates layout animations and gesture-driven state transitions.'
         seo.ogTitle = 'Toggle Switch'

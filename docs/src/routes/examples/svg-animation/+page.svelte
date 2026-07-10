@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'SVG Animation | Examples | Svelte Motion'
+        seo.title = 'SVG Animation | Svelte Motion'
         seo.description = 'Bind MotionValues straight to SVG presentation attributes.'
         seo.ogTitle = 'SVG Animation'
         seo.h1 = { title: 'SVG Animation', mode: 'sr-only' }

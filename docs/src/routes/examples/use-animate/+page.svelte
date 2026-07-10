@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'useAnimate | Examples | Svelte Motion'
+        seo.title = 'useAnimate | Svelte Motion'
         seo.description =
             'Imperative animation with a scoped CSS-selector API. Sequenced staggered list with a follow-up beat on a target button.'
         seo.ogTitle = 'useAnimate'

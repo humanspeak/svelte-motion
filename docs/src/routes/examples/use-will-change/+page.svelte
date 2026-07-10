@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'useWillChange | Examples | Svelte Motion'
+        seo.title = 'useWillChange | Svelte Motion'
         seo.description =
             'Auto-managed CSS will-change that starts at auto and latches to transform after a qualifying animation.'
         seo.ogTitle = 'useWillChange'

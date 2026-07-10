@@ -20,8 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title =
-            'whileHover variant keys — reuse variants across gestures | Examples | Svelte Motion'
+        seo.title = 'whileHover variants — reuse across gestures | Svelte Motion'
         seo.description =
             'Pass a variant key (or array) to whileHover, whileTap, whileFocus, whileDrag, or whileInView to reuse named animation states across gestures.'
         seo.ogTitle = 'whileHover variant keys'

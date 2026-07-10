@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Drag Constraints | Examples | Svelte Motion'
+        seo.title = 'Drag Constraints | Svelte Motion'
         seo.description =
             'A polished constrained-drag stage showing elastic overdrag, ref bounds, and spring settling with Svelte Motion.'
         seo.ogTitle = 'Drag Constraints'

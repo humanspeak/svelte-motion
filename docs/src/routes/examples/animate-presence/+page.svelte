@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'AnimatePresence | Examples | Svelte Motion'
+        seo.title = 'AnimatePresence | Svelte Motion'
         seo.description =
             'Animate components when they are added to or removed from the DOM using Svelte Motion. Smooth enter and exit transitions made easy.'
         seo.ogTitle = 'AnimatePresence'

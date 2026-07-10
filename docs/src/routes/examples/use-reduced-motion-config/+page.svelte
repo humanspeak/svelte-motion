@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'useReducedMotionConfig | Examples | Svelte Motion'
+        seo.title = 'useReducedMotionConfig | Svelte Motion'
         seo.description =
             'Resolve the reduced-motion policy by combining a parent <MotionConfig reducedMotion> override with the OS preference. Reactive via Svelte 5 runes.'
         seo.ogTitle = 'useReducedMotionConfig'

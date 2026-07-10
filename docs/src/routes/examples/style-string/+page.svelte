@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'styleString | Examples | Svelte Motion'
+        seo.title = 'styleString | Svelte Motion'
         seo.description =
             'Reactive style strings with automatic unit handling via the Svelte Motion styleString utility. Simplifies dynamic inline styles in components.'
         seo.ogTitle = 'styleString'

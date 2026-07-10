@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Animated Tabs | Examples | Svelte Motion'
+        seo.title = 'Animated Tabs | Svelte Motion'
         seo.description =
             'Spring-based animated tabs with a sliding indicator powered by svelte-motion layoutId and bits-ui.'
         seo.ogTitle = 'Animated Tabs'

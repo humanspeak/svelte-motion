@@ -17,7 +17,7 @@
         breadcrumbs.breadcrumbs = [{ title: 'Examples', href: '/examples' }, { title: 'Rotate' }]
     }
     if (seo) {
-        seo.title = 'Rotate | Examples | Svelte Motion'
+        seo.title = 'Rotate | Svelte Motion'
         seo.description =
             'Continuous rotation animation with configurable easing built with Svelte Motion. A simple example demonstrating infinite transform animations.'
         seo.ogTitle = 'Rotate'
