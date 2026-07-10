@@ -9,7 +9,7 @@ description: Pointer-driven animations on motion components via whileHover, whil
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'Gestures | Docs | Svelte Motion'
-      seo.description = 'whileHover, whileTap, whileFocus, and whileInView props on motion components — pointer-driven animations with gesture callbacks, true-hover gating, and IntersectionObserver-backed in-view detection.'
+      seo.description = 'whileHover, whileTap, whileFocus, and whileInView props for pointer-driven animations on Svelte motion components, with gesture callbacks and hover gating.'
       seo.ogTitle = 'Gestures'
       seo.ogTagline = 'Pointer-driven animations as motion-component props'
       seo.ogFeatures = ['Hover', 'Tap', 'Focus', 'In-view']

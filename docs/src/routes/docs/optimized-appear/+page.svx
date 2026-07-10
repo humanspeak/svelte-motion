@@ -10,7 +10,7 @@ description: Start SSR appear animations before hydration
     if (seo) {
         seo.title = 'Optimized appear | Docs | Svelte Motion'
         seo.description =
-            'Start server-rendered entrance animations before Svelte hydrates the motion runtime.'
+            'Start server-rendered entrance animations before Svelte hydrates the motion runtime, handing off seamlessly to avoid a flash of unanimated content.'
         seo.ogTitle = 'Optimized appear'
         seo.ogTagline = 'SSR entrance animations without the flash'
         seo.ogFeatures = ['SSR', 'Hydration', 'WAAPI', 'Appear handoff']

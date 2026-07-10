@@ -11,7 +11,7 @@ description: Animate between two DOM states with the browser View Transitions AP
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'View Transitions | Docs | Svelte Motion'
-      seo.description = 'Animate between two DOM states with animateView and the browser View Transitions API — crossfades, shared-element morphs, and enter/exit animations with spring timing.'
+      seo.description = 'Animate between two DOM states with animateView and the browser View Transitions API — crossfades, shared-element morphs, and enter/exit animations in Svelte.'
       seo.ogTitle = 'View Transitions'
       seo.ogTagline = 'Shared-element morphs and page transitions with animateView'
       seo.ogFeatures = ['Shared Element Morphs', 'Spring Timing', 'Enter/Exit Layers', 'Native Browser API']

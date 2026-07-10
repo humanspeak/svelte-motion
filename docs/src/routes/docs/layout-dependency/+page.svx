@@ -11,7 +11,7 @@ description: 'Gate layout measurement so FLIP only recomputes when a dependency 
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'layoutDependency | Docs | Svelte Motion'
-      seo.description = 'Gate layout (FLIP) measurement so a frequently-rerendering element only re-measures when a dependency changes.'
+      seo.description = 'Gate layout (FLIP) measurement with layoutDependency so a frequently-rerendering element only re-measures when a specific dependency value changes in Svelte.'
       seo.ogTitle = 'layoutDependency'
       seo.ogTagline = 'Re-measure only when it matters'
       seo.ogFeatures = ['Layout Animations', 'FLIP', 'Performance', 'Motion Parity']

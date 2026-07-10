@@ -11,7 +11,7 @@ description: 'Read AnimatePresence custom data from an exiting child.'
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'usePresenceData | Docs | Svelte Motion'
-      seo.description = 'Read custom data passed to AnimatePresence from entering and exiting children.'
+      seo.description = 'Read the custom data passed to AnimatePresence from inside entering and exiting children, enabling direction-aware exit animations in Svelte.'
       seo.ogTitle = 'usePresenceData'
       seo.ogTagline = 'Presence custom data inside exiting children'
       seo.ogFeatures = ['AnimatePresence', 'custom', 'usePresenceData', 'Directional Exit']

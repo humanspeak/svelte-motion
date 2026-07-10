@@ -11,7 +11,7 @@ description: 'Pass dynamic data from AnimatePresence into exiting variants.'
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'AnimatePresence custom | Docs | Svelte Motion'
-      seo.description = 'Forward dynamic data from AnimatePresence into exiting variants, matching Motion custom presence semantics.'
+      seo.description = 'Forward dynamic data from AnimatePresence into exiting variants in Svelte, matching Motion custom presence semantics for direction-aware exit animations.'
       seo.ogTitle = 'AnimatePresence custom'
       seo.ogTagline = 'Directional exits from parent presence data'
       seo.ogFeatures = ['AnimatePresence', 'custom', 'Dynamic Variants', 'Directional Exit']

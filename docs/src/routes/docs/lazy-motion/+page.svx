@@ -9,7 +9,7 @@ description: Load only the motion feature bundle your page needs
     const seo = getSeoContext()
     if (seo) {
         seo.title = 'LazyMotion | Docs | Svelte Motion'
-        seo.description = 'Use LazyMotion with the m namespace and domMin, domAnimation, or domMax feature bundles.'
+        seo.description = 'Use LazyMotion with the m namespace to load only the motion feature bundle your page needs — pick domMin, domAnimation, or domMax to shrink your bundle.'
         seo.ogTitle = 'LazyMotion'
         seo.ogTagline = 'Load motion features on demand'
         seo.ogFeatures = ['m namespace', 'domMin', 'domAnimation', 'domMax']

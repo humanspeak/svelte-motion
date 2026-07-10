@@ -12,7 +12,7 @@ description: "Reactive Svelte 5 hook for the user's prefers-reduced-motion acces
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'useReducedMotion | Docs | Svelte Motion'
-      seo.description = "Detect the user's prefers-reduced-motion setting in Svelte. useReducedMotion returns a $state-backed { current } object that updates live when the OS preference changes."
+      seo.description = 'Detect prefers-reduced-motion in Svelte. useReducedMotion returns a $state-backed { current } object that updates live when the OS setting changes.'
       seo.ogTitle = 'useReducedMotion'
       seo.ogTagline = "Honor the user's reduced-motion preference"
       seo.ogFeatures = ['Accessibility', 'Svelte 5 Runes', 'Live Media-Query Updates', 'SSR Safe']

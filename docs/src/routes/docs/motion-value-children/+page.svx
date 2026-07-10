@@ -11,7 +11,7 @@ description: 'Render MotionValue<number | string> values as live text children.'
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'MotionValue children | Docs | Svelte Motion'
-      seo.description = 'Render MotionValue<number | string> values as live text children on motion elements.'
+      seo.description = 'Render a MotionValue<number | string> as live text children on a motion element, updating the DOM node directly without a Svelte re-render.'
       seo.ogTitle = 'MotionValue children'
       seo.ogTagline = 'Live text powered directly by MotionValue'
       seo.ogFeatures = ['MotionValue', 'Live Text', 'useTransform', 'Readouts']

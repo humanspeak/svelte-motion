@@ -11,7 +11,7 @@ description: Use @humanspeak/svelte-scoped-props when component-scoped CSS class
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'Scoped Motion Classes | Docs | Svelte Motion'
-      seo.description = 'Use @humanspeak/svelte-scoped-props when Svelte prunes scoped CSS selectors that are only passed to motion components.'
+      seo.description = 'Use @humanspeak/svelte-scoped-props when Svelte prunes component-scoped CSS selectors that are only ever passed as classes to your motion components.'
       seo.ogTitle = 'Scoped Motion Classes'
       seo.ogTagline = 'Keep parent-scoped CSS on motion components'
       seo.ogFeatures = ['scoped:class', 'motion.*', 'Svelte CSS', 'Companion Preprocessor']
