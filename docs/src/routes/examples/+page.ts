@@ -33,6 +33,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'A rotating conic-gradient border with a masked glow spill, built with useMotionValue, animate, and useMotionTemplate.'
     },
+    'ai-glow-border': {
+        title: 'Apple Intelligence Glow Border',
+        description:
+            'Recreate the Apple Intelligence wavy glow border — the Siri glow effect — in Svelte with springs, feTurbulence noise, and SVG displacement.'
+    },
     'characters-remaining': {
         title: 'Characters Remaining',
         description: 'Interactive characters remaining animation example using Svelte Motion.'

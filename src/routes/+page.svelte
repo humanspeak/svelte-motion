@@ -120,6 +120,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/ai-glow-border') + searchParams}
+                    >
+                        AI glow border (wavy Apple Intelligence ring / SVG filter MotionValues)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/will-change') + searchParams}
                     >
                         useWillChange

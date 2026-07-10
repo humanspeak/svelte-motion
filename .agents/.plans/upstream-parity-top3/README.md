@@ -19,7 +19,7 @@ the A2 projection issues) — see "Superseded issues" below.
 | 002  | SVG MotionValue attribute binding + attrX/attrY/attrScale            | P1         | M      | —          | **YES — new docs page** (`docs/svg-animation`)                             | DONE   |
 | 003  | Full transform composition during drag (buildTransform semantics)    | P1         | M      | —          | No public docs; in-code decision comments must be updated                  | TODO   |
 | 004  | Motion-dom projection authoritative (page-space, retire legacy FLIP) | P1         | L      | 003        | **YES — update** `docs/layout-animations`; shared-layout page as follow-up | TODO   |
-| 005  | Apple Intelligence wavy glow border — flagship example (smooth)      | P2 — LAST  | M      | 002        | **YES — new example page** (`examples/ai-glow-border`) + nav + sitemap     | TODO   |
+| 005  | Apple Intelligence wavy glow border — flagship example (smooth)      | P2 — LAST  | M      | 002        | **YES — new example page** (`examples/ai-glow-border`) + nav + sitemap     | DONE   |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
@@ -45,6 +45,30 @@ REJECTED (with one-line rationale)
   / 2 skipped (both skips pre-existing), docs check 0 errors, `trunk check`
   clean. Guard Finding 8 addressed — the tag-casing e2e now asserts after the
   `{#if mounted}` remount and was confirmed to FAIL with the fix reverted.
+
+- 005: **DONE** 2026-07-10, executed with heavy maintainer-driven design
+  iteration that deliberately superseded the plan's letter (maintainer:
+  "designing outside the plan"). Kept: the four performance MUSTs, the
+  MotionValue channel map, plan 002's declarative `motion.feoffset` /
+  `motion.fedisplacementmap attrScale` bindings as the showcase, reduced-motion
+  static path, and the e2e gates. Key deviations, all maintainer-approved:
+  (a) rotation/noise/swell integrate in ONE `useAnimationFrame` loop scaled by
+  a `flow` spring instead of `animate(v, 360, …)` restarts; (b) noise offsets
+  are BOUNDED dual-sine drift vectors, not linear scroll — unbounded offsets
+  walk off the turbulence raster and the prototype's `%900` wrap popped;
+  (c) five-slider tuning panel (thickness/flow/waviness/swell/brightness) on
+  both pages, thickness via a `--t` custom property scaling every ring
+  dimension in calc(); (d) humanspeak mint `#54DBBC` added to the palette;
+  (e) docs example is theme-aware with per-theme ring blend modes, SEO-targets
+  "Apple Intelligence"/"Siri glow effect", and animates its state chip with
+  AnimatePresence. In-scope-by-necessity library fix (`presence.ts` + 2 unit
+  tests): sync/wait exit placeholders are now skipped for out-of-flow children,
+  with `position` snapshotted as a string while connected (detached elements
+  report '' for every computed property) — found because the chip crossfade
+  ballooned its pill. e2e budget is environment-aware: 25ms p95 on GPU (chrome
+  channel, measured 16.7ms), 60ms software-raster tripwire on CI (bundled
+  chromium; GPU flags stall headless rAF entirely). Final gates: `pnpm check`
+  0 errors, docs check 0 errors, unit 754/754, full e2e pass, trunk clean.
 
 ## Dependency notes
 
