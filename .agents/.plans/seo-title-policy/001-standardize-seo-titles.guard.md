@@ -57,3 +57,12 @@
 - The second plan defect is proven baseline-only: after generation, docs check reports one PostHog environment typing error and ten warnings across `posthog.ts`, tabs, ComponentSource, pan, use-follow-value, and `docs/tsconfig.json`; none of those files differ between `31225de` and reviewed source `b5cf316`.
 - The operator approved a narrow non-regression criterion: docs check may retain exactly that documented baseline but must introduce no new diagnostics. Drift and `Planned at` are re-stamped to `46bea77`; source scope and all other gates are unchanged.
 - Action: plan amended with operator approval; continue only the remaining Trunk, diff, and six browser-title gates without rerunning already-green server tests or build.
+
+## Checkpoint 7 — 2026-07-10 09:16 — ON TRACK
+
+`b5cf316` · final close-out; PR <https://github.com/humanspeak/svelte-motion/pull/445>
+
+- Every amended done criterion is reproduced: exact source/title audit passes; server Vitest reports 2 files and 6/6 tests; build/mirror generation exits 0; docs check adds no diagnostics beyond the approved unchanged 1-error/10-warning baseline; Trunk and `git diff --check` exit 0; README is DONE.
+- Browser gate passes on the production preview at `127.0.0.1:8321`: immediate post-navigation `document.title` exactly matches all six targets. Browser Harness later injects its `🐴` controlled-tab prefix asynchronously; SSR titles and the unmodified immediate browser reads agree, and the temporary server was stopped.
+- Scope and conduct are fully accounted for: reviewed source remains `b5cf316`; no out-of-scope product file is changed. Checkpoint 2's restored wrong-worktree incident remains in history, both operator-approved amendments are recorded, and no accidental primary commit exists.
+- Action: final PASS reported to the operator; PR 445 opened via the `pr` skill. Merge remains the operator's decision.
