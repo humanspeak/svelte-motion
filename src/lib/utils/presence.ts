@@ -33,6 +33,13 @@ type PresenceChild = {
     mergedTransition?: MotionTransition
     lastRect: DOMRect
     lastComputedStyle: CSSStyleDeclaration
+    /**
+     * `position` captured as a STRING while the element was still connected.
+     * `lastComputedStyle` is a live CSSStyleDeclaration, and once Svelte
+     * detaches the node (keyed swaps detach before unregister) every property
+     * on it reads back as '' — so out-of-flow detection must not rely on it.
+     */
+    lastPosition: string
     lastPopLayoutSnapshot?: PopLayoutSnapshot
     layoutInsertion?: { parent: HTMLElement; before?: HTMLElement }
     hasScrollableAncestor: boolean
@@ -659,6 +666,7 @@ export const createAnimatePresenceContext = (context: {
             mergedTransition,
             lastRect: initialRect,
             lastComputedStyle: initialStyle,
+            lastPosition: initialStyle.position,
             lastPopLayoutSnapshot:
                 mode === 'popLayout' ? measurePopLayoutSnapshot(element, initialStyle) : undefined,
             layoutInsertion: findLayoutInsertionParent(element) ?? undefined,
@@ -675,6 +683,7 @@ export const createAnimatePresenceContext = (context: {
         if (child && rect.width > 0 && rect.height > 0) {
             child.lastRect = rect
             child.lastComputedStyle = computedStyle
+            child.lastPosition = computedStyle.position
             child.lastScrollSnapshot = captureScrollSnapshot(child.element)
             child.hasScrollableAncestor = child.lastScrollSnapshot.length > 0
             if (mode === 'popLayout') {
@@ -739,12 +748,19 @@ export const createAnimatePresenceContext = (context: {
         // popLayout is the mode that explicitly pops exits out of flow so
         // surrounding layout can reflow immediately.
         const shouldPreserveLayout = mode !== 'popLayout'
+        // An out-of-flow child holds no layout slot, so a placeholder would
+        // INSERT space that never existed — e.g. absolutely-positioned labels
+        // crossfading inside a fixed-size pill briefly balloon the pill.
+        // Read position from the live element when possible, else from the
+        // string snapshot (a detached element's computed style is all '').
+        const exitPosition = elementIsLive ? computed.position : child.lastPosition
+        const isOutOfFlow = exitPosition === 'absolute' || exitPosition === 'fixed'
         let placeholder: HTMLElement | null = null
         const liveLayoutInsertion = findLayoutInsertionParent(child.element)
         const layoutInsertion =
             liveLayoutInsertion ??
             (child.layoutInsertion?.parent.isConnected ? child.layoutInsertion : null)
-        if (shouldPreserveLayout && layoutInsertion) {
+        if (shouldPreserveLayout && !isOutOfFlow && layoutInsertion) {
             placeholder = document.createElement(child.element.tagName.toLowerCase())
             placeholder.setAttribute('data-presence-placeholder', 'true')
             placeholder.style.display = computed.display === 'contents' ? 'block' : computed.display

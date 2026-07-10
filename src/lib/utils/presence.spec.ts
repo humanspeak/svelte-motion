@@ -580,6 +580,59 @@ describe('AnimatePresence modes', () => {
             await Promise.resolve()
         })
 
+        it('skips the placeholder for out-of-flow children (sync mode)', async () => {
+            vi.spyOn(window, 'getComputedStyle').mockImplementation((target: Element) => {
+                if (target === el) {
+                    return mockComputedStyle({
+                        position: 'absolute',
+                        boxSizing: 'border-box',
+                        display: 'flex'
+                    })
+                }
+                return mockComputedStyle({ position: 'relative', boxSizing: 'border-box' })
+            })
+
+            const ctx = createAnimatePresenceContext({ mode: 'sync' })
+            ctx.registerChild('k1', el, { opacity: 0 })
+            ctx.unregisterChild('k1')
+
+            // An absolutely-positioned child holds no layout slot; inserting a
+            // placeholder for it would ADD in-flow space that never existed
+            // (it briefly ballooned a fixed pill hosting crossfading labels).
+            expect(document.querySelector('[data-presence-placeholder="true"]')).toBeFalsy()
+
+            await Promise.resolve()
+            await Promise.resolve()
+        })
+
+        it('skips the placeholder for out-of-flow children detached before unregister', async () => {
+            vi.spyOn(window, 'getComputedStyle').mockImplementation((target: Element) => {
+                if (target === el) {
+                    return mockComputedStyle({
+                        position: 'absolute',
+                        boxSizing: 'border-box',
+                        display: 'flex'
+                    })
+                }
+                return mockComputedStyle({ position: 'relative', boxSizing: 'border-box' })
+            })
+
+            const ctx = createAnimatePresenceContext({ mode: 'sync' })
+            ctx.registerChild('k1', el, { opacity: 0 })
+
+            // Keyed swaps detach the node before unregister runs. A detached
+            // element's live computed style reads '' for everything, so the
+            // out-of-flow check must use the position snapshot instead.
+            el.remove()
+            vi.spyOn(window, 'getComputedStyle').mockImplementation(() => mockComputedStyle({}))
+            ctx.unregisterChild('k1')
+
+            expect(document.querySelector('[data-presence-placeholder="true"]')).toBeFalsy()
+
+            await Promise.resolve()
+            await Promise.resolve()
+        })
+
         it('preserves grid placement on wait placeholders', () => {
             vi.spyOn(window, 'getComputedStyle').mockImplementation((target: Element) => {
                 if (target === el) {
