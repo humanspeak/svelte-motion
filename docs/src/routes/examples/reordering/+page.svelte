@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Reordering | Examples | Svelte Motion'
+        seo.title = 'Reordering | Svelte Motion'
         seo.description =
             'Drag-to-reorder list items with smooth layout animations using Svelte Motion. Demonstrates drag gestures and automatic layout transitions.'
         seo.ogTitle = 'Reordering'

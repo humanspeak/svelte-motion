@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'useTime (Synced) | Examples | Svelte Motion'
+        seo.title = 'useTime (Synced) | Svelte Motion'
         seo.description =
             'Synchronized time-based animations across multiple elements using a shared Svelte Motion useTime store for coordinated motion effects.'
         seo.ogTitle = 'useTime (Synced)'

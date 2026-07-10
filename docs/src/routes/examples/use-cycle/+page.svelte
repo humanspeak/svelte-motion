@@ -17,7 +17,7 @@
         breadcrumbs.breadcrumbs = [{ title: 'Examples', href: '/examples' }, { title: 'useCycle' }]
     }
     if (seo) {
-        seo.title = 'useCycle | Examples | Svelte Motion'
+        seo.title = 'useCycle | Svelte Motion'
         seo.description =
             'Cycle through animation variants in Svelte. useCycle returns a $state-backed { current, cycle } object for toggling motion states with Svelte 5 runes.'
         seo.ogTitle = 'useCycle'

@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'useAnimationFrame | Examples | Svelte Motion'
+        seo.title = 'useAnimationFrame | Svelte Motion'
         seo.description =
             'Run animations on every frame with Svelte Motion useAnimationFrame. Access delta time and elapsed time for smooth, frame-based effects.'
         seo.ogTitle = 'useAnimationFrame'

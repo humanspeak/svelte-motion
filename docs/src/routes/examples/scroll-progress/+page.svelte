@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Scroll Progress | Examples | Svelte Motion'
+        seo.title = 'Scroll Progress | Svelte Motion'
         seo.description =
             'Interactive scroll progress animation example using Svelte Motion useScroll and useSpring.'
         seo.ogTitle = 'Scroll Progress'

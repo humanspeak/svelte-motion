@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'LayoutGroup — scope shared-layout animations | Examples | Svelte Motion'
+        seo.title = 'LayoutGroup — scoped layout animations | Svelte Motion'
         seo.description =
             'Wrap regions in <LayoutGroup id> to keep identical layoutId values in sibling subtrees from cross-animating. Side-by-side tab strips demo.'
         seo.ogTitle = 'LayoutGroup'

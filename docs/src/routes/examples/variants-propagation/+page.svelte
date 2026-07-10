@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Variants Propagation | Examples | Svelte Motion'
+        seo.title = 'Variants Propagation | Svelte Motion'
         seo.description =
             'Propagate variant animations through nested component trees with Svelte Motion. Parent state changes automatically cascade to child elements.'
         seo.ogTitle = 'Variants Propagation'

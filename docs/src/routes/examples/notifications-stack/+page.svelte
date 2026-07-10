@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Notifications Stack | Examples | Svelte Motion'
+        seo.title = 'Notifications Stack | Svelte Motion'
         seo.description =
             'iOS-style notification stack with variant-based stagger animations built with Svelte Motion. Smooth enter, exit, and reorder transitions.'
         seo.ogTitle = 'Notifications Stack'

@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'useFollowValue | Examples | Svelte Motion'
+        seo.title = 'useFollowValue | Svelte Motion'
         seo.description =
             'Six follower motion values driven by a single pointer source — each with a different transition (spring variants and tweens) so the trail visually shows how each animation type feels.'
         seo.ogTitle = 'useFollowValue'

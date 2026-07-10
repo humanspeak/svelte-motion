@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Scoped Motion Classes | Examples | Svelte Motion'
+        seo.title = 'Scoped Motion Classes | Svelte Motion'
         seo.description =
             'A live Svelte Motion example using @humanspeak/svelte-scoped-props to keep component-scoped CSS selectors alive on motion components.'
         seo.ogTitle = 'Scoped Motion Classes'

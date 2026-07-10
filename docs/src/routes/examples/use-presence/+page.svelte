@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'usePresence | Examples | Svelte Motion'
+        seo.title = 'usePresence | Svelte Motion'
         seo.description =
             'Custom exit animations from inside the child. PresenceChild holds the component rendered until your safeToRemove() fires.'
         seo.ogTitle = 'usePresence'

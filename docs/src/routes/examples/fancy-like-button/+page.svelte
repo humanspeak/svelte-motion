@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Fancy Like Button | Examples | Svelte Motion'
+        seo.title = 'Fancy Like Button | Svelte Motion'
         seo.description =
             'Heart button with animated particle burst on press and hold using Svelte Motion.'
         seo.ogTitle = 'Fancy Like Button'

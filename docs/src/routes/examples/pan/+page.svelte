@@ -18,7 +18,7 @@
         breadcrumbs.breadcrumbs = [{ title: 'Examples', href: '/examples' }, { title: 'Pan' }]
     }
     if (seo) {
-        seo.title = 'Pan | Examples | Svelte Motion'
+        seo.title = 'Pan | Svelte Motion'
         seo.description =
             'A swipe-to-dismiss bottom sheet — the canonical pan-gesture pattern. Pull the sheet down past a threshold or flick fast to dismiss; otherwise it springs back. Velocity-aware release.'
         seo.ogTitle = 'Pan'

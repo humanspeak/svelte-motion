@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'HTML Content | Examples | Svelte Motion'
+        seo.title = 'HTML Content | Svelte Motion'
         seo.description =
             'Animate HTML content with smooth enter and exit transitions using Svelte Motion. Demonstrates AnimatePresence with dynamic HTML elements.'
         seo.ogTitle = 'HTML Content'

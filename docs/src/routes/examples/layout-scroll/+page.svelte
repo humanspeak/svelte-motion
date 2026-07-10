@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'layoutScroll — FLIP inside scroll containers | Examples | Svelte Motion'
+        seo.title = 'layoutScroll — FLIP in scroll containers | Svelte Motion'
         seo.description =
             'Use layoutScroll to keep FLIP layout animations anchored when the user scrolls the parent container mid-animation. Side-by-side demo of the drift vs the fix.'
         seo.ogTitle = 'layoutScroll'

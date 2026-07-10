@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'While In View | Examples | Svelte Motion'
+        seo.title = 'While In View | Svelte Motion'
         seo.description =
             'Animate elements when they enter or leave the viewport using Svelte Motion whileInView. Create scroll-triggered reveal and exit animations.'
         seo.ogTitle = 'While In View'

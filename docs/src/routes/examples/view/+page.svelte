@@ -28,7 +28,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'View Transitions | Examples | Svelte Motion'
+        seo.title = 'View Transitions | Svelte Motion'
         seo.description =
             'Shared-element morphs and filtered galleries with animateView — the browser View Transitions API driven by Motion timing.'
         seo.ogTitle = 'View Transitions'

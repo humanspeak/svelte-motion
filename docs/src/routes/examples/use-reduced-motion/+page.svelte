@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'useReducedMotion | Examples | Svelte Motion'
+        seo.title = 'useReducedMotion | Svelte Motion'
         seo.description =
             "Honor the user's prefers-reduced-motion accessibility setting with Svelte Motion useReducedMotion. A reactive store that updates live when the OS preference changes."
         seo.ogTitle = 'useReducedMotion'

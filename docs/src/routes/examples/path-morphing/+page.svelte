@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Path Morphing | Examples | Svelte Motion'
+        seo.title = 'Path Morphing | Svelte Motion'
         seo.description =
             'Interactive path morphing animation using SVG shape interpolation with Svelte Motion.'
         seo.ogTitle = 'Path Morphing'

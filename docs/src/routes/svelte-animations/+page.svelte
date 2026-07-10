@@ -19,7 +19,7 @@
 
     const seo = getSeoContext()
     if (seo) {
-        seo.title = 'Svelte Animations · Every Svelte 5 animation pattern | Svelte Motion'
+        seo.title = 'Svelte 5 Animation Patterns | Svelte Motion'
         // ~155 chars — fits Google's typical truncation window.
         seo.description =
             'Every Svelte 5 animation pattern: gestures, exit, FLIP layout, variants, drag, scroll-linked motion, SVG paths, hooks. Built with @humanspeak/svelte-motion.'

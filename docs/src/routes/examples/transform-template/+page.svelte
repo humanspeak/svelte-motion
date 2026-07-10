@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'transformTemplate | Examples | Svelte Motion'
+        seo.title = 'transformTemplate | Svelte Motion'
         seo.description = 'Customize generated Motion transform strings with transformTemplate.'
         seo.ogTitle = 'transformTemplate'
         seo.h1 = { title: 'transformTemplate', mode: 'sr-only' }

@@ -22,7 +22,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Armed Buttons | Examples | Svelte Motion'
+        seo.title = 'Armed Buttons | Svelte Motion'
         seo.description =
             'Production-style armed archive and delete wait button microinteractions built with Svelte Motion, AnimatePresence, and spring transitions.'
         seo.ogTitle = 'Armed Buttons'

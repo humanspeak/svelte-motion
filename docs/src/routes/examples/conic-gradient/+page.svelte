@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'Conic Gradient | Examples | Svelte Motion'
+        seo.title = 'Conic Gradient | Svelte Motion'
         seo.description =
             'Pointer-tracking conic gradient example using Svelte Motion useTransform and writable stores.'
         seo.ogTitle = 'Conic Gradient'

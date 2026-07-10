@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'layoutDependency | Examples | Svelte Motion'
+        seo.title = 'layoutDependency | Svelte Motion'
         seo.description =
             'Gate layout measurement so FLIP only recomputes when a dependency changes.'
         seo.ogTitle = 'layoutDependency'

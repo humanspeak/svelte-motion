@@ -20,7 +20,7 @@
         ]
     }
     if (seo) {
-        seo.title = 'While Focus | Examples | Svelte Motion'
+        seo.title = 'While Focus | Svelte Motion'
         seo.description =
             'Animate elements when they receive keyboard focus using Svelte Motion whileFocus. Enhance accessibility with visual feedback on focus events.'
         seo.ogTitle = 'While Focus'

@@ -18,7 +18,7 @@
         breadcrumbs.breadcrumbs = [{ title: 'Examples', href: '/examples' }, { title: 'Reorder' }]
     }
     if (seo) {
-        seo.title = 'Reorder | Examples | Svelte Motion'
+        seo.title = 'Reorder | Svelte Motion'
         seo.description =
             'Drag-to-reorder lists with Reorder.Group and Reorder.Item — axis-locked dragging, FLIP siblings, and edge auto-scroll in scrollable containers.'
         seo.ogTitle = 'Reorder'
