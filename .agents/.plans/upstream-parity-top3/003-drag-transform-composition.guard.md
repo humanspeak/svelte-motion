@@ -51,3 +51,14 @@ c3525d0 · final close-out. Tree already clean (same snapshot as Checkpoint 1).
   Recorded in the close-out report; publication is the operator's next move.
 - Action: close-out report written (`003-drag-transform-composition.guard-report.md`),
   verdict PASS; reported to operator.
+
+## Checkpoint 3 — 2026-07-10 11:55 — ON TRACK (integration)
+
+c3525d0 · maintainer drove the live demo and signed off; publication gate
+cleared.
+
+- Branch pushed (`git push -u origin fix/drag-transform-composition`) and PR
+  opened via the `pr` skill: <https://github.com/humanspeak/svelte-motion/pull/446>
+  (base `main`, labels `bug`/`javascript`, `Closes #436`, refs #403/#396).
+- Report's Integrated line updated with the PR URL.
+- Action: handed back to operator — merging is the operator's call.

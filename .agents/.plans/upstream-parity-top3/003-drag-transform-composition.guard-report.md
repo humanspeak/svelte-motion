@@ -4,12 +4,12 @@
 characterization tests confirmed red without the fix, and the diff delivers the
 plan's intent through motion-dom's own `buildTransform`, exactly as prescribed.
 **Reviewed at** `c3525d0` · 2026-07-10 11:44 · **Plan planned at** `634983b`
-**Integrated** — PR **not** opened: the plan's Git workflow section forbids it
-("Do NOT push or open a PR; maintainer signs off on live demos first"), and
-standing maintainer feedback requires a live-demo sign-off before any PR. The
-verified snapshot `c3525d0` sits on `fix/drag-transform-composition`, ready to
-publish on the operator's word. Demo page for sign-off:
-`/tests/drag/while-drag-transforms`.
+**Integrated** — PR <https://github.com/humanspeak/svelte-motion/pull/446>
+opened via the `pr` skill for the reviewed snapshot `c3525d0`. Publication was
+initially withheld per the plan's Git workflow ("Do NOT push or open a PR;
+maintainer signs off on live demos first"); the maintainer drove the live demo
+at `/tests/drag/while-drag-transforms` and signed off on 2026-07-10, after
+which the PR was opened.
 
 ## Done criteria
 
