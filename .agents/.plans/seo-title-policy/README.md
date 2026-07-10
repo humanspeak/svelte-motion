@@ -13,7 +13,7 @@ the status row when done.
 
 | Plan | Title                                               | Priority | Effort | Depends on | Status |
 | ---- | --------------------------------------------------- | -------- | ------ | ---------- | ------ |
-| 001  | Standardize concise SEO titles across the docs site | P1       | S      | —          | TODO   |
+| 001  | Standardize concise SEO titles across the docs site | P1       | S      | —          | DONE   |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
@@ -25,7 +25,10 @@ REJECTED (with one-line rationale)
 - Revision 2026-07-10: unit verification uses the complete Vitest server
   project because the baseline client project is invalid under Vitest 4.1.9
   and currently matches no test files. Repairing that client project is
-  deferred; Plan 001 remains TODO pending its remaining verification gates.
+  deferred; Plan 001 was kept TODO pending its remaining verification gates.
+- Revision 2026-07-10: docs typecheck is a non-regression gate against its
+  unchanged baseline of one error and ten warnings; baseline repair remains a
+  separate follow-up, and Plan 001 was kept TODO until final verification.
 
 ## Findings considered and rejected
 

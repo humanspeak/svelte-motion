@@ -14,8 +14,14 @@
 > empty client project is deferred maintenance; `docs/vite.config.ts` remains
 > out of scope for this plan.
 >
+> Revision 2026-07-10: The operator approved treating the docs typecheck's
+> unchanged baseline as a non-regression gate: one PostHog environment typing
+> error plus ten warnings in files untouched by this plan. Final verification
+> must introduce no new diagnostics versus that exact baseline; repairing the
+> baseline remains separate follow-up work.
+>
 > **Drift check (run first)**:
-> `git diff --stat 6e6b54b..HEAD -- docs/src/routes/+page.svelte docs/src/routes/svelte-animations/+page.svelte docs/src/routes/examples docs/vite.config.ts docs/src/lib/seo-title-policy.spec.ts`
+> `git diff --stat 46bea77..HEAD -- docs/src/routes/+page.svelte docs/src/routes/svelte-animations/+page.svelte docs/src/routes/examples docs/vite.config.ts docs/src/lib/seo-title-policy.spec.ts`
 > If an in-scope route changed, compare its live SEO block with the excerpts
 > below. A semantic mismatch is a STOP condition; ordinary line-number drift is
 > not.
@@ -27,7 +33,7 @@
 - **Risk**: LOW
 - **Depends on**: none
 - **Category**: docs
-- **Planned at**: commit `6e6b54b`, 2026-07-10
+- **Planned at**: commit `46bea77`, 2026-07-10
 
 ## Why this matters
 
@@ -168,7 +174,7 @@ they already comply with the target policy.
 | ------------------ | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
 | Format             | `trunk fmt docs/src/routes docs/src/lib/seo-title-policy.spec.ts .agents/.plans/seo-title-policy` | exit 0                                                            |
 | Docs unit tests    | `pnpm --filter docs exec vitest run --project server`                                             | current inventory: 2 files and 6 tests pass                       |
-| Docs typecheck     | `pnpm --filter docs check`                                                                        | 0 errors and 0 warnings                                           |
+| Docs typecheck     | `pnpm --filter docs check`                                                                        | no new diagnostics vs. baseline: 1 error and 10 warnings          |
 | Docs build         | `pnpm --filter docs build`                                                                        | exit 0; example mirrors and site build complete                   |
 | Lint changed files | `trunk check`                                                                                     | exit 0                                                            |
 | Inspect scope      | `git status --short`                                                                              | only in-scope source/test files plus the plan index status change |
@@ -310,7 +316,10 @@ this plan changes head metadata only.
 
 **Verify**:
 
-1. `pnpm --filter docs check` → 0 errors and 0 warnings.
+1. `pnpm --filter docs check` → no new diagnostics versus the documented
+   baseline of one PostHog environment typing error and ten warnings. The
+   baseline is confined to unchanged `posthog.ts`, tabs, ComponentSource, pan,
+   use-follow-value, and `docs/tsconfig.json` diagnostics.
 2. `pnpm --filter docs build` → exit 0 and mirror generation completes.
 3. `trunk fmt docs/src/routes docs/src/lib/seo-title-policy.spec.ts .agents/.plans/seo-title-policy` → exit 0.
 4. `trunk check` → exit 0.
@@ -359,7 +368,9 @@ follow-up comment; expected count for these known violations is 0.
 - [ ] Every extracted literal `seo.title` is at most 60 characters and unique.
 - [ ] `pnpm --filter docs exec vitest run --project server` passes (current
       inventory: 2 files and 6 tests).
-- [ ] `pnpm --filter docs check` reports 0 errors and 0 warnings.
+- [ ] `pnpm --filter docs check` introduces no diagnostics beyond the
+      documented baseline of 1 unchanged PostHog environment typing error and
+      10 unchanged warnings.
 - [ ] `pnpm --filter docs build` exits 0 and example mirror generation succeeds.
 - [ ] `trunk check` and `git diff --check` exit 0.
 - [ ] No product files outside the Scope list are modified.
@@ -389,6 +400,8 @@ Stop and report back instead of improvising if:
 - Future example pages must keep a literal `seo.title` because docs-kit mirror
   generation parses route source. The new test makes both this convention and
   the title budget visible at authoring time.
+- Repair the baseline docs typecheck separately: one PostHog environment typing
+  error and ten warnings remain in files untouched by this title-only plan.
 - The 60-character ceiling is intentionally an Ahrefs-oriented operational
   check. If the team later replaces Ahrefs or sees evidence from Search Console
   that a longer title performs better, revise the test and policy deliberately;

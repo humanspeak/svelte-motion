@@ -38,3 +38,22 @@
 - Plan defect corrected with operator approval: the drift and `Planned at` baselines are re-stamped to `6e6b54b`; Step 1/2 now use the targeted server policy command, while Commands, Step 3, Test plan, and Done criteria use the complete server project (currently two files and six tests).
 - Coverage intent is preserved: docs check/build, Trunk, diff-check, and six browser title checks remain unchanged; the baseline-invalid client project currently matches zero tests and is recorded in the plan and batch README as separate deferred maintenance. `docs/vite.config.ts` remains out of scope.
 - Action: plan amended with operator approval; Plan 001 remains TODO until remaining verification and final guard close-out pass.
+
+## Checkpoint 5 — 2026-07-10 08:48 — BLOCKED
+
+`b5cf316` · final close-out; branch contract/history at `46bea77`
+
+- Final source and unit gates pass: exact audit reports 60 details, 59 intended migrations, 56 suffix-only edits, three exact special rewrites, no subject drift, no budget/suffix/uniqueness violations, and exact standalone targets; the complete server project reports 2 files and 6/6 tests passed.
+- Build/parser gate passes: `pnpm --filter docs build` generated registry data, all 226 social images, example/doc/LLM mirrors, and the production site, then exited 0 with the Cloudflare adapter complete.
+- Required typecheck blocks PASS: the first `pnpm --filter docs check` reported 4 errors/10 warnings before generation; after the successful build corrected missing generated modules, the permitted retry still exited 1 with 1 unchanged PostHog environment typing error and 10 unchanged warnings. None of the diagnosed files differ between `31225de` and reviewed source `b5cf316`.
+- STOP respected: the amended plan requires stopping after a verification command fails twice after reasonable correction, so Trunk and browser gates were not run, README remains TODO, and no PR was opened. The snapshot hook had already formatted/linted/typechecked its staged source and the tree remains clean; `git diff --check` passes.
+- Conduct history retained: Checkpoint 2's wrong-worktree write remains a VIOLATING incident, but primary was fully restored, no accidental commit exists, and the final source/full diff is in scope.
+- Action: reported final NO-PASS to the operator. To flip to PASS, first make `pnpm --filter docs check` report 0 errors/0 warnings through a separate baseline fix/rebase or an explicitly approved plan amendment; then rerun Trunk, all six browser title checks, update README to DONE, and repeat `guard final`.
+
+## Checkpoint 6 — 2026-07-10 08:50 — PLAN AMENDED
+
+`46bea77` · operator-approved docs typecheck baseline amendment
+
+- The second plan defect is proven baseline-only: after generation, docs check reports one PostHog environment typing error and ten warnings across `posthog.ts`, tabs, ComponentSource, pan, use-follow-value, and `docs/tsconfig.json`; none of those files differ between `31225de` and reviewed source `b5cf316`.
+- The operator approved a narrow non-regression criterion: docs check may retain exactly that documented baseline but must introduce no new diagnostics. Drift and `Planned at` are re-stamped to `46bea77`; source scope and all other gates are unchanged.
+- Action: plan amended with operator approval; continue only the remaining Trunk, diff, and six browser-title gates without rerunning already-green server tests or build.
