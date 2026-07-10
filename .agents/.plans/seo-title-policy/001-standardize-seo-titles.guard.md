@@ -30,3 +30,11 @@
 - Plan defect blocks the required command: `pnpm --filter docs test` exits 1 before collecting tests because unchanged `docs/vite.config.ts:186` sets `test.environment` to `browser`, which Vitest 4.1.9 rejects. Untouched primary also exits 1 before tests (earlier, on missing ignored `docs/static/examples`), and the baseline/snapshot blobs for `docs/vite.config.ts`, `docs/package.json`, and `pnpm-lock.yaml` are identical, proving the failure is not executor-authored.
 - Narrow replacement preserves current coverage: `vitest run --project server` reports 2 files and 6/6 tests passed, and both baseline and snapshot contain zero files matching the client project's `src/**/*.svelte.{test,spec}.{js,ts}` include. No existing client test is waived.
 - Action: reported BLOCKED to the operator; the executor correctly honored the two-failure STOP condition and did not run later gates. Recommend amending Step 1/2 to use the targeted server command and Step 3/Commands/Done criteria to use the complete server-project command, while retaining check, build, Trunk, and browser gates and tracking the baseline-invalid empty client project separately. No plan amendment made without operator approval.
+
+## Checkpoint 4 — 2026-07-10 08:25 — PLAN AMENDED
+
+`6e6b54b` · operator-approved verification amendment after Checkpoint 3 blocker
+
+- Plan defect corrected with operator approval: the drift and `Planned at` baselines are re-stamped to `6e6b54b`; Step 1/2 now use the targeted server policy command, while Commands, Step 3, Test plan, and Done criteria use the complete server project (currently two files and six tests).
+- Coverage intent is preserved: docs check/build, Trunk, diff-check, and six browser title checks remain unchanged; the baseline-invalid client project currently matches zero tests and is recorded in the plan and batch README as separate deferred maintenance. `docs/vite.config.ts` remains out of scope.
+- Action: plan amended with operator approval; Plan 001 remains TODO until remaining verification and final guard close-out pass.

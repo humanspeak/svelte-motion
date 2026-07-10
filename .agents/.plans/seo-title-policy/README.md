@@ -22,6 +22,10 @@ REJECTED (with one-line rationale)
 
 - There is one plan. Add the regression test before editing title strings so
   the executor proves the test catches the current violations.
+- Revision 2026-07-10: unit verification uses the complete Vitest server
+  project because the baseline client project is invalid under Vitest 4.1.9
+  and currently matches no test files. Repairing that client project is
+  deferred; Plan 001 remains TODO pending its remaining verification gates.
 
 ## Findings considered and rejected
 

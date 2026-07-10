@@ -6,8 +6,16 @@
 > report — do not improvise. When done, update the status row in
 > `.agents/.plans/seo-title-policy/README.md`.
 >
+> Revision 2026-07-10: The operator approved replacing the baseline-broken
+> `pnpm --filter docs test` gate. Vitest 4.1.9 rejects the existing empty
+> client project's `test.environment: 'browser'` before collection; the
+> focused policy check now targets the server project, and the full unit gate
+> runs that complete project (currently two files and six tests). Repairing the
+> empty client project is deferred maintenance; `docs/vite.config.ts` remains
+> out of scope for this plan.
+>
 > **Drift check (run first)**:
-> `git diff --stat 31225de..HEAD -- docs/src/routes/+page.svelte docs/src/routes/svelte-animations/+page.svelte docs/src/routes/examples docs/vite.config.ts docs/src/lib/seo-title-policy.spec.ts`
+> `git diff --stat 6e6b54b..HEAD -- docs/src/routes/+page.svelte docs/src/routes/svelte-animations/+page.svelte docs/src/routes/examples docs/vite.config.ts docs/src/lib/seo-title-policy.spec.ts`
 > If an in-scope route changed, compare its live SEO block with the excerpts
 > below. A semantic mismatch is a STOP condition; ordinary line-number drift is
 > not.
@@ -19,7 +27,7 @@
 - **Risk**: LOW
 - **Depends on**: none
 - **Category**: docs
-- **Planned at**: commit `31225de`, 2026-07-10
+- **Planned at**: commit `6e6b54b`, 2026-07-10
 
 ## Why this matters
 
@@ -159,7 +167,7 @@ they already comply with the target policy.
 | Purpose            | Command                                                                                           | Expected on success                                               |
 | ------------------ | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
 | Format             | `trunk fmt docs/src/routes docs/src/lib/seo-title-policy.spec.ts .agents/.plans/seo-title-policy` | exit 0                                                            |
-| Focused test       | `pnpm --filter docs test`                                                                         | all docs unit tests pass                                          |
+| Docs unit tests    | `pnpm --filter docs exec vitest run --project server`                                             | current inventory: 2 files and 6 tests pass                       |
 | Docs typecheck     | `pnpm --filter docs check`                                                                        | 0 errors and 0 warnings                                           |
 | Docs build         | `pnpm --filter docs build`                                                                        | exit 0; example mirrors and site build complete                   |
 | Lint changed files | `trunk check`                                                                                     | exit 0                                                            |
@@ -237,8 +245,10 @@ violations: five titles over budget and 59 example detail pages with the old
 category segment. If it passes before source edits, the test is not exercising
 the intended files; stop and fix the test.
 
-**Verify**: `pnpm --filter docs test` → fails for the known title-policy
-violations, with readable route/title diagnostics and no unrelated failure.
+**Verify**:
+`pnpm --filter docs exec vitest run src/lib/seo-title-policy.spec.ts --project server`
+→ fails for the known title-policy violations, with readable route/title
+diagnostics and no unrelated failure.
 
 ### Step 2: Normalize every example detail title
 
@@ -254,9 +264,10 @@ Across `docs/src/routes/examples/*/+page.svelte`:
 Use a mechanical replacement for the common suffix if desired, but inspect the
 diff afterward. The diff should show only `seo.title` lines.
 
-**Verify**: run the title-policy test. Its example suffix assertions must pass;
-the only remaining failure should be a non-example over-budget title until Step
-3 is complete.
+**Verify**:
+`pnpm --filter docs exec vitest run src/lib/seo-title-policy.spec.ts --project server`.
+Its example suffix assertions must pass; the only remaining failure should be
+a non-example over-budget title until Step 3 is complete.
 
 ### Step 3: Rewrite the homepage and Svelte animations titles
 
@@ -272,8 +283,9 @@ seo.title = 'Svelte 5 Animation Patterns | Svelte Motion'
 
 Do not alter their descriptions, social-card content, H1 behavior, or analytics.
 
-**Verify**: `pnpm --filter docs test` → all title-policy assertions and all
-existing docs unit tests pass.
+**Verify**: `pnpm --filter docs exec vitest run --project server` → the current
+inventory of two files and six tests passes, including all title-policy
+assertions and all existing docs unit tests.
 
 ### Step 4: Verify rendered and generated SEO surfaces
 
@@ -326,6 +338,10 @@ follow-up comment; expected count for these known violations is 0.
 - The regression test must enumerate all current example detail routes through
   `import.meta.glob`, not hard-code only the three warned examples.
 - Prove the test catches the pre-fix state before editing strings.
+- Run `pnpm --filter docs exec vitest run --project server` to cover the full
+  current docs unit inventory (two files and six tests). The baseline-invalid
+  client project matches no test files and is deferred to separate maintenance;
+  do not change `docs/vite.config.ts` in this plan.
 - Run the docs build to exercise docs-kit's literal-field parser.
 - Browser-check the six rendered routes listed in Step 4; no screenshot test is
   warranted because layout and body content are unchanged.
@@ -341,7 +357,8 @@ follow-up comment; expected count for these known violations is 0.
 - [ ] No example detail title contains `| Examples |`.
 - [ ] `/examples` remains `Examples | Svelte Motion`.
 - [ ] Every extracted literal `seo.title` is at most 60 characters and unique.
-- [ ] `pnpm --filter docs test` passes.
+- [ ] `pnpm --filter docs exec vitest run --project server` passes (current
+      inventory: 2 files and 6 tests).
 - [ ] `pnpm --filter docs check` reports 0 errors and 0 warnings.
 - [ ] `pnpm --filter docs build` exits 0 and example mirror generation succeeds.
 - [ ] `trunk check` and `git diff --check` exit 0.
