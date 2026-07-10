@@ -9,7 +9,7 @@ description: "Compose a MotionValue<string> from multiple motion values using a 
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'useMotionTemplate | Docs | Svelte Motion'
-      seo.description = 'Compose a MotionValue<string> from multiple motion values using a tagged template literal. Build dynamic filter, transform, and background values reactively in Svelte 5.'
+      seo.description = 'Compose a MotionValue<string> from multiple motion values with a tagged template literal — build dynamic filter, transform, and background values in Svelte.'
       seo.ogTitle = 'useMotionTemplate'
       seo.ogTagline = 'Compose motion values into CSS template strings'
       seo.ogFeatures = ['Template Literals', 'CSS Composition', 'MotionValue', 'Reactive Strings']

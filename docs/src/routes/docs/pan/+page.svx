@@ -11,7 +11,7 @@ description: Pan gesture primitive — pointer offset/velocity reporting without
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'Pan | Docs | Svelte Motion'
-      seo.description = 'Pan is the gesture primitive that powers swipe-to-dismiss drawers, swipe-to-delete rows, and custom carousels. Lower-level than drag — pure offset and velocity reporting.'
+      seo.description = 'The pan gesture primitive reports pointer offset and velocity — build swipe-to-dismiss drawers, swipe-to-delete rows, and custom carousels in Svelte.'
       seo.ogTitle = 'Pan'
       seo.ogTagline = 'Pointer offset + velocity, no constraints'
       seo.ogFeatures = ['Pan', 'Gestures', 'Swipe', 'Velocity']

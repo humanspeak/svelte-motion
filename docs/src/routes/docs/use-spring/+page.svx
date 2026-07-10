@@ -9,7 +9,7 @@ description: "Create a spring-animated motion value with physics-based motion."
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'useSpring | Docs | Svelte Motion'
-      seo.description = 'Create a spring-animated motion value with physics-based motion. Animate values with configurable stiffness, damping, mass, duration, and bounce using Svelte Motion.'
+      seo.description = 'Create a spring-animated motion value in Svelte with physics-based motion — configurable stiffness, damping, mass, duration, and bounce.'
       seo.ogTitle = 'useSpring'
       seo.ogTagline = 'Spring-based motion values with natural physics'
       seo.ogFeatures = ['Spring Physics', 'Motion Values', 'Stiffness Control', 'Damping']

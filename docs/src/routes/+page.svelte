@@ -26,7 +26,7 @@
     if (seo) {
         seo.title = 'Svelte Motion · Framer Motion-compatible animation library for Svelte 5'
         seo.description =
-            'Svelte Motion is a Framer Motion-compatible animation library for Svelte 5. Declarative motion.<tag> components, AnimatePresence exit animations, gestures (hover/tap/drag/focus/in-view), variants, FLIP layout, shared-layout, spring physics, and scroll-linked motion values.'
+            'Framer Motion-compatible animation library for Svelte 5 — motion components, AnimatePresence, gestures, variants, layout, springs, and scroll.'
         seo.ogTitle = 'Svelte Motion'
         seo.ogTagline =
             'Framer Motion for Svelte 5 — declarative motion components, gestures, variants, layout, spring, and scroll-linked values.'
@@ -372,11 +372,7 @@
 </script>
 
 <svelte:head>
-    <title>Svelte Motion · Framer Motion-compatible animation library for Svelte 5</title>
-    <meta
-        name="description"
-        content="Svelte Motion is a Framer Motion-compatible animation library for Svelte 5. Declarative motion.<tag> components, AnimatePresence exit animations, gestures, variants, FLIP layout, shared-layout, spring physics, and scroll-linked motion values."
-    />
+    <!-- Title and meta description are emitted by SeoHead (see seo.title / seo.description above). -->
     <!-- eslint-disable-next-line svelte/no-at-html-tags -- static JSON-LD, no user input -->
     {@html softwareJsonLd}
 </svelte:head>

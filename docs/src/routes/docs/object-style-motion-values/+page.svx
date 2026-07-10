@@ -11,7 +11,7 @@ description: 'Pass MotionValues directly to object-form style props.'
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'Object style MotionValues | Docs | Svelte Motion'
-      seo.description = 'Pass MotionValues directly to object-form style props and let motion-dom update inline styles.'
+      seo.description = 'Pass MotionValues directly to object-form style props in Svelte and let motion-dom update inline styles imperatively, outside the render cycle.'
       seo.ogTitle = 'Object style MotionValues'
       seo.ogTagline = 'MotionValue interpolation directly inside style objects'
       seo.ogFeatures = ['MotionValue', 'Style Objects', 'Transforms', 'motion-dom']

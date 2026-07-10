@@ -11,7 +11,7 @@ description: Component-free motion values — motionValue, springValue, transfor
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'Vanilla motion values | Docs | Svelte Motion'
-      seo.description = 'Component-free motion values for Svelte — motionValue, springValue, transformValue, mapValue, element effects, and the toMotionValue bridge that turns runes into motion values.'
+      seo.description = 'Component-free motion values for Svelte — motionValue, springValue, transformValue, mapValue, element effects, and the toMotionValue rune bridge.'
       seo.ogTitle = 'Vanilla Motion Values'
       seo.ogTagline = 'Motion values anywhere — module scope, stores, event handlers'
       seo.ogFeatures = ['No Components Needed', 'Rune Bridge', 'Element Effects', 'Manual Lifecycle']
