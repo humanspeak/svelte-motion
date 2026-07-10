@@ -7,6 +7,7 @@ const nextFrame = (page: Page) =>
 
 const beginHorizontalDrag = async (page: Page, card: Locator) => {
     await card.waitFor({ state: 'visible' })
+    await card.scrollIntoViewIfNeeded()
     const box = await card.boundingBox()
     if (!box) throw new Error('missing drag-card bounds')
 

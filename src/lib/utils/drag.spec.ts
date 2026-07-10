@@ -1,5 +1,6 @@
+import { motionValue } from 'motion-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { applyElastic, attachDrag, resolveConstraints } from './drag.js'
+import { applyElastic, attachDrag, buildDragTransform, resolveConstraints } from './drag.js'
 
 vi.mock('motion', () => {
     const animateMock = vi.fn(() => ({ finished: Promise.resolve() }))
@@ -24,6 +25,46 @@ describe('utils/drag', () => {
     it('resolveConstraints: pixel object passthrough', () => {
         const c = resolveConstraints(null, { top: -10, left: -5, right: 5, bottom: 10 })
         expect(c).toMatchObject({ top: -10, left: -5, right: 5, bottom: 10 })
+    })
+
+    it('builds live drag transforms in upstream channel order', () => {
+        expect(buildDragTransform({ skewX: 3, rotate: 8, x: 20 })).toBe(
+            'translateX(20px) rotate(8deg) skewX(3deg)'
+        )
+    })
+
+    it('passes live drag values through transformTemplate', () => {
+        let received: Record<string, string | number> = {}
+        const transform = buildDragTransform({ x: 20, rotateX: 30 }, '', (latest, generated) => {
+            received = { ...latest }
+            return `perspective(600px) ${generated}`
+        })
+
+        expect(received).toMatchObject({ x: '20px', rotateX: '30deg' })
+        expect(transform).toBe('perspective(600px) translateX(20px) rotateX(30deg)')
+    })
+
+    it('leaves transform rendering to a bound MotionValue when no other channel is active', () => {
+        const el = document.createElement('div')
+        el.style.transform = 'rotate(12deg)'
+        document.body.appendChild(el)
+        const x = motionValue(0)
+        const cleanup = attachDrag(el, {
+            axis: 'x',
+            mergedTransition: { duration: 0 },
+            boundMotionValues: { x }
+        })
+
+        el.dispatchEvent(
+            new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 1 })
+        )
+        window.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: 25, clientY: 10, pointerId: 1 })
+        )
+
+        expect(x.get()).toBe(15)
+        expect(el.style.transform).toBe('rotate(12deg)')
+        cleanup()
     })
 
     it('attachDrag: attaches pointerdown and animates during move', () => {

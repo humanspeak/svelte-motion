@@ -31,8 +31,30 @@ import {
 } from '$lib/utils/dragMath'
 import { deriveBoundaryPhysics } from '$lib/utils/dragParams'
 import { computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
+import {
+    buildGestureTransform,
+    collectGestureTransformValues as collectTransformValues,
+    splitGestureTransformValues as splitTransformValues,
+    type GestureTransformValues as DragTransformValues
+} from '$lib/utils/transformComposer'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
-import { animateValue, type AnimationPlaybackControlsWithThen, type MotionValue } from 'motion-dom'
+import {
+    animateMotionValue,
+    animateValue,
+    getValueAsType,
+    motionValue,
+    numberValueTypes,
+    type AnimationPlaybackControlsWithThen,
+    type AnyResolvedKeyframe,
+    type MotionValue,
+    type TransformTemplate,
+    type ValueAnimationTransition
+} from 'motion-dom'
+
+/**
+ * Drag-specific alias for the shared gesture transform writer.
+ */
+export const buildDragTransform = buildGestureTransform
 
 type Rect = {
     top: number
@@ -77,10 +99,12 @@ export type AttachDragOptions = {
         onEnd?: (e: PointerEvent, info: DragInfo) => void
         onDirectionLock?: (axis: 'x' | 'y') => void
         onTransitionEnd?: () => void
-        onVisualUpdate?: (transform: string) => void
+        onVisualUpdate?: (transform: string, values: DragTransformValues) => void
     }
     baselineSources?: { initial?: Record<string, unknown>; animate?: Record<string, unknown> }
+    getBaseTransformValues?: () => DragTransformValues
     getBaseTransform?: () => string
+    transformTemplate?: TransformTemplate
     propagation?: boolean
     snapToOrigin?: boolean | 'x' | 'y'
     /**
@@ -393,6 +417,18 @@ export type AttachDragCleanup = (() => void) & {
  */
 const sessionListenerOptions: AddEventListenerOptions = { passive: true, capture: true }
 
+const addPixelOffset = (
+    value: AnyResolvedKeyframe | undefined,
+    offset: number
+): AnyResolvedKeyframe => {
+    if (value === undefined || value === 0 || value === '0' || value === '0px') return offset
+    if (typeof value === 'number') return value + offset
+
+    const pxValue = value.match(/^(-?(?:\d+(?:\.\d+)?|\.\d+))px$/)
+    if (pxValue) return `${Number.parseFloat(pxValue[1]) + offset}px`
+    return `calc(${value} + ${offset}px)`
+}
+
 export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDragCleanup => {
     const EL_ID = el.getAttribute('data-testid') || el.id || el.tagName
     pwLog('[drag] attach', {
@@ -444,13 +480,21 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     let history: Array<{ x: number; y: number; t: number }> = []
 
     let whileDragBaseline: Record<string, unknown> | null = null
+    const restingTransformValues: DragTransformValues = {
+        ...collectTransformValues(opts.baselineSources?.initial),
+        ...collectTransformValues(opts.baselineSources?.animate)
+    }
+    const gestureTransformValues: DragTransformValues = {}
+    const crossAxisOffset = { x: 0, y: 0 }
+    const transformAnimations = new Map<
+        string,
+        { value: MotionValue<AnyResolvedKeyframe>; unsubscribe: () => void }
+    >()
     let transformComposerRaf = 0
     let transformComposerActive = false
     let postReleaseAnimationActive = false
     let whileDragRestoreActive = false
-    let managedScaleActive = false
-    let managedScale = 1
-    let scaleAnimation: AnimationPlaybackControlsWithThen | null = null
+    let whileDragAnimationGeneration = 0
     let stopInertia: (() => void) | null = null
 
     const markDragTransformActive = (active: boolean) => {
@@ -532,60 +576,71 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             : null
 
     /**
-     * Write absolute element-space translation by mutating
-     * `el.style.transform` DIRECTLY — no `animate()`, no epsilon skip,
-     * no Playwright retry. The translate channel is rewritten while any
-     * non-translate transform the element already carries (e.g. a
-     * `whileDrag` scale) is preserved as a suffix.
+     * Write the complete live transform directly and synchronously.
      *
-     * Why this exists separately from `setXY`: routing through
-     * `animate(el, _, { duration: 0 })` defers the write to Motion's
-     * scheduler, costing ~1 frame before the new position paints. For
-     * the projection-driven origin compensation (where a layout swap
-     * must keep the dragged element under the cursor in the SAME frame
-     * the swap commits), that frame of lag manifests as a visible
-     * wobble. This path lands synchronously. See #379 / the
-     * `adjustOrigin` hook below.
+     * Drag translation, projection compensation, style/animate baselines,
+     * and active gesture transforms all flow through motion-dom's canonical
+     * `buildTransform` ordering. The synchronous + microtask + rAF writes are
+     * intentional: projection compensation must paint in the same frame as a
+     * layout swap (#379), while the follow-up writes win races with reactive
+     * style effects without adding pointer lag.
      */
     const setXYImmediate = (x: number, y: number) => {
-        // An axis backed by a bound MotionValue is rendered through motion-dom's
-        // styleEffect (and reflected in `getBaseTransform()`). Emitting a translate
-        // for it here too would apply the offset twice (#421), so only non-bound
-        // axes get the synchronous, no-lag translate write (#379).
-        const parts: string[] = []
-        if (dragX && !boundX) parts.push(`translateX(${x}px)`)
-        if (dragY && !boundY) parts.push(`translateY(${y}px)`)
-        const scalePart =
-            managedScaleActive && Math.abs(managedScale - 1) > 0.0001
-                ? `scale(${managedScale})`
-                : ''
-        const liveTransform = [...parts, scalePart].filter(Boolean).join(' ')
+        if (dragX) applied.x = x
+        if (dragY) applied.y = y
 
-        // `liveTransform` is empty only when every dragged axis is
-        // MotionValue-backed and there's no managed scale — i.e. nothing here to
-        // write, so styleEffect owns the transform and writing an empty/stale
-        // value would clobber it (#421). Otherwise this is the unchanged no-lag
-        // write path (#379) — note a no-bound drag always has a translate, so
-        // `liveTransform` is non-empty and the write always runs.
-        if (liveTransform) {
-            el.dataset.svelteMotionDragTransform = liveTransform
+        // Bound MotionValues remain the public source of truth (#421). Update
+        // them before reading base transform values so the full composer sees
+        // the same value that styleEffect will render.
+        if (boundX && boundX.get() !== x) boundX.set(x)
+        if (boundY && boundY.get() !== y) boundY.set(y)
+
+        const latestValues: DragTransformValues = {
+            ...(opts.getBaseTransformValues?.() ?? {}),
+            ...restingTransformValues,
+            ...gestureTransformValues
+        }
+
+        // Unbound drag axes are offsets from their authored/resting channel.
+        // Bound axes are already represented by getBaseTransformValues().
+        if (dragX && !boundX) latestValues.x = addPixelOffset(latestValues.x, x)
+        if (dragY && !boundY) latestValues.y = addPixelOffset(latestValues.y, y)
+        if (!dragX && crossAxisOffset.x) {
+            latestValues.x = addPixelOffset(latestValues.x, crossAxisOffset.x)
+        }
+        if (!dragY && crossAxisOffset.y) {
+            latestValues.y = addPixelOffset(latestValues.y, crossAxisOffset.y)
+        }
+
+        // Preserve the bound-MotionValue empty writer branch: when every drag
+        // axis is styleEffect-owned and no gesture/projection channel is active,
+        // there is nothing for this synchronous path to paint (#421).
+        const shouldWrite =
+            (dragX && !boundX) ||
+            (dragY && !boundY) ||
+            crossAxisOffset.x !== 0 ||
+            crossAxisOffset.y !== 0 ||
+            Object.keys(gestureTransformValues).length > 0
+
+        let composedTransform = ''
+        if (shouldWrite) {
+            composedTransform =
+                buildDragTransform(
+                    latestValues,
+                    opts.getBaseTransform?.() ?? '',
+                    opts.transformTemplate
+                ) || 'none'
+            el.dataset.svelteMotionDragTransform = composedTransform
             const writeComposedTransform = () => {
-                if (el.dataset.svelteMotionDragTransform !== liveTransform) return
-                const baseTransform = opts.getBaseTransform?.() ?? ''
-                el.style.transform = [liveTransform, baseTransform].filter(Boolean).join(' ')
+                if (el.dataset.svelteMotionDragTransform !== composedTransform) return
+                el.style.transform = composedTransform
             }
 
             writeComposedTransform()
             queueMicrotask(writeComposedTransform)
             requestAnimationFrame(writeComposedTransform)
         }
-        if (dragX) applied.x = x
-        if (dragY) applied.y = y
-        // Dual-write the bound MotionValue(s) so `y.get()`, `style={{ y }}`, and a
-        // follow-up `animate(y, …)` stay in sync with the drag (#421).
-        if (boundX && boundX.get() !== x) boundX.set(x)
-        if (boundY && boundY.get() !== y) boundY.set(y)
-        opts.callbacks?.onVisualUpdate?.(liveTransform)
+        opts.callbacks?.onVisualUpdate?.(composedTransform, latestValues)
     }
 
     const startTransformComposer = () => {
@@ -619,62 +674,69 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         })
     }
 
-    const readCurrentScale = () => {
-        const transform = getComputedStyle(el).transform
-        if (!transform || transform === 'none') return 1
-        const matrix = transform.match(/matrix\(([^)]+)\)/)
-        if (!matrix) return 1
-        const [a, b] = matrix[1]
-            .split(',')
-            .map((part) => Number.parseFloat(part.trim()))
-            .slice(0, 2)
-        if (!Number.isFinite(a)) return 1
-        if (!Number.isFinite(b)) return a
-        return Math.hypot(a, b)
+    const stopTransformAnimation = (key: string) => {
+        const active = transformAnimations.get(key)
+        if (!active) return
+        active.value.stop()
+        active.unsubscribe()
+        transformAnimations.delete(key)
     }
 
-    const animateManagedScale = (
+    const stopTransformAnimations = () => {
+        for (const key of [...transformAnimations.keys()]) stopTransformAnimation(key)
+    }
+
+    const normalizeTransformTarget = (
+        key: string,
+        target: unknown
+    ): AnyResolvedKeyframe | Array<AnyResolvedKeyframe | null> | undefined => {
+        const normalize = (value: unknown): AnyResolvedKeyframe | null | undefined => {
+            if (value === null) return null
+            if (typeof value !== 'string' && typeof value !== 'number') return undefined
+            const typedValue: unknown = getValueAsType(value, numberValueTypes[key])
+            return typeof typedValue === 'string' || typeof typedValue === 'number'
+                ? typedValue
+                : value
+        }
+
+        if (!Array.isArray(target)) return normalize(target) ?? undefined
+        const keyframes = target.map(normalize).filter((value) => value !== undefined)
+        return keyframes.length ? keyframes : undefined
+    }
+
+    const startTransformAnimation = (
+        key: string,
         target: unknown,
-        transition: AnimationOptions | undefined,
-        onComplete?: () => void
-    ) => {
-        const targetScale = Number(Array.isArray(target) ? target[target.length - 1] : target)
-        if (!Number.isFinite(targetScale)) {
-            onComplete?.()
-            return null
-        }
+        transition: AnimationOptions | undefined
+    ): AnimationPlaybackControlsWithThen | null => {
+        const normalizedTarget = normalizeTransformTarget(key, target)
+        if (normalizedTarget === undefined) return null
 
-        scaleAnimation?.stop()
-        managedScaleActive = true
-        managedScale = readCurrentScale()
-        const valueTransition = {
-            ...((transition ?? mergedTransition ?? {}) as Record<string, unknown>)
-        }
-        if (typeof valueTransition.duration === 'number') {
-            valueTransition.duration = valueTransition.duration * 1000
-        }
-        if (typeof valueTransition.delay === 'number') {
-            valueTransition.delay = valueTransition.delay * 1000
-        }
-        if (typeof valueTransition.repeatDelay === 'number') {
-            valueTransition.repeatDelay = valueTransition.repeatDelay * 1000
-        }
-
-        const controls = animateValue({
-            ...valueTransition,
-            keyframes: [managedScale, targetScale],
-            onUpdate: (value: number) => {
-                managedScale = value
-                setXYImmediate(applied.x, applied.y)
-            },
-            onComplete: () => {
-                managedScale = targetScale
-                setXYImmediate(applied.x, applied.y)
-                onComplete?.()
-            }
+        stopTransformAnimation(key)
+        const baseValues = opts.getBaseTransformValues?.() ?? {}
+        const neutral = key.startsWith('scale') ? 1 : 0
+        const current =
+            gestureTransformValues[key] ??
+            restingTransformValues[key] ??
+            baseValues[key] ??
+            getValueAsType(neutral, numberValueTypes[key])
+        const value = motionValue<AnyResolvedKeyframe>(current)
+        gestureTransformValues[key] = current
+        const unsubscribe = value.on('change', (latest) => {
+            gestureTransformValues[key] = latest
+            setXYImmediate(applied.x, applied.y)
         })
-        scaleAnimation = controls
-        return controls
+        transformAnimations.set(key, { value, unsubscribe })
+        setXYImmediate(applied.x, applied.y)
+        void value.start(
+            animateMotionValue(
+                key,
+                value,
+                normalizedTarget,
+                (transition ?? mergedTransition) as unknown as ValueAnimationTransition
+            )
+        )
+        return value.animation ?? null
     }
 
     /**
@@ -712,20 +774,20 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         // slot can shift on either axis.
         origin.x += dx
         origin.y += dy
-        // The VISUAL write is `setXYImmediate`, which only writes the axis
-        // this drag manages (`opts.axis`). For the dragged axis that pins
-        // the element same-frame; the cross-axis case (e.g. drag="x" + a
-        // y-shift) only updates `origin`, not the transform. Fully
-        // rendering cross-axis compensation needs to route through the
-        // Motion value the move path uses (a direct write here would be
-        // wiped by the next `setXY`), so it's finalized when this hook is
-        // wired in #310. The common Reorder case (drag axis === the shift
-        // axis) is fully compensated today.
-        setXYImmediate(applied.x + dx, applied.y + dy)
+        // Dragged axes update their gesture offset. Non-dragged axes retain a
+        // dedicated projection offset in the shared transform map, so a
+        // drag="x" item remains pinned when its layout slot moves on y (and
+        // vice versa). Every composer frame now paints both kinds of delta.
+        if (!dragX) crossAxisOffset.x += dx
+        if (!dragY) crossAxisOffset.y += dy
+        setXYImmediate(applied.x + (dragX ? dx : 0), applied.y + (dragY ? dy : 0))
     }
 
     const startWhileDrag = () => {
         if (!opts.whileDrag) return
+        whileDragAnimationGeneration++
+        whileDragRestoreActive = false
+        stopTransformAnimations()
         // Baseline restore target: compute from sources
         whileDragBaseline = computeHoverBaseline(el, {
             initial: opts.baselineSources?.initial,
@@ -736,8 +798,10 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             opts.whileDrag as Record<string, unknown>
         )
         startTransformComposer()
-        const { scale, ...nativeKeyframes } = keyframes
-        if (scale != null) animateManagedScale(scale, transition)
+        const { transform, native: nativeKeyframes } = splitTransformValues(keyframes)
+        for (const [key, target] of Object.entries(transform)) {
+            startTransformAnimation(key, target, transition)
+        }
         if (Object.keys(nativeKeyframes).length > 0) {
             animate(el, nativeKeyframes as DOMKeyframesDefinition, transition ?? mergedTransition)
         }
@@ -750,7 +814,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             return
         }
         whileDragRestoreActive = true
-        const { scale, ...nativeBaseline } = baseline
+        const generation = ++whileDragAnimationGeneration
+        const { transform, native: nativeBaseline } = splitTransformValues(baseline)
         const restore =
             Object.keys(nativeBaseline).length > 0
                 ? animate(el, nativeBaseline as unknown as DOMKeyframesDefinition, mergedTransition)
@@ -758,29 +823,20 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         whileDragBaseline = null
 
         const finishRestore = () => {
+            if (generation !== whileDragAnimationGeneration) return
+            stopTransformAnimations()
+            for (const key of Object.keys(transform)) delete gestureTransformValues[key]
+            setXYImmediate(applied.x, applied.y)
             whileDragRestoreActive = false
-            if (managedScaleActive && Math.abs(managedScale - 1) <= 0.0001) {
-                managedScale = 1
-                setXYImmediate(applied.x, applied.y)
-                managedScaleActive = false
-            }
             maybeStopTransformComposer()
         }
 
-        const scaleRestore =
-            scale != null || managedScaleActive
-                ? animateManagedScale(scale ?? 1, mergedTransition, () => {
-                      managedScale = Number(scale ?? 1)
-                      if (Math.abs(managedScale - 1) <= 0.0001) {
-                          managedScale = 1
-                          setXYImmediate(applied.x, applied.y)
-                          managedScaleActive = false
-                      }
-                  })
-                : null
-
         const restorePromises: PromiseLike<unknown>[] = []
-        for (const control of [restore, scaleRestore]) {
+        for (const [key, target] of Object.entries(transform)) {
+            const control = startTransformAnimation(key, target, mergedTransition)
+            if (control) restorePromises.push(control.finished)
+        }
+        for (const control of [restore]) {
             if (control && typeof (control as PromiseLike<unknown>).then === 'function') {
                 restorePromises.push(control as PromiseLike<unknown>)
             }
@@ -1459,7 +1515,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         pwLog('[drag] detach', { el: EL_ID })
         markDragTransformActive(false)
         stopTransformComposer()
-        scaleAnimation?.stop()
+        stopTransformAnimations()
         stopConstraintResizeObserver?.()
         el.removeEventListener('pointerdown', onPointerDown)
         el.removeEventListener('pointermove', onPointerMove as EventListener)

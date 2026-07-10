@@ -1,6 +1,10 @@
-import { parseMatrixTranslate } from '$lib/utils/dragMath'
-import { type AnimationOptions, type DOMKeyframesDefinition, animate } from 'motion'
-import { animateValue, hover } from 'motion-dom'
+import {
+    buildGestureTransform,
+    collectGestureTransformValues,
+    type GestureTransformValues
+} from '$lib/utils/transformComposer'
+import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
+import { animateValue, hover, type TransformTemplate } from 'motion-dom'
 
 /**
  * Determine whether the current environment supports true hover.
@@ -49,24 +53,6 @@ const readTransformScale = (el: HTMLElement): number => {
     return Math.hypot(a, b)
 }
 
-const readTransformRotation = (el: HTMLElement): string | undefined => {
-    const inlineTransform = el.style.transform || ''
-    const rotateMatch = inlineTransform.match(/(?:^|\s)rotate\(([^)]+)\)/)
-    if (rotateMatch) return rotateMatch[1]
-
-    const computedTransform = getComputedStyle(el).transform
-    if (!computedTransform || computedTransform === 'none') return undefined
-    const matrix = computedTransform.match(/matrix\(([^)]+)\)/)
-    if (!matrix) return undefined
-
-    const [a, b] = matrix[1].split(',').map((part) => Number.parseFloat(part.trim()))
-    if (!Number.isFinite(a) || !Number.isFinite(b)) return undefined
-
-    const degrees = Math.atan2(b, a) * (180 / Math.PI)
-    if (Math.abs(degrees) < 0.001) return undefined
-    return `${degrees}deg`
-}
-
 const getFinalNumber = (value: unknown): number | null => {
     const raw: unknown = Array.isArray(value) ? value[value.length - 1] : value
     const parsed = typeof raw === 'number' ? raw : Number.parseFloat(String(raw))
@@ -83,20 +69,6 @@ const toMillisecondsTransition = (
         }
     }
     return valueTransition
-}
-
-const writeComposedScale = (el: HTMLElement, scale: number) => {
-    const { tx, ty } = parseMatrixTranslate(getComputedStyle(el).transform || 'none')
-    const rotate = readTransformRotation(el)
-
-    el.style.transform = [
-        `translateX(${tx}px)`,
-        `translateY(${ty}px)`,
-        Math.abs(scale - 1) > 0.0001 ? `scale(${scale})` : '',
-        rotate == null ? '' : `rotate(${rotate})`
-    ]
-        .filter(Boolean)
-        .join(' ')
 }
 
 /**
@@ -186,6 +158,13 @@ export const computeHoverBaseline = (
     return baseline
 }
 
+type HoverTransformComposerOptions = {
+    getBaseTransformValues?: () => GestureTransformValues
+    getLiveTransformValues?: () => GestureTransformValues | null
+    getBaseTransform?: () => string
+    transformTemplate?: TransformTemplate
+}
+
 /**
  * Attach whileHover interactions to an element with capability gating.
  *
@@ -199,6 +178,7 @@ export const computeHoverBaseline = (
  * @param mergedTransition Root/component merged transition.
  * @param callbacks Optional lifecycle callbacks for hover start/end.
  * @param baselineSources Optional sources used to compute baseline.
+ * @param transformComposer Optional shared transform sources used by scale animation.
  * @return Cleanup function to remove hover listeners.
  */
 export const attachWhileHover = (
@@ -206,12 +186,33 @@ export const attachWhileHover = (
     whileHover: Record<string, unknown> | undefined,
     mergedTransition: AnimationOptions,
     callbacks?: { onStart?: () => void; onEnd?: () => void },
-    baselineSources?: { initial?: Record<string, unknown>; animate?: Record<string, unknown> }
+    baselineSources?: { initial?: Record<string, unknown>; animate?: Record<string, unknown> },
+    transformComposer?: HoverTransformComposerOptions
 ): (() => void) => {
     if (!whileHover) return () => {}
 
     let hoverBaseline: Record<string, unknown> | null = null
     let scaleAnimation: { stop?: () => void } | null = null
+    let fallbackBaseTransform = ''
+    const restingTransformValues: GestureTransformValues = {
+        ...collectGestureTransformValues(baselineSources?.initial),
+        ...collectGestureTransformValues(baselineSources?.animate)
+    }
+
+    const writeComposedScale = (scale: number) => {
+        const transform =
+            buildGestureTransform(
+                {
+                    ...(transformComposer?.getBaseTransformValues?.() ?? {}),
+                    ...restingTransformValues,
+                    ...(transformComposer?.getLiveTransformValues?.() ?? {}),
+                    scale
+                },
+                transformComposer?.getBaseTransform?.() ?? fallbackBaseTransform,
+                transformComposer?.transformTemplate
+            ) || 'none'
+        el.style.transform = transform
+    }
 
     const stopScaleAnimation = () => {
         scaleAnimation?.stop?.()
@@ -234,10 +235,10 @@ export const attachWhileHover = (
             ...toMillisecondsTransition(transition ?? mergedTransition),
             keyframes: [readTransformScale(el), targetScale],
             onUpdate: (value: number) => {
-                writeComposedScale(el, value)
+                writeComposedScale(value)
             },
             onComplete: () => {
-                writeComposedScale(el, targetScale)
+                writeComposedScale(targetScale)
                 scaleAnimation = null
                 onComplete?.()
             }
@@ -256,6 +257,7 @@ export const attachWhileHover = (
             animate: baselineSources?.animate,
             whileHover
         })
+        fallbackBaseTransform = transformComposer ? '' : el.style.transform
         callbacks?.onStart?.()
         const { keyframes, transition } = splitHoverDefinition(whileHover)
         const { scale, ...nativeKeyframes } = keyframes
