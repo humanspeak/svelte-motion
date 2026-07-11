@@ -55,6 +55,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'A polished constrained-drag stage showing elastic overdrag, ref bounds, and spring settling.'
     },
+    'drag-transforms': {
+        title: 'Drag Transforms',
+        description:
+            'Drag translation composed with authored rotate, skew, perspective, and whileDrag transform channels.'
+    },
     'fancy-like-button': {
         title: 'Fancy Like Button',
         description: 'Interactive fancy like button animation example using Svelte Motion.'

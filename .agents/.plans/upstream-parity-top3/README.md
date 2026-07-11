@@ -17,7 +17,7 @@ the A2 projection issues) — see "Superseded issues" below.
 | ---- | -------------------------------------------------------------------- | ---------- | ------ | ---------- | -------------------------------------------------------------------------- | ------ |
 | 001  | Re-type `animate` for AugmentedMotionValue (kill all 10 casts)       | P1 — FIRST | S–M    | —          | Small — delete casts from docs examples; check prose                       | DONE   |
 | 002  | SVG MotionValue attribute binding + attrX/attrY/attrScale            | P1         | M      | —          | **YES — new docs page** (`docs/svg-animation`)                             | DONE   |
-| 003  | Full transform composition during drag (buildTransform semantics)    | P1         | M      | —          | No public docs; in-code decision comments must be updated                  | TODO   |
+| 003  | Full transform composition during drag (buildTransform semantics)    | P1         | M      | —          | No public docs; in-code decision comments must be updated                  | DONE   |
 | 004  | Motion-dom projection authoritative (page-space, retire legacy FLIP) | P1         | L      | 003        | **YES — update** `docs/layout-animations`; shared-layout page as follow-up | TODO   |
 | 005  | Apple Intelligence wavy glow border — flagship example (smooth)      | P2 — LAST  | M      | 002        | **YES — new example page** (`examples/ai-glow-border`) + nav + sitemap     | DONE   |
 
@@ -45,6 +45,13 @@ REJECTED (with one-line rationale)
   / 2 skipped (both skips pre-existing), docs check 0 errors, `trunk check`
   clean. Guard Finding 8 addressed — the tag-casing e2e now asserts after the
   `{#if mounted}` remount and was confirmed to FAIL with the fix reverted.
+
+- 003: **DONE** 2026-07-10. Drag translation, cross-axis projection
+  compensation, active 2D/3D gesture transforms, authored style channels, and
+  transformTemplate now render through one motion-dom `buildTransform` writer.
+  The same writer replaced hover's partial scale composer; hover enter/leave
+  retains settled drag channels. Final gates: `pnpm check` 0 errors, unit
+  759/759, drag/reorder e2e 76 passed / 1 skipped, trunk clean.
 
 - 005: **DONE** 2026-07-10, executed with heavy maintainer-driven design
   iteration that deliberately superseded the plan's letter (maintainer:

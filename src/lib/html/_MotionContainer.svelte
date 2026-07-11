@@ -28,10 +28,12 @@
     import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
     import {
         animateSingleValue,
+        isMotionValue,
         motionValue,
         readTransformValue,
         styleEffect,
         svgEffect,
+        transformProps,
         type MotionValue,
         type ValueAnimationTransition
     } from 'motion-dom'
@@ -325,25 +327,31 @@
 
     const serializedStyleProp = $derived(serializeMotionStyle(styleProp, transformTemplateProp))
     const userBaseTransform = $derived(extractTransform(styleProp))
-    let liveGestureTransform = $state<string | null>(null)
-    const liveGestureComposedTransform = $derived.by(() => {
-        if (!liveGestureTransform) return null
+    const getStyleTransformValues = () => {
+        if (!styleProp || typeof styleProp !== 'object' || Array.isArray(styleProp)) return {}
 
-        const { transform } = splitSerializedTransform(serializedStyleProp)
-        return [liveGestureTransform, transform].filter(Boolean).join(' ')
-    })
+        const values: Record<string, string | number> = {}
+        for (const [key, source] of Object.entries(styleProp)) {
+            if (!transformProps.has(key)) continue
+            const value = isMotionValue(source) ? source.get() : source
+            if (typeof value === 'string' || typeof value === 'number') values[key] = value
+        }
+        return values
+    }
+    let liveGestureTransform = $state<string | null>(null)
+    let liveGestureTransformValues: Record<string, string | number> | null = null
     const serializedStyleWithLiveGestureTransform = $derived.by(() => {
-        if (!liveGestureComposedTransform) return serializedStyleProp
+        if (!liveGestureTransform) return serializedStyleProp
 
         const { rest } = splitSerializedTransform(serializedStyleProp)
-        return `${rest}${rest ? '; ' : ''}transform: ${liveGestureComposedTransform}`
+        return `${rest}${rest ? '; ' : ''}transform: ${liveGestureTransform}`
     })
 
     $effect(() => {
-        if (!element || !liveGestureComposedTransform) return
-        if (element.style.transform === liveGestureComposedTransform) return
+        if (!element || !liveGestureTransform) return
+        if (element.style.transform === liveGestureTransform) return
 
-        element.style.transform = liveGestureComposedTransform
+        element.style.transform = liveGestureTransform
     })
 
     const projectionParent = getProjectionParent()
@@ -1583,7 +1591,8 @@
                 if (styleValues.x) bound.x = styleValues.x as MotionValue<number>
                 if (styleValues.y) bound.y = styleValues.y as MotionValue<number>
                 return bound.x || bound.y ? bound : undefined
-            })()
+            })(),
+            getBaseTransformValues: getStyleTransformValues
         }))
         const opts = {
             axis,
@@ -1604,12 +1613,16 @@
                 onTransitionEnd: () => {
                     onDragTransitionEndProp?.()
                 },
-                onVisualUpdate: (transform: string) => {
+                onVisualUpdate: (transform: string, values: Record<string, string | number>) => {
                     liveGestureTransform = transform || null
+                    // `values` is freshly allocated per composer frame, so no copy.
+                    liveGestureTransformValues = values
                 }
             },
             baselineSources: dragRuntimeOptions.baselineSources,
-            getBaseTransform: () => splitSerializedTransform(serializedStyleProp).transform,
+            getBaseTransformValues: dragRuntimeOptions.getBaseTransformValues,
+            getBaseTransform: () => userBaseTransform,
+            transformTemplate: transformTemplateProp,
             propagation: !!dragPropagationProp,
             snapToOrigin: dragSnapToOriginProp,
             boundMotionValues: dragRuntimeOptions.boundMotionValues
@@ -1699,7 +1712,8 @@
                 whilePanBaseline = computeHoverBaseline(element, {
                     initial: initialKeyframes ?? {},
                     animate: (resolvedAnimate ?? {}) as Record<string, unknown>,
-                    whileHover: (resolvedWhilePan ?? {}) as Record<string, unknown>
+                    whileHover: (resolvedWhilePan ?? {}) as Record<string, unknown>,
+                    baseValues: getStyleTransformValues()
                 })
                 const { keyframes, transition } = splitHoverDefinition(
                     resolvedWhilePan as Record<string, unknown>
@@ -2493,6 +2507,12 @@
             {
                 initial: (resolvedInitial ?? {}) as Record<string, unknown>,
                 animate: (resolvedAnimate ?? {}) as Record<string, unknown>
+            },
+            {
+                getBaseTransformValues: getStyleTransformValues,
+                getLiveTransformValues: () => liveGestureTransformValues,
+                getBaseTransform: () => userBaseTransform,
+                transformTemplate: transformTemplateProp
             }
         )
     })

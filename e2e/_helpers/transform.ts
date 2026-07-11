@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 
 /**
  * Read the rendered `matrix(...)` transform from an element and return the
@@ -59,3 +59,45 @@ export const readDragTranslate = (
 
         return { tx: read('X'), ty: read('Y') }
     }, selector)
+
+/** Await one rendered animation frame. */
+export const nextFrame = (page: Page) =>
+    page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
+
+/**
+ * Read the rotation (degrees) of a locator's computed transform via
+ * DOMMatrix decomposition. Handles skewed matrices, unlike the regex parser.
+ */
+export const readRotation = (card: Locator) =>
+    card.evaluate((element) => {
+        const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform)
+        return (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI
+    })
+
+/** Sample a per-frame reader across `count` consecutive animation frames. */
+export const sampleFrames = async <T>(page: Page, read: () => Promise<T>, count = 8) => {
+    const samples: T[] = []
+    for (let frame = 0; frame < count; frame++) {
+        await nextFrame(page)
+        samples.push(await read())
+    }
+    return samples
+}
+
+/**
+ * Press the pointer at a locator's center and drag 56px right, leaving the
+ * pointer held down. Returns the press origin.
+ */
+export const beginHorizontalDrag = async (page: Page, card: Locator) => {
+    await card.waitFor({ state: 'visible' })
+    await card.scrollIntoViewIfNeeded()
+    const box = await card.boundingBox()
+    if (!box) throw new Error('missing drag-card bounds')
+
+    const x = box.x + box.width / 2
+    const y = box.y + box.height / 2
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(x + 56, y, { steps: 6 })
+    return { x, y }
+}

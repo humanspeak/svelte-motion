@@ -160,6 +160,22 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/hover-authored-transforms') + searchParams}
+                    >
+                        Hover: whileHover over authored transforms
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/pan-authored-transforms') + searchParams}
+                    >
+                        Pan: whilePan over authored transforms
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/rapid-tap') + searchParams}
                     >
                         Rapid Tap (spring runaway guard)
@@ -439,6 +455,14 @@
                         href={resolve('/tests/drag/brutalist-stage') + searchParams}
                     >
                         Drag: Brutalist Stage (docs FIG-002 repro)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/while-drag-transforms') + searchParams}
+                    >
+                        Drag: whileDrag transform composition
                     </a>
                 </li>
                 <li>

@@ -18,7 +18,8 @@ const { animate: animateMock } = (await import('motion')) as unknown as {
 // Mock motion-dom.hover
 let hoverCallback: ((element: HTMLElement) => (() => void) | void) | null = null
 let hoverCleanup: (() => void) | null = null
-vi.mock('motion-dom', () => {
+vi.mock('motion-dom', async () => {
+    const actual = await vi.importActual<typeof import('motion-dom')>('motion-dom')
     const hoverMock = vi.fn(
         (el: HTMLElement, callback: (element: HTMLElement) => (() => void) | void) => {
             hoverCallback = callback
@@ -42,7 +43,7 @@ vi.mock('motion-dom', () => {
             return { stop: vi.fn(), then: vi.fn() }
         }
     )
-    return { animateValue: animateValueMock, hover: hoverMock }
+    return { ...actual, animateValue: animateValueMock, hover: hoverMock }
 })
 
 describe('utils/hover', () => {
@@ -212,6 +213,41 @@ describe('utils/hover', () => {
         hoverEnd!()
         await Promise.resolve()
         expect(onEnd).toHaveBeenCalledOnce()
+        cleanup()
+    })
+
+    it('attachWhileHover: preserves a pre-existing rotateX while animating scale', () => {
+        const el = document.createElement('div')
+        el.style.transform = 'rotateX(30deg)'
+        const cleanup = attachWhileHover(el, { scale: 1.2 }, { duration: 0 })
+
+        const hoverEnd = hoverCallback!(el)
+        expect(el.style.transform).toBe('scale(1.2) rotateX(30deg)')
+
+        hoverEnd?.()
+        expect(el.style.transform).toBe('rotateX(30deg)')
+        cleanup()
+    })
+
+    it('attachWhileHover: preserves settled drag channels when hover ends', () => {
+        const el = document.createElement('div')
+        const liveDrag = { x: 199, y: 120, rotate: 12 }
+        const cleanup = attachWhileHover(
+            el,
+            { scale: 1.02 },
+            { duration: 0 },
+            undefined,
+            undefined,
+            { getLiveTransformValues: () => liveDrag }
+        )
+
+        const hoverEnd = hoverCallback!(el)
+        expect(el.style.transform).toBe(
+            'translateX(199px) translateY(120px) scale(1.02) rotate(12deg)'
+        )
+
+        hoverEnd?.()
+        expect(el.style.transform).toBe('translateX(199px) translateY(120px) rotate(12deg)')
         cleanup()
     })
 
