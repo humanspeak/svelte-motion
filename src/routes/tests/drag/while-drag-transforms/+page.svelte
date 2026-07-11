@@ -110,6 +110,28 @@
     </section>
 
     <section>
+        <h2>Write coalescing under multi-channel whileDrag springs</h2>
+        <p class="hint">
+            Two whileDrag channels animate under a slow spring while the pointer is held still. The
+            composer should paint at most one composed transform per frame — not one per animated
+            channel.
+        </p>
+        <div class="stage">
+            <motion.div
+                class="card perf-spring-card"
+                data-testid="perf-spring-card"
+                drag="x"
+                dragMomentum={false}
+                whileDrag={{ rotate: 90, scale: 1.3 }}
+                transition={{ type: 'spring', stiffness: 60, damping: 10 }}
+                style={{ rotate: -8 }}
+            >
+                slow spring · 2 channels
+            </motion.div>
+        </div>
+    </section>
+
+    <section>
         <h2>3D rotation with perspective</h2>
         <div class="stage perspective-stage">
             <motion.div

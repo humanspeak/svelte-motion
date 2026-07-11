@@ -729,9 +729,13 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         ) as AnyResolvedKeyframe
         const value = motionValue<AnyResolvedKeyframe>(current)
         gestureTransformValues[key] = current
+        // Record only: the transform composer's frame loop is the single
+        // writer and repaints the latest channel values once per frame.
+        // Composing here as well multiplies the per-frame work by the number
+        // of animated channels (N getBaseTransformValues() scans + N
+        // buildTransform calls per frame).
         const unsubscribe = value.on('change', (latest) => {
             gestureTransformValues[key] = latest
-            setXYImmediate(applied.x, applied.y)
         })
         transformAnimations.set(key, { value, unsubscribe })
         setXYImmediate(applied.x, applied.y)
