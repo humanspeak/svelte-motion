@@ -6,6 +6,7 @@
     import { motion } from '$lib'
 
     let inserted = $state(false)
+    let stackBounds: HTMLElement | null = $state(null)
 </script>
 
 <svelte:head>
@@ -57,6 +58,53 @@
                 layout
             >
                 drag x · stay pinned on y
+            </motion.div>
+        </div>
+    </section>
+
+    <section>
+        <h2>whileDrag overriding an authored style channel</h2>
+        <p class="hint">
+            The card authors <code>rotate</code> on <code>style</code>, and <code>whileDrag</code>
+            overrides that same channel. Both the override and the drag translation must survive.
+        </p>
+        <div class="stage">
+            <motion.div
+                class="card authored-rotate-card"
+                data-testid="authored-rotate-card"
+                drag="x"
+                dragMomentum={false}
+                style={{ rotate: -8 }}
+                whileDrag={{ rotate: 4 }}
+                transition={{ duration: 0.05 }}
+            >
+                style rotate −8° · whileDrag 4°
+            </motion.div>
+        </div>
+    </section>
+
+    <section>
+        <h2>Full gesture stack over authored transform channels</h2>
+        <p class="hint">
+            Mirrors the docs example: constrained two-axis drag, <code>whileHover</code> and
+            <code>whileDrag</code> both owning <code>scale</code>, a spring transition, over
+            authored
+            <code>rotate</code>/<code>skewX</code>. Drag translation and the whileDrag rotate must
+            both survive.
+        </p>
+        <div bind:this={stackBounds} class="stage stack-stage">
+            <motion.div
+                class="card gesture-stack-card"
+                data-testid="gesture-stack-card"
+                drag
+                dragConstraints={stackBounds}
+                dragElastic={0.28}
+                whileHover={{ scale: 1.03 }}
+                whileDrag={{ rotate: 4, scale: 1.08, cursor: 'grabbing' }}
+                transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                style={{ rotate: -8, skewX: -5 }}
+            >
+                full gesture stack
             </motion.div>
         </div>
     </section>
@@ -158,6 +206,16 @@
 
     .perspective-stage {
         perspective: 900px;
+    }
+
+    .hint {
+        margin: 0 0 12px;
+        color: #9fd9cd;
+        font-size: 13px;
+    }
+
+    .stack-stage {
+        min-height: 280px;
     }
 
     button {

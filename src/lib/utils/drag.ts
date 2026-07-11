@@ -715,11 +715,18 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         stopTransformAnimation(key)
         const baseValues = opts.getBaseTransformValues?.() ?? {}
         const neutral = key.startsWith('scale') ? 1 : 0
-        const current =
+        // Seed with the same value type as the normalized target. Style-authored
+        // channels arrive as raw numbers, but the target above is typed (4 ->
+        // '4deg'); spring generators emit NaN when asked to animate a raw number
+        // into a unit string, and one NaN channel invalidates the entire
+        // composed transform ('rotate(NaNdeg)' -> the browser drops the write).
+        const current = getValueAsType(
             gestureTransformValues[key] ??
-            restingTransformValues[key] ??
-            baseValues[key] ??
-            getValueAsType(neutral, numberValueTypes[key])
+                restingTransformValues[key] ??
+                baseValues[key] ??
+                neutral,
+            numberValueTypes[key]
+        ) as AnyResolvedKeyframe
         const value = motionValue<AnyResolvedKeyframe>(current)
         gestureTransformValues[key] = current
         const unsubscribe = value.on('change', (latest) => {
@@ -794,6 +801,15 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             animate: opts.baselineSources?.animate,
             whileHover: (opts.whileDrag ?? {}) as Record<string, unknown>
         })
+        // computeHoverBaseline cannot see style-authored transform channels and
+        // neutral-defaults them (rotate -> 0), so release would settle to
+        // neutral and then snap once the composer hands the channel back to
+        // the authored style. Restore those channels to their style values.
+        const styleBase = opts.getBaseTransformValues?.() ?? {}
+        for (const key of Object.keys(whileDragBaseline)) {
+            if (restingTransformValues[key] !== undefined) continue
+            if (styleBase[key] !== undefined) whileDragBaseline[key] = styleBase[key]
+        }
         const { keyframes, transition } = splitHoverDefinition(
             opts.whileDrag as Record<string, unknown>
         )
