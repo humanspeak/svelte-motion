@@ -2,6 +2,8 @@
     /**
      * Characterization page for transform channels that the drag composer
      * currently overwrites or fails to paint while the pointer is held.
+     *
+     * @component
      */
     import { motion } from '$lib'
 

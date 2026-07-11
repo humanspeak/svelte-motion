@@ -71,5 +71,5 @@ empty-write guard survives (`drag.ts:592-593,616-624`, unit test
   not the race.
 - Plan 004 dependency is now unblocked: the writer's values-map is the seam it
   expects (`crossAxisOffset` + `gestureTransformValues` feeding `setXYImmediate`).
-- Maintainer live-demo sign-off is the remaining gate before PR/publication,
-  per the plan's Git workflow.
+- Maintainer live-demo sign-off and the PR/publication gate are resolved:
+  PR #446 is open and recorded in the plan 003 close-out.

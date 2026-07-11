@@ -1,19 +1,7 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
+import { beginHorizontalDrag } from '../_helpers/transform'
 
 const URL = '/tests/drag/while-drag-transforms?@isPlaywright=true'
-
-const beginHorizontalDrag = async (page: Page, card: Locator) => {
-    await card.waitFor({ state: 'visible' })
-    await card.scrollIntoViewIfNeeded()
-    const box = await card.boundingBox()
-    if (!box) throw new Error('missing drag-card bounds')
-
-    const x = box.x + box.width / 2
-    const y = box.y + box.height / 2
-    await page.mouse.move(x, y)
-    await page.mouse.down()
-    await page.mouse.move(x + 56, y, { steps: 6 })
-}
 
 test.describe('drag/whileDrag write coalescing', () => {
     test('composes at most one transform write per frame while channel springs animate', async ({

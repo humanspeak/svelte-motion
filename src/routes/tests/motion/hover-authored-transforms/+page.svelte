@@ -4,6 +4,8 @@
      * that `style` also authors. The hover-enter animation must compose
      * with the authored channels, and hover-leave must restore the
      * style-authored value smoothly — not settle to neutral and snap.
+     *
+     * @component
      */
     import { motion } from '$lib'
 </script>

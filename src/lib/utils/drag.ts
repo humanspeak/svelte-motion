@@ -53,6 +53,14 @@ import {
 
 /**
  * Drag-specific alias for the shared gesture transform writer.
+ *
+ * @param latestValues Current transform-channel values.
+ * @param baseTransform An authored raw CSS transform that cannot be represented as channels.
+ * @param transformTemplate Optional user transform template applied to the live values.
+ * @returns The composed CSS transform string.
+ * @example
+ * buildDragTransform({ x: '20px', rotateX: 30 }, '', (_, generated) => `perspective(600px) ${generated}`)
+ * // => 'perspective(600px) translateX(20px) rotateX(30deg)'
  */
 export const buildDragTransform = buildGestureTransform
 

@@ -1,38 +1,7 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
+import { beginHorizontalDrag, readRotation, sampleFrames } from '../_helpers/transform'
 
 const URL = '/tests/drag/while-drag-transforms?@isPlaywright=true'
-
-const nextFrame = (page: Page) =>
-    page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
-
-const beginHorizontalDrag = async (page: Page, card: Locator) => {
-    await card.waitFor({ state: 'visible' })
-    await card.scrollIntoViewIfNeeded()
-    const box = await card.boundingBox()
-    if (!box) throw new Error('missing drag-card bounds')
-
-    const x = box.x + box.width / 2
-    const y = box.y + box.height / 2
-    await page.mouse.move(x, y)
-    await page.mouse.down()
-    await page.mouse.move(x + 56, y, { steps: 6 })
-    return { x, y }
-}
-
-const sampleFrames = async <T>(page: Page, read: () => Promise<T>, count = 8) => {
-    const samples: T[] = []
-    for (let frame = 0; frame < count; frame++) {
-        await nextFrame(page)
-        samples.push(await read())
-    }
-    return samples
-}
-
-const readRotation = (card: Locator) =>
-    card.evaluate((element) => {
-        const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform)
-        return (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI
-    })
 
 test.describe('drag/whileDrag transform composition', () => {
     test.beforeEach(async ({ page }) => {

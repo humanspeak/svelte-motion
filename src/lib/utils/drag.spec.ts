@@ -65,6 +65,7 @@ describe('utils/drag', () => {
         expect(x.get()).toBe(15)
         expect(el.style.transform).toBe('rotate(12deg)')
         cleanup()
+        el.remove()
     })
 
     it('attachDrag: attaches pointerdown and animates during move', () => {

@@ -4,6 +4,8 @@
      * that `style` also authors. The pan-start animation must compose
      * with the authored channels, and pan-end must restore the
      * style-authored value smoothly — not settle to neutral and snap.
+     *
+     * @component
      */
     import { motion } from '$lib'
 </script>
