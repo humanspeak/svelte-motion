@@ -1712,7 +1712,8 @@
                 whilePanBaseline = computeHoverBaseline(element, {
                     initial: initialKeyframes ?? {},
                     animate: (resolvedAnimate ?? {}) as Record<string, unknown>,
-                    whileHover: (resolvedWhilePan ?? {}) as Record<string, unknown>
+                    whileHover: (resolvedWhilePan ?? {}) as Record<string, unknown>,
+                    baseValues: getStyleTransformValues()
                 })
                 const { keyframes, transition } = splitHoverDefinition(
                     resolvedWhilePan as Record<string, unknown>

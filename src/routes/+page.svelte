@@ -168,6 +168,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/pan-authored-transforms') + searchParams}
+                    >
+                        Pan: whilePan over authored transforms
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/rapid-tap') + searchParams}
                     >
                         Rapid Tap (spring runaway guard)
