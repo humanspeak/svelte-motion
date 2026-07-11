@@ -20,5 +20,25 @@ jobs:
               with:
                   persist-credentials: false
 
+            - uses: pnpm/action-setup@v6 # zizmor: ignore[unpinned-uses]
+
+            - name: Use Node.js - 24
+              uses: actions/setup-node@v6 # zizmor: ignore[unpinned-uses]
+              with:
+                  node-version: 24
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile --config.engine-strict=false
+
+            # `$lib/*` is mapped to `src/lib/*` only inside the generated
+            # `.svelte-kit/tsconfig.json`, which the root `tsconfig.json` extends and
+            # `.gitignore` excludes. Without this step it never exists on the runner, so
+            # typed lint resolves every `$lib/…` import to an error type and the
+            # `no-unsafe-*` family fires across the repo.
+            - name: Generate SvelteKit tsconfigs for type-aware lint
+              run: |
+                  pnpm exec svelte-kit sync
+                  pnpm --filter docs exec svelte-kit sync
+
             - name: Trunk Code Quality
               uses: trunk-io/trunk-action@v1 # zizmor: ignore[unpinned-uses]
