@@ -257,6 +257,15 @@ export const attachWhileHover = (
             animate: baselineSources?.animate,
             whileHover
         })
+        // computeHoverBaseline cannot see style-authored transform channels and
+        // neutral-defaults them (rotate -> 0), so hover-leave would settle to
+        // neutral instead of the authored value. Restore those channels to
+        // their style values (mirrors the whileDrag baseline fix in drag.ts).
+        const styleBase = transformComposer?.getBaseTransformValues?.() ?? {}
+        for (const key of Object.keys(hoverBaseline)) {
+            if (restingTransformValues[key] !== undefined) continue
+            if (styleBase[key] !== undefined) hoverBaseline[key] = styleBase[key]
+        }
         fallbackBaseTransform = transformComposer ? '' : el.style.transform
         callbacks?.onStart?.()
         const { keyframes, transition } = splitHoverDefinition(whileHover)

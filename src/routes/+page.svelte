@@ -160,6 +160,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/hover-authored-transforms') + searchParams}
+                    >
+                        Hover: whileHover over authored transforms
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/rapid-tap') + searchParams}
                     >
                         Rapid Tap (spring runaway guard)
