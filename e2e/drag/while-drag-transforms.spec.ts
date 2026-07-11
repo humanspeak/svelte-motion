@@ -28,6 +28,12 @@ const sampleFrames = async <T>(page: Page, read: () => Promise<T>, count = 8) =>
     return samples
 }
 
+const readRotation = (card: Locator) =>
+    card.evaluate((element) => {
+        const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform)
+        return (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI
+    })
+
 test.describe('drag/whileDrag transform composition', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto(URL)
@@ -40,12 +46,7 @@ test.describe('drag/whileDrag transform composition', () => {
 
         try {
             await page.waitForTimeout(120)
-            const rotations = await sampleFrames(page, () =>
-                card.evaluate((element) => {
-                    const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform)
-                    return (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI
-                })
-            )
+            const rotations = await sampleFrames(page, () => readRotation(card))
 
             expect(rotations).toHaveLength(8)
             expect(
@@ -179,15 +180,7 @@ test.describe('drag/whileDrag transform composition', () => {
         await page.waitForTimeout(120)
         await page.mouse.up()
 
-        const samples = await sampleFrames(
-            page,
-            () =>
-                card.evaluate((element) => {
-                    const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform)
-                    return (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI
-                }),
-            45
-        )
+        const samples = await sampleFrames(page, () => readRotation(card), 45)
 
         // The restore must be continuous: a settle-to-neutral followed by a
         // snap to the authored angle shows up as a large single-frame jump.

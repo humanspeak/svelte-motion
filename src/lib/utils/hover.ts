@@ -74,11 +74,15 @@ const toMillisecondsTransition = (
 /**
  * Compute the baseline values to restore to on hover end.
  *
- * Preference order per key: `animate` → `initial` → neutral transform defaults
- * → computed style value if present.
+ * Preference order per key: `animate` → `initial` → style-authored base values
+ * → neutral transform defaults → computed style value if present.
  *
  * @param el Target element.
- * @param opts Source records for baseline computation.
+ * @param opts Source records for baseline computation. `baseValues` carries
+ * style-authored transform channels, which this function cannot read from the
+ * element itself; without them a style-authored channel (e.g. rotate) would
+ * neutral-default and the gesture would settle to neutral, then snap once the
+ * authored style repaints.
  * @return Minimal baseline record to restore on hover end.
  */
 export const computeHoverBaseline = (
@@ -87,11 +91,13 @@ export const computeHoverBaseline = (
         initial?: Record<string, unknown>
         animate?: Record<string, unknown>
         whileHover?: Record<string, unknown>
+        baseValues?: Record<string, unknown>
     }
 ): Record<string, unknown> => {
     const baseline: Record<string, unknown> = {}
     const initialRecord = opts.initial ?? {}
     const animateRecord = opts.animate ?? {}
+    const baseValuesRecord = opts.baseValues ?? {}
     const whileHoverRecordRaw = opts.whileHover ?? {}
     const whileHoverRecord = { ...whileHoverRecordRaw } as Record<string, unknown>
     delete whileHoverRecord.transition
@@ -143,6 +149,8 @@ export const computeHoverBaseline = (
             baseline[key] = animateRecord[key]
         } else if (Object.prototype.hasOwnProperty.call(initialRecord, key)) {
             baseline[key] = initialRecord[key]
+        } else if (baseValuesRecord[key] !== undefined) {
+            baseline[key] = baseValuesRecord[key]
         } else if (key in neutralTransformDefaults) {
             baseline[key] = neutralTransformDefaults[key]
         } else {
@@ -255,18 +263,10 @@ export const attachWhileHover = (
         hoverBaseline = computeHoverBaseline(el, {
             initial: baselineSources?.initial,
             animate: baselineSources?.animate,
-            whileHover
+            whileHover,
+            baseValues: transformComposer?.getBaseTransformValues?.()
         })
-        // computeHoverBaseline cannot see style-authored transform channels and
-        // neutral-defaults them (rotate -> 0), so hover-leave would settle to
-        // neutral instead of the authored value. Restore those channels to
-        // their style values (mirrors the whileDrag baseline fix in drag.ts).
-        const styleBase = transformComposer?.getBaseTransformValues?.() ?? {}
-        for (const key of Object.keys(hoverBaseline)) {
-            if (restingTransformValues[key] !== undefined) continue
-            if (styleBase[key] !== undefined) hoverBaseline[key] = styleBase[key]
-        }
-        fallbackBaseTransform = transformComposer ? '' : el.style.transform
+        if (!transformComposer) fallbackBaseTransform = el.style.transform
         callbacks?.onStart?.()
         const { keyframes, transition } = splitHoverDefinition(whileHover)
         const { scale, ...nativeKeyframes } = keyframes

@@ -340,22 +340,18 @@
     }
     let liveGestureTransform = $state<string | null>(null)
     let liveGestureTransformValues: Record<string, string | number> | null = null
-    const liveGestureComposedTransform = $derived.by(() => {
-        if (!liveGestureTransform) return null
-        return liveGestureTransform
-    })
     const serializedStyleWithLiveGestureTransform = $derived.by(() => {
-        if (!liveGestureComposedTransform) return serializedStyleProp
+        if (!liveGestureTransform) return serializedStyleProp
 
         const { rest } = splitSerializedTransform(serializedStyleProp)
-        return `${rest}${rest ? '; ' : ''}transform: ${liveGestureComposedTransform}`
+        return `${rest}${rest ? '; ' : ''}transform: ${liveGestureTransform}`
     })
 
     $effect(() => {
-        if (!element || !liveGestureComposedTransform) return
-        if (element.style.transform === liveGestureComposedTransform) return
+        if (!element || !liveGestureTransform) return
+        if (element.style.transform === liveGestureTransform) return
 
-        element.style.transform = liveGestureComposedTransform
+        element.style.transform = liveGestureTransform
     })
 
     const projectionParent = getProjectionParent()
@@ -1619,7 +1615,8 @@
                 },
                 onVisualUpdate: (transform: string, values: Record<string, string | number>) => {
                     liveGestureTransform = transform || null
-                    liveGestureTransformValues = { ...values }
+                    // `values` is freshly allocated per composer frame, so no copy.
+                    liveGestureTransformValues = values
                 }
             },
             baselineSources: dragRuntimeOptions.baselineSources,

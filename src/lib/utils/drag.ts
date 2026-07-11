@@ -795,21 +795,15 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         whileDragAnimationGeneration++
         whileDragRestoreActive = false
         stopTransformAnimations()
-        // Baseline restore target: compute from sources
+        // Baseline restore target: compute from sources. baseValues carries the
+        // style-authored transform channels so release restores to the authored
+        // value instead of settling to neutral and snapping.
         whileDragBaseline = computeHoverBaseline(el, {
             initial: opts.baselineSources?.initial,
             animate: opts.baselineSources?.animate,
-            whileHover: (opts.whileDrag ?? {}) as Record<string, unknown>
+            whileHover: (opts.whileDrag ?? {}) as Record<string, unknown>,
+            baseValues: opts.getBaseTransformValues?.()
         })
-        // computeHoverBaseline cannot see style-authored transform channels and
-        // neutral-defaults them (rotate -> 0), so release would settle to
-        // neutral and then snap once the composer hands the channel back to
-        // the authored style. Restore those channels to their style values.
-        const styleBase = opts.getBaseTransformValues?.() ?? {}
-        for (const key of Object.keys(whileDragBaseline)) {
-            if (restingTransformValues[key] !== undefined) continue
-            if (styleBase[key] !== undefined) whileDragBaseline[key] = styleBase[key]
-        }
         const { keyframes, transition } = splitHoverDefinition(
             opts.whileDrag as Record<string, unknown>
         )
@@ -852,10 +846,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             const control = startTransformAnimation(key, target, mergedTransition)
             if (control) restorePromises.push(control.finished)
         }
-        for (const control of [restore]) {
-            if (control && typeof (control as PromiseLike<unknown>).then === 'function') {
-                restorePromises.push(control as PromiseLike<unknown>)
-            }
+        if (restore && typeof (restore as PromiseLike<unknown>).then === 'function') {
+            restorePromises.push(restore as PromiseLike<unknown>)
         }
 
         if (restorePromises.length > 0) {
