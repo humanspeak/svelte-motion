@@ -1,8 +1,10 @@
 # Guard report — 004 projection-page-space-consolidation
 
-**Recommendation: PASS** — every done criterion reproduced green by the guard; the one non-deletion (`projection.ts`) is the plan's own STOP branch, correctly triggered and honestly reported.
-**Reviewed at** 2f67d3e · 2026-07-13 07:18 · **Plan planned at** 634983b
-**Integrated** — PR deliberately WITHHELD: the plan's Git workflow section states "Do NOT push or open a PR; maintainer signs off on live demos first", and the operator's standing rule requires driving the live demo before any PR. The reviewed snapshot (`2f67d3e` and ancestors) sits committed on `feat/projection-page-space`; open the PR after live sign-off.
+**Recommendation: PASS** — every done criterion reproduced green by the guard (including a corrective leg after live sign-off caught a scrolled wait-mode regression); the one non-deletion (`projection.ts`) is the plan's own STOP branch, correctly triggered and honestly reported.
+**Reviewed at** 07b2a49 · 2026-07-13 09:55 · **Plan planned at** 634983b
+**Integrated** — PR deliberately WITHHELD: the plan's Git workflow section states "Do NOT push or open a PR; maintainer signs off on live demos first", and the operator's standing rule requires driving the live demo before any PR. The reviewed snapshot (`07b2a49` and ancestors) sits committed on `feat/projection-page-space`; open the PR after live sign-off.
+
+> **Live sign-off status**: pages 1-2 approved by the maintainer 2026-07-13. Page 3 (`/tests/animate-presence/layout-button`) FAILED the first drive — wait-mode enter flew in by exactly the scroll offset (viewport-space `previousRect` diffed against the new page-space `measureLayoutRect` at the presence-release seam; e2e missed it because the existing spec runs unscrolled). Fixed in the corrective leg (`07b2a49`): page-space capture at `releaseWaitLayoutHold`, red-first scrolled regression e2e (red at 273px = scrollY, green after), full suite re-reproduced at **341 passed / 2 skipped, exit 0**. Awaiting the maintainer's scrolled re-drive of page 3.
 
 ## Done criteria
 
@@ -29,6 +31,7 @@ The plan's north star was killing the two-projection-system split and the scroll
 
 ## Residual risk / follow-ups
 
+- **Presence-hold + `layoutScroll` container edge**: the corrective fix converts the hold capture to page space via window scroll only; if a `layoutScroll` ancestor container scrolls _during_ a wait-hold, the release diff could still mismatch (the adapter's `measurePageRect` also removes ancestor layoutScroll offsets). Pre-004 behavior was no better; low-likelihood follow-up candidate, not a regression.
 - **Live-demo sign-off is the remaining gate** (operator requirement + plan's Git workflow). Eye-test script: `src/routes/tests/projection/scroll-during-layout` (linked from the home page) — (1) Swap with no scroll → animates; (2) scroll a little, then swap → now ANIMATES (used to snap — this is the headline fix); (3) scroll to the bottom, swap, scroll back → boxes settled in swapped slots, no replay. Also worth driving: `/tests/reorder/basic` and `/tests/animate-presence/layout-button` (the two consumers of the removed heuristics, per the plan's reviewer note).
 - **Tiny follow-up to finish the retirement**: retarget the two type-only imports (`Axis`/`Box`) in `Reorder/context.ts` / `Reorder/order.ts` to a neutral home (motion-dom's structurally identical types or `$lib/types`), then delete `src/lib/utils/projection.ts` + `projection.spec.ts`. Two-line change + deletion; blocked here only by scope discipline. Until then `projection.ts:10` carries a one-line stale comment referencing the deleted `projection.context.ts`.
 - **Documented deviation to know about**: the adapter invalidates same-phase scroll cache entries (`scroll.animationId = -1`) because the Svelte observer bridge takes standalone reads where upstream's `animationId++` never fires. Adapter-local, JSDoc'd, unit-tested; revisit if upstream's scroll-cache keying changes on a motion-dom upgrade.
