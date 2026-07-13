@@ -6,6 +6,7 @@ import {
     visualElementStore,
     type IProjectionNode,
     type Measurements,
+    type Phase,
     type ResolvedValues,
     type Transition,
     type VisualElement
@@ -24,6 +25,15 @@ type RectLike = { left: number; top: number; width: number; height: number }
 export interface MotionDomProjectionOptions {
     /** Parent adapter used to connect this node into the upstream projection tree. */
     parent?: MotionDomProjectionAdapter | null
+    /**
+     * Thunk returning the element's user-authored base transform (e.g. a
+     * static `style="transform: …"`). `measurePageRect` resets the element
+     * to this value while reading so motion-applied transforms (FLIP /
+     * projection animations) never contaminate a layout measurement, while
+     * authored transforms stay part of the measured box — mirroring the
+     * legacy `ProjectionNode`'s `resolveBaseTransform` contract.
+     */
+    getBaseTransform?: () => string
 }
 
 /**
@@ -118,9 +128,11 @@ export class MotionDomProjectionAdapter {
     private layoutId: string | undefined
     private transition: Transition | undefined
     private lastLayout: Measurements | undefined
+    private readonly getBaseTransform: (() => string) | undefined
 
     constructor(options: MotionDomProjectionOptions = {}) {
         const parent = options.parent ?? null
+        this.getBaseTransform = options.getBaseTransform
         this.visualElement = new HTMLVisualElement(
             {
                 parent: parent?.visualElement,
@@ -256,10 +268,83 @@ export class MotionDomProjectionAdapter {
      */
     seedLayout(): void {
         if (!this.element) return
-        this.updatePathScroll()
+        // Fresh 'measure'-phase scroll so the seeded layout pairs its
+        // viewport box with a contemporaneous scroll offset (page space).
+        this.updatePathScroll('measure')
         this.projection.isLayoutDirty = true
         this.projection.updateLayout()
         this.lastLayout = cloneMeasurements(this.projection.layout)
+    }
+
+    /**
+     * Measure this element's layout rect in scroll-invariant PAGE space via
+     * the upstream projection node.
+     *
+     * Mirrors upstream `measure()`/`measurePageBox()` semantics: the viewport
+     * box plus the document root's phase-cached scroll offset, with ancestor
+     * `layoutScroll` container offsets folded in (`removeElementScroll`). An
+     * element that does not move in page space therefore measures the SAME
+     * rect regardless of any viewport or container scroll between two reads —
+     * a scroll can never masquerade as a layout delta (#437).
+     *
+     * Motion-applied transforms (an in-flight FLIP or projection animation)
+     * are stripped for the duration of the read by resetting this element and
+     * every ancestor adapter's element to their user-authored base transform,
+     * matching the legacy `ProjectionNode.measure()` contract; inline styles
+     * are restored before returning.
+     *
+     * @param phase Scroll-cache phase marking which side of a layout update
+     * this read belongs to: `'snapshot'` before the DOM patch, `'measure'`
+     * after. Mirrors upstream `updateScroll(phase)`; the observer bridge's
+     * callbacks mark the phase boundaries.
+     * @returns The page-space rect, or `null` before mount / without a window.
+     *
+     * @example
+     * ```ts
+     * const before = adapter.measurePageRect('snapshot')
+     * // ...DOM patch...
+     * const after = adapter.measurePageRect('measure')
+     * ```
+     */
+    measurePageRect(phase: Phase = 'measure'): RectLike | null {
+        if (!this.element) return null
+        this.updatePathScroll(phase)
+
+        // Reset this element and ancestor adapter elements to their base
+        // transforms so mid-animation reads measure the true layout box.
+        // Ancestors first (outer-most transforms cascade down), restore in
+        // reverse — same ordering as the legacy node's measure().
+        const restoreList: Array<{ el: HTMLElement; prev: string; base: string }> = []
+        for (const node of this.projection.path) {
+            const ancestor = MotionDomProjectionAdapter.adapters.get(node)
+            if (ancestor?.element) {
+                restoreList.push({
+                    el: ancestor.element,
+                    prev: ancestor.element.style.transform,
+                    base: ancestor.getBaseTransform?.() ?? 'none'
+                })
+            }
+        }
+        restoreList.push({
+            el: this.element,
+            prev: this.element.style.transform,
+            base: this.getBaseTransform?.() ?? 'none'
+        })
+
+        try {
+            for (const { el, base } of restoreList) el.style.transform = base
+            const { layoutBox } = this.projection.measure()
+            return {
+                left: layoutBox.x.min,
+                top: layoutBox.y.min,
+                width: layoutBox.x.max - layoutBox.x.min,
+                height: layoutBox.y.max - layoutBox.y.min
+            }
+        } finally {
+            for (let i = restoreList.length - 1; i >= 0; i--) {
+                restoreList[i].el.style.transform = restoreList[i].prev
+            }
+        }
     }
 
     /**
@@ -378,9 +463,26 @@ export class MotionDomProjectionAdapter {
         return false
     }
 
-    private updatePathScroll(): void {
-        for (const node of this.projection.path) {
-            node.updateScroll()
+    /**
+     * Refresh the phase-cached scroll offsets along this node's ancestor path
+     * (including the shared window-mounted document root) plus the node
+     * itself.
+     *
+     * Upstream keys the cache by `(root.animationId, phase)` and invalidates
+     * it by bumping `animationId` in `startUpdate()`. The Svelte observer
+     * bridge also takes standalone reads BETWEEN update passes (seeding,
+     * post-patch measures) where `animationId` is static, so a repeat read of
+     * the same phase must mark a NEW boundary: the matching cache entry is
+     * invalidated (via an impossible `animationId`) before `updateScroll`
+     * re-measures. `wasRoot` continuity is preserved because upstream derives
+     * it from the existing entry rather than recomputing from scratch.
+     */
+    private updatePathScroll(phase?: Phase): void {
+        for (const node of [...this.projection.path, this.projection]) {
+            if (phase && node.scroll?.phase === phase) {
+                node.scroll.animationId = -1
+            }
+            node.updateScroll(phase)
         }
     }
 
