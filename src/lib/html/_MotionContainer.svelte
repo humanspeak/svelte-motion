@@ -28,6 +28,9 @@
     import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
     import {
         animateSingleValue,
+        calcBoxDelta,
+        createDelta,
+        isDeltaZero,
         isMotionValue,
         motionValue,
         readTransformValue,
@@ -75,8 +78,6 @@
     import { getInitialKeyframes } from '$lib/utils/initial'
     import { attachDrag, type AttachDragCleanup } from '$lib/utils/drag'
     import { attachPan, type AttachPanCleanup } from '$lib/utils/pan'
-    import { ProjectionNode } from '$lib/utils/projection'
-    import { getProjectionParent, setProjectionParent } from '$lib/components/projection.context'
     import { MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
     import { SvelteSet } from 'svelte/reactivity'
     import {
@@ -354,14 +355,6 @@
         element.style.transform = liveGestureTransform
     })
 
-    const projectionParent = getProjectionParent()
-    const projection = new ProjectionNode({
-        parent: projectionParent,
-        getScrollContainers: resolveLayoutScrollAncestors,
-        getBaseTransform: () => userBaseTransform
-    })
-    setProjectionParent(projection)
-
     const motionDomProjectionParent =
         typeof window !== 'undefined' ? getMotionDomProjectionParent() : null
     const motionDomProjection =
@@ -375,18 +368,32 @@
         setMotionDomProjectionParent(motionDomProjection)
     }
 
-    // Convert a projection `Box` (ancestor chain reset to base, self
-    // transform stripped, scroll containers compensated) to the
-    // `RectLike` shape `computeFlipTransforms` consumes.
-    const boxToRectLike = (box: {
-        x: { min: number; max: number }
-        y: { min: number; max: number }
-    }): RectLike => ({
-        left: box.x.min,
-        top: box.y.min,
-        width: box.x.max - box.x.min,
-        height: box.y.max - box.y.min
+    // Convert a page-space `RectLike` to the `{ x: {min,max}, y: {min,max} }`
+    // box shape the public `onProjectionUpdate`/`onLayoutMeasure` payloads use.
+    const rectToLayoutBox = (rect: RectLike) => ({
+        x: { min: rect.left, max: rect.left + rect.width },
+        y: { min: rect.top, max: rect.top + rect.height }
     })
+
+    // Public `onProjectionUpdate` fan-out (#379). Emits the same payload the
+    // retired legacy ProjectionNode did: page-space boxes measured with
+    // motion-applied transforms stripped, delta oriented snapshot→layout
+    // (i.e. how far the layout box MOVED), computed with motion-dom's
+    // calcBoxDelta so the zero-delta epsilon (±0.01px translate) is
+    // unchanged.
+    const emitProjectionUpdate = (previous: RectLike, next: RectLike) => {
+        if (!onProjectionUpdateProp) return
+        const layout = rectToLayoutBox(next)
+        const snapshot = rectToLayoutBox(previous)
+        const delta = createDelta()
+        calcBoxDelta(delta, snapshot, layout)
+        onProjectionUpdateProp({
+            layout,
+            snapshot,
+            delta,
+            hasLayoutChanged: !isDeltaZero(delta)
+        })
+    }
     const domRectToRectLike = (rect: DOMRect): RectLike => ({
         left: rect.left,
         top: rect.top,
@@ -410,15 +417,10 @@
     // `layoutScroll` offsets folded in. A viewport scroll between the
     // 'snapshot' (pre-patch) and 'measure' (post-patch) phases cancels
     // exactly, so it can never masquerade as a layout delta.
-    const measureLayoutRect = (phase: 'snapshot' | 'measure' = 'measure'): RectLike | null => {
-        if (motionDomProjection) {
-            const rect = motionDomProjection.measurePageRect(phase)
-            if (rect) return rect
-        }
-        // Legacy fallback (SSR/no-window) until the legacy node retires.
-        const box = projection.measure()
-        return box ? boxToRectLike(box) : null
-    }
+    const measureLayoutRect = (phase: 'snapshot' | 'measure' = 'measure'): RectLike | null =>
+        // Null without a window (SSR) — every caller lives inside a
+        // client-only effect, so the null branch is never animated against.
+        motionDomProjection?.measurePageRect(phase) ?? null
 
     // Get current presence depth (0 = direct child of AnimatePresence, undefined = not in AnimatePresence)
     const presenceDepth = getPresenceDepth()
@@ -2187,7 +2189,6 @@
 
         // 'snapshot' phase: the pre-patch side of the update boundary.
         explicitLayoutSnapshot = measureLayoutRect('snapshot')
-        projection.willUpdate()
         motionDomProjection?.willUpdate()
         motionDomProjectionUpdatePending = true
     })
@@ -2203,62 +2204,32 @@
         if (previous) {
             const next = measureLayoutRect()
             if (next) {
-                if (motionDomProjection) {
-                    lastRect = next
-                } else {
-                    const flipLayoutMode = layoutProp === 'position' ? 'position' : true
-                    const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
-                    runFlipAnimation(element!, transforms, mergedTransition ?? {})
-                    lastRect = next
-                }
+                lastRect = next
+                // Svelte-owned update: fan out the snapshot→measure delta to
+                // `onProjectionUpdate` subscribers (zero deltas included —
+                // the legacy node notified on every willUpdate/didUpdate
+                // pair, and the idle "changed=false" event is part of the
+                // observable contract).
+                emitProjectionUpdate(previous, next)
             }
         }
-        projection.didUpdate()
         motionDomProjection?.didUpdate()
     })
 
-    // Projection node lifecycle + the `onProjectionUpdate` listener.
-    // Mount once the element binds; seed the baseline layout; unmount on
-    // cleanup. Depends ONLY on `element` — the `onProjectionUpdate`
-    // subscription lives in its own effect below so a change to the
-    // callback's identity re-subscribes WITHOUT tearing the node down
-    // (an unmount would clear latestLayout/children and re-seed the
-    // first commit instead of emitting a real delta).
+    // Subscribe the consumer's `onLayoutMeasure` callback to the adapter's
+    // stripped page-space measurements. The measure-then-subscribe order
+    // matters: the seed read below would otherwise ALSO notify the fresh
+    // subscription and double-fire the initial slot. Consumers like
+    // `Reorder.Item` need that initial slot to register with their group
+    // before the first layout change.
     $effect(() => {
-        if (!element) return
-        projection.mount(element)
-        projection.measure() // seed latestLayout so the first commit can diff
-        return () => {
-            projection.unmount()
-        }
-    })
-
-    // Subscribe the consumer's `onProjectionUpdate` callback. Separate
-    // from the mount effect so re-subscribing on a callback-identity
-    // change never unmounts the node.
-    $effect(() => {
-        if (!(element && onProjectionUpdateProp)) return
-        const off = projection.addEventListener('didUpdate', (data) => onProjectionUpdateProp(data))
-        return () => {
-            off()
-        }
-    })
-
-    // Subscribe the consumer's `onLayoutMeasure` callback to projection
-    // `measure` events. The mount effect above runs first in source
-    // order and already seeded `latestLayout`, so that seed measurement
-    // is replayed here — otherwise a subscriber would only hear about
-    // the element's slot after its first layout CHANGE, and consumers
-    // like `Reorder.Item` need the initial slot too.
-    $effect(() => {
-        if (!(element && onLayoutMeasureProp)) return
-        const off = projection.addEventListener('measure', (box) => onLayoutMeasureProp(box))
-        const seed = projection.latestLayout
+        if (!(element && onLayoutMeasureProp && motionDomProjection)) return
+        const seed = measureLayoutRect()
+        const off = motionDomProjection.onMeasure((rect) =>
+            onLayoutMeasureProp(rectToLayoutBox(rect))
+        )
         if (seed) {
-            onLayoutMeasureProp({
-                x: { min: seed.x.min, max: seed.x.max },
-                y: { min: seed.y.min, max: seed.y.max }
-            })
+            onLayoutMeasureProp(rectToLayoutBox(seed))
         }
         return () => {
             off()
@@ -2267,8 +2238,9 @@
 
     // Upstream layout projection via motion-dom. Svelte runes mode doesn't
     // expose the React-style pre/post render hook pair used upstream, so the
-    // component snapshots committed layout changes through DOM observers while
-    // keeping the existing local ProjectionNode event fan-out alive.
+    // component snapshots committed layout changes through DOM observers and
+    // fans the public `onProjectionUpdate` events out from the same
+    // page-space rect diffs that drive the commits.
     //
     // Measurements are taken in scroll-invariant PAGE space through the
     // motion-dom node's phase-cached scroll (see `measureLayoutRect`), so a
@@ -2318,26 +2290,34 @@
             const isDragActiveElement =
                 element!.dataset.svelteMotionDragActive === 'true' && !!teardownDrag
 
-            const nextBox = projection.commitLayoutChange()
-            if (nextBox && lastRect) {
-                const next = boxToRectLike(nextBox)
+            const next = measureLayoutRect()
+            if (next && lastRect) {
                 const previous = lastRect
                 const shouldCommitMotionDomLayout = hasRectChanged(lastRect, next)
                 if (shouldCommitMotionDomLayout) {
+                    // Observed layout change: fan out to `onProjectionUpdate`
+                    // subscribers before branching, so drag-pinned and
+                    // size-corrected commits report their deltas too (the
+                    // legacy node emitted from its commit for all of them).
+                    emitProjectionUpdate(previous, next)
                     // A live drag whose layout slot just moved (e.g. Reorder
                     // swapped the dragged item's DOM position): a FLIP here
-                    // would fight the gesture, so instead shift the drag
-                    // origin by the slot delta — the element stays pinned
-                    // under the cursor and `dragSnapToOrigin` settles into
-                    // the NEW slot on release. `seedLayout` re-syncs the
-                    // motion-dom projection cache so the skipped commit
-                    // can't replay as a stale delta later.
+                    // would fight the gesture, so instead the motion-dom
+                    // node's `didUpdate` delta shifts the drag origin
+                    // (upstream: VisualElementDragControls.ts:742-758) — the
+                    // element stays pinned under the cursor and
+                    // `dragSnapToOrigin` settles into the NEW slot on
+                    // release. The paint goes through the buildTransform
+                    // writer via `adjustOrigin`. The delta lands within the
+                    // upstream microtask flush — before the next pointermove
+                    // task — so the gesture transform is compensated before
+                    // Reorder's checkReorder can see the uncompensated
+                    // element and double-fire the swap.
                     if (isDragActiveElement && teardownDrag) {
-                        teardownDrag.adjustOrigin(
-                            previous.left - next.left,
-                            previous.top - next.top
-                        )
-                        motionDomProjection?.seedLayout()
+                        const activeDrag = teardownDrag
+                        motionDomProjection?.commitDraggedLayoutChange(previous, (dx, dy) => {
+                            activeDrag.adjustOrigin(dx, dy)
+                        })
                         lastRect = next
                         return
                     }
@@ -2354,8 +2334,8 @@
                     }
                 }
                 lastRect = next
-            } else if (nextBox) {
-                lastRect = boxToRectLike(nextBox)
+            } else if (next) {
+                lastRect = next
             }
         }
 

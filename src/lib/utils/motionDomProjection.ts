@@ -5,6 +5,7 @@ import {
     createBox,
     visualElementStore,
     type IProjectionNode,
+    type LayoutUpdateData,
     type Measurements,
     type Phase,
     type ResolvedValues,
@@ -129,6 +130,7 @@ export class MotionDomProjectionAdapter {
     private transition: Transition | undefined
     private lastLayout: Measurements | undefined
     private readonly getBaseTransform: (() => string) | undefined
+    private readonly measureListeners = new Set<(rect: RectLike) => void>()
 
     constructor(options: MotionDomProjectionOptions = {}) {
         const parent = options.parent ?? null
@@ -310,41 +312,123 @@ export class MotionDomProjectionAdapter {
         if (!this.element) return null
         this.updatePathScroll(phase)
 
-        // Reset this element and ancestor adapter elements to their base
-        // transforms so mid-animation reads measure the true layout box.
-        // Ancestors first (outer-most transforms cascade down), restore in
-        // reverse — same ordering as the legacy node's measure().
-        const restoreList: Array<{ el: HTMLElement; prev: string; base: string }> = []
-        for (const node of this.projection.path) {
-            const ancestor = MotionDomProjectionAdapter.adapters.get(node)
-            if (ancestor?.element) {
-                restoreList.push({
-                    el: ancestor.element,
-                    prev: ancestor.element.style.transform,
-                    base: ancestor.getBaseTransform?.() ?? 'none'
-                })
-            }
-        }
-        restoreList.push({
-            el: this.element,
-            prev: this.element.style.transform,
-            base: this.getBaseTransform?.() ?? 'none'
-        })
-
+        const restoreList = this.collectBaseTransformResets()
+        let rect: RectLike
         try {
-            for (const { el, base } of restoreList) el.style.transform = base
-            const { layoutBox } = this.projection.measure()
-            return {
+            this.applyBaseTransformResets(restoreList)
+            // measure(false): motion-applied transforms are already stripped
+            // PHYSICALLY above. `measure(true)`'s removeTransform step would
+            // subtract `latestValues` transforms (e.g. Reorder.Item's live
+            // drag x/y MotionValues, mirrored into the visual element via its
+            // style) a SECOND time and report slot − offset instead of the
+            // slot.
+            const { layoutBox } = this.projection.measure(false)
+            rect = {
                 left: layoutBox.x.min,
                 top: layoutBox.y.min,
                 width: layoutBox.x.max - layoutBox.x.min,
                 height: layoutBox.y.max - layoutBox.y.min
             }
         } finally {
-            for (let i = restoreList.length - 1; i >= 0; i--) {
-                restoreList[i].el.style.transform = restoreList[i].prev
-            }
+            this.restoreBaseTransformResets(restoreList)
         }
+        // Notify after the inline transforms are restored so listeners
+        // (e.g. Reorder.Item slot registration via `onLayoutMeasure`) see a
+        // consistent DOM.
+        for (const listener of this.measureListeners) listener(rect)
+        return rect
+    }
+
+    /**
+     * Subscribe to every stripped page-space measurement this adapter takes.
+     *
+     * Fires once per successful {@link measurePageRect} — the same cadence
+     * the retired legacy node's 'measure' event had (seed reads, snapshot
+     * and measure phases, observed commits). `Reorder.Item` uses this via
+     * `onLayoutMeasure` to keep its slot registered with the group.
+     *
+     * @param listener Called with the freshly measured page-space rect.
+     * @returns Unsubscribe function.
+     *
+     * @example
+     * ```ts
+     * const off = adapter.onMeasure((rect) => registerSlot(rect))
+     * ```
+     */
+    onMeasure(listener: (rect: RectLike) => void): () => void {
+        this.measureListeners.add(listener)
+        return () => {
+            this.measureListeners.delete(listener)
+        }
+    }
+
+    /**
+     * Commit a dragged element's observed layout (slot) change and deliver
+     * the slot delta instead of running a layout animation.
+     *
+     * Mirrors upstream drag semantics: `VisualElementDragControls` blocks the
+     * dragged node's layout animation (`isAnimationBlocked`,
+     * VisualElementDragControls.ts:139/293) and its `didUpdate` listener
+     * shifts the gesture origin by `delta[axis].translate`
+     * (VisualElementDragControls.ts:742-758). The delta orientation is
+     * `snapshot - layout` (previous - next).
+     *
+     * The element is mid-gesture, so its inline transform carries the live
+     * drag offset. Upstream strips it during the update pass via
+     * `resetTransform` + `latestValues`; this bridge writes drag transforms
+     * outside `latestValues` (the buildTransform writer), so the adapter
+     * strips to base transforms itself for the duration of the pass and
+     * restores in the `didUpdate` listener — the whole pass flushes on a
+     * microtask, before paint, so the stripped state is never rendered.
+     *
+     * @param previousRect Pre-change slot rect (page space, stripped).
+     * @param onSlotDelta Called with the (dx, dy) slot delta when the layout
+     * actually changed; the caller routes it to the drag writer's
+     * `adjustOrigin`.
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * adapter.commitDraggedLayoutChange(previous, (dx, dy) =>
+     *     drag.adjustOrigin(dx, dy)
+     * )
+     * ```
+     */
+    commitDraggedLayoutChange(
+        previousRect: RectLike,
+        onSlotDelta: (dx: number, dy: number) => void
+    ): void {
+        if (!this.element || !this.layout) return
+
+        const restoreList = this.collectBaseTransformResets()
+        this.applyBaseTransformResets(restoreList)
+
+        let finished = false
+        const finish = () => {
+            if (finished) return
+            finished = true
+            off()
+            this.projection.isAnimationBlocked = false
+            this.restoreBaseTransformResets(restoreList)
+        }
+        const off = this.projection.addEventListener(
+            'didUpdate',
+            ({ delta, hasLayoutChanged }: LayoutUpdateData) => {
+                finish()
+                if (hasLayoutChanged) {
+                    onSlotDelta(delta.x.translate, delta.y.translate)
+                }
+            }
+        )
+
+        this.projection.isAnimationBlocked = true
+        this.commitObservedLayoutChange(previousRect)
+
+        // Safety net: `didUpdate` fires within the upstream microtask flush;
+        // if the pass bails (e.g. update blocked), never leave the element
+        // stripped or the node animation-blocked. Double-nested so it runs
+        // after motion-dom's own microtask.
+        queueMicrotask(() => queueMicrotask(finish))
     }
 
     /**
@@ -461,6 +545,49 @@ export class MotionDomProjectionAdapter {
             if (this.isAnimatingSubtree(child)) return true
         }
         return false
+    }
+
+    /**
+     * Collect the inline-transform resets needed for a stripped measurement:
+     * this element and every ancestor adapter's element, reset to their
+     * user-authored base transforms. Ancestors first (outer-most transforms
+     * cascade down); restore in reverse — same ordering as the legacy node's
+     * measure().
+     */
+    private collectBaseTransformResets(): Array<{ el: HTMLElement; prev: string; base: string }> {
+        const restoreList: Array<{ el: HTMLElement; prev: string; base: string }> = []
+        for (const node of this.projection.path) {
+            const ancestor = MotionDomProjectionAdapter.adapters.get(node)
+            if (ancestor?.element) {
+                restoreList.push({
+                    el: ancestor.element,
+                    prev: ancestor.element.style.transform,
+                    base: ancestor.getBaseTransform?.() ?? 'none'
+                })
+            }
+        }
+        if (this.element) {
+            restoreList.push({
+                el: this.element,
+                prev: this.element.style.transform,
+                base: this.getBaseTransform?.() ?? 'none'
+            })
+        }
+        return restoreList
+    }
+
+    private applyBaseTransformResets(
+        restoreList: Array<{ el: HTMLElement; prev: string; base: string }>
+    ): void {
+        for (const { el, base } of restoreList) el.style.transform = base
+    }
+
+    private restoreBaseTransformResets(
+        restoreList: Array<{ el: HTMLElement; prev: string; base: string }>
+    ): void {
+        for (let i = restoreList.length - 1; i >= 0; i--) {
+            restoreList[i].el.style.transform = restoreList[i].prev
+        }
     }
 
     /**
