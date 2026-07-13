@@ -48,3 +48,14 @@ b8017e4 + aa6c5bc · after Steps 3-4 (page-space measurement + scroll-heuristic 
 - Scope check: `layoutId.ts` and `layout.ts` untouched — consistent with guard's checkpoint-1 adjudication (touch only if a gate forces it; none did). All edits within the in-scope list.
 - Carry-forward for close-out: `docs/src/routes/docs/layout-animations/+page.svx:95` ("viewport-relative coordinates") is now stale — the plan's Docs impact section requires updating `docs/layout-animations` before final. Flagged by the executor; guard will hold final on it.
 - Action: verdict ON TRACK reported to operator. Guard authorizes Steps 5-6 (drag-pinning via didUpdate deltas; gated legacy-node retirement), next checkpoint at `guard final`.
+
+## Checkpoint 3 (final) — 2026-07-13 07:18 — ON TRACK · close-out PASS
+
+84dbb4f + 2f67d3e · final close-out: Steps 5-6 + docs carry-forward; snapshot committed by guard, all done criteria re-run
+
+- Snapshot: `84dbb4f` (drag pinning via `commitDraggedLayoutChange`, legacy node retirement, event-parity fan-out, `measure(false)` double-strip fix, `projection.context.ts` deleted) and `2f67d3e` (docs page-space rewrite + README status row).
+- Every done criterion reproduced by guard on the snapshot: `pnpm check` 0 errors; `pnpm test` 764/764; FULL e2e **340 passed / 2 skipped / 0 failed (9.2m)**; heuristic grep clean; scroll-during-layout cases all plain tests; trunk check "No issues" on 9 modified files.
+- `projection.ts` NOT deleted — plan's STOP branch, verified genuine: `Reorder/context.ts:1` + `Reorder/order.ts:1` hold type-only `Axis`/`Box` imports (out of scope). Runtime imports are zero; bundle drop realized. Executor also exposed a plan defect: the Step-6 guard grep is a BSD-grep false negative (`$lib`'s `$` parsed as anchor; `grep -rnF` finds the truth) — guard reproduced both forms.
+- Scope audit on the full contribution (`git diff 5a5dbe5...2f67d3e`): 10 files, all in-scope or authorized; `layoutId.ts`, `layout.ts`, `drag.ts`, `presence.ts`, Reorder untouched.
+- Close-out report written: `004-projection-page-space-consolidation.guard-report.md` — **PASS**. PR deliberately withheld per the plan's Git workflow ("Do NOT push or open a PR; maintainer signs off on live demos first") and the operator's standing sign-off rule; the eye-test script is in the report.
+- Action: reported to operator with the live-demo script; next move is the operator's sign-off, then the `pr` skill.
