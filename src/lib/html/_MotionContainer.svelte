@@ -394,12 +394,6 @@
             hasLayoutChanged: !isDeltaZero(delta)
         })
     }
-    const domRectToRectLike = (rect: DOMRect): RectLike => ({
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height
-    })
     const hasRectChanged = (previous: RectLike, next: RectLike): boolean =>
         Math.abs(previous.left - next.left) > 0.5 ||
         Math.abs(previous.top - next.top) > 0.5 ||
@@ -1958,7 +1952,19 @@
     function releaseWaitLayoutHold() {
         if (!waitLayoutParent) return
         const parent = waitLayoutParent
-        const previousRect = parent.getBoundingClientRect()
+        // Capture the hold parent's rect in PAGE space (viewport rect plus
+        // the window scroll at this instant). The release handler diffs this
+        // against `measureLayoutRect()`, which measures in page space —
+        // a viewport-relative capture on a scrolled page would make the
+        // release FLIP carry a phantom delta of exactly -scrollY (#437: the
+        // entering wait-mode label "flew in" from a full scroll offset away).
+        const parentViewportRect = parent.getBoundingClientRect()
+        const previousRect: RectLike = {
+            left: parentViewportRect.left + (typeof window !== 'undefined' ? window.scrollX : 0),
+            top: parentViewportRect.top + (typeof window !== 'undefined' ? window.scrollY : 0),
+            width: parentViewportRect.width,
+            height: parentViewportRect.height
+        }
         parent.removeAttribute(presenceLayoutHoldAttribute)
         if (waitLayoutParentWidth) {
             parent.style.width = waitLayoutParentWidth
@@ -1977,7 +1983,7 @@
         parent.dispatchEvent(
             new CustomEvent(presenceLayoutReleaseEvent, {
                 detail: {
-                    previousRect: domRectToRectLike(previousRect),
+                    previousRect,
                     viewportScrolledDuringHold
                 }
             })
@@ -2352,12 +2358,12 @@
             if (!(previous && next)) return
 
             lastRect = next
-            // Presence-hold semantics (owned by presence.ts, out of scope
-            // here): a hold that spanned a viewport scroll or released
-            // offscreen still skips its release FLIP. The hold's previousRect
-            // is captured before the hold starts, so it predates any
-            // phase-consistent page-space read this component could pair it
-            // with.
+            // Presence-hold semantics: a hold that spanned a viewport scroll
+            // or released offscreen still skips its release FLIP.
+            // `previousRect` arrives in PAGE space (converted at capture in
+            // `releaseWaitLayoutHold`), matching `measureLayoutRect()` above —
+            // both sides of the diff must share a coordinate space or a
+            // scrolled page shows up as a phantom -scrollY delta (#437).
             const shouldSkipLayoutAnimation =
                 detail?.viewportScrolledDuringHold || isViewportOffscreen(viewportRect)
             const transforms = computeFlipTransforms(previous, next, flipLayoutMode)

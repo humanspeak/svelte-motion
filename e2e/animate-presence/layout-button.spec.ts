@@ -2009,3 +2009,79 @@ test.describe('AnimatePresence layout button dogfood', () => {
         await expect(page.locator('[data-presence-placeholder="true"]')).toHaveCount(0)
     })
 })
+
+test.describe('wait-mode swap with the page scrolled (#437)', () => {
+    /**
+     * Regression: the presence-hold release seam diffs the hold parent's
+     * captured `previousRect` against a page-space measurement. When the
+     * capture is viewport-relative and the page is scrolled, the release FLIP
+     * carries a phantom delta of exactly -scrollY — the entering label paints
+     * in place for a frame, then flies in from ~a full scroll-offset away
+     * (observed live at scrollY≈220: `translate3d(3.65px, -219.586px, 0px)`).
+     *
+     * The unscrolled variants above never catch this because page space and
+     * viewport space coincide at scrollY=0.
+     */
+    test('entering wait label never carries a scroll-magnitude translate', async ({ page }) => {
+        await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+
+        const button = page.getByTestId('wait-button')
+        await expect(button).toBeVisible()
+
+        // Put the wait button mid-viewport like a real user reading the page.
+        await button.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+        await page.waitForTimeout(400)
+
+        const scrollY = await page.evaluate(() => window.scrollY)
+        expect(scrollY, 'setup: the page must actually be scrolled').toBeGreaterThan(120)
+
+        await button.click()
+
+        // Sample the state span (the presence-hold parent) and the entering
+        // presence child every frame through the exit (180ms) + release FLIP
+        // window. A phantom release delta shows up as a translate on the
+        // order of scrollY; legitimate label FLips move a few px at most.
+        const worst = await page.evaluate(
+            () =>
+                new Promise<{ ty: number; tx: number; sample: string }>((resolve) => {
+                    const selectors = [
+                        '[data-testid="wait-copied-state"]',
+                        '[data-testid="wait-copy-state"]',
+                        '[data-testid="wait-copied-presence-state"]'
+                    ]
+                    const worstSeen = { ty: 0, tx: 0, sample: '' }
+                    const start = performance.now()
+                    const read = () => {
+                        for (const selector of selectors) {
+                            const el = document.querySelector<HTMLElement>(selector)
+                            if (!el) continue
+                            const transform = getComputedStyle(el).transform
+                            const match = transform.match(/matrix\(([^)]+)\)/)
+                            if (!match) continue
+                            const parts = match[1]
+                                .split(',')
+                                .map((part) => Number.parseFloat(part.trim()))
+                            const tx = parts[4] ?? 0
+                            const ty = parts[5] ?? 0
+                            if (Math.abs(ty) > Math.abs(worstSeen.ty)) {
+                                worstSeen.ty = ty
+                                worstSeen.tx = tx
+                                worstSeen.sample = `${selector} @ ${Math.round(performance.now() - start)}ms → ${transform}`
+                            }
+                        }
+                        if (performance.now() - start < 1200) requestAnimationFrame(read)
+                        else resolve(worstSeen)
+                    }
+                    requestAnimationFrame(read)
+                })
+        )
+
+        expect(
+            Math.abs(worst.ty),
+            `no scroll-magnitude translate on the entering label; worst: ${worst.sample}`
+        ).toBeLessThan(Math.max(80, scrollY * 0.5))
+        expect(Math.abs(worst.tx), `no phantom x translate; worst: ${worst.sample}`).toBeLessThan(
+            80
+        )
+    })
+})
