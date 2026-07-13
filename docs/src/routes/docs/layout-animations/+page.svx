@@ -90,11 +90,15 @@ The most common use case is a tab indicator that slides between tabs:
 <SharedLayoutAnimationExample />
 </Example>
 
+## Scrolling and layout animations
+
+Layout measurements are taken in **page space**: the element's position in the document, independent of how far the window is scrolled. Scrolling the page between two layout changes — or while a layout animation is playing — can never masquerade as a layout delta, so layout animations run identically whether or not the user has scrolled. This also applies to elements that change layout while scrolled offscreen: they animate to their new position like any other element instead of snapping.
+
 ## Inside scroll containers — `layoutScroll`
 
-By default, FLIP measures elements using `getBoundingClientRect()`, which returns viewport-relative coordinates. If a `motion.div` with `layout` lives inside an `overflow: scroll` container and the user scrolls during the animation, the scroll offset shows up as an unwanted translate — the box visibly drifts.
+Page-space measurement accounts for *window* scrolling automatically, but an `overflow: scroll` container's internal scroll offset is invisible to it. If a `motion.div` with `layout` lives inside such a container and the user scrolls it during the animation, the container's scroll offset shows up as an unwanted translate — the box visibly drifts.
 
-The fix is to mark the scroll container with `layoutScroll`. Descendant `layout` animations then measure rects in that container's coordinate space, so a mid-animation scroll cancels out instead of leaking into the FLIP delta.
+The fix is to mark the scroll container with `layoutScroll`. Descendant `layout` animations then measure rects in that container's coordinate space, so a mid-animation container scroll cancels out instead of leaking into the FLIP delta.
 
 ```svelte
 <motion.div layoutScroll style="overflow: auto; height: 320px;">
