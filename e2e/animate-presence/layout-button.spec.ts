@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { sampleTransformSeries } from '../_helpers/transform'
 
 type ButtonSample = {
     buttonText: string
@@ -2007,5 +2008,66 @@ test.describe('AnimatePresence layout button dogfood', () => {
             timeout: 300
         })
         await expect(page.locator('[data-presence-placeholder="true"]')).toHaveCount(0)
+    })
+})
+
+test.describe('wait-mode swap with the page scrolled (#437)', () => {
+    /**
+     * Regression: the presence-hold release seam diffs the hold parent's
+     * captured `previousRect` against a page-space measurement. When the
+     * capture is viewport-relative and the page is scrolled, the release FLIP
+     * carries a phantom delta of exactly -scrollY — the entering label paints
+     * in place for a frame, then flies in from ~a full scroll-offset away
+     * (observed live at scrollY≈220: `translate3d(3.65px, -219.586px, 0px)`).
+     *
+     * The unscrolled variants above never catch this because page space and
+     * viewport space coincide at scrollY=0.
+     */
+    test('entering wait label never carries a scroll-magnitude translate', async ({ page }) => {
+        await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
+
+        const button = page.getByTestId('wait-button')
+        await expect(button).toBeVisible()
+
+        // Put the wait button mid-viewport like a real user reading the page.
+        await button.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+        await page.waitForTimeout(400)
+
+        const scrollY = await page.evaluate(() => window.scrollY)
+        expect(scrollY, 'setup: the page must actually be scrolled').toBeGreaterThan(120)
+
+        // Sample the state span (the presence-hold parent) and the entering
+        // presence child every frame through the exit (180ms) + release FLIP
+        // window. A phantom release delta shows up as a translate on the
+        // order of scrollY; legitimate label FLIPs move a few px at most.
+        // The sampler starts BEFORE the click (same latency guard as the
+        // scroll-during-layout suite) so a slow click round-trip can't let
+        // the peak decay before the first sampled frame.
+        const samplesPromise = sampleTransformSeries(
+            page,
+            [
+                '[data-testid="wait-copied-state"]',
+                '[data-testid="wait-copy-state"]',
+                '[data-testid="wait-copied-presence-state"]'
+            ],
+            1200
+        )
+        await button.click()
+        const samples = await samplesPromise
+        expect(
+            samples.length,
+            'sampler must observe at least one matching element'
+        ).toBeGreaterThan(0)
+        const worst = samples.reduce(
+            (acc, sample) => (Math.abs(sample.ty) > Math.abs(acc.ty) ? sample : acc),
+            { selector: '(none)', tx: 0, ty: 0, atMs: 0 }
+        )
+        const worstLabel = `${worst.selector} @ ${worst.atMs}ms → tx=${worst.tx} ty=${worst.ty}`
+
+        expect(
+            Math.abs(worst.ty),
+            `no scroll-magnitude translate on the entering label; worst: ${worstLabel}`
+        ).toBeLessThan(Math.max(80, scrollY * 0.5))
+        expect(Math.abs(worst.tx), `no phantom x translate; worst: ${worstLabel}`).toBeLessThan(80)
     })
 })

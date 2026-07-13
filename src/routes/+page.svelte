@@ -764,6 +764,14 @@
                         Nested ancestor (zeroing correctness)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/projection/scroll-during-layout') + searchParams}
+                    >
+                        Scroll during layout (#437 characterization)
+                    </a>
+                </li>
             </ul>
         </div>
     </div>

@@ -101,3 +101,62 @@ export const beginHorizontalDrag = async (page: Page, card: Locator) => {
     await page.mouse.move(x + 56, y, { steps: 6 })
     return { x, y }
 }
+
+/** One per-frame transform sample from `sampleTransformSeries`. */
+export type TransformSample = { selector: string; tx: number; ty: number; atMs: number }
+
+/**
+ * Sample the computed `matrix(...)` translate of one or more selectors every
+ * animation frame for `ms` milliseconds, entirely in-page. Unlike
+ * `readTransform`-per-frame, there is no protocol round trip between frames,
+ * so a fast spring's peak can't slip between samples. Selectors that don't
+ * match (or report `transform: none`) contribute no sample / zeros for that
+ * frame respectively — a snapped (never-transformed) element therefore
+ * yields an all-zero series.
+ */
+export const sampleTransformSeries = (
+    page: Page,
+    selectors: string[],
+    ms: number
+): Promise<TransformSample[]> =>
+    page.evaluate(
+        ({ selectors, ms }) =>
+            new Promise<Array<{ selector: string; tx: number; ty: number; atMs: number }>>(
+                (resolve) => {
+                    const samples: Array<{
+                        selector: string
+                        tx: number
+                        ty: number
+                        atMs: number
+                    }> = []
+                    const start = performance.now()
+                    const read = () => {
+                        for (const selector of selectors) {
+                            const el = document.querySelector<HTMLElement>(selector)
+                            if (!el) continue
+                            const transform = getComputedStyle(el).transform
+                            const match = transform.match(/matrix\(([^)]+)\)/)
+                            let tx = 0
+                            let ty = 0
+                            if (match) {
+                                const parts = match[1]
+                                    .split(',')
+                                    .map((part) => Number.parseFloat(part.trim()))
+                                tx = parts[4] ?? 0
+                                ty = parts[5] ?? 0
+                            }
+                            samples.push({
+                                selector,
+                                tx,
+                                ty,
+                                atMs: Math.round(performance.now() - start)
+                            })
+                        }
+                        if (performance.now() - start < ms) requestAnimationFrame(read)
+                        else resolve(samples)
+                    }
+                    requestAnimationFrame(read)
+                }
+            ),
+        { selectors, ms }
+    )

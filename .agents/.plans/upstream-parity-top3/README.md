@@ -13,13 +13,13 @@ the A2 projection issues) — see "Superseded issues" below.
 
 ## Execution order & status
 
-| Plan | Title                                                                | Priority   | Effort | Depends on | Docs update?                                                               | Status |
-| ---- | -------------------------------------------------------------------- | ---------- | ------ | ---------- | -------------------------------------------------------------------------- | ------ |
-| 001  | Re-type `animate` for AugmentedMotionValue (kill all 10 casts)       | P1 — FIRST | S–M    | —          | Small — delete casts from docs examples; check prose                       | DONE   |
-| 002  | SVG MotionValue attribute binding + attrX/attrY/attrScale            | P1         | M      | —          | **YES — new docs page** (`docs/svg-animation`)                             | DONE   |
-| 003  | Full transform composition during drag (buildTransform semantics)    | P1         | M      | —          | No public docs; in-code decision comments must be updated                  | DONE   |
-| 004  | Motion-dom projection authoritative (page-space, retire legacy FLIP) | P1         | L      | 003        | **YES — update** `docs/layout-animations`; shared-layout page as follow-up | TODO   |
-| 005  | Apple Intelligence wavy glow border — flagship example (smooth)      | P2 — LAST  | M      | 002        | **YES — new example page** (`examples/ai-glow-border`) + nav + sitemap     | DONE   |
+| Plan | Title                                                                | Priority   | Effort | Depends on | Docs update?                                                               | Status                                                                                                                                                                                                                               |
+| ---- | -------------------------------------------------------------------- | ---------- | ------ | ---------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 001  | Re-type `animate` for AugmentedMotionValue (kill all 10 casts)       | P1 — FIRST | S–M    | —          | Small — delete casts from docs examples; check prose                       | DONE                                                                                                                                                                                                                                 |
+| 002  | SVG MotionValue attribute binding + attrX/attrY/attrScale            | P1         | M      | —          | **YES — new docs page** (`docs/svg-animation`)                             | DONE                                                                                                                                                                                                                                 |
+| 003  | Full transform composition during drag (buildTransform semantics)    | P1         | M      | —          | No public docs; in-code decision comments must be updated                  | DONE                                                                                                                                                                                                                                 |
+| 004  | Motion-dom projection authoritative (page-space, retire legacy FLIP) | P1         | L      | 003        | **YES — update** `docs/layout-animations`; shared-layout page as follow-up | DONE — guard PASS + maintainer live sign-off 2026-07-13; PR #447. `projection.ts` stays as a types-only husk (out-of-scope Reorder `Axis`/`Box` imports — plan STOP, follow-up in guard report); legacy node fully unused at runtime |
+| 005  | Apple Intelligence wavy glow border — flagship example (smooth)      | P2 — LAST  | M      | 002        | **YES — new example page** (`examples/ai-glow-border`) + nav + sitemap     | DONE                                                                                                                                                                                                                                 |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
@@ -95,9 +95,46 @@ REJECTED (with one-line rationale)
 
 ## Spike findings (004 Step 2 — filled by executor)
 
-| Demo flow | Path taken (motion-dom / legacy FLIP) |
-| --------- | ------------------------------------- |
-| (pending) |                                       |
+Method: global `window.__projSpike` counters at every projection commit branch
+in `_MotionContainer.svelte` (motion-dom `commitObservedLayoutChange`, the
+legacy `runFlipAnimation` fallbacks, the layoutId FLIP, the drag `adjustOrigin`
+branch, and the scroll/offscreen skip). Each demo was loaded fresh, the counter
+reset after settle, the demo's trigger interaction performed, then the counter
+read. Instrumentation removed afterward (see `git diff` — clean).
+
+| Demo flow                               | Path taken (per commit)                                                                                                                                                                                                                 |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/tests/layout/group` (tab underline)   | **legacy layoutId FLIP** — `runFlipAnimation` via the `layoutId` `$effect` (×2). Not the observer commit path.                                                                                                                          |
+| `/tests/layout/scroll` (box resize)     | **neither FLIP-commit branch fired** — routes through the size-animation subsystem (`data-layout-size-animation` / child `data-svelte-motion-layout` size-correction), which sidesteps `commitObservedLayout`'s diff branches entirely. |
+| `/tests/layout-id` (shared underline)   | **legacy layoutId FLIP** — `runFlipAnimation` via the `layoutId` `$effect` (×2).                                                                                                                                                        |
+| `/tests/reorder/basic` (drag one slot)  | **motion-dom** `commitObservedLayoutChange` for the displaced sibling (×1) **+** drag `adjustOrigin` for the dragged node (×1).                                                                                                         |
+| `/tests/animate-presence/layout-button` | **legacy size-corrected FLIP** — `runFlipAnimation` via `shouldUseSizeCorrectedFallback` in `commitObservedLayout` (×1).                                                                                                                |
+
+**Read on migration cost — COSTLIER than the plan's optimistic framing.** The
+motion-dom `commitObservedLayoutChange` path is authoritative in only **1 of 5**
+flows (the reorder sibling). Two whole flow families never touch it today:
+
+1. **Shared-element `layoutId`** (group + layout-id) runs entirely on the
+   separate legacy `layoutId` `$effect` (`legacyFlipLayoutId`), which the
+   motion-dom node short-circuits (`if (motionDomProjection && layoutProp)
+return`). Promoting the motion-dom node to authoritative therefore **does**
+   require the `layoutId.ts` shared-element routing the plan lists as "only if
+   the spike shows it's required" — the spike shows it IS required for parity on
+   these flows (not just for green tests, but because they're the dominant
+   layout-animation surface).
+2. **Size-corrected FLIP** (animate-presence layout-button, and the
+   `/tests/layout/scroll` resize) is deliberately routed to the LEGACY path via
+   `shouldUseSizeCorrectedFallback` / the size-animation subsystem, because
+   svelte-motion's border-radius/box-shadow correction is home-grown on child
+   `data-svelte-motion-layout` targets. Migration must replace this with the
+   motion-dom node's built-in scale correction (the plan's stated upside) — this
+   is real work, not a free swap.
+
+Net: keep Effort **L / Risk HIGH**; the `layoutId.ts` seam moves from "maybe" to
+"in scope for a faithful migration", and the size-correction replacement is a
+named deliverable rather than a drive-by. The reorder flow is the one place the
+new path is already load-bearing, so its e2e suite (`e2e/reorder`,
+`siblings-flip`) remains the sharpest regression gate for Steps 3-5.
 
 ## GitHub issues for this batch
 
