@@ -59,3 +59,13 @@ b8017e4 + aa6c5bc · after Steps 3-4 (page-space measurement + scroll-heuristic 
 - Scope audit on the full contribution (`git diff 5a5dbe5...2f67d3e`): 10 files, all in-scope or authorized; `layoutId.ts`, `layout.ts`, `drag.ts`, `presence.ts`, Reorder untouched.
 - Close-out report written: `004-projection-page-space-consolidation.guard-report.md` — **PASS**. PR deliberately withheld per the plan's Git workflow ("Do NOT push or open a PR; maintainer signs off on live demos first") and the operator's standing sign-off rule; the eye-test script is in the report.
 - Action: reported to operator with the live-demo script; next move is the operator's sign-off, then the `pr` skill.
+
+## Checkpoint 4 — 2026-07-13 08:25 — DRIFTING (regression found in live sign-off; close-out PASS suspended)
+
+7a7500e · operator live-demo sign-off: pages 1-2 approved; page 3 (`/tests/animate-presence/layout-button`) FAILED the eye test
+
+- Operator observation (wait mode, page scrolled mid-viewport): entering label snaps in, then flies in from off the page. The page's own observer log recorded `stateInlineTransform: translate3d(3.65003px, -219.586px, 0px)` — a Y-translate equal to the scroll offset.
+- Root cause verified by guard in the code: coordinate-space mismatch at the presence-release seam. `releaseWaitLayoutHold` captures `previousRect` in VIEWPORT space (`parent.getBoundingClientRect()`, `_MotionContainer.svelte:1961`) while `commitPresenceLayoutRelease` measures `next` in PAGE space (`measureLayoutRect()`, `:2351`, page-space since Step 3). `computeFlipTransforms(previous, next)` (`:2363`) and `commitObservedLayoutChange(previous)` (`:2376`) therefore contain a phantom delta of exactly `-scrollY`. Pre-004 both rects were viewport-relative and agreed; the mismatch is a Step-3 regression.
+- Why the green gates missed it: the layout-button e2e drives the page unscrolled, where page space ≡ viewport space. A coverage gap, now a required red-first test.
+- Classification: executor drift (unintended regression in a flow the plan's Maintenance notes explicitly told the reviewer to scrutinize; presence-observable behavior must not change). Plan remains sound; no amendment.
+- Action: close-out PASS suspended (report to be overwritten after the corrective leg). Executor dispatched for a corrective leg: red-first scrolled wait-mode e2e, fix the seam in-scope, re-run full gates. Port 4198 freed.
