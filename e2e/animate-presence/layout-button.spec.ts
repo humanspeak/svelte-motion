@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { sampleTransformSeries } from '../_helpers/transform'
 
 type ButtonSample = {
     buttonText: string
@@ -2035,53 +2036,38 @@ test.describe('wait-mode swap with the page scrolled (#437)', () => {
         const scrollY = await page.evaluate(() => window.scrollY)
         expect(scrollY, 'setup: the page must actually be scrolled').toBeGreaterThan(120)
 
-        await button.click()
-
         // Sample the state span (the presence-hold parent) and the entering
         // presence child every frame through the exit (180ms) + release FLIP
         // window. A phantom release delta shows up as a translate on the
-        // order of scrollY; legitimate label FLips move a few px at most.
-        const worst = await page.evaluate(
-            () =>
-                new Promise<{ ty: number; tx: number; sample: string }>((resolve) => {
-                    const selectors = [
-                        '[data-testid="wait-copied-state"]',
-                        '[data-testid="wait-copy-state"]',
-                        '[data-testid="wait-copied-presence-state"]'
-                    ]
-                    const worstSeen = { ty: 0, tx: 0, sample: '' }
-                    const start = performance.now()
-                    const read = () => {
-                        for (const selector of selectors) {
-                            const el = document.querySelector<HTMLElement>(selector)
-                            if (!el) continue
-                            const transform = getComputedStyle(el).transform
-                            const match = transform.match(/matrix\(([^)]+)\)/)
-                            if (!match) continue
-                            const parts = match[1]
-                                .split(',')
-                                .map((part) => Number.parseFloat(part.trim()))
-                            const tx = parts[4] ?? 0
-                            const ty = parts[5] ?? 0
-                            if (Math.abs(ty) > Math.abs(worstSeen.ty)) {
-                                worstSeen.ty = ty
-                                worstSeen.tx = tx
-                                worstSeen.sample = `${selector} @ ${Math.round(performance.now() - start)}ms → ${transform}`
-                            }
-                        }
-                        if (performance.now() - start < 1200) requestAnimationFrame(read)
-                        else resolve(worstSeen)
-                    }
-                    requestAnimationFrame(read)
-                })
+        // order of scrollY; legitimate label FLIPs move a few px at most.
+        // The sampler starts BEFORE the click (same latency guard as the
+        // scroll-during-layout suite) so a slow click round-trip can't let
+        // the peak decay before the first sampled frame.
+        const samplesPromise = sampleTransformSeries(
+            page,
+            [
+                '[data-testid="wait-copied-state"]',
+                '[data-testid="wait-copy-state"]',
+                '[data-testid="wait-copied-presence-state"]'
+            ],
+            1200
         )
+        await button.click()
+        const samples = await samplesPromise
+        expect(
+            samples.length,
+            'sampler must observe at least one matching element'
+        ).toBeGreaterThan(0)
+        const worst = samples.reduce(
+            (acc, sample) => (Math.abs(sample.ty) > Math.abs(acc.ty) ? sample : acc),
+            { selector: '(none)', tx: 0, ty: 0, atMs: 0 }
+        )
+        const worstLabel = `${worst.selector} @ ${worst.atMs}ms → tx=${worst.tx} ty=${worst.ty}`
 
         expect(
             Math.abs(worst.ty),
-            `no scroll-magnitude translate on the entering label; worst: ${worst.sample}`
+            `no scroll-magnitude translate on the entering label; worst: ${worstLabel}`
         ).toBeLessThan(Math.max(80, scrollY * 0.5))
-        expect(Math.abs(worst.tx), `no phantom x translate; worst: ${worst.sample}`).toBeLessThan(
-            80
-        )
+        expect(Math.abs(worst.tx), `no phantom x translate; worst: ${worstLabel}`).toBeLessThan(80)
     })
 })

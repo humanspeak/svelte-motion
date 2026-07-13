@@ -80,7 +80,12 @@ const cloneMeasurements = (measurements: Measurements | undefined): Measurements
     }
 }
 
-const boxFromRect = (rect: RectLike) => {
+/**
+ * Convert a page-space rect to the `{ x: {min,max}, y: {min,max} }` box shape
+ * upstream motion-dom (and the public `onProjectionUpdate`/`onLayoutMeasure`
+ * payloads) use.
+ */
+export const boxFromRect = (rect: RectLike) => {
     const box = createBox()
     box.x.min = rect.left
     box.x.max = rect.left + rect.width
@@ -88,6 +93,14 @@ const boxFromRect = (rect: RectLike) => {
     box.y.max = rect.top + rect.height
     return box
 }
+
+type AxisLike = { min: number; max: number }
+const rectFromBox = (box: { x: AxisLike; y: AxisLike }): RectLike => ({
+    left: box.x.min,
+    top: box.y.min,
+    width: box.x.max - box.x.min,
+    height: box.y.max - box.y.min
+})
 
 const measurementsFromRect = (rect: RectLike, base: Measurements | undefined): Measurements => ({
     animationId: base?.animationId ?? 0,
@@ -312,25 +325,18 @@ export class MotionDomProjectionAdapter {
         if (!this.element) return null
         this.updatePathScroll(phase)
 
-        const restoreList = this.collectBaseTransformResets()
+        const restore = this.stripToBaseTransforms()
         let rect: RectLike
         try {
-            this.applyBaseTransformResets(restoreList)
             // measure(false): motion-applied transforms are already stripped
             // PHYSICALLY above. `measure(true)`'s removeTransform step would
             // subtract `latestValues` transforms (e.g. Reorder.Item's live
             // drag x/y MotionValues, mirrored into the visual element via its
             // style) a SECOND time and report slot − offset instead of the
             // slot.
-            const { layoutBox } = this.projection.measure(false)
-            rect = {
-                left: layoutBox.x.min,
-                top: layoutBox.y.min,
-                width: layoutBox.x.max - layoutBox.x.min,
-                height: layoutBox.y.max - layoutBox.y.min
-            }
+            rect = rectFromBox(this.projection.measure(false).layoutBox)
         } finally {
-            this.restoreBaseTransformResets(restoreList)
+            restore()
         }
         // Notify after the inline transforms are restored so listeners
         // (e.g. Reorder.Item slot registration via `onLayoutMeasure`) see a
@@ -360,6 +366,62 @@ export class MotionDomProjectionAdapter {
         return () => {
             this.measureListeners.delete(listener)
         }
+    }
+
+    /**
+     * The last page-space layout rect this adapter measured (via
+     * `seedLayout`/`measurePageRect`-backed commits), read from cache with
+     * zero DOM access. `null` before the first seed.
+     *
+     * Use this to seed consumers that only need the current slot (e.g. the
+     * `onLayoutMeasure` subscription's initial fire) without forcing a fresh
+     * strip-and-reflow measurement.
+     */
+    get lastMeasuredRect(): RectLike | null {
+        const box = this.lastLayout?.layoutBox
+        return box ? rectFromBox(box) : null
+    }
+
+    /**
+     * Convert an arbitrary element's viewport rect into THIS adapter's
+     * page space — the same space `measurePageRect` measures in: viewport
+     * rect plus the document root's phase-cached scroll, plus the offsets of
+     * any `layoutScroll` ancestor containers that contain the element.
+     *
+     * This is the one sanctioned viewport→page conversion for elements the
+     * projection tree doesn't manage (e.g. the presence wait-hold parent).
+     * A hand-rolled `rect + window.scrollX/Y` is NOT equivalent inside a
+     * scrolled `layoutScroll` container and would reintroduce the phantom
+     * scroll-delta bug class this measurement scheme exists to prevent
+     * (#437).
+     *
+     * @param target Element whose rect to convert; must be this element or
+     * one of its DOM ancestors for the `layoutScroll` path walk to apply.
+     * @param phase Scroll-cache phase for the offsets (see
+     * {@link measurePageRect}).
+     * @returns The element's rect in page space.
+     */
+    pageRectOf(target: Element, phase: Phase = 'measure'): RectLike {
+        const rect = target.getBoundingClientRect()
+        let left = rect.left
+        let top = rect.top
+        if (typeof window !== 'undefined') {
+            this.updatePathScroll(phase)
+            const root = this.projection.root
+            if (root?.scroll) {
+                left += root.scroll.offset.x
+                top += root.scroll.offset.y
+            }
+            for (const node of this.projection.path) {
+                if (node === root || !node.options.layoutScroll || !node.scroll) continue
+                const container = MotionDomProjectionAdapter.adapters.get(node)?.element
+                if (container?.contains(target)) {
+                    left += node.scroll.offset.x
+                    top += node.scroll.offset.y
+                }
+            }
+        }
+        return { left, top, width: rect.width, height: rect.height }
     }
 
     /**
@@ -400,8 +462,7 @@ export class MotionDomProjectionAdapter {
     ): void {
         if (!this.element || !this.layout) return
 
-        const restoreList = this.collectBaseTransformResets()
-        this.applyBaseTransformResets(restoreList)
+        const restore = this.stripToBaseTransforms()
 
         let finished = false
         const finish = () => {
@@ -409,7 +470,7 @@ export class MotionDomProjectionAdapter {
             finished = true
             off()
             this.projection.isAnimationBlocked = false
-            this.restoreBaseTransformResets(restoreList)
+            restore()
         }
         const off = this.projection.addEventListener(
             'didUpdate',
@@ -521,6 +582,9 @@ export class MotionDomProjectionAdapter {
 
         for (const node of projection.path) {
             node.shouldResetTransform = true
+            // Raw updateScroll (no same-phase invalidation à la
+            // refreshNodeScroll): the caller ran root.startUpdate() first,
+            // which bumped animationId and invalidated the cache naturally.
             node.updateScroll('snapshot')
 
             if (node.options.layoutRoot) {
@@ -548,45 +612,39 @@ export class MotionDomProjectionAdapter {
     }
 
     /**
-     * Collect the inline-transform resets needed for a stripped measurement:
-     * this element and every ancestor adapter's element, reset to their
-     * user-authored base transforms. Ancestors first (outer-most transforms
-     * cascade down); restore in reverse — same ordering as the legacy node's
-     * measure().
+     * Strip this element and every ancestor adapter's element to their
+     * user-authored base transforms for a measurement, returning a closure
+     * that restores the inline styles. Ancestors strip first (outer-most
+     * transforms cascade down); restore runs in reverse — same ordering as
+     * the retired legacy node's measure().
+     *
+     * Elements whose inline transform already equals their base exactly (an
+     * idle element with a user-authored transform, or one motion has settled
+     * back to base) are skipped, avoiding a no-op double style write. The
+     * `'' → 'none'` write is NOT skipped: an inline `none` overrides a
+     * stylesheet-authored transform during the read, and that stripping is
+     * part of the measurement contract.
      */
-    private collectBaseTransformResets(): Array<{ el: HTMLElement; prev: string; base: string }> {
-        const restoreList: Array<{ el: HTMLElement; prev: string; base: string }> = []
+    private stripToBaseTransforms(): () => void {
+        const restoreList: Array<{ el: HTMLElement; prev: string }> = []
+        const strip = (adapter: MotionDomProjectionAdapter) => {
+            const el = adapter.element
+            if (!el) return
+            const prev = el.style.transform
+            const base = adapter.getBaseTransform?.() ?? 'none'
+            if (prev === base) return
+            restoreList.push({ el, prev })
+            el.style.transform = base
+        }
         for (const node of this.projection.path) {
             const ancestor = MotionDomProjectionAdapter.adapters.get(node)
-            if (ancestor?.element) {
-                restoreList.push({
-                    el: ancestor.element,
-                    prev: ancestor.element.style.transform,
-                    base: ancestor.getBaseTransform?.() ?? 'none'
-                })
+            if (ancestor) strip(ancestor)
+        }
+        strip(this)
+        return () => {
+            for (let i = restoreList.length - 1; i >= 0; i--) {
+                restoreList[i].el.style.transform = restoreList[i].prev
             }
-        }
-        if (this.element) {
-            restoreList.push({
-                el: this.element,
-                prev: this.element.style.transform,
-                base: this.getBaseTransform?.() ?? 'none'
-            })
-        }
-        return restoreList
-    }
-
-    private applyBaseTransformResets(
-        restoreList: Array<{ el: HTMLElement; prev: string; base: string }>
-    ): void {
-        for (const { el, base } of restoreList) el.style.transform = base
-    }
-
-    private restoreBaseTransformResets(
-        restoreList: Array<{ el: HTMLElement; prev: string; base: string }>
-    ): void {
-        for (let i = restoreList.length - 1; i >= 0; i--) {
-            restoreList[i].el.style.transform = restoreList[i].prev
         }
     }
 
@@ -605,12 +663,17 @@ export class MotionDomProjectionAdapter {
      * it from the existing entry rather than recomputing from scratch.
      */
     private updatePathScroll(phase?: Phase): void {
-        for (const node of [...this.projection.path, this.projection]) {
-            if (phase && node.scroll?.phase === phase) {
-                node.scroll.animationId = -1
-            }
-            node.updateScroll(phase)
+        for (const node of this.projection.path) {
+            this.refreshNodeScroll(node, phase)
         }
+        this.refreshNodeScroll(this.projection, phase)
+    }
+
+    private refreshNodeScroll<Instance>(node: IProjectionNode<Instance>, phase?: Phase): void {
+        if (phase && node.scroll?.phase === phase) {
+            node.scroll.animationId = -1
+        }
+        node.updateScroll(phase)
     }
 
     private refreshCachedLayout(): void {

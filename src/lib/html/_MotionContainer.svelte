@@ -78,7 +78,7 @@
     import { getInitialKeyframes } from '$lib/utils/initial'
     import { attachDrag, type AttachDragCleanup } from '$lib/utils/drag'
     import { attachPan, type AttachPanCleanup } from '$lib/utils/pan'
-    import { MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
+    import { boxFromRect, MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
     import { SvelteSet } from 'svelte/reactivity'
     import {
         getMotionDomProjectionParent,
@@ -290,16 +290,6 @@
         return refs.filter((el): el is HTMLElement => Boolean(el))
     }
 
-    // Projection tree wiring (#379). Capture the parent node BEFORE
-    // publishing our own — same shadowing trap as layoutScroll above.
-    // The node measures through `resolveLayoutScrollAncestors` so its
-    // boxes share the FLIP coordinate space, and zeros ancestor
-    // transforms during measure so nested layout-animated parents don't
-    // corrupt a child's delta.
-    // The user-authored transform, sourced from the `style` prop rather
-    // than the live inline transform — the latter already carries any
-    // transform-type `initial`/`animate` keyframe by the time the node
-    // measures, which would be mistaken for the user's base.
     const splitSerializedTransform = (style: string): { rest: string; transform: string } => {
         const rest: string[] = []
         let transform = ''
@@ -327,6 +317,11 @@
     }
 
     const serializedStyleProp = $derived(serializeMotionStyle(styleProp, transformTemplateProp))
+    // The user-authored transform, sourced from the `style` prop rather
+    // than the live inline transform — the latter already carries any
+    // transform-type `initial`/`animate` keyframe by the time the
+    // projection adapter measures, which would be mistaken for the
+    // user's base.
     const userBaseTransform = $derived(extractTransform(styleProp))
     const getStyleTransformValues = () => {
         if (!styleProp || typeof styleProp !== 'object' || Array.isArray(styleProp)) return {}
@@ -368,13 +363,6 @@
         setMotionDomProjectionParent(motionDomProjection)
     }
 
-    // Convert a page-space `RectLike` to the `{ x: {min,max}, y: {min,max} }`
-    // box shape the public `onProjectionUpdate`/`onLayoutMeasure` payloads use.
-    const rectToLayoutBox = (rect: RectLike) => ({
-        x: { min: rect.left, max: rect.left + rect.width },
-        y: { min: rect.top, max: rect.top + rect.height }
-    })
-
     // Public `onProjectionUpdate` fan-out (#379). Emits the same payload the
     // retired legacy ProjectionNode did: page-space boxes measured with
     // motion-applied transforms stripped, delta oriented snapshot→layout
@@ -383,8 +371,8 @@
     // unchanged.
     const emitProjectionUpdate = (previous: RectLike, next: RectLike) => {
         if (!onProjectionUpdateProp) return
-        const layout = rectToLayoutBox(next)
-        const snapshot = rectToLayoutBox(previous)
+        const layout = boxFromRect(next)
+        const snapshot = boxFromRect(previous)
         const delta = createDelta()
         calcBoxDelta(delta, snapshot, layout)
         onProjectionUpdateProp({
@@ -1952,16 +1940,18 @@
     function releaseWaitLayoutHold() {
         if (!waitLayoutParent) return
         const parent = waitLayoutParent
-        // Capture the hold parent's rect in PAGE space (viewport rect plus
-        // the window scroll at this instant). The release handler diffs this
-        // against `measureLayoutRect()`, which measures in page space —
-        // a viewport-relative capture on a scrolled page would make the
-        // release FLIP carry a phantom delta of exactly -scrollY (#437: the
-        // entering wait-mode label "flew in" from a full scroll offset away).
+        // Capture the hold parent's rect in the adapter's PAGE space. The
+        // release handler diffs this against `measureLayoutRect()`, which
+        // measures in page space — a viewport-relative capture on a scrolled
+        // page would make the release FLIP carry a phantom delta of exactly
+        // -scrollY (#437: the entering wait-mode label "flew in" from a full
+        // scroll offset away). `pageRectOf` owns the conversion so window
+        // scroll AND `layoutScroll` container offsets stay consistent with
+        // the measurement side.
         const parentViewportRect = parent.getBoundingClientRect()
-        const previousRect: RectLike = {
-            left: parentViewportRect.left + (typeof window !== 'undefined' ? window.scrollX : 0),
-            top: parentViewportRect.top + (typeof window !== 'undefined' ? window.scrollY : 0),
+        const previousRect: RectLike = motionDomProjection?.pageRectOf(parent) ?? {
+            left: parentViewportRect.left,
+            top: parentViewportRect.top,
             width: parentViewportRect.width,
             height: parentViewportRect.height
         }
@@ -2230,12 +2220,12 @@
     // before the first layout change.
     $effect(() => {
         if (!(element && onLayoutMeasureProp && motionDomProjection)) return
-        const seed = measureLayoutRect()
-        const off = motionDomProjection.onMeasure((rect) =>
-            onLayoutMeasureProp(rectToLayoutBox(rect))
-        )
+        // Seed from the adapter's cache (mount() already ran seedLayout());
+        // fall back to a fresh read only when no cached rect exists yet.
+        const seed = motionDomProjection.lastMeasuredRect ?? measureLayoutRect()
+        const off = motionDomProjection.onMeasure((rect) => onLayoutMeasureProp(boxFromRect(rect)))
         if (seed) {
-            onLayoutMeasureProp(rectToLayoutBox(seed))
+            onLayoutMeasureProp(boxFromRect(seed))
         }
         return () => {
             off()
@@ -2297,51 +2287,46 @@
                 element!.dataset.svelteMotionDragActive === 'true' && !!teardownDrag
 
             const next = measureLayoutRect()
-            if (next && lastRect) {
-                const previous = lastRect
-                const shouldCommitMotionDomLayout = hasRectChanged(lastRect, next)
-                if (shouldCommitMotionDomLayout) {
-                    // Observed layout change: fan out to `onProjectionUpdate`
-                    // subscribers before branching, so drag-pinned and
-                    // size-corrected commits report their deltas too (the
-                    // legacy node emitted from its commit for all of them).
-                    emitProjectionUpdate(previous, next)
-                    // A live drag whose layout slot just moved (e.g. Reorder
-                    // swapped the dragged item's DOM position): a FLIP here
-                    // would fight the gesture, so instead the motion-dom
-                    // node's `didUpdate` delta shifts the drag origin
-                    // (upstream: VisualElementDragControls.ts:742-758) — the
-                    // element stays pinned under the cursor and
-                    // `dragSnapToOrigin` settles into the NEW slot on
-                    // release. The paint goes through the buildTransform
-                    // writer via `adjustOrigin`. The delta lands within the
-                    // upstream microtask flush — before the next pointermove
-                    // task — so the gesture transform is compensated before
-                    // Reorder's checkReorder can see the uncompensated
-                    // element and double-fire the swap.
-                    if (isDragActiveElement && teardownDrag) {
-                        const activeDrag = teardownDrag
-                        motionDomProjection?.commitDraggedLayoutChange(previous, (dx, dy) => {
-                            activeDrag.adjustOrigin(dx, dy)
-                        })
-                        lastRect = next
-                        return
-                    }
-
-                    const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
-                    const shouldUseSizeCorrectedFallback =
-                        transforms.shouldScale && hasSizeCorrectionTarget
-
-                    if (motionDomProjection && !shouldUseSizeCorrectedFallback) {
-                        motionDomProjection.commitObservedLayoutChange(previous)
-                    } else {
-                        finishFlipAnimations(element!)
-                        runFlipAnimation(element!, transforms, mergedTransition ?? {})
-                    }
+            if (!next) return
+            const previous = lastRect
+            lastRect = next
+            if (previous && hasRectChanged(previous, next)) {
+                // Observed layout change: fan out to `onProjectionUpdate`
+                // subscribers before branching, so drag-pinned and
+                // size-corrected commits report their deltas too (the
+                // legacy node emitted from its commit for all of them).
+                emitProjectionUpdate(previous, next)
+                // A live drag whose layout slot just moved (e.g. Reorder
+                // swapped the dragged item's DOM position): a FLIP here
+                // would fight the gesture, so instead the motion-dom
+                // node's `didUpdate` delta shifts the drag origin
+                // (upstream: VisualElementDragControls.ts:742-758) — the
+                // element stays pinned under the cursor and
+                // `dragSnapToOrigin` settles into the NEW slot on
+                // release. The paint goes through the buildTransform
+                // writer via `adjustOrigin`. The delta lands within the
+                // upstream microtask flush — before the next pointermove
+                // task — so the gesture transform is compensated before
+                // Reorder's checkReorder can see the uncompensated
+                // element and double-fire the swap.
+                if (isDragActiveElement && teardownDrag) {
+                    const activeDrag = teardownDrag
+                    motionDomProjection?.commitDraggedLayoutChange(previous, (dx, dy) => {
+                        activeDrag.adjustOrigin(dx, dy)
+                    })
+                    return
                 }
-                lastRect = next
-            } else if (next) {
-                lastRect = next
+
+                const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
+                const shouldUseSizeCorrectedFallback =
+                    transforms.shouldScale && hasSizeCorrectionTarget
+
+                if (motionDomProjection && !shouldUseSizeCorrectedFallback) {
+                    motionDomProjection.commitObservedLayoutChange(previous)
+                } else {
+                    finishFlipAnimations(element!)
+                    runFlipAnimation(element!, transforms, mergedTransition ?? {})
+                }
             }
         }
 

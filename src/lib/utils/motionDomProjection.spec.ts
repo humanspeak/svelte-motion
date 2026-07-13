@@ -144,7 +144,7 @@ describe('MotionDomProjectionAdapter.measurePageRect', () => {
         slotTop = 196
 
         const onSlotDelta = vi.fn()
-        adapter.commitDraggedLayoutChange(previous, (dx: number, dy: number) => onSlotDelta(dx, dy))
+        adapter.commitDraggedLayoutChange(previous, onSlotDelta)
 
         // The upstream update pass flushes on a microtask.
         await new Promise((resolve) => setTimeout(resolve, 0))

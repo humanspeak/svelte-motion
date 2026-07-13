@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { sampleTransformSeries } from '../_helpers/transform'
 
 /**
  * Scroll-during-layout suite for Plan 004 (#437).
@@ -24,38 +25,12 @@ import { expect, test, type Page } from '@playwright/test'
 const ROW_TRAVEL_MIN = 20 // a real FLIP for a ~96px row peaks well above this
 
 /**
- * Sample the computed `matrix(...)` translateY of a selector every animation
- * frame for `ms` milliseconds, starting immediately. Returns the raw samples
- * so the caller can decide whether the element animated (intermediate,
- * decaying translate) or snapped (translate stays ~0).
+ * Per-frame translateY series for one selector (shared in-page sampler from
+ * `e2e/_helpers/transform.ts`). The caller decides whether the element
+ * animated (intermediate, decaying translate) or snapped (translate stays ~0).
  */
-const sampleTranslateY = (page: Page, selector: string, ms: number): Promise<number[]> =>
-    page.evaluate(
-        ({ selector, ms }) =>
-            new Promise<number[]>((resolve) => {
-                const el = document.querySelector<HTMLElement>(selector)
-                if (!el) {
-                    resolve([])
-                    return
-                }
-                const samples: number[] = []
-                const start = performance.now()
-                const read = () => {
-                    const transform = getComputedStyle(el).transform
-                    const m = transform.match(/matrix\(([^)]+)\)/)
-                    let ty = 0
-                    if (m) {
-                        const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
-                        ty = parts[5] ?? 0
-                    }
-                    samples.push(ty)
-                    if (performance.now() - start < ms) requestAnimationFrame(read)
-                    else resolve(samples)
-                }
-                requestAnimationFrame(read)
-            }),
-        { selector, ms }
-    )
+const sampleTranslateY = async (page: Page, selector: string, ms: number): Promise<number[]> =>
+    (await sampleTransformSeries(page, [selector], ms)).map((sample) => sample.ty)
 
 const animationSignal = (samples: number[]) => {
     const abs = samples.map((s) => Math.abs(s))
@@ -72,45 +47,44 @@ const animationSignal = (samples: number[]) => {
 const gotoDemo = async (page: Page) => {
     await page.goto('/tests/projection/scroll-during-layout?@isPlaywright=true')
     await page.getByTestId('box-0').waitFor({ state: 'visible' })
+    // Let the initial-load layout observers attach and settle so the swap
+    // click can't race the layout effect on a cold preview server, and so
+    // nothing else commits between a case's setup scroll and its swap.
+    await page.waitForTimeout(400)
+}
+
+/**
+ * Shared swap-then-assert body for cases 1-2 (they differ only in scroll
+ * setup). The in-page sampler starts BEFORE the click: under full-suite load
+ * the click round-trip can lag several frames, and sampling only after it
+ * resolves misses the spring's peak (observed in a full run: the first sample
+ * had already decayed to 19.5px — under the 20px threshold — while the
+ * animation itself ran correctly).
+ */
+const swapAndExpectAnimation = async (page: Page, label: string) => {
+    const samplesPromise = sampleTranslateY(page, '[data-testid="box-0"]', 900)
+    await page.getByTestId('toggle').click()
+    const samples = await samplesPromise
+
+    const { maxAbs, intermediateFrames } = animationSignal(samples)
+    expect(maxAbs, `${label}; samples=${JSON.stringify(samples)}`).toBeGreaterThan(ROW_TRAVEL_MIN)
+    expect(
+        intermediateFrames,
+        'multiple frames should show a non-trivial translate (snap renders none)'
+    ).toBeGreaterThanOrEqual(2)
 }
 
 test.describe('projection/scroll-during-layout', () => {
     test('case 1: swap with no scroll animates the layout change', async ({ page }) => {
         await gotoDemo(page)
 
-        // The boxes are above the fold, so no scroll is needed anywhere in
-        // this case — a pure baseline for the FLIP. Let the initial-load
-        // observers attach and settle first (same guard as case 2) so the
-        // click can't race the layout effect on a cold preview server.
-        await page.waitForTimeout(400)
-        // Start the in-page sampler BEFORE the click: under full-suite load
-        // the click round-trip can lag several frames, and sampling only
-        // after it resolves misses the spring's peak (observed in a full run:
-        // the first sample had already decayed to 19.5px — under the 20px
-        // threshold — while the animation itself ran correctly).
-        const samplesPromise = sampleTranslateY(page, '[data-testid="box-0"]', 900)
-        await page.getByTestId('toggle').click()
-        const samples = await samplesPromise
-
-        const { maxAbs, intermediateFrames } = animationSignal(samples)
-        expect(
-            maxAbs,
-            `box-0 should show a FLIP translate; samples=${JSON.stringify(samples)}`
-        ).toBeGreaterThan(ROW_TRAVEL_MIN)
-        expect(
-            intermediateFrames,
-            'multiple frames should show a non-trivial translate (snap renders none)'
-        ).toBeGreaterThanOrEqual(2)
+        // The boxes are above the fold, so no scroll happens anywhere in
+        // this case — a pure baseline for the FLIP.
+        await swapAndExpectAnimation(page, 'box-0 should show a FLIP translate')
     })
 
     test('case 2: swap after a viewport scroll still animates', async ({ page }) => {
         await gotoDemo(page)
-
-        // Let the initial-load layout observers settle so nothing else
-        // commits between the scroll and the swap — this isolates "a viewport
-        // scroll happened since the last layout commit" as the only variable
-        // versus case 1.
-        await page.waitForTimeout(400)
 
         // The boxes stay visible after this small scroll, but a `window`
         // scroll event fires between the last layout commit and the swap.
@@ -120,17 +94,7 @@ test.describe('projection/scroll-during-layout', () => {
         await page.evaluate(() => window.scrollBy(0, 60))
         await page.waitForTimeout(80)
 
-        // Sampler starts before the click — same latency guard as case 1.
-        const samplesPromise = sampleTranslateY(page, '[data-testid="box-0"]', 900)
-        await page.getByTestId('toggle').click()
-        const samples = await samplesPromise
-
-        const { maxAbs, intermediateFrames } = animationSignal(samples)
-        expect(
-            maxAbs,
-            `box-0 animates after a viewport scroll; samples=${JSON.stringify(samples)}`
-        ).toBeGreaterThan(ROW_TRAVEL_MIN)
-        expect(intermediateFrames).toBeGreaterThanOrEqual(2)
+        await swapAndExpectAnimation(page, 'box-0 animates after a viewport scroll')
     })
 
     test('case 3: swap while offscreen settles correctly with no spurious replay', async ({
