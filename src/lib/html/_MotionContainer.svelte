@@ -367,7 +367,8 @@
     const motionDomProjection =
         typeof window !== 'undefined'
             ? new MotionDomProjectionAdapter({
-                  parent: motionDomProjectionParent
+                  parent: motionDomProjectionParent,
+                  getBaseTransform: () => userBaseTransform
               })
             : null
     if (motionDomProjection) {
@@ -403,9 +404,18 @@
         rect.top >= window.innerHeight ||
         rect.left >= window.innerWidth
 
-    // Ancestor-transform-invariant layout measurement for seeding the
-    // fallback FLIP effect's first rect.
-    const measureLayoutRect = (): RectLike | null => {
+    // Ancestor-transform-invariant layout measurement in scroll-invariant
+    // PAGE space, sourced from the upstream motion-dom node (#437): viewport
+    // box plus the document root's phase-cached scroll offset, ancestor
+    // `layoutScroll` offsets folded in. A viewport scroll between the
+    // 'snapshot' (pre-patch) and 'measure' (post-patch) phases cancels
+    // exactly, so it can never masquerade as a layout delta.
+    const measureLayoutRect = (phase: 'snapshot' | 'measure' = 'measure'): RectLike | null => {
+        if (motionDomProjection) {
+            const rect = motionDomProjection.measurePageRect(phase)
+            if (rect) return rect
+        }
+        // Legacy fallback (SSR/no-window) until the legacy node retires.
         const box = projection.measure()
         return box ? boxToRectLike(box) : null
     }
@@ -2175,7 +2185,8 @@
             return
         }
 
-        explicitLayoutSnapshot = measureLayoutRect()
+        // 'snapshot' phase: the pre-patch side of the update boundary.
+        explicitLayoutSnapshot = measureLayoutRect('snapshot')
         projection.willUpdate()
         motionDomProjection?.willUpdate()
         motionDomProjectionUpdatePending = true
@@ -2258,27 +2269,22 @@
     // expose the React-style pre/post render hook pair used upstream, so the
     // component snapshots committed layout changes through DOM observers while
     // keeping the existing local ProjectionNode event fan-out alive.
+    //
+    // Measurements are taken in scroll-invariant PAGE space through the
+    // motion-dom node's phase-cached scroll (see `measureLayoutRect`), so a
+    // viewport scroll between two reads can never masquerade as a layout
+    // delta. This is what allowed the former viewport-scroll/offscreen
+    // suppression heuristic to be deleted (#437): pure scrolls fire no layout
+    // observers, and real layout changes now diff scroll-clean rects —
+    // including offscreen, which animates like upstream instead of snapping.
     $effect(() => {
         if (!(element && layoutProp && isLoaded === 'ready' && hasLayoutFeatures)) return
 
         let rafId: number | null = null
-        let wasViewportOffscreenSinceLastLayout = false
-        let wasViewportScrolledSinceLastLayout = false
         const flipLayoutMode = layoutProp === 'position' ? 'position' : true
         motionDomProjection?.seedLayout()
         lastRect = measureLayoutRect()
         setCompositorHints(element!, true)
-
-        const rememberOffscreenScroll = () => {
-            wasViewportScrolledSinceLastLayout = true
-            if (motionDomProjection?.isAnimating()) {
-                motionDomProjection.finishAnimation()
-            }
-            if (isViewportOffscreen(element!.getBoundingClientRect())) {
-                wasViewportOffscreenSinceLastLayout = true
-                motionDomProjection?.finishAnimation()
-            }
-        }
 
         const commitObservedLayout = () => {
             if (element!.hasAttribute('data-layout-size-animation')) {
@@ -2306,27 +2312,11 @@
                 return
             }
 
-            // An actively dragged element must NOT take the viewport-scroll
-            // early-out: its slot change still needs the `adjustOrigin`
-            // compensation below (measurements are page-coordinate, so the
-            // delta is scroll-clean). Skipping it leaves the gesture's
-            // transform uncompensated, which re-triggers Reorder's
-            // checkReorder and double-fires the swap after any scroll.
+            // A live drag's slot change routes to the `adjustOrigin`
+            // compensation below instead of a FLIP (measurements are
+            // page-coordinate, so the delta is scroll-clean).
             const isDragActiveElement =
                 element!.dataset.svelteMotionDragActive === 'true' && !!teardownDrag
-
-            if (
-                !isDragActiveElement &&
-                (wasViewportScrolledSinceLastLayout ||
-                    wasViewportOffscreenSinceLastLayout ||
-                    isViewportOffscreen(element!.getBoundingClientRect()))
-            ) {
-                lastRect = measureLayoutRect()
-                motionDomProjection?.finishAnimation()
-                wasViewportScrolledSinceLastLayout = false
-                wasViewportOffscreenSinceLastLayout = false
-                return
-            }
 
             const nextBox = projection.commitLayoutChange()
             if (nextBox && lastRect) {
@@ -2349,8 +2339,6 @@
                         )
                         motionDomProjection?.seedLayout()
                         lastRect = next
-                        wasViewportScrolledSinceLastLayout = false
-                        wasViewportOffscreenSinceLastLayout = false
                         return
                     }
 
@@ -2366,12 +2354,8 @@
                     }
                 }
                 lastRect = next
-                wasViewportScrolledSinceLastLayout = false
-                wasViewportOffscreenSinceLastLayout = false
             } else if (nextBox) {
                 lastRect = boxToRectLike(nextBox)
-                wasViewportScrolledSinceLastLayout = false
-                wasViewportOffscreenSinceLastLayout = false
             }
         }
 
@@ -2388,11 +2372,14 @@
             if (!(previous && next)) return
 
             lastRect = next
+            // Presence-hold semantics (owned by presence.ts, out of scope
+            // here): a hold that spanned a viewport scroll or released
+            // offscreen still skips its release FLIP. The hold's previousRect
+            // is captured before the hold starts, so it predates any
+            // phase-consistent page-space read this component could pair it
+            // with.
             const shouldSkipLayoutAnimation =
-                detail?.viewportScrolledDuringHold ||
-                wasViewportScrolledSinceLastLayout ||
-                wasViewportOffscreenSinceLastLayout ||
-                isViewportOffscreen(viewportRect)
+                detail?.viewportScrolledDuringHold || isViewportOffscreen(viewportRect)
             const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
             const hasSizeCorrectionTarget = !!element!.querySelector('[data-svelte-motion-layout]')
             const shouldUseSizeCorrectedFallback = transforms.shouldScale && hasSizeCorrectionTarget
@@ -2404,8 +2391,6 @@
                 finishFlipAnimations(element!)
                 runFlipAnimation(element!, transforms, mergedTransition ?? {})
             }
-            wasViewportScrolledSinceLastLayout = false
-            wasViewportOffscreenSinceLastLayout = false
             if (!shouldSkipLayoutAnimation && hasRectChanged(previous, next)) {
                 if (motionDomProjection && !shouldUseSizeCorrectedFallback) {
                     motionDomProjection.commitObservedLayoutChange(previous)
@@ -2424,12 +2409,10 @@
         }
 
         const disconnectObservers = observeLayoutChanges(element!, () => scheduleProjectionCommit())
-        window.addEventListener('scroll', rememberOffscreenScroll, { passive: true })
         element!.addEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
 
         return () => {
             disconnectObservers()
-            window.removeEventListener('scroll', rememberOffscreenScroll)
             element?.removeEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
             lastRect = null
             if (element) {

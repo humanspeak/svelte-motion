@@ -1,7 +1,7 @@
 <script lang="ts">
     import { motion, type ProjectionUpdatePayload } from '$lib'
 
-    // Characterization demo (Plan 004, #437) — scroll-during-layout.
+    // Scroll-during-layout demo (Plan 004, #437).
     //
     // Two `<motion.div layout>` boxes sit near the TOP of the page so they are
     // visible on load without any scroll, while a tall spacer BELOW makes the
@@ -9,17 +9,14 @@
     // toolbar toggle reverses their order, so each box travels one row (~96px)
     // and the layout animation runs.
     //
-    // The point of this page is to expose how today's projection commit path
-    // behaves when the viewport is scrolled between layout snapshots:
-    //   - No scroll  → the swap animates (FLIP translate decays over frames).
-    //   - After a viewport scroll → today's `wasViewportScrolledSinceLastLayout`
-    //     heuristic SKIPS the layout animation, so the boxes snap.
-    //   - Element offscreen then back → today may produce a spurious/absent
-    //     animation depending on the offscreen heuristic.
-    //
-    // Plan 004 migrates measurement to scroll-invariant page space so the
-    // scroll heuristic can be deleted and every case animates cleanly. The
-    // e2e spec encodes cases 2-3 as `test.fail()` until that lands.
+    // Layout measurements are page-space and phase-cached through the
+    // motion-dom projection node, so a viewport scroll between two reads can
+    // never masquerade as a layout delta. Every case animates:
+    //   - No scroll → the swap animates (FLIP translate decays over frames).
+    //   - After a viewport scroll → still animates (the old viewport-scroll
+    //     suppression heuristic that snapped this case is gone).
+    //   - Swap while offscreen, then scroll back → correct final rects and no
+    //     spurious animation replay on scroll-back.
 
     type Item = { id: number; label: string; color: string }
     let items = $state<Item[]>([
@@ -44,16 +41,16 @@
     <div class="toolbar">
         <button type="button" onclick={swap} data-testid="toggle">Swap order</button>
         <span class="count" data-testid="swap-count">swaps: {swapCount}</span>
-        <span class="hint">Swap with no scroll → animates. Scroll first → snaps (today).</span>
+        <span class="hint">Swaps animate with or without a viewport scroll in between.</span>
     </div>
 
     <section class="stage" data-testid="stage">
-        <h1>Scroll-during-layout characterization</h1>
+        <h1>Scroll during layout</h1>
         <p>
-            These two layout boxes are visible on load. Hit <strong>Swap order</strong> with no scroll
-            and they animate. Scroll the page first, then swap, and today's heuristic makes them snap
-            instead. Scroll all the way down to push them offscreen, swap, and scroll back to see the
-            offscreen case.
+            These two layout boxes are visible on load. Hit <strong>Swap order</strong> and they animate
+            — including right after scrolling the page, which used to snap under the old viewport-scroll
+            suppression heuristic. Scroll all the way down to push them offscreen, swap, and scroll back:
+            correct final positions, no replayed animation.
         </p>
         <div class="stack">
             {#each items as item (item.id)}

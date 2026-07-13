@@ -1,29 +1,24 @@
 import { expect, test, type Page } from '@playwright/test'
 
 /**
- * Characterization suite for Plan 004 (#437) — scroll-during-layout.
+ * Scroll-during-layout suite for Plan 004 (#437).
  *
- * Two `<motion.div layout>` boxes below the fold on a tall page. A swap
- * reverses their order, so each travels one row (~96px) and a layout
- * animation should run. These tests pin down how today's projection commit
- * path behaves when the viewport scrolls between the layout snapshot and the
- * measurement:
+ * Two `<motion.div layout>` boxes visible on load (above the fold) on a tall
+ * page. A swap reverses their order, so each travels one row (~96px) and a
+ * layout animation runs. Layout measurement is page-space and phase-cached
+ * through the motion-dom projection node, so a viewport scroll between the
+ * layout snapshot and the measurement can never masquerade as a layout delta:
  *
  *   1. No scroll → the swap animates (FLIP translate decays over frames).
- *      PASSES today.
- *   2. Viewport scrolled, then swap → DESIRED (upstream page-space) behavior is
- *      that it still animates. Today the `wasViewportScrolledSinceLastLayout`
- *      heuristic SKIPS the animation and the boxes snap, so this asserts the
- *      desired outcome and is marked `test.fail()` — it is the encoded "known
- *      divergence". Flipping it to a plain passing test is the Step 4 gate.
- *   3. Element scrolled fully offscreen, swap, scroll back → DESIRED behavior is
- *      the boxes end in the correct swapped slots with identity transforms and
- *      no spurious animation replays on scroll-back. Verified empirically:
- *      today's offscreen heuristic already produces this outcome, so this stays
- *      a PLAIN passing test — the plan marks case 3 `test.fail()` only "if
- *      today's behavior differs", and it does not. It guards against a Step-4
- *      regression where removing the heuristic could re-introduce a spurious
- *      scroll-back animation.
+ *   2. Viewport scrolled, then swap → still animates. This snapped under the
+ *      old viewport-scroll suppression heuristic and was encoded here as a
+ *      `test.fail()` known divergence; deleting the heuristic flipped it to a
+ *      plain passing test.
+ *   3. Element scrolled fully offscreen, swap, scroll back → the boxes end in
+ *      the correct swapped slots with identity transforms, and scrolling back
+ *      triggers no spurious animation replay. (Offscreen layout changes now
+ *      animate like upstream instead of snapping; the animation completes
+ *      offscreen and the scroll-back must not restart it.)
  */
 
 const ROW_TRAVEL_MIN = 20 // a real FLIP for a ~96px row peaks well above this
@@ -78,8 +73,11 @@ test.describe('projection/scroll-during-layout', () => {
     test('case 1: swap with no scroll animates the layout change', async ({ page }) => {
         await gotoDemo(page)
 
-        // The boxes are above the fold, so no scroll is needed — and no scroll
-        // means the `wasViewportScrolledSinceLastLayout` heuristic never trips.
+        // The boxes are above the fold, so no scroll is needed anywhere in
+        // this case — a pure baseline for the FLIP. Let the initial-load
+        // observers attach and settle first (same guard as case 2) so the
+        // click can't race the layout effect on a cold preview server.
+        await page.waitForTimeout(400)
         const swapPromise = page.getByTestId('toggle').click()
         const samples = await (async () => {
             await swapPromise
@@ -98,22 +96,19 @@ test.describe('projection/scroll-during-layout', () => {
     })
 
     test('case 2: swap after a viewport scroll still animates', async ({ page }) => {
-        // KNOWN DIVERGENCE (Plan 004): today's `wasViewportScrolledSinceLastLayout`
-        // heuristic snaps the swap after any viewport scroll, so this fails. The
-        // Step 4 gate is deleting the heuristic and removing this `test.fail()`.
-        test.fail()
         await gotoDemo(page)
 
-        // Let the initial-load layout observers settle first: an unsettled
-        // ResizeObserver commit right after load can reset the scroll flag and
-        // make this case animate spuriously. Once quiet, nothing else commits
-        // between the scroll and the swap.
+        // Let the initial-load layout observers settle so nothing else
+        // commits between the scroll and the swap — this isolates "a viewport
+        // scroll happened since the last layout commit" as the only variable
+        // versus case 1.
         await page.waitForTimeout(400)
 
-        // The boxes are visible on load; a small viewport scroll keeps them
-        // visible but fires a `window` scroll event since the last layout
-        // commit. Today that sets `wasViewportScrolledSinceLastLayout` and the
-        // swap snaps instead of animating.
+        // The boxes stay visible after this small scroll, but a `window`
+        // scroll event fires between the last layout commit and the swap.
+        // Page-space measurement makes that scroll cancel exactly, so the
+        // swap animates just like case 1 (this snapped under the old
+        // suppression heuristic).
         await page.evaluate(() => window.scrollBy(0, 60))
         await page.waitForTimeout(80)
 
@@ -126,7 +121,7 @@ test.describe('projection/scroll-during-layout', () => {
         const { maxAbs, intermediateFrames } = animationSignal(samples)
         expect(
             maxAbs,
-            `DESIRED: box-0 animates after a viewport scroll; samples=${JSON.stringify(samples)}`
+            `box-0 animates after a viewport scroll; samples=${JSON.stringify(samples)}`
         ).toBeGreaterThan(ROW_TRAVEL_MIN)
         expect(intermediateFrames).toBeGreaterThanOrEqual(3)
     })
@@ -143,15 +138,18 @@ test.describe('projection/scroll-during-layout', () => {
             return { b0: b0.top + window.scrollY, b1: b1.top + window.scrollY }
         })
 
-        // Scroll the boxes fully offscreen (to the bottom of the tall page),
-        // swap while they are not visible, then scroll back to them.
+        // Scroll the boxes fully offscreen (to the bottom of the tall page)
+        // and swap while they are not visible. Offscreen layout changes now
+        // ANIMATE like upstream (the old heuristic snapped them), so give the
+        // spring time to fully settle offscreen — this test pins down the
+        // scroll-back REPLAY invariant, not the offscreen animation itself.
         await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
         await page.waitForTimeout(30)
         await page.getByTestId('toggle').click()
-        await page.waitForTimeout(30)
+        await page.waitForTimeout(900)
 
         // Sample the transform WHILE scrolling back — a spurious FLIP replay
-        // would spike translateY here.
+        // (a scroll masquerading as a layout delta) would spike translateY.
         await page.evaluate(() => window.scrollTo(0, 0))
         await page.getByTestId('stage').scrollIntoViewIfNeeded()
         const scrollBackSamples = await sampleTranslateY(page, '[data-testid="box-0"]', 300)
