@@ -1,3 +1,4 @@
+import type { GestureCoordinator } from '$lib/utils/gestureCoordinator'
 import {
     buildGestureTransform,
     collectGestureTransformValues,
@@ -187,6 +188,10 @@ type HoverTransformComposerOptions = {
  * @param callbacks Optional lifecycle callbacks for hover start/end.
  * @param baselineSources Optional sources used to compute baseline.
  * @param transformComposer Optional shared transform sources used by scale animation.
+ * @param coordinator Optional shared gesture coordinator. When provided, hover
+ * activity is tracked as state (upstream `setActive` semantics), hover yields
+ * its keys while a higher-priority tap is active (upstream protected keys),
+ * and every animation start stops other in-flight gesture writers first.
  * @return Cleanup function to remove hover listeners.
  */
 export const attachWhileHover = (
@@ -195,7 +200,8 @@ export const attachWhileHover = (
     mergedTransition: AnimationOptions,
     callbacks?: { onStart?: () => void; onEnd?: () => void },
     baselineSources?: { initial?: Record<string, unknown>; animate?: Record<string, unknown> },
-    transformComposer?: HoverTransformComposerOptions
+    transformComposer?: HoverTransformComposerOptions,
+    coordinator?: GestureCoordinator
 ): (() => void) => {
     if (!whileHover) return () => {}
 
@@ -238,8 +244,12 @@ export const attachWhileHover = (
             return
         }
 
+        // Caller has already stopped competing writers (see the branch-level
+        // stopAll), so the start keyframe samples exactly where the element
+        // visually froze.
         stopScaleAnimation()
-        scaleAnimation = animateValue({
+        const registration: { unregister?: () => void } = {}
+        const animation = animateValue({
             ...toMillisecondsTransition(transition ?? mergedTransition),
             keyframes: [readTransformScale(el), targetScale],
             onUpdate: (value: number) => {
@@ -248,17 +258,38 @@ export const attachWhileHover = (
             onComplete: () => {
                 writeComposedScale(targetScale)
                 scaleAnimation = null
+                registration.unregister?.()
                 onComplete?.()
             }
+        })
+        scaleAnimation = animation
+        registration.unregister = coordinator?.register(() => {
+            animation.stop?.()
+            if (scaleAnimation === animation) scaleAnimation = null
         })
     }
 
     const handleDragStart = () => stopScaleAnimation()
     el.addEventListener('svelte-motion:drag-start', handleDragStart)
 
+    // Run a native (non-composed) gesture animation, registering it so the
+    // tap system can stop it in turn. Caller stops competing writers first.
+    const animateNative = (keyframes: Record<string, unknown>, transition: AnimationOptions) => {
+        const ctl = animate(el, keyframes as unknown as DOMKeyframesDefinition, transition)
+        const unregister = coordinator?.register(() => {
+            try {
+                ctl.stop()
+            } catch {
+                // Finished animations may throw on stop; nothing keeps writing.
+            }
+        })
+        void ctl.finished?.finally(() => unregister?.()).catch(() => undefined)
+    }
+
     const cleanupHover = hover(el, () => {
         if (el.dataset.svelteMotionDragActive === 'true') return () => {}
 
+        coordinator?.setActive('hover', true)
         // Hover start: compute baseline and animate to whileHover values
         hoverBaseline = computeHoverBaseline(el, {
             initial: baselineSources?.initial,
@@ -268,29 +299,40 @@ export const attachWhileHover = (
         })
         if (!transformComposer) fallbackBaseTransform = el.style.transform
         callbacks?.onStart?.()
-        const { keyframes, transition } = splitHoverDefinition(whileHover)
-        const { scale, ...nativeKeyframes } = keyframes
-        if (scale != null) animateScale(scale, transition)
-        if (Object.keys(nativeKeyframes).length > 0) {
-            animate(
-                el,
-                nativeKeyframes as unknown as DOMKeyframesDefinition,
-                transition ?? mergedTransition
-            )
+        // Upstream protected keys: while a higher-priority tap is active, hover
+        // only records its state — the tap release re-applies hover from the
+        // coordinator flag (variant-props.ts priority order).
+        if (!coordinator?.isActive('tap')) {
+            // Single-writer: stop every in-flight gesture animation (ours and
+            // the tap system's) before this transition's writers start.
+            coordinator?.stopAll()
+            const { keyframes, transition } = splitHoverDefinition(whileHover)
+            const { scale, ...nativeKeyframes } = keyframes
+            if (scale != null) animateScale(scale, transition)
+            if (Object.keys(nativeKeyframes).length > 0) {
+                animateNative(nativeKeyframes, transition ?? mergedTransition)
+            }
         }
 
         // Return cleanup function for hover end
         return () => {
-            // Hover end: restore baseline values
+            coordinator?.setActive('hover', false)
+            // While pressed, the tap state owns these keys — its release path
+            // restores the correct target (base, now that hover is inactive).
+            if (coordinator?.isActive('tap')) {
+                callbacks?.onEnd?.()
+                return
+            }
+            // Hover end: restore baseline values. Stop competing writers
+            // first — e.g. a tap-release spring reapplying hover — so the
+            // unwind is the single writer and starts from the frozen visual
+            // state instead of snapping when the race resolves.
             if (hoverBaseline && Object.keys(hoverBaseline).length > 0) {
+                coordinator?.stopAll()
                 const { scale: baselineScale, ...nativeBaseline } = hoverBaseline
                 if (baselineScale != null) animateScale(baselineScale, mergedTransition)
                 if (Object.keys(nativeBaseline).length > 0) {
-                    animate(
-                        el,
-                        nativeBaseline as unknown as DOMKeyframesDefinition,
-                        mergedTransition
-                    )
+                    animateNative(nativeBaseline, mergedTransition)
                 }
             }
             callbacks?.onEnd?.()

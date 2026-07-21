@@ -47,6 +47,7 @@
     import { isAnimationControls } from '$lib/utils/animationControls.svelte'
     import { attachWhileTap } from '$lib/utils/interaction'
     import { attachWhileHover, computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
+    import { createGestureCoordinator } from '$lib/utils/gestureCoordinator'
     import { attachWhileFocus } from '$lib/utils/focus'
     import { attachWhileInView } from '$lib/utils/inView.svelte'
     import {
@@ -2421,6 +2422,12 @@
         runFlipAnimation(element, transforms, prev.transition ?? mergedTransition ?? {})
     })
 
+    // Shared per-element coordination between the hover and tap gesture
+    // systems: active-state flags + a single-writer animation registry
+    // (upstream setActive / protected-keys semantics — see
+    // gestureCoordinator.ts).
+    const gestureCoordinator = createGestureCoordinator()
+
     // whileTap handling via motion-dom's press()
     $effect(() => {
         if (
@@ -2440,7 +2447,8 @@
                     ? ((resolvedWhileHover ?? {}) as Record<string, unknown>)
                     : undefined,
                 hoverFallbackTransition: mergedTransition ?? {},
-                tapTransition: mergedTransition ?? {}
+                tapTransition: mergedTransition ?? {},
+                coordinator: gestureCoordinator
             }
         )
     })
@@ -2470,7 +2478,8 @@
                 getLiveTransformValues: () => liveGestureTransformValues,
                 getBaseTransform: () => userBaseTransform,
                 transformTemplate: transformTemplateProp
-            }
+            },
+            gestureCoordinator
         )
     })
 

@@ -1,3 +1,4 @@
+import type { GestureCoordinator } from '$lib/utils/gestureCoordinator'
 import { isHoverCapable, splitHoverDefinition } from '$lib/utils/hover'
 import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
@@ -99,6 +100,10 @@ export const attachWhileTap = (
          *  honored for the tap gesture (framer parity). When empty, the gesture
          *  passes no transition so motion-dom applies its per-value defaults. */
         tapTransition?: AnimationOptions | undefined
+        /** Shared per-element gesture coordinator (see gestureCoordinator.ts):
+         *  tracks tap/hover active state and lets hover and tap stop each
+         *  other's in-flight animations so exactly one writer owns the element. */
+        coordinator?: GestureCoordinator
     }
 ): (() => void) => {
     if (!whileTap) return () => {}
@@ -155,6 +160,7 @@ export const attachWhileTap = (
     // Single control tracking whatever gesture animation is in-flight
     // (tap, reset, or hover reapply). Every new gesture cancels the previous.
     let gestureCtl: GestureCtl | null = null
+    const coordinator = callbacks?.coordinator
 
     const cancelGesture = () => {
         if (gestureCtl) {
@@ -172,6 +178,26 @@ export const attachWhileTap = (
             // ignore
         }
         gestureCtl = null
+        // Single-writer: also stop the hover system's in-flight animations
+        // (e.g. a hover-exit unwind) before this gesture starts writing.
+        coordinator?.stopAll()
+    }
+
+    // Track the in-flight control with the coordinator so the hover system
+    // can stop it symmetrically (e.g. leaving mid-release-spring).
+    const setGestureCtl = (ctl: GestureCtl) => {
+        gestureCtl = ctl
+        const unregister = coordinator?.register(() => {
+            try {
+                ctl.stop()
+            } catch {
+                // ignore
+            }
+            if (gestureCtl === ctl) gestureCtl = null
+        })
+        Promise.resolve(ctl.finished)
+            .catch(() => {})
+            .finally(() => unregister?.())
     }
 
     const animateTap = () => {
@@ -182,13 +208,16 @@ export const attachWhileTap = (
             whileTap,
             gestureActive: gestureCtl !== null
         })
+        coordinator?.setActive('tap', true)
         cancelGesture()
         callbacks?.onTapStart?.()
-        gestureCtl = animate(
-            el,
-            tapKeyframes as unknown as DOMKeyframesDefinition,
-            pressTransition
-        ) as unknown as GestureCtl
+        setGestureCtl(
+            animate(
+                el,
+                tapKeyframes as unknown as DOMKeyframesDefinition,
+                pressTransition
+            ) as unknown as GestureCtl
+        )
         Promise.resolve(gestureCtl?.finished)
             .then(() =>
                 pwLog('[tap] tap-applied', {
@@ -200,6 +229,18 @@ export const attachWhileTap = (
             .catch(() => {})
     }
 
+    const isHoverStillActive = (): boolean => {
+        // Prefer the coordinator's tracked state (upstream setActive
+        // semantics): the DOM's `:hover` can report true after the hover
+        // system has already dispatched its exit, and vice versa.
+        if (coordinator) return coordinator.isActive('hover')
+        try {
+            return el.matches(':hover')
+        } catch {
+            return false
+        }
+    }
+
     const reapplyHoverIfActive = (): boolean => {
         if (!callbacks?.hoverDef) {
             pwLog('[tap] hover-reapply-skip', { reason: 'no hoverDef' })
@@ -209,13 +250,8 @@ export const attachWhileTap = (
             pwLog('[tap] hover-reapply-skip', { reason: 'not hover-capable' })
             return false
         }
-        try {
-            if (!el.matches(':hover')) {
-                pwLog('[tap] hover-reapply-skip', { reason: 'not :hover' })
-                return false
-            }
-        } catch {
-            pwLog('[tap] hover-reapply-skip', { reason: 'matches threw' })
+        if (!isHoverStillActive()) {
+            pwLog('[tap] hover-reapply-skip', { reason: 'hover not active' })
             return false
         }
         const { keyframes, transition: hoverTransition } = splitHoverDefinition(callbacks.hoverDef)
@@ -227,11 +263,13 @@ export const attachWhileTap = (
         // Reapplying hover after a tap animates to the hover state, so it should
         // use the hover definition's own transition when provided, falling back
         // to the release transition (component prop → per-value defaults).
-        gestureCtl = animate(
-            el,
-            keyframes as unknown as DOMKeyframesDefinition,
-            hoverTransition ?? releaseTransition
-        ) as unknown as GestureCtl
+        setGestureCtl(
+            animate(
+                el,
+                keyframes as unknown as DOMKeyframesDefinition,
+                hoverTransition ?? releaseTransition
+            ) as unknown as GestureCtl
+        )
         Promise.resolve(gestureCtl?.finished)
             .then(() =>
                 pwLog('[tap] hover-reapply-done', {
@@ -251,6 +289,7 @@ export const attachWhileTap = (
             transform: getComputedStyle(el).transform,
             gestureActive: gestureCtl !== null
         })
+        coordinator?.setActive('tap', false)
         if (success) callbacks?.onTap?.()
         else callbacks?.onTapCancel?.()
 
@@ -262,11 +301,13 @@ export const attachWhileTap = (
         const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, tapKeyframes)
         pwLog('[tap] reset-record', resetRecord)
         if (Object.keys(resetRecord).length > 0) {
-            gestureCtl = animate(
-                el,
-                resetRecord as unknown as DOMKeyframesDefinition,
-                releaseTransition
-            ) as unknown as GestureCtl
+            setGestureCtl(
+                animate(
+                    el,
+                    resetRecord as unknown as DOMKeyframesDefinition,
+                    releaseTransition
+                ) as unknown as GestureCtl
+            )
             Promise.resolve(gestureCtl?.finished)
                 .then(() =>
                     pwLog('[tap] reset-done', {
