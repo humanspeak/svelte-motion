@@ -1,6 +1,6 @@
 <script lang="ts">
     import { Gauge, RotateCcw, Zap } from '@lucide/svelte'
-    import { motion } from '@humanspeak/svelte-motion'
+    import { motion, styleString } from '@humanspeak/svelte-motion'
 
     // A high-frequency render driver: every tick recolors both boxes, forcing
     // a re-render. Without `layoutDependency`, that re-renders the layout box
@@ -13,7 +13,23 @@
     let auto = $state(false)
 
     const hue = $derived(tick % 360)
-    const boxStyle = $derived(`background: hsl(${hue} 85% 62%)`)
+
+    // The hsl recolor is the render-driver visualization — every tick paints a
+    // new hue, forcing the re-render that exercises layout measurement.
+    const boxStyle = $derived(
+        styleString(() => ({
+            width: '84px',
+            height: '84px',
+            display: 'grid',
+            placeItems: 'center',
+            border: '1px solid var(--brut-ink, #0a0a0a)',
+            background: `hsl(${hue} 85% 62%)`,
+            color: 'var(--brut-ink, #0a0a0a)',
+            fontFamily: 'var(--brut-mono, monospace)',
+            fontSize: '22px',
+            fontWeight: 700
+        }))
+    )
 
     function reflow() {
         shifted = !shifted
@@ -53,7 +69,7 @@
     <div class="lanes" class:shifted>
         <section class="lane">
             <header>
-                <span>no gate</span>
+                <span>// no gate</span>
                 <strong>re-measures every render</strong>
             </header>
             <p class="count" data-state={defaultMeasures > 0 ? 'busy' : 'idle'}>
@@ -74,7 +90,7 @@
 
         <section class="lane gated">
             <header>
-                <span>layoutDependency</span>
+                <span>// layoutDependency</span>
                 <strong>measures only on dep change</strong>
             </header>
             <p class="count" data-state={gatedMeasures > 0 ? 'busy' : 'idle'}>
@@ -104,8 +120,8 @@
         grid-template-rows: auto minmax(0, 1fr);
         gap: 16px;
         padding: 20px 26px;
-        background: #0d1518;
-        color: #eef6fb;
+        background: var(--brut-bg, #f8fcfb);
+        color: var(--brut-ink, #0a0a0a);
     }
 
     .toolbar {
@@ -121,23 +137,27 @@
         align-items: center;
         gap: 7px;
         padding: 0 12px;
-        border: 1px solid #46616a;
-        border-radius: 6px;
-        background: #142127;
-        color: #eef6fb;
-        font-size: 13px;
-        font-weight: 780;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg-2, #eef4f1);
+        color: var(--brut-ink, #0a0a0a);
+        font-family: var(--brut-mono, monospace);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
         cursor: pointer;
     }
 
     button.primary {
-        border-color: #5eead4;
-        background: #0f766e;
+        border-color: var(--brut-accent, #247768);
+        background: var(--brut-accent-soft, rgba(36, 119, 104, 0.1));
+        color: var(--brut-accent, #247768);
     }
 
     button.active {
-        border-color: #fbbf24;
-        background: #422006;
+        border-color: var(--brut-ink, #0a0a0a);
+        background: var(--brut-ink, #0a0a0a);
+        color: var(--brut-accent-ink, #f8fcfb);
     }
 
     .lanes {
@@ -153,13 +173,13 @@
         grid-template-rows: auto auto minmax(0, 1fr);
         gap: 12px;
         padding: 18px 22px;
-        border: 1px solid rgba(134, 184, 199, 0.42);
-        background: rgba(7, 17, 20, 0.55);
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg-2, #eef4f1);
         overflow: hidden;
     }
 
     .lane.gated {
-        border-color: rgba(94, 234, 212, 0.5);
+        border-color: var(--brut-accent, #247768);
     }
 
     header {
@@ -170,30 +190,31 @@
     }
 
     header span {
-        color: #67e8f9;
+        color: var(--brut-accent, #247768);
+        font-family: var(--brut-mono, monospace);
         font-size: 11px;
-        font-weight: 850;
-        letter-spacing: 0.14em;
+        font-weight: 700;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
     }
 
     header strong {
-        color: #ecfeff;
+        color: var(--brut-ink, #0a0a0a);
         font-size: 15px;
         text-align: right;
     }
 
     .count {
         margin: 0;
-        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-family: var(--brut-mono, monospace);
         font-size: 26px;
-        font-weight: 850;
-        color: #64748b;
-        transition: color 0.2s ease;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: var(--brut-ink-3, #9a9a9a);
     }
 
     .count[data-state='busy'] {
-        color: #5eead4;
+        color: var(--brut-accent, #247768);
     }
 
     .track {
@@ -202,23 +223,12 @@
         align-items: center;
         justify-content: flex-start;
         padding: 10px;
-        border: 1px dashed rgba(134, 184, 199, 0.22);
+        border: 1px dashed var(--brut-rule-2, #bbc4c0);
         min-height: 0;
     }
 
     .shifted .track {
         justify-content: flex-end;
-    }
-
-    :global(.box) {
-        width: 84px;
-        height: 84px;
-        display: grid;
-        place-items: center;
-        border-radius: 20px;
-        color: #031316;
-        font-size: 22px;
-        font-weight: 900;
     }
 
     @media (max-width: 760px) {

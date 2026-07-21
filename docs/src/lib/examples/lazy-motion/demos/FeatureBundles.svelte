@@ -1,5 +1,12 @@
 <script lang="ts">
-    import { LazyMotion, domAnimation, domMax, domMin, m } from '@humanspeak/svelte-motion'
+    import {
+        LazyMotion,
+        domAnimation,
+        domMax,
+        domMin,
+        m,
+        styleString
+    } from '@humanspeak/svelte-motion'
 
     const bundles = [
         { label: 'domMin', features: domMin, note: 'animation only' },
@@ -14,17 +21,33 @@
         <LazyMotion features={bundle.features}>
             <section class="bundle">
                 <header>
-                    <strong>{bundle.label}</strong>
-                    <span>{bundle.note}</span>
+                    <span class="micro label">// {bundle.label}</span>
+                    <span class="note">{bundle.note}</span>
                 </header>
                 <div class="stage">
                     <m.div
-                        class="tile"
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         whileHover={{ scale: 1.14 }}
                         whileTap={{ scale: 0.92 }}
                         drag
+                        style={styleString(() => ({
+                            width: '72px',
+                            height: '72px',
+                            display: 'grid',
+                            placeItems: 'center',
+                            border: '1px solid var(--brut-ink, #0a0a0a)',
+                            backgroundColor: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))',
+                            boxShadow: '4px 4px 0 var(--brut-rule, #d6dedb)',
+                            color: 'var(--brut-ink, #0a0a0a)',
+                            fontFamily: 'var(--brut-mono, monospace)',
+                            fontSize: '0.625rem',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
+                            cursor: 'grab',
+                            userSelect: 'none'
+                        }))}
                     >
                         {bundle.label}
                     </m.div>
@@ -44,47 +67,42 @@
     }
 
     .bundle {
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 8px;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg-2, #eef4f1);
         padding: 0.8rem;
-        background: rgba(255, 255, 255, 0.03);
     }
 
     header {
         display: grid;
-        gap: 0.2rem;
+        gap: 0.25rem;
         margin-bottom: 0.8rem;
     }
 
-    strong {
-        font-size: 0.9rem;
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
     }
 
-    span {
-        color: rgba(255, 255, 255, 0.58);
-        font-size: 0.75rem;
+    .label {
+        font-weight: 700;
+        color: var(--brut-accent, #247768);
+    }
+
+    .note {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.625rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
     }
 
     .stage {
         min-height: 140px;
         display: grid;
         place-items: center;
-        border: 1px dashed rgba(255, 255, 255, 0.14);
-        border-radius: 6px;
-    }
-
-    :global(.tile) {
-        width: 72px;
-        height: 72px;
-        display: grid;
-        place-items: center;
-        border-radius: 7px;
-        background: #d8f16f;
-        color: #101400;
-        font-size: 0.7rem;
-        font-weight: 800;
-        cursor: grab;
-        user-select: none;
+        border: 1px dashed var(--brut-rule-2, #bbc4c0);
     }
 
     @media (max-width: 720px) {

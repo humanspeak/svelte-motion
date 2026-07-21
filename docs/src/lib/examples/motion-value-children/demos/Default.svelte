@@ -1,5 +1,11 @@
 <script lang="ts">
-    import { animate, motion, useMotionValue, useTransform } from '@humanspeak/svelte-motion'
+    import {
+        animate,
+        motion,
+        styleString,
+        useMotionValue,
+        useTransform
+    } from '@humanspeak/svelte-motion'
 
     const progress = useMotionValue(0)
     const packets = useTransform(progress, [0, 1], [1840, 24680])
@@ -14,6 +20,20 @@
     )
 
     let run = $state(0)
+
+    const buttonStyle = styleString(() => ({
+        height: '38px',
+        padding: '0 14px',
+        border: '1px solid var(--brut-accent, #247768)',
+        background: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))',
+        color: 'var(--brut-accent, #247768)',
+        fontFamily: 'var(--brut-mono, monospace)',
+        fontSize: '12px',
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.06em',
+        cursor: 'pointer'
+    }))
 
     async function sweep() {
         run += 1
@@ -34,10 +54,10 @@
     <section class="console" aria-label="Live telemetry">
         <div class="console-top">
             <div>
-                <span>uplink phase</span>
+                <span>// uplink phase</span>
                 <strong><motion.span children={phaseText} /></strong>
             </div>
-            <em>run {run}</em>
+            <em>run {String(run).padStart(2, '0')}</em>
         </div>
 
         <div class="signal">
@@ -60,8 +80,26 @@
         </div>
 
         <div class="actions">
-            <button type="button" onclick={sweep}>Sweep uplink</button>
-            <button type="button" onclick={reset}>Reset</button>
+            <motion.button
+                type="button"
+                onclick={sweep}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                style={buttonStyle}
+            >
+                Sweep uplink
+            </motion.button>
+            <motion.button
+                type="button"
+                onclick={reset}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                style={buttonStyle}
+            >
+                Reset
+            </motion.button>
         </div>
     </section>
 </div>
@@ -72,10 +110,8 @@
         display: grid;
         place-items: center;
         padding: 2rem;
-        background:
-            radial-gradient(circle at 76% 18%, rgba(190, 242, 100, 0.16), transparent 34%),
-            radial-gradient(circle at 18% 82%, rgba(45, 212, 191, 0.15), transparent 32%), #071012;
-        color: #ecfdf5;
+        background: var(--brut-bg, #f8fcfb);
+        color: var(--brut-ink, #0a0a0a);
     }
 
     .console {
@@ -83,12 +119,9 @@
         display: grid;
         gap: 18px;
         padding: 24px;
-        border: 1px solid #245c54;
-        background:
-            linear-gradient(90deg, rgba(94, 234, 212, 0.11) 1px, transparent 1px),
-            linear-gradient(0deg, rgba(94, 234, 212, 0.11) 1px, transparent 1px), #0c191b;
-        background-size: 38px 38px;
-        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.36);
+        border: 1px solid var(--brut-ink, #0a0a0a);
+        background: var(--brut-bg-2, #eef4f1);
+        box-shadow: 6px 6px 0 var(--brut-rule, #d6dedb);
     }
 
     .console-top,
@@ -102,10 +135,11 @@
 
     span,
     em {
-        color: #8bb8b3;
+        color: var(--brut-ink-3, #9a9a9a);
+        font-family: var(--brut-mono, monospace);
         font-size: 12px;
         font-style: normal;
-        font-weight: 800;
+        font-weight: 700;
         letter-spacing: 0.08em;
         text-transform: uppercase;
     }
@@ -113,7 +147,8 @@
     strong {
         display: block;
         margin-top: 6px;
-        color: #f8fafc;
+        color: var(--brut-ink, #0a0a0a);
+        font-family: var(--brut-mono, monospace);
         font-size: 34px;
         line-height: 1;
         font-variant-numeric: tabular-nums;
@@ -122,15 +157,15 @@
     .signal {
         height: 12px;
         overflow: hidden;
-        border: 1px solid #27655c;
-        background: #081112;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg, #f8fcfb);
     }
 
     .signal div {
         width: 100%;
         height: 100%;
         transform-origin: 0 50%;
-        background: linear-gradient(90deg, #2dd4bf, #bef264, #f9a8d4);
+        background: var(--brut-accent, #247768);
     }
 
     .tiles {
@@ -142,36 +177,21 @@
     article {
         min-width: 0;
         padding: 16px;
-        border: 1px solid #1d4d47;
-        background: rgba(8, 17, 18, 0.8);
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg, #f8fcfb);
     }
 
     b {
         display: block;
         margin-top: 8px;
         min-height: 46px;
-        color: #c6ffdc;
+        color: var(--brut-accent, #247768);
+        font-family: var(--brut-mono, monospace);
         font-size: clamp(26px, 6vw, 46px);
-        font-weight: 850;
+        font-weight: 700;
         line-height: 0.95;
         letter-spacing: 0;
         font-variant-numeric: tabular-nums;
-    }
-
-    button {
-        height: 38px;
-        padding: 0 14px;
-        border: 1px solid #2f7b70;
-        border-radius: 6px;
-        background: #102123;
-        color: #ecfdf5;
-        font-size: 13px;
-        font-weight: 800;
-        cursor: pointer;
-    }
-
-    button:hover {
-        border-color: #5eead4;
     }
 
     @media (max-width: 620px) {

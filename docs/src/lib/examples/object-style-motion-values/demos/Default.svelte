@@ -126,8 +126,8 @@
         align-items: stretch;
         gap: 20px;
         padding: 2rem;
-        background: #0d1518;
-        color: #eef6fb;
+        background: var(--brut-bg, #f8fcfb);
+        color: var(--brut-ink, #0a0a0a);
     }
 
     .toolbar {
@@ -143,18 +143,21 @@
         align-items: center;
         gap: 7px;
         padding: 0 12px;
-        border: 1px solid #46616a;
-        border-radius: 6px;
-        background: #142127;
-        color: #eef6fb;
-        font-size: 13px;
-        font-weight: 780;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg-2, #eef4f1);
+        color: var(--brut-ink, #0a0a0a);
+        font-family: var(--brut-mono, monospace);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
         cursor: pointer;
     }
 
     button.primary {
-        border-color: #5eead4;
-        background: #0f766e;
+        border-color: var(--brut-accent, #247768);
+        background: var(--brut-accent-soft, rgba(36, 119, 104, 0.1));
+        color: var(--brut-accent, #247768);
     }
 
     .stage {
@@ -164,21 +167,12 @@
         display: grid;
         place-items: center;
         overflow: hidden;
-        border: 1px solid #2b4650;
+        border: 1px solid var(--brut-ink, #0a0a0a);
         background:
-            linear-gradient(90deg, rgba(94, 234, 212, 0.1) 1px, transparent 1px),
-            linear-gradient(0deg, rgba(94, 234, 212, 0.1) 1px, transparent 1px), #071114;
+            linear-gradient(90deg, var(--brut-rule, #d6dedb) 1px, transparent 1px),
+            linear-gradient(0deg, var(--brut-rule, #d6dedb) 1px, transparent 1px),
+            var(--brut-bg-2, #eef4f1);
         background-size: 44px 44px;
-    }
-
-    .stage::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background:
-            radial-gradient(circle at 14% 62%, rgba(45, 212, 191, 0.12), transparent 24%),
-            radial-gradient(circle at 86% 34%, rgba(251, 113, 133, 0.12), transparent 28%);
-        pointer-events: none;
     }
 
     .route-line {
@@ -186,9 +180,8 @@
         left: 10%;
         right: 10%;
         top: 50%;
-        height: 1px;
-        background: linear-gradient(90deg, #5eead4, #38bdf8, #fb7185);
-        opacity: 0.55;
+        height: 0;
+        border-top: 1px dashed var(--brut-accent, #247768);
     }
 
     .endpoint {
@@ -200,18 +193,23 @@
         align-content: center;
         gap: 5px;
         padding: 0 16px;
-        border: 1px solid #365766;
-        background: rgba(16, 31, 38, 0.78);
-        color: #dff7ff;
-        font-weight: 850;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg, #f8fcfb);
+        color: var(--brut-ink, #0a0a0a);
+        box-shadow: 4px 4px 0 var(--brut-rule, #d6dedb);
     }
 
     .endpoint span {
-        font-size: 14px;
+        font-family: var(--brut-mono, monospace);
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
     }
 
     .endpoint small {
-        color: #86b8c7;
+        color: var(--brut-ink-3, #9a9a9a);
+        font-family: var(--brut-mono, monospace);
         font-size: 10px;
         letter-spacing: 0.12em;
         text-transform: uppercase;
@@ -219,15 +217,16 @@
 
     .left-end {
         left: 6%;
-        border-radius: 16px 4px 4px 16px;
     }
 
     .right-end {
         right: 6%;
-        border-radius: 4px 16px 16px 4px;
         text-align: right;
     }
 
+    /* Position + size + text chrome only. The colour (hsl backgroundColor),
+       boxShadow, transform, and --packet-x glow are all driven by the MV
+       style object on the element and must stay there. */
     :global(.packet) {
         position: absolute;
         top: calc(50% - 60px);
@@ -238,31 +237,31 @@
         align-content: center;
         justify-items: center;
         gap: 6px;
-        border: 1px solid rgba(236, 254, 255, 0.48);
-        border-radius: 18px;
-        background:
-            radial-gradient(
-                circle at calc(50% + var(--packet-x, 0px)) 50%,
-                rgba(255, 255, 255, 0.22),
-                transparent 52%
-            ),
-            #0f766e;
-        color: #f8fafc;
+        border: 1px solid var(--brut-ink, #0a0a0a);
+        background-image: radial-gradient(
+            circle at calc(50% + var(--packet-x, 0px)) 50%,
+            rgba(255, 255, 255, 0.28),
+            transparent 52%
+        );
+        color: var(--brut-accent-ink, #f8fcfb);
         text-align: center;
         transform-origin: 50% 50%;
         will-change: transform;
     }
 
     :global(.packet) span {
-        font-size: 22px;
-        font-weight: 900;
-        letter-spacing: 0;
+        font-family: var(--brut-mono, monospace);
+        font-size: 20px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
     }
 
     :global(.packet) small {
-        color: rgba(255, 255, 255, 0.76);
+        color: rgba(248, 252, 251, 0.82);
+        font-family: var(--brut-mono, monospace);
         font-size: 11px;
-        font-weight: 820;
+        font-weight: 700;
         letter-spacing: 0.08em;
         text-transform: uppercase;
     }
