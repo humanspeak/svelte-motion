@@ -32,7 +32,9 @@
                         whileTap={{ scale: 0.92 }}
                         drag
                         style={styleString(() => ({
-                            width: '72px',
+                            // Wide enough for the longest label (DOMANIMATION)
+                            // with breathing room — 72px clipped it.
+                            width: '120px',
                             height: '72px',
                             display: 'grid',
                             placeItems: 'center',
