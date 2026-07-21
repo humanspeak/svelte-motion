@@ -24,7 +24,11 @@ test.describe('motion/layout FLIP on parent align toggle', () => {
                     requestAnimationFrame(read)
                 })
         )
-        await page.waitForTimeout(50)
+        // Mirror a real interaction: the pointer hovers the track first,
+        // which animates the PARENT's backgroundColor every frame — the
+        // click then flips align-items mid-hover-animation.
+        await page.getByTestId('align-toggle-track').hover()
+        await page.waitForTimeout(250)
         await page.getByTestId('align-toggle-track').click()
         const samples = await samplesPromise
 

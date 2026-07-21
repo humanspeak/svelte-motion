@@ -29,7 +29,9 @@
     import {
         animateSingleValue,
         calcBoxDelta,
+        cancelFrame,
         createDelta,
+        frame,
         isDeltaZero,
         isMotionValue,
         motionValue,
@@ -2193,6 +2195,39 @@
         motionDomProjectionUpdatePending = true
     })
 
+    // Reactive (Svelte-owned) layout commits race the DOM patch: this
+    // post-effect can run before the flush's style writes land — notably a
+    // PARENT's object-style change repositioning this `layout` element,
+    // which motion-dom's styleEffect batches onto the frameloop's render
+    // phase. Measuring then (or on upstream's microtask flush) reads the
+    // OLD layout, sees no change, and skips the animation — a visible snap.
+    // Defer the measure + commit to frame.postRender — after the frameloop's
+    // style writes, still pre-paint — and drive the animation through the
+    // same explicit-snapshot commit the observer path uses.
+    let reactiveCommitPrevious: RectLike | null = null
+
+    const runReactiveCommit = () => {
+        const prev = reactiveCommitPrevious
+        reactiveCommitPrevious = null
+        if (!(element && prev)) return
+        const next = measureLayoutRect()
+        if (!next) return
+        // Svelte-owned update: fan out the snapshot→measure delta to
+        // `onProjectionUpdate` subscribers (zero deltas included — the
+        // legacy node notified on every willUpdate/didUpdate pair, and the
+        // idle "changed=false" event is part of the observable contract).
+        emitProjectionUpdate(prev, next)
+        if (hasRectChanged(prev, next)) {
+            lastRect = next
+            motionDomProjection?.commitObservedLayoutChange(prev)
+        }
+        // No delta from THIS path's snapshot: leave `lastRect` alone. The
+        // snapshot may have raced the DOM patch (measured post-patch, so
+        // prev === next), and overwriting the cache here would poison the
+        // observer path's diff — it would compare new-vs-new and skip the
+        // FLIP entirely (an intermittent snap, ordering-dependent).
+    }
+
     $effect(() => {
         const shouldProject = element && layoutProp && isLoaded === 'ready' && hasLayoutFeatures
         trackLayoutProjectionDependencies()
@@ -2201,19 +2236,23 @@
         motionDomProjectionUpdatePending = false
         const previous = explicitLayoutSnapshot
         explicitLayoutSnapshot = null
-        if (previous) {
-            const next = measureLayoutRect()
-            if (next) {
-                lastRect = next
-                // Svelte-owned update: fan out the snapshot→measure delta to
-                // `onProjectionUpdate` subscribers (zero deltas included —
-                // the legacy node notified on every willUpdate/didUpdate
-                // pair, and the idle "changed=false" event is part of the
-                // observable contract).
-                emitProjectionUpdate(previous, next)
-            }
+        if (!previous) {
+            motionDomProjection?.didUpdate()
+            return
         }
-        motionDomProjection?.didUpdate()
+        // Keep the OLDEST pending snapshot: with several reactive updates
+        // before the frame, that is what is still visually on screen.
+        // (Re-scheduling an already-queued callback is a frameloop no-op.)
+        if (reactiveCommitPrevious === null) reactiveCommitPrevious = previous
+        frame.postRender(runReactiveCommit)
+    })
+
+    // Cancel a pending reactive commit when the component tears down.
+    $effect(() => {
+        return () => {
+            reactiveCommitPrevious = null
+            cancelFrame(runReactiveCommit)
+        }
     })
 
     // Subscribe the consumer's `onLayoutMeasure` callback to the adapter's

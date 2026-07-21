@@ -5,7 +5,8 @@ import {
     observeLayoutChanges,
     runFlipAnimation,
     selectLayoutDependencies,
-    setCompositorHints
+    setCompositorHints,
+    stripNonChildLayoutStyle
 } from './layout.js'
 
 vi.mock('motion', () => {
@@ -589,5 +590,82 @@ describe('utils/layout', () => {
             expect(selectLayoutDependencies(arr, fallback)).toEqual([arr])
             expect(fallback).not.toHaveBeenCalled()
         })
+    })
+})
+
+describe('stripNonChildLayoutStyle', () => {
+    it('drops animation channels and keeps layout declarations', () => {
+        expect(
+            stripNonChildLayoutStyle(
+                'align-items: flex-end; transform: scale(2); will-change: transform; opacity: 0.5'
+            )
+        ).toBe('align-items:flex-end')
+    })
+
+    it('drops every filtered channel individually', () => {
+        for (const declaration of [
+            'transform: translateY(4px)',
+            'transform-origin: 0 0',
+            'translate: 10px 20px',
+            'rotate: 45deg',
+            'scale: 1.2',
+            'will-change: transform',
+            'opacity: 0.4',
+            'filter: blur(2px)'
+        ]) {
+            expect(stripNonChildLayoutStyle(declaration), declaration).toBe('')
+        }
+    })
+
+    it('keeps common layout declarations', () => {
+        expect(
+            stripNonChildLayoutStyle(
+                'display: flex; align-items: center; justify-content: space-between; width: 80px; padding: 10px'
+            )
+        ).toBe(
+            'display:flex;align-items:center;justify-content:space-between;width:80px;padding:10px'
+        )
+    })
+
+    it('normalizes whitespace and casing for stable comparison', () => {
+        expect(stripNonChildLayoutStyle('Align-Items:flex-start')).toBe(
+            stripNonChildLayoutStyle('align-items:  flex-start ')
+        )
+        expect(stripNonChildLayoutStyle('TRANSFORM: scale(2)')).toBe('')
+    })
+
+    it('treats transform-only strings as empty', () => {
+        expect(stripNonChildLayoutStyle('transform: translate(1px, 2px); rotate: 45deg')).toBe('')
+        expect(stripNonChildLayoutStyle('')).toBe('')
+    })
+
+    it('splits on the FIRST colon so colon-bearing values survive', () => {
+        expect(stripNonChildLayoutStyle('background-image: url(data:image/png;base64,x)')).toBe(
+            // The `;` inside url() splits the declaration — both sides of a
+            // before/after comparison break identically, so change detection
+            // stays stable even though the value is mangled.
+            'background-image:url(data:image/png'
+        )
+        expect(stripNonChildLayoutStyle('grid-area: 1 / 2 / 3 / 4')).toBe('grid-area:1 / 2 / 3 / 4')
+    })
+
+    it('keeps custom properties (they can drive child layout via var())', () => {
+        expect(stripNonChildLayoutStyle('--gap: 4px; transform: none')).toBe('--gap:4px')
+    })
+
+    it('drops filtered channels regardless of !important', () => {
+        expect(stripNonChildLayoutStyle('transform: scale(2) !important')).toBe('')
+    })
+
+    it('ignores malformed declarations without a colon', () => {
+        expect(stripNonChildLayoutStyle('garbage; align-items: center;;')).toBe(
+            'align-items:center'
+        )
+    })
+
+    it('preserves declaration order (a reorder counts as a change)', () => {
+        expect(stripNonChildLayoutStyle('width: 1px; height: 2px')).not.toBe(
+            stripNonChildLayoutStyle('height: 2px; width: 1px')
+        )
     })
 })

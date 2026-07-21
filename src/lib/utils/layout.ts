@@ -8,6 +8,50 @@ import {
 
 const layoutSizeAnimationAttribute = 'data-layout-size-animation'
 
+/**
+ * CSS declaration names whose changes never re-slot CHILDREN: composited
+ * animation channels written every frame by gesture and FLIP writers
+ * (`transform` + the CSS independent transforms), plus paint-only hints.
+ * Used to ignore parent style mutations that can't affect child layout.
+ */
+const nonChildLayoutStyleProps = new Set([
+    'transform',
+    'transform-origin',
+    'translate',
+    'rotate',
+    'scale',
+    'will-change',
+    'opacity',
+    'filter'
+])
+
+/**
+ * Strip declarations that cannot affect CHILD layout from a serialized
+ * style string, normalizing the remainder for change comparison.
+ *
+ * Declaration-parsing (not regex) so values containing `;`-adjacent
+ * constructs or varied whitespace compare stably.
+ *
+ * @param style Serialized inline style (may be empty).
+ * @returns The layout-affecting declarations, normalized.
+ * @example
+ * ```ts
+ * stripNonChildLayoutStyle('align-items: flex-end; transform: scale(2)')
+ * // => 'align-items:flex-end'
+ * ```
+ */
+export const stripNonChildLayoutStyle = (style: string): string => {
+    const kept: string[] = []
+    for (const declaration of style.split(';')) {
+        const separator = declaration.indexOf(':')
+        if (separator === -1) continue
+        const property = declaration.slice(0, separator).trim().toLowerCase()
+        if (!property || nonChildLayoutStyleProps.has(property)) continue
+        kept.push(`${property}:${declaration.slice(separator + 1).trim()}`)
+    }
+    return kept.join(';')
+}
+
 const roundedPx = (value: number): string => `${Math.max(0, Math.round(value))}px`
 const mix = (from: number, to: number, progress: number): number => from + (to - from) * progress
 type TrackedFlipAnimation = {
@@ -472,13 +516,41 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
         childList: true,
         subtree: true
     })
+    // A PARENT's style/class change can re-slot this element (e.g. the
+    // classic toggle-switch: align-items flip on the track) with no
+    // childList or resize signal, and the Svelte-owned reactive path can't
+    // snapshot it — the parent patches before this element's effects run.
+    // Watch the parent's attributes and let the commit path diff against the
+    // cached rect. Style mutations that only touch animation channels
+    // (transforms / opacity / will-change — written every frame by gesture
+    // and FLIP animations) never re-slot children, so they're filtered out
+    // to avoid commit storms.
+    const parentAttributeObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            if (mutation.attributeName === 'style') {
+                const before = stripNonChildLayoutStyle(mutation.oldValue ?? '')
+                const after = stripNonChildLayoutStyle(
+                    (mutation.target as HTMLElement).getAttribute('style') ?? ''
+                )
+                if (before === after) continue
+            }
+            schedule()
+            return
+        }
+    })
     if (el.parentElement) {
         childListObserver.observe(el.parentElement, { childList: true, subtree: true })
+        parentAttributeObserver.observe(el.parentElement, {
+            attributes: true,
+            attributeFilter: ['style', 'class'],
+            attributeOldValue: true
+        })
     }
     return () => {
         ro.disconnect()
         attributeObserver.disconnect()
         childListObserver.disconnect()
+        parentAttributeObserver.disconnect()
         if (pendingRaf !== null && typeof cancelAnimationFrame === 'function') {
             cancelAnimationFrame(pendingRaf)
             pendingRaf = null

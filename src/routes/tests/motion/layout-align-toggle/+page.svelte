@@ -11,7 +11,7 @@
      */
     import { motion, styleString, type MotionTransition } from '$lib'
 
-    let isOn = $state(false)
+    let isOn = $state(true)
 
     const spring: MotionTransition = { type: 'spring', stiffness: 700, damping: 30 }
     const tween: MotionTransition = { duration: 0.6, ease: 'easeOut' }
@@ -29,6 +29,7 @@
         data-testid="align-toggle-track"
         onclick={() => (isOn = !isOn)}
         type="button"
+        whileHover={{ backgroundColor: 'rgba(79, 240, 183, 0.16)' }}
         style={styleString(() => ({
             width: '80px',
             height: '200px',
