@@ -8,6 +8,10 @@ test.describe('Hover + Tap', () => {
 
         const box = page.getByTestId('motion-hover-and-tap')
         await expect(box).toBeVisible()
+        // Let hydration finish before the first pointer event: a hover fired
+        // before listeners attach is silently lost (the pointer never moves
+        // again, so it can't re-fire).
+        await page.waitForTimeout(800)
 
         // Helper to read current scale from computed transform
         const readScale = async () => {
@@ -61,6 +65,66 @@ test.describe('Hover + Tap', () => {
         // Release (pointerup): should return to hover scale (≈1.2), not initial
         await page.mouse.up()
         await expect.poll(readScale).toBeGreaterThan(1.05)
+    })
+
+    test('presses from the current hover scale without snapping', async ({ page }) => {
+        await page.goto('/tests/motion/hover-and-tap?@isPlaywright=true')
+
+        const box = page.getByTestId('motion-hover-and-tap')
+        await expect(box).toBeVisible()
+        await page.waitForTimeout(800)
+
+        const readScale = () =>
+            box.evaluate((el) => {
+                const t = getComputedStyle(el).transform
+                const match = t.match(/matrix\(([^)]+)\)/)
+                if (!match) return 1
+                const n = match[1].split(',').map((v) => parseFloat(v.trim()))
+                return (Math.hypot(n[0], n[1]) + Math.hypot(n[2], n[3])) / 2
+            })
+
+        // Hover and let the scale fully settle at the hover value.
+        await box.hover()
+        await expect.poll(readScale).toBeGreaterThan(1.19)
+        await page.waitForTimeout(200)
+
+        // Sample every frame across the press: the tap animation must seed
+        // from the CURRENT visual scale (~1.2), not from a stale internal
+        // value — a stale seed renders as an instant cliff on frame one.
+        const samplesPromise = box.evaluate(
+            (el) =>
+                new Promise<number[]>((resolve) => {
+                    const out: number[] = []
+                    const t0 = performance.now()
+                    const read = () => {
+                        const t = getComputedStyle(el).transform
+                        let s = 1
+                        const match = t.match(/matrix\(([^)]+)\)/)
+                        if (match) {
+                            const n = match[1].split(',').map((v) => parseFloat(v.trim()))
+                            s = (Math.hypot(n[0], n[1]) + Math.hypot(n[2], n[3])) / 2
+                        }
+                        out.push(s)
+                        if (performance.now() - t0 < 1200) requestAnimationFrame(read)
+                        else resolve(out)
+                    }
+                    requestAnimationFrame(read)
+                })
+        )
+        await page.waitForTimeout(50)
+        await page.mouse.down()
+        const samples = await samplesPromise
+        await page.mouse.up()
+
+        let maxStep = 0
+        for (let i = 1; i < samples.length; i++) {
+            maxStep = Math.max(maxStep, Math.abs(samples[i] - samples[i - 1]))
+        }
+        expect(
+            maxStep,
+            `press must animate from the current hover scale — found a ${maxStep.toFixed(3)} single-frame jump`
+        ).toBeLessThan(0.06)
+        expect(samples[samples.length - 1], 'press must settle at the tap scale').toBeLessThan(0.85)
     })
 
     test('returns to rest smoothly when the pointer leaves mid-release-spring', async ({
