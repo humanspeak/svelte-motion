@@ -40,7 +40,7 @@
             tag: 'LAYOUTID',
             title: { prefix: 'sliding ', accent: 'indicator', end: '.' },
             description:
-                'A pink indicator slides between tabs on every click. Only the active tab renders one; sharing a `layoutId` lets motion animate the indicator across tab boundaries instead of mount-unmount-flash.',
+                'An accent indicator slides between tabs on every click. Only the active tab renders one; sharing a `layoutId` lets motion animate the indicator across tab boundaries instead of mount-unmount-flash.',
             snippet: defaultSection,
             codeSnippet: defaultCode,
             notes: defaultNotes,

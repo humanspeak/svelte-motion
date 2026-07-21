@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { motion, styleString } from '@humanspeak/svelte-motion'
     import CardItem from './CardItem.svelte'
 
     type Card = {
@@ -71,28 +72,65 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div class="dating-stage">
-        {#if deck.length === 0}
-            <button class="reset" type="button" onclick={reset}>↺ shuffle the deck</button>
-        {:else}
-            <!-- Render the top 3 cards. Back cards get a subtle Y offset + scale
-                 to fake depth without using any actual 3D transforms.
-                 Each CardItem owns its own pan MotionValue + LIKE/NOPE
-                 derived opacities + commit animation (see CardItem.svelte).
-                 The parent only knows about the deck array; cards signal
-                 "I'm done flying off, drop me" via the onCommit prop. -->
-            {#each deck.slice(0, 3) as card, i (card.id)}
-                <CardItem
-                    {card}
-                    isTop={i === 0}
-                    depthY={i === 0 ? 0 : i * 16}
-                    depthRotate={i === 0 ? 0 : i === 1 ? -3 : 4}
-                    depthScale={1 - i * 0.03}
-                    zIndex={3 - i}
-                    {onCommit}
-                />
-            {/each}
-        {/if}
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// swipe-deck</span>
+            <span class="micro status">
+                {String(deck.length).padStart(2, '0')} / {String(SEED.length).padStart(2, '0')} left
+            </span>
+        </div>
+
+        <div class="stage">
+            {#if deck.length === 0}
+                <motion.button
+                    type="button"
+                    onclick={reset}
+                    whileHover={{ scale: 1.04 }}
+                    whileTap={{ scale: 0.96 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    style={styleString(() => ({
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        fontFamily: 'var(--brut-mono, monospace)',
+                        fontSize: '0.6875rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
+                        border: '1px solid var(--brut-accent, #247768)',
+                        backgroundColor: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))',
+                        color: 'var(--brut-accent, #247768)',
+                        padding: '0.5rem 0.875rem',
+                        cursor: 'pointer'
+                    }))}
+                >
+                    ↺ shuffle the deck
+                </motion.button>
+            {:else}
+                <!-- Render the top 3 cards. Back cards get a subtle Y offset + scale
+                     to fake depth without using any actual 3D transforms.
+                     Each CardItem owns its own pan MotionValue + LIKE/NOPE
+                     derived opacities + commit animation (see CardItem.svelte).
+                     The parent only knows about the deck array; cards signal
+                     "I'm done flying off, drop me" via the onCommit prop. -->
+                {#each deck.slice(0, 3) as card, i (card.id)}
+                    <CardItem
+                        {card}
+                        isTop={i === 0}
+                        depthY={i === 0 ? 0 : i * 16}
+                        depthRotate={i === 0 ? 0 : i === 1 ? -3 : 4}
+                        depthScale={1 - i * 0.03}
+                        zIndex={3 - i}
+                        {onCommit}
+                    />
+                {/each}
+            {/if}
+        </div>
+
+        <div class="strip-foot">
+            <span class="micro">← nope</span>
+            <span class="micro">like →</span>
+        </div>
     </div>
 </div>
 
@@ -105,128 +143,57 @@
         width: 100%;
     }
 
-    .dating-stage {
-        position: relative;
+    .strip {
         width: 100%;
         max-width: 360px;
-        height: 460px;
-        border-radius: 18px;
-        background: linear-gradient(180deg, #fafafa 0%, #e5e7eb 100%);
-        border: 1px solid #d4d4d8;
-        overflow: hidden;
-        font-family:
-            ui-sans-serif,
-            system-ui,
-            -apple-system,
-            sans-serif;
-    }
-
-    :global(.card) {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 260px;
-        height: 360px;
-        border-radius: 22px;
-        color: #ffffff;
-        padding: 28px 24px;
         display: flex;
         flex-direction: column;
-        justify-content: flex-end;
-        gap: 6px;
-        box-shadow:
-            0 24px 48px -16px rgba(15, 23, 42, 0.45),
-            0 2px 4px rgba(15, 23, 42, 0.15);
-        will-change: transform;
-        user-select: none;
-        touch-action: none;
-        cursor: grab;
+        gap: 0.75rem;
     }
 
-    :global(.card.behind) {
-        opacity: 0.96;
-        cursor: default;
-        pointer-events: none;
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
     }
 
-    :global(.card .emoji) {
-        position: absolute;
-        top: 24px;
-        right: 24px;
-        font-size: 48px;
-        line-height: 1;
-        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+    .status {
+        color: var(--brut-accent, #247768);
+        font-variant-numeric: tabular-nums;
     }
 
-    :global(.card h3) {
-        margin: 0;
-        font-size: 22px;
-        font-weight: 700;
-        letter-spacing: -0.01em;
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
     }
 
-    :global(.card p) {
-        margin: 0;
-        font-size: 13px;
-        line-height: 1.4;
-        opacity: 0.92;
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
     }
 
-    :global(.card .hint) {
-        margin-top: 8px;
-        font-size: 11px;
-        font-family: ui-monospace, monospace;
-        letter-spacing: 0.05em;
-        opacity: 0.65;
-    }
-
-    :global(.card .badge) {
-        position: absolute;
-        top: 28px;
-        left: 24px;
-        padding: 6px 12px;
-        border-radius: 8px;
-        font-family: ui-monospace, monospace;
-        font-size: 14px;
-        font-weight: 700;
-        letter-spacing: 0.12em;
-        border: 2px solid currentColor;
-        background: rgba(255, 255, 255, 0.06);
-        pointer-events: none;
-    }
-
-    :global(.card .badge.like) {
-        color: #10b981;
-        transform: rotate(-14deg);
-    }
-
-    :global(.card .badge.nope) {
-        color: #ef4444;
-        left: auto;
-        right: 24px;
-        transform: rotate(14deg);
-    }
-
-    .reset {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        padding: 10px 18px;
-        border-radius: 10px;
-        border: 1px solid #d4d4d8;
-        background: #ffffff;
-        color: #0f172a;
-        font-family: inherit;
-        font-size: 13px;
-        font-weight: 500;
-        cursor: pointer;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
-    }
-
-    .reset:hover {
-        border-color: #94a3b8;
+    .stage {
+        position: relative;
+        width: 100%;
+        height: 460px;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background:
+            linear-gradient(90deg, var(--brut-rule, #d6dedb) 1px, transparent 1px),
+            linear-gradient(0deg, var(--brut-rule, #d6dedb) 1px, transparent 1px),
+            var(--brut-bg-2, #eef4f1);
+        background-size:
+            36px 36px,
+            36px 36px,
+            auto;
+        overflow: hidden;
     }
 </style>

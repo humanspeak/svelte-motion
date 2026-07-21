@@ -37,12 +37,7 @@
                 style={`background:${selected.color}`}
             ></div>
             <p class="text-sm font-medium">{selected.title}</p>
-            <button
-                class="rounded-lg bg-neutral-700 px-3 py-1.5 text-sm text-white"
-                onclick={close}
-            >
-                Back
-            </button>
+            <button class="view-back" onclick={close}> Back </button>
         </div>
     {:else}
         <p class="text-text-muted text-sm">Click a tile — it morphs into the hero</p>
@@ -61,10 +56,23 @@
 </div>
 
 <style>
-    /* Matching PERCENTAGE radii on both morph endpoints: snapshots bake
-       corner rounding in as transparency, so proportional radii keep the
-       two silhouettes coincident at every scale — no corner ghosting. */
+    /* Matching radii on both morph endpoints: snapshots bake corner
+       rounding in as transparency, so identical radii keep the two
+       silhouettes coincident at every scale. A hard 0/0 satisfies that
+       — no corner ghosting. */
     .view-radius {
-        border-radius: 12%;
+        border-radius: 0;
+    }
+
+    .view-back {
+        padding: 0.5rem 0.875rem;
+        border: 1px solid var(--brut-ink, #0a0a0a);
+        background: var(--brut-bg, #f8fcfb);
+        color: var(--brut-ink, #0a0a0a);
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
     }
 </style>

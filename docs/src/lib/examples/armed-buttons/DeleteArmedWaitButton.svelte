@@ -1,5 +1,11 @@
 <script lang="ts">
-    import { motion, useAnimationFrame, useMotionValue, useSpring } from '@humanspeak/svelte-motion'
+    import {
+        motion,
+        styleString,
+        useAnimationFrame,
+        useMotionValue,
+        useSpring
+    } from '@humanspeak/svelte-motion'
     import { Check, LoaderCircle, Trash2 } from '@lucide/svelte'
 
     interface Props {
@@ -40,6 +46,27 @@
     let spinStartedAt: number | undefined
     let nextSpinAt = 0
     let spinTurns = 0
+
+    // Motion-driven color state: idle / armed (danger) / deleted (accent).
+    const rowColors = $derived(
+        deleted
+            ? {
+                  backgroundColor: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))',
+                  borderColor: 'var(--brut-accent, #247768)',
+                  color: 'var(--brut-accent, #247768)'
+              }
+            : armed
+              ? {
+                    backgroundColor: 'var(--armed-danger, #b91c1c)',
+                    borderColor: 'var(--armed-danger, #b91c1c)',
+                    color: 'var(--brut-accent-ink, #f8fcfb)'
+                }
+              : {
+                    backgroundColor: 'var(--brut-bg-2, #eef4f1)',
+                    borderColor: 'var(--brut-rule-2, #bbc4c0)',
+                    color: 'var(--brut-ink, #0a0a0a)'
+                }
+    )
 
     useAnimationFrame((time) => {
         if (!locked) {
@@ -105,42 +132,78 @@
 </script>
 
 <motion.div
-    class="w-full max-w-[26rem]"
     whileHover={armed || deleted ? undefined : { x: 2 }}
     transition={{ type: 'spring', stiffness: 520, damping: 32 }}
+    style={styleString(() => ({
+        width: '100%',
+        maxWidth: '26rem'
+    }))}
 >
-    <button
+    <motion.button
         type="button"
         disabled={locked || deleted}
-        class="relative flex h-12 w-full overflow-hidden items-center gap-3 rounded-lg border px-4 text-sm leading-none font-semibold shadow-sm transition-colors duration-200 {deleted
-            ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-            : armed
-              ? 'border-destructive bg-destructive text-destructive-foreground'
-              : 'border-border/70 bg-background/95 text-foreground hover:bg-muted'} disabled:cursor-not-allowed disabled:opacity-100"
         onclick={handleClick}
         data-testid="delete-wait-button"
         data-armed={armed}
         data-locked={locked}
         data-deleted={deleted}
+        animate={rowColors}
+        whileHover={armed || deleted ? undefined : { backgroundColor: 'var(--brut-bg, #f8fcfb)' }}
+        transition={{ type: 'spring', stiffness: 520, damping: 32 }}
+        style={styleString(() => ({
+            position: 'relative',
+            display: 'flex',
+            height: '3rem',
+            width: '100%',
+            overflow: 'hidden',
+            alignItems: 'center',
+            gap: '0.75rem',
+            borderWidth: '1px',
+            borderStyle: 'solid',
+            padding: '0 1rem',
+            fontSize: '0.8125rem',
+            lineHeight: 1,
+            fontWeight: 600,
+            boxShadow: '6px 6px 0 var(--brut-rule, #d6dedb)',
+            cursor: locked || deleted ? 'not-allowed' : 'pointer'
+        }))}
     >
         {#if armed && !deleted && !deleting}
             <motion.span
                 key={secondsLeft > 0 ? 'delete-disarm-meter-wait' : 'delete-disarm-meter-ready'}
-                class="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 origin-left bg-current/45"
                 initial={{ scaleX: 1 }}
                 animate={{ scaleX: secondsLeft > 0 ? 1 : 0 }}
                 transition={{ duration: secondsLeft > 0 ? 0 : disarmMeterSeconds, ease: 'linear' }}
                 aria-hidden="true"
                 data-testid="delete-disarm-meter"
+                style={styleString(() => ({
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: '2px',
+                    transformOrigin: 'left',
+                    background: 'currentColor',
+                    opacity: 0.45,
+                    pointerEvents: 'none'
+                }))}
             />
         {/if}
 
         {#key deleted ? 'done' : locked ? 'locked' : armed ? 'ready' : 'idle'}
             <motion.span
-                class="inline-flex size-5 shrink-0 items-center justify-center"
                 initial={{ opacity: 0, scale: 0.6, rotate: locked ? -30 : 0 }}
                 animate={{ opacity: 1, scale: locked ? [1, 1.12, 1] : 1 }}
-                style={locked ? { rotate: spinRotate } : undefined}
+                style={{
+                    display: 'inline-flex',
+                    width: '1.25rem',
+                    height: '1.25rem',
+                    flex: 'none',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    ...(!armed && !deleted ? { color: 'var(--armed-danger, #b91c1c)' } : {}),
+                    ...(locked ? { rotate: spinRotate } : {})
+                }}
                 transition={{
                     type: locked ? 'tween' : 'spring',
                     duration: locked ? 0.42 : undefined,
@@ -155,45 +218,84 @@
                 {:else if locked}
                     <LoaderCircle size={17} />
                 {:else}
-                    <Trash2 size={17} class={armed ? '' : 'text-destructive'} />
+                    <Trash2 size={17} />
                 {/if}
             </motion.span>
         {/key}
 
-        <span class="min-w-0 flex-1 text-left">
+        <span class="label">
             {#if deleted}
                 Deleted
             {:else}
-                <span
-                    class="block text-[0.65rem] leading-[1.15] font-semibold tracking-[0.16em] text-current/55 uppercase"
-                >
-                    {eyebrow}
-                </span>
-                <span class="mt-0.5 block leading-[1.25]">{title}</span>
+                <span class="eyebrow">{eyebrow}</span>
+                <span class="title">{title}</span>
             {/if}
         </span>
 
-        <span class="flex w-16 justify-end">
+        <span class="trail">
             {#if armed && secondsLeft > 0}
                 {#key secondsLeft}
                     <motion.span
-                        class="inline-flex items-center leading-none tabular-nums"
                         initial={{ y: -7, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ type: 'spring', stiffness: 520, damping: 30 }}
                         data-testid="delete-countdown"
+                        style={styleString(() => ({
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            lineHeight: 1,
+                            fontVariantNumeric: 'tabular-nums'
+                        }))}
                     >
                         {secondsLeft}
                     </motion.span>
                 {/key}
             {:else if armed && !deleted}
-                <span
-                    class="relative top-px inline-flex items-center text-xs leading-none tracking-[0.16em] uppercase"
-                    data-testid="delete-ready"
-                >
-                    Ready
-                </span>
+                <span class="ready" data-testid="delete-ready">Ready</span>
             {/if}
         </span>
-    </button>
+    </motion.button>
 </motion.div>
+
+<style>
+    .label {
+        min-width: 0;
+        flex: 1;
+        text-align: left;
+    }
+
+    .eyebrow {
+        display: block;
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.625rem;
+        line-height: 1.15;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        opacity: 0.62;
+    }
+
+    .title {
+        display: block;
+        margin-top: 0.125rem;
+        line-height: 1.25;
+    }
+
+    .trail {
+        display: flex;
+        width: 4rem;
+        justify-content: flex-end;
+    }
+
+    .ready {
+        position: relative;
+        top: 1px;
+        display: inline-flex;
+        align-items: center;
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        line-height: 1;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+</style>

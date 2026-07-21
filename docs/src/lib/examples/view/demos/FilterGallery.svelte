@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { animateView } from '@humanspeak/svelte-motion'
+    import { animateView, motion, styleString } from '@humanspeak/svelte-motion'
 
     // Filtering inside animateView: survivors morph to their new grid
     // slots, pure newcomers scale-fade in via .enter(), pure leavers
@@ -24,20 +24,46 @@
             .enter({ opacity: [0, 1], scale: [0.6, 1] })
             .exit({ opacity: [1, 0], scale: [1, 0.6] })
     }
+
+    // Brut filter chip: active state swaps the border + fill to accent.
+    const filterButtonStyle = (active: boolean) =>
+        styleString(() => ({
+            fontFamily: 'var(--brut-mono, monospace)',
+            fontSize: '0.6875rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            border: `1px solid ${active ? 'var(--brut-accent, #247768)' : 'var(--brut-rule-2, #bbc4c0)'}`,
+            backgroundColor: active
+                ? 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))'
+                : 'transparent',
+            color: active ? 'var(--brut-accent, #247768)' : 'var(--brut-ink-2, #525252)',
+            padding: '0.4rem 0.8rem',
+            cursor: 'pointer'
+        }))
 </script>
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div class="stack">
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// filter gallery</span>
+            <span class="micro readout">
+                {filter} · {String(visible.length).padStart(2, '0')} / 12
+            </span>
+        </div>
+
         <div class="filters">
             {#each ['all', 'circle', 'square'] as const as kind (kind)}
-                <button
-                    class:active={filter === kind}
+                <motion.button
                     aria-pressed={filter === kind}
                     onclick={() => setFilter(kind)}
+                    whileHover={{ scale: 1.04 }}
+                    whileTap={{ scale: 0.96 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    style={filterButtonStyle(filter === kind)}
                 >
                     {kind}
-                </button>
+                </motion.button>
             {/each}
         </div>
 
@@ -45,6 +71,11 @@
             {#each visible as item (item.id)}
                 <div class={`item ${item.kind}`} data-view-item aria-hidden="true"></div>
             {/each}
+        </div>
+
+        <div class="strip-foot">
+            <span class="micro">pattern: enter-exit</span>
+            <span class="micro">layer: [data-view-item]</span>
         </div>
     </div>
 </div>
@@ -58,29 +89,44 @@
         min-height: 320px;
     }
 
-    .stack {
+    .strip {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 0.75rem;
+    }
+
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
+    }
+
+    .readout {
+        color: var(--brut-accent, #247768);
     }
 
     .filters {
         display: flex;
         gap: 8px;
-    }
-
-    .filters button {
-        padding: 6px 14px;
-        border: none;
-        border-radius: 8px;
-        background: rgba(120, 120, 140, 0.25);
-        cursor: pointer;
-        text-transform: capitalize;
-    }
-
-    .filters button.active {
-        background: #6366f1;
-        color: white;
     }
 
     /* Fixed grid height for the 2-row "all" state: filtering down to
@@ -97,17 +143,21 @@
     }
 
     .item {
+        box-sizing: border-box;
         width: 40px;
         height: 40px;
+        border: 1px solid var(--brut-ink, #0a0a0a);
     }
 
+    /* Circles stay intrinsically round; squares are hard-cornered. Two
+       silhouettes map onto the accent (circle) / ink (square) hues. */
     .item.circle {
         border-radius: 50%;
-        background: #f472b6;
+        background: var(--brut-accent, #247768);
     }
 
     .item.square {
-        border-radius: 10px;
-        background: #38bdf8;
+        border-radius: 0;
+        background: var(--brut-ink, #0a0a0a);
     }
 </style>

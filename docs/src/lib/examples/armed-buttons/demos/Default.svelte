@@ -37,6 +37,16 @@
     )
     const visibleRows = $derived(rows.filter((row) => !removedIds.has(row.id)))
 
+    const status = $derived(
+        deletingId
+            ? `deleting: ${deletingId}`
+            : deleteArmedId
+              ? `delete armed: ${deleteArmedId}`
+              : archiveArmedId
+                ? `archive armed: ${archiveArmedId}`
+                : 'idle'
+    )
+
     useAnimationFrame((time) => {
         if (!deleteLocked) {
             nextSpinAt = 0
@@ -116,44 +126,56 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div class="stage">
-        <div class="stack">
-            <AnimatePresence mode="popLayout">
-                {#each visibleRows as row (row.id)}
-                    {@const archiveArmed = archiveArmedId === row.id}
-                    {@const deleteArmed = deleteArmedId === row.id}
-                    {@const deleting = deletingId === row.id}
-                    {@const deleted = deletedIds.has(row.id)}
-                    {@const archived = archiveArchivedIds.has(row.id)}
-                    {@const locked = deleteArmed && deleteSecondsLeft > 0}
-                    <motion.div
-                        key={row.id}
-                        layout
-                        initial={{ opacity: 0, y: 12, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, x: -28, scale: 0.96, filter: 'blur(3px)' }}
-                        transition={{ type: 'spring', stiffness: 520, damping: 34 }}
-                    >
-                        <RecordingInsightRow
-                            {row}
-                            {archiveArmed}
-                            {deleteArmed}
-                            {deleting}
-                            {deleted}
-                            {archived}
-                            {locked}
-                            {deleteSecondsLeft}
-                            archiveTimeoutMs={ARCHIVE_DISARM_AFTER_MS}
-                            deleteDisarmAfterMs={DELETE_DISARM_AFTER_MS}
-                            deleteCountdownSeconds={DELETE_COUNTDOWN_SECONDS}
-                            {spinRotate}
-                            onArmArchive={armArchive}
-                            onConfirmArchive={confirmArchive}
-                            onArmDelete={armDelete}
-                        />
-                    </motion.div>
-                {/each}
-            </AnimatePresence>
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// recording stage</span>
+            <span class="micro state">{status}</span>
+        </div>
+
+        <div class="stage">
+            <div class="stack">
+                <AnimatePresence mode="popLayout">
+                    {#each visibleRows as row (row.id)}
+                        {@const archiveArmed = archiveArmedId === row.id}
+                        {@const deleteArmed = deleteArmedId === row.id}
+                        {@const deleting = deletingId === row.id}
+                        {@const deleted = deletedIds.has(row.id)}
+                        {@const archived = archiveArchivedIds.has(row.id)}
+                        {@const locked = deleteArmed && deleteSecondsLeft > 0}
+                        <motion.div
+                            key={row.id}
+                            layout
+                            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, x: -28, scale: 0.96, filter: 'blur(3px)' }}
+                            transition={{ type: 'spring', stiffness: 520, damping: 34 }}
+                        >
+                            <RecordingInsightRow
+                                {row}
+                                {archiveArmed}
+                                {deleteArmed}
+                                {deleting}
+                                {deleted}
+                                {archived}
+                                {locked}
+                                {deleteSecondsLeft}
+                                archiveTimeoutMs={ARCHIVE_DISARM_AFTER_MS}
+                                deleteDisarmAfterMs={DELETE_DISARM_AFTER_MS}
+                                deleteCountdownSeconds={DELETE_COUNTDOWN_SECONDS}
+                                {spinRotate}
+                                onArmArchive={armArchive}
+                                onConfirmArchive={confirmArchive}
+                                onArmDelete={armDelete}
+                            />
+                        </motion.div>
+                    {/each}
+                </AnimatePresence>
+            </div>
+        </div>
+
+        <div class="strip-foot">
+            <span class="micro">mode: popLayout / spring 520·34</span>
+            <span class="micro">rows: {String(visibleRows.length).padStart(2, '0')} / 03</span>
         </div>
     </div>
 </div>
@@ -167,21 +189,65 @@
         padding: 2rem;
     }
 
-    .stage {
-        display: grid;
+    .strip {
+        display: flex;
         width: min(100%, 32rem);
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .state {
+        color: var(--brut-accent, #247768);
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         gap: 1rem;
-        border-radius: 1rem;
-        border: 1px solid hsl(var(--border));
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
+    }
+
+    .stage {
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
         background:
-            linear-gradient(135deg, hsl(var(--muted) / 0.42), transparent 42%),
-            hsl(var(--background));
+            linear-gradient(90deg, var(--brut-rule, #d6dedb) 1px, transparent 1px),
+            linear-gradient(0deg, var(--brut-rule, #d6dedb) 1px, transparent 1px),
+            var(--brut-bg-2, #eef4f1);
+        background-size:
+            54px 54px,
+            54px 54px,
+            auto;
         padding: 1.25rem;
-        box-shadow: 0 18px 60px hsl(var(--foreground) / 0.1);
     }
 
     .stack {
         display: grid;
         gap: 0.65rem;
+
+        --armed-danger: #b91c1c;
+        --armed-danger-soft: rgba(185, 28, 28, 0.12);
+    }
+
+    :global(.dark) .stack {
+        --armed-danger: #ef5350;
+        --armed-danger-soft: rgba(239, 83, 80, 0.16);
     }
 </style>

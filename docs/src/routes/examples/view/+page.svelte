@@ -98,9 +98,9 @@
         <li>
             <Radius />
             <span>
-                Both endpoints share a <em>percentage</em> <code>border-radius</code>: snapshots
-                bake rounding in as transparency, so proportional radii keep the silhouettes
-                coincident at every scale — no corner ghosting mid-morph.
+                Both endpoints share the <em>same</em> <code>border-radius</code> (a hard 0): snapshots
+                bake rounding in as transparency, so identical radii keep the silhouettes coincident at
+                every scale — no corner ghosting mid-morph.
             </span>
         </li>
     </ul>
