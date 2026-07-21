@@ -1,14 +1,15 @@
+<!--
+@component
+Repro for a sibling "double jump" when a card exits from a CSS grid.
+
+Mirrors the consumer setup: a fixed 3-column grid where each card has
+`layout` + enter/exit animations. Removing a card should leave the
+exiting card's slot held until its exit finishes, then FLIP the
+remaining cards into their new slots — never snap-then-jump-back.
+-->
 <script lang="ts">
     import { AnimatePresence, MotionDiv } from '$lib/index.js'
 
-    /**
-     * Repro for a sibling "double jump" when a card exits from a CSS grid.
-     *
-     * Mirrors the consumer setup: a fixed 3-column grid where each card has
-     * `layout` + enter/exit animations. Removing a card should leave the
-     * exiting card's slot held until its exit finishes, then FLIP the
-     * remaining cards into their new slots — never snap-then-jump-back.
-     */
     const initialCards = () => [
         { id: 'a', label: 'Card A' },
         { id: 'b', label: 'Card B' },

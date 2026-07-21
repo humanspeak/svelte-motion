@@ -543,6 +543,17 @@ export const createAnimatePresenceContext = (context: {
     const children = new Map<string, PresenceChild>()
     const exitPlaceholders = new Map<string, HTMLElement>()
 
+    /**
+     * Find the registered `PresenceChild` whose element is `el`.
+     *
+     * @param el The DOM element to look up.
+     * @returns The matching child record, or `undefined` if `el` is not a
+     *   registered child element.
+     * @example
+     * ```ts
+     * const sibling = childByElement(anchor)
+     * ```
+     */
     const childByElement = (el: Element): PresenceChild | undefined => {
         for (const child of children.values()) {
             if (child.element === el) return child
@@ -554,6 +565,13 @@ export const createAnimatePresenceContext = (context: {
      * Re-capture every still-connected child's next sibling. Called whenever
      * the child set changes so each child's `lastNextSibling` reflects the
      * DOM order just before the next detach — the exit placeholder's anchor.
+     *
+     * @returns Nothing; updates each connected child's `lastNextSibling`.
+     * @example
+     * ```ts
+     * children.delete(key)
+     * refreshSiblingAnchors()
+     * ```
      */
     const refreshSiblingAnchors = () => {
         // Only registered sibling elements and THIS context's live exit
@@ -581,6 +599,15 @@ export const createAnimatePresenceContext = (context: {
      * hopping over siblings that detached in the same update. The chain is
      * acyclic by construction — every pointer comes from one forward
      * DOM-order pass in `refreshSiblingAnchors` — so the walk terminates.
+     *
+     * @param child The exiting child whose slot anchor is being resolved.
+     * @returns The connected element to `insertBefore`, or `null` to append
+     *   at the end of the insertion parent.
+     * @example
+     * ```ts
+     * const anchor = resolvePlaceholderAnchor(child)
+     * parent.insertBefore(placeholder, anchor)
+     * ```
      */
     const resolvePlaceholderAnchor = (child: PresenceChild): Element | null => {
         if (child.element.isConnected) return child.element
@@ -817,7 +844,7 @@ export const createAnimatePresenceContext = (context: {
         const isOutOfFlow = exitPosition === 'absolute' || exitPosition === 'fixed'
         let placeholder: HTMLElement | null = null
         const insertionParent =
-            child.element.parentElement ??
+            (child.element.parentElement?.isConnected ? child.element.parentElement : null) ??
             (child.insertionParent?.isConnected ? child.insertionParent : null)
         if (shouldPreserveLayout && !isOutOfFlow && insertionParent) {
             placeholder = document.createElement(child.element.tagName.toLowerCase())
