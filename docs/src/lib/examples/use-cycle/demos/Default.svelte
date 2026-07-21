@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion, useCycle } from '@humanspeak/svelte-motion'
+    import { motion, styleString, useCycle } from '@humanspeak/svelte-motion'
 
     // `useCycle(...labels)` returns `{ current, cycle }`. `.cycle()` advances
     // through the labels in order, `.cycle(i)` jumps to a specific index, and
@@ -15,74 +15,172 @@
 
     const labels = ['rest', 'nudge', 'flip', 'spin'] as const
     const variant = useCycle<keyof typeof variants>(...labels)
+
+    const cardStyle = styleString(() => ({
+        width: 96,
+        height: 96,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: 'var(--brut-mono, monospace)',
+        fontWeight: 700,
+        fontSize: '0.75rem',
+        textTransform: 'uppercase',
+        letterSpacing: '0.06em',
+        color: '#f8fcfb',
+        border: '1px solid var(--brut-ink, #0a0a0a)',
+        boxShadow: '6px 6px 0 var(--brut-rule, #d6dedb)',
+        willChange: 'transform'
+    }))
+
+    const advanceStyle = styleString(() => ({
+        fontFamily: 'var(--brut-mono, monospace)',
+        fontSize: '0.6875rem',
+        textTransform: 'uppercase',
+        letterSpacing: '0.08em',
+        border: '1px solid var(--brut-accent, #247768)',
+        backgroundColor: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))',
+        color: 'var(--brut-accent, #247768)',
+        padding: '0.4rem 0.75rem',
+        cursor: 'pointer'
+    }))
+
+    const jumpStyle = (active: boolean) =>
+        styleString(() => ({
+            fontFamily: 'var(--brut-mono, monospace)',
+            fontSize: '0.6875rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            border: active
+                ? '1px solid var(--brut-ink, #0a0a0a)'
+                : '1px solid var(--brut-rule-2, #bbc4c0)',
+            backgroundColor: active ? 'var(--brut-bg-2, #eef4f1)' : 'transparent',
+            color: active ? 'var(--brut-ink, #0a0a0a)' : 'var(--brut-ink-2, #525252)',
+            padding: '0.4rem 0.6rem',
+            cursor: 'pointer'
+        }))
 </script>
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div class="track">
-        <motion.div
-            class="cycle-card"
-            {variants}
-            animate={variant.current}
-            transition={{ type: 'spring', stiffness: 220, damping: 18 }}
-        >
-            {variant.current}
-        </motion.div>
-    </div>
-
-    <div class="controls">
-        <div class="control-cell">
-            <button type="button" class="primary" onclick={() => variant.cycle()}> cycle() </button>
-            <span class="control-caption">advance</span>
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// use-cycle</span>
+            <span class="micro readout">current: {variant.current}</span>
         </div>
-        {#each labels as label, i (label)}
-            <div class="control-cell">
-                <button
-                    type="button"
-                    class="ghost"
-                    class:active={variant.current === label}
-                    onclick={() => variant.cycle(i)}
+
+        <div class="stage">
+            <div class="track">
+                <motion.div
+                    style={cardStyle}
+                    {variants}
+                    animate={variant.current}
+                    transition={{ type: 'spring', stiffness: 220, damping: 18 }}
                 >
-                    cycle({i})
-                </button>
-                <span class="control-caption" class:active-caption={variant.current === label}>
-                    {label}
-                </span>
+                    {variant.current}
+                </motion.div>
             </div>
-        {/each}
+        </div>
+
+        <div class="controls">
+            <div class="control-cell">
+                <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.04 }}
+                    whileTap={{ scale: 0.95 }}
+                    style={advanceStyle}
+                    onclick={() => variant.cycle()}
+                >
+                    cycle()
+                </motion.button>
+                <span class="control-caption">advance</span>
+            </div>
+            {#each labels as label, i (label)}
+                <div class="control-cell">
+                    <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.95 }}
+                        style={jumpStyle(variant.current === label)}
+                        onclick={() => variant.cycle(i)}
+                    >
+                        cycle({i})
+                    </motion.button>
+                    <span class="control-caption" class:active-caption={variant.current === label}>
+                        {label}
+                    </span>
+                </div>
+            {/each}
+        </div>
+
+        <div class="strip-foot">
+            <span class="micro">variants keyed by cycle labels</span>
+            <span class="micro">spring: 220 / 18</span>
+        </div>
     </div>
 </div>
 
 <style>
     .dk-demo-shell {
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 2rem;
-        padding: 2rem;
+        padding: 1.5rem;
         min-height: 420px;
     }
 
-    .track {
-        width: 280px;
+    .strip {
+        width: 100%;
+        max-width: 420px;
         display: flex;
-        align-items: center;
-        justify-content: flex-start;
+        flex-direction: column;
+        gap: 1rem;
     }
 
-    .track :global(.cycle-card) {
-        width: 96px;
-        height: 96px;
-        border-radius: 18px;
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .readout {
+        color: var(--brut-accent, #247768);
+        text-transform: none;
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
+    }
+
+    .stage {
         display: flex;
         align-items: center;
         justify-content: center;
-        font-weight: 600;
-        color: white;
-        text-transform: capitalize;
-        box-shadow: 0 12px 32px rgba(15, 15, 35, 0.35);
-        will-change: transform;
+        padding: 1.5rem;
+        border: 1px solid var(--brut-rule, #d6dedb);
+        background: var(--brut-bg-2, #eef4f1);
+    }
+
+    .track {
+        width: 240px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
     }
 
     .controls {
@@ -97,78 +195,18 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 4px;
+        gap: 5px;
     }
 
     .control-caption {
-        font-size: 11px;
-        font-family: ui-monospace, monospace;
-        text-transform: lowercase;
-        letter-spacing: 0.04em;
-        color: #6b7280;
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.625rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--brut-ink-3, #9a9a9a);
     }
+
     .control-caption.active-caption {
-        color: #1d4ed8;
-        font-weight: 600;
-    }
-    :global(.dark) .control-caption {
-        color: rgba(255, 255, 255, 0.55);
-    }
-    :global(.dark) .control-caption.active-caption {
-        color: rgba(255, 255, 255, 0.95);
-    }
-
-    .primary,
-    .ghost {
-        font-size: 13px;
-        font-weight: 500;
-        padding: 6px 12px;
-        border-radius: 8px;
-        border: 1px solid transparent;
-        cursor: pointer;
-        transition:
-            background-color 120ms ease,
-            border-color 120ms ease,
-            color 120ms ease;
-    }
-
-    .primary {
-        background: #2563eb;
-        color: white;
-    }
-
-    .primary:hover {
-        background: #1d4ed8;
-    }
-
-    .ghost {
-        background: transparent;
-        color: #4b5563;
-        border-color: rgba(0, 0, 0, 0.2);
-    }
-
-    .ghost:hover {
-        background: rgba(0, 0, 0, 0.04);
-    }
-
-    .ghost.active {
-        background: rgba(37, 99, 235, 0.1);
-        border-color: #2563eb;
-        color: #1d4ed8;
-    }
-
-    :global(.dark) .ghost {
-        color: rgba(255, 255, 255, 0.85);
-        border-color: rgba(255, 255, 255, 0.25);
-    }
-
-    :global(.dark) .ghost:hover {
-        background: rgba(255, 255, 255, 0.08);
-    }
-
-    :global(.dark) .ghost.active {
-        background: rgba(255, 255, 255, 0.12);
-        border-color: rgba(255, 255, 255, 0.5);
-        color: white;
+        color: var(--brut-accent, #247768);
     }
 </style>

@@ -44,14 +44,26 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div class="container">
-        <div class="swatch-container">
-            <div class="swatch waapi" bind:this={waapiElement}></div>
-            <div class="label">Browser (HSL)</div>
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// color-interpolation</span>
+            <span class="micro readout">#ff0088 → #0d63f8</span>
         </div>
-        <div class="swatch-container">
-            <div class="swatch motion" bind:this={motionElement}></div>
-            <div class="label">Motion (RGB)</div>
+
+        <div class="stage">
+            <div class="cell">
+                <span class="micro">// browser hsl</span>
+                <div class="swatch waapi" bind:this={waapiElement}></div>
+            </div>
+            <div class="cell">
+                <span class="micro">// motion rgb</span>
+                <div class="swatch motion" bind:this={motionElement}></div>
+            </div>
+        </div>
+
+        <div class="strip-foot">
+            <span class="micro">hsl sweeps hue · rgb walks straight</span>
+            <span class="micro">loop: 2s alternate</span>
         </div>
     </div>
 </div>
@@ -61,38 +73,69 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 2rem;
+        padding: 1.5rem;
         min-height: 280px;
     }
 
-    .container {
+    .strip {
+        width: 100%;
+        max-width: 420px;
         display: flex;
-        gap: 30px;
-        align-items: center;
-        justify-content: center;
-        padding: 40px 20px;
+        flex-direction: column;
+        gap: 0.75rem;
     }
 
-    .swatch-container {
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .readout {
+        color: var(--brut-accent, #247768);
+        font-variant-numeric: tabular-nums;
+        text-transform: none;
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
+    }
+
+    .stage {
+        display: flex;
+        gap: 2.5rem;
+        align-items: center;
+        justify-content: center;
+        padding: 1.75rem 0;
+    }
+
+    .cell {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 16px;
+        gap: 0.75rem;
     }
 
     .swatch {
         width: 100px;
         height: 100px;
-        border-radius: 8px;
         background-color: #ff0088;
-        box-shadow:
-            0 4px 6px -1px rgb(0 0 0 / 0.1),
-            0 2px 4px -2px rgb(0 0 0 / 0.1);
-    }
-
-    .label {
-        font-size: 14px;
-        font-weight: 500;
-        color: var(--text-secondary, #6b7280);
+        border: 1px solid var(--brut-ink, #0a0a0a);
+        box-shadow: 6px 6px 0 var(--brut-rule, #d6dedb);
     }
 </style>

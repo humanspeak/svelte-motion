@@ -19,8 +19,8 @@
     const box = {
         width: 50,
         height: 50,
-        backgroundColor: '#8df0cc',
-        borderRadius: 10,
+        backgroundColor: 'var(--brut-ink, #0a0a0a)',
+        border: '1px solid var(--brut-accent, #247768)',
         position: 'absolute',
         top: 0,
         left: 0,
@@ -30,26 +30,42 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div style={styleString(() => ({ position: 'relative' }))}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="451" height="437">
-            <motion.path
-                d={pathData}
-                fill="transparent"
-                stroke-width="12"
-                stroke="#8df0cc"
-                stroke-opacity="0.5"
-                stroke-linecap="round"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                {transition}
-            />
-        </svg>
-        <motion.div
-            style={styleString(() => box)}
-            initial={{ offsetDistance: '0%', scale: 2.5 }}
-            animate={{ offsetDistance: '100%', scale: 1 }}
-            {transition}
-        />
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// motion-path</span>
+            <span class="micro readout">pathLength 0 → 1</span>
+        </div>
+
+        <div class="stage">
+            <div style={styleString(() => ({ position: 'relative' }))}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="451" height="437">
+                    <motion.path
+                        d={pathData}
+                        fill="transparent"
+                        stroke-width="12"
+                        stroke-linecap="round"
+                        style={styleString(() => ({
+                            stroke: 'var(--brut-accent, #247768)',
+                            strokeOpacity: 0.55
+                        }))}
+                        initial={{ pathLength: 0 }}
+                        animate={{ pathLength: 1 }}
+                        {transition}
+                    />
+                </svg>
+                <motion.div
+                    style={styleString(() => box)}
+                    initial={{ offsetDistance: '0%', scale: 2.5 }}
+                    animate={{ offsetDistance: '100%', scale: 1 }}
+                    {transition}
+                />
+            </div>
+        </div>
+
+        <div class="strip-foot">
+            <span class="micro">path draws · box rides offset-path</span>
+            <span class="micro">4s · reverse loop</span>
+        </div>
     </div>
 </div>
 
@@ -58,7 +74,57 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 1rem;
+        padding: 1.5rem;
         min-height: 480px;
+    }
+
+    .strip {
+        width: 100%;
+        max-width: 483px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .readout {
+        color: var(--brut-accent, #247768);
+        font-variant-numeric: tabular-nums;
+        text-transform: none;
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
+    }
+
+    .stage {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        overflow-x: auto;
+        border: 1px solid var(--brut-ink, #0a0a0a);
+        background: var(--brut-bg-2, #eef4f1);
+        box-shadow: 6px 6px 0 var(--brut-rule, #d6dedb);
     }
 </style>
