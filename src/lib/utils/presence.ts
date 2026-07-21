@@ -42,6 +42,14 @@ type PresenceChild = {
     lastPosition: string
     lastPopLayoutSnapshot?: PopLayoutSnapshot
     layoutInsertion?: { parent: HTMLElement; before?: HTMLElement }
+    /**
+     * The element's next sibling captured while it was still connected.
+     * Svelte detaches keyed nodes before `unregisterChild` runs, so the exit
+     * placeholder can't anchor on the element itself — it anchors on this
+     * sibling (walking past siblings that detached in the same update) to
+     * land in the exiting element's real layout slot.
+     */
+    lastNextSibling?: Element | null
     hasScrollableAncestor: boolean
     lastScrollSnapshot: ScrollSnapshot[]
     /** Last captured mid-animation opacity (from rAF polling). */
@@ -194,15 +202,14 @@ const resetTransforms = (element: HTMLElement): void => {
 const findLayoutInsertionParent = (
     element: HTMLElement
 ): { parent: HTMLElement; before?: HTMLElement } | null => {
-    let before = element
-    let parent = element.parentElement
-
-    while (parent && getComputedStyle(parent).display === 'contents') {
-        before = parent
-        parent = parent.parentElement
-    }
-
-    return parent ? { parent, before } : null
+    // Insert the placeholder at the element's own position — even inside a
+    // `display: contents` parent (e.g. AnimatePresence's container), where
+    // children still occupy their slot in the grandparent's grid/flex layout
+    // in DOM order. Walking up to the first non-contents ancestor and
+    // anchoring before the WRAPPER would push the placeholder in front of
+    // every sibling, shifting all surviving children one slot over.
+    const parent = element.parentElement
+    return parent ? { parent, before: element } : null
 }
 
 const canElementScroll = (element: HTMLElement): boolean => {
@@ -541,6 +548,58 @@ export const createAnimatePresenceContext = (context: {
 
     const children = new Map<string, PresenceChild>()
     const exitPlaceholders = new Map<string, HTMLElement>()
+
+    /**
+     * Re-capture every still-connected child's next sibling. Called whenever
+     * the child set changes so each child's `lastNextSibling` reflects the
+     * DOM order just before the next detach — the exit placeholder's anchor.
+     */
+    const refreshSiblingAnchors = () => {
+        // Only registered sibling elements and live exit placeholders are
+        // usable anchors: anything else adjacent to a child (Svelte-injected
+        // <script>/comment nodes, the child's own effects DOM) detaches with
+        // it, leaving a dangling reference the placeholder can't anchor on.
+        const isAnchorCandidate = (el: Element): boolean => {
+            if (el.hasAttribute('data-presence-placeholder')) return true
+            for (const other of children.values()) {
+                if (other.element === el) return true
+            }
+            return false
+        }
+        for (const child of children.values()) {
+            if (!child.element.isConnected) continue
+            let next = child.element.nextElementSibling
+            while (next && !isAnchorCandidate(next)) {
+                next = next.nextElementSibling
+            }
+            child.lastNextSibling = next
+        }
+    }
+
+    /**
+     * Resolve the connected node the exit placeholder should be inserted
+     * before. Prefers the exiting element itself (still connected when Svelte
+     * tears down after unregister), then walks the captured sibling chain,
+     * hopping over siblings that detached in the same update.
+     */
+    const resolvePlaceholderAnchor = (child: PresenceChild): Element | null => {
+        if (child.element.isConnected) return child.element
+
+        let anchor = child.lastNextSibling ?? null
+        const visited = new Set<Element>()
+        while (anchor && !anchor.isConnected && !visited.has(anchor)) {
+            visited.add(anchor)
+            let next: Element | null = null
+            for (const other of children.values()) {
+                if (other.element === anchor) {
+                    next = other.lastNextSibling ?? null
+                    break
+                }
+            }
+            anchor = next
+        }
+        return anchor?.isConnected ? anchor : null
+    }
     // Track number of in-flight exit animations to invoke onExitComplete once
     let inFlightExits = 0
 
@@ -553,6 +612,10 @@ export const createAnimatePresenceContext = (context: {
         if (!current || current === target) {
             exitPlaceholders.delete(key)
         }
+        // Anchors captured while this placeholder was in the DOM may point at
+        // it — re-capture from the reflowed DOM so later exits don't anchor
+        // on a removed node.
+        refreshSiblingAnchors()
     }
 
     /**
@@ -670,9 +733,13 @@ export const createAnimatePresenceContext = (context: {
             lastPopLayoutSnapshot:
                 mode === 'popLayout' ? measurePopLayoutSnapshot(element, initialStyle) : undefined,
             layoutInsertion: findLayoutInsertionParent(element) ?? undefined,
+            lastNextSibling: element.nextElementSibling,
             hasScrollableAncestor: initialScrollSnapshot.length > 0,
             lastScrollSnapshot: initialScrollSnapshot
         })
+        // A new sibling may have landed between existing children — re-anchor
+        // everyone while the whole set is still connected.
+        refreshSiblingAnchors()
     }
 
     /**
@@ -789,10 +856,8 @@ export const createAnimatePresenceContext = (context: {
             if (computed.gridRowEnd) {
                 placeholder.style.gridRowEnd = computed.gridRowEnd
             }
-            const before =
-                layoutInsertion.before?.parentElement === layoutInsertion.parent
-                    ? layoutInsertion.before
-                    : null
+            const anchor = resolvePlaceholderAnchor(child)
+            const before = anchor?.parentElement === layoutInsertion.parent ? anchor : null
             layoutInsertion.parent.insertBefore(placeholder, before)
             exitPlaceholders.set(key, placeholder)
         }
