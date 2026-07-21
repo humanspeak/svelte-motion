@@ -9,22 +9,20 @@
      * exiting card's slot held until its exit finishes, then FLIP the
      * remaining cards into their new slots — never snap-then-jump-back.
      */
-    let cards = $state([
+    const initialCards = () => [
         { id: 'a', label: 'Card A' },
         { id: 'b', label: 'Card B' },
         { id: 'c', label: 'Card C' }
-    ])
+    ]
+
+    let cards = $state(initialCards())
 
     const removeAt = (index: number) => {
         cards = cards.filter((_, i) => i !== index)
     }
 
     const reset = () => {
-        cards = [
-            { id: 'a', label: 'Card A' },
-            { id: 'b', label: 'Card B' },
-            { id: 'c', label: 'Card C' }
-        ]
+        cards = initialCards()
     }
 </script>
 

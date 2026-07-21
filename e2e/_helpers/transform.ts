@@ -160,3 +160,41 @@ export const sampleTransformSeries = (
             ),
         { selectors, ms }
     )
+
+/** One per-frame rect sample from `sampleRectLeftSeries`. */
+export type RectLeftSample = { atMs: number; lefts: Record<string, number | null> }
+
+/**
+ * Sample the viewport left edge of one or more keyed selectors every
+ * animation frame for `ms` milliseconds, entirely in-page (same rationale as
+ * `sampleTransformSeries`: no protocol round trip between frames). A selector
+ * that matches nothing yields `null` for that frame — presence/absence is
+ * part of the signal (e.g. an exit clone's lifetime).
+ */
+export const sampleRectLeftSeries = (
+    page: Page,
+    selectors: Record<string, string>,
+    ms: number
+): Promise<RectLeftSample[]> =>
+    page.evaluate(
+        ({ selectors, ms }) =>
+            new Promise<Array<{ atMs: number; lefts: Record<string, number | null> }>>(
+                (resolve) => {
+                    const samples: Array<{ atMs: number; lefts: Record<string, number | null> }> =
+                        []
+                    const start = performance.now()
+                    const read = () => {
+                        const lefts: Record<string, number | null> = {}
+                        for (const [key, selector] of Object.entries(selectors)) {
+                            const el = document.querySelector(selector)
+                            lefts[key] = el ? el.getBoundingClientRect().left : null
+                        }
+                        samples.push({ atMs: Math.round(performance.now() - start), lefts })
+                        if (performance.now() - start < ms) requestAnimationFrame(read)
+                        else resolve(samples)
+                    }
+                    requestAnimationFrame(read)
+                }
+            ),
+        { selectors, ms }
+    )

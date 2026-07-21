@@ -33,6 +33,21 @@ vi.mock('motion', () => {
     }
 })
 
+// Shared DOMRect mock factory
+function makeRect(left: number, top = 0, width = 100, height = 100): DOMRect {
+    return {
+        x: left,
+        y: top,
+        top,
+        left,
+        bottom: top + height,
+        right: left + width,
+        width,
+        height,
+        toJSON: () => {}
+    }
+}
+
 // Minimal CSSStyleDeclaration mock factory
 function mockComputedStyle(overrides: Partial<CSSStyleDeclaration> = {}): CSSStyleDeclaration {
     const entries: string[] = ['borderRadius']
@@ -61,29 +76,8 @@ describe('presence context', () => {
         parent.appendChild(el)
 
         // Provide stable rects
-        vi.spyOn(el, 'getBoundingClientRect').mockReturnValue({
-            x: 10,
-            y: 20,
-            top: 20,
-            left: 10,
-            bottom: 120,
-            right: 110,
-            width: 100,
-            height: 100,
-            toJSON: () => {}
-        })
-
-        vi.spyOn(parent, 'getBoundingClientRect').mockReturnValue({
-            x: 0,
-            y: 0,
-            top: 0,
-            left: 0,
-            bottom: 200,
-            right: 200,
-            width: 200,
-            height: 200,
-            toJSON: () => {}
-        })
+        vi.spyOn(el, 'getBoundingClientRect').mockReturnValue(makeRect(10, 20))
+        vi.spyOn(parent, 'getBoundingClientRect').mockReturnValue(makeRect(0, 0, 200, 200))
 
         vi.spyOn(window, 'getComputedStyle').mockImplementation(() =>
             mockComputedStyle({ borderRadius: '8px', boxSizing: 'border-box' })
@@ -100,19 +94,7 @@ describe('presence context', () => {
         const ctx = createAnimatePresenceContext({})
         ctx.registerChild('k', el, { opacity: 0 })
 
-        const newRect = {
-            x: 12,
-            y: 22,
-            top: 22,
-            left: 12,
-            bottom: 122,
-            right: 112,
-            width: 100,
-            height: 100,
-            toJSON: () => {}
-        } as unknown as DOMRect
-
-        ctx.updateChildState('k', newRect, mockComputedStyle({ borderRadius: '12px' }))
+        ctx.updateChildState('k', makeRect(12, 22), mockComputedStyle({ borderRadius: '12px' }))
 
         // Trigger exit (also exercises clone creation)
         ctx.unregisterChild('k')
@@ -826,18 +808,6 @@ describe('exit placeholder slot preservation', () => {
     })
 
     it('positions the exit clone at the current slot, not the stale registration rect', () => {
-        const makeRect = (left: number): DOMRect => ({
-            x: left,
-            y: 0,
-            top: 0,
-            left,
-            bottom: 100,
-            right: left + 100,
-            width: 100,
-            height: 100,
-            toJSON: () => {}
-        })
-
         // B registers while sitting in column 2…
         vi.spyOn(cardB, 'getBoundingClientRect').mockReturnValue(makeRect(200))
         // …and the slot-holding placeholder (inserted at unregister time)

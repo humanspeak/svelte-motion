@@ -1,11 +1,13 @@
 import { expect, test, type Page } from '@playwright/test'
+import { sampleRectLeftSeries, type RectLeftSample } from '../_helpers/transform'
 
 /**
  * Regression coverage for exit-placeholder slot preservation in a CSS grid
  * (three `layout` cards inside `AnimatePresence`). Removing a card must:
  *
  * 1. Hold the exiting card's grid slot until its exit finishes — surviving
- *    cards do not move while the clone fades.
+ *    cards do not move while the clone fades, and the clone fades in the
+ *    card's CURRENT slot (not its registration-time slot).
  * 2. Then FLIP the survivors into their new slots — a smooth slide with
  *    intermediate frames, never an instant snap or a jump-then-return.
  *
@@ -14,11 +16,11 @@ import { expect, test, type Page } from '@playwright/test'
  * column over during the exit and back after it.
  */
 
-type FrameSample = {
-    t: number
-    lefts: Record<string, number | null>
-    cloneVisible: boolean
-    cloneLeft: number | null
+const SAMPLE_SELECTORS = {
+    a: '[data-testid="card-a"]:not([data-clone])',
+    b: '[data-testid="card-b"]:not([data-clone])',
+    c: '[data-testid="card-c"]:not([data-clone])',
+    clone: '[data-clone="true"]'
 }
 
 const gotoGridExit = async (page: Page) => {
@@ -35,68 +37,45 @@ const gotoGridExit = async (page: Page) => {
 }
 
 /**
- * Click a remove button and record every card's viewport left edge each
- * animation frame until the exit clone is gone and the layout settles.
+ * Click a remove button and record every tracked element's viewport left
+ * edge each animation frame until the exit clone is gone and the layout
+ * settles.
  */
-const sampleRemoval = async (page: Page, buttonId: string): Promise<FrameSample[]> => {
-    const samplesPromise = page.evaluate(
-        () =>
-            new Promise<FrameSample[]>((resolve) => {
-                const out: FrameSample[] = []
-                const t0 = performance.now()
-                const sample = () => {
-                    const lefts: Record<string, number | null> = {}
-                    for (const id of ['a', 'b', 'c']) {
-                        const el = document.querySelector(
-                            `[data-testid="card-${id}"]:not([data-clone])`
-                        )
-                        lefts[id] = el ? el.getBoundingClientRect().left : null
-                    }
-                    const clone = document.querySelector('[data-clone="true"]')
-                    out.push({
-                        t: performance.now() - t0,
-                        lefts,
-                        cloneVisible: !!clone,
-                        cloneLeft: clone ? clone.getBoundingClientRect().left : null
-                    })
-                    if (performance.now() - t0 < 1400) requestAnimationFrame(sample)
-                    else resolve(out)
-                }
-                requestAnimationFrame(sample)
-            })
-    )
+const sampleRemoval = async (page: Page, buttonId: string): Promise<RectLeftSample[]> => {
+    const samplesPromise = sampleRectLeftSeries(page, SAMPLE_SELECTORS, 1400)
     await page.waitForTimeout(30)
     await page.getByTestId(buttonId).click()
     return samplesPromise
 }
 
-const settledLeft = (samples: FrameSample[], id: string): number => {
-    const last = samples[samples.length - 1].lefts[id]
-    expect(last, `card-${id} should still be in the DOM`).not.toBeNull()
+const settledLeft = (samples: RectLeftSample[], key: string): number => {
+    const last = samples[samples.length - 1].lefts[key]
+    expect(last, `card-${key} should still be in the DOM`).not.toBeNull()
     return last as number
 }
 
 /** Frames captured while the exit clone was fading (the hold window). */
-const holdFrames = (samples: FrameSample[]): FrameSample[] => samples.filter((s) => s.cloneVisible)
+const holdFrames = (samples: RectLeftSample[]): RectLeftSample[] =>
+    samples.filter((s) => s.lefts.clone !== null)
 
 /** Frames captured after the exit finished (the FLIP window). */
-const flipFrames = (samples: FrameSample[]): FrameSample[] => {
-    const lastCloneIndex = samples.map((s) => s.cloneVisible).lastIndexOf(true)
+const flipFrames = (samples: RectLeftSample[]): RectLeftSample[] => {
+    const lastCloneIndex = samples.map((s) => s.lefts.clone !== null).lastIndexOf(true)
     return samples.slice(lastCloneIndex + 1)
 }
 
-const expectHeld = (frames: FrameSample[], id: string, at: number) => {
+const expectHeld = (frames: RectLeftSample[], key: string, at: number) => {
     expect(frames.length, 'exit clone should be observable while it fades').toBeGreaterThan(3)
     for (const frame of frames) {
         expect(
-            Math.abs((frame.lefts[id] ?? Number.NaN) - at),
-            `card-${id} must hold its slot while the exit runs (t=${Math.round(frame.t)}ms)`
+            Math.abs((frame.lefts[key] ?? Number.NaN) - at),
+            `${key} must hold its slot while the exit runs (t=${frame.atMs}ms)`
         ).toBeLessThan(2)
     }
 }
 
-const expectSmoothSlide = (frames: FrameSample[], id: string, from: number, to: number) => {
-    const lefts = frames.map((f) => f.lefts[id]).filter((l): l is number => l !== null)
+const expectSmoothSlide = (frames: RectLeftSample[], key: string, from: number, to: number) => {
+    const lefts = frames.map((f) => f.lefts[key]).filter((l): l is number => l !== null)
     const min = Math.min(from, to)
     const max = Math.max(from, to)
     const intermediate = new Set(
@@ -104,11 +83,9 @@ const expectSmoothSlide = (frames: FrameSample[], id: string, from: number, to: 
     )
     expect(
         intermediate.size,
-        `card-${id} must animate ${from}→${to} through intermediate frames, not snap`
+        `${key} must animate ${from}→${to} through intermediate frames, not snap`
     ).toBeGreaterThanOrEqual(3)
-    expect(Math.abs(lefts[lefts.length - 1] - to), `card-${id} must settle at ${to}`).toBeLessThan(
-        2
-    )
+    expect(Math.abs(lefts[lefts.length - 1] - to), `${key} must settle at ${to}`).toBeLessThan(2)
 }
 
 test.describe('AnimatePresence grid exit', () => {
@@ -121,9 +98,10 @@ test.describe('AnimatePresence grid exit', () => {
         const c0 = await page.getByTestId('card-c').boundingBox()
 
         const samples = await sampleRemoval(page, 'remove-middle')
+        const hold = holdFrames(samples)
 
-        expectHeld(holdFrames(samples), 'a', a0!.x)
-        expectHeld(holdFrames(samples), 'c', c0!.x)
+        expectHeld(hold, 'a', a0!.x)
+        expectHeld(hold, 'c', c0!.x)
         expectSmoothSlide(flipFrames(samples), 'c', c0!.x, b0!.x)
         expect(Math.abs(settledLeft(samples, 'a') - a0!.x)).toBeLessThan(2)
     })
@@ -135,9 +113,10 @@ test.describe('AnimatePresence grid exit', () => {
         const c0 = await page.getByTestId('card-c').boundingBox()
 
         const samples = await sampleRemoval(page, 'remove-first')
+        const hold = holdFrames(samples)
 
-        expectHeld(holdFrames(samples), 'b', b0!.x)
-        expectHeld(holdFrames(samples), 'c', c0!.x)
+        expectHeld(hold, 'b', b0!.x)
+        expectHeld(hold, 'c', c0!.x)
         expectSmoothSlide(flipFrames(samples), 'b', b0!.x, a0!.x)
         expectSmoothSlide(flipFrames(samples), 'c', c0!.x, b0!.x)
     })
@@ -164,13 +143,8 @@ test.describe('AnimatePresence grid exit', () => {
         // must fade where B currently is — not at B's registration-time slot.
         const samples = await sampleRemoval(page, 'remove-first')
         const hold = holdFrames(samples)
-        expect(hold.length, 'exit clone should be observable while it fades').toBeGreaterThan(3)
-        for (const frame of hold) {
-            expect(
-                Math.abs((frame.cloneLeft ?? Number.NaN) - a0!.x),
-                `exit clone must fade in the current slot (t=${Math.round(frame.t)}ms)`
-            ).toBeLessThan(2)
-        }
+
+        expectHeld(hold, 'clone', a0!.x)
         expectHeld(hold, 'c', b0!.x)
         expectSmoothSlide(flipFrames(samples), 'c', b0!.x, a0!.x)
     })
