@@ -11,6 +11,5 @@
 </script>
 
 <AnimatePresence>
-    <!-- Cast until `key` accepts numbers — the fix widens the prop type. -->
-    <motion.div key={key as string} data-testid="presence-key-box">box</motion.div>
+    <motion.div {key} data-testid="presence-key-box">box</motion.div>
 </AnimatePresence>

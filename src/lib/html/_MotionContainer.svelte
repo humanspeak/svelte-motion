@@ -408,8 +408,9 @@
     const presenceDepth = getPresenceDepth()
 
     // Validate key prop only for direct children of AnimatePresence (depth 0)
-    // This matches Framer Motion behavior where only immediate children need keys
-    if (context && presenceDepth === 0 && !keyProp) {
+    // This matches Framer Motion behavior where only immediate children need
+    // keys. Null-check rather than falsiness: 0 and '' are valid keys.
+    if (context && presenceDepth === 0 && keyProp == null) {
         throw new Error(
             'motion elements that are direct children of AnimatePresence must have a `key` prop. ' +
                 'Example: <motion.div key="unique-id" />'
@@ -426,10 +427,12 @@
     // conditional unmounts are immediate unless wrapped in another boundary.
     const shouldRegisterPresenceExit = !!context && presenceDepth === 0 && !inPresenceChild
 
-    // Use the provided key for presence tracking
-    // When not inside AnimatePresence, use a stable identifier based on component instance
+    // Use the provided key for presence tracking, normalized to a string so
+    // numeric keys (e.g. 0) address the same registry entries as their
+    // string form. When not inside AnimatePresence, use a stable identifier
+    // based on component instance.
     // trunk-ignore(eslint/no-useless-assignment): false positive — presenceKey is used throughout the component
-    const presenceKey = keyProp ?? `motion-${++keyCounter}`
+    const presenceKey = keyProp != null ? String(keyProp) : `motion-${++keyCounter}`
 
     // Track previous key for key-change detection (simulates React's key-based remounting)
     // Plain variables (not $state) to avoid self-triggering the key-change $effect

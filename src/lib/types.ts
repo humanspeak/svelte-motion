@@ -523,6 +523,9 @@ export type MotionProps = {
      * Required when inside an AnimatePresence component.
      * Used to track enter/exit state and determine whether to animate.
      *
+     * Numbers are accepted (and normalized to strings internally), so keyed
+     * each-blocks can pass numeric ids — including falsy-but-valid `0`.
+     *
      * @example
      * ```svelte
      * <AnimatePresence>
@@ -532,7 +535,7 @@ export type MotionProps = {
      * </AnimatePresence>
      * ```
      */
-    key?: string
+    key?: string | number
     /** Variants define named animation states */
     variants?: Variants
     /**
