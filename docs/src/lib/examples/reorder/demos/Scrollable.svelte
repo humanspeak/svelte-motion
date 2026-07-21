@@ -67,14 +67,7 @@
                 }))}
             >
                 {#each items as item (item)}
-                    <Reorder.Item
-                        value={item}
-                        whileDrag={{
-                            scale: 1.03,
-                            boxShadow: '6px 6px 0 var(--brut-ink, #0a0a0a)'
-                        }}
-                        style={itemStyle}
-                    >
+                    <Reorder.Item value={item} whileDrag={{ scale: 1.03 }} style={itemStyle}>
                         {item}
                     </Reorder.Item>
                 {/each}
