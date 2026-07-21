@@ -64,6 +64,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Fancy Like Button',
         description: 'Interactive fancy like button animation example using Svelte Motion.'
     },
+    'grid-exit': {
+        title: 'Grid Exit',
+        description:
+            'Complete a card out of a CSS grid — the exit fades in place while surviving cards FLIP into the freed slot.'
+    },
     'hover-and-tap': {
         title: 'Hover and Tap',
         description: 'Interactive hover and tap animation example using Svelte Motion.'

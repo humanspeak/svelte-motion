@@ -33,6 +33,21 @@ vi.mock('motion', () => {
     }
 })
 
+// Shared DOMRect mock factory
+function makeRect(left: number, top = 0, width = 100, height = 100): DOMRect {
+    return {
+        x: left,
+        y: top,
+        top,
+        left,
+        bottom: top + height,
+        right: left + width,
+        width,
+        height,
+        toJSON: () => {}
+    }
+}
+
 // Minimal CSSStyleDeclaration mock factory
 function mockComputedStyle(overrides: Partial<CSSStyleDeclaration> = {}): CSSStyleDeclaration {
     const entries: string[] = ['borderRadius']
@@ -61,29 +76,8 @@ describe('presence context', () => {
         parent.appendChild(el)
 
         // Provide stable rects
-        vi.spyOn(el, 'getBoundingClientRect').mockReturnValue({
-            x: 10,
-            y: 20,
-            top: 20,
-            left: 10,
-            bottom: 120,
-            right: 110,
-            width: 100,
-            height: 100,
-            toJSON: () => {}
-        })
-
-        vi.spyOn(parent, 'getBoundingClientRect').mockReturnValue({
-            x: 0,
-            y: 0,
-            top: 0,
-            left: 0,
-            bottom: 200,
-            right: 200,
-            width: 200,
-            height: 200,
-            toJSON: () => {}
-        })
+        vi.spyOn(el, 'getBoundingClientRect').mockReturnValue(makeRect(10, 20))
+        vi.spyOn(parent, 'getBoundingClientRect').mockReturnValue(makeRect(0, 0, 200, 200))
 
         vi.spyOn(window, 'getComputedStyle').mockImplementation(() =>
             mockComputedStyle({ borderRadius: '8px', boxSizing: 'border-box' })
@@ -100,19 +94,7 @@ describe('presence context', () => {
         const ctx = createAnimatePresenceContext({})
         ctx.registerChild('k', el, { opacity: 0 })
 
-        const newRect = {
-            x: 12,
-            y: 22,
-            top: 22,
-            left: 12,
-            bottom: 122,
-            right: 112,
-            width: 100,
-            height: 100,
-            toJSON: () => {}
-        } as unknown as DOMRect
-
-        ctx.updateChildState('k', newRect, mockComputedStyle({ borderRadius: '12px' }))
+        ctx.updateChildState('k', makeRect(12, 22), mockComputedStyle({ borderRadius: '12px' }))
 
         // Trigger exit (also exercises clone creation)
         ctx.unregisterChild('k')
@@ -729,5 +711,140 @@ describe('presence depth context', () => {
         vi.mocked(getContext).mockReturnValueOnce(3)
         const deepDepth = getPresenceDepth()
         expect(deepDepth).toBe(3)
+    })
+})
+
+describe('exit placeholder slot preservation', () => {
+    // Mirrors the real AnimatePresence DOM: a grid whose direct child is the
+    // `display: contents` presence container, with the motion children (and
+    // Svelte-injected <script> nodes) inside it. Svelte detaches a keyed
+    // child BEFORE unregisterChild runs, so the placeholder has to land in
+    // the exiting child's slot from captured sibling anchors alone.
+    let grid: HTMLElement
+    let wrapper: HTMLElement
+    let cardA: HTMLElement
+    let cardB: HTMLElement
+    let cardC: HTMLElement
+    let scriptB: HTMLElement
+
+    const detach = (...nodes: HTMLElement[]) => nodes.forEach((n) => n.remove())
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        document.body.innerHTML = ''
+
+        grid = document.createElement('div')
+        wrapper = document.createElement('div')
+        wrapper.className = 'animate-presence-container'
+        grid.appendChild(wrapper)
+        document.body.appendChild(grid)
+
+        cardA = document.createElement('div')
+        cardB = document.createElement('div')
+        cardC = document.createElement('div')
+        scriptB = document.createElement('script')
+        wrapper.append(cardA, cardB, scriptB, cardC)
+
+        vi.spyOn(window, 'getComputedStyle').mockImplementation((target) =>
+            mockComputedStyle(
+                target === wrapper
+                    ? { display: 'contents', position: 'static' }
+                    : { display: 'block', position: 'static' }
+            )
+        )
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
+            cb(0)
+            return 1
+        })
+    })
+
+    const registerAll = () => {
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        ctx.registerChild('a', cardA, { opacity: 0 })
+        ctx.registerChild('b', cardB, { opacity: 0 })
+        ctx.registerChild('c', cardC, { opacity: 0 })
+        return ctx
+    }
+
+    const placeholders = () =>
+        Array.from(document.querySelectorAll<HTMLElement>('[data-presence-placeholder="true"]'))
+
+    it('holds a detached middle child slot between its registered siblings', () => {
+        const ctx = registerAll()
+
+        detach(cardB, scriptB)
+        ctx.unregisterChild('b')
+
+        const [placeholder] = placeholders()
+        expect(placeholder).toBeTruthy()
+        expect(placeholder.parentElement).toBe(wrapper)
+        expect(placeholder.nextElementSibling).toBe(cardC)
+        expect(placeholder.previousElementSibling).toBe(cardA)
+    })
+
+    it('holds a detached last child slot after every surviving sibling', () => {
+        const ctx = registerAll()
+
+        detach(cardC)
+        ctx.unregisterChild('c')
+
+        const [placeholder] = placeholders()
+        expect(placeholder).toBeTruthy()
+        expect(placeholder.parentElement).toBe(wrapper)
+        expect(placeholder.previousElementSibling).toBe(scriptB)
+        expect(placeholder.nextElementSibling).toBeNull()
+    })
+
+    it('holds a detached first child slot before every surviving sibling', () => {
+        const ctx = registerAll()
+
+        detach(cardA)
+        ctx.unregisterChild('a')
+
+        const [placeholder] = placeholders()
+        expect(placeholder).toBeTruthy()
+        expect(placeholder.parentElement).toBe(wrapper)
+        expect(placeholder.nextElementSibling).toBe(cardB)
+    })
+
+    it('positions the exit clone at the current slot, not the stale registration rect', () => {
+        // B registers while sitting in column 2…
+        vi.spyOn(cardB, 'getBoundingClientRect').mockReturnValue(makeRect(200))
+        // …and the slot-holding placeholder (inserted at unregister time)
+        // reflects where B's slot ACTUALLY is by then: column 1. A layout
+        // FLIP moved B there after a sibling exit — a position-only change
+        // the ResizeObserver-driven updateChildState never sees.
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+            this: HTMLElement
+        ) {
+            return this.getAttribute?.('data-presence-placeholder') === 'true'
+                ? makeRect(0)
+                : makeRect(-1)
+        })
+
+        const ctx = registerAll()
+
+        detach(cardB, scriptB)
+        ctx.unregisterChild('b')
+
+        const clone = document.querySelector<HTMLElement>('[data-clone="true"]')
+        expect(clone).toBeTruthy()
+        expect(clone!.style.left).toBe('1px')
+    })
+
+    it('keeps slot order when two children detach in the same update', () => {
+        const ctx = registerAll()
+
+        detach(cardB, scriptB, cardC)
+        ctx.unregisterChild('b')
+        ctx.unregisterChild('c')
+
+        const [first, second] = placeholders()
+        expect(first).toBeTruthy()
+        expect(second).toBeTruthy()
+        expect(first.parentElement).toBe(wrapper)
+        expect(second.parentElement).toBe(wrapper)
+        expect(cardA.nextElementSibling).toBe(first)
+        expect(first.nextElementSibling).toBe(second)
     })
 })

@@ -526,6 +526,14 @@
                         AnimatePresence custom
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/grid-exit') + searchParams}
+                    >
+                        Grid exit (siblings hold slots)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

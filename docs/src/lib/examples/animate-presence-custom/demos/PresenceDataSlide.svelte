@@ -37,13 +37,22 @@
     animate="center"
     exit="exit"
     style={`background-color: ${color};`}
-/>
+>
+    {String(slideKey).padStart(2, '0')}
+</motion.div>
 
 <style>
     :global(.dk-demo-shell .box) {
         width: 150px;
         height: 150px;
-        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--brut-ink, #0a0a0a);
+        box-shadow: 6px 6px 0 var(--brut-rule, #d6dedb);
         transform-origin: 50% 50%;
+        font-family: var(--brut-mono, monospace);
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #ffffff;
     }
 </style>

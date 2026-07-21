@@ -41,7 +41,22 @@ type PresenceChild = {
      */
     lastPosition: string
     lastPopLayoutSnapshot?: PopLayoutSnapshot
-    layoutInsertion?: { parent: HTMLElement; before?: HTMLElement }
+    /**
+     * The element's parent captured at registration. The exit placeholder is
+     * inserted here when the element is already detached — even a
+     * `display: contents` parent (e.g. AnimatePresence's container) works,
+     * since its children still occupy their slots in the grandparent's
+     * grid/flex layout in DOM order.
+     */
+    insertionParent?: HTMLElement
+    /**
+     * The element's next sibling captured while it was still connected.
+     * Svelte detaches keyed nodes before `unregisterChild` runs, so the exit
+     * placeholder can't anchor on the element itself — it anchors on this
+     * sibling (walking past siblings that detached in the same update) to
+     * land in the exiting element's real layout slot.
+     */
+    lastNextSibling?: Element | null
     hasScrollableAncestor: boolean
     lastScrollSnapshot: ScrollSnapshot[]
     /** Last captured mid-animation opacity (from rAF polling). */
@@ -189,20 +204,6 @@ const resetTransforms = (element: HTMLElement): void => {
     s.msTransform = 'none'
     s.MozTransform = 'none'
     s.OTransform = 'none'
-}
-
-const findLayoutInsertionParent = (
-    element: HTMLElement
-): { parent: HTMLElement; before?: HTMLElement } | null => {
-    let before = element
-    let parent = element.parentElement
-
-    while (parent && getComputedStyle(parent).display === 'contents') {
-        before = parent
-        parent = parent.parentElement
-    }
-
-    return parent ? { parent, before } : null
 }
 
 const canElementScroll = (element: HTMLElement): boolean => {
@@ -541,6 +542,82 @@ export const createAnimatePresenceContext = (context: {
 
     const children = new Map<string, PresenceChild>()
     const exitPlaceholders = new Map<string, HTMLElement>()
+
+    /**
+     * Find the registered `PresenceChild` whose element is `el`.
+     *
+     * @param el The DOM element to look up.
+     * @returns The matching child record, or `undefined` if `el` is not a
+     *   registered child element.
+     * @example
+     * ```ts
+     * const sibling = childByElement(anchor)
+     * ```
+     */
+    const childByElement = (el: Element): PresenceChild | undefined => {
+        for (const child of children.values()) {
+            if (child.element === el) return child
+        }
+        return undefined
+    }
+
+    /**
+     * Re-capture every still-connected child's next sibling. Called whenever
+     * the child set changes so each child's `lastNextSibling` reflects the
+     * DOM order just before the next detach — the exit placeholder's anchor.
+     *
+     * @returns Nothing; updates each connected child's `lastNextSibling`.
+     * @example
+     * ```ts
+     * children.delete(key)
+     * refreshSiblingAnchors()
+     * ```
+     */
+    const refreshSiblingAnchors = () => {
+        // Only registered sibling elements and THIS context's live exit
+        // placeholders are usable anchors: anything else adjacent to a child
+        // (Svelte-injected <script>/comment nodes, a nested AnimatePresence's
+        // placeholders) can detach without this context noticing, leaving a
+        // dangling reference the placeholder can't anchor on.
+        const childElements = new Set<Element>()
+        for (const child of children.values()) childElements.add(child.element)
+        const ownPlaceholders = new Set<Element>(exitPlaceholders.values())
+        for (const child of children.values()) {
+            if (!child.element.isConnected) continue
+            let next = child.element.nextElementSibling
+            while (next && !childElements.has(next) && !ownPlaceholders.has(next)) {
+                next = next.nextElementSibling
+            }
+            child.lastNextSibling = next
+        }
+    }
+
+    /**
+     * Resolve the connected node the exit placeholder should be inserted
+     * before. Prefers the exiting element itself (still connected when Svelte
+     * tears down after unregister), then walks the captured sibling chain,
+     * hopping over siblings that detached in the same update. The chain is
+     * acyclic by construction — every pointer comes from one forward
+     * DOM-order pass in `refreshSiblingAnchors` — so the walk terminates.
+     *
+     * @param child The exiting child whose slot anchor is being resolved.
+     * @returns The connected element to `insertBefore`, or `null` to append
+     *   at the end of the insertion parent.
+     * @example
+     * ```ts
+     * const anchor = resolvePlaceholderAnchor(child)
+     * parent.insertBefore(placeholder, anchor)
+     * ```
+     */
+    const resolvePlaceholderAnchor = (child: PresenceChild): Element | null => {
+        if (child.element.isConnected) return child.element
+
+        let anchor = child.lastNextSibling ?? null
+        while (anchor && !anchor.isConnected) {
+            anchor = childByElement(anchor)?.lastNextSibling ?? null
+        }
+        return anchor
+    }
     // Track number of in-flight exit animations to invoke onExitComplete once
     let inFlightExits = 0
 
@@ -553,6 +630,10 @@ export const createAnimatePresenceContext = (context: {
         if (!current || current === target) {
             exitPlaceholders.delete(key)
         }
+        // Anchors captured while this placeholder was in the DOM may point at
+        // it — re-capture from the reflowed DOM so later exits don't anchor
+        // on a removed node.
+        refreshSiblingAnchors()
     }
 
     /**
@@ -669,10 +750,13 @@ export const createAnimatePresenceContext = (context: {
             lastPosition: initialStyle.position,
             lastPopLayoutSnapshot:
                 mode === 'popLayout' ? measurePopLayoutSnapshot(element, initialStyle) : undefined,
-            layoutInsertion: findLayoutInsertionParent(element) ?? undefined,
+            insertionParent: element.parentElement ?? undefined,
             hasScrollableAncestor: initialScrollSnapshot.length > 0,
             lastScrollSnapshot: initialScrollSnapshot
         })
+        // A new sibling may have landed between existing children — re-anchor
+        // everyone (including this child) while the whole set is connected.
+        refreshSiblingAnchors()
     }
 
     /**
@@ -730,12 +814,15 @@ export const createAnimatePresenceContext = (context: {
         if (!child.exit && !child.resolveExit) {
             pwLog('[presence] unregisterChild - no exit animation, removing immediately')
             children.delete(key)
+            // Anchors pointing at the removed child would sever the sibling
+            // chain for a same-update multi-detach — re-anchor around it.
+            refreshSiblingAnchors()
             return
         }
 
         const elementIsLive = child.element.isConnected
         const staleScrollDelta = measureScrollDelta(child.lastScrollSnapshot)
-        const rect = elementIsLive
+        let rect = elementIsLive
             ? child.element.getBoundingClientRect()
             : translateRectByScrollDelta(child.lastRect, staleScrollDelta)
         const computed = elementIsLive ? getComputedStyle(child.element) : child.lastComputedStyle
@@ -756,11 +843,10 @@ export const createAnimatePresenceContext = (context: {
         const exitPosition = elementIsLive ? computed.position : child.lastPosition
         const isOutOfFlow = exitPosition === 'absolute' || exitPosition === 'fixed'
         let placeholder: HTMLElement | null = null
-        const liveLayoutInsertion = findLayoutInsertionParent(child.element)
-        const layoutInsertion =
-            liveLayoutInsertion ??
-            (child.layoutInsertion?.parent.isConnected ? child.layoutInsertion : null)
-        if (shouldPreserveLayout && !isOutOfFlow && layoutInsertion) {
+        const insertionParent =
+            (child.element.parentElement?.isConnected ? child.element.parentElement : null) ??
+            (child.insertionParent?.isConnected ? child.insertionParent : null)
+        if (shouldPreserveLayout && !isOutOfFlow && insertionParent) {
             placeholder = document.createElement(child.element.tagName.toLowerCase())
             placeholder.setAttribute('data-presence-placeholder', 'true')
             placeholder.style.display = computed.display === 'contents' ? 'block' : computed.display
@@ -789,12 +875,22 @@ export const createAnimatePresenceContext = (context: {
             if (computed.gridRowEnd) {
                 placeholder.style.gridRowEnd = computed.gridRowEnd
             }
-            const before =
-                layoutInsertion.before?.parentElement === layoutInsertion.parent
-                    ? layoutInsertion.before
-                    : null
-            layoutInsertion.parent.insertBefore(placeholder, before)
+            const anchor = resolvePlaceholderAnchor(child)
+            const before = anchor?.parentElement === insertionParent ? anchor : null
+            insertionParent.insertBefore(placeholder, before)
             exitPlaceholders.set(key, placeholder)
+
+            // `lastRect` only refreshes on SIZE changes (ResizeObserver), so
+            // a child that FLIPed to a new slot after a sibling's exit still
+            // carries its old position. The placeholder now occupies the
+            // child's real slot — measure IT so the exit clone fades where
+            // the child currently is, not where it registered.
+            if (!elementIsLive) {
+                const slotRect = placeholder.getBoundingClientRect()
+                if (slotRect.width > 0 || slotRect.height > 0) {
+                    rect = slotRect
+                }
+            }
         }
 
         // Clone original node to preserve structure/classes, then inline computed styles to freeze look
@@ -827,10 +923,7 @@ export const createAnimatePresenceContext = (context: {
         // last known rect. Svelte can detach keyed nodes before unregister runs,
         // so fall back to the parent captured at registration time instead of
         // escaping to <body>, which would bypass clipping parents.
-        let parent =
-            child.element.parentElement ??
-            (child.layoutInsertion?.parent.isConnected ? child.layoutInsertion.parent : null) ??
-            document.body
+        let parent = insertionParent ?? document.body
         let positioningParent = parent
 
         // Walk up to find a parent that has actual layout (not display: contents)
