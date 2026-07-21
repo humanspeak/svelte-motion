@@ -1,6 +1,7 @@
 <script lang="ts">
     import {
         animate,
+        AnimatePresence,
         motion,
         styleString,
         useMotionValue,
@@ -20,8 +21,12 @@
     const armed = $derived(open && offsetY > DISMISS_OFFSET_PX)
 
     const reopen = () => {
+        // Full motion round-trip: remount the sheet off-screen and spring it
+        // home through the same MotionValue the pan writes — the scrim fade
+        // rides along via the shared `overlayOpacity` transform.
         open = true
-        y.jump(0)
+        y.jump(400)
+        animate(y, 0, { type: 'spring', stiffness: 300, damping: 30 })
     }
 
     const handlePan = (_event: PointerEvent, info: { offset: { y: number } }) => {
@@ -104,32 +109,53 @@
                         <li>animates off-screen if you do</li>
                     </ul>
                 </motion.div>
-            {:else}
-                <motion.button
-                    type="button"
-                    onclick={reopen}
-                    whileHover={{ scale: 1.04 }}
-                    whileTap={{ scale: 0.96 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                    style={styleString(() => ({
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        fontFamily: 'var(--brut-mono, monospace)',
-                        fontSize: '0.6875rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.08em',
-                        border: '1px solid var(--brut-accent, #247768)',
-                        backgroundColor: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))',
-                        color: 'var(--brut-accent, #247768)',
-                        padding: '0.5rem 0.875rem',
-                        cursor: 'pointer'
-                    }))}
-                >
-                    ↑ reopen the sheet
-                </motion.button>
             {/if}
+            <!-- The reopen affordance enters after the dismiss and exits as
+                 the sheet springs back — presence choreography, not a mount
+                 snap. The wrapper is a flex-centering slot: centering the
+                 button via an authored transform would be stomped by the
+                 gesture animations' transform writes. -->
+            <AnimatePresence>
+                {#if !open}
+                    <motion.div
+                        key="reopen"
+                        initial={{ opacity: 0, y: 14, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 14, scale: 0.96 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                        style={styleString(() => ({
+                            position: 'absolute',
+                            inset: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            pointerEvents: 'none'
+                        }))}
+                    >
+                        <motion.button
+                            type="button"
+                            onclick={reopen}
+                            whileHover={{ scale: 1.04 }}
+                            whileTap={{ scale: 0.96 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                            style={styleString(() => ({
+                                pointerEvents: 'auto',
+                                fontFamily: 'var(--brut-mono, monospace)',
+                                fontSize: '0.6875rem',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.08em',
+                                border: '1px solid var(--brut-accent, #247768)',
+                                backgroundColor: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))',
+                                color: 'var(--brut-accent, #247768)',
+                                padding: '0.5rem 0.875rem',
+                                cursor: 'pointer'
+                            }))}
+                        >
+                            ↑ reopen the sheet
+                        </motion.button>
+                    </motion.div>
+                {/if}
+            </AnimatePresence>
         </div>
 
         <div class="strip-foot">
@@ -203,10 +229,11 @@
     }
 
     .overlay {
+        /* Fixed dark scrim: --brut-ink flips to near-white in dark mode,
+           which would BRIGHTEN the backdrop instead of dimming it. */
         position: absolute;
         inset: 0;
-        background: var(--brut-ink, #0a0a0a);
-        opacity: 0.42;
+        background: rgb(0 0 0 / 0.42);
         pointer-events: none;
     }
 
