@@ -55,7 +55,7 @@
             <Timer />
             <span>
                 <code>useTime()</code> ticks every frame from mount. Reading
-                <code>$time</code> in a derived store re-runs the deriver on every update, so the orb's
+                <code>$time</code> in a derived store re-runs the deriver on every update, so the tile's
                 transform and colour update at display refresh rate.
             </span>
         </li>

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { Check, Pause, Play, RotateCcw, Wand2 } from '@lucide/svelte'
-    import { motion, useAnimationControls } from '@humanspeak/svelte-motion'
+    import { motion, styleString, useAnimationControls } from '@humanspeak/svelte-motion'
 
     const controls = useAnimationControls()
 
@@ -65,111 +65,185 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div class="toolbar" aria-label="Animation controls">
-        <button type="button" class="primary" onclick={run} aria-label="Start sequence">
-            <Play size={15} />
-            Start
-        </button>
-        <button type="button" onclick={stop} aria-label="Stop animation">
-            <Pause size={15} />
-            Stop
-        </button>
-        <button type="button" onclick={setVerified} aria-label="Set verified">
-            <Check size={15} />
-            Set
-        </button>
-        <button type="button" onclick={reset} aria-label="Reset">
-            <RotateCcw size={15} />
-            Reset
-        </button>
-    </div>
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// use-animation-controls</span>
+            <span class="micro state">status: {status}</span>
+        </div>
 
-    <div class="stage">
-        <motion.div class="ship" initial="ready" animate={controls} variants={shell}>
-            <div class="ship-top">
-                <Wand2 size={24} />
-                <motion.div class="status" initial="ready" animate={controls} variants={text}>
-                    {status}
-                </motion.div>
-            </div>
-            <motion.div class="beam" initial="ready" animate={controls} variants={beam} />
-            <div class="ship-bottom">
-                <span>run {count}</span>
-                <motion.div class="badge" initial="ready" animate={controls} variants={badge}>
-                    <Check size={18} />
-                </motion.div>
-            </div>
-        </motion.div>
+        <div class="toolbar" aria-label="Animation controls">
+            <button type="button" class="ctrl primary" onclick={run} aria-label="Start sequence">
+                <Play size={14} />
+                Start
+            </button>
+            <button type="button" class="ctrl" onclick={stop} aria-label="Stop animation">
+                <Pause size={14} />
+                Stop
+            </button>
+            <button type="button" class="ctrl" onclick={setVerified} aria-label="Set verified">
+                <Check size={14} />
+                Set
+            </button>
+            <button type="button" class="ctrl" onclick={reset} aria-label="Reset">
+                <RotateCcw size={14} />
+                Reset
+            </button>
+        </div>
+
+        <div class="stage">
+            <motion.div
+                initial="ready"
+                animate={controls}
+                variants={shell}
+                style={styleString(() => ({
+                    width: 230,
+                    display: 'grid',
+                    gap: '0.875rem',
+                    padding: '1.125rem',
+                    border: '1px solid var(--brut-ink, #0a0a0a)',
+                    background: 'var(--brut-bg-2, #eef4f1)',
+                    boxShadow: '6px 6px 0 var(--brut-rule, #d6dedb)',
+                    transformOrigin: '50% 50%'
+                }))}
+            >
+                <div class="ship-top">
+                    <Wand2 size={22} />
+                    <motion.div
+                        initial="ready"
+                        animate={controls}
+                        variants={text}
+                        style={styleString(() => ({
+                            fontFamily: 'var(--brut-mono, monospace)',
+                            fontSize: '1.125rem',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
+                            color: 'var(--brut-accent, #247768)'
+                        }))}
+                    >
+                        {status}
+                    </motion.div>
+                </div>
+                <motion.div
+                    initial="ready"
+                    animate={controls}
+                    variants={beam}
+                    style={styleString(() => ({
+                        width: '100%',
+                        height: 8,
+                        background: 'var(--brut-accent, #247768)',
+                        transformOrigin: '0 50%'
+                    }))}
+                />
+                <div class="ship-bottom">
+                    <span class="run">run {count}</span>
+                    <motion.div
+                        initial="ready"
+                        animate={controls}
+                        variants={badge}
+                        style={styleString(() => ({
+                            width: 34,
+                            height: 34,
+                            display: 'grid',
+                            placeItems: 'center',
+                            border: '1px solid var(--brut-accent, #247768)',
+                            background: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))',
+                            color: 'var(--brut-accent, #247768)'
+                        }))}
+                    >
+                        <Check size={18} />
+                    </motion.div>
+                </div>
+            </motion.div>
+        </div>
+
+        <div class="strip-foot">
+            <span class="micro">one controls object, four targets</span>
+            <span class="micro state">runs: {String(count).padStart(2, '0')}</span>
+        </div>
     </div>
 </div>
 
 <style>
     .dk-demo-shell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
         min-height: 480px;
-        display: grid;
-        place-items: center;
-        gap: 18px;
-        padding: 2rem;
-        background: #0e1419;
-        color: #eef6fb;
+    }
+
+    .strip {
+        width: 100%;
+        max-width: 560px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .state {
+        color: var(--brut-accent, #247768);
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
     }
 
     .toolbar {
         display: flex;
         flex-wrap: wrap;
-        justify-content: center;
-        gap: 8px;
+        gap: 0.5rem;
     }
 
-    button {
-        height: 36px;
+    .ctrl {
         display: inline-flex;
         align-items: center;
-        gap: 7px;
-        padding: 0 12px;
-        border: 1px solid #405767;
-        border-radius: 6px;
-        background: #151f27;
-        color: #eef6fb;
-        font-size: 13px;
-        font-weight: 750;
+        gap: 0.4rem;
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 0.4rem 0.75rem;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: transparent;
+        color: var(--brut-ink-2, #525252);
         cursor: pointer;
     }
 
-    button.primary {
-        border-color: #67e8f9;
-        background: #0e7490;
+    .ctrl.primary {
+        border-color: var(--brut-accent, #247768);
+        background: var(--brut-accent-soft, rgba(36, 119, 104, 0.1));
+        color: var(--brut-accent, #247768);
     }
 
     .stage {
-        width: min(100%, 560px);
-        height: 320px;
+        height: 15rem;
         display: grid;
         place-items: center;
         overflow: hidden;
-        border: 1px solid #273945;
-        background:
-            radial-gradient(circle at 28% 48%, rgba(103, 232, 249, 0.14), transparent 34%),
-            linear-gradient(90deg, rgba(103, 232, 249, 0.1) 1px, transparent 1px),
-            linear-gradient(0deg, rgba(103, 232, 249, 0.1) 1px, transparent 1px), #0a1015;
-        background-size:
-            auto,
-            42px 42px,
-            42px 42px,
-            auto;
-    }
-
-    :global(.ship) {
-        width: 230px;
-        min-height: 144px;
-        display: grid;
-        gap: 14px;
-        padding: 18px;
-        border: 1px solid #547082;
-        border-radius: 8px;
-        background: #121d25;
-        box-shadow: 0 22px 70px rgba(0, 0, 0, 0.32);
-        transform-origin: 50% 50%;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg, #f8fcfb);
     }
 
     .ship-top,
@@ -177,39 +251,16 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
+        gap: 0.75rem;
+        color: var(--brut-ink, #0a0a0a);
     }
 
-    :global(.status) {
-        color: #f9a8d4;
-        font-size: 23px;
-        font-weight: 850;
-        letter-spacing: 0;
-    }
-
-    :global(.beam) {
-        width: 100%;
-        height: 8px;
-        border-radius: 999px;
-        background: linear-gradient(90deg, #67e8f9, #f9a8d4);
-        transform-origin: 0 50%;
-    }
-
-    .ship-bottom span {
-        color: #93a7b6;
-        font-size: 12px;
-        font-variant-numeric: tabular-nums;
+    .run {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.625rem;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
-    }
-
-    :global(.badge) {
-        width: 34px;
-        height: 34px;
-        display: grid;
-        place-items: center;
-        border-radius: 999px;
-        background: #083344;
-        color: #67e8f9;
-        border: 1px solid #155e75;
+        color: var(--brut-ink-3, #9a9a9a);
+        font-variant-numeric: tabular-nums;
     }
 </style>

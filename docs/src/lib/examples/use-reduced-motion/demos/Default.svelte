@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { useReducedMotion } from '@humanspeak/svelte-motion'
+    import { motion, styleString, useReducedMotion } from '@humanspeak/svelte-motion'
 
     // `useReducedMotion()` returns a `$state`-backed `{ current }` object
     // wired to the `(prefers-reduced-motion: reduce)` media query. Use it
@@ -12,68 +12,128 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div
-        class="box"
-        class:spin={!effective}
-        aria-label={effective ? 'Animation disabled' : 'Animation enabled'}
-    ></div>
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// use-reduced-motion</span>
+            <span class="micro state">
+                policy: {effective ? 'reduce' : 'no-preference'}
+            </span>
+        </div>
 
-    <div class="info">
-        <p>
-            OS preference: <strong>{reduced.current ? 'reduce' : 'no-preference'}</strong>
-        </p>
-        <label class="flex items-center gap-2">
-            <input type="checkbox" bind:checked={forceReduced} />
-            Force reduced motion (in-page override)
-        </label>
-        <p class="hint">
-            Tip: Chrome DevTools → Rendering → emulate
-            <code>prefers-reduced-motion: reduce</code> to test the OS path.
-        </p>
+        <div class="stage">
+            <motion.div
+                aria-label={effective ? 'Animation disabled' : 'Animation enabled'}
+                animate={effective ? { rotate: 0 } : { rotate: 360 }}
+                transition={effective
+                    ? { duration: 0 }
+                    : { repeat: Infinity, ease: 'linear', duration: 4 }}
+                style={styleString(() => ({
+                    width: 108,
+                    height: 108,
+                    border: '1px solid var(--brut-ink, #0a0a0a)',
+                    background: 'var(--brut-bg-2, #eef4f1)',
+                    boxShadow: '6px 6px 0 var(--brut-rule, #d6dedb)',
+                    transformOrigin: '50% 50%'
+                }))}
+            ></motion.div>
+        </div>
+
+        <div class="info">
+            <div class="row">
+                <span class="micro">os preference</span>
+                <span class="micro state">{reduced.current ? 'reduce' : 'no-preference'}</span>
+            </div>
+            <label class="override">
+                <input type="checkbox" bind:checked={forceReduced} />
+                <span class="micro">force reduced motion (in-page override)</span>
+            </label>
+            <p class="hint">
+                Tip: Chrome DevTools → Rendering → emulate
+                <code>prefers-reduced-motion: reduce</code> to test the OS path.
+            </p>
+        </div>
     </div>
 </div>
 
 <style>
     .dk-demo-shell {
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 1.5rem;
-        padding: 2rem;
-        min-height: 420px;
+        padding: 1.5rem;
+        min-height: 440px;
     }
 
-    .box {
-        width: 120px;
-        height: 120px;
-        border-radius: 18px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    .strip {
+        width: 100%;
+        max-width: 420px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
     }
 
-    .box.spin {
-        animation: spin 4s linear infinite;
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
     }
 
-    @keyframes spin {
-        from {
-            transform: rotate(0deg);
-        }
-        to {
-            transform: rotate(360deg);
-        }
+    .state {
+        color: var(--brut-accent, #247768);
+    }
+
+    .strip-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .stage {
+        height: 11rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .info {
         display: flex;
         flex-direction: column;
+        gap: 0.6rem;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+    }
+
+    .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .override {
+        display: inline-flex;
         align-items: center;
         gap: 0.5rem;
-        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .override input {
+        accent-color: var(--brut-accent, #247768);
     }
 
     .hint {
-        font-size: 12px;
-        opacity: 0.7;
+        margin: 0;
+        font-size: 0.6875rem;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .hint code {
+        font-family: var(--brut-mono, monospace);
+        color: var(--brut-ink-2, #525252);
     }
 </style>

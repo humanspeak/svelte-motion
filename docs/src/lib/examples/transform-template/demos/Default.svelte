@@ -56,33 +56,33 @@
 
 <!-- dk-strip: docs-kit positioning shell - stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div class="toolbar" aria-label="Transform template controls">
-        <button type="button" onclick={() => moveTo(0)}>
-            <ArrowLeft size={15} />
-            Back
-        </button>
-        <button type="button" class="primary" onclick={() => moveTo(1)}>
-            <Sparkles size={15} />
-            Apply template
-            <ArrowRight size={15} />
-        </button>
-        <button type="button" onclick={reset}>
-            <RotateCcw size={15} />
-            Reset
-        </button>
-    </div>
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// transform-template</span>
+            <span class="micro state">state: {state}</span>
+        </div>
 
-    <div class="stage">
-        <div class="intro">
-            <span>same MotionValue</span>
-            <strong>Generated x, custom final transform</strong>
+        <div class="toolbar" aria-label="Transform template controls">
+            <button type="button" class="ctrl" onclick={() => moveTo(0)}>
+                <ArrowLeft size={14} />
+                Back
+            </button>
+            <button type="button" class="ctrl primary" onclick={() => moveTo(1)}>
+                <Sparkles size={14} />
+                Apply template
+                <ArrowRight size={14} />
+            </button>
+            <button type="button" class="ctrl" onclick={reset}>
+                <RotateCcw size={14} />
+                Reset
+            </button>
         </div>
 
         <div class="comparison" aria-label="Generated transform compared with transformTemplate">
-            <section class="lane generated-lane">
+            <section class="lane">
                 <div class="lane-head">
-                    <span>generated</span>
-                    <strong>straight transform</strong>
+                    <span class="micro">// generated</span>
+                    <span class="micro">straight transform</span>
                 </div>
                 <div class="track">
                     <div class="slot start-slot" aria-label="Start at 0px"></div>
@@ -95,15 +95,14 @@
                 </div>
             </section>
 
-            <section class="lane template-lane">
+            <section class="lane">
                 <div class="lane-head">
-                    <span>transformTemplate</span>
-                    <strong>lift + rotate + generated</strong>
+                    <span class="micro">// transformtemplate</span>
+                    <span class="micro">lift + rotate + generated</span>
                 </div>
                 <div class="track">
                     <div class="slot start-slot" aria-label="Generated transform starts here"></div>
                     <div class="slot end-slot" aria-label="Final transform lands here"></div>
-                    <div class="template-field" aria-hidden="true"></div>
                     <div class="rail highlighted"></div>
                     <motion.div
                         class="card template-card"
@@ -117,107 +116,91 @@
                 </div>
             </section>
         </div>
+
+        <div class="strip-foot">
+            <span class="micro">same MotionValue x</span>
+            <span class="micro">template rewrites the transform string</span>
+        </div>
     </div>
 </div>
 
 <style>
     .dk-demo-shell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        min-height: 560px;
+    }
+
+    .strip {
         width: 100%;
-        height: clamp(560px, calc(100vh - 160px), 640px);
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        grid-template-rows: auto minmax(0, 1fr);
-        gap: 14px;
-        padding: 18px 26px;
-        background: #0d1518;
-        color: #eef6fb;
+        max-width: 720px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .state {
+        color: var(--brut-accent, #247768);
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
     }
 
     .toolbar {
         display: flex;
         flex-wrap: wrap;
-        justify-content: center;
-        gap: 8px;
+        gap: 0.5rem;
     }
 
-    button {
-        height: 36px;
+    .ctrl {
         display: inline-flex;
         align-items: center;
-        gap: 7px;
-        padding: 0 12px;
-        border: 1px solid #46616a;
-        border-radius: 6px;
-        background: #142127;
-        color: #eef6fb;
-        font-size: 13px;
-        font-weight: 780;
+        gap: 0.4rem;
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 0.4rem 0.75rem;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: transparent;
+        color: var(--brut-ink-2, #525252);
         cursor: pointer;
     }
 
-    button.primary {
-        border-color: #5eead4;
-        background: #0f766e;
-    }
-
-    .stage {
-        position: relative;
-        align-self: stretch;
-        height: 100%;
-        min-height: 0;
-        overflow: hidden;
-        border: 1px solid #2b4650;
-        background:
-            linear-gradient(90deg, rgba(94, 234, 212, 0.1) 1px, transparent 1px),
-            linear-gradient(0deg, rgba(94, 234, 212, 0.1) 1px, transparent 1px), #071114;
-        background-size: 44px 44px;
-    }
-
-    .stage::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background:
-            radial-gradient(circle at 20% 72%, rgba(45, 212, 191, 0.16), transparent 28%),
-            radial-gradient(circle at 80% 30%, rgba(251, 113, 133, 0.15), transparent 32%);
-        pointer-events: none;
-    }
-
-    .intro {
-        position: absolute;
-        top: 22px;
-        left: 28px;
-        right: 28px;
-        z-index: 3;
-        display: flex;
-        align-items: center;
-        justify-content: flex-start;
-        gap: 12px;
-    }
-
-    .intro span,
-    .lane-head span {
-        color: #67e8f9;
-        font-size: 11px;
-        font-weight: 850;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-    }
-
-    .intro strong {
-        max-width: 620px;
-        color: #ecfeff;
-        font-size: 18px;
-        line-height: 1.1;
-        text-align: left;
+    .ctrl.primary {
+        border-color: var(--brut-accent, #247768);
+        background: var(--brut-accent-soft, rgba(36, 119, 104, 0.1));
+        color: var(--brut-accent, #247768);
     }
 
     .comparison {
-        position: absolute;
-        inset: 76px 28px 28px;
         display: grid;
         grid-template-rows: repeat(2, minmax(0, 1fr));
-        gap: 14px;
+        gap: 0.75rem;
     }
 
     .lane {
@@ -225,34 +208,25 @@
         overflow: hidden;
         display: grid;
         grid-template-rows: auto minmax(0, 1fr);
-        gap: 10px;
-        padding: 18px 22px 16px;
-        border: 1px solid rgba(134, 184, 199, 0.42);
-        background: rgba(13, 27, 33, 0.74);
+        gap: 0.5rem;
+        padding: 0.875rem 1rem;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg-2, #eef4f1);
     }
 
     .lane-head {
-        z-index: 3;
         display: flex;
         align-items: baseline;
         justify-content: space-between;
-        gap: 16px;
-        min-height: 32px;
-    }
-
-    .lane-head strong {
-        color: #ecfeff;
-        font-size: clamp(16px, 1.55vw, 21px);
-        line-height: 1.05;
-        text-align: right;
+        gap: 1rem;
     }
 
     .track {
-        --card-width: 158px;
+        --card-width: 150px;
         position: relative;
         width: calc(var(--card-width) + 700px);
         max-width: 100%;
-        min-height: 122px;
+        min-height: 112px;
         margin: 0 auto;
         overflow: visible;
     }
@@ -261,9 +235,9 @@
         position: absolute;
         left: calc(var(--card-width) / 2);
         right: calc(var(--card-width) / 2);
-        bottom: 34px;
+        bottom: 30px;
         height: 2px;
-        background: rgba(186, 230, 253, 0.38);
+        background: var(--brut-rule-2, #bbc4c0);
     }
 
     .rail::before,
@@ -271,11 +245,10 @@
         content: '';
         position: absolute;
         top: 50%;
-        width: 12px;
-        height: 12px;
-        border: 2px solid rgba(186, 230, 253, 0.65);
-        border-radius: 999px;
-        background: #071114;
+        width: 10px;
+        height: 10px;
+        border: 2px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg, #f8fcfb);
         transform: translateY(-50%);
     }
 
@@ -288,17 +261,21 @@
     }
 
     .rail.highlighted {
-        background: linear-gradient(90deg, #5eead4, #38bdf8, #fb7185);
-        box-shadow: 0 0 28px rgba(56, 189, 248, 0.32);
+        background: var(--brut-accent, #247768);
+    }
+
+    .rail.highlighted::before,
+    .rail.highlighted::after {
+        border-color: var(--brut-accent, #247768);
     }
 
     .slot {
         position: absolute;
-        bottom: 16px;
+        bottom: 12px;
         width: var(--card-width);
-        height: 88px;
-        border: 1px dashed rgba(134, 184, 199, 0.22);
-        background: rgba(7, 17, 20, 0.28);
+        height: 84px;
+        border: 1px dashed var(--brut-rule-2, #bbc4c0);
+        background: transparent;
     }
 
     .slot.start-slot {
@@ -309,116 +286,76 @@
         right: 0;
     }
 
-    .template-field {
-        position: absolute;
-        inset: 0 0 10px;
-        border: 1px dashed rgba(94, 234, 212, 0.28);
-        background:
-            radial-gradient(ellipse at 50% 30%, rgba(56, 189, 248, 0.18), transparent 34%),
-            radial-gradient(ellipse at 60% 72%, rgba(251, 113, 133, 0.12), transparent 34%);
-    }
-
-    :global(.card) {
+    :global(.dk-demo-shell .card) {
         position: absolute;
         left: 0;
-        bottom: 48px;
+        bottom: 42px;
         z-index: 4;
         width: var(--card-width);
-        min-height: 64px;
+        min-height: 60px;
         display: grid;
         align-content: center;
         gap: 5px;
-        padding: 0 16px;
-        border: 1px solid rgba(186, 230, 253, 0.52);
-        border-radius: 10px;
-        color: #ecfeff;
+        padding: 0 14px;
+        border: 1px solid var(--brut-ink, #0a0a0a);
         transform-origin: 50% 50%;
     }
 
-    :global(.card small) {
-        font-size: 10px;
-        font-weight: 850;
-        letter-spacing: 0.14em;
+    :global(.dk-demo-shell .card small) {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.625rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
     }
 
-    :global(.card strong) {
-        font-size: 20px;
+    :global(.dk-demo-shell .card strong) {
+        font-family: var(--brut-mono, monospace);
+        font-size: 1.125rem;
         line-height: 1;
         text-transform: uppercase;
     }
 
-    :global(.generated-card) {
-        background: rgba(30, 41, 59, 0.9);
-        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.32);
+    :global(.dk-demo-shell .generated-card) {
+        background: var(--brut-bg, #f8fcfb);
+        box-shadow: 4px 4px 0 var(--brut-rule, #d6dedb);
     }
 
-    :global(.generated-card small) {
-        color: #cbd5e1;
+    :global(.dk-demo-shell .generated-card small) {
+        color: var(--brut-ink-3, #9a9a9a);
     }
 
-    :global(.template-card) {
-        background: linear-gradient(135deg, rgba(20, 184, 166, 0.98), rgba(14, 116, 144, 0.98));
-        box-shadow: 0 26px 90px rgba(45, 212, 191, 0.34);
+    :global(.dk-demo-shell .generated-card strong) {
+        color: var(--brut-ink, #0a0a0a);
     }
 
-    :global(.template-card small) {
-        color: #b5f5eb;
+    :global(.dk-demo-shell .template-card) {
+        background: var(--brut-accent-soft, rgba(36, 119, 104, 0.1));
+        box-shadow: 4px 4px 0 var(--brut-rule, #d6dedb);
     }
 
-    :global(.template-card[data-state='end']) {
-        background: linear-gradient(135deg, rgba(251, 113, 133, 0.98), rgba(168, 85, 247, 0.98));
-        box-shadow: 0 26px 90px rgba(251, 113, 133, 0.34);
+    :global(.dk-demo-shell .template-card small) {
+        color: var(--brut-accent, #247768);
+    }
+
+    :global(.dk-demo-shell .template-card strong) {
+        color: var(--brut-accent, #247768);
+    }
+
+    :global(.dk-demo-shell .template-card[data-state='end']) {
+        background: var(--brut-accent, #247768);
+        border-color: var(--brut-accent, #247768);
+    }
+
+    :global(.dk-demo-shell .template-card[data-state='end'] small),
+    :global(.dk-demo-shell .template-card[data-state='end'] strong) {
+        color: var(--brut-accent-ink, #f8fcfb);
     }
 
     @media (max-width: 900px) {
-        .dk-demo-shell {
-            padding: 1rem;
-        }
-
-        .intro {
-            align-items: flex-start;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .intro strong {
-            max-width: 100%;
-            text-align: left;
-        }
-
-        .comparison {
-            inset: 120px 18px 18px;
-        }
-
-        .lane {
-            padding: 14px 14px 12px;
-        }
-
-        .lane-head {
-            align-items: flex-start;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .lane-head strong {
-            font-size: 17px;
-            text-align: left;
-        }
-
         .track {
-            --card-width: 136px;
+            --card-width: 132px;
             width: calc(var(--card-width) + 540px);
-        }
-
-        :global(.card) {
-            bottom: 36px;
-            min-height: 60px;
-            padding: 0 14px;
-        }
-
-        :global(.card strong) {
-            font-size: 18px;
         }
     }
 </style>

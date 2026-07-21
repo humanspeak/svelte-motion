@@ -22,44 +22,79 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div class="stage">
-        <button class="toggle" type="button" onclick={() => (isVisible = !isVisible)}>
-            {isVisible ? 'Hide' : 'Show'} Items
-        </button>
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// variants-propagation</span>
+            <span class="micro state">
+                animate: "{isVisible ? 'visible' : 'hidden'}"
+            </span>
+        </div>
 
-        <motion.ul
-            style={styleString(() => ({
-                listStyle: 'none',
-                padding: 0,
-                margin: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem'
-            }))}
-            variants={containerVariants}
-            initial="hidden"
-            animate={isVisible ? 'visible' : 'hidden'}
-        >
-            {#each items as item, i (i)}
-                <motion.li
-                    style={styleString(() => ({
-                        padding: '1rem',
-                        background: 'var(--color-background)',
-                        borderRadius: 6,
-                        border: '1px solid var(--color-border)'
-                    }))}
-                    variants={itemVariants}
-                    transition={{
-                        type: 'spring',
-                        stiffness: 300,
-                        damping: 24,
-                        delay: i * 0.1
-                    }}
-                >
-                    {item}
-                </motion.li>
-            {/each}
-        </motion.ul>
+        <div class="stage">
+            <motion.ul
+                style={styleString(() => ({
+                    listStyle: 'none',
+                    padding: 0,
+                    margin: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem'
+                }))}
+                variants={containerVariants}
+                initial="hidden"
+                animate={isVisible ? 'visible' : 'hidden'}
+            >
+                {#each items as item, i (i)}
+                    <motion.li
+                        style={styleString(() => ({
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.75rem 0.875rem',
+                            fontFamily: 'var(--brut-mono, monospace)',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            color: 'var(--brut-ink, #0a0a0a)',
+                            background: 'var(--brut-bg-2, #eef4f1)',
+                            border: '1px solid var(--brut-rule-2, #bbc4c0)'
+                        }))}
+                        variants={itemVariants}
+                        transition={{
+                            type: 'spring',
+                            stiffness: 300,
+                            damping: 24,
+                            delay: i * 0.1
+                        }}
+                    >
+                        <span class="dot"></span>
+                        {item}
+                    </motion.li>
+                {/each}
+            </motion.ul>
+        </div>
+
+        <div class="strip-foot">
+            <motion.button
+                onclick={() => (isVisible = !isVisible)}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                style={styleString(() => ({
+                    fontFamily: 'var(--brut-mono, monospace)',
+                    fontSize: '0.6875rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                    border: '1px solid var(--brut-accent, #247768)',
+                    backgroundColor: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))',
+                    color: 'var(--brut-accent, #247768)',
+                    padding: '0.5rem 0.875rem',
+                    cursor: 'pointer'
+                }))}
+            >
+                {isVisible ? '– hide items' : '+ show items'}
+            </motion.button>
+            <span class="micro">stagger: 0.1s / cascade</span>
+        </div>
     </div>
 </div>
 
@@ -68,26 +103,58 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 2rem;
+        padding: 1.5rem;
         min-height: 460px;
     }
 
-    .stage {
-        width: 320px;
+    .strip {
+        width: 100%;
+        max-width: 420px;
         display: flex;
         flex-direction: column;
-        gap: 1rem;
+        gap: 0.75rem;
     }
 
-    .toggle {
-        align-self: flex-start;
-        padding: 0.5rem 1rem;
-        background: #2563eb;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        font-size: 0.875rem;
-        font-weight: 600;
-        cursor: pointer;
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .state {
+        color: var(--brut-accent, #247768);
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
+    }
+
+    .stage {
+        height: 12rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .dot {
+        flex: none;
+        width: 8px;
+        height: 8px;
+        background-color: var(--brut-accent, #247768);
     }
 </style>
