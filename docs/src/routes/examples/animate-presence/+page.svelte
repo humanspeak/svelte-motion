@@ -63,7 +63,7 @@
         <li>
             <Sparkles />
             <span>
-                The cyan box has <code>initial</code>, <code>animate</code>, and <code>exit</code>
+                The unit card has <code>initial</code>, <code>animate</code>, and <code>exit</code>
                 props. On mount, motion tweens from <code>initial → animate</code>; on unmount
                 inside <code>AnimatePresence</code>, it tweens from <code>animate → exit</code> before
                 the DOM node is removed.
