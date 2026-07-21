@@ -42,7 +42,18 @@ export const splitHoverDefinition = (
     return { keyframes: rest, transition }
 }
 
-const readTransformScale = (el: HTMLElement): number => {
+/**
+ * Read the element's current uniform scale from its computed transform —
+ * the VISUAL value, regardless of which system last wrote it.
+ *
+ * @param el Target element.
+ * @returns The rendered scale factor (1 when untransformed).
+ * @example
+ * ```ts
+ * const from = readTransformScale(el) // seed a continuous animation
+ * ```
+ */
+export const readTransformScale = (el: HTMLElement): number => {
     const transform = getComputedStyle(el).transform
     if (!transform || transform === 'none') return 1
     const matrix = transform.match(/matrix\(([^)]+)\)/)
@@ -226,6 +237,10 @@ export const attachWhileHover = (
                 transformComposer?.transformTemplate
             ) || 'none'
         el.style.transform = transform
+        // Motion's internal scale motion-value can't see this direct style
+        // write; flag it so the next motion element animation on `scale`
+        // seeds from the visual value instead of snapping to the stale one.
+        coordinator?.markExternalWrite('scale')
     }
 
     const stopScaleAnimation = () => {

@@ -1,5 +1,5 @@
 import type { GestureCoordinator } from '$lib/utils/gestureCoordinator'
-import { isHoverCapable, splitHoverDefinition } from '$lib/utils/hover'
+import { isHoverCapable, readTransformScale, splitHoverDefinition } from '$lib/utils/hover'
 import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import { press } from 'motion-dom'
@@ -183,6 +183,19 @@ export const attachWhileTap = (
         coordinator?.stopAll()
     }
 
+    // When the hover system's composed writer was the last to touch `scale`,
+    // motion's internal motion value is stale — seed the keyframes from the
+    // element's VISUAL scale so the animation starts where the eye left off
+    // instead of snapping to the stale value on frame one.
+    const seedStaleScale = (record: Record<string, unknown>): Record<string, unknown> => {
+        if (!coordinator?.consumeExternalWrite('scale')) return record
+        const target = record.scale
+        if (typeof target !== 'number') return record
+        const current = readTransformScale(el)
+        if (Math.abs(current - target) < 0.001) return record
+        return { ...record, scale: [current, target] }
+    }
+
     // Track the in-flight control with the coordinator so the hover system
     // can stop it symmetrically (e.g. leaving mid-release-spring).
     const setGestureCtl = (ctl: GestureCtl) => {
@@ -214,7 +227,7 @@ export const attachWhileTap = (
         setGestureCtl(
             animate(
                 el,
-                tapKeyframes as unknown as DOMKeyframesDefinition,
+                seedStaleScale(tapKeyframes) as unknown as DOMKeyframesDefinition,
                 pressTransition
             ) as unknown as GestureCtl
         )
@@ -266,7 +279,7 @@ export const attachWhileTap = (
         setGestureCtl(
             animate(
                 el,
-                keyframes as unknown as DOMKeyframesDefinition,
+                seedStaleScale(keyframes) as unknown as DOMKeyframesDefinition,
                 hoverTransition ?? releaseTransition
             ) as unknown as GestureCtl
         )
@@ -304,7 +317,7 @@ export const attachWhileTap = (
             setGestureCtl(
                 animate(
                     el,
-                    resetRecord as unknown as DOMKeyframesDefinition,
+                    seedStaleScale(resetRecord) as unknown as DOMKeyframesDefinition,
                     releaseTransition
                 ) as unknown as GestureCtl
             )

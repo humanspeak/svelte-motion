@@ -40,6 +40,19 @@ export type GestureCoordinator = {
      * a new gesture animation so exactly one writer owns the element.
      */
     stopAll: () => void
+    /**
+     * Record that a value was written outside motion's element animations
+     * (e.g. the hover system's composed transform writer). Motion's internal
+     * motion value for that key is now stale.
+     */
+    markExternalWrite: (key: string) => void
+    /**
+     * Whether a key was externally written since the last consume; clears the
+     * flag. A consumer starting a motion element animation on that key must
+     * seed its keyframes from the element's visual value or the first frame
+     * snaps to motion's stale internal value.
+     */
+    consumeExternalWrite: (key: string) => boolean
 }
 
 /**
@@ -56,8 +69,13 @@ export type GestureCoordinator = {
 export const createGestureCoordinator = (): GestureCoordinator => {
     const active = new Set<GestureType>()
     const stoppers = new Set<() => void>()
+    const externalWrites = new Set<string>()
 
     return {
+        markExternalWrite: (key) => {
+            externalWrites.add(key)
+        },
+        consumeExternalWrite: (key) => externalWrites.delete(key),
         setActive: (type, isActive) => {
             if (isActive) active.add(type)
             else active.delete(type)
