@@ -802,7 +802,7 @@ export const createAnimatePresenceContext = (context: {
 
         const elementIsLive = child.element.isConnected
         const staleScrollDelta = measureScrollDelta(child.lastScrollSnapshot)
-        const rect = elementIsLive
+        let rect = elementIsLive
             ? child.element.getBoundingClientRect()
             : translateRectByScrollDelta(child.lastRect, staleScrollDelta)
         const computed = elementIsLive ? getComputedStyle(child.element) : child.lastComputedStyle
@@ -860,6 +860,18 @@ export const createAnimatePresenceContext = (context: {
             const before = anchor?.parentElement === layoutInsertion.parent ? anchor : null
             layoutInsertion.parent.insertBefore(placeholder, before)
             exitPlaceholders.set(key, placeholder)
+
+            // `lastRect` only refreshes on SIZE changes (ResizeObserver), so
+            // a child that FLIPed to a new slot after a sibling's exit still
+            // carries its old position. The placeholder now occupies the
+            // child's real slot — measure IT so the exit clone fades where
+            // the child currently is, not where it registered.
+            if (!elementIsLive) {
+                const slotRect = placeholder.getBoundingClientRect()
+                if (slotRect.width > 0 || slotRect.height > 0) {
+                    rect = slotRect
+                }
+            }
         }
 
         // Clone original node to preserve structure/classes, then inline computed styles to freeze look
