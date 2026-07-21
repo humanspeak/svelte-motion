@@ -18,6 +18,7 @@ type FrameSample = {
     t: number
     lefts: Record<string, number | null>
     cloneVisible: boolean
+    cloneLeft: number | null
 }
 
 const gotoGridExit = async (page: Page) => {
@@ -55,7 +56,8 @@ const sampleRemoval = async (page: Page, buttonId: string): Promise<FrameSample[
                     out.push({
                         t: performance.now() - t0,
                         lefts,
-                        cloneVisible: !!clone
+                        cloneVisible: !!clone,
+                        cloneLeft: clone ? clone.getBoundingClientRect().left : null
                     })
                     if (performance.now() - t0 < 1400) requestAnimationFrame(sample)
                     else resolve(out)
@@ -138,6 +140,39 @@ test.describe('AnimatePresence grid exit', () => {
         expectHeld(holdFrames(samples), 'c', c0!.x)
         expectSmoothSlide(flipFrames(samples), 'b', b0!.x, a0!.x)
         expectSmoothSlide(flipFrames(samples), 'c', c0!.x, b0!.x)
+    })
+
+    test('sequential removals: the exit clone fades in the current slot, not the registration slot', async ({
+        page
+    }) => {
+        await gotoGridExit(page)
+        const a0 = await page.getByTestId('card-a').boundingBox()
+        const b0 = await page.getByTestId('card-b').boundingBox()
+
+        // First removal: A exits, B slides into column 1, C into column 2.
+        await page.getByTestId('remove-first').click()
+        await expect
+            .poll(async () => {
+                const b = await page.getByTestId('card-b').boundingBox()
+                const clones = await page.locator('[data-clone="true"]').count()
+                return clones === 0 && Math.abs((b?.x ?? Number.NaN) - a0!.x) < 2
+            })
+            .toBe(true)
+        await page.waitForTimeout(150)
+
+        // Second removal: B (now first, sitting in column 1) exits. Its clone
+        // must fade where B currently is — not at B's registration-time slot.
+        const samples = await sampleRemoval(page, 'remove-first')
+        const hold = holdFrames(samples)
+        expect(hold.length, 'exit clone should be observable while it fades').toBeGreaterThan(3)
+        for (const frame of hold) {
+            expect(
+                Math.abs((frame.cloneLeft ?? Number.NaN) - a0!.x),
+                `exit clone must fade in the current slot (t=${Math.round(frame.t)}ms)`
+            ).toBeLessThan(2)
+        }
+        expectHeld(hold, 'c', b0!.x)
+        expectSmoothSlide(flipFrames(samples), 'c', b0!.x, a0!.x)
     })
 
     test('last card exit: survivors never move', async ({ page }) => {

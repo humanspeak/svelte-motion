@@ -825,6 +825,43 @@ describe('exit placeholder slot preservation', () => {
         expect(placeholder.nextElementSibling).toBe(cardB)
     })
 
+    it('positions the exit clone at the current slot, not the stale registration rect', () => {
+        const makeRect = (left: number): DOMRect => ({
+            x: left,
+            y: 0,
+            top: 0,
+            left,
+            bottom: 100,
+            right: left + 100,
+            width: 100,
+            height: 100,
+            toJSON: () => {}
+        })
+
+        // B registers while sitting in column 2…
+        vi.spyOn(cardB, 'getBoundingClientRect').mockReturnValue(makeRect(200))
+        // …and the slot-holding placeholder (inserted at unregister time)
+        // reflects where B's slot ACTUALLY is by then: column 1. A layout
+        // FLIP moved B there after a sibling exit — a position-only change
+        // the ResizeObserver-driven updateChildState never sees.
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+            this: HTMLElement
+        ) {
+            return this.getAttribute?.('data-presence-placeholder') === 'true'
+                ? makeRect(0)
+                : makeRect(-1)
+        })
+
+        const ctx = registerAll()
+
+        detach(cardB, scriptB)
+        ctx.unregisterChild('b')
+
+        const clone = document.querySelector<HTMLElement>('[data-clone="true"]')
+        expect(clone).toBeTruthy()
+        expect(clone!.style.left).toBe('1px')
+    })
+
     it('keeps slot order when two children detach in the same update', () => {
         const ctx = registerAll()
 
