@@ -2,6 +2,7 @@
     import { enhanceCodeBlocks, ExampleLayoutV2 } from '@humanspeak/docs-kit'
     import { MotionConfig } from '@humanspeak/svelte-motion'
     import favicon from '$lib/assets/logo.svg'
+    import ExamplePager from '$lib/components/general/ExamplePager.svelte'
     import { docsConfig } from '$lib/docs-config'
     import rootPkg from '../../../../package.json'
     import '@fontsource-variable/inter/index.css'
@@ -40,5 +41,7 @@
         <MotionConfig transition={{ duration: 0.6 }}>
             {@render children?.()}
         </MotionConfig>
+        <!-- Renders only on example detail routes; no-op on the index. -->
+        <ExamplePager />
     </div>
 </ExampleLayoutV2>
