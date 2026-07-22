@@ -2742,6 +2742,31 @@
         return animateControls.subscribe(subscriber)
     })
 
+    // Detaching a controls object clears its per-attachment settle state, so a
+    // later idle re-attach cannot resurrect a stale imperative target. Upstream
+    // is last-writer-wins per motion value: swapping `animate={controls}` →
+    // declarative → back to the same idle controls leaves values wherever the
+    // last completed animation put them; an unchanged/idle source re-fires
+    // nothing (motion-dom animation-state.ts `prevProp` diffing). The settle
+    // flags live for one attachment session, matching upstream motion-value
+    // lifetimes bound to the VisualElement.
+    //
+    // Guard on IDENTITY change, not effect re-run: a re-render that keeps the
+    // SAME controls object attached must KEEP the settle state (over-eager
+    // clearing would regress the non-neutral settle-hold — plan 005's
+    // stop-freeze tests and the non-neutral-hold test). Only a swap to a
+    // different controls object (or to a declarative source → `undefined`)
+    // detaches.
+    let prevAttachedControls: unknown = undefined
+    $effect(() => {
+        const current = animateControls
+        if (prevAttachedControls && prevAttachedControls !== current) {
+            animationControlsHasReceivedCommand = false
+            lastAnimationControlsTarget = undefined
+        }
+        prevAttachedControls = current
+    })
+
     // Handle key prop changes inside AnimatePresence (simulates React's key-based remounting)
     // When key changes, run exit → initial → animate sequence on the same element
     $effect(() => {
