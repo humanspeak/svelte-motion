@@ -11,8 +11,15 @@
     let moved = $state(false)
     let recolored = $state(false)
 
+    // Travel is measured from the lane so the box lands inside the far
+    // padding instead of clipping against the lane's right edge.
+    const BOX_WIDTH = 116
+    const LANE_PADDING = 16
+    let laneWidth = $state(0)
+    const travel = $derived(Math.max(laneWidth - LANE_PADDING * 2 - BOX_WIDTH, 0))
+
     // No transform key until the first click, so will-change starts at "auto".
-    const moveTarget = $derived(started ? { x: moved ? 150 : 0 } : {})
+    const moveTarget = $derived(started ? { x: moved ? travel : 0 } : {})
 
     const toggleMove = () => {
         started = true
@@ -61,7 +68,7 @@
                     <span class="tag promote">promotes</span>
                     <span class="label">Animating <code>x</code> (transform)</span>
                 </header>
-                <div class="lane">
+                <div class="lane" bind:clientWidth={laneWidth}>
                     <motion.div
                         class="box move"
                         style={{ willChange: moveWillChange }}
