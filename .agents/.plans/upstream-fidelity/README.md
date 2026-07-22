@@ -27,8 +27,8 @@ conditions, and update your row when done.
 | 002  | Hover↔tap handoff reseeds every externally-written channel                     | P1       | S–M    | 001                       | IN PROGRESS — dispatched to opus executor, based on exec/plan-001 tip         |
 | 003  | Hover-end restores authored style values before neutral defaults               | P1       | M      | 001                       | TODO                                                                          |
 | 004  | Per-key gesture ownership (upstream protectedKeys)                             | P1       | L      | 001, 002, 003             | TODO                                                                          |
-| 005  | controls.stop() freezes at current value                                       | P1       | M      | —                         | IN PROGRESS — dispatched to opus executor (worktree) 2026-07-22               |
-| 006  | Detaching controls clears settle state                                         | P2       | S      | 005                       | TODO                                                                          |
+| 005  | controls.stop() freezes at current value                                       | P1       | M      | —                         | DONE — guard-approved; cherry-pick exec/plan-005 (2c08bc9 test + 08627af fix) |
+| 006  | Detaching controls clears settle state                                         | P2       | S      | 005                       | IN PROGRESS — dispatched to opus executor, based on exec/plan-005 tip         |
 | 007  | Wildcard/relative final keyframes in controls targets (investigate-first)      | P3       | S      | 005, 006 (file adjacency) | TODO                                                                          |
 | 008  | One layout change → exactly one FLIP commit                                    | P1       | S      | —                         | DONE — guard-approved; cherry-pick exec/plan-008 (115abab test + dac45f5 fix) |
 | 009  | Ancestor-chain layout observation + re-parent rebinding                        | P2       | M      | 008                       | IN PROGRESS — dispatched to opus executor, based on exec/plan-008 tip         |
@@ -55,6 +55,14 @@ REJECTED (with one-line rationale)
   churn; running them after avoids rebase noise. 010 is independent.
 - Three parallel tracks are safe for concurrent executors in separate
   worktrees: {001–004, 011, 012}, {005–007}, {008–009}. 010 can join any track.
+
+## Discovered during execution (follow-up candidates)
+
+- **First-ever `controls.start()` wipes a non-neutral idle transform before WAAPI
+  captures its from-value** (found by plan 005's executor): the animation-controls
+  beam (idle `scaleX 0.16`) animates 1→1 invisibly on first start because a
+  `renderedInlineStyle` recompute resets the transform to base first. Out of
+  plan 005's scope; needs its own red test + plan.
 
 ## Findings considered and rejected
 
