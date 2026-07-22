@@ -6,7 +6,13 @@ import {
     type GestureTransformValues
 } from '$lib/utils/transformComposer'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
-import { animateValue, hover, type TransformTemplate } from 'motion-dom'
+import {
+    animateValue,
+    getDefaultTransition,
+    hover,
+    mixNumber,
+    type TransformTemplate
+} from 'motion-dom'
 
 /**
  * Determine whether the current environment supports true hover.
@@ -70,6 +76,32 @@ const getFinalNumber = (value: unknown): number | null => {
     const raw: unknown = Array.isArray(value) ? value[value.length - 1] : value
     const parsed = typeof raw === 'number' ? raw : Number.parseFloat(String(raw))
     return Number.isFinite(parsed) ? parsed : null
+}
+
+/**
+ * Parse a scalar CSS value into its numeric part and unit suffix.
+ *
+ * Numbers report an empty unit; unit strings like `'-50%'` or `'2rem'` report
+ * their suffix so callers can decide whether two values share a unit and may be
+ * safely interpolated. Anything that isn't a finite number-with-unit (colors,
+ * `var(...)`, arrays) returns `null`.
+ *
+ * @param value Candidate channel value (number or string).
+ * @return `{ value, unit }` when parseable, otherwise `null`.
+ * @example
+ * parseUnitValue('-50%') // => { value: -50, unit: '%' }
+ * parseUnitValue(8)      // => { value: 8, unit: '' }
+ * parseUnitValue('red')  // => null
+ */
+export const parseUnitValue = (value: unknown): { value: number; unit: string } | null => {
+    if (typeof value === 'number') {
+        return Number.isFinite(value) ? { value, unit: '' } : null
+    }
+    if (typeof value !== 'string') return null
+    const match = value.trim().match(/^(-?\d*\.?\d+)([a-z%]*)$/i)
+    if (!match) return null
+    const parsed = Number.parseFloat(match[1])
+    return Number.isFinite(parsed) ? { value: parsed, unit: match[2] } : null
 }
 
 const toMillisecondsTransition = (
@@ -266,6 +298,108 @@ export const attachWhileHover = (
         return key.startsWith('scale') ? 1 : 0
     }
 
+    // Resolve the numeric keyframe sequence for a composed channel. Array
+    // targets play in full — upstream plays the authored keyframes as-is, so
+    // element 0 is the explicit start and no visual seed is injected. Scalar
+    // targets seed the start from the frozen visual value, then move to target.
+    // Returns null when the target (or any array element) is non-numeric, so
+    // the caller can fall back to unit-value handling.
+    const resolveComposedKeyframes = (key: string, target: unknown): number[] | null => {
+        if (Array.isArray(target) && target.length > 1) {
+            const numbers = target.map((entry) =>
+                typeof entry === 'number' ? entry : Number.parseFloat(String(entry))
+            )
+            return numbers.every((entry) => Number.isFinite(entry)) ? numbers : null
+        }
+        const targetNumber = getFinalNumber(target)
+        return targetNumber == null ? null : [readChannelStart(key), targetNumber]
+    }
+
+    // Resolve the ms-API transition for a composed channel. An explicit
+    // component/inline transition wins; `{}` (the merged default when neither
+    // the `transition` prop nor <MotionConfig> supplied one) counts as "no
+    // explicit transition" and yields upstream's per-value defaults so a
+    // default-transition hover matches framer-motion. A user-supplied
+    // `{ duration: 0.6 }` is non-empty and is honored verbatim (no spring).
+    // Upstream defaults: motion-dom/src/animation/utils/default-transitions.ts
+    //   scale/scaleX/scaleY -> spring { stiffness: 550, damping: 30, restSpeed: 10 }
+    //   x/y/rotate/translate -> spring { stiffness: 500, damping: 25, restSpeed: 10 }
+    //   keyframes.length > 2  -> { type: 'keyframes', duration: 0.8 }
+    // Springs are duration-free, so the seconds->ms conversion is a no-op for
+    // them; the keyframes default's 0.8s becomes 800ms.
+    const resolveComposedTransition = (
+        explicit: AnimationOptions | undefined,
+        key: string,
+        keyframes: number[]
+    ): Record<string, unknown> => {
+        const chosen = explicit ?? mergedTransition
+        if (chosen && Object.keys(chosen).length > 0) {
+            return toMillisecondsTransition(chosen)
+        }
+        const defaults = getDefaultTransition(key, { keyframes })
+        return toMillisecondsTransition(defaults)
+    }
+
+    // Start a composed-channel animation and wire it into the coordinator so the
+    // tap system (and cleanup) can stop it. `mapSample` converts each raw
+    // animateValue sample into the value written to the transform channel.
+    const runChannelAnimation = (
+        key: string,
+        valueTransition: Record<string, unknown>,
+        keyframes: number[],
+        mapSample: (sample: number) => number | string,
+        finalValue: number | string
+    ) => {
+        const registration: { unregister?: () => void } = {}
+        const animation = animateValue({
+            ...valueTransition,
+            keyframes,
+            onUpdate: (sample: number) => {
+                liveChannelValues[key] = mapSample(sample)
+                writeComposedChannels()
+            },
+            onComplete: () => {
+                liveChannelValues[key] = finalValue
+                writeComposedChannels()
+                channelAnimations.delete(key)
+                registration.unregister?.()
+            }
+        })
+        channelAnimations.set(key, animation)
+        registration.unregister = coordinator?.register(() => {
+            animation.stop?.()
+            if (channelAnimations.get(key) === animation) channelAnimations.delete(key)
+        })
+    }
+
+    // Animate a unit-suffixed target ('-50%', '2rem') by mixing a 0->1 progress
+    // between the start and target magnitudes, re-appending the shared unit each
+    // frame. Only runs when the start value parses to the SAME unit; a bare
+    // number (or px) start can't safely mix into a percentage target because
+    // px<->% needs layout context this writer doesn't resolve, so those snap.
+    const animateUnitChannel = (
+        key: string,
+        target: string,
+        parsedTarget: { value: number; unit: string },
+        transition: AnimationOptions | undefined
+    ) => {
+        const start = parseUnitValue(liveChannelValues[key] ?? restingTransformValues[key])
+        if (!start || start.unit !== parsedTarget.unit) {
+            liveChannelValues[key] = target
+            writeComposedChannels()
+            return
+        }
+        const from = start.value
+        const to = parsedTarget.value
+        runChannelAnimation(
+            key,
+            resolveComposedTransition(transition, key, [from, to]),
+            [0, 1],
+            (progress) => `${mixNumber(from, to, progress)}${parsedTarget.unit}`,
+            target
+        )
+    }
+
     const animateComposedChannel = (
         key: string,
         target: unknown,
@@ -277,11 +411,22 @@ export const attachWhileHover = (
         channelAnimations.get(key)?.stop?.()
         channelAnimations.delete(key)
 
-        const targetNumber = getFinalNumber(target)
-        if (targetNumber == null) {
-            // Non-numeric channel value (e.g. '-50%'): apply without tweening
-            // rather than dropping it — string interpolation from an unknown
-            // start type isn't safe.
+        // Unit-suffixed string targets must not flow through the numeric path:
+        // Number.parseFloat would silently drop the unit and animate a bare
+        // number (e.g. '-50%' -> -50). Route them to unit-aware interpolation.
+        if (!Array.isArray(target) && typeof target === 'string') {
+            const parsedTarget = parseUnitValue(target)
+            if (parsedTarget && parsedTarget.unit !== '') {
+                animateUnitChannel(key, target, parsedTarget, transition)
+                return
+            }
+        }
+
+        const keyframes = resolveComposedKeyframes(key, target)
+        if (keyframes == null) {
+            // Truly non-numeric channel value (e.g. 'red', 'var(--x)'): apply
+            // without tweening rather than dropping it — interpolation from an
+            // unknown start type isn't safe.
             if (typeof target === 'string') {
                 liveChannelValues[key] = target
                 writeComposedChannels()
@@ -289,26 +434,13 @@ export const attachWhileHover = (
             return
         }
 
-        const registration: { unregister?: () => void } = {}
-        const animation = animateValue({
-            ...toMillisecondsTransition(transition ?? mergedTransition),
-            keyframes: [readChannelStart(key), targetNumber],
-            onUpdate: (value: number) => {
-                liveChannelValues[key] = value
-                writeComposedChannels()
-            },
-            onComplete: () => {
-                liveChannelValues[key] = targetNumber
-                writeComposedChannels()
-                channelAnimations.delete(key)
-                registration.unregister?.()
-            }
-        })
-        channelAnimations.set(key, animation)
-        registration.unregister = coordinator?.register(() => {
-            animation.stop?.()
-            if (channelAnimations.get(key) === animation) channelAnimations.delete(key)
-        })
+        runChannelAnimation(
+            key,
+            resolveComposedTransition(transition, key, keyframes),
+            keyframes,
+            (value) => value,
+            keyframes[keyframes.length - 1]
+        )
     }
 
     // Route a gesture target to its writers. The composed writer engages when

@@ -3,6 +3,7 @@ import {
     attachWhileHover,
     computeHoverBaseline,
     isHoverCapable,
+    parseUnitValue,
     splitHoverDefinition
 } from './hover.js'
 
@@ -405,5 +406,45 @@ describe('utils/hover', () => {
             expect(baseline.backgroundColor).toBe('rgb(255, 0, 0)')
             expect(baseline.color).toBe('hsl(200, 100%, 50%)')
         })
+    })
+})
+
+describe('utils/hover parseUnitValue', () => {
+    it('reports an empty unit for finite numbers', () => {
+        expect(parseUnitValue(8)).toEqual({ value: 8, unit: '' })
+        expect(parseUnitValue(-3.5)).toEqual({ value: -3.5, unit: '' })
+        expect(parseUnitValue(0)).toEqual({ value: 0, unit: '' })
+    })
+
+    it('parses unit-suffixed strings into magnitude and unit', () => {
+        expect(parseUnitValue('-50%')).toEqual({ value: -50, unit: '%' })
+        expect(parseUnitValue('2rem')).toEqual({ value: 2, unit: 'rem' })
+        expect(parseUnitValue('10px')).toEqual({ value: 10, unit: 'px' })
+        expect(parseUnitValue('1.5em')).toEqual({ value: 1.5, unit: 'em' })
+    })
+
+    it('treats a unitless numeric string as an empty unit (numeric path)', () => {
+        expect(parseUnitValue('1.2')).toEqual({ value: 1.2, unit: '' })
+        expect(parseUnitValue('  8  ')).toEqual({ value: 8, unit: '' })
+    })
+
+    it('trims surrounding whitespace before parsing', () => {
+        expect(parseUnitValue('  -50%  ')).toEqual({ value: -50, unit: '%' })
+    })
+
+    it('returns null for non-parseable strings', () => {
+        expect(parseUnitValue('red')).toBeNull()
+        expect(parseUnitValue('var(--x)')).toBeNull()
+        expect(parseUnitValue('calc(100% - 20px)')).toBeNull()
+        expect(parseUnitValue('')).toBeNull()
+    })
+
+    it('returns null for non-finite numbers and non-primitive values', () => {
+        expect(parseUnitValue(Number.NaN)).toBeNull()
+        expect(parseUnitValue(Number.POSITIVE_INFINITY)).toBeNull()
+        expect(parseUnitValue(null)).toBeNull()
+        expect(parseUnitValue(undefined)).toBeNull()
+        expect(parseUnitValue([1, 2])).toBeNull()
+        expect(parseUnitValue({})).toBeNull()
     })
 })
