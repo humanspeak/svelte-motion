@@ -21,20 +21,20 @@ conditions, and update your row when done.
 
 ## Execution order & status
 
-| Plan | Title                                                                          | Priority | Effort | Depends on                | Status                                                                                    |
-| ---- | ------------------------------------------------------------------------------ | -------- | ------ | ------------------------- | ----------------------------------------------------------------------------------------- |
-| 001  | Composed hover channels: upstream default springs, full keyframes, unit values | P1       | M      | —                         | DONE — guard-approved; cherry-pick exec/plan-001 (5c0e671 test + 56f5027 fix)             |
-| 002  | Hover↔tap handoff reseeds every externally-written channel                     | P1       | S–M    | 001                       | DONE — guard-approved; cherry-pick exec/plan-002 (bae9c04 test + facc693 fix)             |
-| 003  | Hover-end restores authored style values before neutral defaults               | P1       | M      | 001                       | IN PROGRESS — dispatched to opus executor, based on exec/plan-002 tip                     |
-| 004  | Per-key gesture ownership (upstream protectedKeys)                             | P1       | L      | 001, 002, 003             | TODO                                                                                      |
-| 005  | controls.stop() freezes at current value                                       | P1       | M      | —                         | DONE — guard-approved; cherry-pick exec/plan-005 (2c08bc9 test + 08627af fix)             |
-| 006  | Detaching controls clears settle state                                         | P2       | S      | 005                       | DONE — guard-approved; cherry-pick exec/plan-006 (ea4db8e test + 72d8555 fix)             |
-| 007  | Wildcard/relative final keyframes in controls targets (investigate-first)      | P3       | S      | 005, 006 (file adjacency) | IN PROGRESS — dispatched to opus executor (investigate-first), based on exec/plan-006 tip |
-| 008  | One layout change → exactly one FLIP commit                                    | P1       | S      | —                         | DONE — guard-approved; cherry-pick exec/plan-008 (115abab test + dac45f5 fix)             |
-| 009  | Ancestor-chain layout observation + re-parent rebinding                        | P2       | M      | 008                       | DONE — guard-approved; cherry-pick exec/plan-009 (aa2f991 test + b728efb fix)             |
-| 010  | Base transform composes perspective-first (upstream order)                     | P2       | S      | —                         | DONE — guard-approved; cherry-pick exec/plan-010 (d27c633 test + f52b1c0 fix)             |
-| 011  | Cancel stray adapter rAF; unregister stopped gesture animations                | P2       | S      | 001–004 (hover half)      | TODO                                                                                      |
-| 012  | pwLog lazy payloads (no production reflows)                                    | P2       | S      | 002, 004                  | TODO                                                                                      |
+| Plan | Title                                                                          | Priority | Effort | Depends on                | Status                                                                        |
+| ---- | ------------------------------------------------------------------------------ | -------- | ------ | ------------------------- | ----------------------------------------------------------------------------- |
+| 001  | Composed hover channels: upstream default springs, full keyframes, unit values | P1       | M      | —                         | DONE — guard-approved; cherry-pick exec/plan-001 (5c0e671 test + 56f5027 fix) |
+| 002  | Hover↔tap handoff reseeds every externally-written channel                     | P1       | S–M    | 001                       | DONE — guard-approved; cherry-pick exec/plan-002 (bae9c04 test + facc693 fix) |
+| 003  | Hover-end restores authored style values before neutral defaults               | P1       | M      | 001                       | IN PROGRESS — dispatched to opus executor, based on exec/plan-002 tip         |
+| 004  | Per-key gesture ownership (upstream protectedKeys)                             | P1       | L      | 001, 002, 003             | TODO                                                                          |
+| 005  | controls.stop() freezes at current value                                       | P1       | M      | —                         | DONE — guard-approved; cherry-pick exec/plan-005 (2c08bc9 test + 08627af fix) |
+| 006  | Detaching controls clears settle state                                         | P2       | S      | 005                       | DONE — guard-approved; cherry-pick exec/plan-006 (ea4db8e test + 72d8555 fix) |
+| 007  | Wildcard/relative final keyframes in controls targets (investigate-first)      | P3       | S      | 005, 006 (file adjacency) | DONE (2B REJECTED — not reproduced; pinning test on exec/plan-007 d7f5b06)    |
+| 008  | One layout change → exactly one FLIP commit                                    | P1       | S      | —                         | DONE — guard-approved; cherry-pick exec/plan-008 (115abab test + dac45f5 fix) |
+| 009  | Ancestor-chain layout observation + re-parent rebinding                        | P2       | M      | 008                       | DONE — guard-approved; cherry-pick exec/plan-009 (aa2f991 test + b728efb fix) |
+| 010  | Base transform composes perspective-first (upstream order)                     | P2       | S      | —                         | DONE — guard-approved; cherry-pick exec/plan-010 (d27c633 test + f52b1c0 fix) |
+| 011  | Cancel stray adapter rAF; unregister stopped gesture animations                | P2       | S      | 001–004 (hover half)      | TODO                                                                          |
+| 012  | pwLog lazy payloads (no production reflows)                                    | P2       | S      | 002, 004                  | TODO                                                                          |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
@@ -63,6 +63,13 @@ REJECTED (with one-line rationale)
   beam (idle `scaleX 0.16`) animates 1→1 invisibly on first start because a
   `renderedInlineStyle` recompute resets the transform to base first. Out of
   plan 005's scope; needs its own red test + plan.
+
+- **Wildcard keyframes land at 0, not the current value** (found by plan 007's
+  investigation): `controls.start({ x: [0, null] })` from x=64 lands at 0 —
+  WAAPI normalization drops the channel — where upstream resolves `null` to the
+  value at animation start (64). The settle writer is clean (007's actual
+  question), but the live-animation resolution diverges. Low priority; needs
+  its own plan against the animation input layer, not `resolveRestingValues`.
 
 ## Findings considered and rejected
 
