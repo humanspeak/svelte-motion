@@ -1233,7 +1233,13 @@
                 transformTemplateProp
             )
         )
-        lastAnimationControlsTarget = transformedTarget
+        // Accumulate: successive commands may target disjoint keys; each
+        // held value persists until a later command overwrites it (matching
+        // upstream's per-motion-value holds).
+        lastAnimationControlsTarget = {
+            ...(lastAnimationControlsTarget ?? {}),
+            ...transformedTarget
+        }
         enterAnimationSettled = true
     }
 
@@ -1439,7 +1445,13 @@
             // values collapse keyframe arrays to their last element
             // (animate={{x:[0,100,50]}} rests at 50). (#377)
             enterAnimationSettled
-                ? renderedAnimateBaseline
+                ? // Controls-driven elements settle on the last imperative
+                  // target, not the (empty) declarative baseline — otherwise
+                  // the template rewrite wipes a non-neutral final transform
+                  // (e.g. a variant ending at scaleX 0.66 snaps to identity).
+                  animateControls && animationControlsHasReceivedCommand
+                    ? lastAnimationControlsTarget
+                    : renderedAnimateBaseline
                 : animateControls &&
                     !animationControlsHasReceivedCommand &&
                     isNotEmpty(initialKeyframes)
