@@ -21,20 +21,20 @@ conditions, and update your row when done.
 
 ## Execution order & status
 
-| Plan | Title                                                                          | Priority | Effort | Depends on                | Status |
-| ---- | ------------------------------------------------------------------------------ | -------- | ------ | ------------------------- | ------ |
-| 001  | Composed hover channels: upstream default springs, full keyframes, unit values | P1       | M      | —                         | TODO   |
-| 002  | Hover↔tap handoff reseeds every externally-written channel                     | P1       | S–M    | 001                       | TODO   |
-| 003  | Hover-end restores authored style values before neutral defaults               | P1       | M      | 001                       | TODO   |
-| 004  | Per-key gesture ownership (upstream protectedKeys)                             | P1       | L      | 001, 002, 003             | TODO   |
-| 005  | controls.stop() freezes at current value                                       | P1       | M      | —                         | TODO   |
-| 006  | Detaching controls clears settle state                                         | P2       | S      | 005                       | TODO   |
-| 007  | Wildcard/relative final keyframes in controls targets (investigate-first)      | P3       | S      | 005, 006 (file adjacency) | TODO   |
-| 008  | One layout change → exactly one FLIP commit                                    | P1       | S      | —                         | TODO   |
-| 009  | Ancestor-chain layout observation + re-parent rebinding                        | P2       | M      | 008                       | TODO   |
-| 010  | Base transform composes perspective-first (upstream order)                     | P2       | S      | —                         | TODO   |
-| 011  | Cancel stray adapter rAF; unregister stopped gesture animations                | P2       | S      | 001–004 (hover half)      | TODO   |
-| 012  | pwLog lazy payloads (no production reflows)                                    | P2       | S      | 002, 004                  | TODO   |
+| Plan | Title                                                                          | Priority | Effort | Depends on                | Status                                                          |
+| ---- | ------------------------------------------------------------------------------ | -------- | ------ | ------------------------- | --------------------------------------------------------------- |
+| 001  | Composed hover channels: upstream default springs, full keyframes, unit values | P1       | M      | —                         | IN PROGRESS — dispatched to opus executor (worktree) 2026-07-22 |
+| 002  | Hover↔tap handoff reseeds every externally-written channel                     | P1       | S–M    | 001                       | TODO                                                            |
+| 003  | Hover-end restores authored style values before neutral defaults               | P1       | M      | 001                       | TODO                                                            |
+| 004  | Per-key gesture ownership (upstream protectedKeys)                             | P1       | L      | 001, 002, 003             | TODO                                                            |
+| 005  | controls.stop() freezes at current value                                       | P1       | M      | —                         | IN PROGRESS — dispatched to opus executor (worktree) 2026-07-22 |
+| 006  | Detaching controls clears settle state                                         | P2       | S      | 005                       | TODO                                                            |
+| 007  | Wildcard/relative final keyframes in controls targets (investigate-first)      | P3       | S      | 005, 006 (file adjacency) | TODO                                                            |
+| 008  | One layout change → exactly one FLIP commit                                    | P1       | S      | —                         | IN PROGRESS — dispatched to opus executor (worktree) 2026-07-22 |
+| 009  | Ancestor-chain layout observation + re-parent rebinding                        | P2       | M      | 008                       | TODO                                                            |
+| 010  | Base transform composes perspective-first (upstream order)                     | P2       | S      | —                         | IN PROGRESS — dispatched to opus executor (worktree) 2026-07-22 |
+| 011  | Cancel stray adapter rAF; unregister stopped gesture animations                | P2       | S      | 001–004 (hover half)      | TODO                                                            |
+| 012  | pwLog lazy payloads (no production reflows)                                    | P2       | S      | 002, 004                  | TODO                                                            |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
