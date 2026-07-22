@@ -8,9 +8,13 @@
         type TransformTemplate
     } from '@humanspeak/svelte-motion'
 
-    const travel = 700
+    const CARD_WIDTH = 150
+    // Travel is measured from the live track so the run always fits the
+    // lane — a fixed distance overshoots and clips at narrower sheets.
+    let trackWidth = $state(0)
+    const travel = $derived(Math.max(trackWidth - CARD_WIDTH, 0))
     const progress = useMotionValue(0)
-    const x = useTransform(progress, [0, 1], [0, travel])
+    const x = useTransform(progress, (p) => p * travel)
 
     let state = $state<'start' | 'moving' | 'end'>('start')
     let activeAnimation: { stop: () => void } | null = null
@@ -18,7 +22,7 @@
 
     const transformTemplate: TransformTemplate = ({ x }, generated) => {
         const distance = Number.parseFloat(String(x ?? 0)) || 0
-        const amount = Math.max(0, Math.min(distance / travel, 1))
+        const amount = travel > 0 ? Math.max(0, Math.min(distance / travel, 1)) : 0
         const lift = Math.sin(amount * Math.PI) * -70
         const rotate = amount * 7 - 3.5
 
@@ -84,9 +88,9 @@
                     <span class="micro">// generated</span>
                     <span class="micro">straight transform</span>
                 </div>
-                <div class="track">
+                <div class="track" bind:clientWidth={trackWidth}>
                     <div class="slot start-slot" aria-label="Start at 0px"></div>
-                    <div class="slot end-slot" aria-label={`End at ${travel}px`}></div>
+                    <div class="slot end-slot" aria-label={`End at ${Math.round(travel)}px`}></div>
                     <div class="rail"></div>
                     <motion.div class="card generated-card" style={{ x }}>
                         <small>without template</small>
@@ -135,7 +139,7 @@
 
     .strip {
         width: 100%;
-        max-width: 720px;
+        max-width: 60rem;
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
@@ -224,10 +228,8 @@
     .track {
         --card-width: 150px;
         position: relative;
-        width: calc(var(--card-width) + 700px);
-        max-width: 100%;
+        width: 100%;
         min-height: 112px;
-        margin: 0 auto;
         overflow: visible;
     }
 
