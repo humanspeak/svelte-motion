@@ -153,3 +153,43 @@ Transform channels intentionally skip step 5 (a matrix string is not a channel v
 
 - Follow-up intentionally deferred: transform channels authored ONLY in stylesheets (e.g. CSS `transform: rotate(3deg)`) still restore to neutral. Fixing that needs per-channel matrix decomposition (plan 002's `readTransformChannels`) fed into step 5 for transform keys — do it later, on top of both plans, with its own red test.
 - Reviewer: verify a hover key present in `animate` still restores to the `animate` value (chain order regression risk).
+
+---
+
+## Amendment — 2026-07-22 (guard, after BLOCK)
+
+Execution against the original steps is BLOCKED, not failed. The executor's
+evidence (3× reproducible): reordering the chain so computed style outranks
+neutral defaults is correct for settled elements but wrong mid-gesture,
+because `computeHoverBaseline` runs at every hover-START and `getComputedStyle`
+then captures transient mid-animation values (rapid hover/unhover settles
+opacity at ~0.5). The old string-typed read only masked this — motion
+mishandles numeric-string endpoints, so the wrong restore never rendered.
+Upstream avoids the class of bug structurally: `VisualElement.baseTarget` is
+read from the DOM ONCE at element creation (at rest), never per gesture.
+
+**Revised approach (supersedes Step 2's chain reorder as the whole fix):**
+
+1. Capture non-transform authored base values ONCE, at element creation /
+   first mount while at rest, in `_MotionContainer.svelte` — alongside the
+   existing `getStyleTransformValues` baseline sourcing — and thread them into
+   `attachWhileHover`'s `baselineSources` (e.g. `baseStyleValues: { opacity }`,
+   read via `getComputedStyle` before any animation starts; NOW IN SCOPE).
+2. In `computeHoverBaseline`, the step-5 "authored computed-style" read of the
+   ORIGINAL plan is replaced by a lookup into that creation-time record —
+   never live computed style. Keep the numeric coercion (approved amendment)
+   for values sourced from it. Neutral defaults remain the last resort.
+3. The already-committed red tests (`86b29b9` on the executor's worktree)
+   remain the anchor unchanged. The chain-reorder + coercion diff is preserved
+   at `assets/003-reorder-plus-coercion.patch` — reuse it as the
+   `computeHoverBaseline` half of the revised fix.
+4. New execution base: plan 004's approved tip (this plan now runs AFTER 004;
+   the dependency direction flips). Cherry-pick `86b29b9` onto the new branch
+   first, then apply the revised fix.
+5. Gate addition: `hover-opacity.test.ts` must pass 3/3 consecutively —
+   BOTH the line-59 rapid-hovers test and the line-92 re-hover test — plus the
+   original four-spec set and unit cases.
+
+**Scope change**: `src/lib/html/_MotionContainer.svelte` (baseline sourcing
+only) moves from out-of-scope to in-scope. The out-of-scope list otherwise
+stands.
