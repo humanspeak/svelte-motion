@@ -59,7 +59,7 @@
             <section class="cell">
                 <header>
                     <span class="tag promote">promotes</span>
-                    Animating <code>x</code> (transform)
+                    <span class="label">Animating <code>x</code> (transform)</span>
                 </header>
                 <div class="lane">
                     <motion.div
@@ -91,14 +91,14 @@
             <section class="cell">
                 <header>
                     <span class="tag stay">stays auto</span>
-                    Animating <code>backgroundColor</code> (paint)
+                    <span class="label">Animating <code>backgroundColor</code> (paint)</span>
                 </header>
                 <div class="lane">
                     <motion.div
                         class="box paint"
                         style={{ willChange: paintWillChange }}
                         initial={false}
-                        animate={{ backgroundColor: recolored ? '#f0abfc' : '#67e8f9' }}
+                        animate={{ backgroundColor: recolored ? '#ec4899' : '#247768' }}
                         transition={{ duration: 0.6 }}
                     >
                         <small>will-change</small>
@@ -181,20 +181,23 @@
         gap: 0.75rem;
     }
 
+    /* Each cell spans the shared header/lane/button rows via subgrid, so the
+       stages and buttons stay aligned even when one header label runs longer. */
     .cell {
+        grid-row: span 3;
         display: grid;
+        grid-template-rows: subgrid;
         gap: 0.75rem;
-        align-content: start;
         padding: 0.875rem;
         border: 1px solid var(--brut-rule-2, #bbc4c0);
         background: var(--brut-bg-2, #eef4f1);
     }
 
     header {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.5rem;
+        display: grid;
+        justify-items: start;
+        align-content: start;
+        gap: 0.375rem;
         font-size: 13px;
         color: var(--brut-ink-2, #525252);
     }
@@ -236,9 +239,11 @@
         background: var(--brut-bg, #f8fcfb);
     }
 
-    /* The paint box is vivid by design (it's the backgroundColor demo subject),
-       so its label ink is dark in both themes. motion.* render their own
-       elements, so Svelte's scoping never reaches them — hence :global. */
+    /* Both boxes share one constant teal fill so they read as siblings. The
+       paint box animates backgroundColor between fixed hexes, so its fill
+       can't be a theme var — the move box uses the same fixed teal to match.
+       motion.* render their own elements, so Svelte's scoping never reaches
+       them — hence :global. */
     :global(.dk-demo-shell .box) {
         flex: none;
         width: 116px;
@@ -247,17 +252,9 @@
         align-content: center;
         justify-items: center;
         gap: 4px;
+        background: #247768;
+        color: #f8fcfb;
         box-shadow: 6px 6px 0 var(--brut-rule, #d6dedb);
-    }
-
-    :global(.dk-demo-shell .box.move) {
-        background: var(--brut-accent, #247768);
-        color: var(--brut-accent-ink, #f8fcfb);
-    }
-
-    :global(.dk-demo-shell .box.paint) {
-        background: #67e8f9;
-        color: #0b3b33;
     }
 
     :global(.dk-demo-shell .box small) {
@@ -268,21 +265,22 @@
         opacity: 0.72;
     }
 
-    /* Live will-change readout chip. The boxes are constant vivid fills in both
+    /* Live will-change readout chip. The boxes are constant fills in both
        themes, so a fixed dark/light ink pair keeps contrast regardless of theme
-       — and a <span> avoids docs-kit's global <strong> color rule. */
+       — and a <span> avoids docs-kit's global <strong> color rule. The chip
+       inverts to a light fill while will-change is promoted. */
     :global(.dk-demo-shell .box .val) {
         padding: 2px 9px;
-        background: rgba(3, 19, 22, 0.82);
-        color: #ecfeff;
+        background: rgba(9, 26, 23, 0.85);
+        color: #f8fcfb;
         font-size: 15px;
         font-weight: 700;
         font-family: var(--brut-mono, monospace);
     }
 
     :global(.dk-demo-shell .box .val.on) {
-        background: #ecfeff;
-        color: #0b3b33;
+        background: #f8fcfb;
+        color: #247768;
     }
 
     @media (max-width: 720px) {
