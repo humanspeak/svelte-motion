@@ -2,6 +2,7 @@ import type { GestureCoordinator } from '$lib/utils/gestureCoordinator'
 import {
     buildGestureTransform,
     collectGestureTransformValues,
+    splitGestureTransformValues,
     type GestureTransformValues
 } from '$lib/utils/transformComposer'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
@@ -217,74 +218,124 @@ export const attachWhileHover = (
     if (!whileHover) return () => {}
 
     let hoverBaseline: Record<string, unknown> | null = null
-    let scaleAnimation: { stop?: () => void } | null = null
     let fallbackBaseTransform = ''
     const restingTransformValues: GestureTransformValues = {
         ...collectGestureTransformValues(baselineSources?.initial),
         ...collectGestureTransformValues(baselineSources?.animate)
     }
 
-    const writeComposedScale = (scale: number) => {
+    // Channels the composed writer currently owns, plus their in-flight
+    // animations. Whenever the composed writer engages it must own EVERY
+    // transform channel the gesture animates — a second (native) writer on
+    // `el.style.transform` would clobber it frame by frame.
+    const liveChannelValues: GestureTransformValues = {}
+    const channelAnimations = new Map<string, { stop?: () => void }>()
+
+    const writeComposedChannels = () => {
         const transform =
             buildGestureTransform(
                 {
                     ...(transformComposer?.getBaseTransformValues?.() ?? {}),
                     ...restingTransformValues,
                     ...(transformComposer?.getLiveTransformValues?.() ?? {}),
-                    scale
+                    ...liveChannelValues
                 },
                 transformComposer?.getBaseTransform?.() ?? fallbackBaseTransform,
                 transformComposer?.transformTemplate
             ) || 'none'
         el.style.transform = transform
-        // Motion's internal scale motion-value can't see this direct style
-        // write; flag it so the next motion element animation on `scale`
+        // Motion's internal motion-values can't see this direct style write;
+        // flag each owned channel so the next motion element animation on it
         // seeds from the visual value instead of snapping to the stale one.
-        coordinator?.markExternalWrite('scale')
-    }
-
-    const stopScaleAnimation = () => {
-        scaleAnimation?.stop?.()
-        scaleAnimation = null
-    }
-
-    const animateScale = (
-        target: unknown,
-        transition: AnimationOptions | undefined,
-        onComplete?: () => void
-    ) => {
-        const targetScale = getFinalNumber(target)
-        if (targetScale == null) {
-            onComplete?.()
-            return
+        for (const key of Object.keys(liveChannelValues)) {
+            coordinator?.markExternalWrite(key)
         }
+    }
 
+    const stopChannelAnimations = () => {
+        for (const animation of channelAnimations.values()) animation.stop?.()
+        channelAnimations.clear()
+    }
+
+    const readChannelStart = (key: string): number => {
+        if (key === 'scale') return readTransformScale(el)
+        const live = liveChannelValues[key]
+        if (typeof live === 'number') return live
+        const resting = restingTransformValues[key]
+        if (typeof resting === 'number') return resting
+        return key.startsWith('scale') ? 1 : 0
+    }
+
+    const animateComposedChannel = (
+        key: string,
+        target: unknown,
+        transition: AnimationOptions | undefined
+    ) => {
         // Caller has already stopped competing writers (see the branch-level
         // stopAll), so the start keyframe samples exactly where the element
         // visually froze.
-        stopScaleAnimation()
+        channelAnimations.get(key)?.stop?.()
+        channelAnimations.delete(key)
+
+        const targetNumber = getFinalNumber(target)
+        if (targetNumber == null) {
+            // Non-numeric channel value (e.g. '-50%'): apply without tweening
+            // rather than dropping it — string interpolation from an unknown
+            // start type isn't safe.
+            if (typeof target === 'string') {
+                liveChannelValues[key] = target
+                writeComposedChannels()
+            }
+            return
+        }
+
         const registration: { unregister?: () => void } = {}
         const animation = animateValue({
             ...toMillisecondsTransition(transition ?? mergedTransition),
-            keyframes: [readTransformScale(el), targetScale],
+            keyframes: [readChannelStart(key), targetNumber],
             onUpdate: (value: number) => {
-                writeComposedScale(value)
+                liveChannelValues[key] = value
+                writeComposedChannels()
             },
             onComplete: () => {
-                writeComposedScale(targetScale)
-                scaleAnimation = null
+                liveChannelValues[key] = targetNumber
+                writeComposedChannels()
+                channelAnimations.delete(key)
                 registration.unregister?.()
-                onComplete?.()
             }
         })
-        scaleAnimation = animation
+        channelAnimations.set(key, animation)
         registration.unregister = coordinator?.register(() => {
             animation.stop?.()
-            if (scaleAnimation === animation) scaleAnimation = null
+            if (channelAnimations.get(key) === animation) channelAnimations.delete(key)
         })
     }
 
-    const handleDragStart = () => stopScaleAnimation()
+    // Route a gesture target to its writers. The composed writer engages when
+    // `scale` participates (it must stack on authored base transforms); it then
+    // owns every transform channel in the target so the native writer never
+    // touches `el.style.transform`. Without scale, the native path is the
+    // single transform writer, as before.
+    const animateGestureTarget = (
+        target: Record<string, unknown>,
+        transition: AnimationOptions | undefined
+    ) => {
+        const { transform: transformKeys, native } = splitGestureTransformValues(target)
+        if (transformKeys.scale == null) {
+            if (Object.keys(target).length > 0) {
+                animateNative(target, transition ?? mergedTransition)
+            }
+            return
+        }
+        for (const [key, value] of Object.entries(transformKeys)) {
+            animateComposedChannel(key, value, transition)
+        }
+        if (Object.keys(native).length > 0) {
+            animateNative(native, transition ?? mergedTransition)
+        }
+    }
+
+    const handleDragStart = () => stopChannelAnimations()
     el.addEventListener('svelte-motion:drag-start', handleDragStart)
 
     // Run a native (non-composed) gesture animation, registering it so the
@@ -322,11 +373,7 @@ export const attachWhileHover = (
             // the tap system's) before this transition's writers start.
             coordinator?.stopAll()
             const { keyframes, transition } = splitHoverDefinition(whileHover)
-            const { scale, ...nativeKeyframes } = keyframes
-            if (scale != null) animateScale(scale, transition)
-            if (Object.keys(nativeKeyframes).length > 0) {
-                animateNative(nativeKeyframes, transition ?? mergedTransition)
-            }
+            animateGestureTarget(keyframes, transition)
         }
 
         // Return cleanup function for hover end
@@ -344,18 +391,14 @@ export const attachWhileHover = (
             // state instead of snapping when the race resolves.
             if (hoverBaseline && Object.keys(hoverBaseline).length > 0) {
                 coordinator?.stopAll()
-                const { scale: baselineScale, ...nativeBaseline } = hoverBaseline
-                if (baselineScale != null) animateScale(baselineScale, mergedTransition)
-                if (Object.keys(nativeBaseline).length > 0) {
-                    animateNative(nativeBaseline, mergedTransition)
-                }
+                animateGestureTarget(hoverBaseline, undefined)
             }
             callbacks?.onEnd?.()
         }
     })
 
     return () => {
-        stopScaleAnimation()
+        stopChannelAnimations()
         el.removeEventListener('svelte-motion:drag-start', handleDragStart)
         cleanupHover()
     }
