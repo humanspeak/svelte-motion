@@ -9,6 +9,10 @@
     let sequenceId = 0
     let hydrated = $state(false)
     let frame = $state(0)
+    // Unrelated reactive style channel used to force a `renderedInlineStyle`
+    // recompute after `controls.stop()` — the moment a stale settle state
+    // would rewrite the frozen transform.
+    let pokeOutline = $state('transparent')
     let cardTransform = $state('none')
     let cardOpacity = $state('')
     let orbTransform = $state('none')
@@ -75,6 +79,20 @@
         controls.stop()
     }
 
+    // Single slow step (no chaining) so a stop lands cleanly mid-flight with a
+    // wide, predictable window. Linear ease keeps the mid value deterministic.
+    const startSlowLaunch = () => {
+        sequenceId += 1
+        status = 'launching'
+        void controls.start('launch', { duration: 2, ease: 'linear' })
+    }
+
+    // Toggle an unrelated inline-style channel on the beam to trigger a
+    // reactive style flush without touching any animated channel.
+    const poke = () => {
+        pokeOutline = pokeOutline === 'transparent' ? 'rgb(255, 0, 255)' : 'transparent'
+    }
+
     onMount(() => {
         let raf = 0
         let disposed = false
@@ -136,7 +154,11 @@
             </p>
             <div class="controls" aria-label="Animation controls">
                 <button type="button" data-testid="start" onclick={runSequence}>Start</button>
+                <button type="button" data-testid="start-slow" onclick={startSlowLaunch}
+                    >Start slow</button
+                >
                 <button type="button" data-testid="stop" onclick={stop}>Stop</button>
+                <button type="button" data-testid="poke" onclick={poke}>Poke</button>
                 <button type="button" data-testid="set" onclick={setComplete}>Set complete</button>
                 <button type="button" data-testid="reset" onclick={reset}>Reset</button>
             </div>
@@ -181,6 +203,7 @@
                     animate={controls}
                     variants={cardVariants}
                     {transition}
+                    style="outline: 2px solid {pokeOutline};"
                 >
                     <motion.div
                         class="orb"
@@ -206,7 +229,7 @@
                         initial="idle"
                         animate={controls}
                         variants={beamVariants}
-                        style="width: 160px; height: 8px; background: #4ff0b7; transform-origin: 0 50%;"
+                        style="width: 160px; height: 8px; background: #4ff0b7; transform-origin: 0 50%; outline: 2px solid {pokeOutline};"
                     />
                     <span data-testid="run-count">runs: {runCount}</span>
                 </motion.div>

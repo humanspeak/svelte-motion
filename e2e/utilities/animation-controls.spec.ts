@@ -174,3 +174,104 @@ test('holds a non-neutral variant transform after the sequence settles', async (
     const settled = await readScaleX()
     expect(Math.abs(settled - 0.66), `settled scaleX: ${settled}`).toBeLessThan(0.02)
 })
+
+test.describe('stop() freezes the mid-flight value across a reactive flush', () => {
+    const gotoBeam = async (page: import('@playwright/test').Page) => {
+        await page.goto('/tests/animation-controls?@isPlaywright=true')
+        await page.getByTestId('beam').waitFor({ state: 'visible' })
+        await page.waitForTimeout(300)
+    }
+
+    // DOMMatrixReadOnly parses both `matrix(...)` and the `matrix3d(...)` a
+    // pure-WAAPI (GPU-promoted) transform emits; `.a` is scaleX and `.m41` is
+    // translateX for the non-rotated card/beam.
+    const readBeamScaleX = (page: import('@playwright/test').Page) =>
+        page.getByTestId('beam').evaluate((el) => {
+            const t = getComputedStyle(el).transform
+            return t === 'none' ? 1 : new DOMMatrixReadOnly(t).a
+        })
+
+    const readCardX = (page: import('@playwright/test').Page) =>
+        page.getByTestId('card').evaluate((el) => {
+            const t = getComputedStyle(el).transform
+            return t === 'none' ? 0 : new DOMMatrixReadOnly(t).m41
+        })
+
+    test('holds mid-flight scaleX after a completed start, then a reactive poke', async ({
+        page
+    }) => {
+        await gotoBeam(page)
+
+        // Complete a start so lastAnimationControlsTarget holds a NON-neutral
+        // target (success → scaleX 0.66). This is the stale value the buggy
+        // settle state would snap back to.
+        await page.getByTestId('start').click()
+        await expect(page.getByTestId('label')).toHaveText('complete', { timeout: 4000 })
+
+        // Interrupt a fresh slow start mid-flight (launch → scaleX 1 over 2s).
+        await page.getByTestId('start-slow').click()
+        await page.waitForTimeout(500)
+        await page.getByTestId('stop').click()
+
+        // commitStyles must have frozen the DOM at a mid value strictly
+        // between the completed target (0.66) and the slow endpoint (1).
+        const frozen = await readBeamScaleX(page)
+        expect(frozen, `frozen scaleX: ${frozen}`).toBeGreaterThan(0.7)
+        expect(frozen, `frozen scaleX: ${frozen}`).toBeLessThan(0.97)
+
+        // A benign reactive style change (outline color) forces a
+        // renderedInlineStyle recompute. Buggy code rewrites the transform from
+        // the stale settle state → snaps back to 0.66.
+        await page.getByTestId('poke').click()
+        await page.waitForTimeout(100)
+        const afterPoke = await readBeamScaleX(page)
+        expect(
+            Math.abs(afterPoke - frozen),
+            `frozen: ${frozen}, afterPoke: ${afterPoke}`
+        ).toBeLessThan(0.02)
+    })
+
+    test('holds mid-flight translateX when the FIRST-ever start is interrupted', async ({
+        page
+    }) => {
+        // Uses the card (translateX): its idle x (0) equals its base, so a
+        // first-ever start still drives a visible mid-flight value — unlike the
+        // beam, whose non-neutral idle scaleX is a separate first-start concern.
+        await gotoBeam(page)
+
+        // No prior completed start: lastAnimationControlsTarget is empty, so
+        // buggy code reverts the card to base (x 0) on the reactive flush.
+        await page.getByTestId('start-slow').click()
+        await page.waitForTimeout(500)
+        await page.getByTestId('stop').click()
+
+        // Frozen mid-flight, strictly between base (0) and the launch endpoint (64).
+        const frozen = await readCardX(page)
+        expect(frozen, `frozen x: ${frozen}`).toBeGreaterThan(5)
+        expect(frozen, `frozen x: ${frozen}`).toBeLessThan(60)
+
+        await page.getByTestId('poke').click()
+        await page.waitForTimeout(100)
+        const afterPoke = await readCardX(page)
+        expect(
+            Math.abs(afterPoke - frozen),
+            `frozen: ${frozen}, afterPoke: ${afterPoke}`
+        ).toBeLessThan(2)
+    })
+
+    test('idle stop (nothing in flight) leaves the resting variant untouched', async ({ page }) => {
+        await gotoBeam(page)
+
+        // Beam rests at the idle variant (scaleX 0.16). Stopping with nothing
+        // running must not force a settle that rewrites it.
+        const before = await readBeamScaleX(page)
+        expect(before, `idle scaleX: ${before}`).toBeCloseTo(0.16, 2)
+
+        await page.getByTestId('stop').click()
+        await page.getByTestId('poke').click()
+        await page.waitForTimeout(100)
+
+        const after = await readBeamScaleX(page)
+        expect(after, `idle scaleX after stop+poke: ${after}`).toBeCloseTo(0.16, 2)
+    })
+})
