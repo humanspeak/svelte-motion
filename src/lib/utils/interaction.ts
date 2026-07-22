@@ -1,5 +1,5 @@
 import type { GestureCoordinator } from '$lib/utils/gestureCoordinator'
-import { isHoverCapable, readTransformScale, splitHoverDefinition } from '$lib/utils/hover'
+import { isHoverCapable, readTransformChannels, splitHoverDefinition } from '$lib/utils/hover'
 import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import { press } from 'motion-dom'
@@ -183,17 +183,41 @@ export const attachWhileTap = (
         coordinator?.stopAll()
     }
 
-    // When the hover system's composed writer was the last to touch `scale`,
-    // motion's internal motion value is stale — seed the keyframes from the
-    // element's VISUAL scale so the animation starts where the eye left off
-    // instead of snapping to the stale value on frame one.
-    const seedStaleScale = (record: Record<string, unknown>): Record<string, unknown> => {
-        if (!coordinator?.consumeExternalWrite('scale')) return record
-        const target = record.scale
-        if (typeof target !== 'number') return record
-        const current = readTransformScale(el)
-        if (Math.abs(current - target) < 0.001) return record
-        return { ...record, scale: [current, target] }
+    // When the hover system's composed writer was the last to touch a transform
+    // channel, motion's internal motion value for THAT channel is stale — seed
+    // the keyframes from the element's VISUAL value so the animation starts
+    // where the eye left off instead of snapping to the stale value on frame
+    // one. The composed writer (hover.ts writeComposedChannels) flags every
+    // channel it owns via coordinator.markExternalWrite(key); we consume each
+    // flag here for EVERY seedable key — whether or not a reseed applies — so
+    // the coordinator's Set never accumulates over the element's lifetime.
+    // 3D channels (rotateX/rotateY/z) are intentionally left unseeded: the 2D
+    // matrix reader can't decompose them (readTransformChannels returns null).
+    const seedableChannels = ['scale', 'scaleX', 'scaleY', 'x', 'y', 'rotate'] as const
+    const seedStaleChannels = (record: Record<string, unknown>): Record<string, unknown> => {
+        if (!coordinator) return record
+        let seeded = record
+        // Read the visual matrix at most once, lazily — only when a channel was
+        // actually flagged as externally written.
+        let visual: ReturnType<typeof readTransformChannels> | undefined
+        for (const key of seedableChannels) {
+            // Consume unconditionally so the flag is cleared even when the
+            // checks below skip the reseed (fixes the Set accumulation).
+            if (!coordinator.consumeExternalWrite(key)) continue
+            const target = seeded[key]
+            if (typeof target !== 'number') continue
+            if (visual === undefined) visual = readTransformChannels(el)
+            // null → matrix3d we can't decompose; leave this channel unseeded.
+            if (visual === null) continue
+            // scaleX/scaleY approximate from the uniform matrix scale: a 2D
+            // matrix can't separate per-axis scale, so both seed from the same
+            // hypot(a,b) reading — enough to avoid a frame-one snap.
+            const current = key === 'scaleX' || key === 'scaleY' ? visual.scale : visual[key]
+            if (Math.abs(current - target) < 0.001) continue
+            if (seeded === record) seeded = { ...record }
+            seeded[key] = [current, target]
+        }
+        return seeded
     }
 
     // Track the in-flight control with the coordinator so the hover system
@@ -227,7 +251,7 @@ export const attachWhileTap = (
         setGestureCtl(
             animate(
                 el,
-                seedStaleScale(tapKeyframes) as unknown as DOMKeyframesDefinition,
+                seedStaleChannels(tapKeyframes) as unknown as DOMKeyframesDefinition,
                 pressTransition
             ) as unknown as GestureCtl
         )
@@ -279,7 +303,7 @@ export const attachWhileTap = (
         setGestureCtl(
             animate(
                 el,
-                seedStaleScale(keyframes) as unknown as DOMKeyframesDefinition,
+                seedStaleChannels(keyframes) as unknown as DOMKeyframesDefinition,
                 hoverTransition ?? releaseTransition
             ) as unknown as GestureCtl
         )
@@ -317,7 +341,7 @@ export const attachWhileTap = (
             setGestureCtl(
                 animate(
                     el,
-                    seedStaleScale(resetRecord) as unknown as DOMKeyframesDefinition,
+                    seedStaleChannels(resetRecord) as unknown as DOMKeyframesDefinition,
                     releaseTransition
                 ) as unknown as GestureCtl
             )
