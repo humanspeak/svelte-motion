@@ -34,6 +34,14 @@
         success: { opacity: 1, y: 0 }
     }
 
+    // Ends NON-neutral on purpose: a settle path that wipes the final
+    // transform is invisible when every variant returns to identity.
+    const beamVariants = {
+        idle: { scaleX: 0.16, opacity: 0.35 },
+        launch: { scaleX: 1, opacity: 1 },
+        success: { scaleX: 0.66, opacity: 0.7 }
+    }
+
     const transition = { duration: 0.45, ease: 'easeOut' } as const
 
     const runSequence = async () => {
@@ -192,6 +200,14 @@
                     >
                         {status}
                     </motion.div>
+                    <motion.div
+                        class="beam"
+                        data-testid="beam"
+                        initial="idle"
+                        animate={controls}
+                        variants={beamVariants}
+                        style="width: 160px; height: 8px; background: #4ff0b7; transform-origin: 0 50%;"
+                    />
                     <span data-testid="run-count">runs: {runCount}</span>
                 </motion.div>
             </div>

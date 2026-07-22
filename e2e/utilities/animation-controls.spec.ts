@@ -152,3 +152,25 @@ test.describe('useAnimationControls', () => {
         expect(Math.abs(later.x - stopped.x)).toBeLessThan(2)
     })
 })
+
+test('holds a non-neutral variant transform after the sequence settles', async ({ page }) => {
+    await page.goto('/tests/animation-controls?@isPlaywright=true')
+    await page.getByTestId('beam').waitFor({ state: 'visible' })
+    await page.waitForTimeout(800)
+
+    const readScaleX = () =>
+        page.getByTestId('beam').evaluate((el) => {
+            const t = getComputedStyle(el).transform
+            const match = t.match(/matrix\(([^,]+),/)
+            return match ? Number(match[1]) : 1
+        })
+
+    await page.getByTestId('start').click()
+    await expect(page.getByTestId('label')).toHaveText('complete', { timeout: 4000 })
+
+    // The success variant ends at scaleX 0.66 — it must HOLD there, not
+    // snap back to identity when the settle path rewrites inline styles.
+    await page.waitForTimeout(400)
+    const settled = await readScaleX()
+    expect(Math.abs(settled - 0.66), `settled scaleX: ${settled}`).toBeLessThan(0.02)
+})
