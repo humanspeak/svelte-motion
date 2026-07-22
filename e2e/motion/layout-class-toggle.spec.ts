@@ -16,8 +16,8 @@ const resetEvents = (page: import('@playwright/test').Page) =>
 const readEvents = (page: import('@playwright/test').Page) =>
     page.evaluate(
         () =>
-            ((window as unknown as { __projectionEvents?: ProjectionEvent[] }).__projectionEvents ??
-                []) as ProjectionEvent[]
+            (window as unknown as { __projectionEvents?: ProjectionEvent[] }).__projectionEvents ??
+            []
     )
 
 test.describe('motion/layout FLIP on own class toggle', () => {

@@ -2312,6 +2312,19 @@
 
     let explicitLayoutSnapshot: RectLike | null = null
     let lastRect: RectLike | null = null
+    // Coordinates the two delivery paths so one layout change produces exactly
+    // one FLIP commit (upstream guarantees one measure/animate pass per commit:
+    // MeasureLayout.tsx getSnapshotBeforeUpdate→componentDidUpdate + the
+    // create-projection-node animationId repeat guard). A change to the
+    // element's OWN `class` is seen by BOTH the reactive path (`classProp` is a
+    // tracked layout dependency) and the DOM self-attribute observer (its
+    // `attributeFilter` includes `class`). The observer commits first on its
+    // microtask; `commitObservedLayout` bumps this serial whenever it commits a
+    // changed rect, and `runReactiveCommit` (running later on frame.postRender)
+    // uses the advance to detect that its own snapshot's change was already
+    // committed — so it skips the duplicate re-commit that would otherwise
+    // restart the FLIP from origin and double-fire `onProjectionUpdate`.
+    let observerCommitSerial = 0
     // Reactive deps the measure effects read to decide when to re-snapshot and
     // FLIP. When `layoutDependency` is set, gate measurement on *only* that
     // value so frequent renders that touch class/style/etc. no longer force a
@@ -2357,6 +2370,10 @@
     // style writes, still pre-paint — and drive the animation through the
     // same explicit-snapshot commit the observer path uses.
     let reactiveCommitPrevious: RectLike | null = null
+    // Snapshot of `observerCommitSerial` taken when this reactive commit was
+    // scheduled. If the observer path commits a changed rect before the
+    // postRender callback runs, the serial advances past this captured value.
+    let reactiveCommitSerialAtSchedule = 0
 
     const runReactiveCommit = () => {
         const prev = reactiveCommitPrevious
@@ -2364,6 +2381,21 @@
         if (!(element && prev)) return
         const next = measureLayoutRect()
         if (!next) return
+        // The DOM observer already consumed this exact change: it committed a
+        // changed rect on its microtask (serial advanced since this callback
+        // was scheduled) AND the cached `lastRect` already equals `next`. The
+        // FLIP is already running from the observer's commit — re-committing
+        // from THIS path's pre-patch snapshot would restart it from origin and
+        // emit a second `onProjectionUpdate` for one logical change. Skip both
+        // the changed emit and the commit; the observer already emitted.
+        // (Both conditions are required so a genuine reactive-only delta the
+        // observer never saw still commits, and the no-delta idle event below
+        // is untouched — the observer only bumps the serial on a real change.)
+        const observerAlreadyCommitted =
+            observerCommitSerial !== reactiveCommitSerialAtSchedule &&
+            lastRect !== null &&
+            !hasRectChanged(lastRect, next)
+        if (observerAlreadyCommitted) return
         // Svelte-owned update: fan out the snapshot→measure delta to
         // `onProjectionUpdate` subscribers (zero deltas included — the
         // legacy node notified on every willUpdate/didUpdate pair, and the
@@ -2395,7 +2427,13 @@
         // Keep the OLDEST pending snapshot: with several reactive updates
         // before the frame, that is what is still visually on screen.
         // (Re-scheduling an already-queued callback is a frameloop no-op.)
-        if (reactiveCommitPrevious === null) reactiveCommitPrevious = previous
+        // Capture the observer serial alongside the oldest snapshot so a
+        // subsequent observer commit (which runs on its microtask, after this
+        // synchronous effect) advances the serial past this captured value.
+        if (reactiveCommitPrevious === null) {
+            reactiveCommitPrevious = previous
+            reactiveCommitSerialAtSchedule = observerCommitSerial
+        }
         frame.postRender(runReactiveCommit)
     })
 
@@ -2486,6 +2524,11 @@
             const previous = lastRect
             lastRect = next
             if (previous && hasRectChanged(previous, next)) {
+                // Mark that the observer path consumed a changed rect on this
+                // commit, so a reactive commit scheduled for the same logical
+                // change (`runReactiveCommit`) can detect the overlap and skip
+                // its duplicate re-commit.
+                observerCommitSerial += 1
                 // Observed layout change: fan out to `onProjectionUpdate`
                 // subscribers before branching, so drag-pinned and
                 // size-corrected commits report their deltas too (the
