@@ -13,6 +13,12 @@
     // recompute after `controls.stop()` — the moment a stale settle state
     // would rewrite the frozen transform.
     let pokeOutline = $state('transparent')
+    // Chooses which `animate` source the beam receives: the shared controls
+    // object, or a declarative literal. Swapping controls → declarative →
+    // controls exercises detach/re-attach; upstream is last-writer-wins per
+    // motion value, so a re-attached IDLE controls object must not resurrect a
+    // stale imperative target.
+    let beamUsesControls = $state(true)
     let cardTransform = $state('none')
     let cardOpacity = $state('')
     let orbTransform = $state('none')
@@ -93,6 +99,13 @@
         pokeOutline = pokeOutline === 'transparent' ? 'rgb(255, 0, 255)' : 'transparent'
     }
 
+    // Swap the beam's `animate` source between the controls object and a
+    // declarative literal (`{ scaleX: 1 }`), detaching/re-attaching the
+    // controls subscription.
+    const toggleBeamSource = () => {
+        beamUsesControls = !beamUsesControls
+    }
+
     onMount(() => {
         let raf = 0
         let disposed = false
@@ -159,6 +172,9 @@
                 >
                 <button type="button" data-testid="stop" onclick={stop}>Stop</button>
                 <button type="button" data-testid="poke" onclick={poke}>Poke</button>
+                <button type="button" data-testid="toggle-beam-source" onclick={toggleBeamSource}
+                    >Toggle beam source</button
+                >
                 <button type="button" data-testid="set" onclick={setComplete}>Set complete</button>
                 <button type="button" data-testid="reset" onclick={reset}>Reset</button>
             </div>
@@ -227,7 +243,7 @@
                         class="beam"
                         data-testid="beam"
                         initial="idle"
-                        animate={controls}
+                        animate={beamUsesControls ? controls : { scaleX: 1 }}
                         variants={beamVariants}
                         style="width: 160px; height: 8px; background: #4ff0b7; transform-origin: 0 50%; outline: 2px solid {pokeOutline};"
                     />

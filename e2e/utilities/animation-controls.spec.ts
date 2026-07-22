@@ -275,3 +275,80 @@ test.describe('stop() freezes the mid-flight value across a reactive flush', () 
         expect(after, `idle scaleX after stop+poke: ${after}`).toBeCloseTo(0.16, 2)
     })
 })
+
+test.describe('detaching controls clears their settle state (last-writer-wins parity)', () => {
+    const gotoBeam = async (page: import('@playwright/test').Page) => {
+        await page.goto('/tests/animation-controls?@isPlaywright=true')
+        await page.getByTestId('beam').waitFor({ state: 'visible' })
+        await page.waitForTimeout(300)
+    }
+
+    const readBeamScaleX = (page: import('@playwright/test').Page) =>
+        page.getByTestId('beam').evaluate((el) => {
+            const t = getComputedStyle(el).transform
+            return t === 'none' ? 1 : new DOMMatrixReadOnly(t).a
+        })
+
+    test('re-attaching idle controls after a declarative swap does not resurrect the stale target', async ({
+        page
+    }) => {
+        await gotoBeam(page)
+
+        // 1. Run the controls sequence; it settles the beam at the success
+        //    variant (scaleX 0.66). This is the stale imperative target that a
+        //    never-cleared settle state would later resurrect.
+        await page.getByTestId('start').click()
+        await expect(page.getByTestId('label')).toHaveText('complete', { timeout: 4000 })
+        await expect
+            .poll(async () => await readBeamScaleX(page), { timeout: 4000 })
+            .toBeCloseTo(0.66, 1)
+
+        // 2. Detach controls: swap the beam to a declarative `{ scaleX: 1 }`.
+        //    A declarative animation legitimately moves the beam to scaleX 1.
+        //    Let it fully SETTLE at 1 before swapping back — the bug only shows
+        //    once the declarative writer has committed the new value (polling to
+        //    the first ≈1 frame can catch a transient mid-animation reading).
+        await page.getByTestId('toggle-beam-source').click()
+        await expect
+            .poll(async () => await readBeamScaleX(page), { timeout: 4000 })
+            .toBeCloseTo(1, 1)
+        await page.waitForTimeout(500)
+        expect(await readBeamScaleX(page), 'declarative settled scaleX').toBeCloseTo(1, 1)
+
+        // 3. Re-attach the SAME controls object with NO new command.
+        await page.getByTestId('toggle-beam-source').click()
+        await page.waitForTimeout(300)
+
+        // 4. Upstream is last-writer-wins per motion value: an idle re-attached
+        //    controls object resurrects nothing, so the beam holds the value the
+        //    last (declarative) writer left — scaleX 1. Buggy code re-renders the
+        //    stale `lastAnimationControlsTarget` and snaps back to 0.66.
+        const afterReattach = await readBeamScaleX(page)
+        expect(
+            Math.abs(afterReattach - 1),
+            `after re-attach scaleX: ${afterReattach}`
+        ).toBeLessThan(0.05)
+    })
+
+    test('a completed start holds its settle value across an unrelated re-render (no over-eager clear)', async ({
+        page
+    }) => {
+        await gotoBeam(page)
+
+        // Controls stay attached the whole time. A completed start settles the
+        // beam at the success variant (scaleX 0.66).
+        await page.getByTestId('start').click()
+        await expect(page.getByTestId('label')).toHaveText('complete', { timeout: 4000 })
+        await expect
+            .poll(async () => await readBeamScaleX(page), { timeout: 4000 })
+            .toBeCloseTo(0.66, 1)
+
+        // A benign reactive flush (poke) must NOT clear the still-attached
+        // controls' settle state — clearing on every effect re-run instead of
+        // only on detach would regress the hold and snap the beam off 0.66.
+        await page.getByTestId('poke').click()
+        await page.waitForTimeout(100)
+        const afterPoke = await readBeamScaleX(page)
+        expect(afterPoke, `scaleX after poke: ${afterPoke}`).toBeCloseTo(0.66, 1)
+    })
+})
