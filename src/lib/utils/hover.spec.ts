@@ -9,6 +9,11 @@ import {
     splitHoverDefinition
 } from './hover.js'
 
+// Capture the pristine jsdom implementation at module-eval time, before any
+// test replaces `window.getComputedStyle` with a stub. Authored-value cases
+// below restore it so they exercise the real cascade (inline + stylesheet).
+const REAL_GET_COMPUTED_STYLE = globalThis.getComputedStyle
+
 // Mock motion.animate
 vi.mock('motion', () => {
     const animateMock = vi.fn(() => ({ finished: Promise.resolve() }))
@@ -463,6 +468,104 @@ describe('utils/hover', () => {
             expect(baseline.backgroundColor).toBe('rgb(255, 0, 0)')
             expect(baseline.color).toBe('hsl(200, 100%, 50%)')
         })
+    })
+})
+
+describe('utils/hover computeHoverBaseline authored values (plan 003)', () => {
+    beforeEach(() => {
+        // Restore the real jsdom cascade so authored style values are readable.
+        Object.defineProperty(window, 'getComputedStyle', {
+            value: REAL_GET_COMPUTED_STYLE,
+            configurable: true
+        })
+    })
+
+    it('restores an inline style-authored opacity, not the neutral default', () => {
+        const el = document.createElement('div')
+        el.setAttribute('style', 'opacity: 0.8')
+        document.body.appendChild(el)
+
+        const baseline = computeHoverBaseline(el, {
+            whileHover: { opacity: 1 }
+        })
+
+        // Upstream getBaseTarget has no neutral-default step: the authored 0.8
+        // must win over the hardcoded neutral opacity: 1.
+        expect(Number(baseline.opacity)).toBe(0.8)
+        el.remove()
+    })
+
+    it('restores a stylesheet-authored opacity (non-inline authorship)', () => {
+        const style = document.createElement('style')
+        style.textContent = '.plan003-sheet { opacity: 0.65; }'
+        document.head.appendChild(style)
+        const el = document.createElement('div')
+        el.className = 'plan003-sheet'
+        document.body.appendChild(el)
+
+        const baseline = computeHoverBaseline(el, {
+            whileHover: { opacity: 1 }
+        })
+
+        expect(Number(baseline.opacity)).toBe(0.65)
+        el.remove()
+        style.remove()
+    })
+
+    it('lets animate outrank an authored style value for the same key', () => {
+        const el = document.createElement('div')
+        el.setAttribute('style', 'opacity: 0.8')
+        document.body.appendChild(el)
+
+        const baseline = computeHoverBaseline(el, {
+            animate: { opacity: 0.3 },
+            whileHover: { opacity: 1 }
+        })
+
+        expect(baseline.opacity).toBe(0.3)
+        el.remove()
+    })
+
+    it('lets initial outrank an authored style value for the same key', () => {
+        const el = document.createElement('div')
+        el.setAttribute('style', 'opacity: 0.8')
+        document.body.appendChild(el)
+
+        const baseline = computeHoverBaseline(el, {
+            initial: { opacity: 0.4 },
+            whileHover: { opacity: 1 }
+        })
+
+        expect(baseline.opacity).toBe(0.4)
+        el.remove()
+    })
+
+    it('lets baseValues outrank an authored style value for a transform channel', () => {
+        const el = document.createElement('div')
+        document.body.appendChild(el)
+
+        const baseline = computeHoverBaseline(el, {
+            baseValues: { scale: 1.5 },
+            whileHover: { scale: 1.2 }
+        })
+
+        expect(baseline.scale).toBe(1.5)
+        el.remove()
+    })
+
+    it('still neutral-defaults a transform channel with nothing authored', () => {
+        const el = document.createElement('div')
+        document.body.appendChild(el)
+
+        const baseline = computeHoverBaseline(el, {
+            whileHover: { rotate: 10, scale: 1.2 }
+        })
+
+        // Transform channels intentionally skip the computed-style step: a
+        // matrix string is not a per-channel value, so neutral defaults stand.
+        expect(baseline.rotate).toBe(0)
+        expect(baseline.scale).toBe(1)
+        el.remove()
     })
 })
 
