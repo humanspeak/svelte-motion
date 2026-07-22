@@ -956,6 +956,10 @@
     }
 
     const activeAnimationControls = new SvelteSet<StoppableAnimationControl>()
+    // Animatable channel names of the in-flight controls animation (non-templated
+    // path only). Captured at start so `stop()` knows which channels to snapshot
+    // from the frozen DOM; empty when nothing (or only a templated transform) runs.
+    const activeAnimationControlsKeys = new SvelteSet<string>()
     let animationControlsGeneration = 0
     let animationControlsHasReceivedCommand = false
     let lastAnimationControlsTarget = $state<Record<string, unknown> | undefined>(undefined)
@@ -1260,8 +1264,90 @@
         enterAnimationSettled = true
     }
 
+    /**
+     * Read the element's currently rendered (frozen) values for the given
+     * animatable channels straight off computed style. Lets a stopped
+     * animation's mid-flight value be folded back into the controls settle
+     * state, mirroring upstream stopping each MotionValue at its instantaneous
+     * value. Only transform channels and opacity are recoverable this way.
+     *
+     * @param {HTMLElement} el The element whose committed transform/opacity to read.
+     * @param {Set<string>} keys The animatable channel names that were in flight.
+     * @returns {Record<string, unknown>} A target record (channel → numeric value)
+     *   for the readable keys; keys with no computed-style representation are skipped.
+     */
+    const snapshotFrozenControlsValues = (
+        el: HTMLElement,
+        keys: Iterable<string>
+    ): Record<string, unknown> => {
+        const computed = getComputedStyle(el)
+        // Parse the computed matrix by hand (like readTransformScale): the test
+        // environment has no DOMMatrix, and computed transforms serialize as
+        // `matrix(a,b,c,d,e,f)` or `matrix3d(...)`. For a non-skewed matrix,
+        // hypot of each column is that axis' scale regardless of rotation;
+        // e/f are the translations; atan2(b, a) is the Z rotation — mirroring
+        // how the transform template re-serializes the same channels.
+        const transform = computed.transform
+        const parts =
+            transform && transform !== 'none'
+                ? (transform.match(/matrix(?:3d)?\(([^)]+)\)/)?.[1] ?? '')
+                      .split(',')
+                      .map((part) => Number.parseFloat(part.trim()))
+                : []
+        const is3d = transform.startsWith('matrix3d')
+        const a = parts.length > 0 ? parts[0] : 1
+        const b = parts.length > 0 ? parts[1] : 0
+        const c = parts[is3d ? 4 : 2] ?? 0
+        const d = parts[is3d ? 5 : 3] ?? 1
+        const tx = parts[is3d ? 12 : 4] ?? 0
+        const ty = parts[is3d ? 13 : 5] ?? 0
+        const scaleX = Math.hypot(a, b)
+        const scaleY = Math.hypot(c, d)
+        const rotate = (Math.atan2(b, a) * 180) / Math.PI
+        const opacity = Number.parseFloat(computed.opacity)
+
+        const snapshot: Record<string, unknown> = {}
+        // Only fold in finite readings; a channel we can't read stays at its
+        // prior settle value rather than being wiped to NaN.
+        const put = (key: string, value: number) => {
+            if (Number.isFinite(value)) snapshot[key] = value
+        }
+        for (const key of keys) {
+            switch (key) {
+                case 'opacity':
+                    put('opacity', opacity)
+                    break
+                case 'scale':
+                    put('scale', scaleX)
+                    break
+                case 'scaleX':
+                    put('scaleX', scaleX)
+                    break
+                case 'scaleY':
+                    put('scaleY', scaleY)
+                    break
+                case 'x':
+                case 'translateX':
+                    put(key, tx)
+                    break
+                case 'y':
+                case 'translateY':
+                    put(key, ty)
+                    break
+                case 'rotate':
+                case 'rotateZ':
+                    put(key, rotate)
+                    break
+                default:
+                    // Channels without a computed-style representation (e.g. skew,
+                    // 3D rotate) are left to their prior settle value.
+                    break
+            }
+        }
+        return snapshot
+    }
+
     const stopAnimationControlsAnimations = () => {
-        animationControlsHasReceivedCommand = true
         animationControlsGeneration += 1
 
         // The templated-transform path animates MotionValues that are not part of
@@ -1269,8 +1355,10 @@
         // so a public `controls.stop()` would otherwise leak a running templated
         // transform animation (and its style-effect cleanup). Upstream stops a
         // VisualElement by stopping all of its values; mirror that here. (#402)
+        const templatedWasActive = templatedTransformAnimationControls.length > 0
         cleanupTemplatedTransformAnimations()
 
+        const hadActiveControls = activeAnimationControls.size > 0
         for (const control of activeAnimationControls) {
             if (typeof control.stop === 'function') {
                 control.stop()
@@ -1280,15 +1368,42 @@
         }
         activeAnimationControls.clear()
 
-        if (!element) return
-        if (typeof element.getAnimations !== 'function') return
-        for (const animation of element.getAnimations()) {
-            try {
-                animation.commitStyles?.()
-            } catch {
-                // Ignore unsupported commitStyles cases.
+        // Snapshot which channels were mid-flight, then reset for the next command.
+        const snapshotKeys = [...activeAnimationControlsKeys]
+        activeAnimationControlsKeys.clear()
+
+        if (element && typeof element.getAnimations === 'function') {
+            for (const animation of element.getAnimations()) {
+                try {
+                    animation.commitStyles?.()
+                } catch {
+                    // Ignore unsupported commitStyles cases.
+                }
+                animation.cancel()
             }
-            animation.cancel()
+        }
+
+        // An idle stop (nothing was running) must leave the resting state alone:
+        // just flipping `animationControlsHasReceivedCommand` would make the
+        // render fall through to the (empty) controls target and snap the element
+        // to base. Only a stop that actually interrupted a command settles.
+        if (!(templatedWasActive || hadActiveControls || snapshotKeys.length > 0)) return
+        animationControlsHasReceivedCommand = true
+
+        // Fold the FROZEN mid-flight value into the settle state so the next
+        // reactive style flush rewrites the transform from where stop() left it,
+        // not from a stale previous target. Upstream stops each value in place
+        // (animation-controls.ts → stopAnimation → value.stop()). The templated
+        // path is left as-is (`snapshotKeys` is empty for it — see #402 above).
+        if (element && snapshotKeys.length > 0) {
+            const frozen = snapshotFrozenControlsValues(element, snapshotKeys)
+            if (isNotEmpty(frozen)) {
+                lastAnimationControlsTarget = {
+                    ...(lastAnimationControlsTarget ?? {}),
+                    ...frozen
+                }
+                enterAnimationSettled = true
+            }
         }
     }
 
@@ -1348,6 +1463,10 @@
                 )
             } else {
                 cleanupTemplatedTransformAnimations()
+                // Record the channels now in flight so a mid-flight stop() can
+                // snapshot exactly these from the frozen DOM (and no others).
+                activeAnimationControlsKeys.clear()
+                for (const key of Object.keys(payload)) activeAnimationControlsKeys.add(key)
                 promises.push(
                     trackAnimationControlsControl(
                         animate(element, payload as DOMKeyframesDefinition, transitionAnimate)
@@ -1363,6 +1482,10 @@
             throw error
         }
         if (controlsGeneration !== animationControlsGeneration) return
+        // Completed naturally: the target is now the settle value, so the
+        // in-flight channel set is stale — clear it so a later idle stop() is a
+        // true no-op rather than snapshotting a long-finished animation.
+        activeAnimationControlsKeys.clear()
         applyAnimationControlsTarget(definition)
         onAnimationCompleteProp?.(definition as unknown as DOMKeyframesDefinition)
     }
