@@ -11,15 +11,39 @@ export type GestureTransformValues = Record<string, AnyResolvedKeyframe>
 const getLastValue = (values: readonly unknown[]): unknown => values.at(-1)
 
 /**
+ * Match a simple, top-level `perspective(<length>)` function in an authored
+ * transform string. The value class is deliberately narrow — `[^()]*` forbids
+ * nested parens — so a `perspective(var(--x))` (or any function-valued
+ * perspective) is left untouched rather than sliced into a corrupt fragment.
+ */
+const LEADING_PERSPECTIVE = /\bperspective\([^()]*\)/g
+
+/**
  * Build a gesture-owned transform in Motion's canonical channel order.
+ *
+ * CSS transforms are non-commutative, and upstream motion-dom emits
+ * `transformPerspective` FIRST in its canonical slot order (see
+ * `~/Github/motion/packages/motion-dom/src/render/utils/keys-transform.ts`
+ * `transformPropOrder`, perspective/transformPerspective at index 0). The
+ * channelized values in `latestValues` are already ordered canonically by
+ * `buildTransform`; this function additionally hoists any simple
+ * `perspective(<length>)` function found in the opaque `baseTransform` ahead
+ * of those generated channels so an authored `perspective(600px)` projects
+ * the same way it does under framer-motion.
+ *
+ * Only the perspective slot is reordered. Every other authored function in
+ * `baseTransform` keeps its original relative position and is appended after
+ * the generated channels — honoring the remaining canonical slots for an
+ * arbitrary opaque string would require a full CSS transform parser, which is
+ * out of scope by design.
  *
  * @param latestValues Current transform-channel values.
  * @param baseTransform An authored raw CSS transform that cannot be represented as channels.
  * @param transformTemplate Optional user transform template applied to the live values.
  * @returns The composed CSS transform string.
  * @example
- * buildGestureTransform({ x: '20px', rotate: 4 }, 'perspective(600px)')
- * // => 'translateX(20px) rotate(4deg) perspective(600px)'
+ * buildGestureTransform({ scale: 1.2 }, 'perspective(600px) rotateX(20deg)')
+ * // => 'perspective(600px) scale(1.2) rotateX(20deg)'
  */
 export const buildGestureTransform = (
     latestValues: GestureTransformValues,
@@ -27,7 +51,20 @@ export const buildGestureTransform = (
     transformTemplate?: TransformTemplate
 ): string => {
     const generated = buildTransform(latestValues, {}, transformTemplate)
-    return [generated === 'none' ? '' : generated, baseTransform].filter(Boolean).join(' ')
+    const generatedPart = generated === 'none' ? '' : generated
+
+    const perspectiveParts: string[] = []
+    const strippedBase = baseTransform.replace(LEADING_PERSPECTIVE, (match) => {
+        perspectiveParts.push(match)
+        return ''
+    })
+    // Preserve the pre-hoist string byte-for-byte when nothing was lifted, so
+    // the non-perspective base path is unchanged; only collapse the whitespace
+    // left behind by a removed perspective token.
+    const baseRemainder =
+        perspectiveParts.length > 0 ? strippedBase.replace(/\s+/g, ' ').trim() : baseTransform
+
+    return [perspectiveParts.join(' '), generatedPart, baseRemainder].filter(Boolean).join(' ')
 }
 
 /**
