@@ -1,35 +1,48 @@
 <script lang="ts">
     import { motion, styleString } from '@humanspeak/svelte-motion'
+
+    // Inline form: the gesture states are object literals passed straight to
+    // `whileHover` / `whileTap` — co-located with the element that uses them.
 </script>
 
-<!-- dk-strip: positioning shell — docs-kit's `.dk-ex-body` flex column
-     gives its direct child `flex: 1 1 auto`, so this wrapper grows to
-     fill the example panel and pushes the footer strip to the bottom of
-     the sheet. The motion card then centers within. Stripped from the
-     published manifest by `demoManifestPlugin`'s `stripComments` +
-     `stripWrappers` so readers see only the lesson code below. -->
+<!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <motion.div
-        whileHover={{ scale: 1.06, boxShadow: '0 12px 24px -8px rgba(0,0,0,0.25)' }}
-        whileTap={{ scale: 0.96 }}
-        style={styleString(() => ({
-            width: '200px',
-            height: '120px',
-            borderRadius: 16,
-            padding: '1rem',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-            color: '#fff',
-            fontWeight: 600,
-            fontSize: '0.95rem',
-            cursor: 'pointer'
-        }))}
-    >
-        <span>hover or tap me</span>
-        <small style="opacity: 0.75; font-weight: 400;">whileHover={`{{...}}`}</small>
-    </motion.div>
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// inline keyframes</span>
+            <span class="micro readout">whileHover={'{{ ... }}'}</span>
+        </div>
+
+        <div class="stage">
+            <motion.div
+                whileHover={{ scale: 1.06, y: -4 }}
+                whileTap={{ scale: 0.96, y: 0 }}
+                style={styleString(() => ({
+                    width: '200px',
+                    height: '120px',
+                    padding: '1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    border: '1px solid var(--brut-accent, #247768)',
+                    backgroundColor: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))',
+                    boxShadow: '6px 6px 0 var(--brut-rule, #d6dedb)',
+                    color: 'var(--brut-ink, #171717)',
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                    cursor: 'pointer'
+                }))}
+            >
+                <span>hover or tap me</span>
+                <small class="micro">inline object</small>
+            </motion.div>
+        </div>
+
+        <div class="strip-foot">
+            <span class="micro">hover · tap</span>
+            <span class="micro">hover: 1.06 / tap: 0.96</span>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -37,7 +50,52 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 2rem;
-        min-height: 240px;
+        padding: 1.5rem;
+        min-height: 280px;
+    }
+
+    .strip {
+        width: 100%;
+        max-width: 420px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .readout {
+        color: var(--brut-accent, #247768);
+        text-transform: none;
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
+    }
+
+    .stage {
+        height: 11rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 </style>
