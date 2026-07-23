@@ -443,7 +443,7 @@ describe('utils/layout', () => {
         vi.unstubAllGlobals()
     })
 
-    it('observeLayoutChanges: ignores layout changes while an ancestor is box-size animating', () => {
+    it('observeLayoutChanges: seeds (not FLIPs) a child while an ancestor is box-size animating', () => {
         const parent = document.createElement('div')
         const el = document.createElement('div')
         parent.setAttribute('data-layout-size-animation', 'true')
@@ -478,7 +478,13 @@ describe('utils/layout', () => {
 
         const cleanup = observeLayoutChanges(el, cb)
 
-        expect(cb).not.toHaveBeenCalled()
+        // A PROPER ancestor is box-size animating, so this child is re-slotted
+        // every frame. The child's transform is still cleared (it must not run
+        // its own FLIP and fight the parent), but the commit fires so the
+        // child's projection cache tracks the in-flight slot via a seed —
+        // without it the parent's completion re-slot lands as a one-frame
+        // phantom FLIP (the whole accumulated delta) on the child.
+        expect(cb).toHaveBeenCalled()
         expect(el.style.transform).toBe('')
         expect(el.style.transformOrigin).toBe('')
         expect(el.style.willChange).toBe('')
