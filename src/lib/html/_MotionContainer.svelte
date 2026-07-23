@@ -337,6 +337,23 @@
         }
         return values
     }
+    // Non-transform authored base values (currently `opacity`) captured ONCE
+    // from the DOM at element creation while at rest, mirroring upstream
+    // `VisualElement.baseTarget` (read once, never per gesture). Threaded into
+    // `computeHoverBaseline` so hover-end restores the true rest value instead
+    // of a mid-animation transient — reading live `getComputedStyle` at each
+    // hover START would capture a partway value on rapid hover/unhover cycles.
+    // Only keys NOT driven by `initial`/`animate` matter here: for driven keys
+    // the baseline resolves from those records first, so a value captured mid
+    // enter-animation is never consulted. Populated in the mount effect below.
+    let baseStyleValues: Record<string, string | number> | null = null
+    const captureBaseStyleValues = () => {
+        if (baseStyleValues || !element) return
+        const cs = getComputedStyle(element)
+        const opacity = cs.getPropertyValue('opacity')
+        baseStyleValues = opacity ? { opacity } : {}
+    }
+    const getBaseStyleValues = (): Record<string, unknown> => baseStyleValues ?? {}
     let liveGestureTransform = $state<string | null>(null)
     let liveGestureTransformValues: Record<string, string | number> | null = null
     const serializedStyleWithLiveGestureTransform = $derived.by(() => {
@@ -2528,7 +2545,8 @@
                 getBaseTransformValues: getStyleTransformValues,
                 getLiveTransformValues: () => liveGestureTransformValues,
                 getBaseTransform: () => userBaseTransform,
-                transformTemplate: transformTemplateProp
+                transformTemplate: transformTemplateProp,
+                getBaseStyleValues
             },
             gestureCoordinator
         )
@@ -2793,6 +2811,11 @@
     $effect(() => {
         if (!(element && isLoaded === 'mounting')) return
         markMotionMounted()
+
+        // Capture non-transform authored base values (opacity) from the DOM at
+        // rest, BEFORE any enter/gesture animation runs below, so hover-end can
+        // restore the true authored value rather than a mid-animation transient.
+        captureBaseStyleValues()
 
         pwLog('[motion] main effect running', {
             effectiveAnimate: !!effectiveAnimate,

@@ -178,15 +178,36 @@ const toMillisecondsTransition = (
 /**
  * Compute the baseline values to restore to on hover end.
  *
- * Preference order per key: `animate` → `initial` → style-authored base values
- * → neutral transform defaults → computed style value if present.
+ * Preference order per key (mirrors upstream `VisualElement.getBaseTarget`,
+ * which has no neutral-default step — an authored value always wins):
+ * `animate` → `initial` → style-authored base transform values → inline
+ * CSS-function value → for NON-transform keys, the authored base style value
+ * (the caller's creation-time record captured at rest, else a live
+ * computed-style read as an at-rest fallback) → neutral transform defaults →
+ * computed-style index fallback.
+ *
+ * Transform channels intentionally skip the authored-style step: a computed
+ * `transform` is a matrix string, not a per-channel value, so restoring
+ * `scale`/`rotate` to it is meaningless — those keys land on their neutral
+ * default when nothing is authored via `animate`/`initial`/`baseValues`.
+ *
+ * Non-transform authored values (e.g. `opacity`) come from `baseStyleValues` —
+ * a record the caller captures ONCE at element creation while at rest. Reading
+ * live `getComputedStyle` at hover START would capture a transient
+ * mid-animation value on rapid hover/unhover cycles (the value would settle
+ * partway instead of on the authored rest value); the creation-time record is
+ * stable regardless of when hover fires. The live-cs fallback here only fires
+ * when the caller supplied no record for the key — an at-rest / standalone path
+ * where live computed style is safe.
  *
  * @param el Target element.
  * @param opts Source records for baseline computation. `baseValues` carries
  * style-authored transform channels, which this function cannot read from the
  * element itself; without them a style-authored channel (e.g. rotate) would
  * neutral-default and the gesture would settle to neutral, then snap once the
- * authored style repaints.
+ * authored style repaints. `baseStyleValues` carries non-transform authored
+ * values (e.g. `opacity`) captured at creation-time so hover-end restores the
+ * true rest value rather than a mid-animation transient.
  * @return Minimal baseline record to restore on hover end.
  */
 export const computeHoverBaseline = (
@@ -196,12 +217,14 @@ export const computeHoverBaseline = (
         animate?: Record<string, unknown>
         whileHover?: Record<string, unknown>
         baseValues?: Record<string, unknown>
+        baseStyleValues?: Record<string, unknown>
     }
 ): Record<string, unknown> => {
     const baseline: Record<string, unknown> = {}
     const initialRecord = opts.initial ?? {}
     const animateRecord = opts.animate ?? {}
     const baseValuesRecord = opts.baseValues ?? {}
+    const baseStyleValuesRecord = opts.baseStyleValues ?? {}
     const whileHoverRecordRaw = opts.whileHover ?? {}
     const whileHoverRecord = { ...whileHoverRecordRaw } as Record<string, unknown>
     delete whileHoverRecord.transition
@@ -248,23 +271,83 @@ export const computeHoverBaseline = (
         return null
     }
 
+    // Transform channels are every neutral default except opacity: their
+    // computed value only exists as a matrix string, so they must not consult
+    // authored computed style and instead fall through to the neutral default.
+    const transformChannelKeys = new Set(
+        Object.keys(neutralTransformDefaults).filter((k) => k !== 'opacity')
+    )
+
+    // Coerce a fully-numeric string (e.g. '1', '0.8') to a number; leave every
+    // other string as-is. motion's animate mishandles a numeric-STRING endpoint
+    // (a timing artifact — the value snaps rather than interpolating), and the
+    // semantic value here is numeric. The plan's unit assertions were written
+    // format-agnostic (Number(baseline.x)) for exactly this reason.
+    const coerceNumericString = (value: string): string | number => {
+        const asNumber = Number(value)
+        return Number.isFinite(asNumber) && String(asNumber) === value.trim() ? asNumber : value
+    }
+
+    // Resolve the authored value for a NON-transform key. Prefers the caller's
+    // creation-time base-style record (captured at rest — never a hover-start
+    // transient); only when the caller supplied no entry for this key does it
+    // fall back to a live computed-style read (at-rest/standalone path where
+    // live cs is safe). Prefers getPropertyValue(kebab) over the camelCase
+    // index access and guards test doubles whose computed style lacks
+    // getPropertyValue. Returns undefined when nothing meaningful is present so
+    // the caller can continue down the preference chain to the neutral default.
+    const readAuthoredValue = (key: string): unknown => {
+        if (baseStyleValuesRecord[key] !== undefined) {
+            const authored = baseStyleValuesRecord[key]
+            return typeof authored === 'string' ? coerceNumericString(authored) : authored
+        }
+        if (typeof cs.getPropertyValue === 'function') {
+            const kebabCase = key.replace(/([A-Z])/g, '-$1').toLowerCase()
+            const viaProperty = cs.getPropertyValue(kebabCase)
+            if (viaProperty) return coerceNumericString(viaProperty)
+        }
+        const viaIndex = (cs as unknown as Record<string, unknown>)[key]
+        if (typeof viaIndex === 'string' && viaIndex !== '') return coerceNumericString(viaIndex)
+        return undefined
+    }
+
     for (const key of Object.keys(whileHoverRecord)) {
         if (Object.prototype.hasOwnProperty.call(animateRecord, key)) {
             baseline[key] = animateRecord[key]
-        } else if (Object.prototype.hasOwnProperty.call(initialRecord, key)) {
+            continue
+        }
+        if (Object.prototype.hasOwnProperty.call(initialRecord, key)) {
             baseline[key] = initialRecord[key]
-        } else if (baseValuesRecord[key] !== undefined) {
+            continue
+        }
+        if (baseValuesRecord[key] !== undefined) {
             baseline[key] = baseValuesRecord[key]
-        } else if (key in neutralTransformDefaults) {
-            baseline[key] = neutralTransformDefaults[key]
-        } else {
-            // Check if inline style has a CSS variable for this property
-            const inlineValue = getInlineStyleValue(key)
-            if (inlineValue) {
-                baseline[key] = inlineValue
-            } else if (key in (cs as unknown as Record<string, unknown>)) {
-                baseline[key] = (cs as unknown as Record<string, unknown>)[key]
+            continue
+        }
+        // Inline style CSS function (var/calc/…) for this property, if present.
+        const inlineValue = getInlineStyleValue(key)
+        if (inlineValue) {
+            baseline[key] = inlineValue
+            continue
+        }
+        // Non-transform keys prefer the authored value (creation-time record,
+        // else at-rest computed style) over the neutral default — upstream
+        // getBaseTarget reads the DOM with no neutral step. Transform channels
+        // skip this — see transformChannelKeys.
+        if (!transformChannelKeys.has(key)) {
+            const authored = readAuthoredValue(key)
+            if (authored !== undefined) {
+                baseline[key] = authored
+                continue
             }
+        }
+        if (key in neutralTransformDefaults) {
+            baseline[key] = neutralTransformDefaults[key]
+            continue
+        }
+        // Final fallback: computed-style index access for anything else.
+        if (key in (cs as unknown as Record<string, unknown>)) {
+            baseline[key] = (cs as unknown as Record<string, unknown>)[key]
         }
     }
     return baseline
@@ -275,6 +358,13 @@ type HoverTransformComposerOptions = {
     getLiveTransformValues?: () => GestureTransformValues | null
     getBaseTransform?: () => string
     transformTemplate?: TransformTemplate
+    /**
+     * Non-transform authored base values (e.g. `opacity`) the caller captured
+     * ONCE at element creation while at rest. Threaded into
+     * `computeHoverBaseline` so hover-end restores the true rest value rather
+     * than a mid-animation transient read via live `getComputedStyle`.
+     */
+    getBaseStyleValues?: () => Record<string, unknown>
 }
 
 /**
@@ -572,7 +662,8 @@ export const attachWhileHover = (
             initial: baselineSources?.initial,
             animate: baselineSources?.animate,
             whileHover,
-            baseValues: transformComposer?.getBaseTransformValues?.()
+            baseValues: transformComposer?.getBaseTransformValues?.(),
+            baseStyleValues: transformComposer?.getBaseStyleValues?.()
         })
         if (!transformComposer) fallbackBaseTransform = el.style.transform
         callbacks?.onStart?.()
