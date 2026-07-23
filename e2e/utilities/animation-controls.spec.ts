@@ -276,6 +276,76 @@ test.describe('stop() freezes the mid-flight value across a reactive flush', () 
     })
 })
 
+test.describe('first-ever start animates FROM the non-neutral idle (no from-wipe)', () => {
+    const gotoBeam = async (page: import('@playwright/test').Page) => {
+        await page.goto('/tests/animation-controls?@isPlaywright=true')
+        await page.getByTestId('beam').waitFor({ state: 'visible' })
+        await page.waitForTimeout(300)
+    }
+
+    const readBeamScaleX = (page: import('@playwright/test').Page) =>
+        page.getByTestId('beam').evaluate((el) => {
+            const t = getComputedStyle(el).transform
+            return t === 'none' ? 1 : new DOMMatrixReadOnly(t).a
+        })
+
+    test('first-ever start-slow visibly travels from idle scaleX 0.16 toward 1', async ({
+        page
+    }) => {
+        await gotoBeam(page)
+
+        // The beam idles at its `initial` variant (scaleX 0.16). No command has
+        // ever been issued: this is the ONLY moment the from-wipe bug exists.
+        const idle = await readBeamScaleX(page)
+        expect(idle, `idle scaleX: ${idle}`).toBeCloseTo(0.16, 2)
+
+        // start-slow drives launch (scaleX 1) over 2s linear. Sample scaleX in
+        // the browser from the moment of the click so we can both (a) prove the
+        // first frames never teleport to ≈1 (the wipe: from-value collapses to
+        // 1, so WAAPI runs 1→1 and the DOM sits at ≈1 the whole time) and
+        // (b) capture a genuine mid-travel value.
+        const samplesPromise = page.evaluate(
+            async () =>
+                await new Promise<Array<{ t: number; scaleX: number }>>((resolve) => {
+                    const beam = document.querySelector<HTMLElement>('[data-testid="beam"]')
+                    const samples: Array<{ t: number; scaleX: number }> = []
+                    const started = performance.now()
+                    const read = () => {
+                        if (!beam) return 1
+                        const t = getComputedStyle(beam).transform
+                        return t === 'none' ? 1 : new DOMMatrixReadOnly(t).a
+                    }
+                    const tick = () => {
+                        samples.push({ t: performance.now() - started, scaleX: read() })
+                        if (performance.now() - started < 500) {
+                            setTimeout(tick, 40)
+                        } else {
+                            resolve(samples)
+                        }
+                    }
+                    tick()
+                })
+        )
+
+        await page.getByTestId('start-slow').click()
+        const samples = await samplesPromise
+
+        // No early frame may teleport to the launch endpoint: if the from-side
+        // wiped, scaleX sits at ≈1 from the very first frame.
+        const early = samples.filter((s) => s.t <= 200)
+        const earlyMax = Math.max(...early.map((s) => s.scaleX))
+        expect(earlyMax, `early scaleX values: ${JSON.stringify(early)}`).toBeLessThan(0.9)
+
+        // A mid-flight sample (~400ms into a 2s linear 0.16→1) must sit strictly
+        // between idle and the endpoint — genuine visible travel.
+        const mid = samples.reduce((best, s) =>
+            Math.abs(s.t - 400) < Math.abs(best.t - 400) ? s : best
+        )
+        expect(mid.scaleX, `mid scaleX @${mid.t}ms: ${mid.scaleX}`).toBeGreaterThan(0.2)
+        expect(mid.scaleX, `mid scaleX @${mid.t}ms: ${mid.scaleX}`).toBeLessThan(0.9)
+    })
+})
+
 test.describe('detaching controls clears their settle state (last-writer-wins parity)', () => {
     const gotoBeam = async (page: import('@playwright/test').Page) => {
         await page.goto('/tests/animation-controls?@isPlaywright=true')
