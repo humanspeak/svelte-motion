@@ -2750,6 +2750,13 @@
     // gestureCoordinator.ts).
     const gestureCoordinator = createGestureCoordinator()
 
+    // Per-element registry of persistent per-channel MotionValues the hover
+    // composed writer drives. Sharing it with the tap system lets a mid-flight
+    // hover→tap press read each channel's live velocity for a momentum-carrying
+    // handoff (upstream re-targets the same MotionValue). Owned here so it
+    // survives independent re-runs of the hover/tap effects.
+    const gestureChannelValues = new Map<string, MotionValue<number>>()
+
     // whileTap handling via motion-dom's press()
     $effect(() => {
         if (
@@ -2771,7 +2778,8 @@
                 hoverFallbackTransition: mergedTransition ?? {},
                 tapTransition: mergedTransition ?? {},
                 coordinator: gestureCoordinator,
-                getBaseStyleValues
+                getBaseStyleValues,
+                getSharedChannelValue: (key: string) => gestureChannelValues.get(key)
             }
         )
     })
@@ -2801,7 +2809,8 @@
                 getLiveTransformValues: () => liveGestureTransformValues,
                 getBaseTransform: () => userBaseTransform,
                 transformTemplate: transformTemplateProp,
-                getBaseStyleValues
+                getBaseStyleValues,
+                channelValues: gestureChannelValues
             },
             gestureCoordinator
         )

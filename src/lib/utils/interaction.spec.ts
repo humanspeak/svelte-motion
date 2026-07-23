@@ -37,7 +37,16 @@ vi.mock('motion-dom', () => {
             return pressCleanup
         }
     )
-    return { press: pressMock }
+    // The velocity-handoff path resolves a channel's default spring via
+    // getDefaultTransition; provide a minimal stand-in so the import resolves.
+    // (These tests never wire getSharedChannelValue, so it is not exercised, but
+    // the binding must exist.)
+    const getDefaultTransitionMock = vi.fn(() => ({
+        type: 'spring',
+        stiffness: 550,
+        damping: 30
+    }))
+    return { press: pressMock, getDefaultTransition: getDefaultTransitionMock }
 })
 
 describe('utils/interaction', () => {

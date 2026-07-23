@@ -7,10 +7,12 @@ import {
 } from '$lib/utils/transformComposer'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import {
-    animateValue,
+    animateMotionValue,
     getDefaultTransition,
     hover,
     mixNumber,
+    motionValue,
+    type MotionValue,
     type TransformTemplate
 } from 'motion-dom'
 
@@ -161,18 +163,6 @@ export const parseUnitValue = (value: unknown): { value: number; unit: string } 
     if (!match) return null
     const parsed = Number.parseFloat(match[1])
     return Number.isFinite(parsed) ? { value: parsed, unit: match[2] } : null
-}
-
-const toMillisecondsTransition = (
-    transition: AnimationOptions | undefined
-): Record<string, unknown> => {
-    const valueTransition = { ...((transition ?? {}) as Record<string, unknown>) }
-    for (const key of ['duration', 'delay', 'repeatDelay']) {
-        if (typeof valueTransition[key] === 'number') {
-            valueTransition[key] = valueTransition[key] * 1000
-        }
-    }
-    return valueTransition
 }
 
 /**
@@ -365,6 +355,16 @@ type HoverTransformComposerOptions = {
      * than a mid-animation transient read via live `getComputedStyle`.
      */
     getBaseStyleValues?: () => Record<string, unknown>
+    /**
+     * Per-element registry of persistent per-channel `MotionValue`s the composed
+     * writer drives (upstream backs every animated channel with a `MotionValue`,
+     * so interrupting a spring re-targets the SAME value and position AND
+     * velocity carry into the next animation). When the caller shares one map
+     * across the hover and tap systems, the tap handoff can read each channel's
+     * live velocity (`interaction.ts` `seedStaleChannels`) instead of discarding
+     * it. Omitted (standalone/tests) → the hover attachment owns a private map.
+     */
+    channelValues?: Map<string, MotionValue<number>>
 }
 
 /**
@@ -409,7 +409,22 @@ export const attachWhileHover = (
     // animations. Whenever the composed writer engages it must own EVERY
     // transform channel the gesture animates — a second (native) writer on
     // `el.style.transform` would clobber it frame by frame.
-    const liveChannelValues: GestureTransformValues = {}
+    //
+    // Numeric channels ride a PERSISTENT per-channel `MotionValue` (upstream
+    // backs every animated value with one). Interrupting a spring starts a new
+    // `animateMotionValue` on the SAME value, which seeds the generator with the
+    // value's live position AND velocity — so a mid-flight hover↔tap handoff or
+    // rapid re-hover carries momentum instead of re-seeding from zero. The map
+    // is shared with the tap system (via composer options) so its handoff can
+    // read each channel's velocity; when unshared the attachment owns a private
+    // map. `channelSubscriptions` holds each value's one change→write
+    // subscription so teardown removes it (no leak).
+    const channelValues = transformComposer?.channelValues ?? new Map<string, MotionValue<number>>()
+    const channelSubscriptions = new Map<string, () => void>()
+    // Unit-suffixed / non-numeric channels (e.g. '-50%', 'red') can't ride a
+    // numeric MotionValue; their latest composed string lives here and is driven
+    // by a throwaway progress MotionValue (see animateUnitChannel).
+    const liveStringChannels: Record<string, string> = {}
     // Each entry pairs the channel animation's stopper with its coordinator
     // unregister, so teardown drains BOTH — stopping the animation and removing
     // the stopper closure from the coordinator's Set. Tracking only the stopper
@@ -417,7 +432,18 @@ export const attachWhileHover = (
     // animation is stopped before it completes.
     const channelAnimations = new Map<string, { stop?: () => void; unregister?: () => void }>()
 
+    // Merge every owned channel's current value into one record: numeric
+    // channels read their MotionValue's live `.get()`, string/unit channels
+    // read their last composed string.
+    const collectLiveChannelValues = (): GestureTransformValues => {
+        const out: GestureTransformValues = {}
+        for (const [key, value] of channelValues) out[key] = value.get()
+        for (const key of Object.keys(liveStringChannels)) out[key] = liveStringChannels[key]
+        return out
+    }
+
     const writeComposedChannels = () => {
+        const liveChannelValues = collectLiveChannelValues()
         const transform =
             buildGestureTransform(
                 {
@@ -449,33 +475,55 @@ export const attachWhileHover = (
         channelAnimations.clear()
     }
 
+    // Initial value for a channel's persistent MotionValue, read ONCE at
+    // creation. Scale reads the element's VISUAL scale so a first hover seeds
+    // continuously from whatever the element is rendering; every other channel
+    // starts at its resting/base value. After creation the MotionValue itself is
+    // the source of truth — subsequent interrupts seed from `.get()`/velocity, so
+    // this never re-reads computed style on the animate path.
     const readChannelStart = (key: string): number => {
         if (key === 'scale') return readTransformScale(el)
-        const live = liveChannelValues[key]
-        if (typeof live === 'number') return live
         const resting = restingTransformValues[key]
         if (typeof resting === 'number') return resting
         return key.startsWith('scale') ? 1 : 0
     }
 
-    // Resolve the numeric keyframe sequence for a composed channel. Array
-    // targets play in full — upstream plays the authored keyframes as-is, so
-    // element 0 is the explicit start and no visual seed is injected. Scalar
-    // targets seed the start from the frozen visual value, then move to target.
-    // Returns null when the target (or any array element) is non-numeric, so
-    // the caller can fall back to unit-value handling.
-    const resolveComposedKeyframes = (key: string, target: unknown): number[] | null => {
+    // Lazily create (once) the persistent MotionValue backing a numeric channel,
+    // wiring its single change→write subscription. Reused across every animation
+    // on that channel so velocity is continuous.
+    const getChannelValue = (key: string): MotionValue<number> => {
+        let value = channelValues.get(key)
+        if (!value) {
+            value = motionValue(readChannelStart(key))
+            channelValues.set(key, value)
+            channelSubscriptions.set(
+                key,
+                value.on('change', () => writeComposedChannels())
+            )
+        }
+        return value
+    }
+
+    // Classify a composed-channel target as a scalar number, an all-numeric
+    // keyframe array (length > 1, played in full — upstream plays authored
+    // arrays as-is), or non-numeric (null → the caller routes to unit/string
+    // handling). Scalars carry no explicit start: `animateMotionValue` resolves
+    // the `[null, target]` seed from the value's live position, so momentum is
+    // preserved.
+    const resolveNumericTarget = (
+        target: unknown
+    ): { scalar: number } | { array: number[] } | null => {
         if (Array.isArray(target) && target.length > 1) {
             const numbers = target.map((entry) =>
                 typeof entry === 'number' ? entry : Number.parseFloat(String(entry))
             )
-            return numbers.every((entry) => Number.isFinite(entry)) ? numbers : null
+            return numbers.every((entry) => Number.isFinite(entry)) ? { array: numbers } : null
         }
         const targetNumber = getFinalNumber(target)
-        return targetNumber == null ? null : [readChannelStart(key), targetNumber]
+        return targetNumber == null ? null : { scalar: targetNumber }
     }
 
-    // Resolve the ms-API transition for a composed channel. An explicit
+    // Resolve the seconds-API transition for a composed channel. An explicit
     // component/inline transition wins; `{}` (the merged default when neither
     // the `transition` prop nor <MotionConfig> supplied one) counts as "no
     // explicit transition" and yields upstream's per-value defaults so a
@@ -485,51 +533,53 @@ export const attachWhileHover = (
     //   scale/scaleX/scaleY -> spring { stiffness: 550, damping: 30, restSpeed: 10 }
     //   x/y/rotate/translate -> spring { stiffness: 500, damping: 25, restSpeed: 10 }
     //   keyframes.length > 2  -> { type: 'keyframes', duration: 0.8 }
-    // Springs are duration-free, so the seconds->ms conversion is a no-op for
-    // them; the keyframes default's 0.8s becomes 800ms.
-    const resolveComposedTransition = (
+    // Unlike the old `animateValue` path, `animateMotionValue` takes upstream's
+    // seconds-based transitions and converts durations to ms itself, so there is
+    // NO seconds->ms conversion here (springs are duration-free anyway).
+    const resolveComposedTransitionSeconds = (
         explicit: AnimationOptions | undefined,
         key: string,
         keyframes: number[]
     ): Record<string, unknown> => {
         const chosen = explicit ?? mergedTransition
         if (chosen && Object.keys(chosen).length > 0) {
-            return toMillisecondsTransition(chosen)
+            return { ...(chosen as Record<string, unknown>) }
         }
-        const defaults = getDefaultTransition(key, { keyframes })
-        return toMillisecondsTransition(defaults)
+        return getDefaultTransition(key, { keyframes })
     }
 
-    // Start a composed-channel animation and wire it into the coordinator so the
-    // tap system (and cleanup) can stop it. `mapSample` converts each raw
-    // animateValue sample into the value written to the transform channel.
+    // Retarget a numeric channel's persistent MotionValue. `animateMotionValue`
+    // seeds the generator with `value.getVelocity()`, so starting a new one on
+    // the same value carries velocity through the interrupt (upstream). The
+    // previous animation on this value is stopped for coordinator bookkeeping,
+    // which does NOT reset velocity (only `jump()` does). Registration is wired
+    // AFTER the start so a synchronous test-double completion can't unregister a
+    // stopper that isn't stored yet.
     const runChannelAnimation = (
         key: string,
-        valueTransition: Record<string, unknown>,
-        keyframes: number[],
-        mapSample: (sample: number) => number | string,
-        finalValue: number | string
+        value: MotionValue<number>,
+        target: number | number[],
+        transitionSeconds: Record<string, unknown>,
+        finalValue: number
     ) => {
         const registration: { unregister?: () => void } = {}
         const entry: { stop?: () => void; unregister?: () => void } = {}
-        const animation = animateValue({
-            ...valueTransition,
-            keyframes,
-            onUpdate: (sample: number) => {
-                liveChannelValues[key] = mapSample(sample)
-                writeComposedChannels()
-            },
-            onComplete: () => {
-                liveChannelValues[key] = finalValue
-                writeComposedChannels()
-                channelAnimations.delete(key)
-                registration.unregister?.()
-            }
+        const controls = animateMotionValue(
+            key,
+            value,
+            target as number,
+            transitionSeconds as Parameters<typeof animateMotionValue>[3]
+        )(() => {
+            // Settle exactly on the final value (springs finish within restSpeed
+            // of it); the change subscription writes the composed transform.
+            value.set(finalValue)
+            channelAnimations.delete(key)
+            registration.unregister?.()
         })
-        entry.stop = () => animation.stop?.()
+        entry.stop = () => controls?.stop?.()
         channelAnimations.set(key, entry)
         registration.unregister = coordinator?.register(() => {
-            animation.stop?.()
+            controls?.stop?.()
             if (channelAnimations.get(key) === entry) channelAnimations.delete(key)
         })
         entry.unregister = registration.unregister
@@ -537,30 +587,59 @@ export const attachWhileHover = (
 
     // Animate a unit-suffixed target ('-50%', '2rem') by mixing a 0->1 progress
     // between the start and target magnitudes, re-appending the shared unit each
-    // frame. Only runs when the start value parses to the SAME unit; a bare
-    // number (or px) start can't safely mix into a percentage target because
-    // px<->% needs layout context this writer doesn't resolve, so those snap.
+    // frame. A throwaway progress MotionValue drives the tween (upstream backs
+    // string interpolation with a progress value too). Only runs when the start
+    // value parses to the SAME unit; a bare number (or px) start can't safely
+    // mix into a percentage target because px<->% needs layout context this
+    // writer doesn't resolve, so those snap.
     const animateUnitChannel = (
         key: string,
         target: string,
         parsedTarget: { value: number; unit: string },
         transition: AnimationOptions | undefined
     ) => {
-        const start = parseUnitValue(liveChannelValues[key] ?? restingTransformValues[key])
+        const currentString = liveStringChannels[key] ?? restingTransformValues[key]
+        const start = parseUnitValue(currentString)
         if (!start || start.unit !== parsedTarget.unit) {
-            liveChannelValues[key] = target
+            liveStringChannels[key] = target
             writeComposedChannels()
             return
         }
         const from = start.value
         const to = parsedTarget.value
-        runChannelAnimation(
+        const unit = parsedTarget.unit
+        const transitionSeconds = resolveComposedTransitionSeconds(transition, key, [from, to])
+
+        const progress = motionValue(0)
+        const unsubscribe = progress.on('change', () => {
+            liveStringChannels[key] = `${mixNumber(from, to, progress.get())}${unit}`
+            writeComposedChannels()
+        })
+        const registration: { unregister?: () => void } = {}
+        const entry: { stop?: () => void; unregister?: () => void } = {}
+        const controls = animateMotionValue(
             key,
-            resolveComposedTransition(transition, key, [from, to]),
-            [0, 1],
-            (progress) => `${mixNumber(from, to, progress)}${parsedTarget.unit}`,
-            target
-        )
+            progress,
+            1,
+            transitionSeconds as Parameters<typeof animateMotionValue>[3]
+        )(() => {
+            liveStringChannels[key] = target
+            writeComposedChannels()
+            unsubscribe()
+            channelAnimations.delete(key)
+            registration.unregister?.()
+        })
+        entry.stop = () => {
+            controls?.stop?.()
+            unsubscribe()
+        }
+        channelAnimations.set(key, entry)
+        registration.unregister = coordinator?.register(() => {
+            controls?.stop?.()
+            unsubscribe()
+            if (channelAnimations.get(key) === entry) channelAnimations.delete(key)
+        })
+        entry.unregister = registration.unregister
     }
 
     const animateComposedChannel = (
@@ -568,9 +647,9 @@ export const attachWhileHover = (
         target: unknown,
         transition: AnimationOptions | undefined
     ) => {
-        // Caller has already stopped competing writers (see the branch-level
-        // stopAll), so the start keyframe samples exactly where the element
-        // visually froze.
+        // Drop the previous animation on this channel for coordinator
+        // bookkeeping. The persistent MotionValue keeps its position AND
+        // velocity, so the retarget below still carries momentum.
         const existing = channelAnimations.get(key)
         existing?.stop?.()
         existing?.unregister?.()
@@ -587,25 +666,36 @@ export const attachWhileHover = (
             }
         }
 
-        const keyframes = resolveComposedKeyframes(key, target)
-        if (keyframes == null) {
+        const numeric = resolveNumericTarget(target)
+        if (numeric == null) {
             // Truly non-numeric channel value (e.g. 'red', 'var(--x)'): apply
             // without tweening rather than dropping it — interpolation from an
             // unknown start type isn't safe.
             if (typeof target === 'string') {
-                liveChannelValues[key] = target
+                liveStringChannels[key] = target
                 writeComposedChannels()
             }
             return
         }
 
-        runChannelAnimation(
-            key,
-            resolveComposedTransition(transition, key, keyframes),
-            keyframes,
-            (value) => value,
-            keyframes[keyframes.length - 1]
-        )
+        const value = getChannelValue(key)
+        if ('array' in numeric) {
+            runChannelAnimation(
+                key,
+                value,
+                numeric.array,
+                resolveComposedTransitionSeconds(transition, key, numeric.array),
+                numeric.array[numeric.array.length - 1]
+            )
+        } else {
+            runChannelAnimation(
+                key,
+                value,
+                numeric.scalar,
+                resolveComposedTransitionSeconds(transition, key, [value.get(), numeric.scalar]),
+                numeric.scalar
+            )
+        }
     }
 
     // Route a gesture target to its writers. The composed writer engages when
@@ -712,8 +802,24 @@ export const attachWhileHover = (
         }
     })
 
+    // Drain every persistent channel MotionValue: remove its change→write
+    // subscription and stop/destroy the value. Without this the subscription
+    // (and the value's internal frame hooks) outlive the element. The map may be
+    // shared with the tap system; clearing it is safe because only the hover
+    // writer creates entries, and a re-attach recreates them lazily.
+    const teardownChannelValues = () => {
+        for (const unsubscribe of channelSubscriptions.values()) unsubscribe()
+        channelSubscriptions.clear()
+        for (const value of channelValues.values()) {
+            value.stop()
+            value.destroy()
+        }
+        channelValues.clear()
+    }
+
     return () => {
         stopChannelAnimations()
+        teardownChannelValues()
         el.removeEventListener('svelte-motion:drag-start', handleDragStart)
         cleanupHover()
     }

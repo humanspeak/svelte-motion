@@ -51,7 +51,27 @@ vi.mock('motion-dom', async () => {
             return { stop: vi.fn(), then: vi.fn() }
         }
     )
-    return { ...actual, animateValue: animateValueMock, hover: hoverMock }
+    // The composed writer now drives channels via `animateMotionValue`, which
+    // returns a StartAnimation `(onComplete) => controls`. Mirror the old
+    // synchronous animateValue behavior: settle the value on the final keyframe
+    // (firing its real change→write subscription) and complete immediately.
+    const animateMotionValueMock = vi.fn(
+        (_name: string, value: { set: (v: number) => void }, target: number | number[]) =>
+            (onComplete?: () => void) => {
+                const final = Array.isArray(target) ? target[target.length - 1] : target
+                const finalNumber =
+                    typeof final === 'number' ? final : Number.parseFloat(String(final))
+                if (Number.isFinite(finalNumber)) value.set(finalNumber)
+                onComplete?.()
+                return { stop: vi.fn() }
+            }
+    )
+    return {
+        ...actual,
+        animateValue: animateValueMock,
+        animateMotionValue: animateMotionValueMock,
+        hover: hoverMock
+    }
 })
 
 describe('utils/hover', () => {
