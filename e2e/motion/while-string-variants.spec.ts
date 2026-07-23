@@ -30,6 +30,10 @@ test.describe('motion/while-string-variants', () => {
 
         const box = page.getByTestId('box-while-hover-string')
         await expect(box).toBeVisible()
+        // Let hydration finish before the first pointer event: a hover fired
+        // before listeners attach is silently lost (house convention — see
+        // hover-and-tap.test.ts).
+        await page.waitForTimeout(800)
 
         // Identity transform at rest.
         const initialScale = await readScale(box)
@@ -47,6 +51,8 @@ test.describe('motion/while-string-variants', () => {
 
         const box = page.getByTestId('box-while-hover-array')
         await expect(box).toBeVisible()
+        // Hydration settle — see above.
+        await page.waitForTimeout(800)
 
         // Initial background is the inline orange (`#f97316`). After
         // hover, the array `["hovered", "tinted"]` should resolve so
