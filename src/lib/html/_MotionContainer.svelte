@@ -1417,6 +1417,7 @@
         const resolved = resolveAnimationControlsDefinition(definition)
         if (!resolved) return
 
+        const isFirstCommand = !animationControlsHasReceivedCommand
         animationControlsHasReceivedCommand = true
         const filtered = filterReducedMotionKeyframes(
             resolved as Record<string, unknown>,
@@ -1439,6 +1440,28 @@
             element,
             svgPathFinished.length > 0 ? stripSVGPathKeyframes(target) : target
         )
+
+        // First-ever command from a non-neutral idle: WAAPI reads its from-value
+        // off the live computed style, but by the time it captures it the
+        // reactive inline transform has already been rewritten off the idle
+        // keyframes (the ternary drops it once a command is received), so a
+        // transform like the beam's scaleX 0.16 reads back as the property
+        // default (scaleX 1) and the first animation runs 1->1 — no visible
+        // travel. Pin the from-side explicitly by expanding each channel the
+        // idle variant defines into a `[from, to]` keyframe pair, mirroring
+        // upstream where the motion value holds the idle value as the from.
+        // Only the first command needs this: later commands animate from the
+        // held target, which the inline base already renders correctly.
+        if (isFirstCommand && isNotEmpty(initialKeyframes)) {
+            const idle = initialKeyframes as Record<string, unknown>
+            for (const key of Object.keys(payload)) {
+                const from = idle[key]
+                const to = (payload as Record<string, unknown>)[key]
+                if (from !== undefined && !Array.isArray(to)) {
+                    ;(payload as Record<string, unknown>)[key] = [from, to]
+                }
+            }
+        }
 
         // Imperative controls (useAnimationControls/useAnimate) animate transforms
         // too — notify will-change here just like the declarative path does.
@@ -1599,7 +1622,15 @@
                     isNotEmpty(initialKeyframes)
                   ? initialKeyframes
                   : animateControls && animationControlsHasReceivedCommand
-                    ? lastAnimationControlsTarget
+                    ? // First-ever in-flight command: no target/stop snapshot
+                      // exists yet (lastAnimationControlsTarget is undefined
+                      // until applyAnimationControlsTarget/stop runs). Falling
+                      // through to a neutral base here wipes the idle from-value
+                      // exactly as WAAPI captures it, so the first animation runs
+                      // e.g. 1->1 instead of 0.16->1. Hold the idle keyframes as
+                      // the inline base until a real snapshot supersedes them.
+                      (lastAnimationControlsTarget ??
+                      (isNotEmpty(initialKeyframes) ? initialKeyframes : undefined))
                     : isNotEmpty(initialKeyframes)
                       ? !effectiveAnimate
                           ? initialKeyframes
