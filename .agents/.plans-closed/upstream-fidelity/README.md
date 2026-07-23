@@ -39,6 +39,23 @@ conditions, and update your row when done.
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
 
+## Guard close-out — 2026-07-23
+
+**Batch CLOSED, all 12 plans resolved.** Per-plan verdicts in the
+`NNN-*.guard-report.md` files alongside this index (11 PASS, 1 PASS-as-2B-
+rejection). Every plan was executed by an opus agent in an isolated worktree,
+red-test-first, and guard-verified: done criteria re-run, scope diffed, test
+assertions audited, and red authenticity proven against pre-fix code.
+
+Integration: 23 commits cherry-picked onto `style/brutalist-examples`
+(zero conflicts). Assembled verification: 796 unit tests / 0 type errors /
+full e2e 243 passed, 0 failed (2 permanent unrelated skips: svg-path-length
+`test.skip`, drag single-frame `test.fixme`) / view + presence suites
+additionally arbitrated green 12/12 against a clean preview build (retiring
+the long-deferred dev-vs-preview attribution question — the historical "view/
+shared-element failures" were dev-server pointer-before-hydration artifacts in
+isolated runs, not library or test defects).
+
 ## Dependency notes
 
 - **Gesture chain (001 → 002 → 003 → 004)**: all four edit `hover.ts` and/or
@@ -70,6 +87,16 @@ REJECTED (with one-line rationale)
   value at animation start (64). The settle writer is clean (007's actual
   question), but the live-animation resolution diverges. Low priority; needs
   its own plan against the animation input layer, not `resolveRestingValues`.
+
+- **Reorder scrollable: mid-drag container scroll loses the pointer anchor**
+  (maintainer observation on /examples/reorder scrollable demo, 2026-07-23):
+  scrolling while dragging shifts the item's base with the content while the
+  drag offset stays anchored to the start rect, so the item diverges from the
+  pointer. `drag.ts` has no mid-drag ancestor-scroll compensation; upstream
+  framer-motion shares this limitation (no native drag auto-scroll/compensation),
+  so this is a parity-neutral UX gap — verify 1:1 against upstream Reorder
+  before deciding; the `adjustOrigin` machinery could compensate scroll deltas
+  if we choose to exceed upstream here.
 
 ## Findings considered and rejected
 
