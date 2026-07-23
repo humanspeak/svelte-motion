@@ -25,7 +25,7 @@ STOP conditions, and update your row when done.
 | ---- | ------------------------------------------------------------------- | -------- | ------ | -------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | 001  | Gesture channels ride persistent MotionValues (velocity continuity) | P1       | M–L    | —                          | DONE — guard-approved; integrated (361c912 test + 6cc5c82 fix + 2f22db0 docs example)                           |
 | 002  | First-ever controls.start() animates from the non-neutral idle      | P1       | S–M    | —                          | DONE — guard-approved; integrated (10f8ff2 test + 0f8055c fix); docs beam demo verified, no docs changes needed |
-| 003  | Wildcard/relative keyframes resolve against the live value          | P2       | S–M    | 002 (same-file sequencing) | IN PROGRESS — dispatched to opus executor on post-002 tip                                                       |
+| 003  | Wildcard/relative keyframes resolve against the live value          | P2       | S–M    | 002 (same-file sequencing) | DONE — guard-approved; integrated (6a696b9 test + 0cf4c60 fix + fee642d docs)                                   |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
@@ -50,6 +50,16 @@ REJECTED (with one-line rationale)
 - **Not picked — full #449 VisualElement adoption**: plan 001 deliberately
   slices the highest-value part; the wholesale rewrite stays a standalone
   initiative.
+
+## Discovered during execution (follow-up candidates)
+
+- **Controls settle wipes sibling transform channels** (found by plan 003's
+  executor via the docs demo): settling after animating `scale` alone re-emits
+  `transform` without a previously-drifted `x` (mid-flight WAAPI composes both
+  correctly; the settle write drops the sibling). Pre-existing transform-
+  composition gap in the controls settle path, not wildcard resolution. The
+  wildcard demo works around it honestly (`x: null` holds the channel).
+  Needs its own red-first plan against the settle writer.
 
 ## Audit provenance
 
