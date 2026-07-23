@@ -1,0 +1,112 @@
+diff --git a/src/lib/utils/hover.ts b/src/lib/utils/hover.ts
+index d6192d2..f5fc5ae 100644
+--- a/src/lib/utils/hover.ts
++++ b/src/lib/utils/hover.ts
+@@ -160,8 +160,16 @@ const toMillisecondsTransition = (
+ /**
+  * Compute the baseline values to restore to on hover end.
+  *
+- * Preference order per key: `animate` → `initial` → style-authored base values
+- * → neutral transform defaults → computed style value if present.
++ * Preference order per key (mirrors upstream `VisualElement.getBaseTarget`,
++ * which has no neutral-default step — an authored value always wins):
++ * `animate` → `initial` → style-authored base values → inline CSS-function
++ * value → for NON-transform keys, the authored computed-style value →
++ * neutral transform defaults → computed-style index fallback.
++ *
++ * Transform channels intentionally skip the computed-style step: a computed
++ * `transform` is a matrix string, not a per-channel value, so restoring
++ * `scale`/`rotate` to it is meaningless — those keys land on their neutral
++ * default when nothing is authored via `animate`/`initial`/`baseValues`.
+  *
+  * @param el Target element.
+  * @param opts Source records for baseline computation. `baseValues` carries
+@@ -230,24 +238,77 @@ export const computeHoverBaseline = (
+         return null
+     }
+ 
++    // Transform channels are every neutral default except opacity: their
++    // computed value only exists as a matrix string, so they must not consult
++    // computed style and instead fall through to the neutral default.
++    const transformChannelKeys = new Set(
++        Object.keys(neutralTransformDefaults).filter((k) => k !== 'opacity')
++    )
++
++    // Coerce a fully-numeric computed-style string (e.g. '1', '0.8') to a
++    // number; leave every other string as-is. motion's animate mishandles a
++    // numeric-STRING endpoint (a timing artifact — the value snaps rather than
++    // interpolating), and the semantic value here is numeric. The plan's unit
++    // assertions were written format-agnostic (Number(baseline.x)) for exactly
++    // this reason. Reviewer-approved amendment to plan 003 Step 2.
++    const coerceNumericString = (value: string): string | number => {
++        const asNumber = Number(value)
++        return Number.isFinite(asNumber) && String(asNumber) === value.trim() ? asNumber : value
++    }
++
++    // Read the authored computed-style value for a non-transform key. Prefers
++    // getPropertyValue(kebab) for reliability, falling back to the camelCase
++    // index access. Guards environments (and test doubles) whose computed
++    // style lacks getPropertyValue. Returns undefined when nothing meaningful
++    // is present so the caller can continue down the preference chain.
++    const readComputedStyleValue = (key: string): unknown => {
++        if (typeof cs.getPropertyValue === 'function') {
++            const kebabCase = key.replace(/([A-Z])/g, '-$1').toLowerCase()
++            const viaProperty = cs.getPropertyValue(kebabCase)
++            if (viaProperty) return coerceNumericString(viaProperty)
++        }
++        const viaIndex = (cs as unknown as Record<string, unknown>)[key]
++        if (typeof viaIndex === 'string' && viaIndex !== '') return coerceNumericString(viaIndex)
++        return undefined
++    }
++
+     for (const key of Object.keys(whileHoverRecord)) {
+         if (Object.prototype.hasOwnProperty.call(animateRecord, key)) {
+             baseline[key] = animateRecord[key]
+-        } else if (Object.prototype.hasOwnProperty.call(initialRecord, key)) {
++            continue
++        }
++        if (Object.prototype.hasOwnProperty.call(initialRecord, key)) {
+             baseline[key] = initialRecord[key]
+-        } else if (baseValuesRecord[key] !== undefined) {
++            continue
++        }
++        if (baseValuesRecord[key] !== undefined) {
+             baseline[key] = baseValuesRecord[key]
+-        } else if (key in neutralTransformDefaults) {
+-            baseline[key] = neutralTransformDefaults[key]
+-        } else {
+-            // Check if inline style has a CSS variable for this property
+-            const inlineValue = getInlineStyleValue(key)
+-            if (inlineValue) {
+-                baseline[key] = inlineValue
+-            } else if (key in (cs as unknown as Record<string, unknown>)) {
+-                baseline[key] = (cs as unknown as Record<string, unknown>)[key]
++            continue
++        }
++        // Inline style CSS function (var/calc/…) for this property, if present.
++        const inlineValue = getInlineStyleValue(key)
++        if (inlineValue) {
++            baseline[key] = inlineValue
++            continue
++        }
++        // Non-transform keys prefer the authored computed-style value over the
++        // neutral default (upstream getBaseTarget reads the DOM, no neutral
++        // step). Transform channels skip this — see transformChannelKeys.
++        if (!transformChannelKeys.has(key)) {
++            const authored = readComputedStyleValue(key)
++            if (authored !== undefined) {
++                baseline[key] = authored
++                continue
+             }
+         }
++        if (key in neutralTransformDefaults) {
++            baseline[key] = neutralTransformDefaults[key]
++            continue
++        }
++        // Final fallback: computed-style index access for anything else.
++        if (key in (cs as unknown as Record<string, unknown>)) {
++            baseline[key] = (cs as unknown as Record<string, unknown>)[key]
++        }
+     }
+     return baseline
+ }

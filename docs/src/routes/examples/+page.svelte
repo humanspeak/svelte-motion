@@ -2,23 +2,13 @@
     import { BrutIndexV2 } from '@humanspeak/docs-kit'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import sitemapManifest from '$lib/sitemap-manifest.json'
+    import { listExamples } from '$lib/examplesIndex'
     import posthog from 'posthog-js'
     import { browser } from '$app/environment'
-    import type { PageData } from './$types'
 
     $effect(() => {
         if (browser) posthog.capture('examples_index_viewed')
     })
-
-    type ExampleData = {
-        title: string
-        description: string
-    }
-
-    type ExamplesData = Record<string, ExampleData>
-
-    const { data }: { data: PageData } = $props()
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
@@ -40,32 +30,7 @@
         seo.ogSlug = 'examples'
     }
 
-    const examples = $derived.by(() => {
-        const exampleRoutes = Object.keys(sitemapManifest)
-            .filter((route) => route.startsWith('/examples/') && route !== '/examples')
-            .sort()
-
-        return exampleRoutes.map((route) => {
-            const slug = route.replace('/examples/', '')
-            const exampleData = (data.examples as ExamplesData)[slug]
-            const title = exampleData?.title || formatTitle(slug)
-            return {
-                route,
-                slug,
-                title,
-                description:
-                    exampleData?.description ||
-                    `Interactive ${title.toLowerCase()} animation example`
-            }
-        })
-    })
-
-    function formatTitle(slug: string): string {
-        return slug
-            .split('-')
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ')
-    }
+    const examples = listExamples()
 
     const pad2 = (n: number) => String(n).padStart(2, '0')
 </script>

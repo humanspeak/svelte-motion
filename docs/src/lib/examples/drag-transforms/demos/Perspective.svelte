@@ -2,25 +2,33 @@
     import { motion } from '@humanspeak/svelte-motion'
 
     let bounds: HTMLElement | null = null
+    let dragging = $state(false)
+
+    // NOTE: `transformPerspective` (and the whileDrag `rotateX`/`rotateY`) are
+    // motion transform channels that must compose with the live drag translation.
+    // That composition only runs when `style` is an OBJECT — passing a stringified
+    // style would drop the authored perspective. So this stays object-form.
 </script>
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <section class="perspective-lab" aria-label="Perspective drag example">
-        <div class="lab-header">
-            <span>drag lab</span>
-            <strong>3d composition</strong>
+    <section class="drag-strip" aria-label="Perspective drag example">
+        <div class="strip-head">
+            <span class="micro">// perspective drag</span>
+            <span class="micro status">state: {dragging ? 'dragging' : 'idle'}</span>
         </div>
 
         <div class="stage-wrap">
             <div class="axis-label axis-label-top">transformPerspective 900</div>
             <div class="axis-label axis-label-bottom">rotateX −14° · rotateY 22°</div>
 
-            <div bind:this={bounds} class="perspective-stage">
+            <div bind:this={bounds} class="drag-stage">
                 <motion.div
                     drag
                     dragConstraints={bounds}
                     dragElastic={0.28}
+                    onDragStart={() => (dragging = true)}
+                    onDragEnd={() => (dragging = false)}
                     whileHover={{ scale: 1.03 }}
                     whileDrag={{
                         rotateX: -14,
@@ -34,12 +42,11 @@
                         transformPerspective: 900,
                         width: 'clamp(104px, 17vw, 148px)',
                         aspectRatio: '1',
-                        borderRadius: '8px',
                         cursor: 'grab',
                         touchAction: 'none',
-                        background: 'var(--drag-card-bg)',
-                        border: 'var(--drag-card-border)',
-                        boxShadow: 'var(--drag-card-shadow)'
+                        backgroundColor: 'var(--brut-accent, #247768)',
+                        border: '1px solid var(--brut-ink, #0a0a0a)',
+                        boxShadow: '6px 6px 0 var(--brut-rule, #d6dedb)'
                     }}
                 >
                     <span class="tile-mark">SM</span>
@@ -51,10 +58,13 @@
             </div>
         </div>
 
-        <div class="lab-footer">
-            <span>transformPerspective</span>
-            <span>whileDrag rotateX</span>
-            <span>whileDrag rotateY</span>
+        <div class="strip-foot">
+            <div class="chips">
+                <span class="chip">transformPerspective</span>
+                <span class="chip">whileDrag rotateX</span>
+                <span class="chip">whileDrag rotateY</span>
+            </div>
+            <span class="micro">elastic: 0.28</span>
         </div>
     </section>
 </div>
@@ -67,151 +77,92 @@
         padding: clamp(1rem, 4vw, 2.5rem);
     }
 
-    .perspective-lab {
-        --lab-text: #f8fafc;
-        --lab-bg:
-            linear-gradient(135deg, rgb(2 6 23 / 0.94), rgb(15 23 42 / 0.9)),
-            radial-gradient(
-                circle at 18% 18%,
-                color-mix(in oklab, var(--color-brand-400, #34d399) 28%, transparent),
-                transparent 22rem
-            );
-        --lab-border: color-mix(in oklab, var(--color-brand-300, #6ee7b7) 34%, #334155);
-        --lab-shadow: 0 24px 80px rgb(0 0 0 / 0.28);
-        --lab-muted: rgb(226 232 240 / 0.68);
-        --lab-accent: var(--color-brand-300, #6ee7b7);
-        --lab-chip-bg: rgb(15 23 42 / 0.62);
-        --lab-chip-border: rgb(148 163 184 / 0.28);
-        --stage-border: rgb(148 163 184 / 0.2);
-        --stage-grid: rgb(148 163 184 / 0.06);
-        --constraint-border: rgb(226 232 240 / 0.32);
-        --constraint-bg:
-            linear-gradient(135deg, rgb(15 23 42 / 0.72), rgb(30 41 59 / 0.46)),
-            radial-gradient(
-                circle at center,
-                color-mix(in oklab, var(--color-brand-400, #34d399) 16%, transparent),
-                transparent 70%
-            );
-        --axis-label: rgb(226 232 240 / 0.42);
-        --drag-card-text: #042f2e;
-        --drag-card-frame: rgb(4 47 46 / 0.18);
-        --drag-card-bg:
-            linear-gradient(135deg, rgb(255 255 255 / 0.16), transparent 38%),
-            linear-gradient(135deg, var(--color-brand-300, #6ee7b7), #22d3ee 54%, #38bdf8);
-        --drag-card-border: 1px solid
-            color-mix(in oklab, var(--color-brand-100, #d1fae5) 76%, #ffffff 12%);
-        --drag-card-shadow:
-            0 18px 42px color-mix(in oklab, var(--color-brand-500, #10b981) 28%, transparent),
-            0 1px 0 rgb(255 255 255 / 0.18), inset 0 1px 0 rgb(255 255 255 / 0.52),
-            inset 0 -18px 28px rgb(2 6 23 / 0.12);
-        width: min(100%, 760px);
-        display: grid;
-        gap: 1rem;
-        padding: clamp(1rem, 3vw, 1.4rem);
-        color: var(--lab-text);
-        background: var(--lab-bg);
-        border: 1px solid var(--lab-border);
-        border-radius: 8px;
-        box-shadow: var(--lab-shadow);
+    .drag-strip {
+        width: min(100%, 640px);
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
     }
 
-    :global(html:not(.dark)) .perspective-lab {
-        --lab-text: #0f172a;
-        --lab-bg:
-            linear-gradient(135deg, rgb(248 250 252 / 0.96), rgb(236 253 245 / 0.84)),
-            radial-gradient(
-                circle at 16% 16%,
-                color-mix(in oklab, var(--color-brand-300, #6ee7b7) 36%, transparent),
-                transparent 22rem
-            );
-        --lab-border: color-mix(in oklab, var(--color-brand-500, #10b981) 24%, #cbd5e1);
-        --lab-shadow: 0 24px 70px rgb(15 23 42 / 0.12);
-        --lab-muted: rgb(15 23 42 / 0.64);
-        --lab-accent: var(--color-brand-700, #047857);
-        --lab-chip-bg: rgb(255 255 255 / 0.74);
-        --lab-chip-border: rgb(15 23 42 / 0.14);
-        --stage-border: rgb(15 23 42 / 0.14);
-        --stage-grid: rgb(15 23 42 / 0.07);
-        --constraint-border: rgb(15 23 42 / 0.22);
-        --constraint-bg:
-            linear-gradient(135deg, rgb(255 255 255 / 0.86), rgb(240 253 250 / 0.7)),
-            radial-gradient(
-                circle at center,
-                color-mix(in oklab, var(--color-brand-300, #6ee7b7) 22%, transparent),
-                transparent 72%
-            );
-        --axis-label: rgb(15 23 42 / 0.42);
-        --drag-card-text: #ecfeff;
-        --drag-card-frame: rgb(236 253 245 / 0.28);
-        --drag-card-bg:
-            linear-gradient(135deg, rgb(255 255 255 / 0.18), transparent 38%),
-            linear-gradient(135deg, #0f766e, var(--color-brand-600, #059669) 52%, #0284c7);
-        --drag-card-border: 1px solid rgb(15 118 110 / 0.42);
-        --drag-card-shadow:
-            0 18px 42px rgb(15 118 110 / 0.22), 0 1px 0 rgb(255 255 255 / 0.42),
-            inset 0 1px 0 rgb(255 255 255 / 0.24), inset 0 -18px 28px rgb(2 6 23 / 0.22);
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
     }
 
-    .lab-header,
-    .lab-footer {
+    .status {
+        color: var(--brut-accent, #247768);
+    }
+
+    .strip-head,
+    .strip-foot {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 0.75rem;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        text-transform: uppercase;
-        font-size: 0.72rem;
-        color: var(--lab-muted);
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
     }
 
-    .lab-header strong {
-        color: var(--lab-accent);
-        font-weight: 700;
-    }
-
-    .lab-footer {
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
         flex-wrap: wrap;
-        justify-content: flex-start;
     }
 
-    .lab-footer span {
-        min-height: 1.5rem;
-        display: inline-flex;
-        align-items: center;
-        border: 1px solid var(--lab-chip-border);
-        border-radius: 4px;
-        padding: 0.18rem 0.45rem;
-        background: var(--lab-chip-bg);
+    .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.375rem;
+    }
+
+    .chip {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.625rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-2, #525252);
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg-2, #eef4f1);
+        padding: 0.2rem 0.45rem;
     }
 
     .stage-wrap {
         position: relative;
         display: grid;
         place-items: center;
-        min-height: clamp(320px, 58vw, 480px);
-        border: 1px dashed var(--stage-border);
-        background-image:
-            linear-gradient(var(--stage-grid) 1px, transparent 1px),
-            linear-gradient(90deg, var(--stage-grid) 1px, transparent 1px);
-        background-size: 28px 28px;
+        min-height: clamp(320px, 58vw, 460px);
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background:
+            linear-gradient(90deg, var(--brut-rule, #d6dedb) 1px, transparent 1px),
+            linear-gradient(0deg, var(--brut-rule, #d6dedb) 1px, transparent 1px),
+            var(--brut-bg-2, #eef4f1);
+        background-size:
+            28px 28px,
+            28px 28px,
+            auto;
     }
 
-    .perspective-stage {
+    .drag-stage {
         width: min(62vw, 380px);
         aspect-ratio: 1;
         display: grid;
         place-items: center;
-        border: 1px solid var(--constraint-border);
-        border-radius: 8px;
-        background: var(--constraint-bg);
+        border: 1px dashed var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg, #f8fcfb);
     }
 
     .axis-label {
         position: absolute;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-family: var(--brut-mono, monospace);
         text-transform: uppercase;
-        font-size: 0.68rem;
-        color: var(--axis-label);
+        font-size: 0.625rem;
+        letter-spacing: 0.08em;
+        color: var(--brut-ink-3, #9a9a9a);
         pointer-events: none;
     }
 
@@ -223,27 +174,27 @@
         bottom: 0.65rem;
     }
 
-    :global(.perspective-stage [aria-label='Draggable perspective card']) {
+    :global(.drag-stage [aria-label='Draggable perspective card']) {
         position: relative;
         display: grid;
         grid-template-rows: auto 1fr auto;
         align-items: center;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-family: var(--brut-mono, monospace);
         text-transform: uppercase;
         font-size: 0.72rem;
         font-weight: 800;
-        color: var(--drag-card-text);
+        color: var(--brut-accent-ink, #f8fcfb);
         letter-spacing: 0.08em;
         user-select: none;
         overflow: hidden;
     }
 
-    :global(.perspective-stage [aria-label='Draggable perspective card']::before) {
+    :global(.drag-stage [aria-label='Draggable perspective card']::before) {
         content: '';
         position: absolute;
-        inset: 9px;
-        border: 1px solid var(--drag-card-frame);
-        border-radius: 5px;
+        inset: 8px;
+        border: 1px solid var(--brut-accent-ink, #f8fcfb);
+        opacity: 0.32;
         pointer-events: none;
     }
 
@@ -274,13 +225,12 @@
         display: grid;
         grid-template-columns: repeat(2, 5px);
         gap: 6px;
-        opacity: 0.52;
+        opacity: 0.62;
     }
 
     .tile-grip i {
         width: 5px;
         aspect-ratio: 1;
-        border-radius: 999px;
         background: currentColor;
     }
 
@@ -289,7 +239,7 @@
             min-height: 360px;
         }
 
-        .perspective-stage {
+        .drag-stage {
             width: min(72vw, 320px);
         }
     }

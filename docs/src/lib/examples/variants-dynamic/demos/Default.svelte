@@ -12,9 +12,9 @@
     type State = (typeof STATES)[number]
 
     const NEXT_LABEL: Record<State, string> = {
-        fanned: 'Explode →',
-        exploded: 'Stack →',
-        stacked: 'Fan out →'
+        fanned: 'explode →',
+        exploded: 'stack →',
+        stacked: 'fan out →'
     }
 
     let state = $state<State>('fanned')
@@ -61,8 +61,6 @@
         })
     }
 
-    const hues = ['#f97316', '#ec4899', '#8b5cf6', '#06b6d4', '#22c55e', '#eab308', '#ef4444']
-
     function cycle() {
         state = STATES[(STATES.indexOf(state) + 1) % STATES.length]
     }
@@ -70,27 +68,13 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div
-        style={styleString(() => ({
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '440px',
-            padding: '2rem'
-        }))}
-    >
-        <div
-            style={styleString(() => ({
-                position: 'relative',
-                width: '100%',
-                height: '280px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-            }))}
-        >
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// variants-dynamic</span>
+            <span class="micro readout">state: {state}</span>
+        </div>
+
+        <div class="stage">
             {#each cards as i (i)}
                 <motion.div
                     custom={i}
@@ -106,20 +90,18 @@
                         position: 'absolute',
                         width: '110px',
                         height: '160px',
-                        borderRadius: 12,
-                        background: `linear-gradient(155deg, ${hues[i]} 0%, ${hues[(i + 3) % hues.length]} 100%)`,
-                        boxShadow:
-                            '0 14px 38px -12px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.12) inset, 0 1px 0 rgba(255,255,255,0.25) inset',
-                        border: '2px solid rgba(255,255,255,0.6)',
+                        background: 'var(--brut-bg-2, #eef4f1)',
+                        border: '1px solid var(--brut-rule-2, #bbc4c0)',
+                        boxShadow: '5px 5px 0 var(--brut-rule, #d6dedb)',
                         display: 'flex',
                         alignItems: 'flex-end',
-                        justifyContent: 'center',
+                        justifyContent: 'flex-start',
                         padding: '0.75rem',
-                        color: 'white',
-                        fontFamily: 'JetBrains Mono Variable, ui-monospace, monospace',
+                        color: 'var(--brut-ink, #0a0a0a)',
+                        fontFamily: 'var(--brut-mono, monospace)',
                         fontWeight: 700,
                         fontSize: '0.9rem',
-                        textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                        letterSpacing: '0.04em',
                         cursor: 'pointer',
                         zIndex: i + 1
                     }))}
@@ -129,40 +111,28 @@
             {/each}
         </div>
 
-        <motion.button
-            whileTap={{ scale: 0.95 }}
-            whileHover={{ scale: 1.04, backgroundColor: 'var(--color-brand-600)' }}
-            onclick={cycle}
-            style={styleString(() => ({
-                marginTop: '1.5rem',
-                padding: '0.65rem 1.5rem',
-                background: 'var(--color-brand-500)',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: 10,
-                fontSize: '0.95rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                letterSpacing: '0.02em',
-                boxShadow:
-                    '0 4px 14px -4px color-mix(in oklab, var(--color-brand-500) 70%, transparent)'
-            }))}
-        >
-            {NEXT_LABEL[state]}
-        </motion.button>
-
-        <p
-            style={styleString(() => ({
-                marginTop: '0.85rem',
-                fontSize: '0.78rem',
-                color: 'var(--color-text-muted)',
-                fontFamily: 'JetBrains Mono Variable, ui-monospace, monospace',
-                letterSpacing: '0.02em'
-            }))}
-        >
-            // state: <b style="color: var(--color-brand-500)">{state}</b> — every card resolves
-            <code style="color: var(--color-text-primary)">variants[{state}](i)</code>
-        </p>
+        <div class="strip-foot">
+            <motion.button
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                onclick={cycle}
+                style={styleString(() => ({
+                    fontFamily: 'var(--brut-mono, monospace)',
+                    fontSize: '0.6875rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                    border: '1px solid var(--brut-accent, #247768)',
+                    backgroundColor: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))',
+                    color: 'var(--brut-accent, #247768)',
+                    padding: '0.5rem 0.875rem',
+                    cursor: 'pointer'
+                }))}
+            >
+                {NEXT_LABEL[state]}
+            </motion.button>
+            <span class="micro">every card resolves variants[{state}](i)</span>
+        </div>
     </div>
 </div>
 
@@ -171,7 +141,53 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 2rem;
-        min-height: 540px;
+        padding: 1.5rem;
+        min-height: 480px;
+    }
+
+    .strip {
+        width: 100%;
+        max-width: 560px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .readout {
+        color: var(--brut-accent, #247768);
+        text-transform: none;
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
+    }
+
+    .stage {
+        position: relative;
+        height: 280px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 </style>

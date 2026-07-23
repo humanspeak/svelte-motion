@@ -29,7 +29,9 @@
     import {
         animateSingleValue,
         calcBoxDelta,
+        cancelFrame,
         createDelta,
+        frame,
         isDeltaZero,
         isMotionValue,
         motionValue,
@@ -47,6 +49,7 @@
     import { isAnimationControls } from '$lib/utils/animationControls.svelte'
     import { attachWhileTap } from '$lib/utils/interaction'
     import { attachWhileHover, computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
+    import { createGestureCoordinator } from '$lib/utils/gestureCoordinator'
     import { attachWhileFocus } from '$lib/utils/focus'
     import { attachWhileInView } from '$lib/utils/inView.svelte'
     import {
@@ -57,6 +60,8 @@
         setCompositorHints,
         observeLayoutChanges,
         selectLayoutDependencies,
+        sizeCorrectionSeedEvent,
+        sizeCorrectionEndEvent,
         type RectLike
     } from '$lib/utils/layout'
     import type { SvelteHTMLElements } from 'svelte/elements'
@@ -334,6 +339,23 @@
         }
         return values
     }
+    // Non-transform authored base values (currently `opacity`) captured ONCE
+    // from the DOM at element creation while at rest, mirroring upstream
+    // `VisualElement.baseTarget` (read once, never per gesture). Threaded into
+    // `computeHoverBaseline` so hover-end restores the true rest value instead
+    // of a mid-animation transient — reading live `getComputedStyle` at each
+    // hover START would capture a partway value on rapid hover/unhover cycles.
+    // Only keys NOT driven by `initial`/`animate` matter here: for driven keys
+    // the baseline resolves from those records first, so a value captured mid
+    // enter-animation is never consulted. Populated in the mount effect below.
+    let baseStyleValues: Record<string, string | number> | null = null
+    const captureBaseStyleValues = () => {
+        if (baseStyleValues || !element) return
+        const cs = getComputedStyle(element)
+        const opacity = cs.getPropertyValue('opacity')
+        baseStyleValues = opacity ? { opacity } : {}
+    }
+    const getBaseStyleValues = (): Record<string, unknown> => baseStyleValues ?? {}
     let liveGestureTransform = $state<string | null>(null)
     let liveGestureTransformValues: Record<string, string | number> | null = null
     const serializedStyleWithLiveGestureTransform = $derived.by(() => {
@@ -936,6 +958,10 @@
     }
 
     const activeAnimationControls = new SvelteSet<StoppableAnimationControl>()
+    // Animatable channel names of the in-flight controls animation (non-templated
+    // path only). Captured at start so `stop()` knows which channels to snapshot
+    // from the frozen DOM; empty when nothing (or only a templated transform) runs.
+    const activeAnimationControlsKeys = new SvelteSet<string>()
     let animationControlsGeneration = 0
     let animationControlsHasReceivedCommand = false
     let lastAnimationControlsTarget = $state<Record<string, unknown> | undefined>(undefined)
@@ -1230,12 +1256,100 @@
                 transformTemplateProp
             )
         )
-        lastAnimationControlsTarget = transformedTarget
+        // Accumulate: successive commands may target disjoint keys; each
+        // held value persists until a later command overwrites it (matching
+        // upstream's per-motion-value holds).
+        lastAnimationControlsTarget = {
+            ...(lastAnimationControlsTarget ?? {}),
+            ...transformedTarget
+        }
         enterAnimationSettled = true
     }
 
+    /**
+     * Read the element's currently rendered (frozen) values for the given
+     * animatable channels straight off computed style. Lets a stopped
+     * animation's mid-flight value be folded back into the controls settle
+     * state, mirroring upstream stopping each MotionValue at its instantaneous
+     * value. Only transform channels and opacity are recoverable this way.
+     *
+     * @param {HTMLElement} el The element whose committed transform/opacity to read.
+     * @param {Set<string>} keys The animatable channel names that were in flight.
+     * @returns {Record<string, unknown>} A target record (channel → numeric value)
+     *   for the readable keys; keys with no computed-style representation are skipped.
+     */
+    const snapshotFrozenControlsValues = (
+        el: HTMLElement,
+        keys: Iterable<string>
+    ): Record<string, unknown> => {
+        const computed = getComputedStyle(el)
+        // Parse the computed matrix by hand (like readTransformScale): the test
+        // environment has no DOMMatrix, and computed transforms serialize as
+        // `matrix(a,b,c,d,e,f)` or `matrix3d(...)`. For a non-skewed matrix,
+        // hypot of each column is that axis' scale regardless of rotation;
+        // e/f are the translations; atan2(b, a) is the Z rotation — mirroring
+        // how the transform template re-serializes the same channels.
+        const transform = computed.transform
+        const parts =
+            transform && transform !== 'none'
+                ? (transform.match(/matrix(?:3d)?\(([^)]+)\)/)?.[1] ?? '')
+                      .split(',')
+                      .map((part) => Number.parseFloat(part.trim()))
+                : []
+        const is3d = transform.startsWith('matrix3d')
+        const a = parts.length > 0 ? parts[0] : 1
+        const b = parts.length > 0 ? parts[1] : 0
+        const c = parts[is3d ? 4 : 2] ?? 0
+        const d = parts[is3d ? 5 : 3] ?? 1
+        const tx = parts[is3d ? 12 : 4] ?? 0
+        const ty = parts[is3d ? 13 : 5] ?? 0
+        const scaleX = Math.hypot(a, b)
+        const scaleY = Math.hypot(c, d)
+        const rotate = (Math.atan2(b, a) * 180) / Math.PI
+        const opacity = Number.parseFloat(computed.opacity)
+
+        const snapshot: Record<string, unknown> = {}
+        // Only fold in finite readings; a channel we can't read stays at its
+        // prior settle value rather than being wiped to NaN.
+        const put = (key: string, value: number) => {
+            if (Number.isFinite(value)) snapshot[key] = value
+        }
+        for (const key of keys) {
+            switch (key) {
+                case 'opacity':
+                    put('opacity', opacity)
+                    break
+                case 'scale':
+                    put('scale', scaleX)
+                    break
+                case 'scaleX':
+                    put('scaleX', scaleX)
+                    break
+                case 'scaleY':
+                    put('scaleY', scaleY)
+                    break
+                case 'x':
+                case 'translateX':
+                    put(key, tx)
+                    break
+                case 'y':
+                case 'translateY':
+                    put(key, ty)
+                    break
+                case 'rotate':
+                case 'rotateZ':
+                    put(key, rotate)
+                    break
+                default:
+                    // Channels without a computed-style representation (e.g. skew,
+                    // 3D rotate) are left to their prior settle value.
+                    break
+            }
+        }
+        return snapshot
+    }
+
     const stopAnimationControlsAnimations = () => {
-        animationControlsHasReceivedCommand = true
         animationControlsGeneration += 1
 
         // The templated-transform path animates MotionValues that are not part of
@@ -1243,8 +1357,10 @@
         // so a public `controls.stop()` would otherwise leak a running templated
         // transform animation (and its style-effect cleanup). Upstream stops a
         // VisualElement by stopping all of its values; mirror that here. (#402)
+        const templatedWasActive = templatedTransformAnimationControls.length > 0
         cleanupTemplatedTransformAnimations()
 
+        const hadActiveControls = activeAnimationControls.size > 0
         for (const control of activeAnimationControls) {
             if (typeof control.stop === 'function') {
                 control.stop()
@@ -1254,15 +1370,42 @@
         }
         activeAnimationControls.clear()
 
-        if (!element) return
-        if (typeof element.getAnimations !== 'function') return
-        for (const animation of element.getAnimations()) {
-            try {
-                animation.commitStyles?.()
-            } catch {
-                // Ignore unsupported commitStyles cases.
+        // Snapshot which channels were mid-flight, then reset for the next command.
+        const snapshotKeys = [...activeAnimationControlsKeys]
+        activeAnimationControlsKeys.clear()
+
+        if (element && typeof element.getAnimations === 'function') {
+            for (const animation of element.getAnimations()) {
+                try {
+                    animation.commitStyles?.()
+                } catch {
+                    // Ignore unsupported commitStyles cases.
+                }
+                animation.cancel()
             }
-            animation.cancel()
+        }
+
+        // An idle stop (nothing was running) must leave the resting state alone:
+        // just flipping `animationControlsHasReceivedCommand` would make the
+        // render fall through to the (empty) controls target and snap the element
+        // to base. Only a stop that actually interrupted a command settles.
+        if (!(templatedWasActive || hadActiveControls || snapshotKeys.length > 0)) return
+        animationControlsHasReceivedCommand = true
+
+        // Fold the FROZEN mid-flight value into the settle state so the next
+        // reactive style flush rewrites the transform from where stop() left it,
+        // not from a stale previous target. Upstream stops each value in place
+        // (animation-controls.ts → stopAnimation → value.stop()). The templated
+        // path is left as-is (`snapshotKeys` is empty for it — see #402 above).
+        if (element && snapshotKeys.length > 0) {
+            const frozen = snapshotFrozenControlsValues(element, snapshotKeys)
+            if (isNotEmpty(frozen)) {
+                lastAnimationControlsTarget = {
+                    ...(lastAnimationControlsTarget ?? {}),
+                    ...frozen
+                }
+                enterAnimationSettled = true
+            }
         }
     }
 
@@ -1322,6 +1465,10 @@
                 )
             } else {
                 cleanupTemplatedTransformAnimations()
+                // Record the channels now in flight so a mid-flight stop() can
+                // snapshot exactly these from the frozen DOM (and no others).
+                activeAnimationControlsKeys.clear()
+                for (const key of Object.keys(payload)) activeAnimationControlsKeys.add(key)
                 promises.push(
                     trackAnimationControlsControl(
                         animate(element, payload as DOMKeyframesDefinition, transitionAnimate)
@@ -1337,6 +1484,10 @@
             throw error
         }
         if (controlsGeneration !== animationControlsGeneration) return
+        // Completed naturally: the target is now the settle value, so the
+        // in-flight channel set is stale — clear it so a later idle stop() is a
+        // true no-op rather than snapshotting a long-finished animation.
+        activeAnimationControlsKeys.clear()
         applyAnimationControlsTarget(definition)
         onAnimationCompleteProp?.(definition as unknown as DOMKeyframesDefinition)
     }
@@ -1436,7 +1587,13 @@
             // values collapse keyframe arrays to their last element
             // (animate={{x:[0,100,50]}} rests at 50). (#377)
             enterAnimationSettled
-                ? renderedAnimateBaseline
+                ? // Controls-driven elements settle on the last imperative
+                  // target, not the (empty) declarative baseline — otherwise
+                  // the template rewrite wipes a non-neutral final transform
+                  // (e.g. a variant ending at scaleX 0.66 snaps to identity).
+                  animateControls && animationControlsHasReceivedCommand
+                    ? lastAnimationControlsTarget
+                    : renderedAnimateBaseline
                 : animateControls &&
                     !animationControlsHasReceivedCommand &&
                     isNotEmpty(initialKeyframes)
@@ -2157,6 +2314,19 @@
 
     let explicitLayoutSnapshot: RectLike | null = null
     let lastRect: RectLike | null = null
+    // Coordinates the two delivery paths so one layout change produces exactly
+    // one FLIP commit (upstream guarantees one measure/animate pass per commit:
+    // MeasureLayout.tsx getSnapshotBeforeUpdate→componentDidUpdate + the
+    // create-projection-node animationId repeat guard). A change to the
+    // element's OWN `class` is seen by BOTH the reactive path (`classProp` is a
+    // tracked layout dependency) and the DOM self-attribute observer (its
+    // `attributeFilter` includes `class`). The observer commits first on its
+    // microtask; `commitObservedLayout` bumps this serial whenever it commits a
+    // changed rect, and `runReactiveCommit` (running later on frame.postRender)
+    // uses the advance to detect that its own snapshot's change was already
+    // committed — so it skips the duplicate re-commit that would otherwise
+    // restart the FLIP from origin and double-fire `onProjectionUpdate`.
+    let observerCommitSerial = 0
     // Reactive deps the measure effects read to decide when to re-snapshot and
     // FLIP. When `layoutDependency` is set, gate measurement on *only* that
     // value so frequent renders that touch class/style/etc. no longer force a
@@ -2192,6 +2362,67 @@
         motionDomProjectionUpdatePending = true
     })
 
+    // Reactive (Svelte-owned) layout commits race the DOM patch: this
+    // post-effect can run before the flush's style writes land — notably a
+    // PARENT's object-style change repositioning this `layout` element,
+    // which motion-dom's styleEffect batches onto the frameloop's render
+    // phase. Measuring then (or on upstream's microtask flush) reads the
+    // OLD layout, sees no change, and skips the animation — a visible snap.
+    // Defer the measure + commit to frame.postRender — after the frameloop's
+    // style writes, still pre-paint — and drive the animation through the
+    // same explicit-snapshot commit the observer path uses.
+    let reactiveCommitPrevious: RectLike | null = null
+    // Snapshot of `observerCommitSerial` taken when this reactive commit was
+    // scheduled. If the observer path commits a changed rect before the
+    // postRender callback runs, the serial advances past this captured value.
+    let reactiveCommitSerialAtSchedule = 0
+
+    const runReactiveCommit = () => {
+        const prev = reactiveCommitPrevious
+        reactiveCommitPrevious = null
+        if (!(element && prev)) return
+        // A PROPER ANCESTOR mid size-corrected FLIP (`runBoxSizeAnimation`)
+        // re-slots this child every frame. This deferred (postRender) commit
+        // runs AFTER the ancestor set `data-layout-size-animation`, so it can
+        // see it — and it runs after the size-correction seed already reset the
+        // child's cache. Committing a FLIP here (e.g. from the `.state` label's
+        // copy→copied class flip) would re-apply the very enter transform the
+        // seed cancelled, painting the one-frame pop. Skip it entirely; the
+        // observer path keeps the cache fresh while the ancestor animates.
+        if (element.parentElement?.closest('[data-layout-size-animation]')) return
+        const next = measureLayoutRect()
+        if (!next) return
+        // The DOM observer already consumed this exact change: it committed a
+        // changed rect on its microtask (serial advanced since this callback
+        // was scheduled) AND the cached `lastRect` already equals `next`. The
+        // FLIP is already running from the observer's commit — re-committing
+        // from THIS path's pre-patch snapshot would restart it from origin and
+        // emit a second `onProjectionUpdate` for one logical change. Skip both
+        // the changed emit and the commit; the observer already emitted.
+        // (Both conditions are required so a genuine reactive-only delta the
+        // observer never saw still commits, and the no-delta idle event below
+        // is untouched — the observer only bumps the serial on a real change.)
+        const observerAlreadyCommitted =
+            observerCommitSerial !== reactiveCommitSerialAtSchedule &&
+            lastRect !== null &&
+            !hasRectChanged(lastRect, next)
+        if (observerAlreadyCommitted) return
+        // Svelte-owned update: fan out the snapshot→measure delta to
+        // `onProjectionUpdate` subscribers (zero deltas included — the
+        // legacy node notified on every willUpdate/didUpdate pair, and the
+        // idle "changed=false" event is part of the observable contract).
+        emitProjectionUpdate(prev, next)
+        if (hasRectChanged(prev, next)) {
+            lastRect = next
+            motionDomProjection?.commitObservedLayoutChange(prev)
+        }
+        // No delta from THIS path's snapshot: leave `lastRect` alone. The
+        // snapshot may have raced the DOM patch (measured post-patch, so
+        // prev === next), and overwriting the cache here would poison the
+        // observer path's diff — it would compare new-vs-new and skip the
+        // FLIP entirely (an intermittent snap, ordering-dependent).
+    }
+
     $effect(() => {
         const shouldProject = element && layoutProp && isLoaded === 'ready' && hasLayoutFeatures
         trackLayoutProjectionDependencies()
@@ -2200,19 +2431,29 @@
         motionDomProjectionUpdatePending = false
         const previous = explicitLayoutSnapshot
         explicitLayoutSnapshot = null
-        if (previous) {
-            const next = measureLayoutRect()
-            if (next) {
-                lastRect = next
-                // Svelte-owned update: fan out the snapshot→measure delta to
-                // `onProjectionUpdate` subscribers (zero deltas included —
-                // the legacy node notified on every willUpdate/didUpdate
-                // pair, and the idle "changed=false" event is part of the
-                // observable contract).
-                emitProjectionUpdate(previous, next)
-            }
+        if (!previous) {
+            motionDomProjection?.didUpdate()
+            return
         }
-        motionDomProjection?.didUpdate()
+        // Keep the OLDEST pending snapshot: with several reactive updates
+        // before the frame, that is what is still visually on screen.
+        // (Re-scheduling an already-queued callback is a frameloop no-op.)
+        // Capture the observer serial alongside the oldest snapshot so a
+        // subsequent observer commit (which runs on its microtask, after this
+        // synchronous effect) advances the serial past this captured value.
+        if (reactiveCommitPrevious === null) {
+            reactiveCommitPrevious = previous
+            reactiveCommitSerialAtSchedule = observerCommitSerial
+        }
+        frame.postRender(runReactiveCommit)
+    })
+
+    // Cancel a pending reactive commit when the component tears down.
+    $effect(() => {
+        return () => {
+            reactiveCommitPrevious = null
+            cancelFrame(runReactiveCommit)
+        }
     })
 
     // Subscribe the consumer's `onLayoutMeasure` callback to the adapter's
@@ -2262,6 +2503,28 @@
                 return
             }
 
+            // A PROPER ANCESTOR mid size-corrected FLIP (`runBoxSizeAnimation`,
+            // e.g. a `layout` button whose width springs between "copy" and
+            // "copied") re-slots this `layout`/`layout="position"` child every
+            // frame as it grows. The child must NOT FLIP each frame (that would
+            // fight the parent), so it tracks its natural reflowed slot — but
+            // its cached layout must stay fresh, or the parent's single-step
+            // completion re-slot surfaces the whole accumulated delta as a
+            // one-frame phantom FLIP (an ~8px pop that then glides back).
+            // Seed to the current slot instead: keep the cache aligned with the
+            // in-flight animation so completion produces a zero delta and no
+            // uncompensated frame ever renders.
+            const hasSizeAnimatingAncestor = !!element!.parentElement?.closest(
+                '[data-layout-size-animation]'
+            )
+            if (hasSizeAnimatingAncestor) {
+                finishFlipAnimations(element!)
+                lastRect = measureLayoutRect()
+                motionDomProjection?.seedLayout()
+                motionDomProjection?.finishAnimation()
+                return
+            }
+
             const hasPresenceHold = element!.hasAttribute(presenceLayoutHoldAttribute)
             const hasHiddenWaitEnter = !!element!.querySelector(
                 '[data-presence-wait-hidden="true"]'
@@ -2294,6 +2557,11 @@
             const previous = lastRect
             lastRect = next
             if (previous && hasRectChanged(previous, next)) {
+                // Mark that the observer path consumed a changed rect on this
+                // commit, so a reactive commit scheduled for the same logical
+                // change (`runReactiveCommit`) can detect the overlap and skip
+                // its duplicate re-commit.
+                observerCommitSerial += 1
                 // Observed layout change: fan out to `onProjectionUpdate`
                 // subscribers before branching, so drag-pinned and
                 // size-corrected commits report their deltas too (the
@@ -2382,12 +2650,36 @@
             })
         }
 
+        // A size-animating `layout` ancestor fires these synchronously at the
+        // start/end of its `runBoxSizeAnimation` (before the next paint). On
+        // START, BLOCK this child's projection: any enter/re-slot FLIP it
+        // committed a beat earlier — before the ancestor's
+        // `data-layout-size-animation` attribute was set, so the commit-path
+        // guard could not yet see it — is finished and its scheduled frameloop
+        // update is prevented from resurrecting the transform. The child then
+        // tracks the growing parent at identity. On END, unblock and re-seed so
+        // later real layout changes animate normally. This is what makes the
+        // fix race-proof: `finishAnimation()` alone can be outrun by a
+        // projection update already queued on the frameloop.
+        const handleSizeCorrectionSeed = () => {
+            lastRect = measureLayoutRect()
+            motionDomProjection?.blockLayoutAnimation()
+        }
+        const handleSizeCorrectionEnd = () => {
+            lastRect = measureLayoutRect()
+            motionDomProjection?.unblockLayoutAnimation()
+        }
+        element!.addEventListener(sizeCorrectionSeedEvent, handleSizeCorrectionSeed)
+        element!.addEventListener(sizeCorrectionEndEvent, handleSizeCorrectionEnd)
+
         const disconnectObservers = observeLayoutChanges(element!, () => scheduleProjectionCommit())
         element!.addEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
 
         return () => {
             disconnectObservers()
             element?.removeEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
+            element?.removeEventListener(sizeCorrectionSeedEvent, handleSizeCorrectionSeed)
+            element?.removeEventListener(sizeCorrectionEndEvent, handleSizeCorrectionEnd)
             lastRect = null
             if (element) {
                 setCompositorHints(element, false)
@@ -2421,6 +2713,12 @@
         runFlipAnimation(element, transforms, prev.transition ?? mergedTransition ?? {})
     })
 
+    // Shared per-element coordination between the hover and tap gesture
+    // systems: active-state flags + a single-writer animation registry
+    // (upstream setActive / protected-keys semantics — see
+    // gestureCoordinator.ts).
+    const gestureCoordinator = createGestureCoordinator()
+
     // whileTap handling via motion-dom's press()
     $effect(() => {
         if (
@@ -2440,7 +2738,9 @@
                     ? ((resolvedWhileHover ?? {}) as Record<string, unknown>)
                     : undefined,
                 hoverFallbackTransition: mergedTransition ?? {},
-                tapTransition: mergedTransition ?? {}
+                tapTransition: mergedTransition ?? {},
+                coordinator: gestureCoordinator,
+                getBaseStyleValues
             }
         )
     })
@@ -2469,8 +2769,10 @@
                 getBaseTransformValues: getStyleTransformValues,
                 getLiveTransformValues: () => liveGestureTransformValues,
                 getBaseTransform: () => userBaseTransform,
-                transformTemplate: transformTemplateProp
-            }
+                transformTemplate: transformTemplateProp,
+                getBaseStyleValues
+            },
+            gestureCoordinator
         )
     })
 
@@ -2539,6 +2841,31 @@
         }
 
         return animateControls.subscribe(subscriber)
+    })
+
+    // Detaching a controls object clears its per-attachment settle state, so a
+    // later idle re-attach cannot resurrect a stale imperative target. Upstream
+    // is last-writer-wins per motion value: swapping `animate={controls}` →
+    // declarative → back to the same idle controls leaves values wherever the
+    // last completed animation put them; an unchanged/idle source re-fires
+    // nothing (motion-dom animation-state.ts `prevProp` diffing). The settle
+    // flags live for one attachment session, matching upstream motion-value
+    // lifetimes bound to the VisualElement.
+    //
+    // Guard on IDENTITY change, not effect re-run: a re-render that keeps the
+    // SAME controls object attached must KEEP the settle state (over-eager
+    // clearing would regress the non-neutral settle-hold — plan 005's
+    // stop-freeze tests and the non-neutral-hold test). Only a swap to a
+    // different controls object (or to a declarative source → `undefined`)
+    // detaches.
+    let prevAttachedControls: unknown = undefined
+    $effect(() => {
+        const current = animateControls
+        if (prevAttachedControls && prevAttachedControls !== current) {
+            animationControlsHasReceivedCommand = false
+            lastAnimationControlsTarget = undefined
+        }
+        prevAttachedControls = current
     })
 
     // Handle key prop changes inside AnimatePresence (simulates React's key-based remounting)
@@ -2733,6 +3060,11 @@
     $effect(() => {
         if (!(element && isLoaded === 'mounting')) return
         markMotionMounted()
+
+        // Capture non-transform authored base values (opacity) from the DOM at
+        // rest, BEFORE any enter/gesture animation runs below, so hover-end can
+        // restore the true authored value rather than a mid-animation transient.
+        captureBaseStyleValues()
 
         pwLog('[motion] main effect running', {
             effectiveAnimate: !!effectiveAnimate,

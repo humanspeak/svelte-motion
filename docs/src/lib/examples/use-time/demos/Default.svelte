@@ -16,20 +16,26 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div class="scene">
-        <div
-            class="orb"
-            style="
-                transform: translate({$x}px, {$y}px) rotate({$rotate}deg) scale({$scale});
-                background: linear-gradient(135deg, hsl({$hue}, 70%, 60%), hsl({$hue +
-                60}, 70%, 50%));
-            "
-        >
-            <div class="inner-glow"></div>
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// use-time</span>
+            <span class="micro state">hue: {Math.round($hue)}°</span>
         </div>
 
-        <div class="time-display">
-            {Math.floor($time / 1000)}s
+        <div class="stage">
+            <div
+                class="tile"
+                style="
+                    transform: translate({$x}px, {$y}px) rotate({$rotate}deg) scale({$scale});
+                    background: linear-gradient(135deg, hsl({$hue}, 62%, 52%), hsl({$hue +
+                    60}, 62%, 44%));
+                "
+            ></div>
+        </div>
+
+        <div class="strip-foot">
+            <span class="micro">motion value: ms since mount</span>
+            <span class="micro state">t = {Math.floor($time / 1000)}s</span>
         </div>
     </div>
 </div>
@@ -39,55 +45,63 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 2rem;
+        padding: 1.5rem;
         min-height: 400px;
     }
 
-    .scene {
-        position: relative;
-        width: 300px;
-        height: 300px;
+    .strip {
+        width: 100%;
+        max-width: 420px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .state {
+        color: var(--brut-accent, #247768);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
+    }
+
+    .stage {
+        height: 16rem;
         display: flex;
         align-items: center;
         justify-content: center;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg-2, #eef4f1);
+        overflow: hidden;
     }
 
-    .orb {
-        width: 120px;
-        height: 120px;
-        border-radius: 50%;
-        position: relative;
-        box-shadow:
-            0 0 40px rgba(255, 255, 255, 0.3),
-            0 0 80px rgba(255, 255, 255, 0.2),
-            inset 0 0 40px rgba(255, 255, 255, 0.2);
+    .tile {
+        width: 108px;
+        height: 108px;
+        border: 1px solid var(--brut-ink, #0a0a0a);
+        box-shadow: 6px 6px 0 var(--brut-rule, #d6dedb);
         will-change: transform;
-    }
-
-    .inner-glow {
-        position: absolute;
-        top: 20%;
-        left: 20%;
-        width: 40%;
-        height: 40%;
-        border-radius: 50%;
-        background: radial-gradient(circle, rgba(255, 255, 255, 0.8), transparent);
-        filter: blur(10px);
-    }
-
-    .time-display {
-        position: absolute;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        font-family: monospace;
-        font-size: 18px;
-        font-weight: bold;
-        color: rgba(255, 255, 255, 0.8);
-        text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-        padding: 8px 16px;
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 20px;
-        backdrop-filter: blur(10px);
     }
 </style>

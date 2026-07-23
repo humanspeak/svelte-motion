@@ -9,6 +9,16 @@
     let sequenceId = 0
     let hydrated = $state(false)
     let frame = $state(0)
+    // Unrelated reactive style channel used to force a `renderedInlineStyle`
+    // recompute after `controls.stop()` — the moment a stale settle state
+    // would rewrite the frozen transform.
+    let pokeOutline = $state('transparent')
+    // Chooses which `animate` source the beam receives: the shared controls
+    // object, or a declarative literal. Swapping controls → declarative →
+    // controls exercises detach/re-attach; upstream is last-writer-wins per
+    // motion value, so a re-attached IDLE controls object must not resurrect a
+    // stale imperative target.
+    let beamUsesControls = $state(true)
     let cardTransform = $state('none')
     let cardOpacity = $state('')
     let orbTransform = $state('none')
@@ -32,6 +42,14 @@
         idle: { opacity: 0.65, y: 0 },
         launch: { opacity: 1, y: -8 },
         success: { opacity: 1, y: 0 }
+    }
+
+    // Ends NON-neutral on purpose: a settle path that wipes the final
+    // transform is invisible when every variant returns to identity.
+    const beamVariants = {
+        idle: { scaleX: 0.16, opacity: 0.35 },
+        launch: { scaleX: 1, opacity: 1 },
+        success: { scaleX: 0.66, opacity: 0.7 }
     }
 
     const transition = { duration: 0.45, ease: 'easeOut' } as const
@@ -65,6 +83,27 @@
         sequenceId += 1
         status = 'stopped'
         controls.stop()
+    }
+
+    // Single slow step (no chaining) so a stop lands cleanly mid-flight with a
+    // wide, predictable window. Linear ease keeps the mid value deterministic.
+    const startSlowLaunch = () => {
+        sequenceId += 1
+        status = 'launching'
+        void controls.start('launch', { duration: 2, ease: 'linear' })
+    }
+
+    // Toggle an unrelated inline-style channel on the beam to trigger a
+    // reactive style flush without touching any animated channel.
+    const poke = () => {
+        pokeOutline = pokeOutline === 'transparent' ? 'rgb(255, 0, 255)' : 'transparent'
+    }
+
+    // Swap the beam's `animate` source between the controls object and a
+    // declarative literal (`{ scaleX: 1 }`), detaching/re-attaching the
+    // controls subscription.
+    const toggleBeamSource = () => {
+        beamUsesControls = !beamUsesControls
     }
 
     onMount(() => {
@@ -128,7 +167,14 @@
             </p>
             <div class="controls" aria-label="Animation controls">
                 <button type="button" data-testid="start" onclick={runSequence}>Start</button>
+                <button type="button" data-testid="start-slow" onclick={startSlowLaunch}
+                    >Start slow</button
+                >
                 <button type="button" data-testid="stop" onclick={stop}>Stop</button>
+                <button type="button" data-testid="poke" onclick={poke}>Poke</button>
+                <button type="button" data-testid="toggle-beam-source" onclick={toggleBeamSource}
+                    >Toggle beam source</button
+                >
                 <button type="button" data-testid="set" onclick={setComplete}>Set complete</button>
                 <button type="button" data-testid="reset" onclick={reset}>Reset</button>
             </div>
@@ -173,6 +219,7 @@
                     animate={controls}
                     variants={cardVariants}
                     {transition}
+                    style="outline: 2px solid {pokeOutline};"
                 >
                     <motion.div
                         class="orb"
@@ -192,6 +239,14 @@
                     >
                         {status}
                     </motion.div>
+                    <motion.div
+                        class="beam"
+                        data-testid="beam"
+                        initial="idle"
+                        animate={beamUsesControls ? controls : { scaleX: 1 }}
+                        variants={beamVariants}
+                        style="width: 160px; height: 8px; background: #4ff0b7; transform-origin: 0 50%; outline: 2px solid {pokeOutline};"
+                    />
                     <span data-testid="run-count">runs: {runCount}</span>
                 </motion.div>
             </div>

@@ -3,6 +3,7 @@
     import {
         animate,
         motion,
+        styleString,
         useMotionTemplate,
         useMotionValue,
         useTransform
@@ -66,59 +67,96 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <!-- Animated gradient border -->
-    <div class="ai-border">
-        <motion.div
-            class="ai-border-ring"
-            style={{ backgroundImage: gradient, opacity: glowOpacity }}
-        />
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// ai-gradient-card</span>
+            <span class="micro readout">generating…</span>
+        </div>
 
-        <div class="ai-border-inner">
-            <div class="ai-card-body">
-                <!-- Temp logo from https://logoipsum.com/ -->
-                <svg
-                    width="40"
-                    height="31"
-                    viewBox="0 0 50 39"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="ai-logo"
-                    aria-hidden="true"
-                >
-                    <path d="M16.4992 2H37.5808L22.0816 24.9729H1L16.4992 2Z" />
-                    <path
-                        d="M17.4224 27.102L11.4192 36H33.5008L49 13.0271H32.7024L23.2064 27.102H17.4224Z"
-                    />
-                </svg>
-
-                <button type="button" class="ai-question">
-                    <img
-                        src="https://api.dicebear.com/8.x/lorelei/svg?seed=Tom&backgroundColor=10b981"
-                        alt="avatar"
-                        class="ai-avatar"
-                    />
-                    <span class="ai-question-text">What is the meaning of life?</span>
-                    <ChevronDown size={16} class="ai-chevron" />
-                </button>
-
-                <p class="ai-output">
-                    Hmm, that's a tough one... The traditional answer is 42, but I don't think
-                    that's clever enough for this demo application. Let me search the internet for
-                    some answers.
-                </p>
-
-                <div class="ai-loading">
-                    <LoaderCircle size={16} class="ai-spinner" />
-                    <span>Committing tomfoolery...</span>
-                </div>
-            </div>
-
-            <!-- Blurred, radially-masked glow spill sharing the same gradient -->
+        <!-- Animated gradient border -->
+        <div class="ai-border">
             <motion.div
-                class="ai-glow-spill"
-                aria-hidden="true"
-                style={{ backgroundImage: gradient, opacity: spillOpacity }}
+                class="ai-border-ring"
+                style={{ backgroundImage: gradient, opacity: glowOpacity }}
             />
+
+            <div class="ai-border-inner">
+                <div class="ai-card-body">
+                    <!-- Temp logo from https://logoipsum.com/ -->
+                    <svg
+                        width="40"
+                        height="31"
+                        viewBox="0 0 50 39"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="ai-logo"
+                        aria-hidden="true"
+                    >
+                        <path d="M16.4992 2H37.5808L22.0816 24.9729H1L16.4992 2Z" />
+                        <path
+                            d="M17.4224 27.102L11.4192 36H33.5008L49 13.0271H32.7024L23.2064 27.102H17.4224Z"
+                        />
+                    </svg>
+
+                    <motion.button
+                        type="button"
+                        class="ai-question"
+                        whileHover={{
+                            backgroundColor: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))'
+                        }}
+                        style={styleString(() => ({
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            width: '100%',
+                            padding: '0.875rem',
+                            border: '1px solid var(--brut-rule-2, #bbc4c0)',
+                            backgroundColor: 'var(--brut-bg-2, #eef4f1)',
+                            color: 'inherit',
+                            textAlign: 'left',
+                            cursor: 'pointer'
+                        }))}
+                    >
+                        <img
+                            src="https://api.dicebear.com/8.x/lorelei/svg?seed=Tom&backgroundColor=10b981"
+                            alt="avatar"
+                            class="ai-avatar"
+                        />
+                        <span class="ai-question-text">What is the meaning of life?</span>
+                        <ChevronDown size={16} class="ai-chevron" />
+                    </motion.button>
+
+                    <p class="ai-output">
+                        Hmm, that's a tough one... The traditional answer is 42, but I don't think
+                        that's clever enough for this demo application. Let me search the internet
+                        for some answers.
+                    </p>
+
+                    <div class="ai-loading">
+                        <motion.span
+                            class="ai-spinner"
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                            style={styleString(() => ({ display: 'inline-flex' }))}
+                        >
+                            <LoaderCircle size={16} />
+                        </motion.span>
+                        <span>Committing tomfoolery...</span>
+                    </div>
+                </div>
+
+                <!-- Blurred, radially-masked glow spill sharing the same gradient -->
+                <motion.div
+                    class="ai-glow-spill"
+                    aria-hidden="true"
+                    style={{ backgroundImage: gradient, opacity: spillOpacity }}
+                />
+            </div>
+        </div>
+
+        <div class="strip-foot">
+            <span class="micro">useMotionValue → useMotionTemplate</span>
+            <span class="micro">conic ring · masked glow</span>
         </div>
     </div>
 </div>
@@ -128,51 +166,63 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 6rem 1rem;
+        padding: 3rem 1.5rem;
         min-height: 480px;
-        background: #f5f5f5;
     }
 
-    :global(.dark) .dk-demo-shell {
-        background: #0a0a0a;
+    .strip {
+        width: 100%;
+        max-width: 24rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .readout {
+        color: var(--brut-accent, #247768);
+        text-transform: none;
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
     }
 
     .ai-border {
-        /* Theme tokens — light defaults; overridden under :global(.dark). The
-           rotating conic gradient (ring + glow) is theme-agnostic. */
-        --ai-card-bg: #ffffff;
-        --ai-border-col: #e5e5e5;
-        --ai-field-bg: #fafafa;
-        --ai-field-bg-hover: #f0f0f0;
-        --ai-logo: #171717;
-        --ai-output: #3f3f46;
-
         position: relative;
         width: 100%;
-        max-width: 24rem;
         padding: 1px;
-        border: 1px solid var(--ai-border-col);
-        border-radius: 1.5rem;
-    }
-
-    :global(.dark) .ai-border {
-        --ai-card-bg: #171717;
-        --ai-border-col: #404040;
-        --ai-field-bg: #0a0a0a;
-        --ai-field-bg-hover: #171717;
-        --ai-logo: #fafafa;
-        --ai-output: #d4d4d4;
+        border: 1px solid var(--brut-ink, #0a0a0a);
+        box-shadow: 6px 6px 0 var(--brut-rule, #d6dedb);
     }
 
     .ai-border :global(.ai-border-ring) {
         position: absolute;
         inset: 0;
-        border-radius: inherit;
     }
 
     .ai-border-inner {
         position: relative;
-        border-radius: inherit;
         overflow: hidden;
     }
 
@@ -181,7 +231,7 @@
         display: grid;
         gap: 1.5rem;
         padding: 1rem 1rem 1.5rem;
-        background: var(--ai-card-bg);
+        background: var(--brut-bg, #f8fcfb);
     }
 
     .ai-border :global(.ai-glow-spill) {
@@ -206,26 +256,7 @@
     }
 
     .ai-logo {
-        fill: var(--ai-logo);
-    }
-
-    .ai-question {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        width: 100%;
-        padding: 1rem;
-        border: 1px solid var(--ai-border-col);
-        border-radius: 1rem;
-        background: var(--ai-field-bg);
-        color: inherit;
-        text-align: left;
-        cursor: pointer;
-        transition: background-color 0.15s ease;
-    }
-
-    .ai-question:hover {
-        background: var(--ai-field-bg-hover);
+        fill: var(--brut-ink, #0a0a0a);
     }
 
     .ai-avatar {
@@ -238,15 +269,16 @@
     .ai-question-text {
         flex: 1;
         min-width: 0;
+        font-family: var(--brut-mono, monospace);
         font-size: 0.75rem;
-        color: #737373;
+        color: var(--brut-ink-2, #525252);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    .ai-question :global(.ai-chevron) {
-        color: #737373;
+    :global(.ai-chevron) {
+        color: var(--brut-ink-3, #9a9a9a);
         flex-shrink: 0;
     }
 
@@ -254,31 +286,17 @@
         margin: 0;
         font-size: 0.875rem;
         line-height: 1.625;
-        color: var(--ai-output);
+        color: var(--brut-ink-2, #525252);
     }
 
     .ai-loading {
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        font-size: 0.75rem;
-        color: #737373;
-    }
-
-    .ai-loading :global(.ai-spinner) {
-        color: #737373;
-        animation: ai-spin 1s linear infinite;
-    }
-
-    @keyframes ai-spin {
-        to {
-            transform: rotate(360deg);
-        }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .ai-loading :global(.ai-spinner) {
-            animation: none;
-        }
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--brut-ink-3, #9a9a9a);
     }
 </style>

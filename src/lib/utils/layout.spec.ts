@@ -1,11 +1,12 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
     computeFlipTransforms,
     measureRect,
     observeLayoutChanges,
     runFlipAnimation,
     selectLayoutDependencies,
-    setCompositorHints
+    setCompositorHints,
+    stripNonChildLayoutStyle
 } from './layout.js'
 
 vi.mock('motion', () => {
@@ -442,7 +443,7 @@ describe('utils/layout', () => {
         vi.unstubAllGlobals()
     })
 
-    it('observeLayoutChanges: ignores layout changes while an ancestor is box-size animating', () => {
+    it('observeLayoutChanges: seeds (not FLIPs) a child while an ancestor is box-size animating', () => {
         const parent = document.createElement('div')
         const el = document.createElement('div')
         parent.setAttribute('data-layout-size-animation', 'true')
@@ -477,7 +478,13 @@ describe('utils/layout', () => {
 
         const cleanup = observeLayoutChanges(el, cb)
 
-        expect(cb).not.toHaveBeenCalled()
+        // A PROPER ancestor is box-size animating, so this child is re-slotted
+        // every frame. The child's transform is still cleared (it must not run
+        // its own FLIP and fight the parent), but the commit fires so the
+        // child's projection cache tracks the in-flight slot via a seed —
+        // without it the parent's completion re-slot lands as a one-frame
+        // phantom FLIP (the whole accumulated delta) on the child.
+        expect(cb).toHaveBeenCalled()
         expect(el.style.transform).toBe('')
         expect(el.style.transformOrigin).toBe('')
         expect(el.style.willChange).toBe('')
@@ -544,6 +551,190 @@ describe('utils/layout', () => {
         vi.unstubAllGlobals()
     })
 
+    describe('observeLayoutChanges: bounded ancestor observation + re-parent re-bind', () => {
+        // These cases exercise the REAL jsdom MutationObserver (async microtask
+        // delivery) rather than the synchronous doubles above, because they
+        // depend on real mutation records (attributeName / oldValue) and on the
+        // ancestor-chain wiring. jsdom has no ResizeObserver, so a no-op stub is
+        // installed; rAF is patched to a real timer so schedule()'s throttle
+        // releases between mutations deterministically.
+        class NoopResizeObserver {
+            observe() {}
+            disconnect() {}
+        }
+        const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 60))
+        let restoreRaf: (() => void) | undefined
+
+        beforeEach(() => {
+            // The shared setup installs fake timers, which freeze setTimeout and
+            // the frame loop; these cases need a real clock so jsdom's async
+            // MutationObserver delivery and the flush timeout actually run.
+            vi.useRealTimers()
+            vi.stubGlobal('ResizeObserver', NoopResizeObserver)
+            const win = window as unknown as {
+                requestAnimationFrame: typeof requestAnimationFrame
+                cancelAnimationFrame: typeof cancelAnimationFrame
+            }
+            const prevRaf = win.requestAnimationFrame
+            const prevCaf = win.cancelAnimationFrame
+            win.requestAnimationFrame = ((fn: FrameRequestCallback) =>
+                setTimeout(
+                    () => fn(performance.now()),
+                    0
+                )) as unknown as typeof requestAnimationFrame
+            win.cancelAnimationFrame = (id: number) => clearTimeout(id)
+            restoreRaf = () => {
+                win.requestAnimationFrame = prevRaf
+                win.cancelAnimationFrame = prevCaf
+            }
+        })
+
+        afterEach(() => {
+            restoreRaf?.()
+            vi.unstubAllGlobals()
+            document.body.innerHTML = ''
+        })
+
+        it('re-slots on a grandparent layout-affecting style change', async () => {
+            const grandparent = document.createElement('div')
+            const wrapper = document.createElement('div')
+            const el = document.createElement('div')
+            grandparent.appendChild(wrapper)
+            wrapper.appendChild(el)
+            document.body.appendChild(grandparent)
+
+            const cb = vi.fn()
+            const cleanup = observeLayoutChanges(el, cb)
+            await flush()
+            cb.mockClear()
+
+            // The middle wrapper's attributes never change; the ONLY signal is
+            // the grandparent's align-items flip two levels up.
+            grandparent.style.alignItems = 'flex-end'
+            await flush()
+
+            expect(cb, 'a grandparent re-slot must be observed').toHaveBeenCalled()
+            cleanup()
+        })
+
+        it('ignores a grandparent style change that only touches an animation channel', async () => {
+            const grandparent = document.createElement('div')
+            const wrapper = document.createElement('div')
+            const el = document.createElement('div')
+            grandparent.appendChild(wrapper)
+            wrapper.appendChild(el)
+            document.body.appendChild(grandparent)
+
+            const cb = vi.fn()
+            const cleanup = observeLayoutChanges(el, cb)
+            await flush()
+            cb.mockClear()
+
+            // transform is written every frame by gesture/FLIP writers and never
+            // re-slots children — the same filter that protects the immediate
+            // parent must apply at ancestor levels or commit storms follow.
+            grandparent.style.transform = 'scale(2)'
+            await flush()
+
+            expect(
+                cb,
+                'an animation-channel-only ancestor change must be filtered'
+            ).not.toHaveBeenCalled()
+            cleanup()
+        })
+
+        it('does not observe beyond MAX_OBSERVED_ANCESTORS (4) levels', async () => {
+            // Chain above el: a1 (1st) … a5 (5th). Only 4 levels are watched.
+            const a5 = document.createElement('div')
+            const a4 = document.createElement('div')
+            const a3 = document.createElement('div')
+            const a2 = document.createElement('div')
+            const a1 = document.createElement('div')
+            const el = document.createElement('div')
+            a5.appendChild(a4)
+            a4.appendChild(a3)
+            a3.appendChild(a2)
+            a2.appendChild(a1)
+            a1.appendChild(el)
+            document.body.appendChild(a5)
+
+            const cb = vi.fn()
+            const cleanup = observeLayoutChanges(el, cb)
+            await flush()
+            cb.mockClear()
+
+            // The 4th ancestor is within the bound — it fires.
+            a4.style.alignItems = 'flex-end'
+            await flush()
+            expect(cb, 'the 4th ancestor is within the bound').toHaveBeenCalled()
+            cb.mockClear()
+
+            // The 5th ancestor is beyond the bound — it must be silent.
+            a5.style.alignItems = 'flex-end'
+            await flush()
+            expect(cb, 'the 5th ancestor is beyond the bound').not.toHaveBeenCalled()
+            cleanup()
+        })
+
+        it('re-binds ancestor observers after the element is re-parented', async () => {
+            const oldParent = document.createElement('div')
+            const newParent = document.createElement('div')
+            const el = document.createElement('div')
+            oldParent.appendChild(el)
+            document.body.appendChild(oldParent)
+            document.body.appendChild(newParent)
+
+            const cb = vi.fn()
+            const cleanup = observeLayoutChanges(el, cb)
+            await flush()
+            cb.mockClear()
+
+            // Imperative move: removal from oldParent is observed → schedule →
+            // rewireIfReparented picks up the new chain.
+            newParent.appendChild(el)
+            await flush()
+            cb.mockClear()
+
+            // The NEW parent's layout style must now drive changes.
+            newParent.style.alignItems = 'flex-end'
+            await flush()
+            expect(cb, 'the new parent must be observed after a re-parent').toHaveBeenCalled()
+            cb.mockClear()
+
+            // The OLD parent must no longer drive changes.
+            oldParent.style.alignItems = 'flex-end'
+            await flush()
+            expect(cb, 'the old parent must be silent after a re-parent').not.toHaveBeenCalled()
+            cleanup()
+        })
+
+        it('cleanup disconnects every observed ancestor level (no leak)', async () => {
+            const a4 = document.createElement('div')
+            const a3 = document.createElement('div')
+            const a2 = document.createElement('div')
+            const a1 = document.createElement('div')
+            const el = document.createElement('div')
+            a4.appendChild(a3)
+            a3.appendChild(a2)
+            a2.appendChild(a1)
+            a1.appendChild(el)
+            document.body.appendChild(a4)
+
+            const cb = vi.fn()
+            const cleanup = observeLayoutChanges(el, cb)
+            await flush()
+            cleanup()
+            cb.mockClear()
+
+            for (const ancestor of [a1, a2, a3, a4]) {
+                ancestor.style.alignItems = 'flex-end'
+            }
+            await flush()
+
+            expect(cb, 'no ancestor may fire after cleanup').not.toHaveBeenCalled()
+        })
+    })
+
     describe('selectLayoutDependencies (#314 layoutDependency)', () => {
         it('gates on only the dependency when one is provided', () => {
             expect(selectLayoutDependencies('order-key', () => ['class', 'style'])).toEqual([
@@ -589,5 +780,82 @@ describe('utils/layout', () => {
             expect(selectLayoutDependencies(arr, fallback)).toEqual([arr])
             expect(fallback).not.toHaveBeenCalled()
         })
+    })
+})
+
+describe('stripNonChildLayoutStyle', () => {
+    it('drops animation channels and keeps layout declarations', () => {
+        expect(
+            stripNonChildLayoutStyle(
+                'align-items: flex-end; transform: scale(2); will-change: transform; opacity: 0.5'
+            )
+        ).toBe('align-items:flex-end')
+    })
+
+    it('drops every filtered channel individually', () => {
+        for (const declaration of [
+            'transform: translateY(4px)',
+            'transform-origin: 0 0',
+            'translate: 10px 20px',
+            'rotate: 45deg',
+            'scale: 1.2',
+            'will-change: transform',
+            'opacity: 0.4',
+            'filter: blur(2px)'
+        ]) {
+            expect(stripNonChildLayoutStyle(declaration), declaration).toBe('')
+        }
+    })
+
+    it('keeps common layout declarations', () => {
+        expect(
+            stripNonChildLayoutStyle(
+                'display: flex; align-items: center; justify-content: space-between; width: 80px; padding: 10px'
+            )
+        ).toBe(
+            'display:flex;align-items:center;justify-content:space-between;width:80px;padding:10px'
+        )
+    })
+
+    it('normalizes whitespace and casing for stable comparison', () => {
+        expect(stripNonChildLayoutStyle('Align-Items:flex-start')).toBe(
+            stripNonChildLayoutStyle('align-items:  flex-start ')
+        )
+        expect(stripNonChildLayoutStyle('TRANSFORM: scale(2)')).toBe('')
+    })
+
+    it('treats transform-only strings as empty', () => {
+        expect(stripNonChildLayoutStyle('transform: translate(1px, 2px); rotate: 45deg')).toBe('')
+        expect(stripNonChildLayoutStyle('')).toBe('')
+    })
+
+    it('splits on the FIRST colon so colon-bearing values survive', () => {
+        expect(stripNonChildLayoutStyle('background-image: url(data:image/png;base64,x)')).toBe(
+            // The `;` inside url() splits the declaration — both sides of a
+            // before/after comparison break identically, so change detection
+            // stays stable even though the value is mangled.
+            'background-image:url(data:image/png'
+        )
+        expect(stripNonChildLayoutStyle('grid-area: 1 / 2 / 3 / 4')).toBe('grid-area:1 / 2 / 3 / 4')
+    })
+
+    it('keeps custom properties (they can drive child layout via var())', () => {
+        expect(stripNonChildLayoutStyle('--gap: 4px; transform: none')).toBe('--gap:4px')
+    })
+
+    it('drops filtered channels regardless of !important', () => {
+        expect(stripNonChildLayoutStyle('transform: scale(2) !important')).toBe('')
+    })
+
+    it('ignores malformed declarations without a colon', () => {
+        expect(stripNonChildLayoutStyle('garbage; align-items: center;;')).toBe(
+            'align-items:center'
+        )
+    })
+
+    it('preserves declaration order (a reorder counts as a change)', () => {
+        expect(stripNonChildLayoutStyle('width: 1px; height: 2px')).not.toBe(
+            stripNonChildLayoutStyle('height: 2px; width: 1px')
+        )
     })
 })

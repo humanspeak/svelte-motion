@@ -46,34 +46,41 @@
         return styleString(() => ({
             height: NOTIFICATION_HEIGHT,
             width: NOTIFICATION_WIDTH,
-            backgroundColor: `#f5f5f5`,
-            borderRadius: 16,
+            backgroundColor: 'var(--brut-bg-2, #eef4f1)',
+            border: '1px solid var(--brut-ink, #0a0a0a)',
+            boxShadow: '6px 6px 0 var(--brut-rule, #d6dedb)',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
             zIndex: N_NOTIFICATIONS - index,
             userSelect: 'none',
-            fontWeight: 600,
-            color: '#0f1115'
+            fontFamily: 'var(--brut-mono, monospace)',
+            fontSize: '0.8125rem',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+            color: 'var(--brut-ink, #0a0a0a)'
         }))
     }
 
     const headerButtonStyle = styleString(() => ({
-        fontSize: '14px',
+        fontFamily: 'var(--brut-mono, monospace)',
+        fontSize: '0.625rem',
+        textTransform: 'uppercase',
+        letterSpacing: '0.06em',
         lineHeight: 1,
         marginRight: '8px',
         padding: '4px 12px',
-        height: 20,
+        height: 22,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 16,
-        color: 'var(--color-text-primary)',
-        backgroundColor: 'var(--color-background)',
+        color: 'var(--brut-accent, #247768)',
+        backgroundColor: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))',
+        border: '1px solid var(--brut-accent, #247768)',
         cursor: 'pointer',
         pointerEvents: 'auto',
-        userSelect: 'none',
-        border: 'none'
+        userSelect: 'none'
     }))
 </script>
 
@@ -113,12 +120,24 @@
                 delay: isOpen ? 0.2 : 0
             }}
         >
-            <motion.h2 style={styleString(() => ({ fontSize: 18, lineHeight: 1, marginLeft: 8 }))}>
+            <motion.h2
+                style={styleString(() => ({
+                    fontFamily: 'var(--brut-mono, monospace)',
+                    fontSize: 16,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    lineHeight: 1,
+                    marginLeft: 8,
+                    color: 'var(--brut-ink, #0a0a0a)'
+                }))}
+            >
                 Notifications
             </motion.h2>
             <motion.button
                 style={headerButtonStyle}
-                whileHover={{ backgroundColor: '#f5f5f5', color: '#0f1115' }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onclick={() => (isOpen = false)}
             >
                 Collapse
@@ -154,7 +173,8 @@
     </motion.div>
 
     <div class="status">
-        State: <span class="state-value">{isOpen ? 'open' : 'closed'}</span>
+        <span class="micro">state:</span>
+        <span class="state-value">{isOpen ? 'open' : 'closed'}</span>
     </div>
 </div>
 
@@ -170,13 +190,25 @@
     }
 
     .status {
-        font-size: 0.875rem;
-        color: var(--color-text-secondary);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
     }
 
     .state-value {
-        font-family: monospace;
-        font-weight: 600;
-        color: var(--color-text-primary);
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: var(--brut-accent, #247768);
     }
 </style>

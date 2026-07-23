@@ -1,6 +1,6 @@
 <script lang="ts">
     import { CircleDot, RotateCcw } from '@lucide/svelte'
-    import { motion, useSpring, useTransform } from '@humanspeak/svelte-motion'
+    import { motion, styleString, useSpring, useTransform } from '@humanspeak/svelte-motion'
 
     const RADIUS = 54
     const CIRCUMFERENCE = 2 * Math.PI * RADIUS
@@ -22,6 +22,34 @@
         percent = Math.round(value * 100)
         progress.set(value)
     }
+
+    // Library-driven button chrome: base style inline, interaction via motion props.
+    const buttonLayout = {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        fontFamily: 'var(--brut-mono, monospace)',
+        fontSize: '0.6875rem',
+        textTransform: 'uppercase',
+        letterSpacing: '0.08em',
+        padding: '0.5rem 0.875rem',
+        cursor: 'pointer'
+    } as const
+    const buttonStyle = styleString(() => ({
+        ...buttonLayout,
+        border: '1px solid var(--brut-rule-2, #bbc4c0)',
+        backgroundColor: 'var(--brut-bg, #f8fcfb)',
+        color: 'var(--brut-ink, #0a0a0a)'
+    }))
+    const buttonPrimaryStyle = styleString(() => ({
+        ...buttonLayout,
+        border: '1px solid var(--brut-accent, #247768)',
+        backgroundColor: 'var(--brut-accent, #247768)',
+        color: 'var(--brut-accent-ink, #f8fcfb)'
+    }))
+    const buttonHover = { scale: 1.04 }
+    const buttonTap = { scale: 0.96 }
+    const buttonTransition = { type: 'spring', stiffness: 500, damping: 30 } as const
 </script>
 
 <!--
@@ -32,16 +60,48 @@
 <!-- dk-strip: docs-kit positioning shell - stripped from the published code. -->
 <div class="dk-demo-shell">
     <div class="toolbar" role="toolbar" aria-label="Progress controls">
-        <button type="button" onclick={() => setProgress(0.25)}>25%</button>
-        <button type="button" onclick={() => setProgress(0.5)}>50%</button>
-        <button type="button" class="primary" onclick={() => setProgress(1)}>
+        <motion.button
+            type="button"
+            onclick={() => setProgress(0.25)}
+            whileHover={buttonHover}
+            whileTap={buttonTap}
+            transition={buttonTransition}
+            style={buttonStyle}
+        >
+            25%
+        </motion.button>
+        <motion.button
+            type="button"
+            onclick={() => setProgress(0.5)}
+            whileHover={buttonHover}
+            whileTap={buttonTap}
+            transition={buttonTransition}
+            style={buttonStyle}
+        >
+            50%
+        </motion.button>
+        <motion.button
+            type="button"
+            onclick={() => setProgress(1)}
+            whileHover={buttonHover}
+            whileTap={buttonTap}
+            transition={buttonTransition}
+            style={buttonPrimaryStyle}
+        >
             <CircleDot size={15} />
             Complete
-        </button>
-        <button type="button" onclick={() => setProgress(0)}>
+        </motion.button>
+        <motion.button
+            type="button"
+            onclick={() => setProgress(0)}
+            whileHover={buttonHover}
+            whileTap={buttonTap}
+            transition={buttonTransition}
+            style={buttonStyle}
+        >
             <RotateCcw size={15} />
             Reset
-        </button>
+        </motion.button>
     </div>
 
     <div class="stage">
@@ -99,53 +159,14 @@
 
 <style>
     .dk-demo-shell {
-        /* Light theme by default; overridden under `html.dark` below. */
-        --demo-bg: #f1f5f9;
-        --demo-stage-bg: #ffffff;
-        --demo-grid: rgba(15, 118, 110, 0.08);
-        --demo-panel-bg: rgba(248, 250, 252, 0.9);
-        --demo-border: #cbd5e1;
-        --demo-panel-border: #d5dee7;
-        --demo-ink: #0f172a;
-        --demo-ink-soft: #475569;
-        --demo-accent: #0f766e;
-        --demo-ring: #0d9488;
-        --demo-line: #0284c7;
-        --demo-dot: #e11d48;
-        --demo-rail: rgba(15, 23, 42, 0.14);
-        --demo-track: rgba(15, 23, 42, 0.1);
-        --demo-btn-bg: #ffffff;
-        --demo-btn-border: #cbd5e1;
-        --demo-glow: transparent;
-
         width: 100%;
         min-height: clamp(420px, calc(100vh - 240px), 560px);
         display: flex;
         flex-direction: column;
         gap: 14px;
         padding: 18px;
-        background: var(--demo-bg);
-        color: var(--demo-ink);
-    }
-
-    :global(html.dark) .dk-demo-shell {
-        --demo-bg: #0d1518;
-        --demo-stage-bg: #071114;
-        --demo-grid: rgba(94, 234, 212, 0.1);
-        --demo-panel-bg: rgba(13, 27, 33, 0.74);
-        --demo-border: #2b4650;
-        --demo-panel-border: rgba(134, 184, 199, 0.42);
-        --demo-ink: #ecfeff;
-        --demo-ink-soft: #9fb9c4;
-        --demo-accent: #67e8f9;
-        --demo-ring: #5eead4;
-        --demo-line: #38bdf8;
-        --demo-dot: #fb7185;
-        --demo-rail: rgba(186, 230, 253, 0.24);
-        --demo-track: rgba(186, 230, 253, 0.16);
-        --demo-btn-bg: #142127;
-        --demo-btn-border: #46616a;
-        --demo-glow: rgba(94, 234, 212, 0.45);
+        background: var(--brut-bg, #f8fcfb);
+        color: var(--brut-ink, #0a0a0a);
     }
 
     .toolbar {
@@ -153,32 +174,6 @@
         flex-wrap: wrap;
         justify-content: center;
         gap: 8px;
-    }
-
-    button {
-        height: 36px;
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-        padding: 0 14px;
-        border: 1px solid var(--demo-btn-border);
-        border-radius: 6px;
-        background: var(--demo-btn-bg);
-        color: var(--demo-ink);
-        font-size: 13px;
-        font-weight: 780;
-        cursor: pointer;
-    }
-
-    button.primary {
-        border-color: var(--demo-ring);
-        background: var(--demo-accent);
-        color: #f0fdfa;
-    }
-
-    :global(html.dark) button.primary {
-        background: #0f766e;
-        color: #ecfeff;
     }
 
     .stage {
@@ -190,10 +185,11 @@
         gap: 18px;
         padding: 20px;
         overflow: hidden;
-        border: 1px solid var(--demo-border);
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
         background:
-            linear-gradient(90deg, var(--demo-grid) 1px, transparent 1px),
-            linear-gradient(0deg, var(--demo-grid) 1px, transparent 1px), var(--demo-stage-bg);
+            linear-gradient(90deg, var(--brut-rule, #d6dedb) 1px, transparent 1px),
+            linear-gradient(0deg, var(--brut-rule, #d6dedb) 1px, transparent 1px),
+            var(--brut-bg-2, #eef4f1);
         background-size: 44px 44px;
     }
 
@@ -207,15 +203,16 @@
     }
 
     .eyebrow {
-        color: var(--demo-accent);
+        color: var(--brut-accent, #247768);
+        font-family: var(--brut-mono, monospace);
         font-size: 11px;
-        font-weight: 850;
+        font-weight: 700;
         letter-spacing: 0.16em;
         text-transform: uppercase;
     }
 
     .title {
-        color: var(--demo-ink);
+        color: var(--brut-ink, #0a0a0a);
         font-size: 18px;
         font-weight: 750;
         line-height: 1.1;
@@ -239,8 +236,9 @@
         flex-direction: column;
         gap: 12px;
         padding: 16px;
-        border: 1px solid var(--demo-panel-border);
-        background: var(--demo-panel-bg);
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg-2, #eef4f1);
+        box-shadow: 6px 6px 0 var(--brut-rule, #d6dedb);
     }
 
     .panel-head {
@@ -252,7 +250,7 @@
     }
 
     .panel-title {
-        color: var(--demo-ink);
+        color: var(--brut-ink, #0a0a0a);
         font-size: 16px;
         font-weight: 750;
         line-height: 1.05;
@@ -266,12 +264,13 @@
 
     .ring-track {
         fill: none;
-        stroke: var(--demo-track);
+        stroke: var(--brut-rule-2, #bbc4c0);
         stroke-width: 12;
     }
 
     .ring-label {
-        fill: var(--demo-ink);
+        fill: var(--brut-ink, #0a0a0a);
+        font-family: var(--brut-mono, monospace);
         font-size: 24px;
         font-weight: 800;
         text-anchor: middle;
@@ -280,20 +279,19 @@
     /* motion.* render their own elements, so Svelte's scoping never reaches them. */
     .dk-demo-shell :global(.ring-value) {
         fill: none;
-        stroke: var(--demo-ring);
+        stroke: var(--brut-accent, #247768);
         stroke-width: 12;
         stroke-linecap: round;
-        filter: drop-shadow(0 0 12px var(--demo-glow));
     }
 
     .dk-demo-shell :global(.track-fill) {
-        stroke: var(--demo-line);
+        stroke: var(--brut-accent, #247768);
         stroke-width: 4;
         stroke-linecap: round;
     }
 
     .dk-demo-shell :global(.track-dot) {
-        fill: var(--demo-dot);
+        fill: var(--brut-ink, #0a0a0a);
     }
 
     .track {
@@ -302,24 +300,23 @@
     }
 
     .track-rail {
-        stroke: var(--demo-rail);
+        stroke: var(--brut-rule-2, #bbc4c0);
         stroke-width: 4;
         stroke-linecap: round;
     }
 
     .hint {
         margin: 0;
-        color: var(--demo-ink-soft);
+        color: var(--brut-ink-2, #525252);
         font-size: 12px;
         line-height: 1.6;
     }
 
     .mono {
         padding: 1px 4px;
-        border-radius: 3px;
-        background: var(--demo-track);
-        color: var(--demo-ring);
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: var(--brut-accent-soft, rgba(36, 119, 104, 0.1));
+        color: var(--brut-accent, #247768);
+        font-family: var(--brut-mono, monospace);
         font-size: 11px;
     }
 

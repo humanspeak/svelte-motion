@@ -3,6 +3,7 @@
         animate,
         createDragControls,
         motion,
+        styleString,
         useAnimate,
         useMotionValue
     } from '@humanspeak/svelte-motion'
@@ -42,66 +43,97 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <section class="drawer-demo" aria-label="Drag to close drawer example">
-        <div class="phone">
-            <div class="screen">
-                <p class="screen-hint">Tap to open the bottom sheet</p>
-                <button class="open-btn" onclick={() => (open = true)}>Open drawer</button>
-            </div>
-
-            {#if open}
-                <motion.div
-                    {@attach scope}
-                    scoped:class="overlay"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    onclick={handleClose}
-                >
-                    <motion.div
-                        bind:ref={sheetRef}
-                        scoped:class="sheet"
-                        style={{ y }}
-                        initial={{ y: '100%' }}
-                        animate={{ y: '0%' }}
-                        transition={{ ease: 'easeInOut' }}
-                        drag="y"
-                        dragControls={controls}
-                        dragListener={false}
-                        dragConstraints={{ top: 0, bottom: 0 }}
-                        dragElastic={{ top: 0, bottom: 0.5 }}
-                        onclick={(e: MouseEvent) => e.stopPropagation()}
-                        onDragEnd={() => {
-                            if (y.get() >= 100) handleClose()
-                        }}
-                    >
-                        <div class="handle-row">
-                            <button
-                                class="handle"
-                                aria-label="Drag to close"
-                                onpointerdown={(e: PointerEvent) => controls.start(e)}
-                            ></button>
-                        </div>
-                        <div class="sheet-body">
-                            <h3>Drag me down to close</h3>
-                            <p>
-                                Grab the handle and pull this sheet down past the threshold to
-                                dismiss it, or tap the backdrop. The drag writes the bound
-                                <code>y</code> MotionValue, and the close animation continues from wherever
-                                you let go.
-                            </p>
-                            <p>
-                                Release before the threshold and it springs back into place with a
-                                little elastic give.
-                            </p>
-                            <div class="rows">
-                                <span></span><span></span><span></span><span></span>
-                            </div>
-                        </div>
-                    </motion.div>
-                </motion.div>
-            {/if}
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// mobile drawer</span>
+            <span class="micro status">state: {open ? 'open' : 'closed'}</span>
         </div>
-    </section>
+
+        <section class="phone-wrap" aria-label="Drag to close drawer example">
+            <div class="phone">
+                <div class="screen">
+                    <p class="screen-hint">Tap to open the bottom sheet</p>
+                    <motion.button
+                        onclick={() => (open = true)}
+                        whileHover={{ y: -2, scale: 1.04 }}
+                        whileTap={{ y: 0, scale: 0.96 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                        style={styleString(() => ({
+                            fontFamily: 'var(--brut-mono, monospace)',
+                            fontSize: '0.6875rem',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.08em',
+                            border: '1px solid var(--brut-accent, #247768)',
+                            backgroundColor: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))',
+                            color: 'var(--brut-accent, #247768)',
+                            padding: '0.6rem 1rem',
+                            cursor: 'pointer'
+                        }))}
+                    >
+                        Open drawer
+                    </motion.button>
+                </div>
+
+                {#if open}
+                    <motion.div
+                        {@attach scope}
+                        scoped:class="overlay"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        onclick={handleClose}
+                    >
+                        <motion.div
+                            bind:ref={sheetRef}
+                            scoped:class="sheet"
+                            style={{ y }}
+                            initial={{ y: '100%' }}
+                            animate={{ y: '0%' }}
+                            transition={{ ease: 'easeInOut' }}
+                            drag="y"
+                            dragControls={controls}
+                            dragListener={false}
+                            dragConstraints={{ top: 0, bottom: 0 }}
+                            dragElastic={{ top: 0, bottom: 0.5 }}
+                            onclick={(e: MouseEvent) => e.stopPropagation()}
+                            onDragEnd={() => {
+                                if (y.get() >= 100) handleClose()
+                            }}
+                        >
+                            <div class="handle-row">
+                                <button
+                                    class="handle"
+                                    aria-label="Drag to close"
+                                    onpointerdown={(e: PointerEvent) => controls.start(e)}
+                                ></button>
+                            </div>
+                            <div class="sheet-body">
+                                <h3>Drag me down to close</h3>
+                                <p>
+                                    Grab the handle and pull this sheet down past the threshold to
+                                    dismiss it, or tap the backdrop. The drag writes the bound
+                                    <code>y</code> MotionValue, and the close animation continues from
+                                    wherever you let go.
+                                </p>
+                                <p>
+                                    Release before the threshold and it springs back into place with
+                                    a little elastic give.
+                                </p>
+                                <div class="rows">
+                                    <span></span><span></span><span></span><span></span>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                {/if}
+            </div>
+        </section>
+
+        <div class="strip-foot">
+            <span class="micro">drag y · threshold 100px</span>
+            <span class="micro">elastic 0.5 · ease in-out</span>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -112,70 +144,61 @@
         padding: clamp(1rem, 4vw, 2.5rem);
     }
 
-    /* Theme tokens — dark is the default (the docs site toggles `.dark` on
-       <html>); the light overrides live in the `html:not(.dark)` block below. */
-    .drawer-demo {
-        --phone-bg: radial-gradient(circle at 30% 18%, #1e293b, #020617 68%);
-        --phone-border: rgb(148 163 184 / 0.22);
-        --phone-shadow: 0 30px 90px rgb(0 0 0 / 0.45);
-        --screen-text: rgb(226 232 240 / 0.66);
-        --btn-bg: linear-gradient(
-            135deg,
-            var(--color-brand-400, #34d399),
-            var(--color-brand-600, #059669)
-        );
-        --btn-text: #022c22;
-        --btn-shadow: 0 10px 24px
-            color-mix(in oklab, var(--color-brand-500, #10b981) 38%, transparent);
-        --scrim: rgb(2 6 23 / 0.55);
-        --sheet-bg: #0f172a;
-        --sheet-border: rgb(148 163 184 / 0.16);
-        --sheet-title: #f1f5f9;
-        --sheet-text: rgb(203 213 225 / 0.78);
-        --handle: rgb(148 163 184 / 0.5);
-        --row: rgb(148 163 184 / 0.14);
-        --code-bg: rgb(148 163 184 / 0.16);
-        --code-text: #e2e8f0;
+    .strip {
+        width: 100%;
+        max-width: min(360px, 92vw);
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
 
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .status {
+        color: var(--brut-accent, #247768);
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
+    }
+
+    .phone-wrap {
         display: grid;
         place-items: center;
         width: 100%;
     }
 
-    :global(html:not(.dark)) .drawer-demo {
-        --phone-bg: radial-gradient(circle at 30% 18%, #ffffff, #eef2ff 70%);
-        --phone-border: rgb(15 23 42 / 0.12);
-        --phone-shadow: 0 24px 70px rgb(15 23 42 / 0.16);
-        --screen-text: rgb(15 23 42 / 0.56);
-        --btn-bg: linear-gradient(
-            135deg,
-            var(--color-brand-400, #34d399),
-            var(--color-brand-600, #059669)
-        );
-        --btn-text: #022c22;
-        --btn-shadow: 0 10px 24px
-            color-mix(in oklab, var(--color-brand-600, #059669) 28%, transparent);
-        --scrim: rgb(15 23 42 / 0.4);
-        --sheet-bg: #ffffff;
-        --sheet-border: rgb(15 23 42 / 0.1);
-        --sheet-title: #0f172a;
-        --sheet-text: rgb(51 65 85 / 0.82);
-        --handle: rgb(15 23 42 / 0.28);
-        --row: rgb(15 23 42 / 0.08);
-        --code-bg: rgb(15 23 42 / 0.08);
-        --code-text: #1e293b;
-    }
-
+    /* The phone is a hard brutalist device frame — square corners read as a
+       screen mockup once wrapped in the strip chrome; both themes are driven by
+       --brut-* vars so the frame never hardcodes a dark/light background. */
     .phone {
         position: relative;
-        width: min(360px, 92vw);
+        width: 100%;
         height: 600px;
         max-height: 70vh;
         overflow: hidden;
-        border-radius: 28px;
-        border: 1px solid var(--phone-border);
-        background: var(--phone-bg);
-        box-shadow: var(--phone-shadow);
+        border: 1px solid var(--brut-ink, #0a0a0a);
+        background: var(--brut-bg-2, #eef4f1);
+        box-shadow: 6px 6px 0 var(--brut-rule, #d6dedb);
     }
 
     .screen {
@@ -191,30 +214,11 @@
 
     .screen-hint {
         margin: 0;
-        font-size: 0.85rem;
-        color: var(--screen-text);
-    }
-
-    .open-btn {
-        appearance: none;
-        border: none;
-        cursor: pointer;
-        border-radius: 9px;
-        padding: 0.6rem 1.1rem;
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: var(--btn-text);
-        background: var(--btn-bg);
-        box-shadow: var(--btn-shadow);
-        transition: transform 0.15s ease;
-    }
-
-    .open-btn:hover {
-        transform: translateY(-1px);
-    }
-
-    .open-btn:active {
-        transform: translateY(0);
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-2, #525252);
     }
 
     /* The overlay + sheet are `motion` components. `scoped:class` (a Svelte
@@ -224,7 +228,7 @@
         position: absolute;
         inset: 0;
         z-index: 10;
-        background: var(--scrim);
+        background: color-mix(in oklab, var(--brut-ink, #0a0a0a) 45%, transparent);
         backdrop-filter: blur(2px);
     }
 
@@ -235,12 +239,10 @@
         right: 0;
         height: 78%;
         overflow: hidden;
-        border-top-left-radius: 22px;
-        border-top-right-radius: 22px;
-        border: 1px solid var(--sheet-border);
+        border: 1px solid var(--brut-ink, #0a0a0a);
         border-bottom: none;
-        background: var(--sheet-bg);
-        box-shadow: 0 -18px 50px rgb(0 0 0 / 0.28);
+        background: var(--brut-bg, #f8fcfb);
+        box-shadow: 0 -6px 0 var(--brut-rule, #d6dedb);
     }
 
     .handle-row {
@@ -252,7 +254,8 @@
         display: flex;
         justify-content: center;
         padding: 0.85rem;
-        background: var(--sheet-bg);
+        border-bottom: 1px dashed var(--brut-rule, #d6dedb);
+        background: var(--brut-bg, #f8fcfb);
     }
 
     .handle {
@@ -261,8 +264,7 @@
         width: 56px;
         padding: 0;
         border: none;
-        border-radius: 999px;
-        background: var(--handle);
+        background: var(--brut-rule-2, #bbc4c0);
         cursor: grab;
         touch-action: none;
     }
@@ -275,14 +277,14 @@
         height: 100%;
         overflow-y: auto;
         padding: 3.25rem 1.4rem 1.4rem;
-        color: var(--sheet-text);
+        color: var(--brut-ink-2, #525252);
     }
 
     .sheet-body h3 {
         margin: 0 0 0.6rem;
-        font-size: 1.35rem;
-        font-weight: 700;
-        color: var(--sheet-title);
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: var(--brut-ink, #0a0a0a);
     }
 
     .sheet-body p {
@@ -292,12 +294,12 @@
     }
 
     .sheet-body code {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-family: var(--brut-mono, monospace);
         font-size: 0.85em;
         padding: 0.08em 0.34em;
-        border-radius: 4px;
-        background: var(--code-bg);
-        color: var(--code-text);
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-accent-soft, rgba(36, 119, 104, 0.1));
+        color: var(--brut-accent, #247768);
     }
 
     .rows {
@@ -308,7 +310,7 @@
 
     .rows span {
         height: 2.5rem;
-        border-radius: 8px;
-        background: var(--row);
+        border: 1px solid var(--brut-rule, #d6dedb);
+        background: var(--brut-bg-2, #eef4f1);
     }
 </style>

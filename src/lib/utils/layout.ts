@@ -8,6 +8,83 @@ import {
 
 const layoutSizeAnimationAttribute = 'data-layout-size-animation'
 
+/**
+ * Dispatched on each size-corrected `[data-svelte-motion-layout]` child at the
+ * START of a parent's `runBoxSizeAnimation`, synchronously and before the next
+ * paint. A child re-slot commit can race ahead of the parent setting
+ * `data-layout-size-animation` (MutationObserver ordering), setting up an enter
+ * FLIP whose transform the size-animation guard then clears one frame later — a
+ * visible one-frame pop. On this event the child BLOCKS its projection
+ * (`blockLayoutAnimation`), finishing and preventing any pending frameloop
+ * update from painting a transform, so it tracks the growing parent at identity
+ * instead. Bubbles: no.
+ */
+export const sizeCorrectionSeedEvent = 'svelte-motion:size-correction-seed'
+
+/**
+ * Dispatched on each size-corrected `[data-svelte-motion-layout]` child when a
+ * parent's `runBoxSizeAnimation` finishes (or is cleaned up). Pairs with
+ * {@link sizeCorrectionSeedEvent}: the child lifts the projection block it took
+ * on seed, re-seeds to the settled layout, and resumes animating real layout
+ * changes normally. Bubbles: no.
+ */
+export const sizeCorrectionEndEvent = 'svelte-motion:size-correction-end'
+
+/**
+ * How many ancestor levels above the element `observeLayoutChanges` watches
+ * for re-slotting style/class changes. Upstream framer-motion re-measures the
+ * WHOLE projection tree on any tracked update (`create-projection-node.ts`
+ * `didUpdate` → `nodes.forEach(updateLayout)`), so a re-slot from ANY ancestor
+ * animates. This DOM-scoped port approximates that tree-global reach with a
+ * fixed, bounded walk: a deliberate cost cap so observer count stays O(1) per
+ * layout element. Raise it consciously for a deep-tree bug — never silently.
+ */
+const MAX_OBSERVED_ANCESTORS = 4
+
+/**
+ * CSS declaration names whose changes never re-slot CHILDREN: composited
+ * animation channels written every frame by gesture and FLIP writers
+ * (`transform` + the CSS independent transforms), plus paint-only hints.
+ * Used to ignore parent style mutations that can't affect child layout.
+ */
+const nonChildLayoutStyleProps = new Set([
+    'transform',
+    'transform-origin',
+    'translate',
+    'rotate',
+    'scale',
+    'will-change',
+    'opacity',
+    'filter'
+])
+
+/**
+ * Strip declarations that cannot affect CHILD layout from a serialized
+ * style string, normalizing the remainder for change comparison.
+ *
+ * Declaration-parsing (not regex) so values containing `;`-adjacent
+ * constructs or varied whitespace compare stably.
+ *
+ * @param style Serialized inline style (may be empty).
+ * @returns The layout-affecting declarations, normalized.
+ * @example
+ * ```ts
+ * stripNonChildLayoutStyle('align-items: flex-end; transform: scale(2)')
+ * // => 'align-items:flex-end'
+ * ```
+ */
+export const stripNonChildLayoutStyle = (style: string): string => {
+    const kept: string[] = []
+    for (const declaration of style.split(';')) {
+        const separator = declaration.indexOf(':')
+        if (separator === -1) continue
+        const property = declaration.slice(0, separator).trim().toLowerCase()
+        if (!property || nonChildLayoutStyleProps.has(property)) continue
+        kept.push(`${property}:${declaration.slice(separator + 1).trim()}`)
+    }
+    return kept.join(';')
+}
+
 const roundedPx = (value: number): string => `${Math.max(0, Math.round(value))}px`
 const mix = (from: number, to: number, progress: number): number => from + (to - from) * progress
 type TrackedFlipAnimation = {
@@ -114,6 +191,12 @@ const runBoxSizeAnimation = (
         child.style.transform = ''
         child.style.transformOrigin = ''
         if (child.style.willChange === 'transform') child.style.willChange = ''
+        // Cancel any enter/re-slot FLIP the child set up before this size
+        // animation started (and before it could observe the attribute above):
+        // the child blocks its projection on this event so the pending render
+        // never paints a one-frame transform that the guard would then clear.
+        // It tracks the parent's growth at identity instead (released on END).
+        child.dispatchEvent(new CustomEvent(sizeCorrectionSeedEvent))
     }
     el.style.width = roundedPx(prevWidth)
     el.style.height = roundedPx(prevHeight)
@@ -159,6 +242,11 @@ const runBoxSizeAnimation = (
         el.style.transformOrigin = originalTransformOrigin
         el.style.transform = originalTransform
         el.removeAttribute(layoutSizeAnimationAttribute)
+        // Release each size-corrected child's projection block (taken on seed at
+        // animation start) now that the settled layout is in the DOM.
+        for (const child of el.querySelectorAll<HTMLElement>('[data-svelte-motion-layout]')) {
+            child.dispatchEvent(new CustomEvent(sizeCorrectionEndEvent))
+        }
     }
 
     const animation = animate(0, 1, {
@@ -425,8 +513,11 @@ export const selectLayoutDependencies = (
  * Observe size/attribute changes that commonly trigger layout changes.
  *
  * Returns a cleanup function that disconnects observers. The callback is called
- * for resize events and attribute/class/style changes on the element and
- * immediate parent child-list changes.
+ * for resize events, attribute/class/style changes on the element, the
+ * immediate parent's child-list changes, and layout-affecting style/class
+ * changes on a bounded chain of ancestors (up to `MAX_OBSERVED_ANCESTORS`
+ * levels) — so a re-slot driven from a grandparent-or-higher still animates.
+ * The ancestor observers re-bind automatically when the element is re-parented.
  *
  * @param el Element to observe.
  * @param onChange Callback invoked when a relevant change is detected.
@@ -437,12 +528,30 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
     let releaseTimeout: ReturnType<typeof setTimeout> | null = null
 
     const schedule = () => {
-        if (el.closest(`[${layoutSizeAnimationAttribute}]`)) {
+        const sizeAnimationHost = el.closest(`[${layoutSizeAnimationAttribute}]`)
+        if (sizeAnimationHost) {
             el.style.transform = ''
             el.style.transformOrigin = ''
             if (el.style.willChange === 'transform') el.style.willChange = ''
+            // When the size-animating host is a PROPER ANCESTOR, this element
+            // is a size-corrected CHILD being re-slotted every frame as the
+            // ancestor grows. Keep committing so its projection cache tracks
+            // the in-flight slot — the commit path detects the active ancestor
+            // size-animation and SEEDS rather than FLIPs, so nothing fights the
+            // parent. Without this the child's cache goes stale for the whole
+            // animation and the ancestor's completion re-slot lands as a
+            // one-frame phantom FLIP (the accumulated delta) on the child.
+            // The host element ITSELF still short-circuits (its own commit is
+            // guarded upstream), so its residual translate is untouched.
+            if (sizeAnimationHost !== el) onChange()
             return
         }
+        // Re-parenting (portal / imperative move) leaves the ancestor
+        // observers pointed at the OLD chain, so subsequent new-parent changes
+        // would go unseen. Re-bind before the throttle guard so a move is never
+        // swallowed — upstream never has a stale parent because it measures the
+        // whole projection tree (`create-projection-node.ts`).
+        rewireIfReparented()
         if (pendingRaf !== null || releaseTimeout !== null) return
         // Leading-edge catches synchronous layout writes. The trailing read
         // catches Svelte presence DOM that finishes patching on the next frame
@@ -461,24 +570,116 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
         }
     }
     const ro = new ResizeObserver(() => schedule())
-    ro.observe(el)
     const attributeObserver = new MutationObserver(() => schedule())
+    const childListObserver = new MutationObserver(() => schedule())
+    // The element's OWN childList (subtree) observation. Kept separate from the
+    // ancestor wiring below so a re-parent can disconnect/re-attach the ancestor
+    // observers without dropping this self-observation.
+    const observeSelfChildList = () =>
+        childListObserver.observe(el, {
+            childList: true,
+            subtree: true
+        })
+    // An ANCESTOR's style/class change can re-slot this element (e.g. the
+    // classic toggle-switch: align-items flip on the track, or the same flip
+    // two levels up) with no childList or resize signal, and the Svelte-owned
+    // reactive path can't snapshot it — the ancestor patches before this
+    // element's effects run. Watch each observed ancestor's attributes and let
+    // the commit path diff against the cached rect. Style mutations that only
+    // touch animation channels (transforms / opacity / will-change — written
+    // every frame by gesture and FLIP animations) never re-slot children, so
+    // they're filtered out at EVERY observed level to avoid commit storms.
+    const parentAttributeObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            if (mutation.attributeName === 'style') {
+                const before = stripNonChildLayoutStyle(mutation.oldValue ?? '')
+                const after = stripNonChildLayoutStyle(
+                    (mutation.target as HTMLElement).getAttribute('style') ?? ''
+                )
+                if (before === after) continue
+            }
+            schedule()
+            return
+        }
+    })
+
+    /**
+     * Collect the bounded ancestor chain (closest first) up to
+     * `MAX_OBSERVED_ANCESTORS` levels. Captured references are compared by
+     * identity to detect re-parenting.
+     */
+    const collectAncestors = (): HTMLElement[] => {
+        const chain: HTMLElement[] = []
+        let current = el.parentElement
+        while (current && chain.length < MAX_OBSERVED_ANCESTORS) {
+            chain.push(current)
+            current = current.parentElement
+        }
+        return chain
+    }
+
+    // Eagerly captured so a synchronously-firing observer double (tests) that
+    // reaches `rewireIfReparented` during setup sees the real chain, not an
+    // empty placeholder — real MutationObserver/ResizeObserver never fire on
+    // `observe()`, so in production this is simply the initial chain.
+    let observedAncestors: HTMLElement[] = collectAncestors()
+    const wireAncestors = () => {
+        observedAncestors.forEach((ancestor, index) => {
+            // Only the IMMEDIATE parent gets childList: `subtree: true` already
+            // covers sibling reorders/insertions that re-slot this element.
+            // Higher levels intentionally SKIP childList — a higher-level DOM
+            // insertion that re-slots us still changes some observed ancestor's
+            // rect, which surfaces on the attribute path; adding childList at
+            // every level only widens noise without catching a distinct case.
+            if (index === 0) {
+                childListObserver.observe(ancestor, { childList: true, subtree: true })
+            }
+            parentAttributeObserver.observe(ancestor, {
+                attributes: true,
+                attributeFilter: ['style', 'class'],
+                attributeOldValue: true
+            })
+        })
+    }
+
+    /**
+     * If the element's ancestor chain has changed since it was last wired
+     * (portal, imperative move), disconnect the stale ancestor observers and
+     * re-attach to the new chain. Cheap array-of-references equality.
+     */
+    const rewireIfReparented = () => {
+        const next = collectAncestors()
+        const unchanged =
+            next.length === observedAncestors.length &&
+            next.every((ancestor, index) => ancestor === observedAncestors[index])
+        if (unchanged) return
+        // Drop every stale-chain observer and re-attach to the new chain.
+        // childListObserver also carries el's own self-observation, so
+        // disconnect() wipes that too — re-establish it before re-wiring.
+        childListObserver.disconnect()
+        parentAttributeObserver.disconnect()
+        observedAncestors = next
+        observeSelfChildList()
+        wireAncestors()
+    }
+
+    // Wire every observer only AFTER all closures above are initialized: an
+    // observer double that fires synchronously on `observe()` (used in tests)
+    // would otherwise re-enter `schedule` → `rewireIfReparented` before those
+    // closures exist. Real observers never fire on `observe()`.
+    ro.observe(el)
     attributeObserver.observe(el, {
         attributes: true,
         attributeFilter: ['class', 'data-presence-layout-hold']
     })
-    const childListObserver = new MutationObserver(() => schedule())
-    childListObserver.observe(el, {
-        childList: true,
-        subtree: true
-    })
-    if (el.parentElement) {
-        childListObserver.observe(el.parentElement, { childList: true, subtree: true })
-    }
+    observeSelfChildList()
+    wireAncestors()
+
     return () => {
         ro.disconnect()
         attributeObserver.disconnect()
         childListObserver.disconnect()
+        parentAttributeObserver.disconnect()
         if (pendingRaf !== null && typeof cancelAnimationFrame === 'function') {
             cancelAnimationFrame(pendingRaf)
             pendingRaf = null

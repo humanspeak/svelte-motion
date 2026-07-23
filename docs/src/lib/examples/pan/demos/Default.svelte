@@ -1,5 +1,12 @@
 <script lang="ts">
-    import { animate, motion, useMotionValue, useTransform } from '@humanspeak/svelte-motion'
+    import {
+        animate,
+        AnimatePresence,
+        motion,
+        styleString,
+        useMotionValue,
+        useTransform
+    } from '@humanspeak/svelte-motion'
 
     // Dismiss thresholds — either condition fires close.
     const DISMISS_OFFSET_PX = 120
@@ -9,9 +16,17 @@
     const y = useMotionValue(0)
     const overlayOpacity = useTransform(y, [0, 300], [1, 0])
 
+    // Live readouts for the strip chrome — reactive off the same MotionValue.
+    const offsetY = $derived(Math.max(0, Math.round(y.current)))
+    const armed = $derived(open && offsetY > DISMISS_OFFSET_PX)
+
     const reopen = () => {
+        // Full motion round-trip: remount the sheet off-screen and spring it
+        // home through the same MotionValue the pan writes — the scrim fade
+        // rides along via the shared `overlayOpacity` transform.
         open = true
-        y.jump(0)
+        y.jump(400)
+        animate(y, 0, { type: 'spring', stiffness: 300, damping: 30 })
     }
 
     const handlePan = (_event: PointerEvent, info: { offset: { y: number } }) => {
@@ -41,35 +56,112 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div class="stage">
-        {#if open}
-            <!-- Backdrop fades as the sheet pulls away. -->
-            <div class="overlay" style="opacity: {overlayOpacity.current}" aria-hidden="true"></div>
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// pan-sheet</span>
+            <span class="micro status">
+                {open ? (armed ? 'armed → dismiss' : `y ${offsetY}px`) : 'dismissed'}
+            </span>
+        </div>
 
-            <motion.div
-                class="sheet"
-                style="transform: translateY({y.current}px)"
-                onPan={handlePan}
-                onPanEnd={handlePanEnd}
-                whilePan={{ cursor: 'grabbing' }}
-                role="dialog"
-                aria-label="Demo sheet — pull down or flick to dismiss"
-            >
-                <div class="grabber" aria-hidden="true"></div>
-                <h3>flick to dismiss</h3>
-                <p>
-                    Pull down past 120px, <em>or</em> flick downward at > 700 px/s. The release decision
-                    combines both — fast flicks commit even when distance is short.
-                </p>
-                <ul>
-                    <li>follows your finger 1:1 while you drag</li>
-                    <li>springs home if you don't pass the threshold</li>
-                    <li>animates off-screen if you do</li>
-                </ul>
-            </motion.div>
-        {:else}
-            <button class="reopen" type="button" onclick={reopen}>↑ reopen the sheet</button>
-        {/if}
+        <div class="stage">
+            {#if open}
+                <!-- Backdrop fades as the sheet pulls away. -->
+                <div
+                    class="overlay"
+                    style="opacity: {overlayOpacity.current}"
+                    aria-hidden="true"
+                ></div>
+
+                <motion.div
+                    style={styleString(() => ({
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        transform: `translateY(${y.current}px)`,
+                        padding: '0.875rem 1.25rem 1.5rem',
+                        background: 'var(--brut-bg, #f8fcfb)',
+                        border: '1px solid var(--brut-ink, #0a0a0a)',
+                        borderBottom: 'none',
+                        boxShadow: '-6px -6px 0 var(--brut-rule, #d6dedb)',
+                        cursor: 'grab',
+                        touchAction: 'none',
+                        userSelect: 'none',
+                        willChange: 'transform'
+                    }))}
+                    onPan={handlePan}
+                    onPanEnd={handlePanEnd}
+                    whilePan={{ cursor: 'grabbing' }}
+                    role="dialog"
+                    aria-label="Demo sheet — pull down or flick to dismiss"
+                >
+                    <div class="grabber" aria-hidden="true"></div>
+                    <span class="sheet-tag">// sheet.01</span>
+                    <h3 class="sheet-title">flick to dismiss</h3>
+                    <p class="sheet-copy">
+                        Pull down past 120px, <em>or</em> flick downward at > 700 px/s. The release decision
+                        combines both — fast flicks commit even when distance is short.
+                    </p>
+                    <ul class="sheet-list">
+                        <li>follows your finger 1:1 while you drag</li>
+                        <li>springs home if you don't pass the threshold</li>
+                        <li>animates off-screen if you do</li>
+                    </ul>
+                </motion.div>
+            {/if}
+            <!-- The reopen affordance enters after the dismiss and exits as
+                 the sheet springs back — presence choreography, not a mount
+                 snap. The wrapper is a flex-centering slot: centering the
+                 button via an authored transform would be stomped by the
+                 gesture animations' transform writes. -->
+            <AnimatePresence>
+                {#if !open}
+                    <motion.div
+                        key="reopen"
+                        initial={{ opacity: 0, y: 14, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 14, scale: 0.96 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                        style={styleString(() => ({
+                            position: 'absolute',
+                            inset: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            pointerEvents: 'none'
+                        }))}
+                    >
+                        <motion.button
+                            type="button"
+                            onclick={reopen}
+                            whileHover={{ scale: 1.04 }}
+                            whileTap={{ scale: 0.96 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                            style={styleString(() => ({
+                                pointerEvents: 'auto',
+                                fontFamily: 'var(--brut-mono, monospace)',
+                                fontSize: '0.6875rem',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.08em',
+                                border: '1px solid var(--brut-accent, #247768)',
+                                backgroundColor: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))',
+                                color: 'var(--brut-accent, #247768)',
+                                padding: '0.5rem 0.875rem',
+                                cursor: 'pointer'
+                            }))}
+                        >
+                            ↑ reopen the sheet
+                        </motion.button>
+                    </motion.div>
+                {/if}
+            </AnimatePresence>
+        </div>
+
+        <div class="strip-foot">
+            <span class="micro">offset ≥ 120px</span>
+            <span class="micro">velocity ≥ 700px/s</span>
+        </div>
     </div>
 </div>
 
@@ -82,96 +174,115 @@
         width: 100%;
     }
 
+    .strip {
+        width: 100%;
+        max-width: 360px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .status {
+        color: var(--brut-accent, #247768);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
+    }
+
     .stage {
         position: relative;
         width: 100%;
-        max-width: 360px;
-        height: 460px;
-        border-radius: 18px;
-        background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
-        border: 1px solid #cbd5e1;
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+        height: 420px;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background:
+            linear-gradient(90deg, var(--brut-rule, #d6dedb) 1px, transparent 1px),
+            linear-gradient(0deg, var(--brut-rule, #d6dedb) 1px, transparent 1px),
+            var(--brut-bg-2, #eef4f1);
+        background-size:
+            36px 36px,
+            36px 36px,
+            auto;
         overflow: hidden;
-        font-family:
-            ui-sans-serif,
-            system-ui,
-            -apple-system,
-            sans-serif;
     }
 
     .overlay {
+        /* Fixed dark scrim: --brut-ink flips to near-white in dark mode,
+           which would BRIGHTEN the backdrop instead of dimming it. */
         position: absolute;
         inset: 0;
-        background: rgba(15, 23, 42, 0.42);
+        background: rgb(0 0 0 / 0.42);
         pointer-events: none;
     }
 
-    /* `motion.div` renders the element from a child component, so anything
-       targeting its class must escape Svelte's component-scoped CSS via
-       :global(). */
-    :global(.sheet) {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        padding: 12px 22px 28px;
-        background: #ffffff;
-        border-radius: 18px 18px 0 0;
-        box-shadow: 0 -12px 32px -8px rgba(15, 23, 42, 0.25);
-        cursor: grab;
-        touch-action: none;
-        user-select: none;
-        will-change: transform;
-    }
-
-    :global(.sheet h3) {
-        margin: 8px 0 6px;
-        font-size: 16px;
-        font-weight: 600;
-        color: #0f172a;
-    }
-
-    :global(.sheet p) {
-        margin: 0 0 12px;
-        font-size: 13px;
-        line-height: 1.5;
-        color: #475569;
-    }
-
-    :global(.sheet ul) {
-        margin: 0;
-        padding-left: 18px;
-        font-size: 12.5px;
-        line-height: 1.6;
-        color: #64748b;
-    }
-
+    /* Plain children of the motion `.sheet` element DO receive scoped styles. */
     .grabber {
-        margin: 0 auto 16px;
-        width: 36px;
+        margin: 0 auto 0.75rem;
+        width: 40px;
         height: 4px;
-        border-radius: 999px;
-        background: #cbd5e1;
+        background: var(--brut-ink, #0a0a0a);
     }
 
-    .reopen {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        padding: 10px 18px;
-        border-radius: 10px;
-        border: 1px solid #cbd5e1;
-        background: #ffffff;
-        color: #0f172a;
-        font-family: inherit;
-        font-size: 13px;
-        font-weight: 500;
-        cursor: pointer;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    .sheet-tag {
+        display: block;
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.625rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
     }
 
-    .reopen:hover {
-        border-color: #94a3b8;
+    .sheet-title {
+        margin: 0.375rem 0 0.5rem;
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.9375rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        color: var(--brut-ink, #0a0a0a);
+    }
+
+    .sheet-copy {
+        margin: 0 0 0.75rem;
+        font-size: 0.8125rem;
+        line-height: 1.5;
+        color: var(--brut-ink-2, #525252);
+    }
+
+    .sheet-copy em {
+        font-style: normal;
+        font-weight: 700;
+        color: var(--brut-accent, #247768);
+    }
+
+    .sheet-list {
+        margin: 0;
+        padding-left: 1.125rem;
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        line-height: 1.7;
+        color: var(--brut-ink-3, #9a9a9a);
     }
 </style>

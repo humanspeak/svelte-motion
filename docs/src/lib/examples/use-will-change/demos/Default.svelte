@@ -1,6 +1,6 @@
 <script lang="ts">
     import { Sparkles } from '@lucide/svelte'
-    import { motion, useWillChange } from '@humanspeak/svelte-motion'
+    import { motion, styleString, useWillChange } from '@humanspeak/svelte-motion'
 
     // Two independent will-change values: one attached to a transform animation,
     // one to a paint-only animation. The badge on each box shows its live value.
@@ -11,156 +11,226 @@
     let moved = $state(false)
     let recolored = $state(false)
 
+    // Travel is measured from the lane so the box lands inside the far
+    // padding instead of clipping against the lane's right edge.
+    const BOX_WIDTH = 116
+    const LANE_PADDING = 16
+    let laneWidth = $state(0)
+    const travel = $derived(Math.max(laneWidth - LANE_PADDING * 2 - BOX_WIDTH, 0))
+
     // No transform key until the first click, so will-change starts at "auto".
-    const moveTarget = $derived(started ? { x: moved ? 150 : 0 } : {})
+    const moveTarget = $derived(started ? { x: moved ? travel : 0 } : {})
 
     const toggleMove = () => {
         started = true
         moved = !moved
     }
+
+    // Library-driven button chrome: base style is inline, the hover paint swap
+    // is a `whileHover` motion prop (no CSS :hover doing motion work).
+    const buttonStyle = styleString(() => ({
+        justifySelf: 'start',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        fontFamily: 'var(--brut-mono, monospace)',
+        fontSize: '0.6875rem',
+        textTransform: 'uppercase',
+        letterSpacing: '0.08em',
+        border: '1px solid var(--brut-accent, #247768)',
+        backgroundColor: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))',
+        color: 'var(--brut-accent, #247768)',
+        padding: '0.5rem 0.875rem',
+        cursor: 'pointer'
+    }))
+    const buttonHover = {
+        scale: 1.04,
+        backgroundColor: 'var(--brut-accent, #247768)',
+        color: 'var(--brut-accent-ink, #f8fcfb)'
+    }
+    const buttonTap = { scale: 0.96 }
+    const buttonTransition = { type: 'spring', stiffness: 500, damping: 30 } as const
 </script>
 
-<div class="demo">
-    <div class="row">
-        <section class="cell">
-            <header>
-                <span class="tag promote">promotes</span>
-                Animating <code>x</code> (transform)
-            </header>
-            <div class="lane">
-                <motion.div
-                    class="box move"
-                    style={{ willChange: moveWillChange }}
-                    initial={false}
-                    animate={moveTarget}
-                    transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                >
-                    <small>will-change</small>
-                    <span class="val" class:on={moveWillChange.current === 'transform'}>
-                        {moveWillChange.current}
-                    </span>
-                </motion.div>
-            </div>
-            <button type="button" onclick={toggleMove}>
-                <Sparkles size={15} />
-                {moved ? 'Return' : 'Animate x'}
-            </button>
-        </section>
+<!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
+<div class="dk-demo-shell">
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// usewillchange</span>
+            <span class="micro readout">
+                will-change: {moveWillChange.current} · {paintWillChange.current}
+            </span>
+        </div>
 
-        <section class="cell">
-            <header>
-                <span class="tag stay">stays auto</span>
-                Animating <code>backgroundColor</code> (paint)
-            </header>
-            <div class="lane">
-                <motion.div
-                    class="box paint"
-                    style={{ willChange: paintWillChange }}
-                    initial={false}
-                    animate={{ backgroundColor: recolored ? '#f0abfc' : '#67e8f9' }}
-                    transition={{ duration: 0.6 }}
+        <div class="row">
+            <section class="cell">
+                <header>
+                    <span class="tag promote">promotes</span>
+                    <span class="label">Animating <code>x</code> (transform)</span>
+                </header>
+                <div class="lane" bind:clientWidth={laneWidth}>
+                    <motion.div
+                        class="box move"
+                        style={{ willChange: moveWillChange }}
+                        initial={false}
+                        animate={moveTarget}
+                        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                        <small>will-change</small>
+                        <span class="val" class:on={moveWillChange.current === 'transform'}>
+                            {moveWillChange.current}
+                        </span>
+                    </motion.div>
+                </div>
+                <motion.button
+                    type="button"
+                    onclick={toggleMove}
+                    whileHover={buttonHover}
+                    whileTap={buttonTap}
+                    transition={buttonTransition}
+                    style={buttonStyle}
                 >
-                    <small>will-change</small>
-                    <span class="val" class:on={paintWillChange.current === 'transform'}>
-                        {paintWillChange.current}
-                    </span>
-                </motion.div>
-            </div>
-            <button type="button" onclick={() => (recolored = !recolored)}>
-                <Sparkles size={15} />
-                {recolored ? 'Reset' : 'Animate color'}
-            </button>
-        </section>
+                    <Sparkles size={14} />
+                    {moved ? 'Return' : 'Animate x'}
+                </motion.button>
+            </section>
+
+            <section class="cell">
+                <header>
+                    <span class="tag stay">stays auto</span>
+                    <span class="label">Animating <code>backgroundColor</code> (paint)</span>
+                </header>
+                <div class="lane">
+                    <motion.div
+                        class="box paint"
+                        style={{ willChange: paintWillChange }}
+                        initial={false}
+                        animate={{ backgroundColor: recolored ? '#ec4899' : '#247768' }}
+                        transition={{ duration: 0.6 }}
+                    >
+                        <small>will-change</small>
+                        <span class="val" class:on={paintWillChange.current === 'transform'}>
+                            {paintWillChange.current}
+                        </span>
+                    </motion.div>
+                </div>
+                <motion.button
+                    type="button"
+                    onclick={() => (recolored = !recolored)}
+                    whileHover={buttonHover}
+                    whileTap={buttonTap}
+                    transition={buttonTransition}
+                    style={buttonStyle}
+                >
+                    <Sparkles size={14} />
+                    {recolored ? 'Reset' : 'Animate color'}
+                </motion.button>
+            </section>
+        </div>
+
+        <div class="strip-foot">
+            <span class="micro">transform promotes · paint stays auto</span>
+            <span class="micro">hook: usewillchange</span>
+        </div>
     </div>
 </div>
 
 <style>
-    /* Theme-aware: light is the default; html.dark overrides below. Surfaces are
-       built from the docs brand scale (--color-brand-50…900) so the stage adapts
-       to the page theme instead of being a hardcoded dark slab. */
-    .demo {
-        display: grid;
-        gap: 16px;
-        padding: 22px 24px;
-        background: var(--color-brand-50);
-        color: color-mix(in oklab, var(--color-brand-900) 80%, transparent);
+    .dk-demo-shell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        min-height: 360px;
     }
 
-    :global(html.dark) .demo {
-        background: var(--color-brand-900);
-        color: color-mix(in oklab, var(--color-brand-100) 80%, transparent);
+    .strip {
+        width: 100%;
+        max-width: 640px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .readout {
+        color: var(--brut-accent, #247768);
+        text-transform: none;
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
     }
 
     .row {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
+        gap: 0.75rem;
     }
 
+    /* Each cell spans the shared header/lane/button rows via subgrid, so the
+       stages and buttons stay aligned even when one header label runs longer. */
     .cell {
+        grid-row: span 3;
         display: grid;
-        gap: 12px;
-        align-content: start;
-        padding: 16px;
-        border: 1px solid color-mix(in oklab, var(--color-brand-500) 22%, transparent);
-        border-radius: 10px;
-        background: color-mix(in oklab, var(--color-brand-50) 55%, white);
-    }
-
-    :global(html.dark) .cell {
-        border-color: color-mix(in oklab, var(--color-brand-500) 26%, transparent);
-        background: color-mix(in oklab, var(--color-brand-800) 45%, var(--color-brand-900));
+        grid-template-rows: subgrid;
+        gap: 0.75rem;
+        padding: 0.875rem;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg-2, #eef4f1);
     }
 
     header {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 8px;
+        display: grid;
+        justify-items: start;
+        align-content: start;
+        gap: 0.375rem;
         font-size: 13px;
-        color: color-mix(in oklab, var(--color-brand-900) 72%, transparent);
-    }
-
-    :global(html.dark) header {
-        color: color-mix(in oklab, var(--color-brand-100) 72%, transparent);
+        color: var(--brut-ink-2, #525252);
     }
 
     header code {
-        color: var(--color-brand-700);
-        font-family: 'SFMono-Regular', Consolas, monospace;
-    }
-
-    :global(html.dark) header code {
-        color: var(--color-brand-300);
+        color: var(--brut-accent, #247768);
+        font-family: var(--brut-mono, monospace);
     }
 
     .tag {
-        padding: 2px 8px;
-        border-radius: 999px;
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 0.04em;
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.625rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
+        padding: 2px 7px;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
     }
 
     .tag.promote {
-        background: color-mix(in oklab, var(--color-brand-500) 20%, transparent);
-        color: var(--color-brand-700);
+        color: var(--brut-accent, #247768);
+        border-color: var(--brut-accent, #247768);
     }
 
     .tag.stay {
-        background: color-mix(in oklab, var(--color-brand-900) 9%, transparent);
-        color: color-mix(in oklab, var(--color-brand-900) 60%, transparent);
-    }
-
-    :global(html.dark) .tag.promote {
-        background: color-mix(in oklab, var(--color-brand-500) 26%, transparent);
-        color: var(--color-brand-200);
-    }
-
-    :global(html.dark) .tag.stay {
-        background: color-mix(in oklab, var(--color-brand-100) 12%, transparent);
-        color: color-mix(in oklab, var(--color-brand-100) 62%, transparent);
+        color: var(--brut-ink-3, #9a9a9a);
     }
 
     /* Fixed-height lane in normal flow — can't collapse, and overflow clips the
@@ -172,19 +242,16 @@
         align-items: center;
         padding: 0 16px;
         overflow: hidden;
-        border-radius: 8px;
-        border: 1px solid color-mix(in oklab, var(--color-brand-500) 16%, transparent);
-        background: color-mix(in oklab, var(--color-brand-500) 9%, var(--color-brand-50));
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg, #f8fcfb);
     }
 
-    :global(html.dark) .lane {
-        border-color: color-mix(in oklab, var(--color-brand-500) 22%, transparent);
-        background: color-mix(in oklab, var(--color-brand-500) 14%, var(--color-brand-900));
-    }
-
-    /* The boxes are vivid by design (they're the thing being animated), so their
-       label ink is dark in both themes. */
-    :global(.demo .box) {
+    /* Both boxes share one constant teal fill so they read as siblings. The
+       paint box animates backgroundColor between fixed hexes, so its fill
+       can't be a theme var — the move box uses the same fixed teal to match.
+       motion.* render their own elements, so Svelte's scoping never reaches
+       them — hence :global. */
+    :global(.dk-demo-shell .box) {
         flex: none;
         width: 116px;
         height: 92px;
@@ -192,20 +259,12 @@
         align-content: center;
         justify-items: center;
         gap: 4px;
-        border-radius: 14px;
-        color: color-mix(in oklab, var(--color-brand-900) 90%, black);
-        box-shadow: 0 14px 40px color-mix(in oklab, var(--color-brand-500) 32%, transparent);
+        background: #247768;
+        color: #f8fcfb;
+        box-shadow: 6px 6px 0 var(--brut-rule, #d6dedb);
     }
 
-    :global(.demo .box.move) {
-        background: linear-gradient(135deg, var(--color-brand-400), var(--color-brand-600));
-    }
-
-    :global(.demo .box.paint) {
-        background: #67e8f9;
-    }
-
-    :global(.demo .box small) {
+    :global(.dk-demo-shell .box small) {
         font-size: 9px;
         font-weight: 850;
         letter-spacing: 0.1em;
@@ -213,43 +272,22 @@
         opacity: 0.72;
     }
 
-    /* Self-contained chip colors. The boxes are a constant vivid teal/cyan in
-       both themes, so fixed ink/light pairs keep contrast regardless of the
-       page theme — and a <span> avoids docs-kit's global <strong> color rule. */
-    :global(.demo .box .val) {
+    /* Live will-change readout chip. The boxes are constant fills in both
+       themes, so a fixed dark/light ink pair keeps contrast regardless of theme
+       — and a <span> avoids docs-kit's global <strong> color rule. The chip
+       inverts to a light fill while will-change is promoted. */
+    :global(.dk-demo-shell .box .val) {
         padding: 2px 9px;
-        border-radius: 999px;
-        background: rgba(3, 19, 22, 0.82);
-        color: #ecfeff;
+        background: rgba(9, 26, 23, 0.85);
+        color: #f8fcfb;
         font-size: 15px;
         font-weight: 700;
-        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-family: var(--brut-mono, monospace);
     }
 
-    :global(.demo .box .val.on) {
-        background: #ecfeff;
-        color: #0b3b33;
-    }
-
-    button {
-        justify-self: start;
-        height: 34px;
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-        padding: 0 13px;
-        border: 1px solid var(--color-brand-600);
-        border-radius: 6px;
-        background: var(--color-brand-600);
-        color: var(--color-brand-50);
-        font-size: 13px;
-        font-weight: 780;
-        cursor: pointer;
-    }
-
-    button:hover {
-        background: var(--color-brand-700);
-        border-color: var(--color-brand-700);
+    :global(.dk-demo-shell .box .val.on) {
+        background: #f8fcfb;
+        color: #247768;
     }
 
     @media (max-width: 720px) {

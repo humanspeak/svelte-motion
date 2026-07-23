@@ -1,4 +1,10 @@
-import { isHoverCapable, splitHoverDefinition } from '$lib/utils/hover'
+import type { GestureCoordinator } from '$lib/utils/gestureCoordinator'
+import {
+    computeHoverBaseline,
+    isHoverCapable,
+    readTransformChannels,
+    splitHoverDefinition
+} from '$lib/utils/hover'
 import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import { press } from 'motion-dom'
@@ -99,6 +105,16 @@ export const attachWhileTap = (
          *  honored for the tap gesture (framer parity). When empty, the gesture
          *  passes no transition so motion-dom applies its per-value defaults. */
         tapTransition?: AnimationOptions | undefined
+        /** Shared per-element gesture coordinator (see gestureCoordinator.ts):
+         *  tracks tap/hover active state and lets hover and tap stop each
+         *  other's in-flight animations so exactly one writer owns the element. */
+        coordinator?: GestureCoordinator
+        /** Creation-time authored base values (e.g. `opacity`), captured at
+         *  rest — the same record the hover system threads into its baseline
+         *  computation. Without it, the orphaned-key restore on tap release
+         *  falls back to LIVE computed style, which on a slow frame reads a
+         *  mid-animation transient and settles the element short of rest. */
+        getBaseStyleValues?: () => Record<string, unknown>
     }
 ): (() => void) => {
     if (!whileTap) return () => {}
@@ -155,13 +171,14 @@ export const attachWhileTap = (
     // Single control tracking whatever gesture animation is in-flight
     // (tap, reset, or hover reapply). Every new gesture cancels the previous.
     let gestureCtl: GestureCtl | null = null
+    const coordinator = callbacks?.coordinator
 
     const cancelGesture = () => {
         if (gestureCtl) {
-            pwLog('[tap] cancel-gesture', {
-                currentTime: gestureCtl.currentTime,
+            pwLog('[tap] cancel-gesture', () => ({
+                currentTime: gestureCtl!.currentTime,
                 transform: getComputedStyle(el).transform
-            })
+            }))
         }
         try {
             // Use stop() instead of cancel(). cancel() reverts to the
@@ -172,32 +189,104 @@ export const attachWhileTap = (
             // ignore
         }
         gestureCtl = null
+        // Single-writer: also stop the hover system's in-flight animations
+        // (e.g. a hover-exit unwind) before this gesture starts writing.
+        coordinator?.stopAll()
+    }
+
+    // When the hover system's composed writer was the last to touch a transform
+    // channel, motion's internal motion value for THAT channel is stale — seed
+    // the keyframes from the element's VISUAL value so the animation starts
+    // where the eye left off instead of snapping to the stale value on frame
+    // one. The composed writer (hover.ts writeComposedChannels) flags every
+    // channel it owns via coordinator.markExternalWrite(key); we consume each
+    // flag here for EVERY seedable key — whether or not a reseed applies — so
+    // the coordinator's Set never accumulates over the element's lifetime.
+    // 3D channels (rotateX/rotateY/z) are intentionally left unseeded: the 2D
+    // matrix reader can't decompose them (readTransformChannels returns null).
+    const seedableChannels = ['scale', 'scaleX', 'scaleY', 'x', 'y', 'rotate'] as const
+    const seedStaleChannels = (record: Record<string, unknown>): Record<string, unknown> => {
+        if (!coordinator) return record
+        let seeded = record
+        // Read the visual matrix at most once, lazily — only when a channel was
+        // actually flagged as externally written.
+        let visual: ReturnType<typeof readTransformChannels> | undefined
+        for (const key of seedableChannels) {
+            // Consume unconditionally so the flag is cleared even when the
+            // checks below skip the reseed (fixes the Set accumulation).
+            if (!coordinator.consumeExternalWrite(key)) continue
+            const target = seeded[key]
+            if (typeof target !== 'number') continue
+            if (visual === undefined) visual = readTransformChannels(el)
+            // null → matrix3d we can't decompose; leave this channel unseeded.
+            if (visual === null) continue
+            // scaleX/scaleY approximate from the uniform matrix scale: a 2D
+            // matrix can't separate per-axis scale, so both seed from the same
+            // hypot(a,b) reading — enough to avoid a frame-one snap.
+            const current = key === 'scaleX' || key === 'scaleY' ? visual.scale : visual[key]
+            if (Math.abs(current - target) < 0.001) continue
+            if (seeded === record) seeded = { ...record }
+            seeded[key] = [current, target]
+        }
+        return seeded
+    }
+
+    // Track the in-flight control with the coordinator so the hover system
+    // can stop it symmetrically (e.g. leaving mid-release-spring).
+    const setGestureCtl = (ctl: GestureCtl) => {
+        gestureCtl = ctl
+        const unregister = coordinator?.register(() => {
+            try {
+                ctl.stop()
+            } catch {
+                // ignore
+            }
+            if (gestureCtl === ctl) gestureCtl = null
+        })
+        Promise.resolve(ctl.finished)
+            .catch(() => {})
+            .finally(() => unregister?.())
     }
 
     const animateTap = () => {
-        pwLog('[tap] animate-tap', {
+        pwLog('[tap] animate-tap', () => ({
             w: el.getBoundingClientRect().width,
             h: el.getBoundingClientRect().height,
             transform: getComputedStyle(el).transform,
             whileTap,
             gestureActive: gestureCtl !== null
-        })
+        }))
+        coordinator?.setActive('tap', true)
         cancelGesture()
         callbacks?.onTapStart?.()
-        gestureCtl = animate(
-            el,
-            tapKeyframes as unknown as DOMKeyframesDefinition,
-            pressTransition
-        ) as unknown as GestureCtl
+        setGestureCtl(
+            animate(
+                el,
+                seedStaleChannels(tapKeyframes) as unknown as DOMKeyframesDefinition,
+                pressTransition
+            ) as unknown as GestureCtl
+        )
         Promise.resolve(gestureCtl?.finished)
             .then(() =>
-                pwLog('[tap] tap-applied', {
+                pwLog('[tap] tap-applied', () => ({
                     w: el.getBoundingClientRect().width,
                     h: el.getBoundingClientRect().height,
                     transform: getComputedStyle(el).transform
-                })
+                }))
             )
             .catch(() => {})
+    }
+
+    const isHoverStillActive = (): boolean => {
+        // Prefer the coordinator's tracked state (upstream setActive
+        // semantics): the DOM's `:hover` can report true after the hover
+        // system has already dispatched its exit, and vice versa.
+        if (coordinator) return coordinator.isActive('hover')
+        try {
+            return el.matches(':hover')
+        } catch {
+            return false
+        }
     }
 
     const reapplyHoverIfActive = (): boolean => {
@@ -209,48 +298,46 @@ export const attachWhileTap = (
             pwLog('[tap] hover-reapply-skip', { reason: 'not hover-capable' })
             return false
         }
-        try {
-            if (!el.matches(':hover')) {
-                pwLog('[tap] hover-reapply-skip', { reason: 'not :hover' })
-                return false
-            }
-        } catch {
-            pwLog('[tap] hover-reapply-skip', { reason: 'matches threw' })
+        if (!isHoverStillActive()) {
+            pwLog('[tap] hover-reapply-skip', { reason: 'hover not active' })
             return false
         }
         const { keyframes, transition: hoverTransition } = splitHoverDefinition(callbacks.hoverDef)
-        pwLog('[tap] hover-reapply', {
+        pwLog('[tap] hover-reapply', () => ({
             keyframes,
             transform: getComputedStyle(el).transform,
             w: el.getBoundingClientRect().width
-        })
+        }))
         // Reapplying hover after a tap animates to the hover state, so it should
         // use the hover definition's own transition when provided, falling back
         // to the release transition (component prop → per-value defaults).
-        gestureCtl = animate(
-            el,
-            keyframes as unknown as DOMKeyframesDefinition,
-            hoverTransition ?? releaseTransition
-        ) as unknown as GestureCtl
+        setGestureCtl(
+            animate(
+                el,
+                seedStaleChannels(keyframes) as unknown as DOMKeyframesDefinition,
+                hoverTransition ?? releaseTransition
+            ) as unknown as GestureCtl
+        )
         Promise.resolve(gestureCtl?.finished)
             .then(() =>
-                pwLog('[tap] hover-reapply-done', {
+                pwLog('[tap] hover-reapply-done', () => ({
                     w: el.getBoundingClientRect().width,
                     transform: getComputedStyle(el).transform
-                })
+                }))
             )
             .catch(() => {})
         return true
     }
 
     const animateReset = (success: boolean) => {
-        pwLog('[tap] animate-reset', {
+        pwLog('[tap] animate-reset', () => ({
             success,
             w: el.getBoundingClientRect().width,
             h: el.getBoundingClientRect().height,
             transform: getComputedStyle(el).transform,
             gestureActive: gestureCtl !== null
-        })
+        }))
+        coordinator?.setActive('tap', false)
         if (success) callbacks?.onTap?.()
         else callbacks?.onTapCancel?.()
 
@@ -260,20 +347,55 @@ export const attachWhileTap = (
         if (success && reapplyHoverIfActive()) return
 
         const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, tapKeyframes)
+
+        // Per-key restore (upstream animation-state.ts removed-key handling):
+        // hover may have applied a key while this tap was pressed that whileTap
+        // never owned (e.g. `opacity` while tap owns `scale`). When hover is no
+        // longer active, hover-end already tried to restore that key — but
+        // THIS release's cancelGesture() swept the coordinator and stopped that
+        // in-flight restore mid-flight, so the orphaned key would stay stuck.
+        // Extend the reset with each orphaned hover key's baseline so it settles
+        // to base in the same single writer as the tap keys. We reuse hover's
+        // own baseline computation rather than duplicating it (in scope: no
+        // _MotionContainer wiring — computeHoverBaseline is already exported and
+        // imported here). Overlapping keys (in whileTap) are left to
+        // buildTapResetRecord; still-hovering keeps hover's keys applied.
+        if (!isHoverStillActive() && callbacks?.hoverDef) {
+            const { keyframes: hoverKeyframes } = splitHoverDefinition(callbacks.hoverDef)
+            const orphanedKeys = Object.keys(hoverKeyframes).filter(
+                (k) => !Object.prototype.hasOwnProperty.call(tapKeyframes, k)
+            )
+            if (orphanedKeys.length > 0) {
+                const hoverBaseline = computeHoverBaseline(el, {
+                    initial,
+                    animate: animateDef,
+                    whileHover: hoverKeyframes,
+                    baseStyleValues: callbacks?.getBaseStyleValues?.()
+                })
+                for (const k of orphanedKeys) {
+                    if (Object.prototype.hasOwnProperty.call(hoverBaseline, k)) {
+                        resetRecord[k] = hoverBaseline[k]
+                    }
+                }
+            }
+        }
+
         pwLog('[tap] reset-record', resetRecord)
         if (Object.keys(resetRecord).length > 0) {
-            gestureCtl = animate(
-                el,
-                resetRecord as unknown as DOMKeyframesDefinition,
-                releaseTransition
-            ) as unknown as GestureCtl
+            setGestureCtl(
+                animate(
+                    el,
+                    seedStaleChannels(resetRecord) as unknown as DOMKeyframesDefinition,
+                    releaseTransition
+                ) as unknown as GestureCtl
+            )
             Promise.resolve(gestureCtl?.finished)
                 .then(() =>
-                    pwLog('[tap] reset-done', {
+                    pwLog('[tap] reset-done', () => ({
                         w: el.getBoundingClientRect().width,
                         h: el.getBoundingClientRect().height,
                         transform: getComputedStyle(el).transform
-                    })
+                    }))
                 )
                 .catch(() => {})
         }
@@ -281,17 +403,17 @@ export const attachWhileTap = (
 
     // Use press() for pointer + Enter key handling
     const cancelPress = press(el, () => {
-        pwLog('[tap] press-start', {
+        pwLog('[tap] press-start', () => ({
             w: el.getBoundingClientRect().width,
             transform: getComputedStyle(el).transform
-        })
+        }))
         animateTap()
         return (_endEvent: PointerEvent, { success }: { success: boolean }) => {
-            pwLog('[tap] press-end', {
+            pwLog('[tap] press-end', () => ({
                 success,
                 w: el.getBoundingClientRect().width,
                 transform: getComputedStyle(el).transform
-            })
+            }))
             animateReset(success)
         }
     })
@@ -304,10 +426,10 @@ export const attachWhileTap = (
         e.preventDefault()
         if (spaceActive) return
         spaceActive = true
-        pwLog('[tap] space-down', {
+        pwLog('[tap] space-down', () => ({
             w: el.getBoundingClientRect().width,
             transform: getComputedStyle(el).transform
-        })
+        }))
         animateTap()
     }
 
@@ -316,20 +438,20 @@ export const attachWhileTap = (
         e.preventDefault()
         if (!spaceActive) return
         spaceActive = false
-        pwLog('[tap] space-up', {
+        pwLog('[tap] space-up', () => ({
             w: el.getBoundingClientRect().width,
             transform: getComputedStyle(el).transform
-        })
+        }))
         animateReset(true)
     }
 
     const onBlur = () => {
         if (!spaceActive) return
         spaceActive = false
-        pwLog('[tap] blur', {
+        pwLog('[tap] blur', () => ({
             w: el.getBoundingClientRect().width,
             transform: getComputedStyle(el).transform
-        })
+        }))
         animateReset(false)
     }
 

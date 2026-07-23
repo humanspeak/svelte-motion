@@ -39,19 +39,31 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div class="outer">
-        <div class="input-container">
-            <input bind:value />
-            <div class="counter">
-                <motion.span
-                    bind:ref={counterEl}
-                    style="color: {mapRemainingToColor(
-                        charactersRemaining
-                    )}; will-change: transform; display: block;"
-                >
-                    {charactersRemaining}
-                </motion.span>
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// characters-remaining</span>
+            <span class="micro readout">{charactersRemaining} left</span>
+        </div>
+
+        <div class="stage">
+            <div class="input-container">
+                <input bind:value placeholder="type here…" />
+                <div class="counter">
+                    <motion.span
+                        bind:ref={counterEl}
+                        style="color: {mapRemainingToColor(
+                            charactersRemaining
+                        )}; will-change: transform; display: block;"
+                    >
+                        {charactersRemaining}
+                    </motion.span>
+                </div>
             </div>
+        </div>
+
+        <div class="strip-foot">
+            <span class="micro">spring bounces near the limit</span>
+            <span class="micro">max: {maxLength}</span>
         </div>
     </div>
 </div>
@@ -61,69 +73,93 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 2rem;
+        padding: 1.5rem;
         min-height: 280px;
     }
 
-    .outer {
+    .strip {
+        width: 100%;
+        max-width: 420px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .readout {
+        color: var(--brut-accent, #247768);
+        font-variant-numeric: tabular-nums;
+        text-transform: none;
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
+    }
+
+    .stage {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 100%;
-        height: 100%;
-        background: transparent;
-        border-radius: 12px;
-        padding: 40px;
-    }
-
-    :global(.dark) .outer {
-        background: #0b1011;
+        padding: 2rem 0;
     }
 
     .input-container {
         position: relative;
-        font-size: 32px;
+        font-size: 28px;
         line-height: 1;
     }
 
     .input-container input {
         position: relative;
-        font-size: 32px;
+        font-family: var(--brut-mono, monospace);
+        font-size: 28px;
         line-height: 1;
-        background-color: #ffffff;
-        color: #1a1a1a;
-        border: 2px solid #d1d5db;
-        border-radius: 10px;
-        padding: 20px;
-        padding-right: 70px;
-        width: 300px;
+        background-color: var(--brut-bg-2, #eef4f1);
+        color: var(--brut-ink, #0a0a0a);
+        border: 1px solid var(--brut-ink, #0a0a0a);
+        padding: 18px 64px 18px 18px;
+        width: 280px;
         outline: none;
+        box-shadow: 6px 6px 0 var(--brut-rule, #d6dedb);
     }
 
-    :global(.dark) .input-container input {
-        background-color: #0b1011;
-        color: #f5f5f5;
-        border-color: #1d2628;
+    .input-container input::placeholder {
+        color: var(--brut-ink-3, #9a9a9a);
     }
 
     .input-container input:focus {
-        border-color: #3b82f6;
+        border-color: var(--brut-accent, #247768);
     }
 
     .counter {
-        color: #6b7280;
-        background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, #ffffff 20%);
+        color: var(--brut-ink-2, #525252);
+        background: linear-gradient(to right, transparent 0%, var(--brut-bg-2, #eef4f1) 45%);
         position: absolute;
         top: 50%;
-        right: 2px;
+        right: 1px;
         transform: translateY(-50%);
-        padding: 10px;
-        padding-right: 20px;
-        padding-left: 50px;
-    }
-
-    :global(.dark) .counter {
-        color: #ccc;
-        background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, #0b1011 20%);
+        padding: 10px 18px 10px 44px;
+        font-family: var(--brut-mono, monospace);
+        font-variant-numeric: tabular-nums;
     }
 </style>

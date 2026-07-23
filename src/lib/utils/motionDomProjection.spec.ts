@@ -120,6 +120,58 @@ describe('MotionDomProjectionAdapter.measurePageRect', () => {
         adapter.unmount()
     })
 
+    it('does not resurrect lastLayout after unmount when a pending refresh rAF fires', () => {
+        // Plan 011: refreshCachedLayout schedules a requestAnimationFrame that
+        // re-reads projection.layout on the NEXT frame. unmount() clears
+        // lastLayout, but the pending callback fires afterward and resurrects
+        // it — a post-unmount state write that seeds a remount's first commit
+        // with a stale snapshot. Upstream cancels its equivalent frame in
+        // unmount (create-projection-node.ts: cancelFrame(this.updateProjection)).
+        //
+        // Capture the scheduled rAF instead of running it so we can flush it
+        // deterministically AFTER unmount.
+        const rafCallbacks: FrameRequestCallback[] = []
+        const rafSpy = vi
+            .spyOn(
+                globalThis as unknown as { requestAnimationFrame: typeof requestAnimationFrame },
+                'requestAnimationFrame'
+            )
+            .mockImplementation((fn: FrameRequestCallback): number => {
+                rafCallbacks.push(fn)
+                return rafCallbacks.length
+            })
+        const cafSpy = vi
+            .spyOn(
+                globalThis as unknown as { cancelAnimationFrame: typeof cancelAnimationFrame },
+                'cancelAnimationFrame'
+            )
+            .mockImplementation(() => {})
+
+        setScrollAndRect(element, 0, 100)
+        adapter.mount(element)
+        // Populate projection.layout so the scheduled callback has a snapshot
+        // to (incorrectly) resurrect after unmount.
+        adapter.seedLayout()
+
+        const probe = adapter as unknown as {
+            lastLayout: unknown
+            refreshCachedLayout: () => void
+        }
+        probe.refreshCachedLayout()
+        expect(probe.lastLayout).toBeDefined()
+        expect(rafCallbacks.length).toBeGreaterThan(0)
+
+        adapter.unmount()
+        expect(probe.lastLayout).toBeUndefined()
+
+        // A frame arriving after unmount must NOT write lastLayout again.
+        for (const cb of rafCallbacks) cb(0)
+        expect(probe.lastLayout).toBeUndefined()
+
+        rafSpy.mockRestore()
+        cafSpy.mockRestore()
+    })
+
     it('commitDraggedLayoutChange: delivers the slot delta from the upstream didUpdate, measuring with the drag transform stripped', async () => {
         // Plan 004 Step 5: a dragged element whose layout slot changes (e.g.
         // Reorder swapping its DOM position) must shift its drag origin by

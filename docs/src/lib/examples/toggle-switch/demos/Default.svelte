@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { motion, type MotionTransition } from '@humanspeak/svelte-motion'
+    import { motion, styleString, type MotionTransition } from '@humanspeak/svelte-motion'
 
     let isOn = $state(true)
 
@@ -36,15 +36,52 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <button
-        class="switch"
-        class:is-on={isOn}
-        onclick={() => (isOn = !isOn)}
-        type="button"
-        aria-label={isOn ? 'Turn off' : 'Turn on'}
-    >
-        <motion.div class="ball" layout transition={currentTransition} />
-    </button>
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// toggle-switch</span>
+            <span class="micro state">state: {isOn ? 'on' : 'off'}</span>
+        </div>
+
+        <div class="stage">
+            <motion.button
+                onclick={() => (isOn = !isOn)}
+                type="button"
+                aria-label={isOn ? 'Turn off' : 'Turn on'}
+                whileHover={{ backgroundColor: 'var(--brut-accent-soft, rgba(36, 119, 104, 0.1))' }}
+                style={styleString(() => ({
+                    width: 80,
+                    height: 200,
+                    display: 'flex',
+                    alignItems: isOn ? 'flex-start' : 'flex-end',
+                    padding: 10,
+                    border: '1px solid var(--brut-ink, #0a0a0a)',
+                    background: 'var(--brut-bg-2, #eef4f1)',
+                    boxShadow: '6px 6px 0 var(--brut-rule, #d6dedb)',
+                    cursor: 'pointer'
+                }))}
+            >
+                <motion.div
+                    layout
+                    transition={currentTransition}
+                    style={styleString(() => ({
+                        width: 60,
+                        height: 60,
+                        background: 'var(--brut-accent, #247768)',
+                        border: '1px solid var(--brut-ink, #0a0a0a)',
+                        boxShadow: '4px 4px 0 var(--brut-rule, #d6dedb)',
+                        willChange: 'transform'
+                    }))}
+                ></motion.div>
+            </motion.button>
+        </div>
+
+        <div class="strip-foot">
+            <span class="micro">up: spring 700/30</span>
+            <span class="micro state">
+                {isOn ? 'transition: spring' : 'transition: bounce'}
+            </span>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -52,37 +89,51 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 2rem;
-        min-height: 320px;
+        padding: 1.5rem;
+        min-height: 360px;
     }
 
-    .switch {
-        width: 80px;
-        height: 200px;
-        background-color: rgba(255, 255, 255, 0.2);
+    .strip {
+        width: 100%;
+        max-width: 320px;
         display: flex;
-        align-items: flex-end;
-        border-radius: 50px;
-        padding: 10px;
-        cursor: pointer;
-        border: none;
-        transition: background-color 0.3s;
+        flex-direction: column;
+        gap: 0.75rem;
     }
 
-    .switch:hover {
-        background-color: rgba(255, 255, 255, 0.25);
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
     }
 
-    .switch.is-on {
-        align-items: flex-start;
+    .state {
+        color: var(--brut-accent, #247768);
     }
 
-    :global(.ball) {
-        width: 60px;
-        height: 60px;
-        background-color: #f5f5f5;
-        border-radius: 30px;
-        will-change: transform;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
+    }
+
+    .stage {
+        height: 15rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 </style>

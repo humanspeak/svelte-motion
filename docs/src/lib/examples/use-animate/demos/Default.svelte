@@ -32,67 +32,86 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <div class="controls">
-        <button type="button" class="primary" onclick={run}>Animate</button>
-        <button type="button" class="secondary" onclick={reset}>Reset</button>
-    </div>
+    <div class="strip">
+        <div class="strip-head">
+            <span class="micro">// use-animate</span>
+            <span class="micro state">stagger: 0.08s → target</span>
+        </div>
 
-    <div {@attach scope} class="stage">
-        <ul>
-            {#each items as item (item)}
-                <li>{item}</li>
-            {/each}
-        </ul>
+        <div {@attach scope} class="stage">
+            <ul>
+                {#each items as item, i (item)}
+                    <li>
+                        <span class="index">{String(i + 1).padStart(2, '0')}</span>
+                        <span class="label">{item}</span>
+                    </li>
+                {/each}
+            </ul>
 
-        <button type="button" class="target">Target button</button>
+            <button type="button" class="target">Target button</button>
+        </div>
+
+        <div class="strip-foot">
+            <button type="button" class="ctrl primary" onclick={run}>Animate</button>
+            <button type="button" class="ctrl" onclick={reset}>Reset</button>
+        </div>
     </div>
 </div>
 
 <style>
     .dk-demo-shell {
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 1rem;
-        padding: 2rem;
-        min-height: 420px;
+        padding: 1.5rem;
+        min-height: 440px;
     }
 
-    .controls {
+    .strip {
+        width: 100%;
+        max-width: 360px;
         display: flex;
-        gap: 8px;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .micro {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .state {
+        color: var(--brut-accent, #247768);
+    }
+
+    .strip-head,
+    .strip-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-bottom: 0.5rem;
+    }
+
+    .strip-foot {
+        border-bottom: none;
+        border-top: 1px dashed var(--brut-rule-2, #bbc4c0);
+        padding-top: 0.75rem;
+        padding-bottom: 0;
+        justify-content: flex-start;
+        gap: 0.5rem;
     }
 
     .stage {
         display: flex;
         flex-direction: column;
-        gap: 12px;
-        align-items: center;
-    }
-
-    button {
-        font-size: 13px;
-        padding: 6px 12px;
-        border-radius: 6px;
-        border: 1px solid transparent;
-        cursor: pointer;
-    }
-
-    button.primary {
-        background: #2563eb;
-        color: white;
-    }
-
-    button.secondary {
-        background: rgba(255, 255, 255, 0.06);
-        border-color: rgba(255, 255, 255, 0.18);
-        color: white;
-    }
-
-    button.target {
-        background: linear-gradient(135deg, #db2777 0%, #f59e0b 100%);
-        color: white;
+        gap: 0.75rem;
+        align-items: stretch;
+        padding: 0.5rem 0;
     }
 
     ul {
@@ -101,16 +120,63 @@
         margin: 0;
         display: flex;
         flex-direction: column;
-        gap: 8px;
-        width: 240px;
+        gap: 0.5rem;
     }
 
     li {
-        padding: 10px 14px;
-        border-radius: 8px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        font-weight: 500;
-        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 0.875rem;
+        background: var(--brut-bg-2, #eef4f1);
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+    }
+
+    .index {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.625rem;
+        letter-spacing: 0.08em;
+        color: var(--brut-ink-3, #9a9a9a);
+    }
+
+    .label {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.8125rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--brut-ink, #0a0a0a);
+    }
+
+    button.target {
+        padding: 0.75rem 0.875rem;
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        border: 1px solid var(--brut-ink, #0a0a0a);
+        background: var(--brut-accent-soft, rgba(36, 119, 104, 0.1));
+        color: var(--brut-accent, #247768);
+        box-shadow: 4px 4px 0 var(--brut-rule, #d6dedb);
+        cursor: pointer;
+    }
+
+    .ctrl {
+        font-family: var(--brut-mono, monospace);
+        font-size: 0.6875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 0.5rem 0.875rem;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: transparent;
+        color: var(--brut-ink-2, #525252);
+        cursor: pointer;
+    }
+
+    .ctrl.primary {
+        border-color: var(--brut-accent, #247768);
+        background: var(--brut-accent-soft, rgba(36, 119, 104, 0.1));
+        color: var(--brut-accent, #247768);
     }
 </style>

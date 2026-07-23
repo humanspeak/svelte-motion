@@ -320,6 +320,30 @@ describe('utils/variants - resolveRestingValues', () => {
         expect(resolveRestingValues({ x: [] })).toEqual({})
     })
 
+    /*
+     * Pinning test (plan 007, upstream-fidelity): documents that
+     * `resolveRestingValues` currently takes the LAST array element verbatim,
+     * without running it through upstream's `resolveFinalValueInKeyframes`
+     * (motion-dom `render/utils/setters.ts`). A trailing `null` (wildcard,
+     * "current value") and relative strings (`+=50`) are therefore stored as-is
+     * rather than resolved to a concrete value.
+     *
+     * Plan 007 investigated whether this corrupts the animation-controls settle
+     * path and found it does NOT: the WAAPI animation layer normalizes these
+     * inputs before settle (a `[0, null]` start snaps the channel within one
+     * frame, long before settle runs), and the settle inline-style writer emits
+     * no garbage and does not jump on a reactive re-render. So the verbatim
+     * behavior below is intentional and pinned — any change to it (e.g. adopting
+     * upstream's wildcard/relative resolution) must be deliberate, and should
+     * also update the animation-controls settle handling accordingly.
+     */
+    it('pins current verbatim handling of wildcard/relative final keyframes', () => {
+        expect(resolveRestingValues({ x: [0, null] })).toEqual({ x: null })
+        expect(resolveRestingValues({ x: [null] })).toEqual({ x: null })
+        expect(resolveRestingValues({ x: ['+=50'] })).toEqual({ x: '+=50' })
+        expect(resolveRestingValues({ x: '+=50' })).toEqual({ x: '+=50' })
+    })
+
     it('returns undefined when given undefined', () => {
         expect(resolveRestingValues(undefined)).toBeUndefined()
     })

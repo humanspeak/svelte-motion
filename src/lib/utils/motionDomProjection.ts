@@ -142,6 +142,8 @@ export class MotionDomProjectionAdapter {
     private layoutId: string | undefined
     private transition: Transition | undefined
     private lastLayout: Measurements | undefined
+    /** Handle for the pending refreshCachedLayout frame, cancelled on unmount. */
+    private refreshRafId: number | null = null
     private readonly getBaseTransform: (() => string) | undefined
     private readonly measureListeners = new Set<(rect: RectLike) => void>()
 
@@ -236,6 +238,10 @@ export class MotionDomProjectionAdapter {
         this.visualElement.unmount()
         visualElementStore.delete(element)
         MotionDomProjectionAdapter.adapters.delete(this.projection)
+        if (this.refreshRafId !== null && typeof window !== 'undefined') {
+            cancelAnimationFrame(this.refreshRafId)
+        }
+        this.refreshRafId = null
         this.element = null
         this.lastLayout = undefined
     }
@@ -542,6 +548,40 @@ export class MotionDomProjectionAdapter {
     }
 
     /**
+     * Block this node from starting layout animations, then finish and re-seed.
+     *
+     * Unlike {@link finishAnimation}, which only stops what is running now, this
+     * also sets the projection's `isAnimationBlocked` flag so a layout update
+     * ALREADY SCHEDULED on the frameloop (an earlier `commitObservedLayoutChange`
+     * whose `didUpdate` computes its target next frame) cannot resurrect the
+     * animation. Used while a `layout` ancestor runs its size-corrected width
+     * animation: the child must track the growing parent (identity transform),
+     * never run its own re-slot FLIP — and the block is race-proof against a
+     * commit that landed a beat before the size animation was detected. Mirrors
+     * upstream's drag block (VisualElementDragControls `isAnimationBlocked`).
+     *
+     * @returns Nothing.
+     */
+    blockLayoutAnimation(): void {
+        if (!this.element || !this.layout) return
+        this.projection.isAnimationBlocked = true
+        this.finishAnimationForSubtree(this.projection)
+        this.seedLayout()
+    }
+
+    /**
+     * Lift a prior {@link blockLayoutAnimation} block and re-seed to the current
+     * layout, so subsequent real layout changes animate normally again.
+     *
+     * @returns Nothing.
+     */
+    unblockLayoutAnimation(): void {
+        if (!this.element || !this.layout) return
+        this.projection.isAnimationBlocked = false
+        this.seedLayout()
+    }
+
+    /**
      * Check whether this projection subtree has an active layout animation.
      *
      * @returns `true` when this projection subtree is currently animating.
@@ -678,7 +718,16 @@ export class MotionDomProjectionAdapter {
 
     private refreshCachedLayout(): void {
         this.lastLayout = cloneMeasurements(this.projection.layout)
-        requestAnimationFrame(() => {
+        if (typeof window === 'undefined') return
+        // Cancel any prior pending refresh so only the latest frame writes, and
+        // so unmount() can drop it entirely (upstream cancels its equivalent in
+        // unmount — create-projection-node.ts: cancelFrame(this.updateProjection)).
+        if (this.refreshRafId !== null) cancelAnimationFrame(this.refreshRafId)
+        this.refreshRafId = requestAnimationFrame(() => {
+            this.refreshRafId = null
+            // A frame that arrives after unmount must not resurrect lastLayout
+            // from the stale projection.layout and seed a remount's first commit.
+            if (!this.element) return
             this.lastLayout = cloneMeasurements(this.projection.layout)
         })
     }

@@ -1,10 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { GestureCoordinator } from './gestureCoordinator.js'
 import {
     attachWhileHover,
     computeHoverBaseline,
     isHoverCapable,
+    parseUnitValue,
+    readTransformChannels,
     splitHoverDefinition
 } from './hover.js'
+
+// Capture the pristine jsdom implementation at module-eval time, before any
+// test replaces `window.getComputedStyle` with a stub. Authored-value cases
+// below restore it so they exercise the real cascade (inline + stylesheet).
+const REAL_GET_COMPUTED_STYLE = globalThis.getComputedStyle
 
 // Mock motion.animate
 vi.mock('motion', () => {
@@ -277,6 +285,61 @@ describe('utils/hover', () => {
         cleanup()
     })
 
+    it('attachWhileHover: cleanup unregisters composed-channel stoppers from the coordinator', () => {
+        // Plan 011: composed channel animations register a stopper with the
+        // gesture coordinator, but teardown only calls animation.stop() — the
+        // stored `unregister` runs only from onComplete, so a stopped
+        // animation's closure stays in the coordinator's stoppers Set until the
+        // element is GC'd. Upstream frame-cancellation discipline drains its
+        // registrations on unmount.
+        const el = document.createElement('div')
+
+        // Fake coordinator mirroring createGestureCoordinator but exposing its
+        // stoppers Set so retention after cleanup is observable.
+        const stoppers = new Set<() => void>()
+        const active = new Set<string>()
+        const coordinator = {
+            setActive: (type: string, isActive: boolean) => {
+                if (isActive) active.add(type)
+                else active.delete(type)
+            },
+            isActive: (type: string) => active.has(type),
+            ownedKeys: () => new Set<string>(),
+            isKeyProtected: () => false,
+            register: (stop: () => void) => {
+                stoppers.add(stop)
+                return () => stoppers.delete(stop)
+            },
+            stopAll: () => {
+                for (const stop of stoppers) stop()
+                stoppers.clear()
+            },
+            markExternalWrite: () => {},
+            consumeExternalWrite: () => false
+        } as unknown as GestureCoordinator
+
+        const cleanup = attachWhileHover(
+            el,
+            { scale: 1.2 },
+            { duration: 0.2 },
+            undefined,
+            undefined,
+            undefined,
+            coordinator
+        )
+
+        // Hover-enter starts a composed scale channel that registers its
+        // stopper with the coordinator.
+        const hoverEnd = hoverCallback!(el)
+        expect(hoverEnd).toBeTruthy()
+        expect(stoppers.size).toBe(1)
+
+        // Teardown must drain the coordinator; the leak leaves the stopper
+        // closure retained in the Set.
+        cleanup()
+        expect(stoppers.size).toBe(0)
+    })
+
     describe('CSS variable preservation', () => {
         it('computeHoverBaseline: preserves CSS variables from inline style', () => {
             const el = document.createElement('div')
@@ -405,5 +468,206 @@ describe('utils/hover', () => {
             expect(baseline.backgroundColor).toBe('rgb(255, 0, 0)')
             expect(baseline.color).toBe('hsl(200, 100%, 50%)')
         })
+    })
+})
+
+describe('utils/hover computeHoverBaseline authored values (plan 003)', () => {
+    beforeEach(() => {
+        // Restore the real jsdom cascade so authored style values are readable.
+        Object.defineProperty(window, 'getComputedStyle', {
+            value: REAL_GET_COMPUTED_STYLE,
+            configurable: true
+        })
+    })
+
+    it('restores an inline style-authored opacity, not the neutral default', () => {
+        const el = document.createElement('div')
+        el.setAttribute('style', 'opacity: 0.8')
+        document.body.appendChild(el)
+
+        const baseline = computeHoverBaseline(el, {
+            whileHover: { opacity: 1 }
+        })
+
+        // Upstream getBaseTarget has no neutral-default step: the authored 0.8
+        // must win over the hardcoded neutral opacity: 1.
+        expect(Number(baseline.opacity)).toBe(0.8)
+        el.remove()
+    })
+
+    it('restores a stylesheet-authored opacity (non-inline authorship)', () => {
+        const style = document.createElement('style')
+        style.textContent = '.plan003-sheet { opacity: 0.65; }'
+        document.head.appendChild(style)
+        const el = document.createElement('div')
+        el.className = 'plan003-sheet'
+        document.body.appendChild(el)
+
+        const baseline = computeHoverBaseline(el, {
+            whileHover: { opacity: 1 }
+        })
+
+        expect(Number(baseline.opacity)).toBe(0.65)
+        el.remove()
+        style.remove()
+    })
+
+    it('lets animate outrank an authored style value for the same key', () => {
+        const el = document.createElement('div')
+        el.setAttribute('style', 'opacity: 0.8')
+        document.body.appendChild(el)
+
+        const baseline = computeHoverBaseline(el, {
+            animate: { opacity: 0.3 },
+            whileHover: { opacity: 1 }
+        })
+
+        expect(baseline.opacity).toBe(0.3)
+        el.remove()
+    })
+
+    it('lets initial outrank an authored style value for the same key', () => {
+        const el = document.createElement('div')
+        el.setAttribute('style', 'opacity: 0.8')
+        document.body.appendChild(el)
+
+        const baseline = computeHoverBaseline(el, {
+            initial: { opacity: 0.4 },
+            whileHover: { opacity: 1 }
+        })
+
+        expect(baseline.opacity).toBe(0.4)
+        el.remove()
+    })
+
+    it('lets baseValues outrank an authored style value for a transform channel', () => {
+        const el = document.createElement('div')
+        document.body.appendChild(el)
+
+        const baseline = computeHoverBaseline(el, {
+            baseValues: { scale: 1.5 },
+            whileHover: { scale: 1.2 }
+        })
+
+        expect(baseline.scale).toBe(1.5)
+        el.remove()
+    })
+
+    it('still neutral-defaults a transform channel with nothing authored', () => {
+        const el = document.createElement('div')
+        document.body.appendChild(el)
+
+        const baseline = computeHoverBaseline(el, {
+            whileHover: { rotate: 10, scale: 1.2 }
+        })
+
+        // Transform channels intentionally skip the computed-style step: a
+        // matrix string is not a per-channel value, so neutral defaults stand.
+        expect(baseline.rotate).toBe(0)
+        expect(baseline.scale).toBe(1)
+        el.remove()
+    })
+})
+
+describe('utils/hover parseUnitValue', () => {
+    it('reports an empty unit for finite numbers', () => {
+        expect(parseUnitValue(8)).toEqual({ value: 8, unit: '' })
+        expect(parseUnitValue(-3.5)).toEqual({ value: -3.5, unit: '' })
+        expect(parseUnitValue(0)).toEqual({ value: 0, unit: '' })
+    })
+
+    it('parses unit-suffixed strings into magnitude and unit', () => {
+        expect(parseUnitValue('-50%')).toEqual({ value: -50, unit: '%' })
+        expect(parseUnitValue('2rem')).toEqual({ value: 2, unit: 'rem' })
+        expect(parseUnitValue('10px')).toEqual({ value: 10, unit: 'px' })
+        expect(parseUnitValue('1.5em')).toEqual({ value: 1.5, unit: 'em' })
+    })
+
+    it('treats a unitless numeric string as an empty unit (numeric path)', () => {
+        expect(parseUnitValue('1.2')).toEqual({ value: 1.2, unit: '' })
+        expect(parseUnitValue('  8  ')).toEqual({ value: 8, unit: '' })
+    })
+
+    it('trims surrounding whitespace before parsing', () => {
+        expect(parseUnitValue('  -50%  ')).toEqual({ value: -50, unit: '%' })
+    })
+
+    it('returns null for non-parseable strings', () => {
+        expect(parseUnitValue('red')).toBeNull()
+        expect(parseUnitValue('var(--x)')).toBeNull()
+        expect(parseUnitValue('calc(100% - 20px)')).toBeNull()
+        expect(parseUnitValue('')).toBeNull()
+    })
+
+    it('returns null for non-finite numbers and non-primitive values', () => {
+        expect(parseUnitValue(Number.NaN)).toBeNull()
+        expect(parseUnitValue(Number.POSITIVE_INFINITY)).toBeNull()
+        expect(parseUnitValue(null)).toBeNull()
+        expect(parseUnitValue(undefined)).toBeNull()
+        expect(parseUnitValue([1, 2])).toBeNull()
+        expect(parseUnitValue({})).toBeNull()
+    })
+})
+
+describe('utils/hover readTransformChannels', () => {
+    const withTransform = (transform: string): HTMLElement => {
+        const el = document.createElement('div')
+        Object.defineProperty(window, 'getComputedStyle', {
+            value: () => ({ transform }),
+            configurable: true
+        })
+        return el
+    }
+
+    it('returns identity values for an untransformed element', () => {
+        expect(readTransformChannels(withTransform('none'))).toEqual({
+            scale: 1,
+            x: 0,
+            y: 0,
+            rotate: 0
+        })
+        expect(readTransformChannels(withTransform(''))).toEqual({
+            scale: 1,
+            x: 0,
+            y: 0,
+            rotate: 0
+        })
+    })
+
+    it('reads translate-only from matrix e/f', () => {
+        // matrix(1, 0, 0, 1, 30, -20) — pure translate.
+        const channels = readTransformChannels(withTransform('matrix(1, 0, 0, 1, 30, -20)'))
+        expect(channels).not.toBeNull()
+        expect(channels?.x).toBeCloseTo(30, 5)
+        expect(channels?.y).toBeCloseTo(-20, 5)
+        expect(channels?.scale).toBeCloseTo(1, 5)
+        expect(channels?.rotate).toBeCloseTo(0, 5)
+    })
+
+    it('decomposes a combined rotate + uniform scale', () => {
+        // rotate(90deg) scale(2) → matrix(0, 2, -2, 0, 0, 0):
+        //   a = 2*cos(90) = 0, b = 2*sin(90) = 2, c = -2*sin(90) = -2, d = 0.
+        const channels = readTransformChannels(withTransform('matrix(0, 2, -2, 0, 0, 0)'))
+        expect(channels).not.toBeNull()
+        expect(channels?.scale).toBeCloseTo(2, 5)
+        expect(channels?.rotate).toBeCloseTo(90, 5)
+        expect(channels?.x).toBeCloseTo(0, 5)
+        expect(channels?.y).toBeCloseTo(0, 5)
+    })
+
+    it('reports a negative rotation with the browser sign convention', () => {
+        // rotate(-30deg): a = cos(-30) ≈ 0.866, b = sin(-30) = -0.5.
+        const channels = readTransformChannels(
+            withTransform('matrix(0.866, -0.5, 0.5, 0.866, 0, 0)')
+        )
+        expect(channels?.rotate).toBeCloseTo(-30, 2)
+    })
+
+    it('returns null for a 3D matrix (out of scope)', () => {
+        expect(
+            readTransformChannels(
+                withTransform('matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)')
+            )
+        ).toBeNull()
     })
 })

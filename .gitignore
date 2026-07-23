@@ -43,3 +43,4 @@ mprocs.log
 SEO.md
 .claude/scheduled_tasks.lock
 docs/test-results/
+/.claude/worktrees

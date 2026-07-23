@@ -65,14 +65,14 @@
         <li>
             <MousePointer2 />
             <span>
-                Left panel — the red box drifts as the FLIP transform fights the scroll offset. Same
+                Left panel — the ink box drifts as the FLIP transform fights the scroll offset. Same
                 FLIP, no <code>layoutScroll</code>.
             </span>
         </li>
         <li>
             <Anchor />
             <span>
-                Right panel — the teal box stays anchored in scroll-content space.
+                Right panel — the accent box stays anchored in scroll-content space.
                 <code>layoutScroll</code> tells FLIP to re-base measurements in the container's coordinate
                 system, so a mid-animation scroll cancels out instead of leaking into the delta.
             </span>
