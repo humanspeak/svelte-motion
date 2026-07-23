@@ -113,6 +113,24 @@ export const readTransformChannels = (
     }
 }
 
+/**
+ * Return a shallow copy of `record` keeping only keys the predicate accepts.
+ *
+ * @param record Source key/value record.
+ * @param keep Predicate deciding whether each key survives.
+ * @return A new record with only the kept keys.
+ */
+const filterRecord = (
+    record: Record<string, unknown>,
+    keep: (key: string) => boolean
+): Record<string, unknown> => {
+    const out: Record<string, unknown> = {}
+    for (const key of Object.keys(record)) {
+        if (keep(key)) out[key] = record[key]
+    }
+    return out
+}
+
 const getFinalNumber = (value: unknown): number | null => {
     const raw: unknown = Array.isArray(value) ? value[value.length - 1] : value
     const parsed = typeof raw === 'number' ? raw : Number.parseFloat(String(raw))
@@ -528,7 +546,11 @@ export const attachWhileHover = (
     const cleanupHover = hover(el, () => {
         if (el.dataset.svelteMotionDragActive === 'true') return () => {}
 
-        coordinator?.setActive('hover', true)
+        const { keyframes, transition } = splitHoverDefinition(whileHover)
+        // Upstream protectedKeys: hover records the keys it owns so a
+        // higher-priority tap can protect its own keys from us and we protect
+        // nothing tap already owns.
+        coordinator?.setActive('hover', true, Object.keys(keyframes))
         // Hover start: compute baseline and animate to whileHover values
         hoverBaseline = computeHoverBaseline(el, {
             initial: baselineSources?.initial,
@@ -538,33 +560,46 @@ export const attachWhileHover = (
         })
         if (!transformComposer) fallbackBaseTransform = el.style.transform
         callbacks?.onStart?.()
-        // Upstream protected keys: while a higher-priority tap is active, hover
-        // only records its state — the tap release re-applies hover from the
-        // coordinator flag (variant-props.ts priority order).
-        if (!coordinator?.isActive('tap')) {
-            // Single-writer: stop every in-flight gesture animation (ours and
-            // the tap system's) before this transition's writers start.
-            coordinator?.stopAll()
-            const { keyframes, transition } = splitHoverDefinition(whileHover)
-            animateGestureTarget(keyframes, transition)
+        // Per-key ownership (upstream animation-state.ts protectedKeys): apply
+        // only the keys no higher-priority (tap) gesture owns. tap-owned keys
+        // (e.g. an overlapping `scale`) stay untouched and re-apply through the
+        // tap release's reapplyHoverIfActive path — unchanged arbitration.
+        const unprotected = filterRecord(keyframes, (k) => !coordinator?.isKeyProtected(k, 'hover'))
+        if (Object.keys(unprotected).length > 0) {
+            // Single-writer: when no tap is active this stops every in-flight
+            // gesture animation before our writers start (unchanged behavior).
+            // While a tap IS active we must NOT stopAll — that would kill the
+            // tap's in-flight animation on ITS keys; the subset we apply is
+            // disjoint from tap's keys by construction, so no writer fights.
+            if (!coordinator?.isActive('tap')) coordinator?.stopAll()
+            animateGestureTarget(unprotected, transition)
         }
 
         // Return cleanup function for hover end
         return () => {
             coordinator?.setActive('hover', false)
-            // While pressed, the tap state owns these keys — its release path
-            // restores the correct target (base, now that hover is inactive).
-            if (coordinator?.isActive('tap')) {
-                callbacks?.onEnd?.()
-                return
-            }
-            // Hover end: restore baseline values. Stop competing writers
-            // first — e.g. a tap-release spring reapplying hover — so the
-            // unwind is the single writer and starts from the frozen visual
-            // state instead of snapping when the race resolves.
-            if (hoverBaseline && Object.keys(hoverBaseline).length > 0) {
-                coordinator?.stopAll()
-                animateGestureTarget(hoverBaseline, undefined)
+            // Per-key restore (upstream removed-key handling): restore only the
+            // baseline keys NOT owned by a higher-priority (tap) gesture. Keys
+            // tap owns (e.g. an overlapping `scale`) keep deferring to tap's
+            // release — unchanged arbitration for overlapping keys. Disjoint
+            // keys tap never touched (e.g. `opacity` while tap owns `scale`)
+            // restore immediately here instead of staying stuck until release.
+            if (hoverBaseline) {
+                const tapActive = coordinator?.isActive('tap')
+                const restorable = filterRecord(
+                    hoverBaseline,
+                    (k) => !coordinator?.isKeyProtected(k, 'hover')
+                )
+                if (Object.keys(restorable).length > 0) {
+                    // Stop competing writers first — e.g. a tap-release spring
+                    // reapplying hover — so the unwind is the single writer and
+                    // starts from the frozen visual state instead of snapping
+                    // when the race resolves. While a tap is active we must NOT
+                    // stopAll (it would kill tap's animation on its own keys);
+                    // the restored subset is disjoint from tap's keys.
+                    if (!tapActive) coordinator?.stopAll()
+                    animateGestureTarget(restorable, undefined)
+                }
             }
             callbacks?.onEnd?.()
         }

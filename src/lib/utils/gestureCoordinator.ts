@@ -25,11 +25,44 @@
 /** Gesture types the coordinator tracks, lowest priority first. */
 export type GestureType = 'hover' | 'tap'
 
+/**
+ * Gesture priority order, lowest first (upstream framer-motion
+ * variant-props.ts: `animate < … < whileHover < whileTap < whileDrag`). Only
+ * the two gestures this coordinator tracks appear here; `tap` outranks `hover`,
+ * so a key `tap` owns is protected from the `hover` system.
+ */
+const GESTURE_PRIORITY: readonly GestureType[] = ['hover', 'tap']
+
 export type GestureCoordinator = {
-    /** Record a gesture type becoming active/inactive (upstream `setActive`). */
-    setActive: (type: GestureType, isActive: boolean) => void
+    /**
+     * Record a gesture type becoming active/inactive (upstream `setActive`).
+     *
+     * @param type Gesture becoming active/inactive.
+     * @param isActive Whether the gesture is now active.
+     * @param ownedKeys Keys this gesture animates while active (upstream
+     * `protectedKeys`). Recorded on activate so higher-priority gestures can
+     * protect them; cleared on deactivate. Omitting keys owns nothing new,
+     * preserving the flag-only callers.
+     */
+    setActive: (type: GestureType, isActive: boolean, ownedKeys?: string[]) => void
     /** Whether a gesture type is currently active. */
     isActive: (type: GestureType) => boolean
+    /**
+     * Keys a gesture currently owns (empty when inactive or key-less). Upstream
+     * `protectedKeys` for one gesture type.
+     */
+    ownedKeys: (type: GestureType) => ReadonlySet<string>
+    /**
+     * Whether `key` is owned by a gesture with strictly higher priority than
+     * `below` (upstream: a higher-priority variant protects the key). Directional
+     * — `tap`'s keys are protected from `hover`, but `hover`'s keys are never
+     * protected from `tap`.
+     *
+     * @param key Transform/style key to test.
+     * @param below The asking gesture; only gestures above it can protect.
+     * @returns `true` when a higher-priority active gesture owns `key`.
+     */
+    isKeyProtected: (key: string, below: GestureType) => boolean
     /**
      * Register an in-flight gesture animation's stopper. Returns an
      * unregister function for animations that complete naturally.
@@ -70,17 +103,34 @@ export const createGestureCoordinator = (): GestureCoordinator => {
     const active = new Set<GestureType>()
     const stoppers = new Set<() => void>()
     const externalWrites = new Set<string>()
+    // Keys each gesture currently owns (upstream protectedKeys). Recorded on
+    // activate, cleared on deactivate.
+    const owned = new Map<GestureType, Set<string>>()
 
     return {
         markExternalWrite: (key) => {
             externalWrites.add(key)
         },
         consumeExternalWrite: (key) => externalWrites.delete(key),
-        setActive: (type, isActive) => {
-            if (isActive) active.add(type)
-            else active.delete(type)
+        setActive: (type, isActive, ownedKeys) => {
+            if (isActive) {
+                active.add(type)
+                owned.set(type, new Set(ownedKeys ?? []))
+            } else {
+                active.delete(type)
+                owned.delete(type)
+            }
         },
         isActive: (type) => active.has(type),
+        ownedKeys: (type) => owned.get(type) ?? new Set<string>(),
+        isKeyProtected: (key, below) => {
+            const belowRank = GESTURE_PRIORITY.indexOf(below)
+            for (let rank = belowRank + 1; rank < GESTURE_PRIORITY.length; rank++) {
+                const higher = GESTURE_PRIORITY[rank]
+                if (active.has(higher) && owned.get(higher)?.has(key)) return true
+            }
+            return false
+        },
         register: (stop) => {
             stoppers.add(stop)
             return () => stoppers.delete(stop)

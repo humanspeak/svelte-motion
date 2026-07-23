@@ -1,5 +1,10 @@
 import type { GestureCoordinator } from '$lib/utils/gestureCoordinator'
-import { isHoverCapable, readTransformChannels, splitHoverDefinition } from '$lib/utils/hover'
+import {
+    computeHoverBaseline,
+    isHoverCapable,
+    readTransformChannels,
+    splitHoverDefinition
+} from '$lib/utils/hover'
 import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import { press } from 'motion-dom'
@@ -336,6 +341,38 @@ export const attachWhileTap = (
         if (success && reapplyHoverIfActive()) return
 
         const resetRecord = buildTapResetRecord(initial ?? {}, animateDef ?? {}, tapKeyframes)
+
+        // Per-key restore (upstream animation-state.ts removed-key handling):
+        // hover may have applied a key while this tap was pressed that whileTap
+        // never owned (e.g. `opacity` while tap owns `scale`). When hover is no
+        // longer active, hover-end already tried to restore that key — but
+        // THIS release's cancelGesture() swept the coordinator and stopped that
+        // in-flight restore mid-flight, so the orphaned key would stay stuck.
+        // Extend the reset with each orphaned hover key's baseline so it settles
+        // to base in the same single writer as the tap keys. We reuse hover's
+        // own baseline computation rather than duplicating it (in scope: no
+        // _MotionContainer wiring — computeHoverBaseline is already exported and
+        // imported here). Overlapping keys (in whileTap) are left to
+        // buildTapResetRecord; still-hovering keeps hover's keys applied.
+        if (!isHoverStillActive() && callbacks?.hoverDef) {
+            const { keyframes: hoverKeyframes } = splitHoverDefinition(callbacks.hoverDef)
+            const orphanedKeys = Object.keys(hoverKeyframes).filter(
+                (k) => !Object.prototype.hasOwnProperty.call(tapKeyframes, k)
+            )
+            if (orphanedKeys.length > 0) {
+                const hoverBaseline = computeHoverBaseline(el, {
+                    initial,
+                    animate: animateDef,
+                    whileHover: hoverKeyframes
+                })
+                for (const k of orphanedKeys) {
+                    if (Object.prototype.hasOwnProperty.call(hoverBaseline, k)) {
+                        resetRecord[k] = hoverBaseline[k]
+                    }
+                }
+            }
+        }
+
         pwLog('[tap] reset-record', resetRecord)
         if (Object.keys(resetRecord).length > 0) {
             setGestureCtl(

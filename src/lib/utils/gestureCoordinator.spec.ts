@@ -17,6 +17,48 @@ describe('createGestureCoordinator', () => {
         expect(coordinator.isActive('tap')).toBe(true)
     })
 
+    it('records owned keys on activate and clears them on deactivate', () => {
+        const coordinator = createGestureCoordinator()
+        expect([...coordinator.ownedKeys('tap')]).toEqual([])
+
+        coordinator.setActive('tap', true, ['scale'])
+        expect([...coordinator.ownedKeys('tap')]).toEqual(['scale'])
+
+        coordinator.setActive('tap', false)
+        expect([...coordinator.ownedKeys('tap')]).toEqual([])
+    })
+
+    it('activating without keys owns nothing new (backward compatible)', () => {
+        const coordinator = createGestureCoordinator()
+        coordinator.setActive('tap', true)
+        expect(coordinator.isActive('tap')).toBe(true)
+        expect([...coordinator.ownedKeys('tap')]).toEqual([])
+        // A key-less tap protects nothing, so hover keeps every key.
+        expect(coordinator.isKeyProtected('scale', 'hover')).toBe(false)
+    })
+
+    it('protects a key only for lower-priority gestures (priority-directional)', () => {
+        const coordinator = createGestureCoordinator()
+        coordinator.setActive('tap', true, ['scale'])
+        coordinator.setActive('hover', true, ['opacity'])
+
+        // tap outranks hover: tap's `scale` is protected from hover…
+        expect(coordinator.isKeyProtected('scale', 'hover')).toBe(true)
+        // …but hover's `opacity` is NOT protected from the higher-priority tap.
+        expect(coordinator.isKeyProtected('opacity', 'tap')).toBe(false)
+        // Disjoint keys tap doesn't own stay unprotected from hover.
+        expect(coordinator.isKeyProtected('opacity', 'hover')).toBe(false)
+    })
+
+    it('stops protecting a key once the owning gesture deactivates', () => {
+        const coordinator = createGestureCoordinator()
+        coordinator.setActive('tap', true, ['scale'])
+        expect(coordinator.isKeyProtected('scale', 'hover')).toBe(true)
+
+        coordinator.setActive('tap', false)
+        expect(coordinator.isKeyProtected('scale', 'hover')).toBe(false)
+    })
+
     it('stopAll stops every registered animation exactly once', () => {
         const coordinator = createGestureCoordinator()
         const first = vi.fn()
