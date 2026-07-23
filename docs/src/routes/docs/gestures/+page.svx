@@ -90,6 +90,12 @@ If a transform must **never pass its resting value** — e.g. a `scale` press on
 </motion.button>
 ```
 
+### Interrupts carry momentum
+
+Gesture channels ride persistent motion values, so interrupting a spring re-targets the **same value** — position *and velocity* carry into the next animation, exactly as in Framer Motion. Press an element while its hover spring is still climbing and the press animation launches from that live upward velocity: the element keeps growing for a beat before curving into the shrink, instead of reversing from a dead stop. Rapid flicks across a hover boundary read as one continuous elastic motion.
+
+There is nothing to configure — it applies to every `whileHover`/`whileTap` interrupt. See it (and feel it) on the [velocity interrupts example](/examples/velocity-interrupts).
+
 ## `whileFocus`
 
 Animate while the element has keyboard focus.

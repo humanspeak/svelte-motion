@@ -48,7 +48,12 @@
     import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation'
     import { isAnimationControls } from '$lib/utils/animationControls.svelte'
     import { attachWhileTap } from '$lib/utils/interaction'
-    import { attachWhileHover, computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
+    import {
+        attachWhileHover,
+        computeHoverBaseline,
+        readTransformChannels,
+        splitHoverDefinition
+    } from '$lib/utils/hover'
     import { createGestureCoordinator } from '$lib/utils/gestureCoordinator'
     import { attachWhileFocus } from '$lib/utils/focus'
     import { attachWhileInView } from '$lib/utils/inView.svelte'
@@ -95,7 +100,8 @@
         resolveExit,
         resolveWhile,
         resolveVariantList,
-        resolveRestingValues
+        resolveRestingValues,
+        resolveWildcardKeyframes
     } from '$lib/utils/variants'
     import {
         setVariantContext,
@@ -237,6 +243,13 @@
     let enterAnimationSettled = $state(false)
     let lastAnimateRestingValues = $state<Record<string, unknown> | undefined>(undefined)
     let lastAnimateRestingJson = $state<string | undefined>(undefined)
+    // Raw animate-prop JSON the settle-resolved resting values were computed
+    // FROM: lets the reactive baseline detect that its raw wildcard/relative
+    // definition already has a resolved settle snapshot to prefer.
+    let lastAnimateSourceJson = $state<string | undefined>(undefined)
+    /** An unresolved wildcard (`null`) or relative (`'+=50'`) keyframe value. */
+    const isUnresolvedKeyframeValue = (value: unknown): boolean =>
+        value === null || value === undefined || (typeof value === 'string' && /^[+-]=/.test(value))
     let dataPath = $state<number>(-1)
     const motionConfig = $derived(getMotionConfig())
     const lazyMotion = getLazyMotionContext()
@@ -812,6 +825,27 @@
         const restingValues = resolveRestingValues(
             animateKeyframes as DOMKeyframesDefinition | undefined
         ) as unknown as Record<string, unknown> | undefined
+        // Wildcard/relative definitions (animate={{ x: null }} / '+=50')
+        // collapse to UNRESOLVED resting values here — the animation layer
+        // resolved them against the live value, so the baseline must reuse the
+        // settle-resolved snapshot (adversarial-review finding: recomputing
+        // from the raw definition snapped x:null holds to 0). When no snapshot
+        // exists yet, drop the unresolved channels rather than serializing
+        // null/'+=50' into the inline transform.
+        if (restingValues && Object.values(restingValues).some(isUnresolvedKeyframeValue)) {
+            if (
+                enterAnimationSettled &&
+                lastAnimateRestingValues &&
+                lastAnimateSourceJson === JSON.stringify(animateKeyframes)
+            ) {
+                return lastAnimateRestingValues
+            }
+            const stripped: Record<string, unknown> = {}
+            for (const [key, value] of Object.entries(restingValues)) {
+                if (!isUnresolvedKeyframeValue(value)) stripped[key] = value
+            }
+            return stripped
+        }
         if (!transformTemplateProp || !restingValues) return restingValues
 
         const restingJson = JSON.stringify(restingValues)
@@ -854,18 +888,44 @@
         for (const key of keys) willChange.add(key)
     }
 
-    const applyAnimateRestingStyle = () => {
+    const applyAnimateRestingStyle = (resolvedTarget?: Record<string, unknown>) => {
         if (!element) return
         if (!animateKeyframes) return
         const { target, transitionEnd } = extractTargetTransition(animateKeyframes)
-        const restingValues = resolveRestingValues({
+        // Prefer the payload the animation ACTUALLY ran (wildcards/relatives
+        // already resolved against the pre-animation live value). Recomputing
+        // from the raw definition here settled `x: null` to null and '+=50'
+        // unapplied (adversarial-review finding). The wildcard-only safety net
+        // below covers call sites with no resolved payload (optimized appear):
+        // at settle the live value IS the held value, so null→live is
+        // idempotent — but relatives must NOT re-resolve against the
+        // post-animation value (they would re-add), so any still-unresolved
+        // entry is dropped instead of serialized.
+        const mergedRaw = {
             ...getResolvedStyleTransformValues(),
-            ...target,
+            ...(resolvedTarget ?? target),
             ...(transitionEnd ?? {})
-        } as DOMKeyframesDefinition | undefined) as Record<string, unknown> | undefined
+        } as Record<string, unknown>
+        const wildcardResolved = resolveWildcardKeyframes(
+            mergedRaw as DOMKeyframesDefinition,
+            readLiveChannelValue
+        ) as Record<string, unknown> | undefined
+        const sanitized: Record<string, unknown> = {}
+        for (const [key, value] of Object.entries(wildcardResolved ?? mergedRaw)) {
+            if (
+                !isUnresolvedKeyframeValue(value) &&
+                !(typeof value === 'string' && /^[+-]=/.test(value))
+            ) {
+                sanitized[key] = value
+            }
+        }
+        const restingValues = resolveRestingValues(
+            sanitized as DOMKeyframesDefinition | undefined
+        ) as Record<string, unknown> | undefined
         if (!restingValues) return
         lastAnimateRestingValues = restingValues
         lastAnimateRestingJson = JSON.stringify(restingValues)
+        lastAnimateSourceJson = JSON.stringify(animateKeyframes)
         element.setAttribute(
             'style',
             mergeInlineStyles(
@@ -1213,6 +1273,30 @@
             })
     }
 
+    /**
+     * Read the element's current numeric value for an animate channel, for
+     * {@link resolveWildcardKeyframes}. Transform channels (`x`/`y`/`scale`/
+     * `rotate`) come from the decomposed computed matrix via the shared
+     * `readTransformChannels` reader; other channels (e.g. `opacity`) come from
+     * computed style. Returns `undefined` when no numeric value is available (a
+     * color, a `var(...)`, a 3D matrix, or a channel this reader does not own),
+     * in which case the wildcard/relative passes through unchanged — the
+     * documented numeric bound.
+     */
+    const readLiveChannelValue = (key: string): number | undefined => {
+        if (!element) return undefined
+        if (key === 'x' || key === 'y' || key === 'scale' || key === 'rotate') {
+            const channels = readTransformChannels(element)
+            return channels ? channels[key] : undefined
+        }
+        const computed = getComputedStyle(element)[key as keyof CSSStyleDeclaration] as
+            | string
+            | number
+            | undefined
+        const parsed = typeof computed === 'number' ? computed : Number.parseFloat(String(computed))
+        return Number.isFinite(parsed) ? parsed : undefined
+    }
+
     const resolveAnimationControlsDefinition = (
         definition: AnimationControlsDefinition
     ): DOMKeyframesDefinition | undefined => {
@@ -1224,7 +1308,18 @@
         return resolvedDefinition
     }
 
-    const applyAnimationControlsTarget = (definition: AnimationControlsDefinition) => {
+    const applyAnimationControlsTarget = (
+        definition: AnimationControlsDefinition,
+        /**
+         * Pre-resolved keyframes to settle to (from a completed
+         * `startAnimationControlsDefinition`). When present they are used
+         * verbatim so a relative offset is not re-applied against the element
+         * after it has already moved. When absent (e.g. `controls.set`, an
+         * instantaneous jump where live == start), wildcards/relatives are
+         * resolved against the live value here instead. See plan 003.
+         */
+        resolvedOverride?: Record<string, unknown>
+    ) => {
         if (!element) return
         const resolved = resolveAnimationControlsDefinition(definition)
         if (!resolved) return
@@ -1237,8 +1332,14 @@
         const transitionEnd = target.transitionEnd
         delete target.transition
         delete target.transitionEnd
+        const settleSource =
+            resolvedOverride ??
+            (resolveWildcardKeyframes(target as DOMKeyframesDefinition, readLiveChannelValue) as
+                | Record<string, unknown>
+                | undefined) ??
+            target
         const finalTarget = resolveRestingValues({
-            ...target,
+            ...settleSource,
             ...(transitionEnd ?? {})
         } as DOMKeyframesDefinition) as Record<string, unknown> | undefined
         if (!finalTarget) return
@@ -1417,6 +1518,7 @@
         const resolved = resolveAnimationControlsDefinition(definition)
         if (!resolved) return
 
+        const isFirstCommand = !animationControlsHasReceivedCommand
         animationControlsHasReceivedCommand = true
         const filtered = filterReducedMotionKeyframes(
             resolved as Record<string, unknown>,
@@ -1439,6 +1541,48 @@
             element,
             svgPathFinished.length > 0 ? stripSVGPathKeyframes(target) : target
         )
+
+        // Resolve wildcard (`null` = "current value") and relative (`'+=50'`)
+        // keyframes against the element's LIVE value NOW, at animation start —
+        // upstream framer-motion resolves both in its keyframe pipeline before
+        // the animation layer runs, but our WAAPI port otherwise drops a
+        // `[0, null]` channel within a frame and ignores `'+=50'` entirely (see
+        // resolveWildcardKeyframes + plan 003). This MUST run BEFORE the
+        // first-command idle expansion below: that guard only pairs SCALAR
+        // channels (`!Array.isArray(to)`), so a user-authored wildcard ARRAY
+        // must already be concrete when it runs, and a relative SCALAR must be a
+        // number so it expands to `[from, number]` rather than `[from, '+=50']`.
+        // Capture the resolved keyframes (pre-expansion) so the settle collapse
+        // reuses them instead of re-resolving a relative against the now-MOVED
+        // element (which would double-apply the offset).
+        const resolvedPayload = resolveWildcardKeyframes(
+            payload as DOMKeyframesDefinition,
+            readLiveChannelValue
+        )
+        if (resolvedPayload) Object.assign(payload as Record<string, unknown>, resolvedPayload)
+        const settleTarget = { ...(payload as Record<string, unknown>) }
+
+        // First-ever command from a non-neutral idle: WAAPI reads its from-value
+        // off the live computed style, but by the time it captures it the
+        // reactive inline transform has already been rewritten off the idle
+        // keyframes (the ternary drops it once a command is received), so a
+        // transform like the beam's scaleX 0.16 reads back as the property
+        // default (scaleX 1) and the first animation runs 1->1 — no visible
+        // travel. Pin the from-side explicitly by expanding each channel the
+        // idle variant defines into a `[from, to]` keyframe pair, mirroring
+        // upstream where the motion value holds the idle value as the from.
+        // Only the first command needs this: later commands animate from the
+        // held target, which the inline base already renders correctly.
+        if (isFirstCommand && isNotEmpty(initialKeyframes)) {
+            const idle = initialKeyframes as Record<string, unknown>
+            for (const key of Object.keys(payload)) {
+                const from = idle[key]
+                const to = (payload as Record<string, unknown>)[key]
+                if (from !== undefined && !Array.isArray(to)) {
+                    ;(payload as Record<string, unknown>)[key] = [from, to]
+                }
+            }
+        }
 
         // Imperative controls (useAnimationControls/useAnimate) animate transforms
         // too — notify will-change here just like the declarative path does.
@@ -1488,7 +1632,11 @@
         // in-flight channel set is stale — clear it so a later idle stop() is a
         // true no-op rather than snapshotting a long-finished animation.
         activeAnimationControlsKeys.clear()
-        applyAnimationControlsTarget(definition)
+        // Settle from the keyframes we actually animated (wildcards/relatives
+        // already resolved against the start value) — NOT by re-resolving the
+        // raw definition, whose relative offsets would re-apply against the
+        // element after it has moved. See plan 003.
+        applyAnimationControlsTarget(definition, settleTarget)
         onAnimationCompleteProp?.(definition as unknown as DOMKeyframesDefinition)
     }
 
@@ -1599,7 +1747,15 @@
                     isNotEmpty(initialKeyframes)
                   ? initialKeyframes
                   : animateControls && animationControlsHasReceivedCommand
-                    ? lastAnimationControlsTarget
+                    ? // First-ever in-flight command: no target/stop snapshot
+                      // exists yet (lastAnimationControlsTarget is undefined
+                      // until applyAnimationControlsTarget/stop runs). Falling
+                      // through to a neutral base here wipes the idle from-value
+                      // exactly as WAAPI captures it, so the first animation runs
+                      // e.g. 1->1 instead of 0.16->1. Hold the idle keyframes as
+                      // the inline base until a real snapshot supersedes them.
+                      (lastAnimationControlsTarget ??
+                      (isNotEmpty(initialKeyframes) ? initialKeyframes : undefined))
                     : isNotEmpty(initialKeyframes)
                       ? !effectiveAnimate
                           ? initialKeyframes
@@ -1991,6 +2147,17 @@
         // Transform SVG path properties (pathLength, pathOffset) to their CSS equivalents
         payload = transformSVGPathProperties(element, payload)
 
+        // Resolve wildcard (`null`) / relative (`'+=50'`) keyframes on the
+        // declarative animate payload against the live value before the
+        // animation layer sees them (see resolveWildcardKeyframes + plan 003).
+        // A no-op for payloads without wildcards/relatives — the common enter
+        // case is untouched.
+        const resolvedDeclarative = resolveWildcardKeyframes(
+            payload as DOMKeyframesDefinition,
+            readLiveChannelValue
+        )
+        if (resolvedDeclarative) payload = resolvedDeclarative as unknown as typeof payload
+
         // Ensure dash properties aren't pinned as inline styles
         if (element && element.style) {
             element.style.removeProperty('stroke-dasharray')
@@ -2012,8 +2179,10 @@
             if (enterAnimationSettled) return
             // Now the target is the resting state — promote it to the
             // inline baseline so it persists after WAAPI surrenders the
-            // property (default fill:'none'). (#377)
-            applyAnimateRestingStyle()
+            // property (default fill:'none'). (#377) The RESOLVED payload
+            // (wildcards/relatives already concrete) feeds the settle so the
+            // baseline matches what actually animated.
+            applyAnimateRestingStyle(payload as unknown as Record<string, unknown>)
             enterAnimationSettled = true
             onAnimationCompleteProp?.(def)
         }
@@ -2719,6 +2888,13 @@
     // gestureCoordinator.ts).
     const gestureCoordinator = createGestureCoordinator()
 
+    // Per-element registry of persistent per-channel MotionValues the hover
+    // composed writer drives. Sharing it with the tap system lets a mid-flight
+    // hover→tap press read each channel's live velocity for a momentum-carrying
+    // handoff (upstream re-targets the same MotionValue). Owned here so it
+    // survives independent re-runs of the hover/tap effects.
+    const gestureChannelValues = new Map<string, MotionValue<number>>()
+
     // whileTap handling via motion-dom's press()
     $effect(() => {
         if (
@@ -2740,7 +2916,8 @@
                 hoverFallbackTransition: mergedTransition ?? {},
                 tapTransition: mergedTransition ?? {},
                 coordinator: gestureCoordinator,
-                getBaseStyleValues
+                getBaseStyleValues,
+                getSharedChannelValue: (key: string) => gestureChannelValues.get(key)
             }
         )
     })
@@ -2770,7 +2947,8 @@
                 getLiveTransformValues: () => liveGestureTransformValues,
                 getBaseTransform: () => userBaseTransform,
                 transformTemplate: transformTemplateProp,
-                getBaseStyleValues
+                getBaseStyleValues,
+                channelValues: gestureChannelValues
             },
             gestureCoordinator
         )
@@ -2924,9 +3102,23 @@
                     const { target: exitKeyframes, transition: exitTransition } =
                         extractTargetTransition(exitPayload)
 
-                    pwLog('[motion] key transition: running exit', { exitKeyframes })
-                    await animate(element, exitKeyframes as DOMKeyframesDefinition, exitTransition)
-                        .finished
+                    // Resolve wildcard/relative keyframes on the exit payload
+                    // against the live value at exit start (plan 003) — a no-op
+                    // unless the exit definition uses `null` / `'+=…'`.
+                    const resolvedExitKeyframes =
+                        resolveWildcardKeyframes(
+                            exitKeyframes as DOMKeyframesDefinition,
+                            readLiveChannelValue
+                        ) ?? exitKeyframes
+
+                    pwLog('[motion] key transition: running exit', {
+                        exitKeyframes: resolvedExitKeyframes
+                    })
+                    await animate(
+                        element,
+                        resolvedExitKeyframes as DOMKeyframesDefinition,
+                        exitTransition
+                    ).finished
                 }
 
                 pwLog('[motion] key transition: exit done', {

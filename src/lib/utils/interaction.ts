@@ -7,7 +7,7 @@ import {
 } from '$lib/utils/hover'
 import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
-import { press } from 'motion-dom'
+import { getDefaultTransition, press, type MotionValue } from 'motion-dom'
 
 /**
  * Build a reset record for whileTap on pointerup.
@@ -115,6 +115,15 @@ export const attachWhileTap = (
          *  falls back to LIVE computed style, which on a slow frame reads a
          *  mid-animation transient and settles the element short of rest. */
         getBaseStyleValues?: () => Record<string, unknown>
+        /** Read the persistent per-channel `MotionValue` the hover composed
+         *  writer drives, shared via the same per-element map. When a tap
+         *  interrupts a mid-flight hover, position already carries via the
+         *  matrix seed (see `seedStaleChannels`) — but VELOCITY was discarded.
+         *  Reading the shared value's live `getVelocity()` at press time lets the
+         *  tap spring launch from the hover's momentum (upstream re-targets the
+         *  same MotionValue), so flicking across a target or pressing mid-spring
+         *  keeps its feel instead of snapping to a dead zero-velocity start. */
+        getSharedChannelValue?: (key: string) => MotionValue<number> | undefined
     }
 ): (() => void) => {
     if (!whileTap) return () => {}
@@ -231,6 +240,70 @@ export const attachWhileTap = (
         return seeded
     }
 
+    // Read the live velocity of each seedable channel the tap animates from the
+    // shared hover MotionValue. Position already carries via the matrix seed
+    // above; this is the missing VELOCITY. Called BEFORE cancelGesture stops the
+    // hover writer, so a mid-flight press samples the spring's true momentum
+    // rather than a just-stopped (decaying) reading. Channels without a shared
+    // value, or effectively at rest (|v| ~ 0 when hover isn't mid-flight), are
+    // omitted so nothing spurious is injected.
+    const collectHandoffVelocities = (record: Record<string, unknown>): Record<string, number> => {
+        const velocities: Record<string, number> = {}
+        const getShared = callbacks?.getSharedChannelValue
+        if (!getShared) return velocities
+        for (const key of seedableChannels) {
+            if (typeof record[key] !== 'number') continue
+            const shared = getShared(key)
+            if (!shared) continue
+            const velocity = shared.getVelocity()
+            if (Number.isFinite(velocity) && Math.abs(velocity) > 0.0001) {
+                velocities[key] = velocity
+            }
+        }
+        return velocities
+    }
+
+    // Merge carried per-channel velocities into a gesture transition as
+    // value-specific overrides. Upstream `getValueTransition(transition, key)`
+    // resolves `transition[key] ?? transition.default ?? transition`, so every
+    // non-velocity channel falls through to `default` (the base transition, or
+    // `{}` so it keeps its own per-value defaults) while a velocity channel
+    // inherits its transition PLUS the carried `velocity` so a spring launches
+    // from the hover's momentum.
+    //
+    // Crucially, a bare `{ velocity }` is NOT enough: upstream
+    // `isTransitionDefined` treats `velocity` as a defining key, which SUPPRESSES
+    // the per-value default spring and collapses the animation to a tween that
+    // ignores velocity entirely. So when the base has no explicit type we splice
+    // in the channel's OWN default spring (same `getDefaultTransition` the hover
+    // writer uses) and attach the velocity to it. When the base already defines a
+    // transition it is honored as-is plus the velocity (a user tween still can't
+    // overshoot, which is correct).
+    const withHandoffVelocity = (
+        base: AnimationOptions | undefined,
+        velocities: Record<string, number>
+    ): AnimationOptions | undefined => {
+        const keys = Object.keys(velocities)
+        if (keys.length === 0) return base
+        const baseObject = (base ?? {}) as Record<string, unknown>
+        const baseIsDefined = Object.keys(baseObject).length > 0
+        const merged: Record<string, unknown> = { default: base ? { ...baseObject } : {} }
+        for (const key of keys) {
+            // Resolve the channel's transition the way motion-dom does
+            // (getValueTransition: transition[key] ?? transition.default ??
+            // transition) BEFORE attaching velocity. Spreading the whole base
+            // object here buried a value-specific override ({ scale: {...} })
+            // one level too deep, where motion-dom cannot see its type/damping
+            // — the authored spring silently degraded (adversarial-review
+            // finding).
+            const channelBase = baseIsDefined
+                ? ((baseObject[key] ?? baseObject.default ?? baseObject) as Record<string, unknown>)
+                : (getDefaultTransition(key, { keyframes: [0, 1] }) as Record<string, unknown>)
+            merged[key] = { ...channelBase, velocity: velocities[key] }
+        }
+        return merged as AnimationOptions
+    }
+
     // Track the in-flight control with the coordinator so the hover system
     // can stop it symmetrically (e.g. leaving mid-release-spring).
     const setGestureCtl = (ctl: GestureCtl) => {
@@ -257,13 +330,16 @@ export const attachWhileTap = (
             gestureActive: gestureCtl !== null
         }))
         coordinator?.setActive('tap', true)
+        // Sample the hover spring's live velocity BEFORE cancelGesture stops it,
+        // so a mid-flight press carries true momentum into the tap retarget.
+        const handoffVelocities = collectHandoffVelocities(tapKeyframes)
         cancelGesture()
         callbacks?.onTapStart?.()
         setGestureCtl(
             animate(
                 el,
                 seedStaleChannels(tapKeyframes) as unknown as DOMKeyframesDefinition,
-                pressTransition
+                withHandoffVelocity(pressTransition, handoffVelocities)
             ) as unknown as GestureCtl
         )
         Promise.resolve(gestureCtl?.finished)

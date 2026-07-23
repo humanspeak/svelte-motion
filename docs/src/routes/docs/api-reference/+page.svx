@@ -170,6 +170,18 @@ import {
 
 These are the same math helpers motion uses internally — convenient when you're building your own value-mapping pipelines outside `useTransform`.
 
+## Keyframes grammar
+
+Every animatable channel — on `animate`, gesture props, and `controls.start()` — accepts:
+
+- **A value** (`x: 100`) — animate from the current value to the target.
+- **A keyframe array** (`x: [0, 100, 50]`) — played in full; the element rests on the last keyframe.
+- **`null` wildcards** — "the current value". The live value feeds only the **first** keyframe (`x: [null, 100]` animates from wherever `x` is); later `null`s hold their preceding keyframe (`x: [0, null]` plays `[0, 0]`). This mirrors motion-dom's `fillWildcards` exactly.
+- **A bare `null`** (`x: null`) — hold the channel at its current value; handy for pinning one channel while animating a sibling.
+- **Relative strings** (`x: '+=50'`, `rotate: '-=10'`) — offset from the live value at animation start.
+
+Wildcards and relatives require a numeric live value; color/`var()` channels pass through unchanged.
+
 ## SSR behavior
 
 Svelte Motion is server-render safe. Under SSR:

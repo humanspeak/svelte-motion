@@ -25,6 +25,59 @@
     let orbOpacity = $state('')
     let labelTransform = $state('none')
     let labelOpacity = $state('')
+    let beamScaleX = $state('0.16')
+    // First-start sweep trace (plan 002's fix made this visible): on a Start
+    // click the beam must SWEEP 0.16→1 continuously. The trace samples scaleX
+    // per frame for ~1.2s and the verdict flags any single-frame jump — the
+    // regression was a teleport (0.16 held ~100ms, then 1 in one frame).
+    let beamTrace = $state('—')
+    let beamVerdict = $state('—')
+    let firstStartArmed = true
+
+    const readBeamScaleX = (): number => {
+        const el = document.querySelector<HTMLElement>('[data-testid="beam"]')
+        if (!el) return Number.NaN
+        const t = getComputedStyle(el).transform
+        if (!t || t === 'none') return 1
+        const m = t.match(/matrix\(([^)]+)\)/)
+        if (!m) return 1
+        const [a, b] = m[1].split(',').map((v) => Number.parseFloat(v.trim()))
+        return Math.hypot(a, b)
+    }
+
+    const recordBeamTrace = (label: string) => {
+        const samples: number[] = []
+        const started = performance.now()
+        const wasFirst = firstStartArmed
+        firstStartArmed = false
+        const sample = () => {
+            samples.push(readBeamScaleX())
+            if (performance.now() - started < 1200) {
+                requestAnimationFrame(sample)
+                return
+            }
+            const finite = samples.filter(Number.isFinite)
+            let maxJump = 0
+            let jumpAt = -1
+            for (let i = 1; i < finite.length; i++) {
+                const step = Math.abs(finite[i] - finite[i - 1])
+                if (step > maxJump) {
+                    maxJump = step
+                    jumpAt = i
+                }
+            }
+            const condensed = [0, 4, 8, 14, 22, finite.length - 1]
+                .filter((i) => i >= 0 && i < finite.length)
+                .map((i) => finite[i].toFixed(2))
+                .join(' → ')
+            beamTrace = `${label}${wasFirst ? ' (FIRST)' : ''}: ${condensed}`
+            beamVerdict =
+                maxJump > 0.3
+                    ? `✗ TELEPORT — ${maxJump.toFixed(2)} in one frame (sample ${jumpAt})`
+                    : `✓ smooth sweep — max frame step ${maxJump.toFixed(3)}`
+        }
+        requestAnimationFrame(sample)
+    }
 
     const cardVariants = {
         idle: { opacity: 1, x: 0, scale: 1, rotate: 0 },
@@ -57,6 +110,7 @@
     const runSequence = async () => {
         const id = ++sequenceId
         runCount += 1
+        recordBeamTrace('start')
         status = 'launching'
         await controls.start('launch', transition)
         if (id !== sequenceId) return
@@ -89,8 +143,33 @@
     // wide, predictable window. Linear ease keeps the mid value deterministic.
     const startSlowLaunch = () => {
         sequenceId += 1
+        recordBeamTrace('start-slow')
         status = 'launching'
         void controls.start('launch', { duration: 2, ease: 'linear' })
+    }
+
+    // Wildcard probe: `[0, null]` fills the trailing null FORWARD from its
+    // predecessor (upstream fillWildcards), resolving to [0, 0] — from x=64 the
+    // card jumps to 0 at animation start and stays. Linear ease keeps the
+    // landing deterministic.
+    const probeWildcard = () => {
+        sequenceId += 1
+        void controls.start({ x: [0, null] }, { duration: 0.3, ease: 'linear' })
+    }
+
+    // Leading-wildcard probe: `[null, 100]` fills keyframes[0] from the card's
+    // live x (upstream: the ONLY position the live value feeds), so from x=64
+    // this animates 64→100 — the true "start from the current value" showcase.
+    const probeLeading = () => {
+        sequenceId += 1
+        void controls.start({ x: [null, 100] }, { duration: 0.3, ease: 'linear' })
+    }
+
+    // Relative probe (plan 003): `'+=50'` resolves against the card's live x at
+    // animation start. From a fresh idle (x=0) this settles at 50.
+    const probeRelative = () => {
+        sequenceId += 1
+        void controls.start({ x: '+=50' }, { duration: 0.3, ease: 'linear' })
     }
 
     // Toggle an unrelated inline-style channel on the beam to trigger a
@@ -125,6 +204,7 @@
             const card = readElement('card')
             const orb = readElement('orb')
             const label = readElement('label')
+            beamScaleX = Number.isFinite(readBeamScaleX()) ? readBeamScaleX().toFixed(3) : '—'
 
             cardTransform = card.transform
             cardOpacity = card.opacity
@@ -170,6 +250,15 @@
                 <button type="button" data-testid="start-slow" onclick={startSlowLaunch}
                     >Start slow</button
                 >
+                <button type="button" data-testid="probe-wildcard" onclick={probeWildcard}
+                    >Probe wildcard</button
+                >
+                <button type="button" data-testid="probe-leading" onclick={probeLeading}
+                    >Probe leading</button
+                >
+                <button type="button" data-testid="probe-relative" onclick={probeRelative}
+                    >Probe relative</button
+                >
                 <button type="button" data-testid="stop" onclick={stop}>Stop</button>
                 <button type="button" data-testid="poke" onclick={poke}>Poke</button>
                 <button type="button" data-testid="toggle-beam-source" onclick={toggleBeamSource}
@@ -210,7 +299,24 @@
                     <dt>label o</dt>
                     <dd>{labelOpacity}</dd>
                 </div>
+                <div>
+                    <dt>beam sx</dt>
+                    <dd>{beamScaleX} (idle 0.16 · launch 1 · success 0.66)</dd>
+                </div>
+                <div>
+                    <dt>trace</dt>
+                    <dd>{beamTrace}</dd>
+                </div>
+                <div class="verdict-row">
+                    <dt>verdict</dt>
+                    <dd>{beamVerdict}</dd>
+                </div>
             </dl>
+            <p class="expectation">
+                FIRST Start after a hard refresh: the beam (green bar) must SWEEP from skinny
+                (scaleX 0.16) to full — the regression teleported it. The trace/verdict rows above
+                measure every Start.
+            </p>
             <div class="motion-area">
                 <motion.div
                     class="card"
@@ -349,12 +455,27 @@
         overflow: hidden;
     }
 
+    .expectation {
+        margin: 0;
+        padding: 8px 10px;
+        border: 1px dashed rgba(79, 240, 183, 0.4);
+        color: #4ff0b7;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-size: 11px;
+        line-height: 1.45;
+    }
+
+    .frame-readout .verdict-row dd {
+        color: #4ff0b7;
+        font-weight: 800;
+    }
+
     .frame-readout {
         width: 100%;
-        height: 172px;
+        height: 244px;
         box-sizing: border-box;
         display: grid;
-        grid-template-rows: repeat(7, 1fr);
+        grid-template-rows: repeat(10, 1fr);
         gap: 5px;
         margin: 0;
         padding: 10px;

@@ -3,6 +3,31 @@ import { animationControls } from '$lib/utils/animationControls.svelte'
 import { fireEvent, render } from '@testing-library/svelte'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// Curried like the real API: animateMotionValue(name, value, target, transition)
+// returns a START function taking onComplete. The mock jumps the MotionValue to
+// the final target synchronously (firing its change subscription, as the real
+// animation's updates would) and completes.
+const animateMotionValueMock = vi.hoisted(() =>
+    vi.fn(
+        (
+            _name: string,
+            value: { jump?: (v: number) => void; set?: (v: number) => void },
+            target: unknown,
+            _transition?: Record<string, unknown>
+        ) =>
+            (onComplete?: () => void) => {
+                // Recorded via mock.calls for transition assertions; unused here.
+                void _transition
+                const final = Array.isArray(target)
+                    ? Number((target as unknown[]).at(-1))
+                    : Number(target)
+                if (Number.isFinite(final)) (value.jump ?? value.set)?.call(value, final)
+                onComplete?.()
+                return { stop: vi.fn() }
+            }
+    )
+)
+
 const animateValueMock = vi.hoisted(() =>
     vi.fn(
         ({
@@ -36,7 +61,7 @@ const { animate: animateMock } = (await import('motion')) as unknown as {
 
 vi.mock('motion-dom', async (importOriginal) => {
     const actual = await importOriginal<typeof import('motion-dom')>()
-    return { ...actual, animateValue: animateValueMock }
+    return { ...actual, animateValue: animateValueMock, animateMotionValue: animateMotionValueMock }
 })
 
 // Mock sleep to resolve immediately
@@ -50,6 +75,7 @@ import MotionContainer from './_MotionContainer.svelte'
 beforeEach(() => {
     animateMock.mockClear()
     animateValueMock.mockClear()
+    animateMotionValueMock.mockClear()
     vi.useFakeTimers()
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
         setTimeout(() => cb(0), 0)
@@ -179,8 +205,11 @@ describe('_MotionContainer', () => {
         await fireEvent.pointerEnter(el)
         await flushTimers()
 
-        const enterScaleCall = animateValueMock.mock.calls.at(-1)?.[0]
-        expect(enterScaleCall?.keyframes?.at(-1)).toBe(1.2)
+        // Post plan-001 the composed writer retargets the channel's persistent
+        // MotionValue via animateMotionValue(name, value, target, transition).
+        const enterScaleCall = animateMotionValueMock.mock.calls.at(-1)
+        expect(enterScaleCall?.[0]).toBe('scale')
+        expect(enterScaleCall?.[2]).toBe(1.2)
     })
 
     it('whileHover accepts an array of variant keys, merging later-wins (#349)', async () => {
@@ -223,8 +252,9 @@ describe('_MotionContainer', () => {
         await fireEvent.pointerEnter(el)
         await flushTimers()
 
-        const enterScaleCall = animateValueMock.mock.calls.at(-1)?.[0]
-        expect(enterScaleCall?.keyframes?.at(-1)).toBe(1.2)
+        const enterScaleCall = animateMotionValueMock.mock.calls.at(-1)
+        expect(enterScaleCall?.[0]).toBe('scale')
+        expect(enterScaleCall?.[2]).toBe(1.2)
         const enterCall = animateMock.mock.calls.at(-1)
         expect(enterCall?.[1]).toMatchObject({ color: 'gray' })
     })
@@ -569,17 +599,20 @@ describe('_MotionContainer', () => {
         // Enter: should animate to whileHover with its nested transition
         await fireEvent.pointerEnter(el)
         await flushTimers()
-        let lastScaleCall = animateValueMock.mock.calls.at(-1)?.[0]
-        expect(lastScaleCall?.keyframes?.at(-1)).toBe(1.2)
-        expect(lastScaleCall).toMatchObject({ duration: 120 })
+        let lastScaleCall = animateMotionValueMock.mock.calls.at(-1)
+        expect(lastScaleCall?.[0]).toBe('scale')
+        expect(lastScaleCall?.[2]).toBe(1.2)
+        // animateMotionValue takes upstream's SECONDS-based transitions.
+        expect(lastScaleCall?.[3]).toMatchObject({ duration: 0.12 })
         expect(onHoverStart).toHaveBeenCalledTimes(1)
 
         // Leave: should animate back to baseline (animate over initial) with component transition
         await fireEvent.pointerLeave(el)
         await flushTimers()
-        lastScaleCall = animateValueMock.mock.calls.at(-1)?.[0]
-        expect(lastScaleCall?.keyframes?.at(-1)).toBe(1.1)
-        expect(lastScaleCall).toMatchObject({ duration: 250 })
+        lastScaleCall = animateMotionValueMock.mock.calls.at(-1)
+        expect(lastScaleCall?.[0]).toBe('scale')
+        expect(lastScaleCall?.[2]).toBe(1.1)
+        expect(lastScaleCall?.[3]).toMatchObject({ duration: 0.25 })
         expect(onHoverEnd).toHaveBeenCalledTimes(1)
     })
 

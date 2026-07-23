@@ -68,6 +68,38 @@ finish their animation.
 </script>
 ```
 
+## start vs set vs stop
+
+The three commands have deliberately different relationships to time, matching upstream:
+
+- **`start(definition)`** animates from the currently rendered value to the target — including the very first command on an element idling at a non-neutral pose (the animation departs from the idle value, never from a wiped base).
+- **`set(definition)`** applies the values **instantly** — no animation, by design. It is the imperative "pose" primitive: `set('hidden')` then `start('visible')` is the canonical pose-then-animate pattern. If you expected motion and saw a snap, you wanted `start`.
+- **`stop()`** freezes every in-flight animation **at its current mid-flight value** and holds it there — through later re-renders — rather than jumping to the target or reverting to a previous state.
+
+## Wildcard and relative values
+
+Keyframe wildcards and relative strings resolve against the element's **live value** the moment the animation starts:
+
+```svelte
+<script lang="ts">
+    const controls = useAnimationControls()
+
+    // [null, 100]: the live value feeds the FIRST keyframe, so this animates
+    // from wherever x currently is → 100. (Later `null`s hold the previous
+    // keyframe instead: [0, null] plays [0, 0].)
+    const slideFromHere = () => controls.start({ x: [null, 100] })
+
+    // Relative strings offset from the live value: x moves 50px further right.
+    const nudge = () => controls.start({ x: '+=50' })
+
+    // A bare `null` holds a channel at its current value — useful to pin one
+    // channel while animating another.
+    const pulseInPlace = () => controls.start({ scale: [null, 1.15, 1], x: null })
+</script>
+```
+
+The same grammar works on the declarative `animate` prop. See the [keyframes example](/examples/keyframes) for the visual version.
+
 ## Variants
 
 Each subscribed component resolves the same variant label against its own

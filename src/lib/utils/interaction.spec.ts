@@ -37,7 +37,16 @@ vi.mock('motion-dom', () => {
             return pressCleanup
         }
     )
-    return { press: pressMock }
+    // The velocity-handoff path resolves a channel's default spring via
+    // getDefaultTransition; provide a minimal stand-in so the import resolves.
+    // (These tests never wire getSharedChannelValue, so it is not exercised, but
+    // the binding must exist.)
+    const getDefaultTransitionMock = vi.fn(() => ({
+        type: 'spring',
+        stiffness: 550,
+        damping: 30
+    }))
+    return { press: pressMock, getDefaultTransition: getDefaultTransitionMock }
 })
 
 describe('utils/interaction', () => {
@@ -268,6 +277,36 @@ describe('utils/interaction', () => {
         const last = animateMock.mock.calls.at(-1)
         expect(last?.[1]).toMatchObject({ scale: 1 })
         cleanup()
+    })
+
+    it('attachWhileTap: velocity handoff preserves value-specific transition overrides', () => {
+        const el = document.createElement('div')
+        document.body.appendChild(el)
+        // Shared hover MotionValue with live velocity — triggers the handoff
+        // injection path (collectHandoffVelocities → withHandoffVelocity).
+        const sharedScale = { getVelocity: () => 5.3 }
+        const cleanup = attachWhileTap(el, { scale: 0.9 }, { scale: 1 }, undefined, {
+            // Value-specific override: upstream resolves a channel's
+            // transition as transition[key] ?? transition.default ??
+            // transition (getValueTransition). Injecting velocity must
+            // preserve that resolution — the authored spring's type and
+            // damping stay TOP-LEVEL on the channel's merged transition.
+            tapTransition: { scale: { type: 'spring', damping: 10 } },
+            getSharedChannelValue: (key: string) => (key === 'scale' ? sharedScale : undefined)
+        } as never)
+
+        expect(pressCallback).toBeTruthy()
+        pressCallback!(el, new PointerEvent('pointerdown'))
+
+        const transition = animateMock.mock.calls.at(-1)?.[2] as Record<string, unknown>
+        const scaleTransition = transition?.scale as Record<string, unknown>
+        expect(scaleTransition).toMatchObject({ type: 'spring', damping: 10, velocity: 5.3 })
+        // The regression nested the whole base object under the channel key
+        // ({ scale: { scale: {...}, velocity } }), burying type/damping where
+        // motion-dom cannot see them.
+        expect(scaleTransition?.scale).toBeUndefined()
+        cleanup()
+        el.remove()
     })
 
     it('attachWhileTap: keyboard Space behaves like tap (prevents scroll)', async () => {

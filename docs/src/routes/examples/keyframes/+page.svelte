@@ -5,11 +5,12 @@
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
-    import { Clock, Layers, Repeat } from '@lucide/svelte'
+    import { Clock, Crosshair, Layers, MoveRight, Repeat, Sparkles } from '@lucide/svelte'
     import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import KeyframesDefault from '$lib/examples/keyframes/demos/Default.svelte'
+    import KeyframesWildcard from '$lib/examples/keyframes/demos/Wildcard.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
@@ -43,6 +44,18 @@
             notes: defaultNotes,
             barCells: [{ k: 'pattern', v: 'keyframe-array' }],
             sourceUrl: `${SOURCE_URL}keyframes/demos/Default.svelte`
+        },
+        {
+            figId: 'FIG-002',
+            tag: 'ANIMATE',
+            title: { prefix: 'wildcard ', accent: 'keyframes', end: '.' },
+            description:
+                "A `null` keyframe means \"the current value\" and a relative string (`'+=30'`) offsets from it — both resolve against the element's LIVE value the moment the animation starts. Drift the card, nudge it with `+=30`, then pulse `scale: [null, 1.15, 1]` mid-flight: the pulse begins from wherever the card is, without a hardcoded from-value.",
+            snippet: wildcardSection,
+            codeSnippet: wildcardCode,
+            notes: wildcardNotes,
+            barCells: [{ k: 'pattern', v: 'null · += relative' }],
+            sourceUrl: `${SOURCE_URL}keyframes/demos/Wildcard.svelte`
         }
     ]
 </script>
@@ -83,6 +96,54 @@
     <CodeReferenceV2
         samples={[
             demoCodeSample('keyframes/demos/Default.svelte', 'keyframes-default', 'Default.svelte')
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#snippet wildcardSection()}
+    <KeyframesWildcard />
+{/snippet}
+{#snippet wildcardNotes()}
+    <ul>
+        <li>
+            <Crosshair />
+            <span>
+                <code>null</code> in a keyframe means "the current value". The live element feeds
+                the <strong>first</strong> keyframe at animation start —
+                <code>scale: [null, 1.15, 1]</code>
+                pulses from wherever <code>scale</code> already is, then settles at <code>1</code>.
+                Later <code>null</code>s hold the previous keyframe instead (upstream
+                <code>fillWildcards</code>).
+            </span>
+        </li>
+        <li>
+            <MoveRight />
+            <span>
+                Relative strings resolve against the live value too:
+                <code>x: '+=30'</code> steps 30px right from the card's current <code>x</code>, and
+                <code>'-=30'</code> steps left — no absolute target needed.
+            </span>
+        </li>
+        <li>
+            <Sparkles />
+            <span>
+                A bare <code>x: null</code> means "hold <code>x</code> at its current value", so the
+                pulse keeps the card wherever it drifted to. Because every wildcard resolves at
+                <strong>start</strong>, the <code>x</code> position and the <code>scale</code> pulse compose
+                instead of snapping to a hardcoded from-value.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet wildcardCode()}
+    <CodeReferenceV2
+        samples={[
+            demoCodeSample(
+                'keyframes/demos/Wildcard.svelte',
+                'keyframes-wildcard',
+                'Wildcard.svelte'
+            )
         ]}
         columns={1}
     />
