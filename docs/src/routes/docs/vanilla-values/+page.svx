@@ -5,7 +5,7 @@ description: Component-free motion values — motionValue, springValue, transfor
 
 <script>
   import Example from '$lib/components/general/Example.svelte'
-  import VanillaValuesExample from '$lib/examples/VanillaValuesExample.svelte'
+  import VanillaValuesDemo from '$lib/examples/vanilla-values/demos/Default.svelte'
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()
@@ -31,7 +31,7 @@ export const scrollProgress = motionValue(0)
 ```
 
 <Example isSmall>
-  <VanillaValuesExample />
+  <VanillaValuesDemo />
 </Example>
 
 ## Hooks vs vanilla
