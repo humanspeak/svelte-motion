@@ -243,6 +243,13 @@
     let enterAnimationSettled = $state(false)
     let lastAnimateRestingValues = $state<Record<string, unknown> | undefined>(undefined)
     let lastAnimateRestingJson = $state<string | undefined>(undefined)
+    // Raw animate-prop JSON the settle-resolved resting values were computed
+    // FROM: lets the reactive baseline detect that its raw wildcard/relative
+    // definition already has a resolved settle snapshot to prefer.
+    let lastAnimateSourceJson = $state<string | undefined>(undefined)
+    /** An unresolved wildcard (`null`) or relative (`'+=50'`) keyframe value. */
+    const isUnresolvedKeyframeValue = (value: unknown): boolean =>
+        value === null || value === undefined || (typeof value === 'string' && /^[+-]=/.test(value))
     let dataPath = $state<number>(-1)
     const motionConfig = $derived(getMotionConfig())
     const lazyMotion = getLazyMotionContext()
@@ -818,6 +825,27 @@
         const restingValues = resolveRestingValues(
             animateKeyframes as DOMKeyframesDefinition | undefined
         ) as unknown as Record<string, unknown> | undefined
+        // Wildcard/relative definitions (animate={{ x: null }} / '+=50')
+        // collapse to UNRESOLVED resting values here — the animation layer
+        // resolved them against the live value, so the baseline must reuse the
+        // settle-resolved snapshot (adversarial-review finding: recomputing
+        // from the raw definition snapped x:null holds to 0). When no snapshot
+        // exists yet, drop the unresolved channels rather than serializing
+        // null/'+=50' into the inline transform.
+        if (restingValues && Object.values(restingValues).some(isUnresolvedKeyframeValue)) {
+            if (
+                enterAnimationSettled &&
+                lastAnimateRestingValues &&
+                lastAnimateSourceJson === JSON.stringify(animateKeyframes)
+            ) {
+                return lastAnimateRestingValues
+            }
+            const stripped: Record<string, unknown> = {}
+            for (const [key, value] of Object.entries(restingValues)) {
+                if (!isUnresolvedKeyframeValue(value)) stripped[key] = value
+            }
+            return stripped
+        }
         if (!transformTemplateProp || !restingValues) return restingValues
 
         const restingJson = JSON.stringify(restingValues)
@@ -860,18 +888,41 @@
         for (const key of keys) willChange.add(key)
     }
 
-    const applyAnimateRestingStyle = () => {
+    const applyAnimateRestingStyle = (resolvedTarget?: Record<string, unknown>) => {
         if (!element) return
         if (!animateKeyframes) return
         const { target, transitionEnd } = extractTargetTransition(animateKeyframes)
-        const restingValues = resolveRestingValues({
+        // Prefer the payload the animation ACTUALLY ran (wildcards/relatives
+        // already resolved against the pre-animation live value). Recomputing
+        // from the raw definition here settled `x: null` to null and '+=50'
+        // unapplied (adversarial-review finding). The wildcard-only safety net
+        // below covers call sites with no resolved payload (optimized appear):
+        // at settle the live value IS the held value, so null→live is
+        // idempotent — but relatives must NOT re-resolve against the
+        // post-animation value (they would re-add), so any still-unresolved
+        // entry is dropped instead of serialized.
+        const mergedRaw = {
             ...getResolvedStyleTransformValues(),
-            ...target,
+            ...(resolvedTarget ?? target),
             ...(transitionEnd ?? {})
-        } as DOMKeyframesDefinition | undefined) as Record<string, unknown> | undefined
+        } as Record<string, unknown>
+        const wildcardResolved = resolveWildcardKeyframes(
+            mergedRaw as DOMKeyframesDefinition,
+            readLiveChannelValue
+        ) as Record<string, unknown> | undefined
+        const sanitized: Record<string, unknown> = {}
+        for (const [key, value] of Object.entries(wildcardResolved ?? mergedRaw)) {
+            if (!isUnresolvedKeyframeValue(value) && !(typeof value === 'string' && /^[+-]=/.test(value))) {
+                sanitized[key] = value
+            }
+        }
+        const restingValues = resolveRestingValues(
+            sanitized as DOMKeyframesDefinition | undefined
+        ) as Record<string, unknown> | undefined
         if (!restingValues) return
         lastAnimateRestingValues = restingValues
         lastAnimateRestingJson = JSON.stringify(restingValues)
+        lastAnimateSourceJson = JSON.stringify(animateKeyframes)
         element.setAttribute(
             'style',
             mergeInlineStyles(
@@ -2125,8 +2176,10 @@
             if (enterAnimationSettled) return
             // Now the target is the resting state — promote it to the
             // inline baseline so it persists after WAAPI surrenders the
-            // property (default fill:'none'). (#377)
-            applyAnimateRestingStyle()
+            // property (default fill:'none'). (#377) The RESOLVED payload
+            // (wildcards/relatives already concrete) feeds the settle so the
+            // baseline matches what actually animated.
+            applyAnimateRestingStyle(payload as unknown as Record<string, unknown>)
             enterAnimationSettled = true
             onAnimationCompleteProp?.(def)
         }
