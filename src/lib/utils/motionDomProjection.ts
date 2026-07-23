@@ -142,6 +142,8 @@ export class MotionDomProjectionAdapter {
     private layoutId: string | undefined
     private transition: Transition | undefined
     private lastLayout: Measurements | undefined
+    /** Handle for the pending refreshCachedLayout frame, cancelled on unmount. */
+    private refreshRafId: number | null = null
     private readonly getBaseTransform: (() => string) | undefined
     private readonly measureListeners = new Set<(rect: RectLike) => void>()
 
@@ -236,6 +238,10 @@ export class MotionDomProjectionAdapter {
         this.visualElement.unmount()
         visualElementStore.delete(element)
         MotionDomProjectionAdapter.adapters.delete(this.projection)
+        if (this.refreshRafId !== null && typeof window !== 'undefined') {
+            cancelAnimationFrame(this.refreshRafId)
+        }
+        this.refreshRafId = null
         this.element = null
         this.lastLayout = undefined
     }
@@ -678,7 +684,16 @@ export class MotionDomProjectionAdapter {
 
     private refreshCachedLayout(): void {
         this.lastLayout = cloneMeasurements(this.projection.layout)
-        requestAnimationFrame(() => {
+        if (typeof window === 'undefined') return
+        // Cancel any prior pending refresh so only the latest frame writes, and
+        // so unmount() can drop it entirely (upstream cancels its equivalent in
+        // unmount — create-projection-node.ts: cancelFrame(this.updateProjection)).
+        if (this.refreshRafId !== null) cancelAnimationFrame(this.refreshRafId)
+        this.refreshRafId = requestAnimationFrame(() => {
+            this.refreshRafId = null
+            // A frame that arrives after unmount must not resurrect lastLayout
+            // from the stale projection.layout and seed a remount's first commit.
+            if (!this.element) return
             this.lastLayout = cloneMeasurements(this.projection.layout)
         })
     }

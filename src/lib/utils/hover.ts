@@ -320,7 +320,12 @@ export const attachWhileHover = (
     // transform channel the gesture animates — a second (native) writer on
     // `el.style.transform` would clobber it frame by frame.
     const liveChannelValues: GestureTransformValues = {}
-    const channelAnimations = new Map<string, { stop?: () => void }>()
+    // Each entry pairs the channel animation's stopper with its coordinator
+    // unregister, so teardown drains BOTH — stopping the animation and removing
+    // the stopper closure from the coordinator's Set. Tracking only the stopper
+    // (and unregistering solely from onComplete) leaks the closure whenever an
+    // animation is stopped before it completes.
+    const channelAnimations = new Map<string, { stop?: () => void; unregister?: () => void }>()
 
     const writeComposedChannels = () => {
         const transform =
@@ -344,7 +349,13 @@ export const attachWhileHover = (
     }
 
     const stopChannelAnimations = () => {
-        for (const animation of channelAnimations.values()) animation.stop?.()
+        for (const entry of channelAnimations.values()) {
+            entry.stop?.()
+            // Idempotent with onComplete's unregister (coordinator.register
+            // returns a Set-delete closure); drops the stopper the coordinator
+            // would otherwise retain until this element is GC'd.
+            entry.unregister?.()
+        }
         channelAnimations.clear()
     }
 
@@ -410,6 +421,7 @@ export const attachWhileHover = (
         finalValue: number | string
     ) => {
         const registration: { unregister?: () => void } = {}
+        const entry: { stop?: () => void; unregister?: () => void } = {}
         const animation = animateValue({
             ...valueTransition,
             keyframes,
@@ -424,11 +436,13 @@ export const attachWhileHover = (
                 registration.unregister?.()
             }
         })
-        channelAnimations.set(key, animation)
+        entry.stop = () => animation.stop?.()
+        channelAnimations.set(key, entry)
         registration.unregister = coordinator?.register(() => {
             animation.stop?.()
-            if (channelAnimations.get(key) === animation) channelAnimations.delete(key)
+            if (channelAnimations.get(key) === entry) channelAnimations.delete(key)
         })
+        entry.unregister = registration.unregister
     }
 
     // Animate a unit-suffixed target ('-50%', '2rem') by mixing a 0->1 progress
@@ -467,7 +481,9 @@ export const attachWhileHover = (
         // Caller has already stopped competing writers (see the branch-level
         // stopAll), so the start keyframe samples exactly where the element
         // visually froze.
-        channelAnimations.get(key)?.stop?.()
+        const existing = channelAnimations.get(key)
+        existing?.stop?.()
+        existing?.unregister?.()
         channelAnimations.delete(key)
 
         // Unit-suffixed string targets must not flow through the numeric path:
