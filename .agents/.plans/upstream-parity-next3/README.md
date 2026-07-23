@@ -21,11 +21,11 @@ STOP conditions, and update your row when done.
 
 ## Execution order & status
 
-| Plan | Title                                                               | Priority | Effort | Depends on                 | Status                                                                                                 |
-| ---- | ------------------------------------------------------------------- | -------- | ------ | -------------------------- | ------------------------------------------------------------------------------------------------------ |
-| 001  | Gesture channels ride persistent MotionValues (velocity continuity) | P1       | M–L    | —                          | IN PROGRESS — dispatched to opus executor (worktree, base 1798110) + docs-example scope extension      |
-| 002  | First-ever controls.start() animates from the non-neutral idle      | P1       | S–M    | —                          | IN PROGRESS — dispatched to opus executor (worktree, base 1798110) + docs-verification scope extension |
-| 003  | Wildcard/relative keyframes resolve against the live value          | P2       | S–M    | 002 (same-file sequencing) | TODO                                                                                                   |
+| Plan | Title                                                               | Priority | Effort | Depends on                 | Status                                                                                                          |
+| ---- | ------------------------------------------------------------------- | -------- | ------ | -------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 001  | Gesture channels ride persistent MotionValues (velocity continuity) | P1       | M–L    | —                          | IN PROGRESS — dispatched to opus executor (worktree, base 1798110) + docs-example scope extension               |
+| 002  | First-ever controls.start() animates from the non-neutral idle      | P1       | S–M    | —                          | DONE — guard-approved; integrated (10f8ff2 test + 0f8055c fix); docs beam demo verified, no docs changes needed |
+| 003  | Wildcard/relative keyframes resolve against the live value          | P2       | S–M    | 002 (same-file sequencing) | IN PROGRESS — dispatched to opus executor on post-002 tip                                                       |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
