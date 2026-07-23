@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { GestureCoordinator } from './gestureCoordinator.js'
 import {
     attachWhileHover,
     computeHoverBaseline,
@@ -277,6 +278,61 @@ describe('utils/hover', () => {
         expect(leaveCall?.[1]).toMatchObject({ backgroundColor: 'white' })
         expect(onEnd).toHaveBeenCalledOnce()
         cleanup()
+    })
+
+    it('attachWhileHover: cleanup unregisters composed-channel stoppers from the coordinator', () => {
+        // Plan 011: composed channel animations register a stopper with the
+        // gesture coordinator, but teardown only calls animation.stop() — the
+        // stored `unregister` runs only from onComplete, so a stopped
+        // animation's closure stays in the coordinator's stoppers Set until the
+        // element is GC'd. Upstream frame-cancellation discipline drains its
+        // registrations on unmount.
+        const el = document.createElement('div')
+
+        // Fake coordinator mirroring createGestureCoordinator but exposing its
+        // stoppers Set so retention after cleanup is observable.
+        const stoppers = new Set<() => void>()
+        const active = new Set<string>()
+        const coordinator = {
+            setActive: (type: string, isActive: boolean) => {
+                if (isActive) active.add(type)
+                else active.delete(type)
+            },
+            isActive: (type: string) => active.has(type),
+            ownedKeys: () => new Set<string>(),
+            isKeyProtected: () => false,
+            register: (stop: () => void) => {
+                stoppers.add(stop)
+                return () => stoppers.delete(stop)
+            },
+            stopAll: () => {
+                for (const stop of stoppers) stop()
+                stoppers.clear()
+            },
+            markExternalWrite: () => {},
+            consumeExternalWrite: () => false
+        } as unknown as GestureCoordinator
+
+        const cleanup = attachWhileHover(
+            el,
+            { scale: 1.2 },
+            { duration: 0.2 },
+            undefined,
+            undefined,
+            undefined,
+            coordinator
+        )
+
+        // Hover-enter starts a composed scale channel that registers its
+        // stopper with the coordinator.
+        const hoverEnd = hoverCallback!(el)
+        expect(hoverEnd).toBeTruthy()
+        expect(stoppers.size).toBe(1)
+
+        // Teardown must drain the coordinator; the leak leaves the stopper
+        // closure retained in the Set.
+        cleanup()
+        expect(stoppers.size).toBe(0)
     })
 
     describe('CSS variable preservation', () => {
