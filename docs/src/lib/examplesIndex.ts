@@ -255,6 +255,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Variants Propagation',
         description: 'Interactive variants propagation animation example using Svelte Motion.'
     },
+    'velocity-interrupts': {
+        title: 'Velocity Interrupts',
+        description:
+            'Interrupt a gesture spring mid-flight and momentum carries — position and velocity both ride the same MotionValue into the next animation.'
+    },
     'while-focus': {
         title: 'While Focus',
         description: 'Interactive while focus animation example using Svelte Motion.'
