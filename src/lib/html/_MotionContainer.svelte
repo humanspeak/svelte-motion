@@ -912,7 +912,10 @@
         ) as Record<string, unknown> | undefined
         const sanitized: Record<string, unknown> = {}
         for (const [key, value] of Object.entries(wildcardResolved ?? mergedRaw)) {
-            if (!isUnresolvedKeyframeValue(value) && !(typeof value === 'string' && /^[+-]=/.test(value))) {
+            if (
+                !isUnresolvedKeyframeValue(value) &&
+                !(typeof value === 'string' && /^[+-]=/.test(value))
+            ) {
                 sanitized[key] = value
             }
         }

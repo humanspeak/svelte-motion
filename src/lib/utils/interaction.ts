@@ -297,10 +297,7 @@ export const attachWhileTap = (
             // — the authored spring silently degraded (adversarial-review
             // finding).
             const channelBase = baseIsDefined
-                ? ((baseObject[key] ?? baseObject.default ?? baseObject) as Record<
-                      string,
-                      unknown
-                  >)
+                ? ((baseObject[key] ?? baseObject.default ?? baseObject) as Record<string, unknown>)
                 : (getDefaultTransition(key, { keyframes: [0, 1] }) as Record<string, unknown>)
             merged[key] = { ...channelBase, velocity: velocities[key] }
         }

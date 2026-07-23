@@ -279,28 +279,21 @@ describe('utils/interaction', () => {
         cleanup()
     })
 
-
     it('attachWhileTap: velocity handoff preserves value-specific transition overrides', () => {
         const el = document.createElement('div')
         document.body.appendChild(el)
         // Shared hover MotionValue with live velocity — triggers the handoff
         // injection path (collectHandoffVelocities → withHandoffVelocity).
         const sharedScale = { getVelocity: () => 5.3 }
-        const cleanup = attachWhileTap(
-            el,
-            { scale: 0.9 },
-            { scale: 1 },
-            undefined,
-            {
-                // Value-specific override: upstream resolves a channel's
-                // transition as transition[key] ?? transition.default ??
-                // transition (getValueTransition). Injecting velocity must
-                // preserve that resolution — the authored spring's type and
-                // damping stay TOP-LEVEL on the channel's merged transition.
-                tapTransition: { scale: { type: 'spring', damping: 10 } },
-                getSharedChannelValue: (key) => (key === 'scale' ? sharedScale : undefined)
-            } as never
-        )
+        const cleanup = attachWhileTap(el, { scale: 0.9 }, { scale: 1 }, undefined, {
+            // Value-specific override: upstream resolves a channel's
+            // transition as transition[key] ?? transition.default ??
+            // transition (getValueTransition). Injecting velocity must
+            // preserve that resolution — the authored spring's type and
+            // damping stay TOP-LEVEL on the channel's merged transition.
+            tapTransition: { scale: { type: 'spring', damping: 10 } },
+            getSharedChannelValue: (key) => (key === 'scale' ? sharedScale : undefined)
+        } as never)
 
         expect(pressCallback).toBeTruthy()
         pressCallback!(el, new PointerEvent('pointerdown'))
