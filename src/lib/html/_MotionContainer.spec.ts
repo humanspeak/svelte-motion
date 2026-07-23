@@ -16,6 +16,8 @@ const animateMotionValueMock = vi.hoisted(() =>
             _transition?: Record<string, unknown>
         ) =>
             (onComplete?: () => void) => {
+                // Recorded via mock.calls for transition assertions; unused here.
+                void _transition
                 const final = Array.isArray(target)
                     ? Number((target as unknown[]).at(-1))
                     : Number(target)

@@ -337,7 +337,7 @@ export const resolveWildcardKeyframes = (
                 // resolveFinalValueInKeyframes semantics).
                 const resolved: unknown[] = []
                 for (let i = 0; i < value.length; i++) {
-                    const el = value[i]
+                    const el: unknown = value[i]
                     if (isWildcardKeyframe(el)) {
                         resolved.push(i === 0 ? (live === undefined ? el : live) : resolved[i - 1])
                     } else {

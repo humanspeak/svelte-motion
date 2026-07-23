@@ -30,6 +30,22 @@ STOP conditions, and update your row when done.
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
 
+## Guard close-out — 2026-07-23
+
+**Batch CLOSED, all 3 plans resolved** (guard reports alongside this index).
+Maintainer signed off all three example pages live (velocity-interrupts,
+use-animation-controls, keyframes wildcard sheet). Post-approval hardening on
+the same branch: a maintainer eye-test found the tap-cancel frozen-value snap,
+and a Codex adversarial review found three more defects — including a
+semantics error in plan 003 ITSELF (wildcard fill rule) — all fixed red-first.
+Final verification: 811 unit / 0 type errors / trunk clean / 33-test e2e gate.
+Shipped as PR #453 (label: minor).
+
+Process lessons recorded in the guard reports: (1) guard gates must run the
+FULL unit suite, not the plan's scoped subset; (2) when an executor's
+measurement of a dependency contradicts the plan's asserted semantics,
+arbitrate against the source before approving.
+
 ## Dependency notes
 
 - 001 is independent (hover/interaction) and can run in parallel with 002.
