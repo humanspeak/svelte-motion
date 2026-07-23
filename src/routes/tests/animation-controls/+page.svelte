@@ -148,10 +148,10 @@
         void controls.start('launch', { duration: 2, ease: 'linear' })
     }
 
-    // Wildcard probe (plan 003): `[0, null]` should resolve the trailing null
-    // wildcard to the card's live x at animation start. After `start-slow`
-    // parks the card at x=64, this animates 0→64 and lands at 64. Linear ease
-    // keeps the landing deterministic.
+    // Wildcard probe: `[0, null]` fills the trailing null FORWARD from its
+    // predecessor (upstream fillWildcards), resolving to [0, 0] — from x=64 the
+    // card jumps to 0 at animation start and stays. Linear ease keeps the
+    // landing deterministic.
     const probeWildcard = () => {
         sequenceId += 1
         void controls.start({ x: [0, null] }, { duration: 0.3, ease: 'linear' })

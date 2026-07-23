@@ -426,14 +426,17 @@ describe('utils/variants - resolveWildcardKeyframes', () => {
         })
     })
 
-    it('leaves a wildcard/relative unchanged when no numeric live value exists', () => {
+    it('leaves a LEADING wildcard/relative unchanged when no numeric live value exists', () => {
         // Documented numeric bound: a color / var() / 3D-matrix channel reports
-        // no numeric live value, so the wildcard passes through verbatim rather
-        // than corrupting the payload.
+        // no numeric live value, so a LEADING wildcard (the only position the
+        // live value feeds) passes through verbatim. Non-leading nulls never
+        // need the live value — upstream fillWildcards fills them from the
+        // predecessor unconditionally.
         const noValue = () => undefined
-        expect(resolveWildcardKeyframes({ x: [0, null] }, noValue)).toEqual({
-            x: [0, null]
+        expect(resolveWildcardKeyframes({ x: [null, 100] }, noValue)).toEqual({
+            x: [null, 100]
         })
+        expect(resolveWildcardKeyframes({ x: [0, null] }, noValue)).toEqual({ x: [0, 0] })
         expect(resolveWildcardKeyframes({ x: '+=50' }, noValue)).toEqual({ x: '+=50' })
     })
 

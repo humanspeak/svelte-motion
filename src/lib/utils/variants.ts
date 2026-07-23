@@ -309,7 +309,8 @@ const resolveKeyframeElement = (value: unknown, live: number | undefined): unkno
  *
  * @example
  * ```ts
- * resolveWildcardKeyframes({ x: [0, null] }, () => 64) // { x: [0, 64] }
+ * resolveWildcardKeyframes({ x: [0, null] }, () => 64)  // { x: [0, 0] } (fill-forward)
+ * resolveWildcardKeyframes({ x: [null, 100] }, () => 64) // { x: [64, 100] } (live feeds [0])
  * resolveWildcardKeyframes({ x: '+=50' }, () => 64)    // { x: 114 }
  * resolveWildcardKeyframes({ x: [0, 100] }, () => 64)  // { x: [0, 100] } (untouched)
  * ```
@@ -324,7 +325,22 @@ export const resolveWildcardKeyframes = (
         if (Array.isArray(value)) {
             if (value.some((el) => isWildcardKeyframe(el) || isRelativeKeyframe(el))) {
                 const live = readLiveValue(key)
-                out[key] = value.map((el) => resolveKeyframeElement(el, live))
+                // Upstream semantics (motion-dom KeyframeResolver +
+                // fillWildcards): the LIVE value feeds only keyframes[0]; every
+                // later wildcard fills FORWARD from its resolved predecessor.
+                // [0, null] -> [0, 0], [null, null, 100] -> [live, live, 100].
+                // Relative strings still offset from the live value (setters.ts
+                // resolveFinalValueInKeyframes semantics).
+                const resolved: unknown[] = []
+                for (let i = 0; i < value.length; i++) {
+                    const el = value[i]
+                    if (isWildcardKeyframe(el)) {
+                        resolved.push(i === 0 ? (live === undefined ? el : live) : resolved[i - 1])
+                    } else {
+                        resolved.push(resolveKeyframeElement(el, live))
+                    }
+                }
+                out[key] = resolved
             } else {
                 out[key] = value
             }
