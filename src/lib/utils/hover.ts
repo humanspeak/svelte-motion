@@ -679,6 +679,28 @@ export const attachWhileHover = (
         }
 
         const value = getChannelValue(key)
+        // Stale-value sync: a channel with NO live hover animation may have
+        // frozen while another writer (the tap's element-level animation) owned
+        // it — e.g. press interrupts hover at scale 1.49, tap animates the
+        // ELEMENT to 0.9, and this value still holds 1.49. motion-dom defers
+        // hover-end past an active press (pointer capture), so the deferred
+        // restore fires at RELEASE and would launch from that fiction — a
+        // one-frame snap to 1.49 before springing down. Re-sync the idle value
+        // to the rendered visual first: `jump()` clears the (equally stale)
+        // velocity and its change event rewrites the composed transform with
+        // what is already rendered, so the sync itself is invisible. A LIVE
+        // hover animation skips this — its value IS the truth, velocity intact.
+        if (existing === undefined) {
+            const visual = readTransformChannels(el)
+            if (visual !== null) {
+                const current = key.startsWith('scale')
+                    ? visual.scale
+                    : visual[key as 'x' | 'y' | 'rotate']
+                if (Number.isFinite(current) && Math.abs(current - value.get()) > 0.001) {
+                    value.jump(current)
+                }
+            }
+        }
         if ('array' in numeric) {
             runChannelAnimation(
                 key,
