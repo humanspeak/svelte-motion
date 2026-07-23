@@ -126,4 +126,74 @@ test.describe('Hover→tap velocity continuity', () => {
         // target rather than running away upward.
         expect(Math.min(...post)).toBeLessThan(pressScale)
     })
+
+    test('tap cancel (release outside) never snaps to the frozen hover value', async ({ page }) => {
+        await page.goto('/tests/motion/hover-velocity-continuity?@isPlaywright=true')
+
+        const box = page.getByTestId('motion-hover-velocity-continuity')
+        await expect(box).toBeVisible()
+        await page.waitForTimeout(800)
+
+        // Hold → drag off (hover ends while tap owns scale) → release OUTSIDE
+        // (tap cancels). The reset must animate from the held 0.9 toward base
+        // with no discontinuity. The regression: the hover channel's persistent
+        // MotionValue froze near 1.5 when the press interrupted it, and the
+        // cancel path re-emitted that stale value through the composed writer
+        // for one frame (0.9 -> ~1.47) before the reset spring took over.
+        const { maxStep, stepAt, series } = await page.evaluate((sel) => {
+            const el = document.querySelector(sel) as HTMLElement
+            const read = () => {
+                const t = getComputedStyle(el).transform
+                const m = t.match(/matrix\(([^)]+)\)/)
+                if (!m) return 1
+                const p = m[1].split(',').map((v) => parseFloat(v.trim()))
+                return Math.hypot(p[0] ?? 1, p[1] ?? 0)
+            }
+            const pe = (type: string) =>
+                new PointerEvent(type, {
+                    pointerType: 'mouse',
+                    isPrimary: true,
+                    button: 0,
+                    buttons: type === 'pointerdown' ? 1 : 0,
+                    bubbles: true
+                })
+            const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+            return (async () => {
+                const series: number[] = []
+                const sampler = setInterval(() => series.push(read()), 16)
+                el.dispatchEvent(pe('pointerenter'))
+                await wait(700) // settle at hover 1.5
+                el.dispatchEvent(pe('pointerdown'))
+                await wait(400) // settle at tap 0.9 (held)
+                el.dispatchEvent(pe('pointerleave'))
+                await wait(400) // hover ends; scale stays tap-owned at 0.9
+                window.dispatchEvent(pe('pointerup')) // cancel: released outside
+                await wait(700) // reset spring to base
+                clearInterval(sampler)
+                let maxStep = 0
+                let stepAt = -1
+                for (let i = 1; i < series.length; i++) {
+                    const step = Math.abs(series[i] - series[i - 1])
+                    if (step > maxStep) {
+                        maxStep = step
+                        stepAt = i
+                    }
+                }
+                return { maxStep, stepAt, series }
+            })()
+        }, SEL)
+
+        // The default 500-550 stiffness springs peak well under 0.12/frame on
+        // this travel; the frozen-value re-emit was a 0.57 single-frame snap.
+        expect(
+            maxStep,
+            `max single-frame step ${maxStep.toFixed(3)} at sample ${stepAt} (series tail: ${series
+                .slice(Math.max(0, stepAt - 3), stepAt + 3)
+                .map((v) => v.toFixed(3))
+                .join(' -> ')})`
+        ).toBeLessThan(0.12)
+
+        // And the cancel actually resets: settles back at base scale 1.
+        expect(Math.abs(series[series.length - 1] - 1)).toBeLessThan(0.02)
+    })
 })
