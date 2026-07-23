@@ -93,6 +93,22 @@
         void controls.start('launch', { duration: 2, ease: 'linear' })
     }
 
+    // Wildcard probe (plan 003): `[0, null]` should resolve the trailing null
+    // wildcard to the card's live x at animation start. After `start-slow`
+    // parks the card at x=64, this animates 0→64 and lands at 64. Linear ease
+    // keeps the landing deterministic.
+    const probeWildcard = () => {
+        sequenceId += 1
+        void controls.start({ x: [0, null] }, { duration: 0.3, ease: 'linear' })
+    }
+
+    // Relative probe (plan 003): `'+=50'` resolves against the card's live x at
+    // animation start. From a fresh idle (x=0) this settles at 50.
+    const probeRelative = () => {
+        sequenceId += 1
+        void controls.start({ x: '+=50' }, { duration: 0.3, ease: 'linear' })
+    }
+
     // Toggle an unrelated inline-style channel on the beam to trigger a
     // reactive style flush without touching any animated channel.
     const poke = () => {
@@ -169,6 +185,12 @@
                 <button type="button" data-testid="start" onclick={runSequence}>Start</button>
                 <button type="button" data-testid="start-slow" onclick={startSlowLaunch}
                     >Start slow</button
+                >
+                <button type="button" data-testid="probe-wildcard" onclick={probeWildcard}
+                    >Probe wildcard</button
+                >
+                <button type="button" data-testid="probe-relative" onclick={probeRelative}
+                    >Probe relative</button
                 >
                 <button type="button" data-testid="stop" onclick={stop}>Stop</button>
                 <button type="button" data-testid="poke" onclick={poke}>Poke</button>
