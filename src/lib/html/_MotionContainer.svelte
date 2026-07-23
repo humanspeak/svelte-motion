@@ -60,6 +60,8 @@
         setCompositorHints,
         observeLayoutChanges,
         selectLayoutDependencies,
+        sizeCorrectionSeedEvent,
+        sizeCorrectionEndEvent,
         type RectLike
     } from '$lib/utils/layout'
     import type { SvelteHTMLElements } from 'svelte/elements'
@@ -2379,6 +2381,15 @@
         const prev = reactiveCommitPrevious
         reactiveCommitPrevious = null
         if (!(element && prev)) return
+        // A PROPER ANCESTOR mid size-corrected FLIP (`runBoxSizeAnimation`)
+        // re-slots this child every frame. This deferred (postRender) commit
+        // runs AFTER the ancestor set `data-layout-size-animation`, so it can
+        // see it — and it runs after the size-correction seed already reset the
+        // child's cache. Committing a FLIP here (e.g. from the `.state` label's
+        // copy→copied class flip) would re-apply the very enter transform the
+        // seed cancelled, painting the one-frame pop. Skip it entirely; the
+        // observer path keeps the cache fresh while the ancestor animates.
+        if (element.parentElement?.closest('[data-layout-size-animation]')) return
         const next = measureLayoutRect()
         if (!next) return
         // The DOM observer already consumed this exact change: it committed a
@@ -2639,12 +2650,36 @@
             })
         }
 
+        // A size-animating `layout` ancestor fires these synchronously at the
+        // start/end of its `runBoxSizeAnimation` (before the next paint). On
+        // START, BLOCK this child's projection: any enter/re-slot FLIP it
+        // committed a beat earlier — before the ancestor's
+        // `data-layout-size-animation` attribute was set, so the commit-path
+        // guard could not yet see it — is finished and its scheduled frameloop
+        // update is prevented from resurrecting the transform. The child then
+        // tracks the growing parent at identity. On END, unblock and re-seed so
+        // later real layout changes animate normally. This is what makes the
+        // fix race-proof: `finishAnimation()` alone can be outrun by a
+        // projection update already queued on the frameloop.
+        const handleSizeCorrectionSeed = () => {
+            lastRect = measureLayoutRect()
+            motionDomProjection?.blockLayoutAnimation()
+        }
+        const handleSizeCorrectionEnd = () => {
+            lastRect = measureLayoutRect()
+            motionDomProjection?.unblockLayoutAnimation()
+        }
+        element!.addEventListener(sizeCorrectionSeedEvent, handleSizeCorrectionSeed)
+        element!.addEventListener(sizeCorrectionEndEvent, handleSizeCorrectionEnd)
+
         const disconnectObservers = observeLayoutChanges(element!, () => scheduleProjectionCommit())
         element!.addEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
 
         return () => {
             disconnectObservers()
             element?.removeEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
+            element?.removeEventListener(sizeCorrectionSeedEvent, handleSizeCorrectionSeed)
+            element?.removeEventListener(sizeCorrectionEndEvent, handleSizeCorrectionEnd)
             lastRect = null
             if (element) {
                 setCompositorHints(element, false)

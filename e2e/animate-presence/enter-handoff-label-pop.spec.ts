@@ -69,7 +69,9 @@ const sampleEnterMaxStep = async (page: import('@playwright/test').Page): Promis
         })
     })
 
-    const readable = samples.filter((sample) => sample.text.includes('copied') && sample.opacity > 0.2)
+    const readable = samples.filter(
+        (sample) => sample.text.includes('copied') && sample.opacity > 0.2
+    )
     expect(readable.length, 'readable copied samples in enter window').toBeGreaterThan(5)
 
     let maxMove = 0

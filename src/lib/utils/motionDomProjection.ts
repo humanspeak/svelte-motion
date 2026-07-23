@@ -548,6 +548,40 @@ export class MotionDomProjectionAdapter {
     }
 
     /**
+     * Block this node from starting layout animations, then finish and re-seed.
+     *
+     * Unlike {@link finishAnimation}, which only stops what is running now, this
+     * also sets the projection's `isAnimationBlocked` flag so a layout update
+     * ALREADY SCHEDULED on the frameloop (an earlier `commitObservedLayoutChange`
+     * whose `didUpdate` computes its target next frame) cannot resurrect the
+     * animation. Used while a `layout` ancestor runs its size-corrected width
+     * animation: the child must track the growing parent (identity transform),
+     * never run its own re-slot FLIP — and the block is race-proof against a
+     * commit that landed a beat before the size animation was detected. Mirrors
+     * upstream's drag block (VisualElementDragControls `isAnimationBlocked`).
+     *
+     * @returns Nothing.
+     */
+    blockLayoutAnimation(): void {
+        if (!this.element || !this.layout) return
+        this.projection.isAnimationBlocked = true
+        this.finishAnimationForSubtree(this.projection)
+        this.seedLayout()
+    }
+
+    /**
+     * Lift a prior {@link blockLayoutAnimation} block and re-seed to the current
+     * layout, so subsequent real layout changes animate normally again.
+     *
+     * @returns Nothing.
+     */
+    unblockLayoutAnimation(): void {
+        if (!this.element || !this.layout) return
+        this.projection.isAnimationBlocked = false
+        this.seedLayout()
+    }
+
+    /**
      * Check whether this projection subtree has an active layout animation.
      *
      * @returns `true` when this projection subtree is currently animating.

@@ -9,6 +9,28 @@ import {
 const layoutSizeAnimationAttribute = 'data-layout-size-animation'
 
 /**
+ * Dispatched on each size-corrected `[data-svelte-motion-layout]` child at the
+ * START of a parent's `runBoxSizeAnimation`, synchronously and before the next
+ * paint. A child re-slot commit can race ahead of the parent setting
+ * `data-layout-size-animation` (MutationObserver ordering), setting up an enter
+ * FLIP whose transform the size-animation guard then clears one frame later — a
+ * visible one-frame pop. On this event the child BLOCKS its projection
+ * (`blockLayoutAnimation`), finishing and preventing any pending frameloop
+ * update from painting a transform, so it tracks the growing parent at identity
+ * instead. Bubbles: no.
+ */
+export const sizeCorrectionSeedEvent = 'svelte-motion:size-correction-seed'
+
+/**
+ * Dispatched on each size-corrected `[data-svelte-motion-layout]` child when a
+ * parent's `runBoxSizeAnimation` finishes (or is cleaned up). Pairs with
+ * {@link sizeCorrectionSeedEvent}: the child lifts the projection block it took
+ * on seed, re-seeds to the settled layout, and resumes animating real layout
+ * changes normally. Bubbles: no.
+ */
+export const sizeCorrectionEndEvent = 'svelte-motion:size-correction-end'
+
+/**
  * How many ancestor levels above the element `observeLayoutChanges` watches
  * for re-slotting style/class changes. Upstream framer-motion re-measures the
  * WHOLE projection tree on any tracked update (`create-projection-node.ts`
@@ -169,6 +191,12 @@ const runBoxSizeAnimation = (
         child.style.transform = ''
         child.style.transformOrigin = ''
         if (child.style.willChange === 'transform') child.style.willChange = ''
+        // Cancel any enter/re-slot FLIP the child set up before this size
+        // animation started (and before it could observe the attribute above):
+        // the child blocks its projection on this event so the pending render
+        // never paints a one-frame transform that the guard would then clear.
+        // It tracks the parent's growth at identity instead (released on END).
+        child.dispatchEvent(new CustomEvent(sizeCorrectionSeedEvent))
     }
     el.style.width = roundedPx(prevWidth)
     el.style.height = roundedPx(prevHeight)
@@ -214,6 +242,11 @@ const runBoxSizeAnimation = (
         el.style.transformOrigin = originalTransformOrigin
         el.style.transform = originalTransform
         el.removeAttribute(layoutSizeAnimationAttribute)
+        // Release each size-corrected child's projection block (taken on seed at
+        // animation start) now that the settled layout is in the DOM.
+        for (const child of el.querySelectorAll<HTMLElement>('[data-svelte-motion-layout]')) {
+            child.dispatchEvent(new CustomEvent(sizeCorrectionEndEvent))
+        }
     }
 
     const animation = animate(0, 1, {
