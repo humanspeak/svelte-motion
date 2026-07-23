@@ -495,10 +495,22 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
     let releaseTimeout: ReturnType<typeof setTimeout> | null = null
 
     const schedule = () => {
-        if (el.closest(`[${layoutSizeAnimationAttribute}]`)) {
+        const sizeAnimationHost = el.closest(`[${layoutSizeAnimationAttribute}]`)
+        if (sizeAnimationHost) {
             el.style.transform = ''
             el.style.transformOrigin = ''
             if (el.style.willChange === 'transform') el.style.willChange = ''
+            // When the size-animating host is a PROPER ANCESTOR, this element
+            // is a size-corrected CHILD being re-slotted every frame as the
+            // ancestor grows. Keep committing so its projection cache tracks
+            // the in-flight slot — the commit path detects the active ancestor
+            // size-animation and SEEDS rather than FLIPs, so nothing fights the
+            // parent. Without this the child's cache goes stale for the whole
+            // animation and the ancestor's completion re-slot lands as a
+            // one-frame phantom FLIP (the accumulated delta) on the child.
+            // The host element ITSELF still short-circuits (its own commit is
+            // guarded upstream), so its residual translate is untouched.
+            if (sizeAnimationHost !== el) onChange()
             return
         }
         // Re-parenting (portal / imperative move) leaves the ancestor

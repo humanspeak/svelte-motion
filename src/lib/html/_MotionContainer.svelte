@@ -2492,6 +2492,28 @@
                 return
             }
 
+            // A PROPER ANCESTOR mid size-corrected FLIP (`runBoxSizeAnimation`,
+            // e.g. a `layout` button whose width springs between "copy" and
+            // "copied") re-slots this `layout`/`layout="position"` child every
+            // frame as it grows. The child must NOT FLIP each frame (that would
+            // fight the parent), so it tracks its natural reflowed slot — but
+            // its cached layout must stay fresh, or the parent's single-step
+            // completion re-slot surfaces the whole accumulated delta as a
+            // one-frame phantom FLIP (an ~8px pop that then glides back).
+            // Seed to the current slot instead: keep the cache aligned with the
+            // in-flight animation so completion produces a zero delta and no
+            // uncompensated frame ever renders.
+            const hasSizeAnimatingAncestor = !!element!.parentElement?.closest(
+                '[data-layout-size-animation]'
+            )
+            if (hasSizeAnimatingAncestor) {
+                finishFlipAnimations(element!)
+                lastRect = measureLayoutRect()
+                motionDomProjection?.seedLayout()
+                motionDomProjection?.finishAnimation()
+                return
+            }
+
             const hasPresenceHold = element!.hasAttribute(presenceLayoutHoldAttribute)
             const hasHiddenWaitEnter = !!element!.querySelector(
                 '[data-presence-wait-hidden="true"]'
