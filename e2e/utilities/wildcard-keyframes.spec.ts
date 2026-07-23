@@ -25,7 +25,9 @@ test.describe('wildcard / relative keyframes resolve against the live value', ()
             return t === 'none' ? 0 : new DOMMatrixReadOnly(t).m41
         })
 
-    test('wildcard [0, null] fills forward to [0, 0] and lands at 0 (upstream fillWildcards)', async ({ page }) => {
+    test('wildcard [0, null] fills forward to [0, 0] and lands at 0 (upstream fillWildcards)', async ({
+        page
+    }) => {
         await gotoReady(page)
 
         // Park the card at x=64 (launch) over a slow linear run, then settle.

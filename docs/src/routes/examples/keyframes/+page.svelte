@@ -110,7 +110,8 @@
             <Crosshair />
             <span>
                 <code>null</code> in a keyframe means "the current value". The live element feeds
-                the <strong>first</strong> keyframe at animation start — <code>scale: [null, 1.15, 1]</code>
+                the <strong>first</strong> keyframe at animation start —
+                <code>scale: [null, 1.15, 1]</code>
                 pulses from wherever <code>scale</code> already is, then settles at <code>1</code>.
                 Later <code>null</code>s hold the previous keyframe instead (upstream
                 <code>fillWildcards</code>).
