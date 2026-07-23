@@ -46,7 +46,7 @@
         "@tailwindcss/typography": "^0.5.20",
         "@tailwindcss/vite": "^4.3.2",
         "@types/flubber": "^0.4.0",
-        "@vitest/browser": "^4.1.9",
+        "@vitest/browser": "^4.1.10",
         "@vitest/browser-playwright": "4.1.9",
         "chokidar-cli": "^3.0.0",
         "clsx": "^2.1.1",
