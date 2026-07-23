@@ -7,7 +7,8 @@ import {
     resolveRestingValues,
     resolveVariant,
     resolveVariantList,
-    resolveWhile
+    resolveWhile,
+    resolveWildcardKeyframes
 } from './variants.js'
 
 describe('utils/variants - resolveVariant', () => {
@@ -321,27 +322,24 @@ describe('utils/variants - resolveRestingValues', () => {
     })
 
     /*
-     * Pinning test (plan 007, upstream-fidelity): documents that
-     * `resolveRestingValues` currently takes the LAST array element verbatim,
-     * without running it through upstream's `resolveFinalValueInKeyframes`
-     * (motion-dom `render/utils/setters.ts`). A trailing `null` (wildcard,
-     * "current value") and relative strings (`+=50`) are therefore stored as-is
-     * rather than resolved to a concrete value.
-     *
-     * Plan 007 investigated whether this corrupts the animation-controls settle
-     * path and found it does NOT: the WAAPI animation layer normalizes these
-     * inputs before settle (a `[0, null]` start snaps the channel within one
-     * frame, long before settle runs), and the settle inline-style writer emits
-     * no garbage and does not jump on a reactive re-render. So the verbatim
-     * behavior below is intentional and pinned — any change to it (e.g. adopting
-     * upstream's wildcard/relative resolution) must be deliberate, and should
-     * also update the animation-controls settle handling accordingly.
+     * Plan 003 (upstream-parity): the plan-007 verbatim pins below were
+     * DELIBERATELY updated. Wildcards (`null` = "current value") and relative
+     * strings (`+=50`) are now resolved against the live value at animation
+     * start by `resolveWildcardKeyframes`, whose output feeds both the
+     * `animate()` call and this resting collapse. `resolveRestingValues` is the
+     * pure SETTLE side: it can no longer see a live value, so a trailing `null`
+     * takes the previous CONCRETE keyframe (upstream `fillWildcards` settle
+     * semantics — `render/utils/setters.ts`), and an all-wildcard array or an
+     * unresolved relative is OMITTED rather than emitted as a garbage inline
+     * style. See plan 003 and `resolveWildcardKeyframes`' own spec for the
+     * live-value resolution matrix.
      */
-    it('pins current verbatim handling of wildcard/relative final keyframes', () => {
-        expect(resolveRestingValues({ x: [0, null] })).toEqual({ x: null })
-        expect(resolveRestingValues({ x: [null] })).toEqual({ x: null })
-        expect(resolveRestingValues({ x: ['+=50'] })).toEqual({ x: '+=50' })
-        expect(resolveRestingValues({ x: '+=50' })).toEqual({ x: '+=50' })
+    it('collapses trailing wildcard/relative keyframes to the previous concrete value (plan 003)', () => {
+        expect(resolveRestingValues({ x: [0, null] })).toEqual({ x: 0 })
+        expect(resolveRestingValues({ x: [100, 0, null] })).toEqual({ x: 0 })
+        expect(resolveRestingValues({ x: [null] })).toEqual({})
+        expect(resolveRestingValues({ x: ['+=50'] })).toEqual({})
+        expect(resolveRestingValues({ x: '+=50' })).toEqual({})
     })
 
     it('returns undefined when given undefined', () => {
@@ -353,5 +351,97 @@ describe('utils/variants - resolveRestingValues', () => {
         const out = resolveRestingValues(input)
         expect(out).not.toBe(input)
         expect((input as { x: number[] }).x).toEqual([0, 50])
+    })
+})
+
+describe('utils/variants - resolveWildcardKeyframes', () => {
+    // A live value of 64 for every channel — the plan-003 probe baseline.
+    const live64 = () => 64
+
+    it('resolves a trailing null wildcard to the live value', () => {
+        expect(resolveWildcardKeyframes({ x: [0, null] }, live64)).toEqual({ x: [0, 64] })
+    })
+
+    it('resolves a leading null wildcard to the live value', () => {
+        expect(resolveWildcardKeyframes({ x: [null, 100] }, live64)).toEqual({
+            x: [64, 100]
+        })
+    })
+
+    it('resolves undefined wildcards the same as null', () => {
+        // `undefined` is not part of DOMKeyframesDefinition's array type (only
+        // `null` is), so this cast is genuinely required.
+        expect(resolveWildcardKeyframes({ x: [0, undefined] } as never, live64)).toEqual({
+            x: [0, 64]
+        })
+    })
+
+    it('resolves a relative "+=" scalar against the live value', () => {
+        expect(resolveWildcardKeyframes({ x: '+=50' }, live64)).toEqual({ x: 114 })
+    })
+
+    it('resolves a relative "-=" scalar against the live value', () => {
+        expect(resolveWildcardKeyframes({ x: '-=10' }, live64)).toEqual({ x: 54 })
+    })
+
+    it('resolves relative strings inside a keyframe array', () => {
+        expect(resolveWildcardKeyframes({ x: ['+=50', '-=4'] }, live64)).toEqual({
+            x: [114, 60]
+        })
+    })
+
+    it('resolves fractional relative offsets', () => {
+        expect(resolveWildcardKeyframes({ scale: '+=0.5' }, () => 1)).toEqual({
+            scale: 1.5
+        })
+    })
+
+    it('passes plain numeric arrays through untouched and never reads the live value', () => {
+        let reads = 0
+        const read = () => {
+            reads += 1
+            return 64
+        }
+        expect(resolveWildcardKeyframes({ x: [0, 100] }, read)).toEqual({ x: [0, 100] })
+        expect(reads).toBe(0)
+    })
+
+    it('passes scalars and non-relative strings through untouched', () => {
+        expect(resolveWildcardKeyframes({ opacity: 0.5, color: 'red' }, live64)).toEqual({
+            opacity: 0.5,
+            color: 'red'
+        })
+    })
+
+    it('leaves a wildcard/relative unchanged when no numeric live value exists', () => {
+        // Documented numeric bound: a color / var() / 3D-matrix channel reports
+        // no numeric live value, so the wildcard passes through verbatim rather
+        // than corrupting the payload.
+        const noValue = () => undefined
+        expect(resolveWildcardKeyframes({ x: [0, null] }, noValue)).toEqual({
+            x: [0, null]
+        })
+        expect(resolveWildcardKeyframes({ x: '+=50' }, noValue)).toEqual({ x: '+=50' })
+    })
+
+    it('reads the live value once per channel that needs it', () => {
+        const reads: string[] = []
+        const read = (key: string) => {
+            reads.push(key)
+            return 10
+        }
+        resolveWildcardKeyframes({ x: [0, null], y: '+=5', scale: [0, 1] }, read)
+        expect(reads).toEqual(['x', 'y'])
+    })
+
+    it('returns a new object and does not mutate the input', () => {
+        const input = { x: [0, null] }
+        const out = resolveWildcardKeyframes(input, live64)
+        expect(out).not.toBe(input)
+        expect(input.x).toEqual([0, null])
+    })
+
+    it('returns undefined when given undefined', () => {
+        expect(resolveWildcardKeyframes(undefined, live64)).toBeUndefined()
     })
 })
