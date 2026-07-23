@@ -157,6 +157,14 @@
         void controls.start({ x: [0, null] }, { duration: 0.3, ease: 'linear' })
     }
 
+    // Leading-wildcard probe: `[null, 100]` fills keyframes[0] from the card's
+    // live x (upstream: the ONLY position the live value feeds), so from x=64
+    // this animates 64→100 — the true "start from the current value" showcase.
+    const probeLeading = () => {
+        sequenceId += 1
+        void controls.start({ x: [null, 100] }, { duration: 0.3, ease: 'linear' })
+    }
+
     // Relative probe (plan 003): `'+=50'` resolves against the card's live x at
     // animation start. From a fresh idle (x=0) this settles at 50.
     const probeRelative = () => {
@@ -244,6 +252,9 @@
                 >
                 <button type="button" data-testid="probe-wildcard" onclick={probeWildcard}
                     >Probe wildcard</button
+                >
+                <button type="button" data-testid="probe-leading" onclick={probeLeading}
+                    >Probe leading</button
                 >
                 <button type="button" data-testid="probe-relative" onclick={probeRelative}
                     >Probe relative</button

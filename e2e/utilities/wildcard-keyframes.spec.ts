@@ -41,8 +41,11 @@ test.describe('wildcard / relative keyframes resolve against the live value', ()
         await page.getByTestId('probe-wildcard').click()
         await page.waitForTimeout(600)
         const landed = await readCardX(page)
-        expect(landed, `landed x: ${landed}`).toBeGreaterThan(62)
-        expect(landed, `landed x: ${landed}`).toBeLessThan(66)
+        // Upstream fillWildcards: the live value fills only keyframes[0]; a
+        // trailing null fills forward from its predecessor. [0, null] therefore
+        // plays [0, 0] — the element JUMPS to 0 at animation start and stays.
+        expect(landed, `landed x: ${landed}`).toBeGreaterThan(-2)
+        expect(landed, `landed x: ${landed}`).toBeLessThan(2)
     })
 
     test('relative "+=50" resolves against the live x (0 → 50)', async ({ page }) => {
@@ -58,5 +61,27 @@ test.describe('wildcard / relative keyframes resolve against the live value', ()
         const landed = await readCardX(page)
         expect(landed, `landed x: ${landed}`).toBeGreaterThan(48)
         expect(landed, `landed x: ${landed}`).toBeLessThan(52)
+    })
+
+    test('leading wildcard [null, 100] starts FROM the live x (64) and lands at 100', async ({
+        page
+    }) => {
+        await page.goto('/tests/animation-controls?@isPlaywright=true')
+        await page.getByTestId('card').waitFor({ state: 'visible' })
+        await page.waitForTimeout(500)
+
+        // Park the card at x=64 via the slow linear launch, then settle.
+        await page.getByTestId('start-slow').click()
+        await expect.poll(async () => readCardX(page), { timeout: 5000 }).toBeGreaterThan(62)
+        await page.waitForTimeout(200)
+
+        // [null, 100]: keyframes[0] fills from the live value (upstream), so
+        // the animation must DEPART from ~64 — never dip toward 0 — and land
+        // at 100. Sample early frames to prove the departure point.
+        await page.getByTestId('probe-leading').click()
+        await page.waitForTimeout(50)
+        const early = await readCardX(page)
+        expect(early, `early x: ${early}`).toBeGreaterThan(55)
+        await expect.poll(async () => readCardX(page), { timeout: 3000 }).toBeGreaterThan(98)
     })
 })

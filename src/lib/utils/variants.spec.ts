@@ -358,8 +358,21 @@ describe('utils/variants - resolveWildcardKeyframes', () => {
     // A live value of 64 for every channel — the plan-003 probe baseline.
     const live64 = () => 64
 
-    it('resolves a trailing null wildcard to the live value', () => {
-        expect(resolveWildcardKeyframes({ x: [0, null] }, live64)).toEqual({ x: [0, 64] })
+    it('fills a trailing null wildcard from the PREVIOUS keyframe (upstream fillWildcards)', () => {
+        // motion-dom reads the live value only into keyframes[0]; every later
+        // null fills forward from its predecessor (fillWildcards). [0, null]
+        // therefore resolves to [0, 0] — NOT [0, live].
+        expect(resolveWildcardKeyframes({ x: [0, null] }, live64)).toEqual({ x: [0, 0] })
+        expect(resolveWildcardKeyframes({ x: [100, null] }, live64)).toEqual({ x: [100, 100] })
+    })
+
+    it('fills interior and consecutive nulls forward from the previous keyframe', () => {
+        expect(resolveWildcardKeyframes({ x: [0, null, 100] }, live64)).toEqual({
+            x: [0, 0, 100]
+        })
+        expect(resolveWildcardKeyframes({ x: [null, null, 100] }, live64)).toEqual({
+            x: [64, 64, 100]
+        })
     })
 
     it('resolves a leading null wildcard to the live value', () => {
@@ -372,7 +385,7 @@ describe('utils/variants - resolveWildcardKeyframes', () => {
         // `undefined` is not part of DOMKeyframesDefinition's array type (only
         // `null` is), so this cast is genuinely required.
         expect(resolveWildcardKeyframes({ x: [0, undefined] } as never, live64)).toEqual({
-            x: [0, 64]
+            x: [0, 0]
         })
     })
 
