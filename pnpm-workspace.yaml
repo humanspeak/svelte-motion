@@ -6,7 +6,8 @@ allowBuilds:
     # plain package-name key does NOT match. This key embeds the resolved
     # commit of docs-kit#<tag>, so it must be refreshed whenever the docs-kit
     # tag in docs/package.json bumps (pnpm approve-builds will prompt).
-    '@humanspeak/docs-kit@https://codeload.github.com/humanspeak/docs-kit/tar.gz/bc850a017d844972bf12ab6174655575d5915c54': true
+    '@humanspeak/docs-kit@https://codeload.github.com/humanspeak/docs-kit/tar.gz/a474a0725babdda6f267951a578d14289037b0cc': true
+    '@humanspeak/docs-kit@https://codeload.github.com/humanspeak/docs-kit/tar.gz/bc850a017d844972bf12ab6174655575d5915c54': set this to true or false
     core-js: true
     esbuild: true
     sharp: true
