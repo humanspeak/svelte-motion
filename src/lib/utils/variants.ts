@@ -169,7 +169,11 @@ export const resolveAnimate = (
     if (animate === undefined) return undefined
     if (typeof animate === 'string' || Array.isArray(animate))
         return resolveVariantList(variants, animate, custom)
-    return animate
+    // The scalar-null wildcard widening on MotionAnimate (`x: null` = hold the
+    // current value) is erased here: downstream keyframe plumbing types stay
+    // upstream-shaped, and resolveWildcardKeyframes resolves the nulls against
+    // the live value before the animation layer sees them.
+    return animate as DOMKeyframesDefinition
 }
 
 /**

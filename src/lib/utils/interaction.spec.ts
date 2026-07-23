@@ -292,7 +292,7 @@ describe('utils/interaction', () => {
             // preserve that resolution — the authored spring's type and
             // damping stay TOP-LEVEL on the channel's merged transition.
             tapTransition: { scale: { type: 'spring', damping: 10 } },
-            getSharedChannelValue: (key) => (key === 'scale' ? sharedScale : undefined)
+            getSharedChannelValue: (key: string) => (key === 'scale' ? sharedScale : undefined)
         } as never)
 
         expect(pressCallback).toBeTruthy()

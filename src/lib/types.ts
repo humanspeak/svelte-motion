@@ -195,6 +195,12 @@ export type AnimationControls = {
 
 export type MotionAnimate =
     | DOMKeyframesDefinition
+    // Per-channel `null` wildcard scalars (`animate={{ x: null }}` = "hold the
+    // current value") resolve against the live value at animation start — see
+    // resolveWildcardKeyframes. DOMKeyframesDefinition only admits `null`
+    // inside keyframe ARRAYS, so the documented scalar-hold idiom needs this
+    // explicit widening to be legal for consumers.
+    | { [K in keyof DOMKeyframesDefinition]: DOMKeyframesDefinition[K] | null }
     | string
     | string[]
     | AnimationControls
