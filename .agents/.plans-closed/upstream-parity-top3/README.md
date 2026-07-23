@@ -178,3 +178,9 @@ new path is already load-bearing, so its e2e suite (`e2e/reorder`,
 - Re-typing `AugmentedMotionValue` itself as `MotionValue<T> & {…}` — rejected
   in Plan 001's root-cause analysis: the class's private `current` collides
   with the public reactive `current`; the wrapper approach avoids the catch-22.
+
+## Batch close-out — 2026-07-23
+
+Verified on `origin/main` before archival: every plan row DONE with a PASS
+guard report, integration PRs merged (#442/#445/#446/#447 as applicable),
+and shipped artifacts spot-checked on HEAD. Moved to `.plans-closed`.

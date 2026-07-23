@@ -88,3 +88,9 @@ REJECTED (with one-line rationale)
 gitignored ESLint config owned by docs-kit; out of this repo's lint story
 (the plan adds a `disableTypeChecked` guard so root config can never apply
   typed rules there).
+
+## Batch close-out — 2026-07-23
+
+Verified on `origin/main` before archival: every plan row DONE with a PASS
+guard report, integration PRs merged (#442/#445/#446/#447 as applicable),
+and shipped artifacts spot-checked on HEAD. Moved to `.plans-closed`.
