@@ -109,6 +109,12 @@ export const attachWhileTap = (
          *  tracks tap/hover active state and lets hover and tap stop each
          *  other's in-flight animations so exactly one writer owns the element. */
         coordinator?: GestureCoordinator
+        /** Creation-time authored base values (e.g. `opacity`), captured at
+         *  rest — the same record the hover system threads into its baseline
+         *  computation. Without it, the orphaned-key restore on tap release
+         *  falls back to LIVE computed style, which on a slow frame reads a
+         *  mid-animation transient and settles the element short of rest. */
+        getBaseStyleValues?: () => Record<string, unknown>
     }
 ): (() => void) => {
     if (!whileTap) return () => {}
@@ -363,7 +369,8 @@ export const attachWhileTap = (
                 const hoverBaseline = computeHoverBaseline(el, {
                     initial,
                     animate: animateDef,
-                    whileHover: hoverKeyframes
+                    whileHover: hoverKeyframes,
+                    baseStyleValues: callbacks?.getBaseStyleValues?.()
                 })
                 for (const k of orphanedKeys) {
                     if (Object.prototype.hasOwnProperty.call(hoverBaseline, k)) {

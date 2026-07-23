@@ -2682,7 +2682,8 @@
                     : undefined,
                 hoverFallbackTransition: mergedTransition ?? {},
                 tapTransition: mergedTransition ?? {},
-                coordinator: gestureCoordinator
+                coordinator: gestureCoordinator,
+                getBaseStyleValues
             }
         )
     })
