@@ -289,8 +289,18 @@ export const attachWhileTap = (
         const baseIsDefined = Object.keys(baseObject).length > 0
         const merged: Record<string, unknown> = { default: base ? { ...baseObject } : {} }
         for (const key of keys) {
+            // Resolve the channel's transition the way motion-dom does
+            // (getValueTransition: transition[key] ?? transition.default ??
+            // transition) BEFORE attaching velocity. Spreading the whole base
+            // object here buried a value-specific override ({ scale: {...} })
+            // one level too deep, where motion-dom cannot see its type/damping
+            // — the authored spring silently degraded (adversarial-review
+            // finding).
             const channelBase = baseIsDefined
-                ? baseObject
+                ? ((baseObject[key] ?? baseObject.default ?? baseObject) as Record<
+                      string,
+                      unknown
+                  >)
                 : (getDefaultTransition(key, { keyframes: [0, 1] }) as Record<string, unknown>)
             merged[key] = { ...channelBase, velocity: velocities[key] }
         }
