@@ -167,12 +167,18 @@ test.describe('Hover→tap velocity continuity', () => {
                 await wait(400) // settle at tap 0.9 (held)
                 el.dispatchEvent(pe('pointerleave'))
                 await wait(400) // hover ends; scale stays tap-owned at 0.9
+                // Scan only the RELEASE window: the press-interrupt frame takes
+                // a legitimately large first spring step (~0.16 from 1.5 with
+                // carried velocity — that continuity is the FIRST test's job).
+                // The regression this test pins lived after the cancel: the
+                // frozen hover value re-emitting as a 0.59 one-frame snap.
+                const upIndex = series.length
                 window.dispatchEvent(pe('pointerup')) // cancel: released outside
                 await wait(700) // reset spring to base
                 clearInterval(sampler)
                 let maxStep = 0
                 let stepAt = -1
-                for (let i = 1; i < series.length; i++) {
+                for (let i = Math.max(1, upIndex - 1); i < series.length; i++) {
                     const step = Math.abs(series[i] - series[i - 1])
                     if (step > maxStep) {
                         maxStep = step
