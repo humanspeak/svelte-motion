@@ -169,10 +169,10 @@ export const attachWhileTap = (
 
     const cancelGesture = () => {
         if (gestureCtl) {
-            pwLog('[tap] cancel-gesture', {
-                currentTime: gestureCtl.currentTime,
+            pwLog('[tap] cancel-gesture', () => ({
+                currentTime: gestureCtl!.currentTime,
                 transform: getComputedStyle(el).transform
-            })
+            }))
         }
         try {
             // Use stop() instead of cancel(). cancel() reverts to the
@@ -243,13 +243,13 @@ export const attachWhileTap = (
     }
 
     const animateTap = () => {
-        pwLog('[tap] animate-tap', {
+        pwLog('[tap] animate-tap', () => ({
             w: el.getBoundingClientRect().width,
             h: el.getBoundingClientRect().height,
             transform: getComputedStyle(el).transform,
             whileTap,
             gestureActive: gestureCtl !== null
-        })
+        }))
         coordinator?.setActive('tap', true)
         cancelGesture()
         callbacks?.onTapStart?.()
@@ -262,11 +262,11 @@ export const attachWhileTap = (
         )
         Promise.resolve(gestureCtl?.finished)
             .then(() =>
-                pwLog('[tap] tap-applied', {
+                pwLog('[tap] tap-applied', () => ({
                     w: el.getBoundingClientRect().width,
                     h: el.getBoundingClientRect().height,
                     transform: getComputedStyle(el).transform
-                })
+                }))
             )
             .catch(() => {})
     }
@@ -297,11 +297,11 @@ export const attachWhileTap = (
             return false
         }
         const { keyframes, transition: hoverTransition } = splitHoverDefinition(callbacks.hoverDef)
-        pwLog('[tap] hover-reapply', {
+        pwLog('[tap] hover-reapply', () => ({
             keyframes,
             transform: getComputedStyle(el).transform,
             w: el.getBoundingClientRect().width
-        })
+        }))
         // Reapplying hover after a tap animates to the hover state, so it should
         // use the hover definition's own transition when provided, falling back
         // to the release transition (component prop → per-value defaults).
@@ -314,23 +314,23 @@ export const attachWhileTap = (
         )
         Promise.resolve(gestureCtl?.finished)
             .then(() =>
-                pwLog('[tap] hover-reapply-done', {
+                pwLog('[tap] hover-reapply-done', () => ({
                     w: el.getBoundingClientRect().width,
                     transform: getComputedStyle(el).transform
-                })
+                }))
             )
             .catch(() => {})
         return true
     }
 
     const animateReset = (success: boolean) => {
-        pwLog('[tap] animate-reset', {
+        pwLog('[tap] animate-reset', () => ({
             success,
             w: el.getBoundingClientRect().width,
             h: el.getBoundingClientRect().height,
             transform: getComputedStyle(el).transform,
             gestureActive: gestureCtl !== null
-        })
+        }))
         coordinator?.setActive('tap', false)
         if (success) callbacks?.onTap?.()
         else callbacks?.onTapCancel?.()
@@ -384,11 +384,11 @@ export const attachWhileTap = (
             )
             Promise.resolve(gestureCtl?.finished)
                 .then(() =>
-                    pwLog('[tap] reset-done', {
+                    pwLog('[tap] reset-done', () => ({
                         w: el.getBoundingClientRect().width,
                         h: el.getBoundingClientRect().height,
                         transform: getComputedStyle(el).transform
-                    })
+                    }))
                 )
                 .catch(() => {})
         }
@@ -396,17 +396,17 @@ export const attachWhileTap = (
 
     // Use press() for pointer + Enter key handling
     const cancelPress = press(el, () => {
-        pwLog('[tap] press-start', {
+        pwLog('[tap] press-start', () => ({
             w: el.getBoundingClientRect().width,
             transform: getComputedStyle(el).transform
-        })
+        }))
         animateTap()
         return (_endEvent: PointerEvent, { success }: { success: boolean }) => {
-            pwLog('[tap] press-end', {
+            pwLog('[tap] press-end', () => ({
                 success,
                 w: el.getBoundingClientRect().width,
                 transform: getComputedStyle(el).transform
-            })
+            }))
             animateReset(success)
         }
     })
@@ -419,10 +419,10 @@ export const attachWhileTap = (
         e.preventDefault()
         if (spaceActive) return
         spaceActive = true
-        pwLog('[tap] space-down', {
+        pwLog('[tap] space-down', () => ({
             w: el.getBoundingClientRect().width,
             transform: getComputedStyle(el).transform
-        })
+        }))
         animateTap()
     }
 
@@ -431,20 +431,20 @@ export const attachWhileTap = (
         e.preventDefault()
         if (!spaceActive) return
         spaceActive = false
-        pwLog('[tap] space-up', {
+        pwLog('[tap] space-up', () => ({
             w: el.getBoundingClientRect().width,
             transform: getComputedStyle(el).transform
-        })
+        }))
         animateReset(true)
     }
 
     const onBlur = () => {
         if (!spaceActive) return
         spaceActive = false
-        pwLog('[tap] blur', {
+        pwLog('[tap] blur', () => ({
             w: el.getBoundingClientRect().width,
             transform: getComputedStyle(el).transform
-        })
+        }))
         animateReset(false)
     }
 
