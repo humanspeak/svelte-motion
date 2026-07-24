@@ -103,3 +103,25 @@ unreachable-green by construction.
   plain function (never memoized). Recorded as a constraint in revision #4.
 - Landing + Steps 5–8 delegated back to the executor under revision #4;
   guard verifies the landed state at the next checkpoint.
+
+## Checkpoint 2026-07-24 #4 — STOP review (executor run 4, Steps 3 landed + 5 partial)
+
+- **Snapshot**: `dc2d197` (Step 3, guard-accepted), `91d31d9` (Step 5 partial),
+  `bc2c5be` (docs) on the working branch; tree clean; guard re-ran
+  `pnpm test:only` → 844 passed.
+- **Verdict**: **ON TRACK** (executor) + **PLAN AMENDED** (guard, revision #5).
+  The material finding is a GUARD DEFECT: the revision-#3/#4 Step-3 gate
+  omitted `e2e/utilities` (which the original Step-8 gate included), masking
+  3 real Step-3 regressions (reduced-motion policy ×2, transformTemplate
+  removal ×1). The executor found this adversarially — stashing its Step-5
+  work and re-running utilities at exactly `dc2d197` (7 failures there).
+  Checkpoint #3's ACCEPT ruling stands, but its gate basis was too narrow;
+  the acceptance is repaired by revision #5's Step 3h completion items rather
+  than reverted (the landed swap is still strictly closer to done and the
+  regressions are enumerated, owned, and gated).
+- **Step 5 partial accepted**: strictly-better-by-every-suite, labelled, with
+  the load-bearing props-vs-context inheritance model and the
+  never-skip-first-`animateChanges` constraint recorded in revision #5.
+- Current full-suite state: 280 passed / 7 failed = 2 documented 004
+  exclusions + 3 Step-3h items + 1 Step-5 remainder (stagger-interrupt) +
+  1 Step-7 subject (controls re-attach).

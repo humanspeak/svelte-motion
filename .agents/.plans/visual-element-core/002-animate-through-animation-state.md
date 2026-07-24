@@ -121,6 +121,46 @@
 >   (never a creation-time snapshot — empty under `initial={false}`);
 >   3f relative-keyframe memoization commits only when a live value was
 >   available.
+>
+> Revision 2026-07-24 #5 (guard, after executor STOP at `bc2c5be`): the
+> revision-#3/#4 Step-3 gate omitted `e2e/utilities` (present in the ORIGINAL
+> Step-8 gate) and masked three real Step-3 regressions. Guard defect, found
+> by the executor bisecting at `dc2d197`. Rulings:
+>
+> 1. **Step 5 partial (`91d31d9`) is ACCEPTED** — strictly better than
+>    `dc2d197` on every suite, clearly labelled. The props-vs-context split it
+>    implements is a binding constraint: an inheriting child keeps
+>    `props.animate` undefined (else `isControllingVariants` breaks
+>    `addVariantChild`) and seeds first paint via the `context` parameter
+>    (`{ animate: effectiveAnimate }`); the Svelte variant/custom stores STAY
+>    (they feed `effectiveCustom` and the context label).
+> 2. **New Step 3h (completion items)**: `e2e/utilities` joins Step 3's gate
+>    retroactively. Fix the three regressions it exposed:
+>    (a) reduced-motion policy — re-home `filterReducedMotionKeyframes` onto
+>    the VE path (filter the `animate`/`while*` definitions in
+>    `buildMotionNodeProps` so the animationState never sees transform
+>    channels under a reducing policy; `initialKeyframes` filtering already
+>    survives). Verify: both `motion-config-reduced-motion` specs.
+>    (b) transformTemplate removal — clearing the prop must drop the template
+>    from the next VE render. Verify: `transform-template` "removes
+>    transformTemplate if prop is removed".
+> 3. **Step 5 remainder** (`variants/stagger-interrupt`): the interrupted stop
+>    settles `latestValues` without a following render (cancelled ≠ completed,
+>    so no `AnimationComplete`). Pursue the executor's lead: flush via the
+>    `Update` event or a render on the stop/retarget path — NOT another
+>    `AnimationComplete` subscription. A manual `ve.scheduleRender()` provably
+>    corrects the DOM.
+> 4. **`utilities/animation-controls` "re-attaching idle controls"** is
+>    Step 7's subject and is a named allowed-failure until Step 7 lands —
+>    within this plan, not deferred across plans.
+> 5. **A first `animateChanges()` pass must NEVER be skipped** — motion-dom's
+>    private `isInitialRender` swallow (`animation-state.mjs:318-325`) depends
+>    on the pass running; skipping it makes the first real variant change get
+>    swallowed instead. No "already at target" shortcuts, ever.
+>
+> Completion order: 3h → Step 5 remainder → Steps 6, 7, 8. Step 8's full gate
+> = original suites, allowed failures ONLY the two 004-owned layout-button
+> specs.
 
 ## Status
 
