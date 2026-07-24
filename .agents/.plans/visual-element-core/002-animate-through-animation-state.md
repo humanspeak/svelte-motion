@@ -97,6 +97,30 @@
 > 5. Executor process note stands: never locate deletion boundaries in this
 >    3,600-line component by unanchored string index; take a WIP commit before
 >    large surgery.
+>
+> Revision 2026-07-24 #4 (guard, after executor STOP at `7cce600`): Step 3 is
+> ACCEPTED for landing from `plan002-step3-attempt` commit `e4fe515`
+> (cherry-pick it; gate result 157/159). The two failures —
+> `e2e/animate-presence/layout-button.spec.ts` "runs the interactive rolling
+> copy control" and "keeps rolling copy labels out of scaled ancestors during
+> the swap" — share one root cause: wait-mode key-change exit coordination,
+> which this plan's own Out-of-scope section and sub-item 3e defer to plan
+> 004 (`setActive('exit')` + presence registration). Ruling:
+>
+> - These two specs are DOCUMENTED KNOWN-FAILURES until plan 004 lands. They
+>   are excluded from Step 3's and Step 8's gates by name — nothing else in
+>   `e2e/animate-presence` may fail. Plan 004's done criteria now own them.
+> - Plan 004 is re-ordered to run IMMEDIATELY after 002, before 003, to keep
+>   the known-red window minimal (README updated).
+> - Executor findings recorded as constraints for later steps: the
+>   `renderedInlineStyle` animated-key slot MUST NOT be memoized (a `$derived`
+>   over mutable `latestValues` computes once and freezes — plain function
+>   only); optimized-appear requires `animateChanges` after
+>   `finishOptimizedAppearAnimation` (non-accelerated channels like `filter`
+>   depend on it); the 3e rewind targets the CURRENTLY resolved `initial`
+>   (never a creation-time snapshot — empty under `initial={false}`);
+>   3f relative-keyframe memoization commits only when a live value was
+>   available.
 
 ## Status
 

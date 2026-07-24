@@ -27,8 +27,11 @@ REJECTED (with one-line rationale)
 - 003 requires 002: gestures reduce to `setActive` only once the animation
   state owns rendering; deleting the gesture writers before that leaves
   while-props dead.
-- 004 requires 002 (exit is an animationState type); running after 003 avoids
-  re-testing gesture/exit priority interplay twice.
+- 004 requires 002 (exit is an animationState type). **Re-ordered by guard
+  (2026-07-24) to run BEFORE 003**: 002's writer swap landed with two
+  documented known-failing specs (`e2e/animate-presence/layout-button.spec.ts`)
+  whose fix IS 004's exit coordination — running 004 next keeps the known-red
+  window minimal. Execution order is now 001 → 002 → 004 → 003 → 005.
 - 005 last and deferrable: drag was recently rebuilt and signed off
   (#399–#415); a BLOCKED outcome with a clean report is acceptable.
 

@@ -15,9 +15,22 @@
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: MED
-- **Depends on**: 002-animate-through-animation-state.md (DONE); 003 recommended first but not required
+- **Depends on**: 002-animate-through-animation-state.md (DONE); runs BEFORE 003 (guard re-order 2026-07-24 — see revision note)
 - **Category**: tech-debt (architecture migration, GitHub issue #449)
 - **Planned at**: commit `7eba0bd`, 2026-07-24
+
+> Revision 2026-07-24 (guard, after 002's Step 3 landed): this plan now runs
+> immediately after 002 and OWNS two documented known-failing specs that
+> 002's writer swap exposed — `e2e/animate-presence/layout-button.spec.ts`
+> "runs the interactive rolling copy control" and "keeps rolling copy labels
+> out of scaled ancestors during the swap". Root cause (measured by the 002
+> executor): under `AnimatePresence mode="wait" initial={false}` with a
+> `key={stage}` child, the key-change exit half lands AFTER the enter and the
+> deferred re-enter never fires — the wait gate blocks enters on the node
+> that is simultaneously the exiting one. This is precisely the exit
+> coordination this plan wires (`setActive('exit')` + presence
+> register/onExitComplete). Making these two specs pass is added to the Done
+> criteria below; they are the acceptance test for Step 4's key-change work.
 
 ## Why this matters
 
@@ -199,7 +212,9 @@ callbacks' timing (`onAnimationStart`/`onAnimationComplete` order).
 
 - [ ] `pnpm check` exits 0; `trunk check` no new issues
 - [ ] `pnpm test:only` exits 0
-- [ ] `pnpm test:e2e e2e/animate-presence e2e/motion e2e/variants` exits 0
+- [ ] `pnpm test:e2e e2e/animate-presence e2e/motion e2e/variants` exits 0 —
+      INCLUDING the two `layout-button.spec.ts` specs inherited as known
+      failures from 002 (see revision note); they must pass with NO exclusions
 - [ ] `grep -n "setActive('exit'\|setActive(\"exit\"" src/lib` → present in
       `visualElementCore.ts` (feature) and/or container key-change path
 - [ ] Clone path untouched: `git diff 7eba0bd..HEAD -- src/lib/utils/presence.ts`

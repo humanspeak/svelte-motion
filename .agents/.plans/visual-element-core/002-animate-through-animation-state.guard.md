@@ -79,3 +79,27 @@ unreachable-green by construction.
    working branch, attempt preserved for cherry-pick). Disclosed process
    slip (two self-corrected file corruptions, never committed) — verified
    harmless via clean diffstat + green suite; lesson recorded in revision #3.
+
+## Checkpoint 2026-07-24 #3 — landing ruling (executor run 3, Step 3 complete)
+
+- **Snapshot**: working branch carries only `7cce600` (docs) since `37e59a0`;
+  guard verified tree clean + docs-only diff. Full Step 3 (incl. sub-items
+  3e/3f/3g) preserved at `plan002-step3-attempt` / `e4fe515`
+  (+522/−565, net −43 lines).
+- **Executor verdict**: **ON TRACK** — gate 157/159; the 2 failures are one
+  root cause (wait-mode key-change exit coordination) that the plan's
+  Out-of-scope section assigns to plan 004. Correct STOP rather than
+  improvising past the boundary.
+- **Guard ruling: ACCEPT-AND-LAND** (`PLAN AMENDED`, revision #4). Folding the
+  exit half into 002 would execute plan 004's core ad hoc; instead the two
+  specs become documented known-failures excluded BY NAME from 002's gates,
+  owned by 004's done criteria, and 004 is re-ordered before 003 to minimize
+  the known-red window. No other criterion weakened; the batch-level bar
+  (those specs pass before the batch completes) is unchanged.
+- **Correction to checkpoint #2's review**: the `renderedInlineStyle` collapse
+  approved there was correct in intent but carried a reactivity bug the
+  executor found and fixed itself — a `$derived` slot over mutable
+  `latestValues` computes once and freezes at the seed. The slot must be a
+  plain function (never memoized). Recorded as a constraint in revision #4.
+- Landing + Steps 5–8 delegated back to the executor under revision #4;
+  guard verifies the landed state at the next checkpoint.
