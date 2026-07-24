@@ -10,6 +10,30 @@
 > Plan 001 legitimately changed `_MotionContainer.svelte` and created
 > `visualElementCore.ts` — expect that. Any OTHER drift vs the excerpts below
 > is a STOP condition.
+>
+> Revision 2026-07-24 (guard, after plan 001 landed at `66a7af9`): three
+> findings from 001 change this plan's assumptions — read
+> `001-visual-element-foundation.guard.md` before starting.
+>
+> 1. `buildMotionNodeProps()` ALREADY carries `style` (001 had to include it:
+>    the projection adapter has always bound style onto the VE). Step 2's
+>    "add `style: styleProp`" is therefore already done; Step 2's real work is
+>    the rest (initial-inline-style source, removing the container's direct
+>    `styleEffect` subscription).
+> 2. The container creates the VE with `seedLatestValues: false` because
+>    `HTMLProjectionNode` holds `latestValues` BY REFERENCE and reads its
+>    transform keys as already-applied transforms. **This plan MUST flip
+>    `seedLatestValues` to `true` in the same step that makes the VE the
+>    renderer** (Step 2), and the layout/projection e2e suites
+>    (`e2e/layout e2e/projection`) must be added to that step's verify — a
+>    seeded-but-unrendered target corrupts projection measurement.
+> 3. Installed motion-dom 12.42.2 never calls `updateFeatures()` itself; the
+>    container calls it after mount (upstream `use-visual-element.ts:147`).
+>    The `animateChanges()` scheduling in Step 3 hooks in AFTER that existing
+>    call, mirroring upstream's effect ordering. Also: `MotionConfigProps`
+>    (our context) has no `skipAnimations` field — check how
+>    `MotionConfig.skipAnimations` actually reaches the runtime
+>    (`MotionGlobalConfig`?) before wiring it to the VE.
 
 ## Status
 
