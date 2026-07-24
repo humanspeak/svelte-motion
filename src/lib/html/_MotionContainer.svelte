@@ -917,6 +917,19 @@
                       // claim the DOM does not back. Landed atomically with the
                       // legacy-writer deletion — plan 002 Step 3.
                       seedLatestValues: true,
+                      // Inherited variant labels travel via `context`, NOT via
+                      // props — upstream's exact split (`use-visual-state.ts`
+                      // takes `props` and `MotionContext` separately).
+                      //
+                      // `props.animate` must stay undefined for an inheriting
+                      // child so `isControllingVariants` is false and
+                      // `addVariantChild` registers it for parent-driven
+                      // propagation. But `makeLatestValues` then has nothing to
+                      // seed from, so the child would first-paint unstyled. The
+                      // context supplies the label for SEEDING only, which is how
+                      // a stacked child renders correctly before its parent ever
+                      // animates. (plan 002 Step 5)
+                      context: { animate: effectiveAnimate },
                       // plan 004: presence context flows in here.
                       presenceContext: null,
                       reducedMotionConfig: motionConfig?.reducedMotion ?? 'never',
@@ -1881,13 +1894,19 @@
             }
         }
         if (isNotEmpty(values)) return values
-        // First-paint fallback. `initial={}` (or no `initial` at all) resolves to
-        // no seeded values, but this library deliberately pins the `animate`
-        // target's resting values into the very first paint so there is no flash
-        // of unstyled state — a documented deviation from upstream, pinned by
-        // `_MotionContainer.ssr.spec.ts` ("falls back to first animate keyframe").
-        // Harmless against the VE: an empty `latestValues` means the VE writes
-        // nothing, so there is no second writer to disagree with.
+        // First-paint fallback, for a node with its OWN `animate` only.
+        // `initial={}` (or no `initial`) resolves to no seeded values, but this
+        // library deliberately pins the `animate` target's resting values into the
+        // very first paint so there is no flash of unstyled state — a documented
+        // deviation from upstream, pinned by `_MotionContainer.ssr.spec.ts`
+        // ("falls back to first animate keyframe").
+        //
+        // It MUST NOT apply to a node that INHERITS its animate from a variant
+        // parent: such a child also starts with an empty `latestValues`, and
+        // pinning the inherited target here would snap it declaratively to the
+        // end state before the parent's propagated animation ever runs (measured:
+        // the notifications stack jumped instead of animating).
+        if (declarativeAnimateProp === undefined) return undefined
         return renderedAnimateBaseline
     }
 
@@ -2613,6 +2632,13 @@
             onAnimationStartProp?.(definition as DOMKeyframesDefinition | undefined)
         })
         const offComplete = visualElement.on('AnimationComplete', (definition) => {
+            // Flush one render on settle. An INTERRUPTED animation (a variant
+            // retargeted mid-flight) can land its final value without a
+            // subsequent render, leaving the element frozen at the frame the
+            // interrupt happened on while `latestValues` reads correct — measured
+            // on e2e/variants/stagger-interrupt. Scheduling here is idempotent:
+            // motion-dom coalesces onto the frameloop's render step.
+            visualElement.scheduleRender()
             if (animateControls) return
             onAnimationCompleteProp?.(definition as DOMKeyframesDefinition | undefined)
         })
@@ -3408,12 +3434,18 @@
             if (effectiveInitialProp === false && resolvedAnimate) {
                 // `initial={false}`: `blockInitialAnimation` is set and
                 // `makeLatestValues` seeded from `animate`'s last keyframe, so the
-                // element already renders at the target. Mark the first pass done
-                // so later prop changes still animate.
-                pwLog('[motion] path: initial=false, already at animate target')
-                firstAnimatePassDone = true
+                // element already renders at the target and nothing should move.
+                //
+                // The pass still has to RUN, though. `animateChanges` owns an
+                // `isInitialRender` flag and swallows the first pass when
+                // `props.initial === false` (animation-state.mjs:318-325); if we
+                // skip that pass entirely the flag stays true, and the first REAL
+                // variant change gets swallowed instead — the element records the
+                // new target in `prevResolvedValues` and never animates to it.
+                pwLog('[motion] path: initial=false, priming animationState at target')
                 dataPath = 5
                 isLoaded = 'ready'
+                runAnimation()
             } else if (isNotEmpty(initialKeyframes)) {
                 const canHandoffOptimizedAppear = hasOptimizedAppearAnimation(optimizedAppearId)
                 if (canHandoffOptimizedAppear) {
