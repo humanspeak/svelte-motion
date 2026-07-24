@@ -34,6 +34,31 @@
 >    (our context) has no `skipAnimations` field — check how
 >    `MotionConfig.skipAnimations` actually reaches the runtime
 >    (`MotionGlobalConfig`?) before wiring it to the VE.
+>
+> Revision 2026-07-24 #2 (guard, after executor STOP at `c6b336b`): the first
+> revision's "flip `seedLatestValues` in the same step that makes the VE the
+> renderer" was correct as a constraint but unsatisfiable in Step 2 — Step 2
+> only makes the VE the renderer of style MotionValues; animated keys are only
+> VE-driven once `animateChanges()` runs AND the legacy WAAPI writer is gone.
+> A seeded-but-undriven `latestValues` freezes at the `initial` target and any
+> VE render writes it to the DOM (measured: exit clone at 2.36px vs 128px live
+> box). Consequences, now reflected in the rewritten Steps 2–4 below:
+>
+> - The style-MotionValue slice of Step 2 is ALREADY LANDED (`36adbca`) and
+>   verified. Do not redo it.
+> - `seedLatestValues: true` + `scheduleRenderMicrotask()` (both call sites
+>   carry `// plan 002 STOP` comments) move into the new ATOMIC Step 3 and
+>   must land in the same commit that wires `animateChanges()` AND deletes the
+>   legacy declarative writers. No intermediate commit may exist where
+>   `latestValues` is seeded but not driven.
+> - `skipAnimations` is answered: this library has no `MotionConfig.skipAnimations`
+>   prop (`MotionConfigProps` = `transition` + `reducedMotion` only, `types.ts:783`);
+>   `MotionGlobalConfig` is a user-facing re-export. The VE option stays
+>   threaded-but-unset. Nothing to wire.
+> - Line references in "Current state" are shifted ~+123 by plan 001. Current
+>   locations: `executeAnimation` :2216, `runAnimation` :2422, re-run effects
+>   :3290–3375, mount/enter effect :3376–3553, `renderedInlineStyle`
+>   :1803–1855, controls helpers :1398/:1469/:1540/:1600.
 
 ## Status
 
@@ -191,54 +216,60 @@ this plan must end with identical results.
 **Verify**: `pnpm test:only` and the two e2e commands above → record results;
 all expected to pass.
 
-### Step 2: Bind style + animated values to the VE
+### Step 2: Bind style MotionValues to the VE — ALREADY LANDED (`36adbca`)
 
-In `buildMotionNodeProps()` (from plan 001), add `style: styleProp` so
-`updateMotionValuesFromProps`/scraping binds user MotionValues to the VE. Move
-the initial-inline-style source for the CLIENT render to
-`visualState.latestValues` (keep the existing SSR serialization path untouched
-— it runs where no VE exists). Remove the container's direct
-`styleEffect`/`applyMotionStyleEffect` subscription (`:638-649`) — the VE's
-`bindToMotionValue` now schedules renders on value changes. Keep `svgEffect`
-for attr-only SVG values until Step 6.
+(Rewritten by guard revision #2.) The style-MotionValue slice is done and
+verified: `styleEffect`/`applyMotionStyleEffect` demoted to the no-VE fallback,
+`transformTemplate` carried in `buildMotionNodeProps()`. Confirm it is present
+(`git log --oneline | grep 36adbca`) and do not redo it. `svgEffect` for
+attr-only SVG values stays until Step 6.
 
-**Verify**: `pnpm test:only src/lib/html/_MotionContainer.ssr.spec.ts` → passes
-unchanged; `pnpm test:e2e e2e/vanilla-values e2e/utilities` → all pass.
+**Verify**: `pnpm test:only src/lib/html/_MotionContainer.ssr.spec.ts` →
+passes; `pnpm test:e2e e2e/vanilla-values e2e/utilities` → all pass.
 
-### Step 3: Call `animateChanges()` on the upstream schedule
+### Step 3: The writer swap — ATOMIC (seed + animateChanges + legacy deletion)
 
-Add to the container: after `ve.update(...)` in the props effect (and once
-after mount), call `ve.animationState?.animateChanges()` — but gate the FIRST
-call behind the existing wait-mode deferral: where `runAnimation()` today
-defers via the AnimatePresence context (`:2335-2429`), defer the first
-`animateChanges()` identically, and when unblocking honor the CLAUDE.md wait-mode
-rule (mark enter handled before flipping loaded state). `initial={false}` maps
-to `blockInitialAnimation: true` at VE creation (plan 001 already plumbed the
-option; set it from `effectiveInitialProp === false || parentInitialFalse`).
+(Rewritten by guard revision #2 after the `c6b336b` STOP.) These four changes
+land in ONE commit; no intermediate state is green, by construction — a seeded
+`latestValues` that nothing drives freezes at the `initial` target and any VE
+render writes it to the DOM.
 
-Do NOT delete the legacy paths yet — put the new call behind a module-level
-`const USE_ANIMATION_STATE = true` flag and the legacy calls behind its
-negation, so a single flag flip reverts during review.
+a. Flip `seedLatestValues: true` and enable `scheduleRenderMicrotask()` after
+`updateFeatures()` — both call sites are marked `// plan 002 STOP` in
+`_MotionContainer.svelte`.
+b. Wire `ve.animationState?.animateChanges()` on the upstream schedule: once
+after mount + `updateFeatures()`, and after each `ve.update(...)` in the
+props effect. Gate the FIRST call behind the existing wait-mode deferral
+(where `runAnimation()` defers via the AnimatePresence context, `:2422`),
+honoring the CLAUDE.md wait-mode rule (mark enter handled before flipping
+loaded state). `initial={false}` maps to `blockInitialAnimation: true` at
+VE creation (set from `effectiveInitialProp === false || parentInitialFalse`).
+c. Delete the legacy declarative writers: `executeAnimation` (`:2216`),
+`runAnimation`'s animation body (`:2422`, keep the wait-gate now wrapping
+`animateChanges`), the re-run JSON-dedup effects (`:3290-3375`), the
+duration-0 snaps in the mount/enter effect (`:3376-3553`), and
+`applyAnimateRestingStyle`.
+d. Collapse `renderedInlineStyle` (`:1803-1855`) for ANIMATED keys only. It
+must RETAIN, untouched: the `liveGestureTransform` splice (gestures stay
+legacy until plan 003), the wait-mode `display:none` holds, and the
+`pathLength` mounting visibility hold. What goes: the enter/animate/
+controls slot logic for keys the animationState now owns.
 
-**Verify**: `pnpm test:e2e e2e/motion` → all pass.
-
-### Step 4: Retire the legacy declarative writers
-
-With Step 3 green: delete the legacy branches — `executeAnimation`,
-`runAnimation`'s animation body (keep the wait-gate, now wrapping
-`animateChanges`), the re-run JSON-dedup effects (`:3165-3250`), the duration-0
-snaps in the mount effect, `applyAnimateRestingStyle`, and collapse
-`renderedInlineStyle` (`:1716-1766`) to: SSR/mount-phase initial style only
-(visibility/display holds for wait mode stay). Delete the
-`USE_ANIMATION_STATE` flag (legacy path gone). Keep `onAnimationStart`/
-`onAnimationComplete` firing — the VE emits `AnimationStart`/`AnimationComplete`
-events; subscribe via `ve.on('AnimationStart', ...)` in the container.
+Keep `onAnimationStart`/`onAnimationComplete` firing — subscribe via
+`ve.on('AnimationStart', ...)` / `ve.on('AnimationComplete', ...)`.
 
 `grep -n "duration: 0" src/lib/html/_MotionContainer.svelte` afterward — every
 remaining hit must be justified in your report (expected: none in the
 enter/animate paths).
 
-**Verify**: `pnpm test:only` → all pass; `pnpm test:e2e e2e/motion e2e/variants` → all pass.
+**Verify** (full gate for this step — it is the swap):
+`pnpm test:only` → all pass; SSR pin passes unchanged;
+`pnpm test:e2e e2e/motion e2e/variants e2e/layout e2e/projection e2e/animate-presence`
+→ all pass. If `e2e/motion/exit-animation.spec.ts` fails on clone sizing, the
+seed is being rendered before animateChanges drives it — re-check ordering
+before anything else.
+
+### Step 4: (merged into Step 3 by guard revision #2 — no separate work)
 
 ### Step 5: Variant tree inheritance through the VE
 
