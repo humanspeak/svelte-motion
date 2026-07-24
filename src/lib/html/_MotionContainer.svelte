@@ -408,6 +408,98 @@
     // than constructing its own.
 
     /**
+     * Read the element's current numeric value for an animate channel, for
+     * {@link resolveWildcardKeyframes}. Transform channels (`x`/`y`/`scale`/
+     * `rotate`) come from the decomposed computed matrix via the shared
+     * `readTransformChannels` reader; other channels (e.g. `opacity`) come from
+     * computed style. Returns `undefined` when no numeric value is available (a
+     * color, a `var(...)`, a 3D matrix, or a channel this reader does not own),
+     * in which case the wildcard/relative passes through unchanged — the
+     * documented numeric bound.
+     */
+    const readLiveChannelValue = (key: string): number | undefined => {
+        if (!element) return undefined
+        if (key === 'x' || key === 'y' || key === 'scale' || key === 'rotate') {
+            const channels = readTransformChannels(element)
+            return channels ? channels[key] : undefined
+        }
+        const computed = getComputedStyle(element)[key as keyof CSSStyleDeclaration] as
+            | string
+            | number
+            | undefined
+        const parsed = typeof computed === 'number' ? computed : Number.parseFloat(String(computed))
+        return Number.isFinite(parsed) ? parsed : undefined
+    }
+
+    /** Memo so a given raw definition resolves its relatives exactly once. */
+    let relativeResolvedSourceJson: string | undefined = undefined
+    let relativeResolvedAnimate: Record<string, unknown> | undefined = undefined
+    /**
+     * Mutable mirror of `visualElement`, assigned right after it is created.
+     *
+     * `buildMotionNodeProps()` runs INSIDE the `visualElement` initializer, so
+     * touching that `const` from here would hit its temporal dead zone and throw
+     * (a ReferenceError that blanks the whole component).
+     */
+    let visualElementForRelatives: { latestValues: Record<string, unknown> } | null = null
+
+    /**
+     * Resolve `'+=N'` / `'-=N'` relative keyframes into concrete values before
+     * the animationState sees them.
+     *
+     * Relative keyframes are a svelte-motion extension: motion-dom's
+     * `fillWildcards` resolves `null` wildcards but has NO relative-value
+     * concept, so a `'+=50'` handed to `animateChanges()` never resolves and the
+     * channel silently holds. The former `executeAnimation` resolved them right
+     * before animating; this does the same job at the point props are (re)built.
+     *
+     * Resolution is memoized on the RAW definition: a relative must resolve
+     * against the value the animation starts FROM, exactly once. Re-resolving on
+     * every props rebuild would offset from the post-animation value and keep
+     * re-adding (the #453 regression this memo exists to prevent).
+     *
+     * @param definition The raw `animate` definition.
+     * @returns The definition with relatives resolved, or it unchanged.
+     */
+    const resolveRelativeAnimate = (definition: unknown): unknown => {
+        if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
+            return definition
+        }
+        const raw = definition as Record<string, unknown>
+        const isRelative = (v: unknown) => typeof v === 'string' && /^[+-]=/.test(v)
+        const hasRelative = Object.values(raw).some((value) =>
+            Array.isArray(value) ? value.some(isRelative) : isRelative(value)
+        )
+        if (!hasRelative) return definition
+
+        const sourceJson = JSON.stringify(raw)
+        if (relativeResolvedSourceJson === sourceJson && relativeResolvedAnimate) {
+            return relativeResolvedAnimate
+        }
+        // Did we actually have a value to offset from? At VE-creation time there
+        // is no node and no element yet, so nothing resolves — leave the raw
+        // definition alone and let the post-mount props pass resolve it, rather
+        // than memoizing an unresolved passthrough forever.
+        let didResolve = false
+        const resolved = resolveWildcardKeyframes(raw as DOMKeyframesDefinition, (key) => {
+            // Prefer the VisualElement's own live value — it is the value the
+            // animation will start from (the seeded `initial` on the first pass).
+            const fromNode = visualElementForRelatives?.latestValues?.[key]
+            const fromNodeNumber =
+                typeof fromNode === 'number' ? fromNode : Number.parseFloat(String(fromNode))
+            const live = Number.isFinite(fromNodeNumber)
+                ? fromNodeNumber
+                : readLiveChannelValue(key)
+            if (live !== undefined) didResolve = true
+            return live
+        }) as Record<string, unknown> | undefined
+        if (!resolved || !didResolve) return definition
+        relativeResolvedSourceJson = sourceJson
+        relativeResolvedAnimate = resolved
+        return relativeResolvedAnimate
+    }
+
+    /**
      * The props motion-dom reads off this node.
      *
      * `style` is carried through because the projection adapter has always
@@ -420,12 +512,21 @@
     const buildMotionNodeProps = (includeStyle = true): MotionNodeOptions =>
         ({
             ...(includeStyle ? { style: styleProp } : {}),
-            initial: initialProp,
-            // Declarative targets only — svelte-motion's animation-controls
-            // objects are not upstream `AnimationControls`. plan 002.
-            animate: isAnimationControls(animateProp) ? undefined : animateProp,
+            // The EFFECTIVE values, not the raw props: `animationState` resolves
+            // variants off `visualElement.props`, so it must see the same
+            // presence/parent-resolved `initial`, the same inherited variant
+            // label and the same `custom` the legacy writer used. (plan 002)
+            initial: effectiveInitialProp,
+            // The node's OWN animate only. Passing the INHERITED variant label
+            // here would make `isControllingVariants(props)` true, which stops
+            // motion-dom registering this node as a variant CHILD
+            // (`addVariantChild` requires `isVariantNode && !isControllingVariants`)
+            // — killing parent-driven propagation and `staggerChildren`.
+            // `animateChanges` reads the inherited label itself, from
+            // `getVariantContext(visualElement.parent)`.
+            animate: animateControls ? undefined : resolveRelativeAnimate(declarativeAnimateProp),
             variants: variantsProp,
-            custom: customProp,
+            custom: effectiveCustom,
             transition: mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {}),
             whileHover: whileHoverProp,
             whileTap: whileTapProp,
@@ -439,58 +540,6 @@
             exit: exitProp,
             layoutId: scopedLayoutId
         }) as MotionNodeOptions
-
-    const visualElementParent = typeof window !== 'undefined' ? getVisualElementParent() : undefined
-    // `untrack`: the node is created ONCE with the props of this render, the
-    // way upstream's `useConstant(makeState)` does (use-visual-state.ts:135).
-    // Later prop changes flow through the update effect below, not by
-    // rebuilding the node.
-    const visualElement =
-        typeof window !== 'undefined'
-            ? untrack(() =>
-                  createMotionVisualElement({
-                      // No `style` at creation: the adapter used to construct
-                      // its node with `props: {}` and bind the style
-                      // MotionValues on its first `updateOptions`, so seeding
-                      // them into `latestValues` here would move that write
-                      // earlier than it has ever happened.
-                      props: buildMotionNodeProps(false),
-                      parent: visualElementParent,
-                      // plan 002 STOP (see 002 report): seeding must wait for the
-                      // step that makes the VE the renderer OF ANIMATED KEYS.
-                      // Plan 002's Step 2 only makes it the renderer of style
-                      // MotionValues; `animationState` does not own
-                      // `latestValues` until animateChanges() drives it (Step 3)
-                      // and the legacy WAAPI writer is deleted (Step 4). Seeded
-                      // here, `latestValues` stays frozen at the `initial`
-                      // target while WAAPI animates the DOM, so the next VE
-                      // render writes a stale `scale(0)`/`opacity:0` and the
-                      // exit clone measures 2.36px instead of 128px.
-                      seedLatestValues: false,
-                      // plan 004: presence context flows in here.
-                      presenceContext: null,
-                      reducedMotionConfig: motionConfig?.reducedMotion ?? 'never',
-                      isSVG: isSVGTag(String(tag))
-                  })
-              )
-            : null
-    if (visualElement) {
-        setVisualElementParent(visualElement)
-    }
-
-    const motionDomProjectionParent =
-        typeof window !== 'undefined' ? getMotionDomProjectionParent() : null
-    const motionDomProjection =
-        typeof window !== 'undefined'
-            ? new MotionDomProjectionAdapter({
-                  parent: motionDomProjectionParent,
-                  getBaseTransform: () => userBaseTransform,
-                  visualElement: visualElement ?? undefined
-              })
-            : null
-    if (motionDomProjection) {
-        setMotionDomProjectionParent(motionDomProjection)
-    }
 
     // Public `onProjectionUpdate` fan-out (#379). Emits the same payload the
     // retired legacy ProjectionNode did: page-space boxes measured with
@@ -838,6 +887,68 @@
         localCustomStore.set(effectiveCustom)
     })
 
+    // ── The single motion-dom VisualElement for this component (#449) ────────
+    //
+    // Declared HERE, after `effectiveInitialProp` / `effectiveAnimate` /
+    // `effectiveCustom`, because `createAnimationState` resolves variants off
+    // `visualElement.props` and must see the same resolved values the legacy
+    // writer saw. `visualElementStore` is a `WeakMap<instance, VisualElement>`
+    // written in `VisualElement.mount()`, so there is exactly one node per
+    // element and the projection adapter is handed this instance.
+    const visualElementParent = typeof window !== 'undefined' ? getVisualElementParent() : undefined
+    // `untrack`: the node is created ONCE with the props of this render, the
+    // way upstream's `useConstant(makeState)` does (use-visual-state.ts:135).
+    // Later prop changes flow through the update effect below, not by
+    // rebuilding the node.
+    const visualElement =
+        typeof window !== 'undefined'
+            ? untrack(() =>
+                  createMotionVisualElement({
+                      // No `style` at creation: the adapter used to construct
+                      // its node with `props: {}` and bind the style
+                      // MotionValues on its first `updateOptions`, so seeding
+                      // them into `latestValues` here would move that write
+                      // earlier than it has ever happened.
+                      props: buildMotionNodeProps(false),
+                      parent: visualElementParent,
+                      // `latestValues` is authoritative now: `animationState`
+                      // drives it (animateChanges below) and the VE renders it,
+                      // so the seed is the real starting state rather than a
+                      // claim the DOM does not back. Landed atomically with the
+                      // legacy-writer deletion — plan 002 Step 3.
+                      seedLatestValues: true,
+                      // plan 004: presence context flows in here.
+                      presenceContext: null,
+                      reducedMotionConfig: motionConfig?.reducedMotion ?? 'never',
+                      isSVG: isSVGTag(String(tag))
+                  })
+              )
+            : null
+    if (visualElement) {
+        visualElementForRelatives = visualElement
+        // `initial={false}` (own prop, inherited, or a presence re-entry that
+        // must not replay) means "start AT the animate target".
+        // `makeLatestValues` already seeded from `animate`'s LAST keyframe
+        // because `props.initial === false`; this flag stops `animateChanges`
+        // animating on the first pass.
+        visualElement.blockInitialAnimation = effectiveInitialProp === false
+        setVisualElementParent(visualElement)
+    }
+
+    const motionDomProjectionParent =
+        typeof window !== 'undefined' ? getMotionDomProjectionParent() : null
+    const motionDomProjection =
+        typeof window !== 'undefined'
+            ? new MotionDomProjectionAdapter({
+                  parent: motionDomProjectionParent,
+                  getBaseTransform: () => userBaseTransform,
+                  visualElement: visualElement ?? undefined
+              })
+            : null
+    if (motionDomProjection) {
+        setMotionDomProjectionParent(motionDomProjection)
+    }
+
     $effect(() => {
         if (!variantsProp) return localVariantStore.set(undefined)
         if (typeof declarativeAnimateProp === 'string')
@@ -991,61 +1102,9 @@
         for (const key of keys) willChange.add(key)
     }
 
-    const applyAnimateRestingStyle = (resolvedTarget?: Record<string, unknown>) => {
-        if (!element) return
-        if (!animateKeyframes) return
-        const { target, transitionEnd } = extractTargetTransition(animateKeyframes)
-        // Prefer the payload the animation ACTUALLY ran (wildcards/relatives
-        // already resolved against the pre-animation live value). Recomputing
-        // from the raw definition here settled `x: null` to null and '+=50'
-        // unapplied (adversarial-review finding). The wildcard-only safety net
-        // below covers call sites with no resolved payload (optimized appear):
-        // at settle the live value IS the held value, so null→live is
-        // idempotent — but relatives must NOT re-resolve against the
-        // post-animation value (they would re-add), so any still-unresolved
-        // entry is dropped instead of serialized.
-        const mergedRaw = {
-            ...getResolvedStyleTransformValues(),
-            ...(resolvedTarget ?? target),
-            ...(transitionEnd ?? {})
-        } as Record<string, unknown>
-        const wildcardResolved = resolveWildcardKeyframes(
-            mergedRaw as DOMKeyframesDefinition,
-            readLiveChannelValue
-        ) as Record<string, unknown> | undefined
-        const sanitized: Record<string, unknown> = {}
-        for (const [key, value] of Object.entries(wildcardResolved ?? mergedRaw)) {
-            if (
-                !isUnresolvedKeyframeValue(value) &&
-                !(typeof value === 'string' && /^[+-]=/.test(value))
-            ) {
-                sanitized[key] = value
-            }
-        }
-        const restingValues = resolveRestingValues(
-            sanitized as DOMKeyframesDefinition | undefined
-        ) as Record<string, unknown> | undefined
-        if (!restingValues) return
-        lastAnimateRestingValues = restingValues
-        lastAnimateRestingJson = JSON.stringify(restingValues)
-        lastAnimateSourceJson = JSON.stringify(animateKeyframes)
-        element.setAttribute(
-            'style',
-            mergeInlineStyles(
-                element.getAttribute('style') ?? '',
-                undefined,
-                restingValues,
-                transformTemplateProp
-            )
-        )
-    }
-    const isJsdomRuntime = (): boolean =>
-        typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)
-    const getTransitionFallbackMs = (transition: AnimationOptions | undefined): number => {
-        const duration = typeof transition?.duration === 'number' ? transition.duration : 0
-        const delay = typeof transition?.delay === 'number' ? transition.delay : 0
-        return Math.max(0, (duration + delay) * 1000)
-    }
+    // `isJsdomRuntime` / `getTransitionFallbackMs` are gone with the legacy
+    // writer: they existed only to fake an animation-complete timer under jsdom,
+    // where WAAPI never finishes. The animationState resolves its own promises.
     let cleanupSVGPathAttributeEffect: (() => void) | null = null
 
     /**
@@ -1297,15 +1356,6 @@
         return values
     }
 
-    const getResolvedStyleTransformValues = (): Record<string, unknown> => {
-        const values: Record<string, unknown> = {}
-        for (const key of templatedTransformKeys) {
-            const value = getMotionStyleInitialValue(key)
-            if (value !== undefined) values[key] = value
-        }
-        return values
-    }
-
     const animateTemplatedTransformPayload = (
         payload: Record<string, unknown>,
         transition: AnimationOptions,
@@ -1374,30 +1424,6 @@
                 templatedTransformAnimationCleanup = null
                 onComplete(payload)
             })
-    }
-
-    /**
-     * Read the element's current numeric value for an animate channel, for
-     * {@link resolveWildcardKeyframes}. Transform channels (`x`/`y`/`scale`/
-     * `rotate`) come from the decomposed computed matrix via the shared
-     * `readTransformChannels` reader; other channels (e.g. `opacity`) come from
-     * computed style. Returns `undefined` when no numeric value is available (a
-     * color, a `var(...)`, a 3D matrix, or a channel this reader does not own),
-     * in which case the wildcard/relative passes through unchanged — the
-     * documented numeric bound.
-     */
-    const readLiveChannelValue = (key: string): number | undefined => {
-        if (!element) return undefined
-        if (key === 'x' || key === 'y' || key === 'scale' || key === 'rotate') {
-            const channels = readTransformChannels(element)
-            return channels ? channels[key] : undefined
-        }
-        const computed = getComputedStyle(element)[key as keyof CSSStyleDeclaration] as
-            | string
-            | number
-            | undefined
-        const parsed = typeof computed === 'number' ? computed : Number.parseFloat(String(computed))
-        return Number.isFinite(parsed) ? parsed : undefined
     }
 
     const resolveAnimationControlsDefinition = (
@@ -1816,56 +1842,117 @@
     const waitEnterBlockedBeforeMount = $derived(
         context?.mode === 'wait' && !waitEnterReleased && context.isEnterBlocked(presenceKey)
     )
+    // The three holds this string carries are RETAINED verbatim through the
+    // plan-002 collapse — none of them is an animated-key concern:
+    //   1. the `liveGestureTransform` splice (gestures stay legacy until 003),
+    //   2. the wait-mode `display:none` holds,
+    //   3. the `pathLength` mounting `visibility:hidden` hold.
+    const inlineStyleBaseWithHolds = $derived(
+        `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleWithLiveGestureTransform};visibility:hidden` : serializedStyleWithLiveGestureTransform}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`
+    )
+
+    /**
+     * The declarative style slot for keys the animationState owns.
+     *
+     * Upstream's renderer builds its style attribute FROM `latestValues`
+     * (`framer-motion/src/render/html/use-props.ts:21-32`), which is what keeps
+     * React's declarative write and the VisualElement's per-frame imperative
+     * write in agreement. This is the Svelte equivalent: whenever Svelte
+     * rewrites the `style` attribute (a hold flips, the style prop changes, a
+     * gesture transform splices in) it re-reads the CURRENT `latestValues`, so a
+     * rewrite can never clobber the animated state back to a stale target.
+     *
+     * Deliberately a PLAIN FUNCTION, not a `$derived`: `latestValues` is a plain
+     * mutable object, so reading it registers no Svelte dependency. A `$derived`
+     * whose only deps are non-reactive would compute once and freeze at the
+     * seeded `initial` forever, and every later style-attribute rewrite would
+     * clobber the animated state back to that stale target. Called from inside
+     * `renderedInlineStyle` instead, so it re-samples on each rewrite.
+     */
+    const readAnimationStateStyleSlot = (): Record<string, unknown> | undefined => {
+        if (!visualElement) return undefined
+        const values: Record<string, unknown> = { ...visualElement.latestValues }
+        // A live gesture transform is spliced into the base string above and
+        // must win: drop the transform channels so the merge cannot override it
+        // with the resting composition. (Gestures move onto the VE in plan 003.)
+        if (liveGestureTransform) {
+            for (const key of Object.keys(values)) {
+                if (transformProps.has(key)) delete values[key]
+            }
+        }
+        if (isNotEmpty(values)) return values
+        // First-paint fallback. `initial={}` (or no `initial` at all) resolves to
+        // no seeded values, but this library deliberately pins the `animate`
+        // target's resting values into the very first paint so there is no flash
+        // of unstyled state — a documented deviation from upstream, pinned by
+        // `_MotionContainer.ssr.spec.ts` ("falls back to first animate keyframe").
+        // Harmless against the VE: an empty `latestValues` means the VE writes
+        // nothing, so there is no second writer to disagree with.
+        return renderedAnimateBaseline
+    }
+
     const renderedInlineStyle = $derived.by(() =>
-        mergeInlineStyles(
-            `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleWithLiveGestureTransform};visibility:hidden` : serializedStyleWithLiveGestureTransform}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`,
-            // The "from" slot: apply initialKeyframes as inline styles during
-            // the mounting/initial phases (before the WAAPI animation locks
-            // its from-value and we promote to 'ready' — see the lifecycle
-            // around the enter rAF). mergeInlineStyles prefers this slot when
-            // non-empty, so it wins over the animate slot below in these phases.
-            isLoaded === 'mounting' || isLoaded === 'initial' ? initialKeyframes : undefined,
-            // The "target" slot. Only AFTER the enter animation completes does
-            // the target become the inline baseline, so the element holds it
-            // once WAAPI surrenders the property (default fill:'none' would
-            // otherwise leave transform:none). It must NOT be applied during
-            // the run: flipping the inline value to the target mid-animation
-            // shows the target for the one frame the inline changes (a visible
-            // snap), since WAAPI's composite doesn't override that exact frame.
-            // While the animation runs we keep the original behavior — initial
-            // keyframes own the inline (via the slot above), or, with no
-            // initial, the animate values seed the inline as the from. Resting
-            // values collapse keyframe arrays to their last element
-            // (animate={{x:[0,100,50]}} rests at 50). (#377)
-            enterAnimationSettled
-                ? // Controls-driven elements settle on the last imperative
-                  // target, not the (empty) declarative baseline — otherwise
-                  // the template rewrite wipes a non-neutral final transform
-                  // (e.g. a variant ending at scaleX 0.66 snaps to identity).
-                  animateControls && animationControlsHasReceivedCommand
-                    ? lastAnimationControlsTarget
-                    : renderedAnimateBaseline
-                : animateControls &&
-                    !animationControlsHasReceivedCommand &&
-                    isNotEmpty(initialKeyframes)
-                  ? initialKeyframes
-                  : animateControls && animationControlsHasReceivedCommand
-                    ? // First-ever in-flight command: no target/stop snapshot
-                      // exists yet (lastAnimationControlsTarget is undefined
-                      // until applyAnimationControlsTarget/stop runs). Falling
-                      // through to a neutral base here wipes the idle from-value
-                      // exactly as WAAPI captures it, so the first animation runs
-                      // e.g. 1->1 instead of 0.16->1. Hold the idle keyframes as
-                      // the inline base until a real snapshot supersedes them.
-                      (lastAnimationControlsTarget ??
-                      (isNotEmpty(initialKeyframes) ? initialKeyframes : undefined))
-                    : isNotEmpty(initialKeyframes)
-                      ? !effectiveAnimate
-                          ? initialKeyframes
-                          : undefined
-                      : renderedAnimateBaseline,
-            transformTemplateProp
-        )
+        // Imperative animation controls are NOT owned by the animationState yet
+        // (Step 7 bridges them), so their slot machinery is retained verbatim in
+        // the second branch. Everything else reads `latestValues`. SSR has no
+        // VisualElement and also takes the second branch, keeping the
+        // server-rendered style byte-identical.
+        !animateControls && visualElement
+            ? mergeInlineStyles(
+                  inlineStyleBaseWithHolds,
+                  undefined,
+                  readAnimationStateStyleSlot(),
+                  transformTemplateProp
+              )
+            : mergeInlineStyles(
+                  inlineStyleBaseWithHolds,
+                  // The "from" slot: apply initialKeyframes as inline styles during
+                  // the mounting/initial phases (before the WAAPI animation locks
+                  // its from-value and we promote to 'ready' — see the lifecycle
+                  // around the enter rAF). mergeInlineStyles prefers this slot when
+                  // non-empty, so it wins over the animate slot below in these phases.
+                  isLoaded === 'mounting' || isLoaded === 'initial' ? initialKeyframes : undefined,
+                  // The "target" slot. Only AFTER the enter animation completes does
+                  // the target become the inline baseline, so the element holds it
+                  // once WAAPI surrenders the property (default fill:'none' would
+                  // otherwise leave transform:none). It must NOT be applied during
+                  // the run: flipping the inline value to the target mid-animation
+                  // shows the target for the one frame the inline changes (a visible
+                  // snap), since WAAPI's composite doesn't override that exact frame.
+                  // While the animation runs we keep the original behavior — initial
+                  // keyframes own the inline (via the slot above), or, with no
+                  // initial, the animate values seed the inline as the from. Resting
+                  // values collapse keyframe arrays to their last element
+                  // (animate={{x:[0,100,50]}} rests at 50). (#377)
+                  enterAnimationSettled
+                      ? // Controls-driven elements settle on the last imperative
+                        // target, not the (empty) declarative baseline — otherwise
+                        // the template rewrite wipes a non-neutral final transform
+                        // (e.g. a variant ending at scaleX 0.66 snaps to identity).
+                        animateControls && animationControlsHasReceivedCommand
+                          ? lastAnimationControlsTarget
+                          : renderedAnimateBaseline
+                      : animateControls &&
+                          !animationControlsHasReceivedCommand &&
+                          isNotEmpty(initialKeyframes)
+                        ? initialKeyframes
+                        : animateControls && animationControlsHasReceivedCommand
+                          ? // First-ever in-flight command: no target/stop snapshot
+                            // exists yet (lastAnimationControlsTarget is undefined
+                            // until applyAnimationControlsTarget/stop runs). Falling
+                            // through to a neutral base here wipes the idle from-value
+                            // exactly as WAAPI captures it, so the first animation runs
+                            // e.g. 1->1 instead of 0.16->1. Hold the idle keyframes as
+                            // the inline base until a real snapshot supersedes them.
+                            (lastAnimationControlsTarget ??
+                            (isNotEmpty(initialKeyframes) ? initialKeyframes : undefined))
+                          : isNotEmpty(initialKeyframes)
+                            ? !effectiveAnimate
+                                ? initialKeyframes
+                                : undefined
+                            : renderedAnimateBaseline,
+                  transformTemplateProp
+              )
     )
 
     // SVG tag names are case-sensitive: our components pass `tag` all-lowercase, but
@@ -2227,103 +2314,24 @@
     })
 
     /**
-     * Execute the actual animation without wait mode checks.
+     * Run the declarative enter/animate/variant pass through the VisualElement's
+     * animationState.
+     *
+     * Replaces the former hand-rolled writer: instead of building a payload and
+     * driving WAAPI directly, `animateChanges()` diffs `visualElement.props`
+     * against its own `prevResolvedValues` and animates the owning MotionValues
+     * (`motion-dom/render/utils/animation-state.mjs`). Keyframe arrays,
+     * wildcards, `transitionEnd`, protected keys, variant priority and dedup are
+     * all handled there, so the JSON bookkeeping this file used to carry is gone.
      */
-    const executeAnimation = () => {
-        if (!element || !resolvedAnimate) {
-            pwLog('[motion] executeAnimation bailing - no element or resolvedAnimate')
+    const runAnimateChanges = () => {
+        const animationState = visualElement?.animationState
+        if (!element || !animationState) {
+            pwLog('[motion] runAnimateChanges bailing - no element or animationState')
             return
         }
-
-        const rawPayload = filterReducedMotionKeyframes(
-            $state.snapshot(resolvedAnimate) as Record<string, unknown>,
-            reducedMotion
-        )
-        const { target: rawTarget, transition: transitionAnimate } =
-            extractTargetTransition(rawPayload)
-        const svgPathFinished =
-            isSVGPathElement(element) && hasSVGPathProperties(rawTarget)
-                ? animateSVGPathAttributes(element, rawTarget, transitionAnimate)
-                : []
-        let payload = svgPathFinished.length > 0 ? stripSVGPathKeyframes(rawTarget) : rawTarget
-
-        // Transform SVG path properties (pathLength, pathOffset) to their CSS equivalents
-        payload = transformSVGPathProperties(element, payload)
-
-        // Resolve wildcard (`null`) / relative (`'+=50'`) keyframes on the
-        // declarative animate payload against the live value before the
-        // animation layer sees them (see resolveWildcardKeyframes + plan 003).
-        // A no-op for payloads without wildcards/relatives — the common enter
-        // case is untouched.
-        const resolvedDeclarative = resolveWildcardKeyframes(
-            payload as DOMKeyframesDefinition,
-            readLiveChannelValue
-        )
-        if (resolvedDeclarative) payload = resolvedDeclarative as unknown as typeof payload
-
-        // Ensure dash properties aren't pinned as inline styles
-        if (element && element.style) {
-            element.style.removeProperty('stroke-dasharray')
-            element.style.removeProperty('stroke-dashoffset')
-        }
-
-        pwLog('[motion] executeAnimation animating', {
-            payload,
-            transitionAnimate
-        })
-
-        notifyWillChange(Object.keys(payload))
-
-        // A fresh run owns the transform again until it completes.
-        enterAnimationSettled = false
-        const completeEnterAnimation = (
-            def: DOMKeyframesDefinition | undefined = payload as unknown as DOMKeyframesDefinition
-        ) => {
-            if (enterAnimationSettled) return
-            // Now the target is the resting state — promote it to the
-            // inline baseline so it persists after WAAPI surrenders the
-            // property (default fill:'none'). (#377) The RESOLVED payload
-            // (wildcards/relatives already concrete) feeds the settle so the
-            // baseline matches what actually animated.
-            applyAnimateRestingStyle(payload as unknown as Record<string, unknown>)
-            enterAnimationSettled = true
-            onAnimationCompleteProp?.(def)
-        }
-        const shouldAnimateThroughTransformTemplate =
-            !!transformTemplateProp && splitTemplatedTransformPayload(payload).hasTemplatePayload
-
-        if (isNotEmpty(payload) && shouldAnimateThroughTransformTemplate) {
-            // Fire-and-forget: the enter animation drives its own lifecycle
-            // callbacks; nothing here awaits its completion.
-            void animateTemplatedTransformPayload(
-                payload,
-                transitionAnimate,
-                (def) => onAnimationStartProp?.(def as DOMKeyframesDefinition | undefined),
-                (def) => completeEnterAnimation(def as DOMKeyframesDefinition | undefined)
-            )
-        } else if (isNotEmpty(payload)) {
-            cleanupTemplatedTransformAnimations()
-            animateWithLifecycle(
-                element,
-                payload as unknown as DOMKeyframesDefinition,
-                transitionAnimate,
-                (def) => onAnimationStartProp?.(def as DOMKeyframesDefinition | undefined),
-                (def) => completeEnterAnimation(def as DOMKeyframesDefinition | undefined)
-            )
-        } else if (svgPathFinished.length > 0) {
-            onAnimationStartProp?.(rawPayload as unknown as DOMKeyframesDefinition)
-            Promise.all(svgPathFinished)
-                .then(() => completeEnterAnimation(rawPayload as unknown as DOMKeyframesDefinition))
-                .catch(() =>
-                    completeEnterAnimation(rawPayload as unknown as DOMKeyframesDefinition)
-                )
-        }
-        if (isJsdomRuntime()) {
-            window.setTimeout(
-                () => completeEnterAnimation(),
-                getTransitionFallbackMs(transitionAnimate)
-            )
-        }
+        pwLog('[motion] runAnimateChanges via animationState')
+        void animationState.animateChanges()
     }
 
     // Cleanup wait callback on component unmount to prevent memory leaks
@@ -2432,10 +2440,18 @@
     }
 
     /**
+     * True once the mount/enter effect has run the first `animateChanges()`
+     * pass. Until then the props effect must not fire one — the enter path owns
+     * the initial ordering (phase transitions + the wait-mode gate).
+     */
+    let firstAnimatePassDone = false
+
+    /**
      * Run the enter animation, respecting wait mode if inside AnimatePresence.
      * Returns true if animation was deferred (wait mode with blocked enters).
      */
     const runAnimation = (): boolean => {
+        firstAnimatePassDone = true
         pwLog('[motion] runAnimation called', {
             hasElement: !!element,
             resolvedAnimate,
@@ -2443,8 +2459,11 @@
             mode: context?.mode
         })
 
-        if (!element || !resolvedAnimate) {
-            pwLog('[motion] runAnimation bailing - no element or resolvedAnimate')
+        // The animationState is the writer now, so the gate no longer needs a
+        // resolved payload — `animateChanges()` decides for itself whether
+        // anything changed. It DOES still need a mounted node.
+        if (!element || !visualElement?.animationState) {
+            pwLog('[motion] runAnimation bailing - no element or animationState')
             return false
         }
 
@@ -2486,34 +2505,25 @@
                     // overlap between exiting and entering content.
                     revealWaitHiddenElement()
 
-                    // Snap to initial state first (in case inline styles were removed)
-                    if (initialKeyframes && element) {
-                        const transformedInitial = transformSVGPathProperties(
-                            element,
-                            initialKeyframes
-                        )
-                        animate(element, transformedInitial as DOMKeyframesDefinition, {
-                            duration: 0
-                        })
-                    }
+                    // No duration-0 initial snap needed any more: the deferred
+                    // pass has not animated yet, so `latestValues` still holds the
+                    // seeded `initial` and the VE has already rendered it — the
+                    // element is at its from-state by construction.
 
                     // Use RAF to ensure DOM is settled, then run animation
                     requestAnimationFrame(() => {
-                        executeAnimation()
+                        runAnimateChanges()
                         // Now it's safe to mark as ready
                         requestAnimationFrame(() => {
-                            // Ensure follow-up effects treat this as the initial enter animation.
-                            // Without this, the ready-state effects can fire and re-run enter,
-                            // which shows up as a "pop" after the deferred animation completes.
+                            // CLAUDE.md "AnimatePresence wait mode": the enter has
+                            // to be marked handled BEFORE flipping `isLoaded`, or
+                            // the ready-state effects re-run enter and the deferred
+                            // animation ends in a visible pop. The JSON flags that
+                            // did the marking are gone — dedup lives in
+                            // `animateChanges` (`prevResolvedValues`), so a second
+                            // pass is inherently a no-op — but the ORDER still
+                            // matters for the reveal, so it is preserved.
                             pwLog('[motion] wait-unblocked: marking enter handled')
-                            initialAnimationTriggered = true
-                            if (
-                                declarativeAnimateProp &&
-                                typeof declarativeAnimateProp !== 'string'
-                            ) {
-                                objectAnimateRanOnMount = true
-                                lastAnimatePropJson = JSON.stringify(declarativeAnimateProp)
-                            }
                             isLoaded = 'ready'
                         })
                     })
@@ -2529,33 +2539,17 @@
 
         // Not blocked - run animation immediately
         pwLog('[motion] runAnimation: not blocked, executing')
-        executeAnimation()
+        runAnimateChanges()
         return false
     }
 
-    // Track the last variant key we ran to avoid re-running on mount
-    let lastRanVariantKey = $state<string | undefined>(undefined)
-    // Companion to `lastRanVariantKey`: the JSON-serialized resolved
-    // keyframes for that variant. Lets us detect when a function-form
-    // variant produces new keyframes (because `custom` changed) while
-    // the variant key stayed the same — otherwise the animate effect
-    // would short-circuit and the element would never re-animate.
-    let lastRanResolvedJson = $state<string | undefined>(undefined)
-    let mountedWithInitialFalse = $state(false)
-    // Track if the initial->animate transition has already been triggered by main effect
-    let initialAnimationTriggered = $state(false)
-    // Track if we've run the animation for object animateProp on this mount
-    let objectAnimateRanOnMount = $state(false)
-    // Track the serialized animateProp to detect changes for object animate props
-    let lastAnimatePropJson = $state<string | undefined>(undefined)
+    // The JSON dedup state (`lastRanVariantKey`, `lastRanResolvedJson`,
+    // `mountedWithInitialFalse`, `initialAnimationTriggered`,
+    // `objectAnimateRanOnMount`, `lastAnimatePropJson`) is deleted: dedup is
+    // `animateChanges`'s job via `prevResolvedValues` (plan 002 Step 3).
     let motionDomProjectionUpdatePending = false
-    const currentAnimateKey = $derived(
-        typeof declarativeAnimateProp === 'string'
-            ? declarativeAnimateProp
-            : typeof effectiveAnimate === 'string'
-              ? effectiveAnimate
-              : undefined
-    )
+    // `currentAnimateKey` is gone: it existed only for the JSON variant-dedup
+    // bookkeeping, which `animateChanges` now owns.
 
     $effect(() => {
         if (!motionDomProjection) return
@@ -2601,24 +2595,52 @@
         // (upstream use-visual-element.ts:147). It instantiates the enabled
         // features, giving the node its `animationState`.
         visualElement.updateFeatures()
-        // plan 002 STOP: upstream also calls `scheduleRenderMicrotask()` here
-        // (use-visual-element.ts:148), but that only makes sense once
-        // `latestValues` is authoritative. While the legacy WAAPI writer owns
-        // the animated keys, flushing an unsynced `latestValues` to the DOM
-        // writes a stale target. Turn this on with seedLatestValues.
+        // Upstream use-visual-element.ts:148 — flush `latestValues` to the DOM so
+        // the seeded starting state is actually applied before anything animates.
+        // Safe now that `animationState` drives `latestValues`.
+        visualElement.scheduleRenderMicrotask()
+        // The FIRST `animateChanges()` is fired by the mount/enter effect below,
+        // which owns the `isLoaded` phase transitions and the wait-mode gate
+        // (upstream does the equivalent in a later effect,
+        // use-visual-element.ts:163-176).
+
+        // `animateChanges` no longer runs our own lifecycle callbacks, so bridge
+        // the VisualElement's events instead. The controls path still fires its
+        // own callbacks directly (it is not animationState-driven until Step 7),
+        // hence the guard.
+        const offStart = visualElement.on('AnimationStart', (definition) => {
+            if (animateControls) return
+            onAnimationStartProp?.(definition as DOMKeyframesDefinition | undefined)
+        })
+        const offComplete = visualElement.on('AnimationComplete', (definition) => {
+            if (animateControls) return
+            onAnimationCompleteProp?.(definition as DOMKeyframesDefinition | undefined)
+        })
         return () => {
+            offStart()
+            offComplete()
             if (visualElement.current === mounted) visualElement.unmount()
             visualElementStore.delete(mounted)
         }
     })
 
-    // Keep the node's props in sync. `untrack` on the write so only the props
-    // read inside `buildMotionNodeProps` are tracked.
+    // Keep the node's props in sync, then let the animationState diff them.
+    // `untrack` on the write so only the props read inside
+    // `buildMotionNodeProps` are tracked.
+    //
+    // This replaces the former JSON-dedup re-run effects wholesale: upstream
+    // dedups inside `animateChanges` against `prevResolvedValues` (plus
+    // `protectedKeys` for priority), so re-running on every prop change is
+    // correct and idempotent — no `lastAnimatePropJson` / `lastRanVariantKey`
+    // bookkeeping required.
     $effect(() => {
         if (!visualElement) return
         const next = buildMotionNodeProps()
         untrack(() => {
             visualElement.update(next, null)
+            // Only once the mount/enter effect has run the first pass — it owns
+            // the enter ordering and the wait-mode gate.
+            if (firstAnimatePassDone) runAnimation()
         })
     })
 
@@ -3270,18 +3292,66 @@
                 // Check if component was unmounted during exit animation
                 if (keyTransitionStopped || !element) return
 
-                // 2. Snap to initial state
-                if (initialKeyframes && element) {
-                    const transformedInitial = transformSVGPathProperties(element, initialKeyframes)
-                    pwLog('[motion] key transition: snapping to initial', { transformedInitial })
-                    animate(element, transformedInitial as DOMKeyframesDefinition, { duration: 0 })
-                }
-
-                // Check again before running enter animation
+                // 2. Rewind to the initial state, and 3. re-enter.
+                //
+                // Upstream gets this free: a React `key` change UNMOUNTS and
+                // remounts, so `VisualElement.mount()` rewinds every value to
+                // `initialValues` (`VisualElement.mjs:186-191`) and a fresh
+                // animationState replays initial→animate. Svelte keeps the same
+                // element and the same node, so we reproduce both halves
+                // explicitly: jump the values back, then `reset()` the
+                // animationState so `animateChanges()` treats this as a first
+                // render instead of deduping the enter away against
+                // `prevResolvedValues`.
+                //
+                // (plan 004 formalizes the exit half above via setActive('exit').)
                 if (keyTransitionStopped || !element) return
 
-                // 3. Run enter animation
-                pwLog('[motion] key transition: running enter animation')
+                pwLog('[motion] key transition: rewinding to initial and re-entering')
+                const animationState = visualElement?.animationState
+                if (visualElement && animationState) {
+                    // Rewind to the CURRENTLY resolved `initial`, not to a
+                    // creation-time snapshot: the from-state for a key change is
+                    // whatever `initial` resolves to NOW (it commonly differs from
+                    // the first render's — e.g. an AnimatePresence `initial={false}`
+                    // first paint followed by a real roll-in on later keys).
+                    for (const [key, value] of Object.entries(initialKeyframes ?? {})) {
+                        // A keyframe array's FIRST element is the from-state.
+                        const resolved = (Array.isArray(value) ? value[0] : value) as
+                            | string
+                            | number
+                        if (resolved === undefined || resolved === null) continue
+                        // `jump`, not `set`: a rewind must not leave velocity
+                        // behind for the re-enter to inherit.
+                        visualElement.getValue(key)?.jump(resolved)
+                        visualElement.setStaticValue(key, resolved)
+                    }
+                    visualElement.scheduleRender()
+                    // Clear `prevResolvedValues` so the re-enter is not deduped
+                    // away as "already at target".
+                    animationState.reset()
+                }
+
+                // SVG dash attrs are presentation attributes the style render
+                // cannot rewind; keep writing them directly.
+                if (initialKeyframes && element) {
+                    const transformedInitial = transformSVGPathProperties(element, initialKeyframes)
+                    for (const [key, value] of Object.entries(transformedInitial)) {
+                        if (key === 'strokeDasharray' || key === 'stroke-dasharray') {
+                            element.setAttribute(
+                                'stroke-dasharray',
+                                String(Array.isArray(value) ? value[0] : value)
+                            )
+                        }
+                        if (key === 'strokeDashoffset' || key === 'stroke-dashoffset') {
+                            element.setAttribute(
+                                'stroke-dashoffset',
+                                String(Array.isArray(value) ? value[0] : value)
+                            )
+                        }
+                    }
+                }
+
                 runAnimation()
             } finally {
                 pwLog('[motion] key transition: finally', { keyTransitionStopped })
@@ -3302,94 +3372,21 @@
         }
     })
 
-    // Re-run animate when animateProp changes while ready
-    $effect(() => {
-        if (!(element && isLoaded === 'ready')) return
-        if (animateControls) return
-        // Skip first run if we mounted with initial={false} AND the variant hasn't changed
-        if (mountedWithInitialFalse) {
-            // Only skip if the variant is the same as what we mounted with
-            if (
-                typeof declarativeAnimateProp === 'string' &&
-                lastRanVariantKey === declarativeAnimateProp
-            ) {
-                mountedWithInitialFalse = false
-                return
-            }
-            // Variant has changed, so we should animate
-            mountedWithInitialFalse = false
-        }
-        // Skip if the initial animation was already triggered by the main effect
-        if (initialAnimationTriggered) {
-            pwLog('[motion] effect: skipping, initial animation already triggered')
-            initialAnimationTriggered = false
-            // Also mark object animate as ran to prevent duplicate runs from effect re-triggers
-            if (declarativeAnimateProp && typeof declarativeAnimateProp !== 'string') {
-                objectAnimateRanOnMount = true
-            }
-            return
-        }
-        if (typeof declarativeAnimateProp === 'string') {
-            // Compare BOTH the variant key and the resolved keyframes JSON.
-            // For static variants the JSON is constant per key; for
-            // function-form variants the JSON changes when `custom`
-            // changes, which we must treat as a new animation target.
-            const resolvedJson = resolvedAnimate ? JSON.stringify(resolvedAnimate) : undefined
-            if (
-                lastRanVariantKey !== declarativeAnimateProp ||
-                lastRanResolvedJson !== resolvedJson
-            ) {
-                lastRanVariantKey = declarativeAnimateProp
-                lastRanResolvedJson = resolvedJson
-                runAnimation()
-            }
-        } else if (declarativeAnimateProp) {
-            // Object animate props - detect if the prop actually changed
-            const currentJson = JSON.stringify(declarativeAnimateProp)
-            const propChanged = lastAnimatePropJson !== currentJson
+    // The former JSON-dedup re-run effects lived here (`lastAnimatePropJson`,
+    // `lastRanVariantKey`, `lastRanResolvedJson`, `objectAnimateRanOnMount`,
+    // `mountedWithInitialFalse`, `initialAnimationTriggered`). They are gone:
+    // the props effect above calls `animateChanges()` on every prop change and
+    // upstream dedups internally against `prevResolvedValues`, so a re-run with
+    // an unchanged target is a no-op rather than a duplicate animation.
 
-            // Reset flag if animate prop changed
-            if (propChanged) {
-                objectAnimateRanOnMount = false
-                lastAnimatePropJson = currentJson
-            }
-
-            // Only run if we haven't already animated on this mount (or prop changed)
-            // This prevents duplicate animations when Svelte re-triggers the effect
-            if (!objectAnimateRanOnMount) {
-                objectAnimateRanOnMount = true
-                lastRanVariantKey = undefined
-                runAnimation()
-            }
-        }
-    })
-
-    // Also run when inherited/effective variant changes
-    $effect(() => {
-        void resolvedAnimate
-        if (!(element && isLoaded === 'ready' && !declarativeAnimateProp && resolvedAnimate)) return
-        // Skip first run if we mounted with initial={false} AND the variant hasn't changed
-        if (mountedWithInitialFalse) {
-            // Only skip if the variant is the same as what we mounted with
-            if (typeof currentAnimateKey === 'string' && lastRanVariantKey === currentAnimateKey) {
-                mountedWithInitialFalse = false
-                return
-            }
-            // Variant has changed, so we should animate
-            mountedWithInitialFalse = false
-        }
-        if (typeof currentAnimateKey === 'string') {
-            const resolvedJson = resolvedAnimate ? JSON.stringify(resolvedAnimate) : undefined
-            if (lastRanVariantKey !== currentAnimateKey || lastRanResolvedJson !== resolvedJson) {
-                lastRanVariantKey = currentAnimateKey
-                lastRanResolvedJson = resolvedJson
-                runAnimation()
-            }
-        } else {
-            runAnimation()
-        }
-    })
-
+    // Mount/enter lifecycle.
+    //
+    // The animation itself is `animationState.animateChanges()` now, so every
+    // duration-0 "snap" is gone: `latestValues` is seeded with the resolved
+    // `initial` (or, under `initial={false}`, with the `animate` target's LAST
+    // keyframe) and the VisualElement has already flushed it to the DOM via
+    // `scheduleRenderMicrotask()`. This effect owns only the `isLoaded` phase
+    // machine and the enter ordering.
     $effect(() => {
         if (!(element && isLoaded === 'mounting')) return
         markMotionMounted()
@@ -3408,22 +3405,13 @@
         })
 
         if (effectiveAnimate) {
-            // If initial={false}, render at animate state immediately with no transition
             if (effectiveInitialProp === false && resolvedAnimate) {
-                pwLog('[motion] path: initial=false, skip to animate')
-                // Use Motion's animate() with duration:0 so it takes control of these properties
-                // This prevents inline styles from pinning the properties during future animations
-                let snapshot = $state.snapshot(resolvedAnimate) as Record<string, unknown>
-                snapshot = transformSVGPathProperties(element!, snapshot)
-                animate(element!, snapshot as DOMKeyframesDefinition, { duration: 0 })
-                // Mark that we've already applied this variant to avoid a second animate pass
-                mountedWithInitialFalse = true
-                if (typeof currentAnimateKey === 'string') {
-                    lastRanVariantKey = currentAnimateKey
-                    lastRanResolvedJson = resolvedAnimate
-                        ? JSON.stringify(resolvedAnimate)
-                        : undefined
-                }
+                // `initial={false}`: `blockInitialAnimation` is set and
+                // `makeLatestValues` seeded from `animate`'s last keyframe, so the
+                // element already renders at the target. Mark the first pass done
+                // so later prop changes still animate.
+                pwLog('[motion] path: initial=false, already at animate target')
+                firstAnimatePassDone = true
                 dataPath = 5
                 isLoaded = 'ready'
             } else if (isNotEmpty(initialKeyframes)) {
@@ -3432,15 +3420,20 @@
                     pwLog('[motion] path: optimized appear handoff')
                     dataPath = 6
                     isLoaded = 'initial'
-                    initialAnimationTriggered = true
-                    if (declarativeAnimateProp && typeof declarativeAnimateProp !== 'string') {
-                        objectAnimateRanOnMount = true
-                        lastAnimatePropJson = JSON.stringify(declarativeAnimateProp)
-                    }
+                    // The appear animation owns the values while it is in flight,
+                    // so block the props effect from starting a competing pass.
+                    firstAnimatePassDone = true
                     finishOptimizedAppearAnimation(optimizedAppearId)
                         .then(() => {
-                            applyAnimateRestingStyle()
-                            enterAnimationSettled = true
+                            // Hand off to the animationState only AFTER the appear
+                            // animation resolves (plan 002 scope note; upstream
+                            // does the same in use-visual-element.ts:163-176).
+                            // This is load-bearing, not belt-and-braces: the
+                            // optimized-appear bootstrap only animates
+                            // WAAPI-accelerated channels (opacity/transform), so
+                            // without this pass a non-accelerated channel such as
+                            // `filter` would never leave its `initial` value.
+                            runAnimation()
                             isLoaded = 'ready'
                             onAnimationCompleteProp?.(resolvedAnimate)
                         })
@@ -3450,15 +3443,15 @@
                     return
                 }
                 pwLog('[motion] path: has initialKeyframes, will animate to target')
-                // Apply initial instantly BEFORE exposing 'initial' state
-                const transformedInitial = transformSVGPathProperties(element!, initialKeyframes)
 
-                // For SVG paths, apply initial state truly synchronously to prevent flash
-                const hasSVGProps =
+                // SVG dash properties are presentation ATTRIBUTES, not styles, so
+                // the VE's style render cannot seed them. Keep the synchronous
+                // attribute write that prevents a mount flash.
+                const transformedInitial = transformSVGPathProperties(element!, initialKeyframes)
+                if (
                     'strokeDasharray' in transformedInitial ||
                     'strokeDashoffset' in transformedInitial
-                if (hasSVGProps) {
-                    // Apply presentation attributes to avoid pinning CSS properties
+                ) {
                     Object.entries(transformedInitial).forEach(([key, value]) => {
                         const v = String(Array.isArray(value) ? value[0] : value)
                         if (key === 'strokeDasharray' || key === 'stroke-dasharray') {
@@ -3468,25 +3461,14 @@
                             element!.setAttribute('stroke-dashoffset', v)
                         }
                     })
-                    // no-op
                 }
-                // Avoid pinning: strip stroke dash props from the animate(0) payload
-                const initialForAnimate = { ...transformedInitial }
-                delete (initialForAnimate as Record<string, unknown>).strokeDasharray
-                delete (initialForAnimate as Record<string, unknown>)['stroke-dasharray']
-                delete (initialForAnimate as Record<string, unknown>).strokeDashoffset
-                delete (initialForAnimate as Record<string, unknown>)['stroke-dashoffset']
 
-                animate(element!, initialForAnimate as DOMKeyframesDefinition, { duration: 0 })
-                // no-op
-
-                // Mark initial after styles are applied so tests read CSS=0 while state=initial
-                // This also removes visibility:hidden that was hiding SVG paths during mount
+                // Expose 'initial': the seeded render already put the from-state on
+                // the element, and this drops the pathLength visibility hold.
                 isLoaded = 'initial'
                 dataPath = 1
 
-                // Then promote to ready and run the enter animation
-                // rAF expects a void return; an async callback hands it a Promise that
+                // rAF expects a void return; an async callback hands it a Promise
                 // nothing can await. Name the work and mark it fire-and-forget.
                 const runEnterAnimation = async () => {
                     if (isPlaywright) {
@@ -3494,26 +3476,10 @@
                     }
                     pwLog('[motion] RAF: promoting to ready and running animation')
 
-                    // Mark that we're triggering the initial animation to prevent duplicate runs
-                    initialAnimationTriggered = true
-                    if (declarativeAnimateProp && typeof declarativeAnimateProp !== 'string') {
-                        lastAnimatePropJson = JSON.stringify(declarativeAnimateProp)
-                    }
-
-                    // IMPORTANT: Start the animation BEFORE changing isLoaded.
-                    // When isLoaded changes to 'ready', Svelte will reactively remove the
-                    // initial inline styles. We need the animation to capture the current
-                    // state (from inline styles) before they're removed.
                     const wasDeferred = runAnimation()
 
-                    // CRITICAL: Wait for the next animation frame before changing isLoaded.
-                    // This gives WAAPI time to:
-                    // 1. Parse and create the animation
-                    // 2. Start the animation layer
-                    // 3. Lock in the "from" values from current computed style
-                    // Only THEN can we safely clear inline styles without killing the animation
-                    // BUT: If animation was deferred (wait mode), don't change isLoaded yet -
-                    // the callback will handle it when the animation actually runs.
+                    // If the enter was deferred (wait mode) the unblock callback
+                    // flips `isLoaded`; otherwise promote on the next frame.
                     if (!wasDeferred) {
                         requestAnimationFrame(() => {
                             isLoaded = 'ready'
@@ -3525,41 +3491,14 @@
                 pwLog('[motion] path: no initialKeyframes, skip to ready')
                 dataPath = 2
                 isLoaded = 'ready'
-                // If we're inheriting a variant and parent had initial={false}, apply the variant instantly
-                // without animation, then mark it as applied
-                if (
-                    parentInitialFalse &&
-                    typeof currentAnimateKey === 'string' &&
-                    resolvedAnimate
-                ) {
-                    // Apply variant styles instantly with duration:0
-                    let snapshot = $state.snapshot(resolvedAnimate) as Record<string, unknown>
-                    snapshot = transformSVGPathProperties(element!, snapshot)
-                    animate(element!, snapshot as DOMKeyframesDefinition, { duration: 0 })
-                    lastRanVariantKey = currentAnimateKey
-                    lastRanResolvedJson = resolvedAnimate
-                        ? JSON.stringify(resolvedAnimate)
-                        : undefined
-                } else {
-                    runAnimation()
-                }
+                runAnimation()
             }
         } else if (isNotEmpty(initialKeyframes)) {
-            // Apply initial instantly BEFORE exposing 'initial' state
-            const transformedInitial = transformSVGPathProperties(element!, initialKeyframes)
-            element!.setAttribute(
-                'style',
-                mergeInlineStyles(
-                    element!.getAttribute('style') ?? '',
-                    transformedInitial,
-                    undefined,
-                    transformTemplateProp
-                )
-            )
+            // `initial` with no `animate`: the seeded render already applied it, so
+            // there is nothing to write and nothing to animate.
             dataPath = 3
             isLoaded = 'initial'
-            // rAF expects a void return; an async callback hands it a Promise that
-            // nothing can await. Name the work and mark it fire-and-forget.
+            // rAF expects a void return; see above.
             const promoteToReady = async () => {
                 if (isPlaywright) {
                     await sleep(10)
