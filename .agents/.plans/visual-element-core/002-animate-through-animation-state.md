@@ -1,0 +1,315 @@
+# Plan 002: Route enter/animate/variant animations through createAnimationState
+
+> **Executor instructions**: Follow this plan step by step. Run every
+> verification command and confirm the expected result before moving to the
+> next step. If anything in the "STOP conditions" section occurs, stop and
+> report — do not improvise. When done, update the status row for this plan
+> in `.agents/.plans/visual-element-core/README.md`.
+>
+> **Drift check (run first)**: `git diff --stat 7eba0bd..HEAD -- src/lib/html/_MotionContainer.svelte src/lib/utils/visualElementCore.ts src/lib/utils/animationControls.svelte.ts`
+> Plan 001 legitimately changed `_MotionContainer.svelte` and created
+> `visualElementCore.ts` — expect that. Any OTHER drift vs the excerpts below
+> is a STOP condition.
+
+## Status
+
+- **Priority**: P1
+- **Effort**: L
+- **Risk**: HIGH
+- **Depends on**: 001-visual-element-foundation.md (must be DONE)
+- **Category**: tech-debt (architecture migration, GitHub issue #449)
+- **Planned at**: commit `7eba0bd`, 2026-07-24
+
+## Why this matters
+
+This is the core of #449: the declarative `initial`/`animate`/`variants` writer
+moves from bespoke `animate()` calls + inline-style bookkeeping onto
+`visualElement.animationState.animateChanges()`. That deletes the fragile
+machinery the current design forces: duration-0 "snap" animations, JSON
+dedup flags (`lastAnimatePropJson`, `lastRanVariantKey`), the
+`renderedInlineStyle` phase machine, and `applyAnimateRestingStyle` — because a
+VisualElement holds values in `latestValues` and renders them every frame, so
+nothing "surrenders" a property when WAAPI fill ends. After this plan the
+`animate` semantics are upstream's exactly: dedup via `prevResolvedValues`,
+`initial={false}` via `blockInitialAnimation`, removed-key restoration via
+`baseTarget`, velocity continuity via retargeting the same MotionValue.
+
+## Current state
+
+(Plan 001 added the inert VE; these are the legacy writers this plan replaces.)
+
+- **Mount/enter effect** `_MotionContainer.svelte:3252-3433`. Branches:
+    - `initial === false` → `animate(element, snapshot, { duration: 0 })` then
+      `mountedWithInitialFalse = true` (`:3271-3287`).
+    - has `initialKeyframes` → optimized-appear handoff
+      (`finishOptimizedAppearAnimation`, `:3288-3310`) or: SVG dash attributes
+      set directly, `animate(element, initialForAnimate, { duration: 0 })`
+      (`:3339`), then rAF → `runAnimation()` → flip `isLoaded='ready'`
+      (`:3350-3382`).
+    - no initialKeyframes → `runAnimation()` or a duration-0 variant snap when
+      `parentInitialFalse` (`:3383-3405`).
+    - no `animate` at all → write initial via
+      `element.setAttribute('style', mergeInlineStyles(...))` (`:3406-3428`).
+- **`executeAnimation`** `_MotionContainer.svelte:2129-2224` — the primary
+  animate writer:
+
+```ts
+// _MotionContainer.svelte:2135-2148 (payload prep)
+const rawPayload = filterReducedMotionKeyframes($state.snapshot(resolvedAnimate), reducedMotion)
+const { target: rawTarget, transition: transitionAnimate } = extractTargetTransition(rawPayload)
+const svgPathFinished =
+    isSVGPathElement(element) && hasSVGPathProperties(rawTarget)
+        ? animateSVGPathAttributes(element, rawTarget, transitionAnimate)
+        : []
+let payload = svgPathFinished.length > 0 ? stripSVGPathKeyframes(rawTarget) : rawTarget
+payload = transformSVGPathProperties(element, payload)
+```
+
+then wildcard resolution (`resolveWildcardKeyframes`), `notifyWillChange`,
+and either `animateTemplatedTransformPayload` (transformTemplate case) or
+`animateWithLifecycle(element, payload, ...)`; on completion
+`applyAnimateRestingStyle(payload)` promotes the target to the inline
+baseline (`:2176-2188`, the #377 mechanism).
+
+- **`runAnimation`** `:2335-2429` — gates `executeAnimation` behind the
+  AnimatePresence wait-mode contract (`display:none` hold, deferred-enter
+  callback; see CLAUDE.md "AnimatePresence wait mode": when enter is deferred
+  in `mode="wait"`, the enter animation must be marked handled BEFORE flipping
+  `isLoaded` to ready, and `objectAnimateRanOnMount`/`lastAnimatePropJson` set,
+  to prevent a duplicate run / visible pop).
+- **Re-run effects** `:3165-3250` — JSON-compare `animateProp` / variant keys
+  and call `runAnimation()` again.
+- **`renderedInlineStyle`** `:1716-1766` — a `$derived.by` that rewrites the
+  whole `style` attribute per phase (`mounting`/`initial`/`ready` ×
+  `enterAnimationSettled` × animation-controls state). This is the "second
+  writer" that must disappear for animated keys.
+- **Imperative controls** — `animate={controls}`:
+  `startAnimationControlsDefinition` (`:1513-1642`),
+  `applyAnimationControlsTarget` (`:1311-1367`, does `animate(..., {duration:0})`
+  AND `element.setAttribute('style', ...)`), `snapshotFrozenControlsValues`
+  (`:1382-1452`), registered with the controls object at `:3012-3020` via
+  `src/lib/utils/animationControls.svelte.ts` (`registerElement` API around
+  line 52).
+- **Style motion values** — `$effect` at `:638-649` runs
+  `applyMotionStyleEffect` / `styleEffect(element, styleValues)`; SVG attrs via
+  `svgEffect` at `:1798-1807`.
+- **Upstream semantics to replicate** (cite these in comments):
+    - Commit order per React commit: `update(props, presenceContext)` →
+      (mount on first) → `updateFeatures()` + microtask render →
+      `animationState.animateChanges()` in an effect
+      (`framer-motion/src/motion/utils/use-visual-element.ts:112-187`).
+    - `animateChanges` reads `visualElement.props` — there is no `setProps` on
+      AnimationState.
+    - The initial inline style comes from `visualState.latestValues` via
+      `buildHTMLStyles` (`framer-motion/src/render/html/use-props.ts:21-32`).
+    - `MotionConfig` transition reaches the VE as `props.transition`
+      (`getDefaultTransition()`); plan 001's `buildMotionNodeProps` already
+      passes `mergedTransition`.
+- **SSR**: `src/lib/html/_MotionContainer.ssr.spec.ts` pins the server-rendered
+  style/attr output. SSR has no VE (client-only); the server-rendered inline
+  style must remain byte-identical.
+- Installed-API note: `AnimationState.setActive` accepts only
+  `(type, isActive)` at runtime (the third options param in the .d.ts is
+  ignored in 12.42.2).
+
+## Commands you will need
+
+| Purpose       | Command                                                                       | Expected on success |
+| ------------- | ----------------------------------------------------------------------------- | ------------------- |
+| Typecheck     | `pnpm check`                                                                  | 0 errors            |
+| Unit tests    | `pnpm test:only`                                                              | all pass            |
+| SSR pin       | `pnpm test:only src/lib/html/_MotionContainer.ssr.spec.ts`                    | all pass            |
+| Targeted e2e  | `pnpm test:e2e e2e/motion e2e/variants e2e/svg e2e/utilities e2e/lazy-motion` | all pass            |
+| Presence e2e  | `pnpm test:e2e e2e/animate-presence`                                          | all pass            |
+| Format / lint | `trunk fmt` / `trunk check`                                                   | no new issues       |
+
+## Scope
+
+**In scope**:
+
+- `src/lib/html/_MotionContainer.svelte`
+- `src/lib/utils/visualElementCore.ts` (extend: controls subscription, style
+  scraping enablement)
+- `src/lib/utils/animationControls.svelte.ts` (bridge `start/stop/set` to
+  `animateVisualElement`)
+- `src/lib/utils/visualElementCore.spec.ts`, new spec files for changed units
+- Deletions of now-dead helpers in `_MotionContainer.svelte` and, if they
+  become fully unused, `src/lib/utils/animation.ts` helpers (verify with grep
+  before deleting)
+
+**Out of scope** (do NOT touch):
+
+- Gesture files (`hover.ts`, `interaction.ts`, `focus.ts`, `inView.svelte.ts`,
+  `gestureCoordinator.ts`) — plan 003. The gesture systems keep animating the
+  element directly in this plan; they already coordinate against the enter
+  writer via `getBaseStyleValues`/`liveGestureTransform`, and those hooks must
+  keep working until 003.
+- `drag.ts`, `layout.ts`, `motionDomProjection.ts` behavior — plan 005.
+- The presence CLONE exit path (`presence.ts`) — plan 004.
+- Optimized-appear internals (`src/lib/utils/optimizedAppear.ts`) — keep the
+  handoff working by calling `animateChanges` only after
+  `finishOptimizedAppearAnimation` resolves, mirroring today's ordering.
+
+## Git workflow
+
+- Branch `issue-449-visual-element-core`; commit per step,
+  e.g. `feat(core): route declarative animate through animationState (#449)`.
+- Do NOT push.
+
+## Steps
+
+### Step 1: Characterization baseline
+
+Run the targeted e2e suites and unit tests on the branch BEFORE changes; save
+the summary (pass counts) in your report. These suites are the behavioral pin —
+this plan must end with identical results.
+
+**Verify**: `pnpm test:only` and the two e2e commands above → record results;
+all expected to pass.
+
+### Step 2: Bind style + animated values to the VE
+
+In `buildMotionNodeProps()` (from plan 001), add `style: styleProp` so
+`updateMotionValuesFromProps`/scraping binds user MotionValues to the VE. Move
+the initial-inline-style source for the CLIENT render to
+`visualState.latestValues` (keep the existing SSR serialization path untouched
+— it runs where no VE exists). Remove the container's direct
+`styleEffect`/`applyMotionStyleEffect` subscription (`:638-649`) — the VE's
+`bindToMotionValue` now schedules renders on value changes. Keep `svgEffect`
+for attr-only SVG values until Step 6.
+
+**Verify**: `pnpm test:only src/lib/html/_MotionContainer.ssr.spec.ts` → passes
+unchanged; `pnpm test:e2e e2e/vanilla-values e2e/utilities` → all pass.
+
+### Step 3: Call `animateChanges()` on the upstream schedule
+
+Add to the container: after `ve.update(...)` in the props effect (and once
+after mount), call `ve.animationState?.animateChanges()` — but gate the FIRST
+call behind the existing wait-mode deferral: where `runAnimation()` today
+defers via the AnimatePresence context (`:2335-2429`), defer the first
+`animateChanges()` identically, and when unblocking honor the CLAUDE.md wait-mode
+rule (mark enter handled before flipping loaded state). `initial={false}` maps
+to `blockInitialAnimation: true` at VE creation (plan 001 already plumbed the
+option; set it from `effectiveInitialProp === false || parentInitialFalse`).
+
+Do NOT delete the legacy paths yet — put the new call behind a module-level
+`const USE_ANIMATION_STATE = true` flag and the legacy calls behind its
+negation, so a single flag flip reverts during review.
+
+**Verify**: `pnpm test:e2e e2e/motion` → all pass.
+
+### Step 4: Retire the legacy declarative writers
+
+With Step 3 green: delete the legacy branches — `executeAnimation`,
+`runAnimation`'s animation body (keep the wait-gate, now wrapping
+`animateChanges`), the re-run JSON-dedup effects (`:3165-3250`), the duration-0
+snaps in the mount effect, `applyAnimateRestingStyle`, and collapse
+`renderedInlineStyle` (`:1716-1766`) to: SSR/mount-phase initial style only
+(visibility/display holds for wait mode stay). Delete the
+`USE_ANIMATION_STATE` flag (legacy path gone). Keep `onAnimationStart`/
+`onAnimationComplete` firing — the VE emits `AnimationStart`/`AnimationComplete`
+events; subscribe via `ve.on('AnimationStart', ...)` in the container.
+
+`grep -n "duration: 0" src/lib/html/_MotionContainer.svelte` afterward — every
+remaining hit must be justified in your report (expected: none in the
+enter/animate paths).
+
+**Verify**: `pnpm test:only` → all pass; `pnpm test:e2e e2e/motion e2e/variants` → all pass.
+
+### Step 5: Variant tree inheritance through the VE
+
+Variant propagation currently flows through Svelte stores
+(`localVariantStore`, `_MotionContainer.svelte:651-745` region). With VEs
+parented (plan 001 context), upstream inheritance comes from
+`getVariantContext(parent)` + the VE tree (`addVariantChild` happens in
+`mount()`). Route `inheritedVariant`/`effectiveAnimate` resolution through the
+VE: children with no own `animate` inherit via animationState (upstream
+`isVariantNode`/`isControllingVariants` semantics). Keep the Svelte stores only
+if `custom` propagation (`effectiveCustom`) still needs them — if so, say so in
+NOTES rather than forcing it.
+
+**Verify**: `pnpm test:e2e e2e/variants` → all pass (includes stagger/children
+propagation specs).
+
+### Step 6: SVG values through the VE
+
+`SVGVisualElement` builds `attrs` natively (including `pathLength` handling
+upstream-style). Move the SVG motion-value attrs (`svgEffect` at `:1798-1807`)
+and the path-drawing special cases (`animateSVGPathAttributes`,
+`transformSVGPathProperties` calls inside the deleted `executeAnimation`) onto
+the VE path. If the VE's native `pathLength` semantics differ from our
+`stroke-dasharray` approach in a way that breaks `e2e/svg`, STOP and report
+(do not layer both).
+
+**Verify**: `pnpm test:e2e e2e/svg` → all pass.
+
+### Step 7: Imperative `animate={controls}` through `animateVisualElement`
+
+In `animationControls.svelte.ts`, change the element-registration bridge so a
+subscribed component hands its VE to the controls object; `controls.start(def)`
+→ `animateVisualElement(ve, def, { transitionOverride })` (upstream
+`animation-controls.ts`), `controls.stop()` → stop the VE's values
+(`ve.values.forEach(v => v.stop())`), `controls.set(def)` → resolve + set
+values. Then delete `startAnimationControlsDefinition`,
+`applyAnimationControlsTarget`, `snapshotFrozenControlsValues`,
+`stopAnimationControlsAnimations` from the container and the
+controls-specific branches of `renderedInlineStyle` (already collapsed in
+Step 4). Wire `AnimationFeature.mount`'s `isAnimationControls` subscription
+(the plan-001 TODO).
+
+**Verify**: `pnpm test:only src/lib/utils/animationControls.spec.ts` (update it)
+→ all pass; `pnpm test:e2e e2e/utilities` → all pass.
+
+### Step 8: Full gate
+
+`trunk fmt` → `trunk check` → `pnpm check` → `pnpm test:only` →
+`pnpm test:e2e e2e/motion e2e/variants e2e/svg e2e/utilities e2e/lazy-motion e2e/animate-presence`.
+
+**Verify**: identical-or-better results vs the Step 1 baseline. Any regression
+is a STOP after two fix attempts.
+
+## Test plan
+
+- No red-first test: behavior-preserving migration; the Step 1 characterization
+  baseline (existing suites) is the pin.
+- New unit tests: extend `visualElementCore.spec.ts` — `blockInitialAnimation`
+  from `initial={false}`; AnimationStart/Complete event bridging; controls
+  bridge (`start` resolves through `animateVisualElement` — assert via a
+  mounted VE on jsdom with a spied value).
+- Updated: `animationControls.spec.ts` for the new bridge.
+- Verification: full unit suite + the six e2e suites named above.
+
+## Done criteria
+
+- [ ] `pnpm check` exits 0; `trunk check` no new issues
+- [ ] `pnpm test:only` exits 0
+- [ ] The six targeted e2e suites exit 0, matching the Step 1 baseline
+- [ ] `grep -n "executeAnimation\|applyAnimateRestingStyle\|lastAnimatePropJson\|objectAnimateRanOnMount" src/lib/html/_MotionContainer.svelte` → no matches
+- [ ] `grep -n "animateChanges" src/lib/html/_MotionContainer.svelte` → present
+- [ ] SSR spec passes byte-identical (no snapshot updates to
+      `_MotionContainer.ssr.spec.ts` unless justified in NOTES)
+- [ ] No files outside the in-scope list modified
+- [ ] README status row updated
+
+## STOP conditions
+
+- Any drift vs the excerpts beyond plan 001's expected changes.
+- The wait-mode deferral cannot be expressed as "defer first animateChanges"
+  without regressing `e2e/animate-presence` — report the exact failing spec.
+- Gesture e2e (hover/tap) breaks because removing `renderedInlineStyle`
+  changed the baseline the gesture writers read (`getBaseStyleValues`) — do
+  not patch gesture files (out of scope); report.
+- SVG pathLength semantics conflict (Step 6).
+- The Step 1 baseline itself has failures — report before starting.
+- A step's verification fails twice after a reasonable fix attempt.
+
+## Maintenance notes
+
+- After this plan, `latestValues` on the VE is the single source of truth for
+  animated style; anything reading computed style mid-animation (gesture
+  baselines, drag) is temporarily reading VE output — plans 003/005 formalize.
+- Reviewer should scrutinize: wait-mode enter deferral (CLAUDE.md pop bug),
+  `initial={false}` + variant-inheritance matrix, controls stop/velocity
+  continuity, and that deleted helpers are truly unreferenced (grep).
+- Deferred: gesture/drag/layout writers still bypass the VE (plans 003/005);
+  presence clone path untouched (004).
