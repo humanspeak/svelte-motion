@@ -125,3 +125,30 @@ unreachable-green by construction.
 - Current full-suite state: 280 passed / 7 failed = 2 documented 004
   exclusions + 3 Step-3h items + 1 Step-5 remainder (stagger-interrupt) +
   1 Step-7 subject (controls re-attach).
+
+## Checkpoint 2026-07-24 #5 — STOP review (executor run 5, 3h partial + Step 5 done)
+
+- **Snapshot**: `6bda8bc`, `b14859d`, `6193fb3` since last checkpoint; tree
+  clean; guard re-ran unit suite (844 passed) and reproduced the single real
+  e2e failure in isolation.
+- **Verdict**: **ON TRACK** (executor) + **PLAN AMENDED** (guard, revision #6).
+  Full-suite 283/287: only the two 004 exclusions, the named Step-7
+  allowance, and one real failure remain. Step 5 is DONE (7/7 variants,
+  stagger-interrupt fixed by the per-commit microtask flush).
+- **Guard investigation of `policy='always'`**: the executor's remount
+  hypothesis was WRONG (the page defaults to `always`, so `.check()` is a
+  no-op and `{#key}` never fires) — but its refusal to modify the spec was
+  right. Guard reproduced: assertion read opacity **0.0198** AFTER the wait
+  helper (which requires > 0.99) returned — the fade completes then RE-RUNS.
+  Real behavioral bug (double-fade flash), spec correct. Prime suspect: the
+  one-shot post-mount policy strip. Recorded in revision #6 with fix
+  directions and a 3-consecutive-run verify.
+- **Step 6 SKIPPED by guard ruling** (executor's recommendation accepted):
+  `e2e/svg` is fully green; migration is churn with no observable gain.
+  Becomes a follow-up issue at batch close-out.
+- **Constraints recorded**: per-commit flush must be
+  `scheduleRenderMicrotask()` (frameloop variant provably leaves renderState
+  stale when idle); controls flush-guard removal is part of Step 7's commit.
+- Notable executor quality: bisected the flush regression on the controls
+  path (12/13 → 9/13) instead of shipping it guarded-by-luck; disclosed an
+  unproven hypothesis as unproven.

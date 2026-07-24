@@ -161,6 +161,37 @@
 > Completion order: 3h → Step 5 remainder → Steps 6, 7, 8. Step 8's full gate
 > = original suites, allowed failures ONLY the two 004-owned layout-button
 > specs.
+>
+> Revision 2026-07-24 #6 (guard, after executor STOP at `6193fb3`):
+>
+> 1. **3h(a) `policy='always'` — guard reproduced and characterized it.** The
+>    spec's wait helper returns only once opacity > 0.99; the assertion then
+>    read **0.0198**. So the fade genuinely completed and then RE-RAN from ~0
+>    — a real double-fade flash, not a stale-element test artifact. The spec
+>    is CORRECT and must not be modified. Prime suspect: the "one-shot strip
+>    for nodes seeded before the policy resolved" disturbing the node after
+>    completion (it only runs under a reducing policy — matching the
+>    always-only failure). Fix directions, in preference order: resolve
+>    `'always'` synchronously at VE creation so no post-mount strip exists at
+>    all (`'always'` needs no matchMedia); otherwise constrain the strip to
+>    transform channels only and prove it cannot trigger a reset/re-animate.
+>    Verify: the `policy='always'` spec passes 3 consecutive runs in
+>    isolation AND in the full utilities suite.
+> 2. **Step 6 (SVG values through the VE) is SKIPPED by guard ruling.**
+>    `e2e/svg` passes in full on the landed swap; migrating `svgEffect`/path
+>    drawing is churn against a green suite with no test-visible gain, and
+>    the plan always flagged a pathLength-conflict STOP. It becomes a
+>    follow-up issue at batch close-out, not part of 002. Do not touch SVG
+>    handling.
+> 3. Binding constraints added: the per-commit flush is
+>    `scheduleRenderMicrotask()` — `scheduleRender()` provably leaves
+>    `renderState` stale when the frameloop is idle; and the controls-path
+>    flush guard MUST be removed in the same commit that lands Step 7 (a
+>    VE-driven controls node must not stay un-flushed).
+>
+> Remaining order: 3h(a) → Step 7 (controls; remove flush guard) → Step 8
+> full gate (allowed failures: ONLY the two 004-owned layout-button specs —
+> the controls re-attach allowance ends when Step 7 lands).
 
 ## Status
 
