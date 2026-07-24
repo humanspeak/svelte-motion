@@ -9,13 +9,13 @@ and update your row when done.
 
 ## Execution order & status
 
-| Plan | Title                                                     | Priority | Effort | Risk | Depends on            | Status      |
-| ---- | --------------------------------------------------------- | -------- | ------ | ---- | --------------------- | ----------- |
-| 001  | One VisualElement per motion component (inert foundation) | P1       | M      | LOW  | —                     | DONE        |
-| 002  | Enter/animate/variants through createAnimationState       | P1       | L      | HIGH | 001                   | IN PROGRESS |
-| 003  | Gestures via setActive; delete coordinator layer          | P1       | L      | MED  | 002                   | TODO        |
-| 004  | Presence context + exit through the VisualElement         | P1       | M      | MED  | 002 (003 recommended) | TODO        |
-| 005  | Drag + layout single-writer completion                    | P2       | L      | HIGH | 003                   | TODO        |
+| Plan | Title                                                     | Priority | Effort | Risk | Depends on            | Status                                                                                                                              |
+| ---- | --------------------------------------------------------- | -------- | ------ | ---- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 001  | One VisualElement per motion component (inert foundation) | P1       | M      | LOW  | —                     | DONE                                                                                                                                |
+| 002  | Enter/animate/variants through createAnimationState       | P1       | L      | HIGH | 001                   | BLOCKED — Step 2's mandated `seedLatestValues: true` is unsatisfiable before Steps 3–4 delete the WAAPI writer; needs re-sequencing |
+| 003  | Gestures via setActive; delete coordinator layer          | P1       | L      | MED  | 002                   | TODO                                                                                                                                |
+| 004  | Presence context + exit through the VisualElement         | P1       | M      | MED  | 002 (003 recommended) | TODO                                                                                                                                |
+| 005  | Drag + layout single-writer completion                    | P2       | L      | HIGH | 003                   | TODO                                                                                                                                |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)

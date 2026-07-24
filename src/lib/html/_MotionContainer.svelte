@@ -456,13 +456,16 @@
                       // earlier than it has ever happened.
                       props: buildMotionNodeProps(false),
                       parent: visualElementParent,
-                      // plan 002: seed `latestValues` from the props once this
-                      // node is the renderer. Until then it must start EMPTY —
-                      // the projection node holds `latestValues` by reference
-                      // and reads its transform keys as transforms already
-                      // applied to the element, so seeding an unrendered
-                      // `initial`/`animate` target corrupts projection
-                      // measurement (exit-clone sizing, FLIP deltas).
+                      // plan 002 STOP (see 002 report): seeding must wait for the
+                      // step that makes the VE the renderer OF ANIMATED KEYS.
+                      // Plan 002's Step 2 only makes it the renderer of style
+                      // MotionValues; `animationState` does not own
+                      // `latestValues` until animateChanges() drives it (Step 3)
+                      // and the legacy WAAPI writer is deleted (Step 4). Seeded
+                      // here, `latestValues` stays frozen at the `initial`
+                      // target while WAAPI animates the DOM, so the next VE
+                      // render writes a stale `scale(0)`/`opacity:0` and the
+                      // exit clone measures 2.36px instead of 128px.
                       seedLatestValues: false,
                       // plan 004: presence context flows in here.
                       presenceContext: null,
@@ -2596,11 +2599,13 @@
         if (visualElement.current !== mounted) visualElement.mount(mounted)
         // motion-dom never calls this itself — the consumer does, after mount
         // (upstream use-visual-element.ts:147). It instantiates the enabled
-        // features, giving the node its `animationState`. We deliberately do
-        // NOT call `scheduleRenderMicrotask()` or
-        // `animationState.animateChanges()` (upstream :148/:167) — that is what
-        // plan 002 turns on.
+        // features, giving the node its `animationState`.
         visualElement.updateFeatures()
+        // plan 002 STOP: upstream also calls `scheduleRenderMicrotask()` here
+        // (use-visual-element.ts:148), but that only makes sense once
+        // `latestValues` is authoritative. While the legacy WAAPI writer owns
+        // the animated keys, flushing an unsynced `latestValues` to the DOM
+        // writes a stale target. Turn this on with seedLatestValues.
         return () => {
             if (visualElement.current === mounted) visualElement.unmount()
             visualElementStore.delete(mounted)
