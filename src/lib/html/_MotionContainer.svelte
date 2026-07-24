@@ -500,6 +500,53 @@
     }
 
     /**
+     * Strip transform channels from a definition under a reducing policy.
+     *
+     * `filterReducedMotionKeyframes` used to be applied by the deleted
+     * `executeAnimation`, so the animationState was seeing unfiltered targets and
+     * animating transforms that the policy forbids (`initialKeyframes` keeps its
+     * own filtering, which is why only the animate half regressed). Re-homed here
+     * so the animationState never sees a transform channel it must not touch.
+     *
+     * Handles both shapes the animationState resolves: a target object, and a
+     * variant MAP (a bare variant LABEL cannot be filtered, so the map behind it
+     * is filtered instead). Lists of labels resolve through the same map.
+     *
+     * @param definition A target object, variant label, or list of labels.
+     * @returns The definition with transform channels removed where applicable.
+     */
+    const filterReducedMotionDefinition = (definition: unknown): unknown => {
+        if (!reducedMotion) return definition
+        if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
+            // A label (or list of labels) resolves via `variants`, filtered below.
+            return definition
+        }
+        return filterReducedMotionKeyframes(definition as Record<string, unknown>, reducedMotion)
+    }
+
+    /** The `variants` map with transform channels stripped under a reducing policy. */
+    const reducedMotionVariants = $derived.by(() => {
+        if (!reducedMotion || !variantsProp) return variantsProp
+        const out: Record<string, unknown> = {}
+        for (const [name, variant] of Object.entries(variantsProp)) {
+            // Function-form variants resolve per `custom` inside the
+            // animationState, so wrap rather than filter eagerly.
+            out[name] =
+                typeof variant === 'function'
+                    ? (...args: unknown[]) =>
+                          filterReducedMotionKeyframes(
+                              (variant as (...a: unknown[]) => Record<string, unknown>)(...args),
+                              reducedMotion
+                          )
+                    : filterReducedMotionKeyframes(
+                          variant as Record<string, unknown>,
+                          reducedMotion
+                      )
+        }
+        return out as typeof variantsProp
+    })
+
+    /**
      * The props motion-dom reads off this node.
      *
      * `style` is carried through because the projection adapter has always
@@ -516,7 +563,12 @@
             // variants off `visualElement.props`, so it must see the same
             // presence/parent-resolved `initial`, the same inherited variant
             // label and the same `custom` the legacy writer used. (plan 002)
-            initial: effectiveInitialProp,
+            // Filtered too: under a reducing policy the node must not even be
+            // SEEDED with a transform channel, or `makeLatestValues` puts it in
+            // `latestValues` and the VE renders it (the container's own
+            // `initialKeyframes` was already filtered, which is why only the
+            // animate half of the regression was visible).
+            initial: filterReducedMotionDefinition(effectiveInitialProp),
             // The node's OWN animate only. Passing the INHERITED variant label
             // here would make `isControllingVariants(props)` true, which stops
             // motion-dom registering this node as a variant CHILD
@@ -524,15 +576,17 @@
             // — killing parent-driven propagation and `staggerChildren`.
             // `animateChanges` reads the inherited label itself, from
             // `getVariantContext(visualElement.parent)`.
-            animate: animateControls ? undefined : resolveRelativeAnimate(declarativeAnimateProp),
-            variants: variantsProp,
+            animate: animateControls
+                ? undefined
+                : filterReducedMotionDefinition(resolveRelativeAnimate(declarativeAnimateProp)),
+            variants: reducedMotionVariants,
             custom: effectiveCustom,
             transition: mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {}),
-            whileHover: whileHoverProp,
-            whileTap: whileTapProp,
-            whileFocus: whileFocusProp,
-            whileInView: whileInViewProp,
-            whileDrag: whileDragProp,
+            whileHover: filterReducedMotionDefinition(whileHoverProp),
+            whileTap: filterReducedMotionDefinition(whileTapProp),
+            whileFocus: filterReducedMotionDefinition(whileFocusProp),
+            whileInView: filterReducedMotionDefinition(whileInViewProp),
+            whileDrag: filterReducedMotionDefinition(whileDragProp),
             // `buildHTMLStyles(state, latestValues, transformTemplate)` reads the
             // template off the props, so the VE composes templated transforms
             // natively — the job `applyMotionStyleEffect` used to do.
@@ -2458,6 +2512,49 @@
         releaseWaitLayoutHold()
     }
 
+    /** Guards {@link stripReducedMotionTransforms} to one pass per policy flip. */
+    let reducedMotionTransformsStripped = false
+
+    /**
+     * Drop transform channels the reducing policy forbids from a node that was
+     * already seeded with them.
+     *
+     * The policy is not always resolved during component init — `MotionConfig
+     * reducedMotion="always"` becomes visible to `useReducedMotionConfig` only
+     * after its context effect settles — so a node can be seeded from an
+     * unfiltered `initial` and keep e.g. `x: -200` in `latestValues` even though
+     * `buildMotionNodeProps` now filters both `initial` and `animate`. Filtering
+     * the props cannot retroactively unseed those values, so drop them once.
+     *
+     * Style-prop MotionValues are left alone: those are author-driven channels
+     * the policy does not own, and removing them would break `vanilla-values`.
+     *
+     * @returns Nothing.
+     */
+    const stripReducedMotionTransforms = (): void => {
+        if (!visualElement) return
+        if (!reducedMotion) {
+            reducedMotionTransformsStripped = false
+            return
+        }
+        if (reducedMotionTransformsStripped) return
+        reducedMotionTransformsStripped = true
+
+        const styleDriven = collectMotionStyleValues(styleProp) ?? {}
+        let changed = false
+        for (const key of Object.keys(visualElement.latestValues)) {
+            if (!transformProps.has(key) || key in styleDriven) continue
+            visualElement.values.get(key)?.stop()
+            visualElement.values.delete(key)
+            delete visualElement.latestValues[key]
+            changed = true
+        }
+        // Microtask flush, not the frameloop one: deleting keys from
+        // `latestValues` is a silent state change and the frameloop variant can
+        // sit unflushed when nothing else is animating.
+        if (changed) visualElement.scheduleRenderMicrotask()
+    }
+
     /**
      * True once the mount/enter effect has run the first `animateChanges()`
      * pass. Until then the props effect must not fire one — the enter path owns
@@ -2664,6 +2761,19 @@
         const next = buildMotionNodeProps()
         untrack(() => {
             visualElement.update(next, null)
+            stripReducedMotionTransforms()
+            // `update()` can change what the node renders WITHOUT scheduling a
+            // render of its own: `addValue()` writes `latestValues[key]` directly
+            // when a MotionValue instance is replaced (VisualElement.mjs:437-447),
+            // and dropping `transformTemplate` changes how `latestValues` composes.
+            // Both leave the DOM showing the previous frame — measured on
+            // `transform-template` "removes transformTemplate if prop is removed"
+            // (latestValues.x = 20 while the element still read translateX(10px)).
+            // `scheduleRenderMicrotask` (not `scheduleRender`) because this is a
+            // per-commit flush, exactly as upstream does after every React commit
+            // (use-visual-element.ts:148); the frameloop variant can sit unflushed
+            // when nothing else is animating, which left `renderState` stale.
+            visualElement.scheduleRenderMicrotask()
             // Only once the mount/enter effect has run the first pass — it owns
             // the enter ordering and the wait-mode gate.
             if (firstAnimatePassDone) runAnimation()
