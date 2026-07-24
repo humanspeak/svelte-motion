@@ -432,6 +432,10 @@
             whileFocus: whileFocusProp,
             whileInView: whileInViewProp,
             whileDrag: whileDragProp,
+            // `buildHTMLStyles(state, latestValues, transformTemplate)` reads the
+            // template off the props, so the VE composes templated transforms
+            // natively — the job `applyMotionStyleEffect` used to do.
+            transformTemplate: transformTemplateProp,
             exit: exitProp,
             layoutId: scopedLayoutId
         }) as MotionNodeOptions
@@ -722,8 +726,17 @@
         })
     })
 
+    // Style MotionValues are driven by the VisualElement (#449 plan 002): its
+    // `bindToMotionValue` subscribes each scraped value and schedules a render,
+    // and `buildHTMLStyles` composes the transform (honouring
+    // `props.transformTemplate`). That is the same job the former
+    // `styleEffect` / `applyMotionStyleEffect` subscription did here, so
+    // keeping both would make two writers race for the element's style.
+    //
+    // Retained only as the no-VisualElement fallback (SSR has no VE, but this
+    // effect never runs there; a client render always has one).
     $effect(() => {
-        if (!element) return
+        if (!element || visualElement) return
 
         const styleValues = collectMotionStyleValues(styleProp)
         if (!styleValues) return
