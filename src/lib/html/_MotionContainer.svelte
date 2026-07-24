@@ -2773,7 +2773,12 @@
             // per-commit flush, exactly as upstream does after every React commit
             // (use-visual-element.ts:148); the frameloop variant can sit unflushed
             // when nothing else is animating, which left `renderState` stale.
-            visualElement.scheduleRenderMicrotask()
+            // Not for controls-driven elements: the imperative controls path is still
+            // the legacy writer until Step 7 and holds its own frozen mid-flight
+            // value on the element. Flushing this node's `latestValues` over it
+            // resurrects a stale declarative target (verified by bisection: the
+            // flush alone breaks 3 animation-controls specs).
+            if (!animateControls) visualElement.scheduleRenderMicrotask()
             // Only once the mount/enter effect has run the first pass — it owns
             // the enter ordering and the wait-mode gate.
             if (firstAnimatePassDone) runAnimation()
