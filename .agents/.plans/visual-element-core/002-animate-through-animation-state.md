@@ -59,6 +59,44 @@
 >   locations: `executeAnimation` :2216, `runAnimation` :2422, re-run effects
 >   :3290–3375, mount/enter effect :3376–3553, `renderedInlineStyle`
 >   :1803–1855, controls helpers :1398/:1469/:1540/:1600.
+>
+> Revision 2026-07-24 #3 (guard, after executor STOP at `2efc9a2`): the atomic
+> Step 3 attempt is PRESERVED on branch `plan002-step3-attempt` (commit
+> `129a394`) and is largely CORRECT — resume by cherry-picking it, do not
+> rewrite from scratch. Proven on that attempt: seed + `scheduleRenderMicrotask`
+> caused zero projection/exit-clone failures; the `renderedInlineStyle`
+> collapse retained all three holds with no gesture/wait regressions; the
+> inherited-variant fix (pass only `declarativeAnimateProp` as `animate`, let
+> `animateChanges` read inherited labels via `getVariantContext(parent)`) is
+> the correct upstream model; VE creation must sit after
+> `effectiveInitialProp`/`effectiveAnimate`/`effectiveCustom` are resolved;
+> and the library's animate-first-keyframe first-paint seed (SSR pin) must be
+> preserved explicitly. Changes to Step 3:
+>
+> 1. **Gate re-scoped**: drop `e2e/variants` from Step 3's verify — variant
+>    tree/stagger propagation is Step 5's subject and returns to the gate
+>    there. Step 3's gate is now `pnpm test:only` + SSR pin +
+>    `pnpm test:e2e e2e/motion e2e/layout e2e/projection e2e/animate-presence`.
+> 2. **New sub-item 3e — key-change writer**: `runKeyTransition` (the
+>    same-element key-change exit→initial→enter sequence) is a 5th declarative
+>    writer Step 3c must migrate, not leave: replace its snap+enter with
+>    `animationState.reset()` + jump values to resolved initial +
+>    `animateChanges()` (upstream re-enter semantics; plan 004 later
+>    formalizes the exit half with `setActive('exit')`). The four
+>    `e2e/animate-presence/key-change` specs are its verify.
+> 3. **New sub-item 3f — relative keyframes**: `'+=N'` relative keyframe
+>    resolution (`resolveWildcardKeyframes`) is a svelte-motion extension with
+>    NO motion-dom equivalent (`fillWildcards` handles `null` only). Re-home
+>    it on the VE path: resolve relatives against the live channel value into
+>    the `animate` definition the animationState sees, at the point props are
+>    (re)built. Verify: `e2e/motion/declarative-wildcards` spec passes.
+> 4. **New sub-item 3g — white-box unit specs**: 6 tests in
+>    `_MotionContainer.spec.ts` assert call counts on the mocked legacy
+>    `animate()`; rewrite them to assert BEHAVIOR (DOM/latestValues outcomes
+>    or animationState interactions), not the deleted mechanism.
+> 5. Executor process note stands: never locate deletion boundaries in this
+>    3,600-line component by unanchored string index; take a WIP commit before
+>    large surgery.
 
 ## Status
 

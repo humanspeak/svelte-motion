@@ -46,3 +46,36 @@ unreachable-green by construction.
   answer (nothing to wire) recorded in the revision note.
 - No done criterion was weakened; the amendment re-sequences, adds gates.
 - README row 002: BLOCKED → TODO (amended, ready for re-dispatch).
+
+## Checkpoint 2026-07-24 #2 — STOP review (executor run 2, atomic Step 3)
+
+- **Snapshot**: working branch carries only `2efc9a2` (BLOCKED docs) since the
+  last checkpoint — guard verified `git diff e4f05a4..HEAD --stat` = README
+  only, `pnpm test:only` 844 passed, tree clean. The full Step-3 attempt is
+  preserved off-branch at `plan002-step3-attempt` / `129a394`
+  (−497/+308 lines in the container).
+- **Verdict**: **ON TRACK** (executor) + **PLAN AMENDED** (guard, revision #3).
+  Correct STOP on "verification fails twice"; the residual failures were
+  provably outside Step 3's fixable scope.
+
+### Findings
+
+1. **Gate mis-scoped (plan defect)**: Step 3's gate included `e2e/variants`,
+   whose subject (variant tree/stagger through the VE tree) is Step 5's work.
+   Unsatisfiable by construction. Gate re-scoped in revision #3.
+2. **Un-enumerated 5th writer (plan defect)**: the key-change transition
+   (`runKeyTransition`) was missing from Step 3c's deletion list; its enter
+   no-ops under `animateChanges` (no prop change). New sub-item 3e with the
+   reset+jump mechanism.
+3. **Library extension gap (plan defect)**: `'+=N'` relative keyframes are a
+   svelte-motion extension with no motion-dom equivalent; the deleted
+   `executeAnimation` was its only resolver. New sub-item 3f.
+4. **White-box unit specs**: 6 `_MotionContainer.spec.ts` tests pin the
+   mocked legacy `animate()` call counts — mechanism assertions, not
+   behavior. New sub-item 3g to rewrite them.
+5. **Executor quality notes**: inherited-variant fix (declarative-only
+   `animate` prop + `getVariantContext(parent)`) matches upstream and
+   recovered 2 failures; branch hygiene excellent (no red commit on the
+   working branch, attempt preserved for cherry-pick). Disclosed process
+   slip (two self-corrected file corruptions, never committed) — verified
+   harmless via clean diffstat + green suite; lesson recorded in revision #3.
