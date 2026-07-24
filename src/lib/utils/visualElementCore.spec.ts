@@ -7,6 +7,7 @@ import {
     type MotionNodeOptions
 } from 'motion-dom'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { MotionDomProjectionAdapter } from './motionDomProjection.js'
 import {
     createMotionVisualElement,
     createRenderState,
@@ -197,6 +198,18 @@ describe('createMotionVisualElement', () => {
         expect(ve.latestValues).toEqual({ opacity: 0 })
     })
 
+    it('starts with EMPTY latestValues when seeding is opted out', () => {
+        // The projection node holds `latestValues` by reference and reads its
+        // transform keys as transforms already applied to the element, so a
+        // node that does not render yet must not advertise a target it never
+        // wrote (#449 plan 001 inertness).
+        const ve = createMotionVisualElement({
+            props: { initial: { opacity: 0, scale: 0.5 } },
+            seedLatestValues: false
+        })
+        expect(ve.latestValues).toEqual({})
+    })
+
     it('registers itself in visualElementStore on mount and constructs the animation feature', () => {
         const ve = createMotionVisualElement({ props: { animate: { opacity: 1 } } })
         expect(ve.animationState).toBeUndefined()
@@ -220,6 +233,26 @@ describe('createMotionVisualElement', () => {
         ve.updateFeatures()
         expect(ve.animationState).toBeUndefined()
         ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    it('keeps exactly ONE VisualElement in the store when a projection adapter shares the element', () => {
+        // The single-VisualElement invariant: the container owns the node and
+        // injects it into the projection adapter, so `visualElementStore` maps
+        // the element to that one instance — never to a second node that would
+        // double-render it.
+        const ve = createMotionVisualElement({ props: { animate: { opacity: 1 } } })
+        const adapter = new MotionDomProjectionAdapter({ visualElement: ve })
+        adapter.updateOptions({ layout: true })
+
+        adapter.mount(element)
+        ve.mount(element)
+        ve.updateFeatures()
+
+        expect(adapter.visualElement).toBe(ve)
+        expect(visualElementStore.get(element)).toBe(ve)
+
+        adapter.unmount()
         visualElementStore.delete(element)
     })
 

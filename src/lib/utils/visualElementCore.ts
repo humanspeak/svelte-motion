@@ -320,6 +320,19 @@ export interface CreateMotionVisualElementOptions {
     blockInitialAnimation?: boolean
     /** Variant labels inherited from the nearest motion ancestor. */
     context?: MotionVariantContext
+    /**
+     * Seed `latestValues` from the props via {@link makeLatestValues}
+     * (default `true`, matching upstream).
+     *
+     * Pass `false` while the VisualElement is not yet the renderer: the
+     * projection node holds `latestValues` BY REFERENCE
+     * (`new HTMLProjectionNode(visualElement.latestValues, …)`) and treats the
+     * transform keys in it as transforms currently applied to the element. A
+     * node seeded with an `initial`/`animate` target it has not actually
+     * rendered therefore reports a wrong box out of `measure()`/scale
+     * correction. plan 002 turns seeding on together with rendering.
+     */
+    seedLatestValues?: boolean
 }
 
 /**
@@ -352,11 +365,14 @@ export const createMotionVisualElement = (
         skipAnimations,
         isSVG = false,
         blockInitialAnimation,
-        context = {}
+        context = {},
+        seedLatestValues = true
     } = options
 
     const scrape = isSVG ? scrapeSVGMotionValuesFromProps : scrapeHTMLMotionValuesFromProps
-    const latestValues = makeLatestValues(props, context, presenceContext, scrape)
+    const latestValues = seedLatestValues
+        ? makeLatestValues(props, context, presenceContext, scrape)
+        : {}
     const shared = {
         parent: parent ?? undefined,
         props,

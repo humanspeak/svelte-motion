@@ -205,19 +205,20 @@ export class MotionDomProjectionAdapter {
         this.layoutId = options.layoutId
         this.transition = options.transition
 
-        // Only seed props on a VisualElement this adapter owns. An injected
-        // VisualElement's props are the owning component's contract (#449) —
-        // overwriting them here would drop `animate`/`variants` and scrape the
-        // `style` MotionValues onto a node the component renders itself.
-        if (this.ownsVisualElement) {
-            this.visualElement.update(
-                {
-                    transition: options.transition,
-                    style: options.style
-                } as never,
-                null
-            )
-        }
+        // An injected VisualElement's props are the owning component's contract
+        // (#449), so MERGE rather than replace: a bare `{ transition, style }`
+        // write would drop the owner's `animate`/`variants`/`while*`. The
+        // `style` write itself is load-bearing and must keep happening — it is
+        // what binds the style MotionValues onto the node, mirroring them into
+        // `latestValues` for the projection transform math.
+        this.visualElement.update(
+            {
+                ...(this.ownsVisualElement ? {} : this.visualElement.props),
+                transition: options.transition,
+                style: options.style
+            } as never,
+            null
+        )
         this.projection.setOptions({
             layout: options.layout,
             layoutId: options.layoutId,
@@ -268,7 +269,9 @@ export class MotionDomProjectionAdapter {
         if (!this.element) return
         const element = this.element
         this.projection.scheduleCheckAfterUnmount()
-        this.visualElement.unmount()
+        // An injected VisualElement may already have been unmounted by its
+        // owner; unmounting twice would re-run the projection/feature teardown.
+        if (this.visualElement.current) this.visualElement.unmount()
         visualElementStore.delete(element)
         MotionDomProjectionAdapter.adapters.delete(this.projection)
         if (this.refreshRafId !== null && typeof window !== 'undefined') {

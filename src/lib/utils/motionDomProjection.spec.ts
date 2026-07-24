@@ -265,17 +265,19 @@ describe('MotionDomProjectionAdapter visual-element injection', () => {
         adapter.unmount()
     })
 
-    it('does not overwrite an injected VisualElement props from updateOptions', () => {
+    it('merges into an injected VisualElement props instead of replacing them', () => {
         const visualElement = createMotionVisualElement({
             props: { animate: { opacity: 1 }, variants: { a: { opacity: 0 } } }
         })
         const adapter = new MotionDomProjectionAdapter({ visualElement })
         adapter.updateOptions({ layout: true, transition: { duration: 1 }, style: { x: 5 } })
 
+        // The owner's props survive…
         expect(visualElement.getProps().animate).toEqual({ opacity: 1 })
         expect(visualElement.getProps().variants).toEqual({ a: { opacity: 0 } })
-        // Inertness: no style MotionValues bound onto the injected node.
-        expect(visualElement.values.size).toBe(0)
+        // …and the adapter's own contributions land.
+        expect(visualElement.getProps().transition).toEqual({ duration: 1 })
+        expect((visualElement.getProps() as { style?: unknown }).style).toEqual({ x: 5 })
     })
 
     it('still constructs its own VisualElement with no injection', () => {

@@ -11,7 +11,7 @@ and update your row when done.
 
 | Plan | Title                                                     | Priority | Effort | Risk | Depends on            | Status |
 | ---- | --------------------------------------------------------- | -------- | ------ | ---- | --------------------- | ------ |
-| 001  | One VisualElement per motion component (inert foundation) | P1       | M      | LOW  | —                     | TODO   |
+| 001  | One VisualElement per motion component (inert foundation) | P1       | M      | LOW  | —                     | DONE   |
 | 002  | Enter/animate/variants through createAnimationState       | P1       | L      | HIGH | 001                   | TODO   |
 | 003  | Gestures via setActive; delete coordinator layer          | P1       | L      | MED  | 002                   | TODO   |
 | 004  | Presence context + exit through the VisualElement         | P1       | M      | MED  | 002 (003 recommended) | TODO   |

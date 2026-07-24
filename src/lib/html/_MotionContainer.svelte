@@ -39,6 +39,8 @@
         styleEffect,
         svgEffect,
         transformProps,
+        visualElementStore,
+        type MotionNodeOptions,
         type MotionValue,
         type ValueAnimationTransition
     } from 'motion-dom'
@@ -94,6 +96,11 @@
         getMotionDomProjectionParent,
         setMotionDomProjectionParent
     } from '$lib/components/motionDomProjection.context'
+    import {
+        getVisualElementParent,
+        setVisualElementParent
+    } from '$lib/components/visualElementTree.context'
+    import { createMotionVisualElement } from '$lib/utils/visualElementCore'
     import {
         resolveInitial,
         resolveAnimate,
@@ -385,13 +392,93 @@
         element.style.transform = liveGestureTransform
     })
 
+    // ── The single motion-dom VisualElement for this component (#449) ────────
+    //
+    // Upstream Framer Motion gives every motion component exactly ONE
+    // VisualElement and routes every animation through it. This is the
+    // foundation for that migration (plan 001): the node is created, mounted,
+    // updated and unmounted on the Svelte lifecycle, and the animation feature
+    // is registered — but it is deliberately INERT. Nothing here starts an
+    // animation or renders; the existing writers still own the DOM. Plans
+    // 002–005 move each writer onto this node.
+    //
+    // `visualElementStore` is a `WeakMap<instance, VisualElement>` written in
+    // `VisualElement.mount()`, so there must be exactly one VisualElement per
+    // element — hence the projection adapter is handed this instance rather
+    // than constructing its own.
+
+    /**
+     * The props motion-dom reads off this node.
+     *
+     * `style` is carried through because the projection adapter has always
+     * written it onto its VisualElement: the scrape binds the style
+     * MotionValues and mirrors them into `latestValues`, which is the object
+     * the projection node does its transform math against. Dropping it changes
+     * FLIP/projection behaviour. It is omitted at CREATION time only (see
+     * below), matching the adapter's former `props: {}` construction.
+     */
+    const buildMotionNodeProps = (includeStyle = true): MotionNodeOptions =>
+        ({
+            ...(includeStyle ? { style: styleProp } : {}),
+            initial: initialProp,
+            // Declarative targets only — svelte-motion's animation-controls
+            // objects are not upstream `AnimationControls`. plan 002.
+            animate: isAnimationControls(animateProp) ? undefined : animateProp,
+            variants: variantsProp,
+            custom: customProp,
+            transition: mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {}),
+            whileHover: whileHoverProp,
+            whileTap: whileTapProp,
+            whileFocus: whileFocusProp,
+            whileInView: whileInViewProp,
+            whileDrag: whileDragProp,
+            exit: exitProp,
+            layoutId: scopedLayoutId
+        }) as MotionNodeOptions
+
+    const visualElementParent = typeof window !== 'undefined' ? getVisualElementParent() : undefined
+    // `untrack`: the node is created ONCE with the props of this render, the
+    // way upstream's `useConstant(makeState)` does (use-visual-state.ts:135).
+    // Later prop changes flow through the update effect below, not by
+    // rebuilding the node.
+    const visualElement =
+        typeof window !== 'undefined'
+            ? untrack(() =>
+                  createMotionVisualElement({
+                      // No `style` at creation: the adapter used to construct
+                      // its node with `props: {}` and bind the style
+                      // MotionValues on its first `updateOptions`, so seeding
+                      // them into `latestValues` here would move that write
+                      // earlier than it has ever happened.
+                      props: buildMotionNodeProps(false),
+                      parent: visualElementParent,
+                      // plan 002: seed `latestValues` from the props once this
+                      // node is the renderer. Until then it must start EMPTY —
+                      // the projection node holds `latestValues` by reference
+                      // and reads its transform keys as transforms already
+                      // applied to the element, so seeding an unrendered
+                      // `initial`/`animate` target corrupts projection
+                      // measurement (exit-clone sizing, FLIP deltas).
+                      seedLatestValues: false,
+                      // plan 004: presence context flows in here.
+                      presenceContext: null,
+                      reducedMotionConfig: motionConfig?.reducedMotion ?? 'never',
+                      isSVG: isSVGTag(String(tag))
+                  })
+              )
+            : null
+    if (visualElement) {
+        setVisualElementParent(visualElement)
+    }
+
     const motionDomProjectionParent =
         typeof window !== 'undefined' ? getMotionDomProjectionParent() : null
     const motionDomProjection =
         typeof window !== 'undefined'
             ? new MotionDomProjectionAdapter({
                   parent: motionDomProjectionParent,
-                  getBaseTransform: () => userBaseTransform
+                  getBaseTransform: () => userBaseTransform,
+                  visualElement: visualElement ?? undefined
               })
             : null
     if (motionDomProjection) {
@@ -2479,6 +2566,42 @@
         return () => {
             motionDomProjection.unmount()
         }
+    })
+
+    // Mount the single VisualElement (#449) and instantiate its features.
+    //
+    // Declared AFTER the projection effect on purpose: `VisualElement.mount()`
+    // also mounts the projection node, and the node must already carry its
+    // `setOptions({ layout, layoutId, … })` when that happens — mounting the
+    // VisualElement first registers an option-less projection node and changes
+    // layout/FLIP behaviour. So the adapter does the actual `mount()` (with
+    // options applied and the layout seeded) and this effect only covers the
+    // no-adapter fallback, the feature instantiation, and teardown.
+    $effect(() => {
+        if (!visualElement || !element) return
+        const mounted = element
+        if (visualElement.current !== mounted) visualElement.mount(mounted)
+        // motion-dom never calls this itself — the consumer does, after mount
+        // (upstream use-visual-element.ts:147). It instantiates the enabled
+        // features, giving the node its `animationState`. We deliberately do
+        // NOT call `scheduleRenderMicrotask()` or
+        // `animationState.animateChanges()` (upstream :148/:167) — that is what
+        // plan 002 turns on.
+        visualElement.updateFeatures()
+        return () => {
+            if (visualElement.current === mounted) visualElement.unmount()
+            visualElementStore.delete(mounted)
+        }
+    })
+
+    // Keep the node's props in sync. `untrack` on the write so only the props
+    // read inside `buildMotionNodeProps` are tracked.
+    $effect(() => {
+        if (!visualElement) return
+        const next = buildMotionNodeProps()
+        untrack(() => {
+            visualElement.update(next, null)
+        })
     })
 
     let explicitLayoutSnapshot: RectLike | null = null
