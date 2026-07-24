@@ -2512,48 +2512,15 @@
         releaseWaitLayoutHold()
     }
 
-    /** Guards {@link stripReducedMotionTransforms} to one pass per policy flip. */
-    let reducedMotionTransformsStripped = false
-
-    /**
-     * Drop transform channels the reducing policy forbids from a node that was
-     * already seeded with them.
-     *
-     * The policy is not always resolved during component init — `MotionConfig
-     * reducedMotion="always"` becomes visible to `useReducedMotionConfig` only
-     * after its context effect settles — so a node can be seeded from an
-     * unfiltered `initial` and keep e.g. `x: -200` in `latestValues` even though
-     * `buildMotionNodeProps` now filters both `initial` and `animate`. Filtering
-     * the props cannot retroactively unseed those values, so drop them once.
-     *
-     * Style-prop MotionValues are left alone: those are author-driven channels
-     * the policy does not own, and removing them would break `vanilla-values`.
-     *
-     * @returns Nothing.
-     */
-    const stripReducedMotionTransforms = (): void => {
-        if (!visualElement) return
-        if (!reducedMotion) {
-            reducedMotionTransformsStripped = false
-            return
-        }
-        if (reducedMotionTransformsStripped) return
-        reducedMotionTransformsStripped = true
-
-        const styleDriven = collectMotionStyleValues(styleProp) ?? {}
-        let changed = false
-        for (const key of Object.keys(visualElement.latestValues)) {
-            if (!transformProps.has(key) || key in styleDriven) continue
-            visualElement.values.get(key)?.stop()
-            visualElement.values.delete(key)
-            delete visualElement.latestValues[key]
-            changed = true
-        }
-        // Microtask flush, not the frameloop one: deleting keys from
-        // `latestValues` is a silent state change and the frameloop variant can
-        // sit unflushed when nothing else is animating.
-        if (changed) visualElement.scheduleRenderMicrotask()
-    }
+    // A post-mount "strip transforms the reducing policy forbids" pass used to
+    // live here. It is GONE: `useReducedMotionConfig` already resolves
+    // `'always'`/`'never'` SYNCHRONOUSLY from the MotionConfig context (only
+    // `'user'` consults matchMedia), so `buildMotionNodeProps` filters `initial`
+    // before the node is ever seeded and there is nothing left to strip. The pass
+    // also ran only under a reducing policy and disturbed the node after its
+    // enter had completed, which showed up as a double-fade flash under
+    // `policy='always'` (guard-measured: opacity settled >0.99, then re-ran from
+    // ~0.02). plan 002 Step 3h(a).
 
     /**
      * True once the mount/enter effect has run the first `animateChanges()`
@@ -2761,7 +2728,6 @@
         const next = buildMotionNodeProps()
         untrack(() => {
             visualElement.update(next, null)
-            stripReducedMotionTransforms()
             // `update()` can change what the node renders WITHOUT scheduling a
             // render of its own: `addValue()` writes `latestValues[key]` directly
             // when a MotionValue instance is replaced (VisualElement.mjs:437-447),
