@@ -25,7 +25,7 @@
      * attribute on `<feDisplacementMap>`, where it drives the warp below.
      *
      * `attrScale` exists because a plain `scale` prop would collide with the CSS
-     * transform property and be style-routed.
+     * transform channel that Motion already owns.
      */
     const attrScale = motionValue(12)
 
@@ -66,10 +66,10 @@
     let rows = $state<Row[]>([])
 
     const WATCHED: { testid: string; label: string; prop: string; channel: string }[] = [
-        { testid: 'mv-circle', label: 'circle (bound)', prop: 'cx', channel: 'style' },
-        { testid: 'static-circle', label: 'circle (plain 5)', prop: 'cx', channel: 'style' },
-        { testid: 'kebab-circle', label: 'circle', prop: 'stroke-width', channel: 'style' },
-        { testid: 'progress-ring', label: 'ring', prop: 'stroke-dashoffset', channel: 'style' },
+        { testid: 'mv-circle', label: 'circle (bound)', prop: 'cx', channel: 'attribute' },
+        { testid: 'static-circle', label: 'circle (plain 5)', prop: 'cx', channel: 'attribute' },
+        { testid: 'kebab-circle', label: 'circle', prop: 'stroke-width', channel: 'attribute' },
+        { testid: 'progress-ring', label: 'ring', prop: 'stroke-dashoffset', channel: 'attribute' },
         { testid: 'chart-line', label: 'line', prop: 'x2', channel: 'attribute' },
         { testid: 'attr-rect', label: 'rect (attrX)', prop: 'x', channel: 'attribute' },
         { testid: 'attr-rect', label: 'rect (attrY)', prop: 'y', channel: 'attribute' },
@@ -350,7 +350,7 @@
 
                 <div>
                     <h3 class="mb-1 text-sm font-medium text-slate-300">
-                        Progress ring: stroke-dashoffset (style-routed)
+                        Progress ring: stroke-dashoffset (attribute-routed)
                     </h3>
                     <svg
                         width="140"
@@ -519,9 +519,9 @@
         <section class="min-w-[26rem] flex-1">
             <h2 class="mb-2 text-lg font-medium">Live DOM channels</h2>
             <p class="mb-3 text-xs text-slate-400">
-                Sampled every animation frame. A style-routed key moves in the
-                <strong>computed style</strong> column while its attribute stays frozen at the server-rendered
-                seed — that is correct, not a bug.
+                Sampled every animation frame. Every bound key moves in the
+                <strong>attribute</strong> column, and computed style follows it (presentation attributes
+                reflect into computed style) — one channel, both readouts agreeing.
             </p>
             <table class="w-full border-collapse text-left font-mono text-xs">
                 <thead>

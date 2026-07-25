@@ -1,18 +1,19 @@
+<!--
+@component
+Root-`<svg>` parity pins (upstream framer-motion behavior, operator-ruled
+2026-07-25 — see issue #456 for the post-1.x enhancement):
+
+- A bound `x` on `<motion.svg>` animates as a CSS TRANSFORM (`translateX`),
+  not the `x` geometry attribute — `buildSVGAttrs` treats the root `<svg>`
+  tag as HTML-like.
+- A bound `attrX` on `<motion.svg>` is a DOCUMENTED NO-OP: the renderer
+  early-returns for root `<svg>` tags before the attrX → attribute copy, so
+  the attribute stays at its server-rendered seed. React framer-motion
+  behaves identically.
+-->
 <script lang="ts">
     import { motion, motionValue } from '$lib'
 
-    /**
-     * Root-`<svg>` parity pins (upstream framer-motion behavior, operator-ruled
-     * 2026-07-25 — see issue #456 for the post-1.x enhancement):
-     *
-     * - A bound `x` on `<motion.svg>` animates as a CSS TRANSFORM
-     *   (`translateX`), not the `x` geometry attribute — `buildSVGAttrs`
-     *   treats the root `<svg>` tag as HTML-like.
-     * - A bound `attrX` on `<motion.svg>` is a DOCUMENTED NO-OP: the renderer
-     *   early-returns for root `<svg>` tags before the attrX → attribute copy,
-     *   so the attribute stays at its server-rendered seed. React framer-motion
-     *   behaves identically.
-     */
     const nestedX = motionValue(0)
     const frozenAttrX = motionValue(20)
 

@@ -455,9 +455,10 @@ describe('createMotionVisualElement', () => {
  */
 describe('SVG motion-value attribute routing', () => {
     let path: SVGPathElement
+    let svg: SVGSVGElement
 
     beforeEach(() => {
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+        svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
         path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
         svg.appendChild(path)
         document.body.appendChild(svg)
@@ -465,6 +466,7 @@ describe('SVG motion-value attribute routing', () => {
 
     afterEach(() => {
         visualElementStore.delete(path)
+        svg.remove()
     })
 
     it('binds MotionValue attributes off the props and mirrors them into latestValues', () => {
