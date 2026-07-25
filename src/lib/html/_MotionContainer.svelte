@@ -35,6 +35,8 @@
         styleEffect,
         svgEffect,
         animateVisualElement,
+        isControllingVariants,
+        isVariantLabel,
         transformProps,
         visualElementStore,
         type MotionNodeOptions,
@@ -109,6 +111,8 @@
     import {
         setVariantContext,
         getVariantContext,
+        setInitialVariantContext,
+        getInitialVariantContext,
         setInitialFalseContext,
         getInitialFalseContext,
         setCustomContext,
@@ -941,6 +945,38 @@
     // Provide context immediately during initialization so children can inherit
     setVariantContext(localVariantStore)
 
+    // The `initial` half of upstream's variant context (plan 006).
+    //
+    // `getCurrentTreeVariants` (framer-motion context/MotionContext/utils.ts)
+    // publishes BOTH labels: a variant-CONTROLLING node contributes its own
+    // `initial`/`animate` labels, and a non-controlling node passes its parent's
+    // straight through so labels reach any depth. We already had the animate half
+    // (`localVariantStore`); without the initial half a child carrying only a
+    // `variants` map had nothing to seed its first paint from and rendered at its
+    // natural pose — the first expand then animated to a pose it already occupied.
+    //
+    // `initial === false` is deliberately NOT carried here: it keeps its own
+    // boolean channel (`setInitialFalseContext`), as upstream keeps them separate.
+    const inheritedInitialVariant = getInitialVariantContext()
+    // `untrack`: variant context is resolved ONCE during init, exactly as
+    // upstream's `useCreateMotionContext` memoizes on the label values. Reading
+    // the props reactively here would only add spurious dependencies.
+    setInitialVariantContext(
+        untrack(() => {
+            const isControllingVariantLabels = isControllingVariants({
+                animate: animateProp,
+                initial: initialProp,
+                whileHover: whileHoverProp,
+                whileTap: whileTapProp,
+                whileFocus: whileFocusProp,
+                whileInView: whileInViewProp,
+                whileDrag: whileDragProp
+            } as MotionNodeOptions)
+            if (!isControllingVariantLabels) return inheritedInitialVariant
+            return isVariantLabel(initialProp) ? (initialProp as string | string[]) : undefined
+        })
+    )
+
     // Custom-value inheritance. Children with no `custom` prop adopt the
     // nearest motion ancestor's value. Reactive via a writable store so a
     // parent updating `custom` re-fires descendants' variant resolution.
@@ -1012,7 +1048,15 @@
                       // context supplies the label for SEEDING only, which is how
                       // a stacked child renders correctly before its parent ever
                       // animates. (plan 002 Step 5)
-                      context: { animate: effectiveAnimate },
+                      // Both halves of the variant context. `makeLatestValues`
+                      // applies each only when the node has no OWN value
+                      // (`if (initial === undefined) initial = context.initial`),
+                      // so an own `initial` still wins — the precedence is not
+                      // duplicated here.
+                      context: {
+                          initial: inheritedInitialVariant,
+                          animate: effectiveAnimate
+                      },
                       reducedMotionConfig: motionConfig?.reducedMotion ?? 'never',
                       isSVG: isSVGTag(String(tag))
                   })
