@@ -38,6 +38,7 @@
         transformProps,
         visualElementStore,
         type MotionNodeOptions,
+        type PresenceContextProps,
         type MotionValue
     } from 'motion-dom'
     import { isPlaywrightEnv, pwLog } from '$lib/utils/log'
@@ -269,7 +270,8 @@
     // (custom exit, then clone of a node the wrapper already let go).
     // Enter-side coordination (shouldAnimateEnter, mode='wait' blocking)
     // remains active so the element still slots into the outer presence flow.
-    const inPresenceChild = !!getPresenceChildContext()
+    const presenceChildContext = getPresenceChildContext()
+    const inPresenceChild = !!presenceChildContext
 
     // Get layoutId registry (provided by AnimatePresence or a parent LayoutGroup)
     const layoutIdRegistry = getLayoutIdRegistry()
@@ -384,6 +386,42 @@
         element.style.transform = liveGestureTransform
     })
 
+    const resolvePresenceCustom = () => {
+        const presenceCustom = context?.custom
+        return presenceCustom !== undefined ? presenceCustom : effectiveCustom
+    }
+    /**
+     * Adapt the `PresenceChild` context into motion-dom's `PresenceContextProps`
+     * so `ExitAnimationFeature` can drive `setActive('exit', …)` (plan 004).
+     *
+     * A FRESH object every call, deliberately. `VisualElement.update()` stores
+     * `prevPresenceContext = presenceContext` before assigning the new one, and
+     * the exit feature fires only when `isPresent !== prevIsPresent`. Handing it
+     * the same object with a live getter would make those two reads identical and
+     * the feature would never see a flip.
+     *
+     * Only the `PresenceChild` path is wired: direct `AnimatePresence` children
+     * exit through the CLONE path in `presence.ts`, which is a deliberate
+     * architectural deviation this plan keeps (the clone is detached and has no
+     * VisualElement, so it cannot fight the original's).
+     *
+     * @returns The presence context, or `null` outside a `PresenceChild`.
+     */
+    const buildPresenceContext = (): PresenceContextProps | null => {
+        if (!presenceChildContext) return null
+        return {
+            id: componentHydrationId,
+            // Read here so the calling effect tracks the wrapper's exit flip.
+            isPresent: presenceChildContext.isPresent,
+            // The wrapper owns the lifecycle; nothing extra to track per id.
+            register: () => () => {},
+            // Completion is how the wrapper learns it may stop rendering.
+            onExitComplete: () => presenceChildContext.safeToRemove(),
+            // `AnimatePresence initial={false}` suppresses the first enter.
+            initial: presenceSkipEnter ? false : undefined,
+            custom: resolvePresenceCustom()
+        }
+    }
     // ── The single motion-dom VisualElement for this component (#449) ────────
     //
     // Upstream Framer Motion gives every motion component exactly ONE
@@ -963,6 +1001,9 @@
                       // claim the DOM does not back. Landed atomically with the
                       // legacy-writer deletion — plan 002 Step 3.
                       seedLatestValues: true,
+                      // plan 004: the PresenceChild adapter (null for direct
+                      // AnimatePresence children, which use the clone path).
+                      presenceContext: buildPresenceContext(),
                       // Inherited variant labels travel via `context`, NOT via
                       // props — upstream's exact split (`use-visual-state.ts`
                       // takes `props` and `MotionContext` separately).
@@ -976,8 +1017,6 @@
                       // a stacked child renders correctly before its parent ever
                       // animates. (plan 002 Step 5)
                       context: { animate: effectiveAnimate },
-                      // plan 004: presence context flows in here.
-                      presenceContext: null,
                       reducedMotionConfig: motionConfig?.reducedMotion ?? 'never',
                       isSVG: isSVGTag(String(tag))
                   })
@@ -990,7 +1029,13 @@
         // `makeLatestValues` already seeded from `animate`'s LAST keyframe
         // because `props.initial === false`; this flag stops `animateChanges`
         // animating on the first pass.
-        visualElement.blockInitialAnimation = effectiveInitialProp === false
+        //
+        // Upstream derives it from BOTH sources — the prop and
+        // `presenceContext.initial === false` (use-visual-element.ts:64-76) — so
+        // an `AnimatePresence initial={false}` wrapper suppresses the first enter
+        // even when the element itself declares an `initial`. (plan 004 Step 3)
+        visualElement.blockInitialAnimation =
+            effectiveInitialProp === false || visualElement.presenceContext?.initial === false
         setVisualElementParent(visualElement)
     }
 
@@ -1022,10 +1067,6 @@
     const resolvedAnimate = $derived(
         resolveAnimate(effectiveAnimate, variantsProp, effectiveCustom)
     )
-    const resolvePresenceCustom = () => {
-        const presenceCustom = context?.custom
-        return presenceCustom !== undefined ? presenceCustom : effectiveCustom
-    }
     const resolvedExit = $derived(resolveExit(exitProp, variantsProp, resolvePresenceCustom()))
 
     // Resolve `whileX` props against `variants` so each gesture's attach
@@ -2062,7 +2103,7 @@
         if (!visualElement) return
         const next = buildMotionNodeProps()
         untrack(() => {
-            visualElement.update(next, null)
+            visualElement.update(next, buildPresenceContext())
             // `update()` can change what the node renders WITHOUT scheduling a
             // render of its own: `addValue()` writes `latestValues[key]` directly
             // when a MotionValue instance is replaced (VisualElement.mjs:437-447),
