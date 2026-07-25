@@ -5,8 +5,9 @@ the SVGVisualElement; the one spec change was operator-ruled and the executor
 strengthened the ruled probe with a red-first vacuity proof.
 **Reviewed at** `c7f8a18` · 2026-07-25 15:38 · **Plan planned at** `f183b74`
 (re-stamped post-squash; original authoring at `4758dcd` on the merged branch)
-**Integrated** — no PR yet; operator sign-off policy applies (live demo before
-push/PR). Branch `svg-through-ve`, not pushed.
+**Integrated** — PR opened at the operator's direction after sign-off:
+<https://github.com/humanspeak/svelte-motion/pull/457> (refs #449, #456).
+Merging remains the operator's call.
 
 ## Done criteria
 
