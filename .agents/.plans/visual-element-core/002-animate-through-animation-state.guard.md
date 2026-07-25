@@ -227,3 +227,20 @@ unreachable-green by construction.
 - **Scope deadline set**: one more run on Step 7; if not landed, 002 closes
   with a named Step-7 exclusion and controls become their own plan so 004
   and 003 stop waiting.
+
+## Checkpoint 2026-07-24 #9 — FINAL (executor run 9, plan 002 DONE)
+
+- **Snapshot**: `8d89017` (Step 7, one commit incl. flush-guard removal),
+  `cad0d2c` (DONE docs); tree clean; all 9 guard checkpoints verified in
+  history by both executor and guard.
+- **Verdict**: **ON TRACK — plan 002 CLOSED with PASS.** Close-out report
+  written: `002-animate-through-animation-state.guard-report.md`.
+- The revision-#9 probes named the writer in one run: `xValue.jump(0)` from
+  `HTMLVisualElement.mount()` via the adapter's mount effect reactively
+  tracking `styleProp` — a remount rewinds all values to `initialValues`.
+  Three real bugs fixed with evidence; two guard eliminations held.
+- Guard close-out ran the FULL `e2e/` directory: 375 passed / 2 failed
+  (exactly the two 004-owned exclusions) / 2 skipped; unit 844; typecheck 0
+  errors; SSR pin byte-identical; grep criteria met (comments only).
+- No PR per operator sign-off policy; publication deferred to batch close.
+- Next: plan 004 (owns the two exclusions), then 003, then 005 (P2).
