@@ -33,6 +33,7 @@
         isDeltaZero,
         isMotionValue,
         styleEffect,
+        svgEffect,
         animateVisualElement,
         isControllingVariants,
         isVariantLabel,
@@ -588,11 +589,6 @@
     const buildMotionNodeProps = (includeStyle = true): MotionNodeOptions =>
         ({
             ...(includeStyle ? { style: styleProp } : {}),
-            // MotionValue-bound SVG attributes ride as TOP-LEVEL props, the shape
-            // `scrapeSVGMotionValuesFromProps` reads: it walks every prop key and
-            // claims any MotionValue, mapping transform names onto their `attr*`
-            // form. `buildSVGAttrs`/`renderSVG` then own the DOM writes.
-            ...svgMotionValueAttrs,
             // The EFFECTIVE values, not the raw props: `animationState` resolves
             // variants off `visualElement.props`, so it must see the same
             // presence/parent-resolved `initial`, the same inherited variant
@@ -1007,22 +1003,6 @@
         localCustomStore.set(effectiveCustom)
     })
 
-    // MotionValue-bound SVG attributes (`cx`, `stroke-width`, `attrX`, …) must be
-    // pulled out of `rest` before it reaches the raw spread, or they stringify as
-    // `[object Object]`. They are carried into the VisualElement's props instead,
-    // where `scrapeSVGMotionValuesFromProps` binds them and `buildSVGAttrs` /
-    // `renderSVG` write them.
-    //
-    // Declared ABOVE the VisualElement creation block: `buildMotionNodeProps()`
-    // runs inside that initializer, so a declaration below it would sit in its
-    // temporal dead zone.
-    const svgAttrSplit = $derived(
-        isSVGTag(String(tag))
-            ? extractSVGMotionValueAttributes(rest as Record<string, unknown>)
-            : null
-    )
-    const svgMotionValueAttrs = $derived(svgAttrSplit?.motionValueAttrs ?? {})
-
     // ── The single motion-dom VisualElement for this component (#449) ────────
     //
     // Declared HERE, after `effectiveInitialProp` / `effectiveAnimate` /
@@ -1367,19 +1347,6 @@
                 if (transformProps.has(key)) delete values[key]
             }
         }
-        // An SVG element other than `<svg>` itself renders every non-transform
-        // animated value on the ATTRIBUTE channel: `buildSVGAttrs` moves
-        // `state.style` wholesale into `state.attrs` and `renderSVG` writes them
-        // with `setAttribute`. An inline style for one of those keys WINS the
-        // cascade over the presentation attribute the VE writes, freezing the
-        // element at the seeded value (measured: `style="cx: 40"` pinned the
-        // computed `cx` at 40px while the attribute tracked the MotionValue to 60).
-        if (svgAttrSplit && String(tag).toLowerCase() !== 'svg') {
-            for (const key of Object.keys(values)) {
-                if (!transformProps.has(key) && !key.startsWith('origin')) delete values[key]
-            }
-            return isNotEmpty(values) ? values : undefined
-        }
         if (isNotEmpty(values)) return values
         // First-paint fallback, for a node with its OWN `animate` only.
         // `initial={}` (or no `initial`) resolves to no seeded values, but this
@@ -1427,6 +1394,16 @@
     // SVGFEDisplacementMapElement. Canonicalize before rendering.
     const renderTag = $derived(isSVGTag(String(tag)) ? resolveSVGTagName(String(tag)) : tag)
 
+    // MotionValue-bound SVG attributes (`cx`, `stroke-width`, `attrX`, …) must be
+    // pulled out of `rest` before it reaches the raw spread below, or they
+    // stringify as `[object Object]`. `svgEffect` drives them on the client;
+    // `computeSSRSVGAttrValues` seeds the server payload so hydration doesn't flash.
+    const svgAttrSplit = $derived(
+        isSVGTag(String(tag))
+            ? extractSVGMotionValueAttributes(rest as Record<string, unknown>)
+            : null
+    )
+    const svgMotionValueAttrs = $derived(svgAttrSplit?.motionValueAttrs ?? {})
     const spreadAttrs = $derived<Record<string, unknown>>(
         svgAttrSplit
             ? {
@@ -1434,13 +1411,24 @@
                   // `untrack`: this library's MotionValues are Svelte-augmented, so a
                   // tracked `.get()` here would make the whole attribute spread a
                   // dependency of every value change — re-rendering each frame of an
-                  // animation and letting Svelte race the VisualElement on
-                  // attr-routed keys. The seed only needs to be correct at render
-                  // time; the SVGVisualElement owns the DOM afterwards.
+                  // animation and letting Svelte race `svgEffect` on attr-routed keys.
+                  // The seed only needs to be correct at render time; `svgEffect` owns
+                  // the DOM afterwards.
                   ...untrack(() => computeSSRSVGAttrValues(svgAttrSplit.motionValueAttrs))
               }
             : (rest as Record<string, unknown>)
     )
+
+    $effect(() => {
+        if (!element) return
+
+        const values = svgMotionValueAttrs
+        if (!isNotEmpty(values)) return
+
+        // Keys stay verbatim: svgEffect applies its own `attr`-prefix conversion
+        // and picks the style-vs-attribute channel per key.
+        return svgEffect(element, values)
+    })
 
     // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
     const derivedAttrs = $derived<Record<string, unknown>>({
