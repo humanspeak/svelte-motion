@@ -22,7 +22,7 @@
 - **Risk**: HIGH — 80 signed-off drag/reorder e2e specs are the bar
 - **Depends on**: none (first plan of the re-scope batch)
 - **Category**: tech-debt (re-scope of visual-element-core 005 Step 2; #449 follow-up)
-- **Planned at**: commit `bb99032`, 2026-07-25
+- **Planned at**: `04418be` (re-stamped: `bb99032` was squashed away by PRs #454/#457; drag-surface files verified byte-identical to `7eba0bd`; container line references may have shifted with #457's svgEffect removal — locate by grep), 2026-07-25
 
 ## Why this matters
 
