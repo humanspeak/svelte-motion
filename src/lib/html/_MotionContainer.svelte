@@ -24,7 +24,7 @@
     } from '$lib/types'
     import { isNotEmpty } from '$lib/utils/objects'
     import { sleep } from '$lib/utils/testing'
-    import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
+    import { type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
     import {
         calcBoxDelta,
         cancelFrame,
@@ -1067,7 +1067,29 @@
     const resolvedAnimate = $derived(
         resolveAnimate(effectiveAnimate, variantsProp, effectiveCustom)
     )
-    const resolvedExit = $derived(resolveExit(exitProp, variantsProp, resolvePresenceCustom()))
+    // `resolvedExit` is gone: the exit target is resolved by the animationState
+    // from `props.exit` now, and the clone path resolves its own via
+    // `resolvePresenceExit`. (plan 004 Step 4)
+
+    /**
+     * The from-state a KEY CHANGE should rewind to.
+     *
+     * Deliberately resolved from the RAW reactive `initialProp`, not from
+     * `effectiveInitialProp`. The latter is forced to `false` for the lifetime of
+     * the component when `AnimatePresence initial={false}` suppressed the FIRST
+     * enter (`presenceSkipEnter` is computed once at init), but upstream applies
+     * that suppression only to the first render — a later key change is a fresh
+     * mount and must animate. Using the effective value left the rewind empty and
+     * the element stranded on its exit target. (plan 004 Step 4)
+     */
+    const keyChangeInitialKeyframes = $derived(
+        filterReducedMotionKeyframes(
+            getInitialKeyframes(
+                resolveInitial(initialProp, variantsProp, effectiveCustom)
+            ) as Record<string, unknown>,
+            reducedMotion
+        )
+    )
 
     // Resolve `whileX` props against `variants` so each gesture's attach
     // helper receives a plain keyframes object regardless of whether the
@@ -1166,33 +1188,6 @@
         if (enterAnimationSettled && lastAnimateRestingJson === restingJson) return restingValues
         return lastAnimateRestingValues ?? restingValues
     })
-    const extractTargetTransition = <T extends Record<string, unknown>>(
-        keyframes: T,
-        transitionOverride?: AnimationOptions
-    ) => {
-        const transition = keyframes.transition as AnimationOptions | undefined
-        const transitionEnd = keyframes.transitionEnd as Record<string, unknown> | undefined
-        const target = { ...keyframes }
-        delete target.transition
-        delete target.transitionEnd
-
-        return {
-            target,
-            transition:
-                transitionOverride ?? mergeTransitions(mergedTransition ?? {}, transition ?? {}),
-            transitionEnd
-        }
-    }
-
-    /**
-     * Notify a `useWillChange()` value carried in object-form `style` that the
-     * given keys are animating, so it can promote the element to its own
-     * compositor layer. Mirrors framer-motion wiring the will-change value into
-     * the animation pipeline. `add()` self-filters to transform/accelerated
-     * keys, so passing the full key set is safe.
-     *
-     * @param {string[]} keys The property keys about to animate.
-     */
     // A ~215-line block lived here: the SVG path-drawing MotionValue readers
     // (`readSVGPathDrawingState`, `cleanupSVGPathAttributeEffect`), the
     // stoppable-control promise plumbing (`getFinishedPromise`,
@@ -2811,32 +2806,17 @@
         // Run the key transition sequence
         const runKeyTransition = async () => {
             try {
-                // 1. Run exit animation if defined
-                if (resolvedExit && element && !keyTransitionStopped) {
-                    const exitPayload = filterReducedMotionKeyframes(
-                        { ...(resolvedExit as Record<string, unknown>) },
-                        reducedMotion
-                    )
-                    const { target: exitKeyframes, transition: exitTransition } =
-                        extractTargetTransition(exitPayload)
+                // A Svelte `key` change on the SAME element is upstream's
+                // unmount+remount. Reproduce it as: exit -> rewind -> re-enter,
+                // with the exit half driven by the animationState so it gets the
+                // same priority/protected-keys semantics as everything else
+                // (upstream `exit.ts:19-72`). (plan 004 Step 4)
+                const animationState = visualElement?.animationState
 
-                    // Resolve wildcard/relative keyframes on the exit payload
-                    // against the live value at exit start (plan 003) — a no-op
-                    // unless the exit definition uses `null` / `'+=…'`.
-                    const resolvedExitKeyframes =
-                        resolveWildcardKeyframes(
-                            exitKeyframes as DOMKeyframesDefinition,
-                            readLiveChannelValue
-                        ) ?? exitKeyframes
-
-                    pwLog('[motion] key transition: running exit', {
-                        exitKeyframes: resolvedExitKeyframes
-                    })
-                    await animate(
-                        element,
-                        resolvedExitKeyframes as DOMKeyframesDefinition,
-                        exitTransition
-                    ).finished
+                // 1. Exit, via setActive — not a bespoke `animate()` call.
+                if (animationState && exitProp !== undefined && !keyTransitionStopped) {
+                    pwLog('[motion] key transition: setActive(exit, true)')
+                    await animationState.setActive('exit', true)
                 }
 
                 pwLog('[motion] key transition: exit done', {
@@ -2844,34 +2824,14 @@
                     hasElement: !!element
                 })
 
-                // Check if component was unmounted during exit animation
-                if (keyTransitionStopped || !element) return
-
-                // 2. Rewind to the initial state, and 3. re-enter.
-                //
-                // Upstream gets this free: a React `key` change UNMOUNTS and
-                // remounts, so `VisualElement.mount()` rewinds every value to
-                // `initialValues` (`VisualElement.mjs:186-191`) and a fresh
-                // animationState replays initial→animate. Svelte keeps the same
-                // element and the same node, so we reproduce both halves
-                // explicitly: jump the values back, then `reset()` the
-                // animationState so `animateChanges()` treats this as a first
-                // render instead of deduping the enter away against
-                // `prevResolvedValues`.
-                //
-                // (plan 004 formalizes the exit half above via setActive('exit').)
+                // Check if component was unmounted during the exit animation
                 if (keyTransitionStopped || !element) return
 
                 pwLog('[motion] key transition: rewinding to initial and re-entering')
-                const animationState = visualElement?.animationState
                 if (visualElement && animationState) {
-                    // Rewind to the CURRENTLY resolved `initial`, not to a
-                    // creation-time snapshot: the from-state for a key change is
-                    // whatever `initial` resolves to NOW (it commonly differs from
-                    // the first render's — e.g. an AnimatePresence `initial={false}`
-                    // first paint followed by a real roll-in on later keys).
-                    for (const [key, value] of Object.entries(initialKeyframes ?? {})) {
-                        // A keyframe array's FIRST element is the from-state.
+                    // 2. Rewind to the CURRENTLY resolved `initial`. Keyframe
+                    // arrays rewind to element [0] — the from-state.
+                    for (const [key, value] of Object.entries(keyChangeInitialKeyframes ?? {})) {
                         const resolved = (Array.isArray(value) ? value[0] : value) as
                             | string
                             | number
@@ -2881,7 +2841,19 @@
                         visualElement.getValue(key)?.jump(resolved)
                         visualElement.setStaticValue(key, resolved)
                     }
-                    visualElement.scheduleRender()
+                    visualElement.scheduleRenderMicrotask()
+
+                    // 3. Re-enter. `blockInitialAnimation` must be cleared first:
+                    // it is set when `AnimatePresence initial={false}` suppressed
+                    // the FIRST enter, but upstream scopes that to the first
+                    // render only — a key change is a new mount and must animate.
+                    // Left set, `animateChanges` swallows the re-enter after
+                    // `reset()` restores `isInitialRender`, and the element stays
+                    // on its exit target (measured on the rolling copy control:
+                    // latestValues stuck at opacity 0 / y -14 / blur(5px)).
+                    visualElement.blockInitialAnimation = false
+                    // Release exit so it stops protecting those keys.
+                    await animationState.setActive('exit', false)
                     // Clear `prevResolvedValues` so the re-enter is not deduped
                     // away as "already at target".
                     animationState.reset()
@@ -2889,8 +2861,11 @@
 
                 // SVG dash attrs are presentation attributes the style render
                 // cannot rewind; keep writing them directly.
-                if (initialKeyframes && element) {
-                    const transformedInitial = transformSVGPathProperties(element, initialKeyframes)
+                if (keyChangeInitialKeyframes && element) {
+                    const transformedInitial = transformSVGPathProperties(
+                        element,
+                        keyChangeInitialKeyframes
+                    )
                     for (const [key, value] of Object.entries(transformedInitial)) {
                         if (key === 'strokeDasharray' || key === 'stroke-dasharray') {
                             element.setAttribute(
