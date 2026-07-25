@@ -69,3 +69,17 @@ the VisualElement**.
   release notes for the next version should mention it.
 - Batch complete: this was the batch's only plan. Remaining backlog:
   `drag-single-writer/` (5 plans) and `clone-exit-migration/` (spike).
+
+## Post-close addendum (2026-07-25) — Codex adversarial review + operator ruling
+
+A Codex adversarial review flagged that MotionValue `attrX`/`attrY`/`attrScale`
+on a root `<motion.svg>` freeze (the renderer's root-svg early return drops
+them). Guard verified: mechanism correct, headline overstated — `x`/`y` still
+animate (as CSS transforms, upstream semantics); only explicit `attr*` on the
+root `<svg>` tag freeze, and React framer-motion has the identical limitation
+(same `buildSVGAttrs`). **Operator ruling: PARITY** — keep upstream behavior
+until the library is 1:1, then enhance. Actions taken: issue #456 tracks the
+post-1.x enhancement; `e2e/svg/nested-svg.spec.ts` + fixture pin BOTH facts
+(x-as-transform live; attrX no-op, annotated to flip when #456 lands); the
+docs guide gained an amber limitation callout; the motion-value-attributes
+fixture's stale channel prose was corrected in the same pass.

@@ -2,25 +2,25 @@
     import { motion, motionValue } from '$lib'
 
     /**
-     * Style-routed: `cx` is a CSS property in Chromium, so `svgEffect` writes it to
-     * `element.style`. The same MotionValue also drives `x2` on the chart line,
-     * which is attribute-routed — one value, both channels.
+     * Rendered as the `cx` presentation attribute by the SVGVisualElement —
+     * the single channel every bound SVG value uses. The same MotionValue
+     * also drives `x2` on the chart line: one value, one channel, two elements.
      */
     const cx = motionValue(40)
 
-    /** Style-routed, kebab-cased — the spelling a Svelte author actually writes. */
+    /** Kebab-cased — the spelling a Svelte author actually writes. */
     const strokeWidth = motionValue(4)
 
-    /** Style-routed. The ring sweeps by shrinking its dash offset. */
+    /** The ring sweeps by shrinking its dash-offset attribute. */
     const RING_CIRCUMFERENCE = 2 * Math.PI * 30
     const dashOffset = motionValue(RING_CIRCUMFERENCE * 0.35)
 
-    /** Attribute-routed: rendered as the `x` / `y` attributes on the rect. */
+    /** Rendered as the `x` / `y` attributes on the rect (attr-prefixed to avoid the transform channel). */
     const attrX = motionValue(10)
     const attrY = motionValue(10)
 
     /**
-     * Attribute-routed. `scale` is not a presentation attribute on shape elements —
+     * `scale` is not a presentation attribute on shape elements —
      * writing it to a rect is inert, which is upstream's behavior too. It is a real
      * attribute on `<feDisplacementMap>`, where it drives the warp below.
      *
@@ -30,7 +30,7 @@
     const attrScale = motionValue(12)
 
     /**
-     * Attribute-routed camelCase filter key. `stdDeviation` is claimed via
+     * CamelCase filter key. `stdDeviation` is claimed via
      * motion-dom's `camelCaseAttributes`, not our hand-written allowlist — an
      * unclaimed key would render `stdDeviation="[object Object]"`.
      */
@@ -57,7 +57,7 @@
 
     /**
      * Toggle: force an unrelated Svelte re-render (a class change). The attribute
-     * spread must not clobber a value that `svgEffect` owns.
+     * spread must not clobber a value the SVGVisualElement owns.
      */
     let highlight = $state(false)
 
@@ -134,19 +134,14 @@
         </p>
         <p>
             <strong class="text-slate-100">The subtlety.</strong>
-            <code class="rounded bg-slate-800 px-1">svgEffect</code> writes to
-            <em>two different DOM channels</em>. Keys that are CSS properties in the browser (<code
-                class="rounded bg-slate-800 px-1">cx</code
-            >,
+            Every bound value (<code class="rounded bg-slate-800 px-1">cx</code>,
             <code class="rounded bg-slate-800 px-1">r</code>,
-            <code class="rounded bg-slate-800 px-1">stroke-*</code>) go to
-            <code class="rounded bg-slate-800 px-1">element.style</code> — their
-            <em>attribute</em> never changes. Everything else (<code
-                class="rounded bg-slate-800 px-1">x2</code
-            >,
-            <code class="rounded bg-slate-800 px-1">attrX</code>) goes to
-            <code class="rounded bg-slate-800 px-1">setAttribute</code>. The table shows both, so
-            you can see which channel each key actually moves.
+            <code class="rounded bg-slate-800 px-1">stroke-*</code>,
+            <code class="rounded bg-slate-800 px-1">x2</code>,
+            <code class="rounded bg-slate-800 px-1">attrX</code>) is rendered by the
+            SVGVisualElement as a <em>presentation attribute</em> via
+            <code class="rounded bg-slate-800 px-1">setAttribute</code> — one channel, matching React
+            Framer Motion. Computed style follows the attribute, so the table shows both readouts agreeing.
         </p>
     </div>
 
@@ -316,7 +311,7 @@
             {#if mounted}
                 <div>
                     <h3 class="mb-1 text-sm font-medium text-slate-300">
-                        Style-routed: cx, stroke-width &nbsp;·&nbsp; Attribute-routed: x2
+                        One attribute channel: cx, stroke-width, x2
                     </h3>
                     <svg
                         width="300"

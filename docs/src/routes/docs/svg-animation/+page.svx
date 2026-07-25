@@ -127,6 +127,18 @@ displacement amount. This mirrors Framer Motion's behavior.
 
 </div>
 
+<div class="not-prose my-6 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
+
+**`attrX`/`attrY`/`attrScale` are inert on `<motion.svg>` itself.** The
+renderer treats the root `<svg>` tag as HTML-like and returns before the
+attribute copy, so a bound `attrX` on a nested `<motion.svg>` leaves the `x`
+attribute at its server-rendered value. Position nested `<svg>` elements with
+`x`/`y` instead — they animate as transforms. This also mirrors React Framer
+Motion; [#456](https://github.com/humanspeak/svelte-motion/issues/456) tracks
+lifting the limitation after 1.x.
+
+</div>
+
 ## Drawing paths
 
 `pathLength`, `pathSpacing`, and `pathOffset` are handled separately, as
