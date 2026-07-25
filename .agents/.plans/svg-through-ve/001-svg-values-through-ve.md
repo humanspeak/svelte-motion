@@ -6,11 +6,14 @@
 > report — do not improvise. When done, update the status row in
 > `.agents/.plans/svg-through-ve/README.md`.
 >
-> **Drift check (run first)**: `git diff --stat 4758dcd..HEAD -- src/lib/html/_MotionContainer.svelte src/lib/utils/svg.ts src/lib/utils/effects.ts`
-> Plan 006 of the visual-element-core batch (inherited-initial context wiring)
-> may legitimately have touched `_MotionContainer.svelte` after this was
-> planned — read `.agents/.plans/visual-element-core/006-*.md` and its guard
-> log to account for that; any OTHER drift vs the excerpts below is a STOP.
+> **Drift check (run first)**: `git diff --stat f183b74..HEAD -- src/lib/html/_MotionContainer.svelte src/lib/utils/svg.ts src/lib/utils/effects.ts`
+> Expect empty. Re-stamped 2026-07-25: PR #454 squash-merged the entire
+> visual-element-core batch (incl. plan 006) into main as `f183b74`; the
+> original per-plan SHAs no longer exist in this branch's history. All
+> excerpts below were re-verified against `f183b74` — the cited container
+> line numbers hold. The archived batch records live at
+> `.agents/.plans-closed/visual-element-core/`. Any drift vs the excerpts
+> is a STOP.
 
 ## Status
 
@@ -18,10 +21,10 @@
 - **Effort**: M
 - **Risk**: MED — `e2e/svg` is fully green today; this migration must be
   behavior-neutral, and it trades working bespoke code for upstream machinery
-- **Depends on**: visual-element-core batch plans 001–004 (DONE at `4758dcd`)
+- **Depends on**: visual-element-core batch (MERGED to main in PR #454, `f183b74`)
 - **Category**: tech-debt (deferred from visual-element-core plan 002 Step 6
   by guard ruling; GitHub issue #449 follow-up)
-- **Planned at**: commit `4758dcd`, 2026-07-25
+- **Planned at**: commit `f183b74`, 2026-07-25 (re-stamped post-squash-merge)
 
 ## Why this matters
 
@@ -39,7 +42,7 @@ completes the single-writer story for SVG and deletes ~2 conversion layers.
 
 ## Current state
 
-(All excerpts verified at `4758dcd`.)
+(All excerpts re-verified at `f183b74`.)
 
 - **The attr side channel** — `_MotionContainer.svelte:1399-1430`: MotionValue
   SVG attributes are split out of the prop spread
