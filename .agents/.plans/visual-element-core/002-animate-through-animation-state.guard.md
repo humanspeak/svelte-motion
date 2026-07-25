@@ -173,3 +173,28 @@ unreachable-green by construction.
   investigation probes in revision #7. The spec remains correct.
 - Step 6 skip confirmed in effect (SVG untouched); Step 7 constraints carry
   forward unchanged.
+
+## Checkpoint 2026-07-24 #7 — STOP review (executor run 7, 3h(a) closed)
+
+- **Snapshot**: `de134ac` (3h(a) fix), `dcb1ae2` (docs) on the working branch;
+  Step 7 attempt preserved at `plan002-step7-attempt` / `219046c`. Guard
+  re-verified: unit 844 passed; `motion-config-reduced-motion` suite 3/3.
+- **Verdict**: **ON TRACK** (executor) + **PLAN AMENDED** (guard, revision #8).
+- **3h(a) root cause confirmed and closed**: guard's probe (b) was correct —
+  accelerated WAAPI channels short-circuit `bindToMotionValue`'s change
+  subscription (`VisualElement.mjs:262-281`), so after the optimized-appear
+  fade the MotionValue still held 0 and the handoff's `animateChanges()`
+  replayed the full fade. Fix (`de134ac`): jump values to the resolved
+  animate resting state before priming the animationState. The reducing
+  policy was never the cause — it only determined which assertion could
+  observe the replay.
+- **Step 7 STOP correct**: landing it red would have gone from 3 accounted
+  failures to 8. Guard read motion-dom's installed
+  `NativeAnimationExtended.updateMotionValue()` and identified the right
+  freeze mechanism (per-channel `value.stop()` routes into a double-sampled
+  renderless JSAnimation that restores value+velocity and covers the cancel
+  gap) — recorded in revision #8 with the instruction to DELETE the
+  hand-rolled freeze, not fix it, plus the mandatory diagnosis of the
+  `+=50` regression on the attempt branch before landing.
+- Working-branch state: **284/287, zero unaccounted failures** — 2 × 004
+  layout-button + 1 × controls re-attach (ends with Step 7).

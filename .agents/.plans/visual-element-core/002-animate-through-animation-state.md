@@ -223,6 +223,42 @@
 > (fresh filtered object vs stable reference) flips a needsAnimating bit at
 > completion time. The spec stays untouched; the fix is code-side. Verify:
 > the always spec 3× consecutive in isolation + full utilities suite.
+>
+> Revision 2026-07-24 #8 (guard, after executor STOP at `dcb1ae2`): 3h(a) is
+> CLOSED (`de134ac`, guard re-verified). Step 7 resumes from the preserved
+> attempt `plan002-step7-attempt` / `219046c` — cherry-pick it; it is
+> structurally complete (~630 lines deleted). Three items close it:
+>
+> 1. **The accelerated `stop()` freeze — use motion-dom's own machinery, do
+>    not hand-roll.** Guard read the installed implementation:
+>    `NativeAnimationExtended.updateMotionValue()`
+>    (`node_modules/motion-dom/dist/es/animation/NativeAnimationExtended.mjs:54-84`)
+>    already handles WAAPI interruption correctly — it samples a renderless
+>    `JSAnimation` twice at wall-clock elapsed time (value + velocity), writes
+>    the sampled value to inline style to cover the post-`cancel()` gap, and
+>    calls `motionValue.setWithVelocity(...)`. That runs via the animation's
+>    own `.stop()`. So controls `stop()` should be upstream's shape —
+>    per-channel `value.stop()` (upstream `animation-controls.ts` does
+>    `visualElement.values.forEach(v => v.stop())`) — and your
+>    read-live→jump→stop code should be DELETED, not fixed. If `value.stop()`
+>    doesn't route into `updateMotionValue`, the bug is that the accelerated
+>    animation instance isn't registered on the MotionValue (`value.animation`)
+>    — fix the registration, not the freeze.
+> 2. **Diagnose the `wildcard-keyframes.spec.ts:53` (`+=50`) regression on
+>    the attempt branch BEFORE landing** — it is green on the working branch,
+>    so the Step 7 diff causes it (suspects: the `renderedInlineStyle`
+>    single-path collapse or the flush-guard removal interacting with the
+>    relative-keyframe memo). No landing while it is red and undiagnosed.
+> 3. **The three controls white-box unit specs get the 3g treatment**
+>    (assert behavior/latestValues, not `animateMock` call args).
+>
+> The Step 7 SVG-symbol deletions (`readSVGPathDrawingState` etc.) are
+> confirmed as dead-code removal (their only callers were the deleted legacy
+> writers) and do NOT violate the Step 6 skip — `svgEffect` and
+> `transformSVGPathProperties` stay, `e2e/svg` must stay green.
+> After Step 7 lands (flush guard removed in the same commit, re-attach
+> allowance ends), run Step 8's full gate: allowed failures ONLY the two
+> 004-owned layout-button specs. That completes plan 002.
 
 ## Status
 
