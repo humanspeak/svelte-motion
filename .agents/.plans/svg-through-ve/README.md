@@ -8,9 +8,9 @@ and path drawing move onto the `SVGVisualElement` the elements already have.
 
 ## Execution order & status
 
-| Plan | Title                                                  | Priority | Effort | Risk | Depends on                  | Status |
-| ---- | ------------------------------------------------------ | -------- | ------ | ---- | --------------------------- | ------ |
-| 001  | SVG attributes + path drawing through SVGVisualElement | P2       | M      | MED  | visual-element-core 001–004 | TODO   |
+| Plan | Title                                                  | Priority | Effort | Risk | Depends on                  | Status      |
+| ---- | ------------------------------------------------------ | -------- | ------ | ---- | --------------------------- | ----------- |
+| 001  | SVG attributes + path drawing through SVGVisualElement | P2       | M      | MED  | visual-element-core 001–004 | IN PROGRESS |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
