@@ -152,3 +152,24 @@ unreachable-green by construction.
 - Notable executor quality: bisected the flush regression on the controls
   path (12/13 → 9/13) instead of shipping it guarded-by-luck; disclosed an
   unproven hypothesis as unproven.
+
+## Checkpoint 2026-07-24 #6 — STOP review (executor run 6) + guard instrumentation
+
+- **Snapshot**: `d3dddfa` (strip deletion, kept as a regression-free
+  simplification), `0cb9401` (docs); tree clean.
+- **Verdict**: **ON TRACK** (executor) + **PLAN AMENDED** (guard, revision #7).
+  The executor's run was short but high-value: three theories empirically
+  disproven (the strip, async policy resolution, fresh-object
+  variantDidChange), each with evidence, plus an honest "could not reproduce
+  outside the harness."
+- **Guard took the executor's recommended next step itself** (instrumentation)
+  since guard can reproduce the failure: WAAPI lifecycle hooks + rAF sampler
+  in a scratchpad harness script. Result — the smoking gun: an IDENTICAL
+  second enter animation (`{opacity:[0,1]}`, 1200ms) starts 2.4ms after the
+  first one's finished/commitStyles/cancel, exactly once. Full keyframes
+  `[0,1]` (not resolved from current=1) implicate a completion-time trigger
+  reading stale opacity=0 — the enter ran accelerated (WAAPI), which
+  bypasses per-frame value sync. Recorded with the trace and three concrete
+  investigation probes in revision #7. The spec remains correct.
+- Step 6 skip confirmed in effect (SVG untouched); Step 7 constraints carry
+  forward unchanged.

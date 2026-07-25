@@ -192,6 +192,37 @@
 > Remaining order: 3h(a) → Step 7 (controls; remove flush guard) → Step 8
 > full gate (allowed failures: ONLY the two 004-owned layout-button specs —
 > the controls re-attach allowance ends when Step 7 lands).
+>
+> Revision 2026-07-24 #7 (guard, after executor STOP at `0cb9401`): guard
+> instrumented the harness (WAAPI lifecycle hooks + rAF opacity sampler; the
+> reproducer script is at the session scratchpad `trace-always-policy.mjs`
+> and reproduces 3/3 against the production preview on 4198). The 3h(a)
+> mechanism, measured:
+>
+> ```text
+> 1789.9ms anim.finished            (enter fade done, computed opacity 1)
+> 1790.0ms anim.commitStyles
+> 1790.1ms anim.cancel
+> 1792.4ms element.animate {"opacity":[0,1]} 1200ms ease-out  ← IDENTICAL second enter
+> 1806.1ms computed 0.0201          ← the value the spec catches
+> ```
+>
+> One duplicate enter animation starts 2.4ms after the first completes —
+> with the FULL `[0,1]` keyframes rather than keyframes resolved from the
+> current value (1). That points at a completion-time trigger (the
+> AnimationComplete bridge / props-effect re-run / animateChanges) acting on
+> a stale opacity=0 in the MotionValue or `latestValues` — plausible because
+> the enter ran as an ACCELERATED WAAPI animation (there is also a 10s
+> `{opacity:[0,0]}` placeholder pre-animation in the trace), which bypasses
+> per-frame value sync. Why 'always'-only remains to be confirmed, but note
+> the filtered `animate` object is rebuilt fresh under a reducing policy
+> while the raw prop reference is passed through otherwise. Investigate:
+> (a) what fires 2.4ms after AnimationComplete (log `getState().animate`
+> and `latestValues.opacity` at that instant), (b) whether the accelerated
+> path leaves the motion value at 0 on finish, (c) whether prop-identity
+> (fresh filtered object vs stable reference) flips a needsAnimating bit at
+> completion time. The spec stays untouched; the fix is code-side. Verify:
+> the always spec 3× consecutive in isolation + full utilities suite.
 
 ## Status
 
