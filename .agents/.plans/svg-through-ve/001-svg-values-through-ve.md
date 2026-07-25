@@ -15,6 +15,38 @@
 > `.agents/.plans-closed/visual-element-core/`. Any drift vs the excerpts
 > is a STOP.
 
+> Revision 2026-07-25 #2 (guard, after executor STOP at `e365d49`, ruling by
+> the OPERATOR): MotionValue-bound SVG attributes adopt UPSTREAM'S CHANNEL —
+> the VE writes presentation attributes via `setAttribute` (`buildSVGAttrs`
+> moves style→attrs for non-`<svg>` tags; there is no style-routing hook and
+> we will not fork one). Consequences:
+>
+> 1. `e2e/svg/motion-value-attributes.spec.ts` "does not re-render the
+>    attribute spread when a bound value changes" (`:314`) comes INTO scope
+>    for exactly one change: its proxy assertion (attribute frozen at the
+>    SSR seed) is replaced by a direct probe of its stated intent — the
+>    Svelte attribute SPREAD must not recompute when a bound value changes.
+>    Use the MutationObserver technique of the neighboring "unrelated
+>    re-render" test: during a bound-cx animation, an UNRELATED spread-
+>    routed attribute on the same element must receive zero mutations
+>    (spread recomputation would rewrite it), while `cx`'s attribute is now
+>    EXPECTED to track. Do not weaken any other assertion in the file.
+> 2. The cascade change is a DOCUMENTED behavior change (presentation
+>    attributes lose to author CSS where inline style won): record it in
+>    the migration commit message. It matches what React framer-motion
+>    users get.
+> 3. RESUME FROM THE ATTEMPT: cherry-pick `2239321` from
+>    `svg-through-ve-step2-attempt` — it carries the working channel move
+>    PLUS the second finding, which is binding: `readAnimationStateStyleSlot()`
+>    must exclude attr-routed keys for non-`<svg>` SVG tags, or the
+>    declarative inline style wins the cascade over the VE's presentation
+>    attribute and freezes the element at the seed (measured: computed cx
+>    stuck at 40px while the attribute tracked to 60). That exclusion took
+>    e2e/svg from 5 failures to 1.
+> 4. The `--no-verify` wip commits are acknowledged for checkpoints, but
+>    the final per-step commits must pass the full pre-commit.
+> 5. Step 3 (pathLength) proceeds as written after Step 2 closes.
+
 ## Status
 
 - **Priority**: P2
