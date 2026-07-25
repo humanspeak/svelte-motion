@@ -41,28 +41,27 @@ component re-render when the value changes.
   <SvgAnimationExample />
 </Example>
 
-## Two DOM channels
+## One DOM channel
 
-Motion writes a bound attribute to one of two places, chosen per key at runtime:
+Every bound value renders as an SVG **presentation attribute** via
+`setAttribute` — `cx`, `stroke-dashoffset`, `x1`/`y1`/`x2`/`y2`, `points`,
+all of them. Transforms are the one exception: they compose on the `style`
+attribute. This is exactly how React Framer Motion renders SVG.
 
-- Keys that are **CSS properties** in the browser — `cx`, `cy`, `r`, `rx`, `ry`,
-  `width`, `height`, `d`, and the `stroke-*` family — are written to
-  `element.style`.
-- Everything else — `points`, `viewBox`, `x1`/`y1`/`x2`/`y2` — is written with
-  `setAttribute`.
-
-This matters when you inspect the DOM or write a test. A bound `cx` never
-changes the element's `cx` **attribute**; it moves the computed style instead.
-The attribute you see in devtools is the initial server-rendered value.
+That means the DOM you inspect is the live value — a bound `cx` moves the
+element's `cx` **attribute** every frame, and computed style follows it
+(presentation attributes reflect into computed style):
 
 ```ts
 // After cx.set(60):
-getComputedStyle(circle).cx    // "60px"  <- the live value
-circle.getAttribute('cx')      // "40"    <- the SSR seed, frozen
+circle.getAttribute('cx')      // "60"   <- the live value
+getComputedStyle(circle).cx    // "60px" <- follows the attribute
 ```
 
-Both render identically. CSS geometry properties win over the matching
-presentation attribute, which is exactly why the initial attribute can stay put.
+One cascade note: presentation attributes sit at the very bottom of the CSS
+cascade, so a stylesheet rule targeting the same geometry property (e.g.
+`circle { cx: … }`) wins over the animated attribute — the same trade-off
+React Framer Motion makes.
 
 ## Prop names use the DOM spelling
 
@@ -125,6 +124,18 @@ transform. To reach the **attribute** instead, use `attrX`, `attrY`, or
 `<rect>` writes the attribute faithfully, and the rect ignores it — nothing
 moves. It is a real attribute on `<feDisplacementMap>`, where it drives the
 displacement amount. This mirrors Framer Motion's behavior.
+
+</div>
+
+<div class="not-prose my-6 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
+
+**`attrX`/`attrY`/`attrScale` are inert on `<motion.svg>` itself.** The
+renderer treats the root `<svg>` tag as HTML-like and returns before the
+attribute copy, so a bound `attrX` on a nested `<motion.svg>` leaves the `x`
+attribute at its server-rendered value. Position nested `<svg>` elements with
+`x`/`y` instead — they animate as transforms. This also mirrors React Framer
+Motion; [#456](https://github.com/humanspeak/svelte-motion/issues/456) tracks
+lifting the limitation after 1.x.
 
 </div>
 

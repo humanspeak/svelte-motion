@@ -8,13 +8,13 @@
     /** A single spring drives every bound attribute below. */
     const progress = useSpring(0, { stiffness: 120, damping: 20 })
 
-    /** Style-routed: `stroke-dashoffset` is a CSS property, so it lands on element.style. */
+    /** Rendered as a presentation attribute, like every bound SVG value. */
     const dashOffset = useTransform(progress, [0, 1], [CIRCUMFERENCE, 0])
 
-    /** Style-routed: the dot's `cx` sweeps across the track. */
+    /** The dot's `cx` sweeps across the track — same attribute channel. */
     const dotCx = useTransform(progress, [0, 1], [16, 284])
 
-    /** Attribute-routed: `x2` is not a CSS property, so it lands on setAttribute. */
+    /** `x2` too: one MotionValue, one setAttribute channel, matching React. */
     const lineX2 = useTransform(progress, [0, 1], [16, 284])
 
     let percent = $state(0)
@@ -139,7 +139,7 @@
             <section class="panel">
                 <div class="panel-head">
                     <span class="eyebrow">cx &amp; x2</span>
-                    <span class="panel-title">both DOM channels</span>
+                    <span class="panel-title">one attribute channel</span>
                 </div>
                 <svg viewBox="0 0 300 90" class="track" role="presentation">
                     <line x1="16" y1="62" x2="284" y2="62" class="track-rail" />
@@ -147,10 +147,10 @@
                     <motion.circle cx={dotCx} cy={62} r={9} class="track-dot" />
                 </svg>
                 <p class="hint">
-                    <span class="mono">cx</span> is a CSS property, so Motion writes it to
-                    <span class="mono">element.style</span>. <span class="mono">x2</span> is not, so
-                    it is written with <span class="mono">setAttribute</span>. Same MotionValue,
-                    different channels.
+                    <span class="mono">cx</span> and <span class="mono">x2</span> are both written
+                    as presentation attributes via
+                    <span class="mono">setAttribute</span> — one MotionValue, one channel, exactly how
+                    React Framer Motion renders SVG.
                 </p>
             </section>
         </div>

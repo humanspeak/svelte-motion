@@ -6,15 +6,17 @@ const ROUTE = '/tests/svg/motion-value-attributes'
  * A MotionValue bound to an SVG presentation attribute must be subscribed to,
  * not spread raw onto the element (which stringifies as `[object Object]`).
  *
- * Upstream parity: motion-dom `svgEffect` (effects/svg/index.ts) routes each key
- * to one of two DOM channels:
+ * Upstream parity: bound SVG values render through the `SVGVisualElement`
+ * (`buildSVGAttrs` moves every non-transform value into `renderState.attrs`
+ * for non-`<svg>` tags; `renderSVG` writes them with `setAttribute`) — the
+ * same single ATTRIBUTE channel React framer-motion uses. Transforms stay on
+ * the style attribute, also matching upstream.
  *
- * - `attr*`, `points`, `viewBox`, `x1/y1/x2/y2` -> `setAttribute`
- * - `cx cy r x y width height d stroke-*` -> `element.style`, because
- *   `key in element.style` is true for these in Chromium
- *
- * Tests must read the channel the key actually routes to. Polling
- * `getAttribute('cx')` never observes a change and hangs until timeout.
+ * Reading `getComputedStyle(el)` remains a valid probe for geometry keys
+ * (`cx`, `r`, …): presentation attributes reflect into computed style. What
+ * changed with the channel move is the cascade — presentation attributes lose
+ * to author CSS where the old inline-style writes won (accepted, documented
+ * behavior change matching React framer-motion).
  */
 
 /** Reads a resolved CSS property, e.g. `cx` -> `"40px"`. */
@@ -72,7 +74,9 @@ test.describe('SVG MotionValue attributes', () => {
         expect(Number.isFinite(Number(cx))).toBe(true)
     })
 
-    test('updates cx on the style channel when the MotionValue changes', async ({ page }) => {
+    test('updates cx through the SVGVisualElement when the MotionValue changes', async ({
+        page
+    }) => {
         await page.goto(ROUTE)
 
         const circle = page.getByTestId('mv-circle')
@@ -272,8 +276,9 @@ test.describe('SVG MotionValue attributes', () => {
         // as hidden. Attachment is the meaningful check here.
         await expect(line).toBeAttached()
 
-        // x1/y1/x2/y2 are not in element.style, so svgEffect writes them via
-        // setAttribute even though they carry no `attr` prefix.
+        // x1/y1/x2/y2 land on the attribute channel like every other bound SVG
+        // value (SVGVisualElement renders attrs via setAttribute), with no
+        // `attr` prefix required.
         const before = await attrNumber(line, 'x2')
         expect(Number.isFinite(before)).toBe(true)
 
@@ -294,8 +299,9 @@ test.describe('SVG MotionValue attributes', () => {
         await expect(staticCircle).toBeVisible()
         expect(await staticCircle.getAttribute('cx')).toBe('5')
 
-        // Read the style channel, the one a bound cx would move. Asserting the
-        // attribute is unchanged would pass even if the subscription were broken.
+        // Read computed style, which reflects whichever channel a bound cx
+        // would move. Asserting the raw attribute alone could pass even if
+        // the subscription were broken.
         const before = await computedNumber(staticCircle, 'cx')
         expect(before).toBe(5)
 
@@ -317,16 +323,67 @@ test.describe('SVG MotionValue attributes', () => {
         const circle = page.getByTestId('mv-circle')
         await expect(circle).toBeVisible()
 
-        // `cx` is style-routed, so its attribute is a one-time SSR seed. If the
-        // spread tracked the MotionValue (this library's values are Svelte-augmented,
-        // so a tracked `.get()` would), the attribute would follow the style and the
-        // whole attrs object would recompute every frame of an animation.
-        const seed = await circle.getAttribute('cx')
+        // `cx` is written by the SVGVisualElement on the ATTRIBUTE channel
+        // (`buildSVGAttrs` moves every non-transform value into `attrs`), so its
+        // attribute is EXPECTED to track the MotionValue. What must not happen is
+        // the Svelte attribute SPREAD recomputing: this library's MotionValues are
+        // Svelte-augmented, so a tracked `.get()` inside the spread would make the
+        // whole attrs object a dependency of every value change and rewrite it on
+        // each one — racing the VE for the DOM.
+        //
+        // Probe the intent directly rather than via a frozen-attribute proxy:
+        // count the WRITERS of the attribute channel. Every bump must produce
+        // exactly one `cx` mutation — the VE's. If the spread also tracked the
+        // value it would write `cx` too (from `computeSSRSVGAttrValues`) and every
+        // bump would mutate the attribute twice.
+        //
+        // Measured on this page, 3 bumps: 3 mutations with the `untrack` in
+        // `spreadAttrs` (correct), 6 with it removed. Bounding the count below
+        // `2 * bumps` is what separates them, and tolerates a benign extra render.
+        //
+        // `cy`, `r` and `fill` are static spread-routed attributes on the same
+        // element and must not be touched at all. That check alone is NOT
+        // sufficient — Svelte's spread diffs against its previous values, so a
+        // recomputation that yields unchanged values writes nothing (verified: the
+        // untrack-removed build leaves them untouched too). The count above is the
+        // assertion with teeth; these keep the blast radius honest.
+        await circle.evaluate((el) => {
+            const seen: string[] = []
+            const observer = new MutationObserver((records) => {
+                for (const record of records) {
+                    if (record.attributeName) seen.push(record.attributeName)
+                }
+            })
+            observer.observe(el, { attributes: true })
+            // Stash on the element so the assertions below can read it back.
+            ;(el as unknown as { __seen: string[] }).__seen = seen
+        })
 
-        await page.getByTestId('bump-cx').click()
-        await expect.poll(async () => computedNumber(circle, 'cx'), { timeout: 5000 }).toBe(60)
+        const BUMPS = 3
+        for (let bump = 1; bump <= BUMPS; bump++) {
+            await page.getByTestId('bump-cx').click()
+            await expect
+                .poll(async () => computedNumber(circle, 'cx'), { timeout: 5000 })
+                .toBe(40 + bump * 20)
+        }
 
-        expect(await circle.getAttribute('cx')).toBe(seed)
+        const seen = await circle.evaluate(
+            (el) => (el as unknown as { __seen: string[] }).__seen ?? []
+        )
+
+        // One writer per change: the observer was live (>= BUMPS) and the spread
+        // did not double up on it (< 2 * BUMPS).
+        const cxWrites = seen.filter((name) => name === 'cx').length
+        expect(cxWrites, 'cx attribute mutations').toBeGreaterThanOrEqual(BUMPS)
+        expect(cxWrites, 'cx attribute mutations').toBeLessThan(2 * BUMPS)
+
+        // ...and nothing the spread owns was touched.
+        for (const untouched of ['cy', 'r', 'fill']) {
+            expect(
+                seen.filter((name) => name === untouched),
+                `${untouched} mutations`
+            ).toEqual([])
+        }
     })
 
     test('an unrelated re-render does not clobber attribute-routed values', async ({ page }) => {

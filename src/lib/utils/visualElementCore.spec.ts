@@ -2,11 +2,12 @@ import {
     HTMLVisualElement,
     SVGVisualElement,
     getFeatureDefinitions,
+    motionValue,
     scrapeHTMLMotionValuesFromProps,
     visualElementStore,
     type MotionNodeOptions
 } from 'motion-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MotionDomProjectionAdapter } from './motionDomProjection.js'
 import {
     ExitAnimationFeature,
@@ -436,5 +437,111 @@ describe('createMotionVisualElement', () => {
         parent.unmount()
         visualElementStore.delete(element)
         visualElementStore.delete(parentElement)
+    })
+})
+
+/**
+ * SVG attribute routing (svg-through-ve plan 001 Step 2).
+ *
+ * MotionValue-bound SVG attributes used to be driven by a side channel
+ * (`svgEffect` subscribed them straight to the DOM). They are now carried as
+ * TOP-LEVEL props on the VisualElement, which is the shape
+ * `scrapeSVGMotionValuesFromProps` reads: it walks every prop key, claims any
+ * MotionValue, and maps transform names onto their `attr*` form. From there
+ * `buildSVGAttrs`/`renderSVG` own the DOM.
+ *
+ * These assert the BEHAVIOUR that migration depends on — that the values land
+ * on the node and reach the attribute channel — not which function was called.
+ */
+describe('SVG motion-value attribute routing', () => {
+    let path: SVGPathElement
+    let svg: SVGSVGElement
+
+    beforeEach(() => {
+        svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+        path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+        svg.appendChild(path)
+        document.body.appendChild(svg)
+    })
+
+    afterEach(() => {
+        visualElementStore.delete(path)
+        svg.remove()
+    })
+
+    it('binds MotionValue attributes off the props and mirrors them into latestValues', () => {
+        const cx = motionValue(40)
+        const strokeWidth = motionValue(4)
+        const ve = createMotionVisualElement({
+            props: { cx, 'stroke-width': strokeWidth } as unknown as MotionNodeOptions,
+            isSVG: true
+        })
+        ve.mount(path)
+        ve.update({ cx, 'stroke-width': strokeWidth } as unknown as MotionNodeOptions, null)
+
+        expect(ve.values.get('cx')).toBe(cx)
+        expect(ve.values.get('stroke-width')).toBe(strokeWidth)
+        expect(ve.latestValues.cx).toBe(40)
+        expect(ve.latestValues['stroke-width']).toBe(4)
+
+        ve.unmount()
+    })
+
+    it('maps a transform-named MotionValue onto its attr* form, not the CSS transform', () => {
+        // `x` is a transform prop, so the SVG scraper renames it `attrX` —
+        // upstream's way of keeping the attribute channel distinct from the
+        // CSS transform. `buildSVGAttrs` then emits it as the `x` attribute.
+        const x = motionValue(10)
+        const ve = createMotionVisualElement({
+            props: { x } as unknown as MotionNodeOptions,
+            isSVG: true
+        })
+        ve.mount(path)
+        ve.update({ x } as unknown as MotionNodeOptions, null)
+
+        expect(ve.values.get('attrX')).toBe(x)
+        expect(ve.values.has('x')).toBe(false)
+
+        ve.unmount()
+    })
+
+    it('renders bound values onto the ATTRIBUTE channel, and tracks later changes', () => {
+        const cx = motionValue(40)
+        const ve = createMotionVisualElement({
+            props: { cx } as unknown as MotionNodeOptions,
+            isSVG: true
+        })
+        ve.mount(path)
+        ve.update({ cx } as unknown as MotionNodeOptions, null)
+        ve.render()
+
+        // The upstream channel: `buildSVGAttrs` moves every non-transform value
+        // into `attrs` for a non-`<svg>` tag and `renderSVG` uses setAttribute.
+        expect(path.getAttribute('cx')).toBe('40')
+        expect(path.style.cx).toBe('')
+
+        cx.set(60)
+        ve.render()
+        expect(path.getAttribute('cx')).toBe('60')
+
+        ve.unmount()
+    })
+
+    it('composes path drawing from raw pathLength via buildSVGPath', () => {
+        // The two hand-rolled `transformSVGPathProperties` call sites are gone
+        // (Step 3): the raw value reaches the render state and the VE converts.
+        const ve = createMotionVisualElement({
+            props: { initial: { pathLength: 0.25 } },
+            isSVG: true,
+            seedLatestValues: true
+        })
+        ve.mount(path)
+        ve.render()
+
+        expect(path.getAttribute('pathLength')).toBe('1')
+        expect(path.getAttribute('stroke-dasharray')).toBe('0.25 1')
+        expect(path.getAttribute('stroke-dashoffset')).toBe('0')
+
+        ve.unmount()
     })
 })

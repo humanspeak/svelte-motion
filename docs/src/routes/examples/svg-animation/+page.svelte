@@ -38,14 +38,14 @@
             tag: 'SVG',
             title: { prefix: 'one spring, ', accent: 'three attributes', end: '.' },
             description:
-                'A single useSpring drives the ring’s stroke-dashoffset, the dot’s cx, and the line’s x2. No keyframes and no re-render: Motion subscribes to the value and writes each attribute on the channel it belongs to.',
+                'A single useSpring drives the ring’s stroke-dashoffset, the dot’s cx, and the line’s x2. No keyframes and no re-render: Motion subscribes to the value and renders every bound value as an SVG presentation attribute — the same channel React Framer Motion uses.',
             snippet: defaultSection,
             codeSnippet: defaultCode,
             notes: defaultNotes,
             barCells: [
                 { k: 'api', v: 'motion.circle' },
                 { k: 'input', v: 'useSpring' },
-                { k: 'channels', v: 'style + attribute' }
+                { k: 'channel', v: 'attribute' }
             ],
             sourceUrl: `${SOURCE_URL}svg-animation/demos/Default.svelte`
         }
@@ -67,15 +67,16 @@
         <li>
             <Route />
             <span>
-                <code>cx</code> and <code>stroke-dashoffset</code> are CSS properties, so they are
-                written to <code>element.style</code>.
+                Every bound value — <code>cx</code>, <code>stroke-dashoffset</code>,
+                <code>x2</code> — is written as a presentation attribute via
+                <code>setAttribute</code>: one MotionValue, one channel.
             </span>
         </li>
         <li>
             <Wand />
             <span>
-                <code>x2</code> is not a CSS property, so it is written with
-                <code>setAttribute</code> — same value, different channel.
+                That is exactly how React Framer Motion renders SVG, so cascade behavior (author CSS
+                beats presentation attributes) matches upstream too.
             </span>
         </li>
     </ul>

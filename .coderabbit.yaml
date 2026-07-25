@@ -48,7 +48,11 @@ reviews:
           instructions: Apply to accessibility improvements (a11y, keyboard, screen readers)
         - label: breaking-change
           instructions: Apply to changes that break backward compatibility
-    path_filters: []
+    # Plan batches and their guard logs are process records (planning-time
+    # excerpts, checkpoint history) — not living docs to keep in sync with code.
+    path_filters:
+        - '!.agents/.plans/**'
+        - '!.agents/.plans-closed/**'
     path_instructions:
         - path: src/lib/utils/**/*.ts
           instructions: Ensure all exported functions use arrow function syntax (const fn = () => {}), with one exception — overloaded functions must use the `function` declaration form because TypeScript forbids arrow syntax for overload signatures. This exception applies to hooks like useFollowValue, useSpring, and useCycle, which carry multiple call signatures. All functions must have comprehensive JSDoc comments with @param, @returns, and @example tags. Verify type safety and check for potential ReDoS vulnerabilities in regex patterns.
