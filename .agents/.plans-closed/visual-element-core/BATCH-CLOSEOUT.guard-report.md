@@ -5,8 +5,9 @@ the sixth deferred by sanctioned ruling with a complete re-scope record;
 operator live-demo sign-off COMPLETE on every section.
 **Closed at** the batch-final gate on `issue-449-visual-element-core`
 (2026-07-25; final gate results recorded below) · **Batch planned at** `7eba0bd`
-**Integrated** — branch not pushed; PR is the operator's next decision now
-that sign-off is complete.
+**Integrated** — PR opened at the operator's direction after complete
+sign-off: <https://github.com/humanspeak/svelte-motion/pull/454>
+(`Closes #449`). Merging remains the operator's call.
 
 ## Plan-by-plan verdicts (each has its own guard report beside it)
 
