@@ -8,9 +8,9 @@ and path drawing move onto the `SVGVisualElement` the elements already have.
 
 ## Execution order & status
 
-| Plan | Title                                                  | Priority | Effort | Risk | Depends on                  | Status      |
-| ---- | ------------------------------------------------------ | -------- | ------ | ---- | --------------------------- | ----------- |
-| 001  | SVG attributes + path drawing through SVGVisualElement | P2       | M      | MED  | visual-element-core 001–004 | IN PROGRESS |
+| Plan | Title                                                  | Priority | Effort | Risk | Depends on                  | Status                                                                                                |
+| ---- | ------------------------------------------------------ | -------- | ------ | ---- | --------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 001  | SVG attributes + path drawing through SVGVisualElement | P2       | M      | MED  | visual-element-core 001–004 | BLOCKED — `e2e/svg` pins `cx` on the style channel; the VE writes it as an attribute (needs a ruling) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
@@ -24,6 +24,53 @@ REJECTED (with one-line rationale)
 - The visual-element-core constraint ledger applies
   (`.agents/.plans/visual-element-core/002-*.md` revisions #4–#9).
 - Operator sign-off precedes any push/PR.
+
+## Executor STOP record (2026-07-25, plan 001 Step 2)
+
+Baseline (Step 1): `e2e/svg` 25 passed; `pnpm test:only` 813 passed
+(69 files). Attribute-exact pins live in
+`e2e/svg/motion-value-attributes.spec.ts` and
+`e2e/motion/svg-path-length.test.ts`.
+
+Step 2 was implemented (attempt preserved on branch
+`svg-through-ve-step2-attempt`, commits `f3075eb` + `2239321`) and reverted
+on this branch (`01f0780`) because it hits a STOP condition.
+
+**The conflict is a DOM CHANNEL divergence, not a format one.**
+`svgEffect` (`motion-dom/dist/es/effects/svg/index.mjs`) picks the channel
+per key: `const handler = key in element.style ? addStyleValue : addAttrValue`
+— so `cx`, `stroke-width`, `stroke-dashoffset` are written to
+`element.style`. `buildSVGAttrs`
+(`motion-dom/dist/es/render/svg/utils/build-attrs.mjs`) instead does
+`state.attrs = state.style; state.style = {}` for every non-`<svg>` tag, so
+`renderSVG` writes ALL non-transform values with `setAttribute`. That is
+upstream's behavior and there is no hook to route a key back to style.
+
+`e2e/svg/motion-value-attributes.spec.ts:314` ("does not re-render the
+attribute spread when a bound value changes") asserts at `:329`
+`expect(await circle.getAttribute('cx')).toBe(seed)` — i.e. the bound `cx`
+must NEVER appear on the attribute channel; the attribute is a one-time SSR
+seed. Observed on the attempt: `Expected: "40"` / `Received: "60"`. The
+spec's stated INTENT (the Svelte attribute spread must not track the
+MotionValue) is still satisfied — the attribute moves because the VE writes
+it, not because the spread recomputed — but its chosen proxy is
+mechanism-specific and cannot survive the migration. Per this plan's
+out-of-scope list, the executor did not modify it.
+
+Two secondary findings worth keeping if this resumes:
+
+1. `readAnimationStateStyleSlot()` must exclude attr-routed keys for
+   non-`<svg>` SVG tags. Without that, the declarative inline style
+   (`style="cx: 40"`) wins the cascade over the presentation attribute the
+   VE writes, freezing the element at the seed — measured: computed `cx`
+   stayed `40px` while the attribute tracked to `60`. Adding the exclusion
+   took `e2e/svg` from 5 failures to 1 (24/25), and `pnpm test:only`
+   (813 passed) plus the SSR pin (4 passed) stayed green.
+2. TDZ: `svgAttrSplit` / `svgMotionValueAttrs` must be declared ABOVE the
+   VE-creation block, because `buildMotionNodeProps()` runs inside that
+   initializer.
+
+Step 3 (path drawing) was never reached.
 
 ## Findings considered and rejected
 
