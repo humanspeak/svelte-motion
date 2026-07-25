@@ -341,10 +341,15 @@ describe('_MotionContainer', () => {
     })
 
     it('subscribes animate controls and starts resolved variants', async () => {
+        // Controls drive the VisualElement now (plan 002 Step 7), so behaviour is
+        // asserted on the values the node holds rather than on call args to the
+        // retired `animate()` writer. `animateMotionValue` is mocked at the top of
+        // this file to jump each MotionValue to its target, so a resolved start is
+        // observable synchronously.
         const controls = animationControls()
         const cleanup = controls.mount()
 
-        render(MotionContainer as unknown as any, {
+        const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
                 animate: controls,
@@ -356,18 +361,15 @@ describe('_MotionContainer', () => {
         })
 
         await flushTimers()
-        animateMock.mockClear()
 
-        await controls.start('visible', { duration: 0.1 })
+        void controls.start('visible', { duration: 0.1 })
+        await flushTimers()
 
-        expect(
-            animateMock.mock.calls.some(
-                (call) =>
-                    (call[1] as Record<string, unknown>)?.opacity === 1 &&
-                    (call[1] as Record<string, unknown>)?.x === 20 &&
-                    (call[2] as Record<string, unknown>)?.duration === 0.1
-            )
-        ).toBe(true)
+        // The variant label resolved against this node's own `variants`.
+        expect(await latestValuesOf(container.firstElementChild)).toMatchObject({
+            opacity: 1,
+            x: 20
+        })
 
         cleanup()
     })
@@ -376,7 +378,7 @@ describe('_MotionContainer', () => {
         const controls = animationControls()
         const cleanup = controls.mount()
 
-        render(MotionContainer as unknown as any, {
+        const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
                 animate: controls,
@@ -390,60 +392,49 @@ describe('_MotionContainer', () => {
         })
 
         await flushTimers()
-        animateMock.mockClear()
 
         controls.set('hidden')
+        await flushTimers()
 
-        expect(animateMock).toHaveBeenCalledWith(
-            expect.any(HTMLElement),
-            expect.objectContaining({ opacity: 0.2, display: 'none' }),
-            { duration: 0 }
-        )
+        // `set` is a jump, and a keyframe array collapses to its RESTING value
+        // (0.2, not 1); `transitionEnd` is applied on top.
+        expect(await latestValuesOf(container.firstElementChild)).toMatchObject({
+            opacity: 0.2,
+            display: 'none'
+        })
 
         cleanup()
     })
 
-    it('stops active animate controls using Motion playback controls', async () => {
+    it('stops active animate controls, freezing the value where it is', async () => {
         const controls = animationControls()
         const cleanup = controls.mount()
 
-        render(MotionContainer as unknown as any, {
+        const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
                 animate: controls,
+                initial: { opacity: 0.5 },
                 variants: {
-                    visible: { opacity: 1, x: 20 }
+                    visible: { opacity: 1 }
                 }
             }
         })
 
         await flushTimers()
-        animateMock.mockClear()
+        const el = container.firstElementChild
 
-        let resolveFinished: () => void = () => {}
-        const stop = vi.fn()
-        const finished = new Promise<void>((resolve) => {
-            resolveFinished = resolve
-        })
-        animateMock.mockReturnValueOnce({ finished, stop })
-
-        const start = controls.start('visible', { duration: 4 })
-        await Promise.resolve()
+        void controls.start('visible', { duration: 4 })
+        await flushTimers()
+        const beforeStop = (await latestValuesOf(el)).opacity
 
         controls.stop()
+        await flushTimers()
 
-        expect(stop).toHaveBeenCalledTimes(1)
-
-        resolveFinished()
-        await start
-
-        expect(
-            animateMock.mock.calls.some(
-                (call) =>
-                    (call[1] as Record<string, unknown>)?.opacity === 1 &&
-                    (call[2] as Record<string, unknown>)?.duration === 0
-            )
-        ).toBe(false)
+        // `stop()` FREEZES: it must not reset the value and must not keep
+        // animating. `MotionValue.stop()` routes into the animation's own
+        // interrupt handling, so the value simply stays where it was.
+        expect(await latestValuesOf(el)).toMatchObject({ opacity: beforeStop })
 
         cleanup()
     })

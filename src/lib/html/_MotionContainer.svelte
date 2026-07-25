@@ -13,7 +13,6 @@
     } from '$lib/utils/reducedMotionConfig.svelte'
     import type {
         MotionProps,
-        MotionTransition,
         AnimationControlsDefinition,
         AnimationControlsSubscriber,
         DragAxis,
@@ -27,22 +26,19 @@
     import { sleep } from '$lib/utils/testing'
     import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
     import {
-        animateSingleValue,
         calcBoxDelta,
         cancelFrame,
         createDelta,
         frame,
         isDeltaZero,
         isMotionValue,
-        motionValue,
-        readTransformValue,
         styleEffect,
         svgEffect,
+        animateVisualElement,
         transformProps,
         visualElementStore,
         type MotionNodeOptions,
-        type MotionValue,
-        type ValueAnimationTransition
+        type MotionValue
     } from 'motion-dom'
     import { isPlaywrightEnv, pwLog } from '$lib/utils/log'
     import { onDestroy, untrack, type Snippet } from 'svelte'
@@ -79,7 +75,6 @@
         mergeInlineStyles,
         serializeMotionStyle
     } from '$lib/utils/style'
-    import { isWillChangeMotionValue } from '$lib/utils/willChange.svelte'
     import { isNativelyFocusable } from '$lib/utils/a11y'
     import {
         getAnimatePresenceContext,
@@ -91,7 +86,6 @@
     import { attachDrag, type AttachDragCleanup } from '$lib/utils/drag'
     import { attachPan, type AttachPanCleanup } from '$lib/utils/pan'
     import { boxFromRect, MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
-    import { SvelteSet } from 'svelte/reactivity'
     import {
         getMotionDomProjectionParent,
         setMotionDomProjectionParent
@@ -124,8 +118,6 @@
         computeNormalizedSVGInitialAttrs,
         computeSSRSVGAttrValues,
         extractSVGMotionValueAttributes,
-        hasSVGPathProperties,
-        isSVGPathElement,
         isSVGTag,
         resolveSVGTagName,
         SVG_NAMESPACE
@@ -1160,338 +1152,22 @@
      *
      * @param {string[]} keys The property keys about to animate.
      */
-    const notifyWillChange = (keys: string[]) => {
-        // Widen to `unknown` first: narrowing the motion-dom `MotionValue` union
-        // directly against `WillChangeMotionValue` collapses to `never` (the
-        // augmented public `current` clashes with the base's private one).
-        const willChange: unknown = collectMotionStyleValues(styleProp)?.willChange
-        if (!isWillChangeMotionValue(willChange)) return
-        for (const key of keys) willChange.add(key)
-    }
-
-    // `isJsdomRuntime` / `getTransitionFallbackMs` are gone with the legacy
-    // writer: they existed only to fake an animation-complete timer under jsdom,
-    // where WAAPI never finishes. The animationState resolves its own promises.
-    let cleanupSVGPathAttributeEffect: (() => void) | null = null
-
-    /**
-     * Reads the current normalized SVG path drawing state from DOM
-     * attributes. `motion-dom`'s svgEffect owns future writes; this only
-     * seeds its MotionValues from the currently rendered frame.
-     *
-     * @param {SVGPathElement} path The SVG path element to inspect.
-     * @returns {{ pathLength: number; pathSpacing: number; pathOffset: number }} The normalized drawing state.
-     */
-    const readSVGPathDrawingState = (
-        path: SVGPathElement
-    ): { pathLength: number; pathSpacing: number; pathOffset: number } => {
-        const dashArray =
-            path.getAttribute('stroke-dasharray') || path.style.strokeDasharray || '1 0'
-        const [rawLength, rawSpacing] = dashArray
-            .split(/[,\s]+/)
-            .filter(Boolean)
-            .map((part) => Number.parseFloat(part))
-        const rawOffset = Number.parseFloat(
-            path.getAttribute('stroke-dashoffset') || path.style.strokeDashoffset || '0'
-        )
-
-        return {
-            pathLength: Number.isFinite(rawLength) ? rawLength : 1,
-            pathSpacing: Number.isFinite(rawSpacing) ? rawSpacing : 1,
-            pathOffset: Number.isFinite(rawOffset) ? -rawOffset : 0
-        }
-    }
-
-    /**
-     * Removes custom SVG path props from keyframes after `svgEffect` has
-     * taken ownership of them.
-     *
-     * @param {Record<string, unknown>} keyframes Keyframes to copy.
-     * @returns {Record<string, unknown>} Keyframes without SVG path-only props.
-     */
-    const stripSVGPathKeyframes = (keyframes: Record<string, unknown>): Record<string, unknown> => {
-        const stripped = { ...keyframes }
-        delete stripped.pathLength
-        delete stripped.pathSpacing
-        delete stripped.pathOffset
-        return stripped
-    }
-
-    /**
-     * Extracts an animation completion promise from a Motion control when
-     * one is available.
-     *
-     * @param {unknown} control The return value from `animate`.
-     * @returns {Promise<unknown> | null} The finished promise, or null.
-     */
-    const getFinishedPromise = (control: unknown): Promise<unknown> | null => {
-        if (!control || typeof control !== 'object') return null
-        const finished = (control as { finished?: unknown }).finished
-        return finished && typeof (finished as Promise<unknown>).then === 'function'
-            ? (finished as Promise<unknown>)
-            : null
-    }
-
-    const getAnimationPromise = (control: unknown): Promise<unknown> => {
-        const finished = getFinishedPromise(control)
-        if (finished) return finished
-        if (control && typeof (control as Promise<unknown>).then === 'function') {
-            return control as Promise<unknown>
-        }
-        return Promise.resolve()
-    }
-
-    type StoppableAnimationControl = {
-        stop?: () => void
-        cancel?: () => void
-    }
-
-    const activeAnimationControls = new SvelteSet<StoppableAnimationControl>()
-    // Animatable channel names of the in-flight controls animation (non-templated
-    // path only). Captured at start so `stop()` knows which channels to snapshot
-    // from the frozen DOM; empty when nothing (or only a templated transform) runs.
-    const activeAnimationControlsKeys = new SvelteSet<string>()
-    let animationControlsGeneration = 0
-    let animationControlsHasReceivedCommand = false
-    let lastAnimationControlsTarget = $state<Record<string, unknown> | undefined>(undefined)
-    const templatedTransformMotionValues: Record<string, MotionValue> = {}
-    let templatedTransformAnimationControls: StoppableAnimationControl[] = []
-    let templatedTransformAnimationGeneration = 0
-    let templatedTransformAnimationCleanup: (() => void) | null = null
-
-    const isStoppableAnimationControl = (control: unknown): control is StoppableAnimationControl =>
-        !!control &&
-        typeof control === 'object' &&
-        (typeof (control as StoppableAnimationControl).stop === 'function' ||
-            typeof (control as StoppableAnimationControl).cancel === 'function')
-
-    const trackAnimationControlsControl = (control: unknown): Promise<unknown> => {
-        const promise = getAnimationPromise(control)
-        if (isStoppableAnimationControl(control)) {
-            activeAnimationControls.add(control)
-            promise.then(
-                () => activeAnimationControls.delete(control),
-                () => activeAnimationControls.delete(control)
-            )
-        }
-        return promise
-    }
-
-    const templatedTransformKeys = new Set([
-        'x',
-        'y',
-        'z',
-        'scale',
-        'scaleX',
-        'scaleY',
-        'rotate',
-        'rotateX',
-        'rotateY',
-        'rotateZ',
-        'skew',
-        'skewX',
-        'skewY',
-        'translateX',
-        'translateY',
-        'translateZ',
-        'transform',
-        'transformPerspective'
-    ])
-
-    const getFirstKeyframeValue = (value: unknown): unknown =>
-        Array.isArray(value) ? value[0] : value
-
-    const getMotionStyleInitialValue = (key: string): unknown => {
-        if (!styleProp || typeof styleProp !== 'object' || Array.isArray(styleProp))
-            return undefined
-        const value = (styleProp as Record<string, unknown>)[key]
-        if (
-            value &&
-            typeof value === 'object' &&
-            'get' in value &&
-            typeof value.get === 'function'
-        ) {
-            return (value as { get: () => unknown }).get()
-        }
-        return value
-    }
-
-    const getDefaultTransformValue = (key: string, target: unknown): unknown => {
-        if (key === 'transform') {
-            return element?.style.transform || getComputedStyle(element!).transform || 'none'
-        }
-        if (key.startsWith('scale')) return 1
-        if (typeof target === 'string' && /%$/.test(target)) return '0%'
-        if (typeof target === 'string' && /turn$/.test(target)) return '0turn'
-        if (typeof target === 'string' && /rad$/.test(target)) return '0rad'
-        if (typeof target === 'string' && /deg$/.test(target)) return '0deg'
-        if (typeof target === 'string' && /px$/.test(target)) return '0px'
-        return 0
-    }
-
-    const getCurrentTransformValue = (key: string, target: unknown): unknown => {
-        if (!element || key === 'transform') return undefined
-
-        try {
-            const current = readTransformValue(element, key)
-            if (!Number.isFinite(current)) return undefined
-            if (typeof target === 'string') {
-                if (/%$/.test(target)) return `${current}%`
-                if (/turn$/.test(target)) return `${current}turn`
-                if (/rad$/.test(target)) return `${current}rad`
-                if (/deg$/.test(target)) return `${current}deg`
-                if (/px$/.test(target)) return `${current}px`
-            }
-            return current
-        } catch {
-            return undefined
-        }
-    }
-
-    const getTemplatedTransformInitialValue = (key: string, target: unknown): unknown => {
-        const fromInitial =
-            initialKeyframes && key in initialKeyframes
-                ? getFirstKeyframeValue(initialKeyframes[key])
-                : undefined
-        if (fromInitial != null) return fromInitial
-
-        const fromStyle = getMotionStyleInitialValue(key)
-        if (fromStyle != null) return getFirstKeyframeValue(fromStyle)
-
-        return getDefaultTransformValue(key, getFirstKeyframeValue(target))
-    }
-
-    const getTemplatedTransformMotionValue = (key: string, target: unknown): MotionValue => {
-        const existing = templatedTransformMotionValues[key]
-        if (existing) return existing
-
-        const firstTarget = getFirstKeyframeValue(target)
-        const initialValue =
-            getCurrentTransformValue(key, firstTarget) ??
-            getTemplatedTransformInitialValue(key, firstTarget)
-
-        const value = motionValue(initialValue) as MotionValue
-        templatedTransformMotionValues[key] = value
-        return value
-    }
-
-    const stopTemplatedTransformAnimations = () => {
-        templatedTransformAnimationGeneration += 1
-        for (const control of templatedTransformAnimationControls) {
-            if (typeof control.stop === 'function') {
-                control.stop()
-            } else {
-                control.cancel?.()
-            }
-        }
-        templatedTransformAnimationControls = []
-    }
-
-    const cleanupTemplatedTransformAnimations = () => {
-        stopTemplatedTransformAnimations()
-        templatedTransformAnimationCleanup?.()
-        templatedTransformAnimationCleanup = null
-    }
-
-    const splitTemplatedTransformPayload = (payload: Record<string, unknown>) => {
-        const templatePayload: Record<string, unknown> = {}
-        const nativePayload: Record<string, unknown> = {}
-
-        for (const [key, value] of Object.entries(payload)) {
-            if (templatedTransformKeys.has(key)) {
-                templatePayload[key] = value
-            } else {
-                nativePayload[key] = value
-            }
-        }
-
-        return {
-            templatePayload,
-            nativePayload,
-            hasTemplatePayload: Object.keys(templatePayload).length > 0,
-            hasNativePayload: Object.keys(nativePayload).length > 0
-        }
-    }
-
-    const getTemplatedStyleTransformValues = (): Record<string, unknown> => {
-        if (!styleProp || typeof styleProp !== 'object' || Array.isArray(styleProp)) return {}
-
-        const values: Record<string, unknown> = {}
-        for (const [key, value] of Object.entries(styleProp as Record<string, unknown>)) {
-            if (templatedTransformKeys.has(key)) values[key] = value
-        }
-        return values
-    }
-
-    const animateTemplatedTransformPayload = (
-        payload: Record<string, unknown>,
-        transition: AnimationOptions,
-        onStart: (def: unknown) => void,
-        onComplete: (def: unknown) => void
-    ): Promise<unknown> => {
-        if (!element || !transformTemplateProp) return Promise.resolve()
-
-        const { templatePayload, nativePayload, hasNativePayload } =
-            splitTemplatedTransformPayload(payload)
-        const motionValues: Record<string, MotionValue> = {}
-        const valueTransition: ValueAnimationTransition = {
-            ...transition,
-            delay: typeof transition.delay === 'number' ? transition.delay : undefined
-        }
-        stopTemplatedTransformAnimations()
-        const generation = templatedTransformAnimationGeneration
-
-        for (const [key, target] of Object.entries(templatePayload)) {
-            motionValues[key] = getTemplatedTransformMotionValue(key, target)
-        }
-
-        templatedTransformAnimationCleanup?.()
-        templatedTransformAnimationCleanup =
-            applyMotionStyleEffect(
-                element,
-                { ...getTemplatedStyleTransformValues(), ...motionValues },
-                transformTemplateProp
-            ) ?? null
-
-        onStart(payload)
-
-        const promises: Promise<unknown>[] = []
-        for (const [key, target] of Object.entries(templatePayload)) {
-            const control = animateSingleValue(motionValues[key], target as never, valueTransition)
-            if (isStoppableAnimationControl(control)) {
-                templatedTransformAnimationControls.push(control)
-            }
-            promises.push(getAnimationPromise(control))
-        }
-
-        if (hasNativePayload) {
-            const nativeControl = animate(
-                element,
-                nativePayload as DOMKeyframesDefinition,
-                transition
-            )
-            if (isStoppableAnimationControl(nativeControl)) {
-                templatedTransformAnimationControls.push(nativeControl)
-            }
-            promises.push(getAnimationPromise(nativeControl))
-        }
-
-        return Promise.all(promises)
-            .then(() => {
-                if (generation !== templatedTransformAnimationGeneration) return
-                templatedTransformAnimationControls = []
-                templatedTransformAnimationCleanup?.()
-                templatedTransformAnimationCleanup = null
-                onComplete(payload)
-            })
-            .catch(() => {
-                if (generation !== templatedTransformAnimationGeneration) return
-                templatedTransformAnimationControls = []
-                templatedTransformAnimationCleanup?.()
-                templatedTransformAnimationCleanup = null
-                onComplete(payload)
-            })
-    }
+    // A ~215-line block lived here: the SVG path-drawing MotionValue readers
+    // (`readSVGPathDrawingState`, `cleanupSVGPathAttributeEffect`), the
+    // stoppable-control promise plumbing (`getFinishedPromise`,
+    // `getAnimationPromise`, `activeAnimationControls`,
+    // `trackAnimationControlsControl`) and the whole templated-transform
+    // subsystem (`templatedTransform*`, `splitTemplatedTransformPayload`,
+    // `getTemplatedTransform*`).
+    //
+    // Every one of them was reachable ONLY from the three deleted legacy writers
+    // (`executeAnimation`, `startAnimationControlsDefinition`,
+    // `applyAnimationControlsTarget`). The VisualElement supersedes all three
+    // concerns: it composes templated transforms natively via
+    // `buildHTMLStyles(state, latestValues, props.transformTemplate)`, its
+    // MotionValues are the stoppable handles, and `svgEffect` (still live below)
+    // owns SVG attribute writes. `e2e/svg` and `e2e/utilities/transform-template`
+    // both stay green. (plan 002 Step 7)
 
     const resolveAnimationControlsDefinition = (
         definition: AnimationControlsDefinition
@@ -1504,397 +1180,23 @@
         return resolvedDefinition
     }
 
-    const applyAnimationControlsTarget = (
-        definition: AnimationControlsDefinition,
-        /**
-         * Pre-resolved keyframes to settle to (from a completed
-         * `startAnimationControlsDefinition`). When present they are used
-         * verbatim so a relative offset is not re-applied against the element
-         * after it has already moved. When absent (e.g. `controls.set`, an
-         * instantaneous jump where live == start), wildcards/relatives are
-         * resolved against the live value here instead. See plan 003.
-         */
-        resolvedOverride?: Record<string, unknown>
-    ) => {
-        if (!element) return
-        const resolved = resolveAnimationControlsDefinition(definition)
-        if (!resolved) return
+    // `applyAnimationControlsTarget`, `snapshotFrozenControlsValues`,
+    // `stopAnimationControlsAnimations` and `startAnimationControlsDefinition`
+    // lived here (~340 lines). All four are gone: the controls subscriber below
+    // drives the VisualElement through `animateVisualElement`, which resolves
+    // labels/lists/function-form definitions itself, notifies
+    // AnimationStart/Complete, and retargets the SAME MotionValues — so the
+    // generation counters, the frozen-value snapshots and the settle bookkeeping
+    // they existed to maintain are all inherent to the node now. (plan 002 Step 7)
 
-        animationControlsHasReceivedCommand = true
-        const target = { ...(resolved as Record<string, unknown>) } as Record<string, unknown> & {
-            transition?: AnimationOptions
-            transitionEnd?: Record<string, unknown>
-        }
-        const transitionEnd = target.transitionEnd
-        delete target.transition
-        delete target.transitionEnd
-        const settleSource =
-            resolvedOverride ??
-            (resolveWildcardKeyframes(target as DOMKeyframesDefinition, readLiveChannelValue) as
-                | Record<string, unknown>
-                | undefined) ??
-            target
-        const finalTarget = resolveRestingValues({
-            ...settleSource,
-            ...(transitionEnd ?? {})
-        } as DOMKeyframesDefinition) as Record<string, unknown> | undefined
-        if (!finalTarget) return
+    // `animateSVGPathAttributes` / `stripSVGPathKeyframes` / `isSVGPathElement`
+    // lived here. They were used ONLY by the two deleted legacy writers
+    // (`executeAnimation` and `startAnimationControlsDefinition`), so they are
+    // unreferenced now. SVG path HANDLING itself is untouched per the Step 6
+    // skip ruling: `svgEffect`, `transformSVGPathProperties`,
+    // `readSVGPathDrawingState` and the mount-effect dash-attribute seeding all
+    // remain, and `e2e/svg` stays green.
 
-        const transformedTarget = transformSVGPathProperties(element, finalTarget)
-        if (!transformTemplateProp) {
-            animate(element, transformedTarget as DOMKeyframesDefinition, { duration: 0 })
-        }
-        element.setAttribute(
-            'style',
-            mergeInlineStyles(
-                element.getAttribute('style') ?? '',
-                undefined,
-                transformedTarget,
-                transformTemplateProp
-            )
-        )
-        // Accumulate: successive commands may target disjoint keys; each
-        // held value persists until a later command overwrites it (matching
-        // upstream's per-motion-value holds).
-        lastAnimationControlsTarget = {
-            ...(lastAnimationControlsTarget ?? {}),
-            ...transformedTarget
-        }
-        enterAnimationSettled = true
-    }
-
-    /**
-     * Read the element's currently rendered (frozen) values for the given
-     * animatable channels straight off computed style. Lets a stopped
-     * animation's mid-flight value be folded back into the controls settle
-     * state, mirroring upstream stopping each MotionValue at its instantaneous
-     * value. Only transform channels and opacity are recoverable this way.
-     *
-     * @param {HTMLElement} el The element whose committed transform/opacity to read.
-     * @param {Set<string>} keys The animatable channel names that were in flight.
-     * @returns {Record<string, unknown>} A target record (channel → numeric value)
-     *   for the readable keys; keys with no computed-style representation are skipped.
-     */
-    const snapshotFrozenControlsValues = (
-        el: HTMLElement,
-        keys: Iterable<string>
-    ): Record<string, unknown> => {
-        const computed = getComputedStyle(el)
-        // Parse the computed matrix by hand (like readTransformScale): the test
-        // environment has no DOMMatrix, and computed transforms serialize as
-        // `matrix(a,b,c,d,e,f)` or `matrix3d(...)`. For a non-skewed matrix,
-        // hypot of each column is that axis' scale regardless of rotation;
-        // e/f are the translations; atan2(b, a) is the Z rotation — mirroring
-        // how the transform template re-serializes the same channels.
-        const transform = computed.transform
-        const parts =
-            transform && transform !== 'none'
-                ? (transform.match(/matrix(?:3d)?\(([^)]+)\)/)?.[1] ?? '')
-                      .split(',')
-                      .map((part) => Number.parseFloat(part.trim()))
-                : []
-        const is3d = transform.startsWith('matrix3d')
-        const a = parts.length > 0 ? parts[0] : 1
-        const b = parts.length > 0 ? parts[1] : 0
-        const c = parts[is3d ? 4 : 2] ?? 0
-        const d = parts[is3d ? 5 : 3] ?? 1
-        const tx = parts[is3d ? 12 : 4] ?? 0
-        const ty = parts[is3d ? 13 : 5] ?? 0
-        const scaleX = Math.hypot(a, b)
-        const scaleY = Math.hypot(c, d)
-        const rotate = (Math.atan2(b, a) * 180) / Math.PI
-        const opacity = Number.parseFloat(computed.opacity)
-
-        const snapshot: Record<string, unknown> = {}
-        // Only fold in finite readings; a channel we can't read stays at its
-        // prior settle value rather than being wiped to NaN.
-        const put = (key: string, value: number) => {
-            if (Number.isFinite(value)) snapshot[key] = value
-        }
-        for (const key of keys) {
-            switch (key) {
-                case 'opacity':
-                    put('opacity', opacity)
-                    break
-                case 'scale':
-                    put('scale', scaleX)
-                    break
-                case 'scaleX':
-                    put('scaleX', scaleX)
-                    break
-                case 'scaleY':
-                    put('scaleY', scaleY)
-                    break
-                case 'x':
-                case 'translateX':
-                    put(key, tx)
-                    break
-                case 'y':
-                case 'translateY':
-                    put(key, ty)
-                    break
-                case 'rotate':
-                case 'rotateZ':
-                    put(key, rotate)
-                    break
-                default:
-                    // Channels without a computed-style representation (e.g. skew,
-                    // 3D rotate) are left to their prior settle value.
-                    break
-            }
-        }
-        return snapshot
-    }
-
-    const stopAnimationControlsAnimations = () => {
-        animationControlsGeneration += 1
-
-        // The templated-transform path animates MotionValues that are not part of
-        // `activeAnimationControls` and never surface in `element.getAnimations()`,
-        // so a public `controls.stop()` would otherwise leak a running templated
-        // transform animation (and its style-effect cleanup). Upstream stops a
-        // VisualElement by stopping all of its values; mirror that here. (#402)
-        const templatedWasActive = templatedTransformAnimationControls.length > 0
-        cleanupTemplatedTransformAnimations()
-
-        const hadActiveControls = activeAnimationControls.size > 0
-        for (const control of activeAnimationControls) {
-            if (typeof control.stop === 'function') {
-                control.stop()
-            } else {
-                control.cancel?.()
-            }
-        }
-        activeAnimationControls.clear()
-
-        // Snapshot which channels were mid-flight, then reset for the next command.
-        const snapshotKeys = [...activeAnimationControlsKeys]
-        activeAnimationControlsKeys.clear()
-
-        if (element && typeof element.getAnimations === 'function') {
-            for (const animation of element.getAnimations()) {
-                try {
-                    animation.commitStyles?.()
-                } catch {
-                    // Ignore unsupported commitStyles cases.
-                }
-                animation.cancel()
-            }
-        }
-
-        // An idle stop (nothing was running) must leave the resting state alone:
-        // just flipping `animationControlsHasReceivedCommand` would make the
-        // render fall through to the (empty) controls target and snap the element
-        // to base. Only a stop that actually interrupted a command settles.
-        if (!(templatedWasActive || hadActiveControls || snapshotKeys.length > 0)) return
-        animationControlsHasReceivedCommand = true
-
-        // Fold the FROZEN mid-flight value into the settle state so the next
-        // reactive style flush rewrites the transform from where stop() left it,
-        // not from a stale previous target. Upstream stops each value in place
-        // (animation-controls.ts → stopAnimation → value.stop()). The templated
-        // path is left as-is (`snapshotKeys` is empty for it — see #402 above).
-        if (element && snapshotKeys.length > 0) {
-            const frozen = snapshotFrozenControlsValues(element, snapshotKeys)
-            if (isNotEmpty(frozen)) {
-                lastAnimationControlsTarget = {
-                    ...(lastAnimationControlsTarget ?? {}),
-                    ...frozen
-                }
-                enterAnimationSettled = true
-            }
-        }
-    }
-
-    const startAnimationControlsDefinition = async (
-        definition: AnimationControlsDefinition,
-        transitionOverride?: AnimationOptions
-    ): Promise<unknown> => {
-        if (!element) return
-        const resolved = resolveAnimationControlsDefinition(definition)
-        if (!resolved) return
-
-        const isFirstCommand = !animationControlsHasReceivedCommand
-        animationControlsHasReceivedCommand = true
-        const filtered = filterReducedMotionKeyframes(
-            resolved as Record<string, unknown>,
-            reducedMotion
-        ) as Record<string, unknown> & {
-            transition?: AnimationOptions
-            transitionEnd?: Record<string, unknown>
-        }
-        const transition = filtered.transition
-        const target = { ...filtered }
-        delete target.transition
-        delete target.transitionEnd
-        const transitionAnimate: MotionTransition =
-            transitionOverride ?? mergeTransitions(mergedTransition ?? {}, transition ?? {})
-        const svgPathFinished =
-            isSVGPathElement(element) && hasSVGPathProperties(target)
-                ? animateSVGPathAttributes(element, target, transitionAnimate, true)
-                : []
-        const payload = transformSVGPathProperties(
-            element,
-            svgPathFinished.length > 0 ? stripSVGPathKeyframes(target) : target
-        )
-
-        // Resolve wildcard (`null` = "current value") and relative (`'+=50'`)
-        // keyframes against the element's LIVE value NOW, at animation start —
-        // upstream framer-motion resolves both in its keyframe pipeline before
-        // the animation layer runs, but our WAAPI port otherwise drops a
-        // `[0, null]` channel within a frame and ignores `'+=50'` entirely (see
-        // resolveWildcardKeyframes + plan 003). This MUST run BEFORE the
-        // first-command idle expansion below: that guard only pairs SCALAR
-        // channels (`!Array.isArray(to)`), so a user-authored wildcard ARRAY
-        // must already be concrete when it runs, and a relative SCALAR must be a
-        // number so it expands to `[from, number]` rather than `[from, '+=50']`.
-        // Capture the resolved keyframes (pre-expansion) so the settle collapse
-        // reuses them instead of re-resolving a relative against the now-MOVED
-        // element (which would double-apply the offset).
-        const resolvedPayload = resolveWildcardKeyframes(
-            payload as DOMKeyframesDefinition,
-            readLiveChannelValue
-        )
-        if (resolvedPayload) Object.assign(payload as Record<string, unknown>, resolvedPayload)
-        const settleTarget = { ...(payload as Record<string, unknown>) }
-
-        // First-ever command from a non-neutral idle: WAAPI reads its from-value
-        // off the live computed style, but by the time it captures it the
-        // reactive inline transform has already been rewritten off the idle
-        // keyframes (the ternary drops it once a command is received), so a
-        // transform like the beam's scaleX 0.16 reads back as the property
-        // default (scaleX 1) and the first animation runs 1->1 — no visible
-        // travel. Pin the from-side explicitly by expanding each channel the
-        // idle variant defines into a `[from, to]` keyframe pair, mirroring
-        // upstream where the motion value holds the idle value as the from.
-        // Only the first command needs this: later commands animate from the
-        // held target, which the inline base already renders correctly.
-        if (isFirstCommand && isNotEmpty(initialKeyframes)) {
-            const idle = initialKeyframes as Record<string, unknown>
-            for (const key of Object.keys(payload)) {
-                const from = idle[key]
-                const to = (payload as Record<string, unknown>)[key]
-                if (from !== undefined && !Array.isArray(to)) {
-                    ;(payload as Record<string, unknown>)[key] = [from, to]
-                }
-            }
-        }
-
-        // Imperative controls (useAnimationControls/useAnimate) animate transforms
-        // too — notify will-change here just like the declarative path does.
-        notifyWillChange(Object.keys(payload))
-
-        const controlsGeneration = ++animationControlsGeneration
-        enterAnimationSettled = false
-        onAnimationStartProp?.(definition as unknown as DOMKeyframesDefinition)
-
-        const promises: Promise<unknown>[] = [...svgPathFinished]
-        if (isNotEmpty(payload)) {
-            const shouldAnimateThroughTransformTemplate =
-                !!transformTemplateProp &&
-                splitTemplatedTransformPayload(payload).hasTemplatePayload
-
-            if (shouldAnimateThroughTransformTemplate) {
-                promises.push(
-                    animateTemplatedTransformPayload(
-                        payload,
-                        transitionAnimate,
-                        () => {},
-                        () => {}
-                    )
-                )
-            } else {
-                cleanupTemplatedTransformAnimations()
-                // Record the channels now in flight so a mid-flight stop() can
-                // snapshot exactly these from the frozen DOM (and no others).
-                activeAnimationControlsKeys.clear()
-                for (const key of Object.keys(payload)) activeAnimationControlsKeys.add(key)
-                promises.push(
-                    trackAnimationControlsControl(
-                        animate(element, payload as DOMKeyframesDefinition, transitionAnimate)
-                    )
-                )
-            }
-        }
-
-        try {
-            await Promise.all(promises)
-        } catch (error) {
-            if (controlsGeneration !== animationControlsGeneration) return
-            throw error
-        }
-        if (controlsGeneration !== animationControlsGeneration) return
-        // Completed naturally: the target is now the settle value, so the
-        // in-flight channel set is stale — clear it so a later idle stop() is a
-        // true no-op rather than snapshotting a long-finished animation.
-        activeAnimationControlsKeys.clear()
-        // Settle from the keyframes we actually animated (wildcards/relatives
-        // already resolved against the start value) — NOT by re-resolving the
-        // raw definition, whose relative offsets would re-apply against the
-        // element after it has moved. See plan 003.
-        applyAnimationControlsTarget(definition, settleTarget)
-        onAnimationCompleteProp?.(definition as unknown as DOMKeyframesDefinition)
-    }
-
-    /**
-     * Animates SVG path drawing props via motion-dom's `svgEffect`, matching
-     * upstream's attribute-based pathLength/pathSpacing/pathOffset behavior.
-     *
-     * @param {SVGPathElement} path The path element to animate.
-     * @param {Record<string, unknown>} keyframes Keyframes containing SVG path props.
-     * @param {MotionTransition} transition The transition to apply to generated MotionValues.
-     * @returns {Promise<unknown>[]} Promises for generated path animations.
-     */
-    const animateSVGPathAttributes = (
-        path: SVGPathElement,
-        keyframes: Record<string, unknown>,
-        transition: MotionTransition,
-        trackControl = false
-    ): Promise<unknown>[] => {
-        if (!hasSVGPathProperties(keyframes)) return []
-
-        cleanupSVGPathAttributeEffect?.()
-        const current = readSVGPathDrawingState(path)
-        const values: Record<string, MotionValue<number>> = {}
-
-        if ('pathLength' in keyframes) {
-            values.pathLength = motionValue(current.pathLength)
-        }
-        if ('pathLength' in keyframes || 'pathSpacing' in keyframes) {
-            values.pathSpacing = motionValue(current.pathSpacing)
-        }
-        if ('pathOffset' in keyframes) {
-            values.pathOffset = motionValue(current.pathOffset)
-        }
-
-        cleanupSVGPathAttributeEffect = svgEffect(path, values)
-
-        return Object.entries(values)
-            .map(([key, value]) => {
-                const control = animate(
-                    value as never,
-                    (key === 'pathSpacing' && !('pathSpacing' in keyframes)
-                        ? 1
-                        : keyframes[key]) as never,
-                    transition as unknown as AnimationOptions
-                )
-                return trackControl
-                    ? trackAnimationControlsControl(control)
-                    : getFinishedPromise(control)
-            })
-            .filter((promise): promise is Promise<unknown> => promise !== null)
-    }
-
-    onDestroy(() => {
-        cleanupSVGPathAttributeEffect?.()
-        cleanupSVGPathAttributeEffect = null
-        stopTemplatedTransformAnimations()
-        templatedTransformAnimationCleanup?.()
-        templatedTransformAnimationCleanup = null
-    })
-
-    // Wait-mode enter coordination needs to affect the first rendered attrs,
-    // before the blocked entrant can participate in layout.
     let waitCallbackRegistered = $state(false)
     let waitUnsubscribe: (() => void) | null = null
     let waitHiddenDisplay: string | null = null
@@ -1939,6 +1241,26 @@
     const readAnimationStateStyleSlot = (): Record<string, unknown> | undefined => {
         if (!visualElement) return undefined
         const values: Record<string, unknown> = { ...visualElement.latestValues }
+        // Prefer each MotionValue's own current value over `latestValues`.
+        //
+        // `latestValues` is kept in sync by `bindToMotionValue`'s
+        // `on("change")` subscription — but that subscription is NEVER INSTALLED
+        // for accelerated channels: `bindToMotionValue` builds a NativeAnimation
+        // and returns early for them (`VisualElement.mjs:262-281`). So after a
+        // WAAPI-accelerated animation is interrupted, `MotionValue.stop()` writes
+        // the sampled freeze value onto the MotionValue
+        // (`NativeAnimationExtended.updateMotionValue`) while `latestValues` still
+        // holds the from-state. Reading the MotionValues here keeps the
+        // declarative rewrite consistent with the real store, so a benign
+        // reactive change cannot snap a frozen channel back (measured: an
+        // interrupted controls start froze translateX at 15.936px, then an
+        // unrelated style poke rewrote it to 0).
+        //
+        // A no-op for non-accelerated keys, whose MotionValue and `latestValues`
+        // agree by construction.
+        visualElement.values.forEach((value, key) => {
+            values[key] = value.get()
+        })
         // A live gesture transform is spliced into the base string above and
         // must win: drop the transform channels so the merge cannot override it
         // with the resting composition. (Gestures move onto the VE in plan 003.)
@@ -1965,12 +1287,14 @@
     }
 
     const renderedInlineStyle = $derived.by(() =>
-        // Imperative animation controls are NOT owned by the animationState yet
-        // (Step 7 bridges them), so their slot machinery is retained verbatim in
-        // the second branch. Everything else reads `latestValues`. SSR has no
-        // VisualElement and also takes the second branch, keeping the
-        // server-rendered style byte-identical.
-        !animateControls && visualElement
+        // One path now. The controls-specific slot machinery this used to carry
+        // (settle targets, first-command holds, `animationControlsHasReceivedCommand`)
+        // is gone with Step 7: controls drive the SAME VisualElement, so
+        // `latestValues` is the single source of truth for every animated key
+        // regardless of which writer set it. SSR has no VisualElement and falls
+        // back to the initial/animate serialization, keeping the server-rendered
+        // style byte-identical.
+        visualElement
             ? mergeInlineStyles(
                   inlineStyleBaseWithHolds,
                   undefined,
@@ -1979,51 +1303,10 @@
               )
             : mergeInlineStyles(
                   inlineStyleBaseWithHolds,
-                  // The "from" slot: apply initialKeyframes as inline styles during
-                  // the mounting/initial phases (before the WAAPI animation locks
-                  // its from-value and we promote to 'ready' — see the lifecycle
-                  // around the enter rAF). mergeInlineStyles prefers this slot when
-                  // non-empty, so it wins over the animate slot below in these phases.
                   isLoaded === 'mounting' || isLoaded === 'initial' ? initialKeyframes : undefined,
-                  // The "target" slot. Only AFTER the enter animation completes does
-                  // the target become the inline baseline, so the element holds it
-                  // once WAAPI surrenders the property (default fill:'none' would
-                  // otherwise leave transform:none). It must NOT be applied during
-                  // the run: flipping the inline value to the target mid-animation
-                  // shows the target for the one frame the inline changes (a visible
-                  // snap), since WAAPI's composite doesn't override that exact frame.
-                  // While the animation runs we keep the original behavior — initial
-                  // keyframes own the inline (via the slot above), or, with no
-                  // initial, the animate values seed the inline as the from. Resting
-                  // values collapse keyframe arrays to their last element
-                  // (animate={{x:[0,100,50]}} rests at 50). (#377)
-                  enterAnimationSettled
-                      ? // Controls-driven elements settle on the last imperative
-                        // target, not the (empty) declarative baseline — otherwise
-                        // the template rewrite wipes a non-neutral final transform
-                        // (e.g. a variant ending at scaleX 0.66 snaps to identity).
-                        animateControls && animationControlsHasReceivedCommand
-                          ? lastAnimationControlsTarget
-                          : renderedAnimateBaseline
-                      : animateControls &&
-                          !animationControlsHasReceivedCommand &&
-                          isNotEmpty(initialKeyframes)
-                        ? initialKeyframes
-                        : animateControls && animationControlsHasReceivedCommand
-                          ? // First-ever in-flight command: no target/stop snapshot
-                            // exists yet (lastAnimationControlsTarget is undefined
-                            // until applyAnimationControlsTarget/stop runs). Falling
-                            // through to a neutral base here wipes the idle from-value
-                            // exactly as WAAPI captures it, so the first animation runs
-                            // e.g. 1->1 instead of 0.16->1. Hold the idle keyframes as
-                            // the inline base until a real snapshot supersedes them.
-                            (lastAnimationControlsTarget ??
-                            (isNotEmpty(initialKeyframes) ? initialKeyframes : undefined))
-                          : isNotEmpty(initialKeyframes)
-                            ? !effectiveAnimate
-                                ? initialKeyframes
-                                : undefined
-                            : renderedAnimateBaseline,
+                  isNotEmpty(initialKeyframes) && !effectiveAnimate
+                      ? initialKeyframes
+                      : renderedAnimateBaseline,
                   transformTemplateProp
               )
     )
@@ -2683,17 +1966,33 @@
         })
     })
 
+    // MOUNT effect — must track ONLY `element`.
+    //
+    // The `updateOptions` call is deliberately `untrack`ed. Read reactively it
+    // makes `styleProp`/`transition`/`layout*` dependencies of the MOUNT effect,
+    // so any of them changing tears the adapter down and mounts it again — and
+    // `VisualElement.mount()` REWINDS every value to `initialValues` on a
+    // remount (`VisualElement.mjs:180-191`, the Suspense-replay branch). A
+    // reactive style change would therefore jump the element back to `initial`
+    // mid-flight: measured on the controls page, an interrupted start frozen at
+    // translateX(16.032px) snapped to 0 in one frame when an unrelated outline
+    // colour changed, with the stack naming
+    // `HTMLVisualElement.mount` <- `MotionDomProjectionAdapter.mount` <- this
+    // effect. The effect above owns reactive option updates.
     $effect(() => {
         if (!motionDomProjection) return
         if (!element) return
-        motionDomProjection.updateOptions({
-            layout: layoutProp,
-            layoutId: scopedLayoutId,
-            layoutScroll: layoutScrollProp,
-            transition: mergedTransition as never,
-            style: styleProp
+        const mountTarget = element
+        untrack(() => {
+            motionDomProjection.updateOptions({
+                layout: layoutProp,
+                layoutId: scopedLayoutId,
+                layoutScroll: layoutScrollProp,
+                transition: mergedTransition as never,
+                style: styleProp
+            })
         })
-        motionDomProjection.mount(element)
+        motionDomProjection.mount(mountTarget)
         return () => {
             motionDomProjection.unmount()
         }
@@ -2730,7 +2029,6 @@
         // own callbacks directly (it is not animationState-driven until Step 7),
         // hence the guard.
         const offStart = visualElement.on('AnimationStart', (definition) => {
-            if (animateControls) return
             onAnimationStartProp?.(definition as DOMKeyframesDefinition | undefined)
         })
         const offComplete = visualElement.on('AnimationComplete', (definition) => {
@@ -2741,7 +2039,6 @@
             // on e2e/variants/stagger-interrupt. Scheduling here is idempotent:
             // motion-dom coalesces onto the frameloop's render step.
             visualElement.scheduleRender()
-            if (animateControls) return
             onAnimationCompleteProp?.(definition as DOMKeyframesDefinition | undefined)
         })
         return () => {
@@ -2777,15 +2074,20 @@
             // per-commit flush, exactly as upstream does after every React commit
             // (use-visual-element.ts:148); the frameloop variant can sit unflushed
             // when nothing else is animating, which left `renderState` stale.
-            // Not for controls-driven elements: the imperative controls path is still
-            // the legacy writer until Step 7 and holds its own frozen mid-flight
-            // value on the element. Flushing this node's `latestValues` over it
-            // resurrects a stale declarative target (verified by bisection: the
-            // flush alone breaks 3 animation-controls specs).
-            if (!animateControls) visualElement.scheduleRenderMicrotask()
+            visualElement.scheduleRenderMicrotask()
             // Only once the mount/enter effect has run the first pass — it owns
             // the enter ordering and the wait-mode gate.
-            if (firstAnimatePassDone) runAnimation()
+            //
+            // And never while imperative controls are attached: the subscriber is
+            // the writer then, and `props.animate` is `undefined`, so a pass would
+            // see every key the previous declarative target animated as REMOVED
+            // and animate it back to `getBaseTarget` — snapping the element to
+            // `initial` on a declarative -> controls swap. Upstream never hits
+            // this because it hands `animateChanges` the controls object itself,
+            // which it early-skips; our props shape cannot do that without
+            // tripping `isControllingVariants` (measured: 10 controls specs
+            // regressed), so the guard lives here instead.
+            if (firstAnimatePassDone && !animateControls) runAnimation()
         })
     })
 
@@ -3320,39 +2622,106 @@
     $effect(() => {
         if (!(element && animateControls)) return
 
+        const node = visualElement
+        if (!node) return
+
+        /** Live value for a relative offset: the node's own value, else the DOM. */
+        const readControlsChannel = (key: string): number | undefined => {
+            const live = node.getValue(key)?.get()
+            if (typeof live === 'number') return live
+            const parsed = Number.parseFloat(String(live))
+            return Number.isFinite(parsed) ? parsed : readLiveChannelValue(key)
+        }
+
+        const resolveControlsRelatives = (definition: unknown): unknown => {
+            if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
+                return definition
+            }
+            return (
+                resolveWildcardKeyframes(
+                    definition as DOMKeyframesDefinition,
+                    readControlsChannel
+                ) ?? definition
+            )
+        }
+
         const subscriber: AnimationControlsSubscriber = {
-            start: startAnimationControlsDefinition,
-            set: applyAnimationControlsTarget,
-            stop: stopAnimationControlsAnimations
+            // Upstream's `animation-controls.ts` does exactly this: hand the
+            // definition to `animateVisualElement`, which resolves variant
+            // labels, lists and function-form definitions against the node's own
+            // props, notifies AnimationStart/AnimationComplete, and RETARGETS the
+            // same MotionValues (so an interrupting start keeps velocity).
+            start: (definition, transitionOverride) =>
+                animateVisualElement(
+                    node,
+                    // Resolve `'+=N'` / `'-=N'` relatives against the CURRENT live
+                    // value first. They are a svelte-motion extension with no
+                    // motion-dom equivalent (`fillWildcards` handles `null` only),
+                    // so an unresolved relative reaching `animateTarget` silently
+                    // holds the channel. Deliberately NOT memoized, unlike the
+                    // declarative path: every imperative `start()` is a fresh
+                    // command that must offset from wherever the value is NOW.
+                    // Object targets only — a bare label keeps going through
+                    // motion-dom so `animateVariant`'s label handling and child
+                    // propagation stay intact.
+                    resolveControlsRelatives(definition) as never,
+                    {
+                        transitionOverride: transitionOverride as never,
+                        custom: effectiveCustom
+                    } as never
+                ),
+            // `set` is a jump, not an animation: resolve to resting values and
+            // write them straight onto the node.
+            set: (definition) => {
+                const resolved = resolveAnimationControlsDefinition(definition)
+                if (!resolved) return
+                // Split the orchestration keys out before collapsing: `transition`
+                // is irrelevant to a jump, and `transitionEnd` values are applied
+                // ON TOP of the target (upstream `setTarget` semantics).
+                const target = { ...(resolved as Record<string, unknown>) }
+                const transitionEnd = target.transitionEnd as Record<string, unknown> | undefined
+                delete target.transition
+                delete target.transitionEnd
+                const resting = {
+                    ...((resolveRestingValues(target as DOMKeyframesDefinition) ?? {}) as Record<
+                        string,
+                        unknown
+                    >),
+                    ...(transitionEnd ?? {})
+                }
+                if (!isNotEmpty(resting)) return
+                for (const [key, value] of Object.entries(resting)) {
+                    if (value === undefined || value === null) continue
+                    const target = value as string | number
+                    node.getValue(key)?.jump(target)
+                    node.setStaticValue(key, target)
+                }
+                node.scheduleRenderMicrotask()
+            },
+            // Upstream's shape exactly (`animation-controls.ts`): stop each
+            // MotionValue. No snapshot bookkeeping — `MotionValue.stop()` routes
+            // into `NativeAnimation.stop()`, which calls
+            // `NativeAnimationExtended.updateMotionValue()`
+            // (NativeAnimationExtended.mjs:54-84). That samples a renderless
+            // JSAnimation twice at wall-clock elapsed time to recover BOTH value
+            // and velocity, writes the sampled value to inline style so it
+            // survives the post-`cancel()` gap, and calls `setWithVelocity` — so
+            // an interrupted accelerated channel freezes exactly where it is and
+            // any follow-up animation inherits its velocity.
+            stop: () => {
+                node.values.forEach((value) => value.stop())
+            }
         }
 
         return animateControls.subscribe(subscriber)
     })
 
-    // Detaching a controls object clears its per-attachment settle state, so a
-    // later idle re-attach cannot resurrect a stale imperative target. Upstream
-    // is last-writer-wins per motion value: swapping `animate={controls}` →
-    // declarative → back to the same idle controls leaves values wherever the
-    // last completed animation put them; an unchanged/idle source re-fires
-    // nothing (motion-dom animation-state.ts `prevProp` diffing). The settle
-    // flags live for one attachment session, matching upstream motion-value
-    // lifetimes bound to the VisualElement.
-    //
-    // Guard on IDENTITY change, not effect re-run: a re-render that keeps the
-    // SAME controls object attached must KEEP the settle state (over-eager
-    // clearing would regress the non-neutral settle-hold — plan 005's
-    // stop-freeze tests and the non-neutral-hold test). Only a swap to a
-    // different controls object (or to a declarative source → `undefined`)
-    // detaches.
-    let prevAttachedControls: unknown = undefined
-    $effect(() => {
-        const current = animateControls
-        if (prevAttachedControls && prevAttachedControls !== current) {
-            animationControlsHasReceivedCommand = false
-            lastAnimationControlsTarget = undefined
-        }
-        prevAttachedControls = current
-    })
+    // The per-attachment "clear the settle state on detach" effect lived here.
+    // It is gone with Step 7: there is no settle state to clear any more. Values
+    // live on the VisualElement's MotionValues, which ARE the upstream
+    // last-writer-wins store — swapping `animate={controls}` -> declarative ->
+    // back to idle controls now leaves each value wherever its last completed
+    // animation put it, because that is simply where the MotionValue is.
 
     // Handle key prop changes inside AnimatePresence (simulates React's key-based remounting)
     // When key changes, run exit → initial → animate sequence on the same element
@@ -3652,6 +3021,14 @@
         } else if (isNotEmpty(initialKeyframes)) {
             // `initial` with no `animate`: the seeded render already applied it, so
             // there is nothing to write and nothing to animate.
+            //
+            // The gate still has to OPEN. It exists only to stop the props effect
+            // racing the enter ordering; leaving it shut means a later prop change
+            // can never animate. That is reachable in practice: a node with
+            // `animate={controls}` has no declarative `animate` at all, so it
+            // mounts here — and swapping it to a declarative target afterwards
+            // produced no animation until this flag was set.
+            firstAnimatePassDone = true
             dataPath = 3
             isLoaded = 'initial'
             // rAF expects a void return; see above.
@@ -3663,6 +3040,9 @@
             }
             requestAnimationFrame(() => void promoteToReady())
         } else {
+            // Nothing to animate on mount, but open the gate for later changes
+            // (see the dataPath 3 note above).
+            firstAnimatePassDone = true
             dataPath = 4
             isLoaded = 'ready'
         }
