@@ -228,11 +228,11 @@ describe('_MotionContainer', () => {
         await fireEvent.pointerEnter(el)
         await flushTimers()
 
-        // Post plan-001 the composed writer retargets the channel's persistent
-        // MotionValue via animateMotionValue(name, value, target, transition).
-        const enterScaleCall = animateMotionValueMock.mock.calls.at(-1)
-        expect(enterScaleCall?.[0]).toBe('scale')
-        expect(enterScaleCall?.[2]).toBe(1.2)
+        // Plan 003: whileHover is `setActive('whileHover', true)` and the
+        // animationState resolves the label against `variants` itself, so the
+        // assertion is on the value the node lands at, not on the retired
+        // writer's call args.
+        expect(await latestValuesOf(el)).toMatchObject({ scale: 1.2 })
     })
 
     it('whileHover accepts an array of variant keys, merging later-wins (#349)', async () => {
@@ -275,11 +275,11 @@ describe('_MotionContainer', () => {
         await fireEvent.pointerEnter(el)
         await flushTimers()
 
-        const enterScaleCall = animateMotionValueMock.mock.calls.at(-1)
-        expect(enterScaleCall?.[0]).toBe('scale')
-        expect(enterScaleCall?.[2]).toBe(1.2)
-        const enterCall = animateMock.mock.calls.at(-1)
-        expect(enterCall?.[1]).toMatchObject({ color: 'gray' })
+        // Plan 003: the animationState resolves the label LIST itself, merging
+        // later-wins. `muted` comes second so its `color` wins, while `hover`'s
+        // `scale` survives — asserted on the node's values now, not on the
+        // retired writer's two separate call channels.
+        expect(await latestValuesOf(el)).toMatchObject({ scale: 1.2, color: 'gray' })
     })
 
     it('whileHover with unknown variant key is treated as no-op (#349)', async () => {
@@ -612,23 +612,19 @@ describe('_MotionContainer', () => {
         const el = container.firstElementChild as HTMLElement
         expect(el).toBeTruthy()
 
-        // Enter: should animate to whileHover with its nested transition
+        // Enter: the whileHover target wins over `animate` (higher priority).
         await fireEvent.pointerEnter(el)
         await flushTimers()
-        let lastScaleCall = animateMotionValueMock.mock.calls.at(-1)
-        expect(lastScaleCall?.[0]).toBe('scale')
-        expect(lastScaleCall?.[2]).toBe(1.2)
-        // animateMotionValue takes upstream's SECONDS-based transitions.
-        expect(lastScaleCall?.[3]).toMatchObject({ duration: 0.12 })
+        expect(await latestValuesOf(el)).toMatchObject({ scale: 1.2 })
         expect(onHoverStart).toHaveBeenCalledTimes(1)
 
-        // Leave: should animate back to baseline (animate over initial) with component transition
+        // Leave: whileHover is removed, so the animationState restores the
+        // next-highest source — `animate` (1.1), not `initial` — via its
+        // removed-key handling. That restoration used to be hand-rolled by
+        // `computeHoverBaseline`; it is upstream's `baseTarget` now.
         await fireEvent.pointerLeave(el)
         await flushTimers()
-        lastScaleCall = animateMotionValueMock.mock.calls.at(-1)
-        expect(lastScaleCall?.[0]).toBe('scale')
-        expect(lastScaleCall?.[2]).toBe(1.1)
-        expect(lastScaleCall?.[3]).toMatchObject({ duration: 0.25 })
+        expect(await latestValuesOf(el)).toMatchObject({ scale: 1.1 })
         expect(onHoverEnd).toHaveBeenCalledTimes(1)
     })
 

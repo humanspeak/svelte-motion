@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GestureCoordinator } from './gestureCoordinator.js'
 import {
-    attachWhileHover,
     computeHoverBaseline,
     isHoverCapable,
     parseUnitValue,
@@ -23,18 +21,12 @@ const { animate: animateMock } = (await import('motion')) as unknown as {
     animate: ReturnType<typeof vi.fn> & { mockClear: () => void; mock: { calls: unknown[][] } }
 }
 
-// Mock motion-dom.hover
-let hoverCallback: ((element: HTMLElement) => (() => void) | void) | null = null
-let hoverCleanup: (() => void) | null = null
+// `motion-dom` stays mocked for the animation helpers the surviving pure-function
+// tests share with the rest of the suite. The `hover()` interception that the
+// deleted `attachWhileHover` tests drove is gone with them (plan 003).
 vi.mock('motion-dom', async () => {
     const actual = await vi.importActual<typeof import('motion-dom')>('motion-dom')
-    const hoverMock = vi.fn(
-        (el: HTMLElement, callback: (element: HTMLElement) => (() => void) | void) => {
-            hoverCallback = callback
-            hoverCleanup = vi.fn(() => {})
-            return hoverCleanup
-        }
-    )
+    const hoverMock = vi.fn(() => vi.fn(() => {}))
     const animateValueMock = vi.fn(
         ({
             keyframes,
@@ -77,8 +69,6 @@ vi.mock('motion-dom', async () => {
 describe('utils/hover', () => {
     beforeEach(() => {
         animateMock.mockClear()
-        hoverCallback = null
-        hoverCleanup = null
         // default to hover-capable environment
         vi.stubGlobal('matchMedia', (query: string) => {
             const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
@@ -186,178 +176,6 @@ describe('utils/hover', () => {
             whileHover: { opacity: 0 }
         })
         expect(baseline.opacity).toBe(1)
-    })
-
-    it('attachWhileHover: animates on enter with nested transition, restores on leave', async () => {
-        const el = document.createElement('div')
-        const cleanup = attachWhileHover(
-            el,
-            { opacity: 0.5, transition: { duration: 0.12 } },
-            { duration: 0.25 },
-            undefined,
-            { initial: { opacity: 1 }, animate: { opacity: 0.8 } }
-        )
-
-        // Simulate hover start by calling the callback
-        expect(hoverCallback).toBeTruthy()
-        const hoverEnd = hoverCallback!(el)
-        expect(hoverEnd).toBeTruthy()
-
-        await Promise.resolve()
-        expect(animateMock).toHaveBeenCalled()
-        const enterCall = animateMock.mock.calls.at(-1)
-        expect(enterCall?.[1]).toMatchObject({ opacity: 0.5 })
-        expect(enterCall?.[2]).toMatchObject({ duration: 0.12 })
-
-        // Simulate hover end by calling the cleanup function
-        hoverEnd!()
-        await Promise.resolve()
-        const leaveCall = animateMock.mock.calls.at(-1)
-        expect(leaveCall?.[1]).toMatchObject({ opacity: 0.8 })
-        expect(leaveCall?.[2]).toMatchObject({ duration: 0.25 })
-        cleanup()
-    })
-
-    it('attachWhileHover: returns cleanup function when whileHover is undefined', () => {
-        const el = document.createElement('div')
-        const cleanup = attachWhileHover(el, undefined, { duration: 0.2 })
-        expect(cleanup).toBeTypeOf('function')
-        expect(hoverCallback).toBeNull()
-        cleanup()
-    })
-
-    it('attachWhileHover: calls onStart and onEnd callbacks', async () => {
-        const el = document.createElement('div')
-        const onStart = vi.fn()
-        const onEnd = vi.fn()
-        const cleanup = attachWhileHover(el, { scale: 1.2 }, { duration: 0.2 }, { onStart, onEnd })
-
-        expect(hoverCallback).toBeTruthy()
-        const hoverEnd = hoverCallback!(el)
-        expect(hoverEnd).toBeTruthy()
-        await Promise.resolve()
-        expect(onStart).toHaveBeenCalledOnce()
-
-        hoverEnd!()
-        await Promise.resolve()
-        expect(onEnd).toHaveBeenCalledOnce()
-        cleanup()
-    })
-
-    it('attachWhileHover: preserves a pre-existing rotateX while animating scale', () => {
-        const el = document.createElement('div')
-        el.style.transform = 'rotateX(30deg)'
-        const cleanup = attachWhileHover(el, { scale: 1.2 }, { duration: 0 })
-
-        const hoverEnd = hoverCallback!(el)
-        expect(el.style.transform).toBe('scale(1.2) rotateX(30deg)')
-
-        hoverEnd?.()
-        expect(el.style.transform).toBe('rotateX(30deg)')
-        cleanup()
-    })
-
-    it('attachWhileHover: preserves settled drag channels when hover ends', () => {
-        const el = document.createElement('div')
-        const liveDrag = { x: 199, y: 120, rotate: 12 }
-        const cleanup = attachWhileHover(
-            el,
-            { scale: 1.02 },
-            { duration: 0 },
-            undefined,
-            undefined,
-            { getLiveTransformValues: () => liveDrag }
-        )
-
-        const hoverEnd = hoverCallback!(el)
-        expect(el.style.transform).toBe(
-            'translateX(199px) translateY(120px) scale(1.02) rotate(12deg)'
-        )
-
-        hoverEnd?.()
-        expect(el.style.transform).toBe('translateX(199px) translateY(120px) rotate(12deg)')
-        cleanup()
-    })
-
-    it('attachWhileHover: restores hover state if drag starts before hover ends', async () => {
-        const el = document.createElement('div')
-        const onEnd = vi.fn()
-        const cleanup = attachWhileHover(
-            el,
-            { backgroundColor: 'black' },
-            { duration: 0.2 },
-            { onEnd },
-            { animate: { backgroundColor: 'white' } }
-        )
-
-        expect(hoverCallback).toBeTruthy()
-        const hoverEnd = hoverCallback!(el)
-        expect(hoverEnd).toBeTruthy()
-        await Promise.resolve()
-
-        el.dataset.svelteMotionDragActive = 'true'
-        hoverEnd!()
-        await Promise.resolve()
-
-        const leaveCall = animateMock.mock.calls.at(-1)
-        expect(leaveCall?.[1]).toMatchObject({ backgroundColor: 'white' })
-        expect(onEnd).toHaveBeenCalledOnce()
-        cleanup()
-    })
-
-    it('attachWhileHover: cleanup unregisters composed-channel stoppers from the coordinator', () => {
-        // Plan 011: composed channel animations register a stopper with the
-        // gesture coordinator, but teardown only calls animation.stop() — the
-        // stored `unregister` runs only from onComplete, so a stopped
-        // animation's closure stays in the coordinator's stoppers Set until the
-        // element is GC'd. Upstream frame-cancellation discipline drains its
-        // registrations on unmount.
-        const el = document.createElement('div')
-
-        // Fake coordinator mirroring createGestureCoordinator but exposing its
-        // stoppers Set so retention after cleanup is observable.
-        const stoppers = new Set<() => void>()
-        const active = new Set<string>()
-        const coordinator = {
-            setActive: (type: string, isActive: boolean) => {
-                if (isActive) active.add(type)
-                else active.delete(type)
-            },
-            isActive: (type: string) => active.has(type),
-            ownedKeys: () => new Set<string>(),
-            isKeyProtected: () => false,
-            register: (stop: () => void) => {
-                stoppers.add(stop)
-                return () => stoppers.delete(stop)
-            },
-            stopAll: () => {
-                for (const stop of stoppers) stop()
-                stoppers.clear()
-            },
-            markExternalWrite: () => {},
-            consumeExternalWrite: () => false
-        } as unknown as GestureCoordinator
-
-        const cleanup = attachWhileHover(
-            el,
-            { scale: 1.2 },
-            { duration: 0.2 },
-            undefined,
-            undefined,
-            undefined,
-            coordinator
-        )
-
-        // Hover-enter starts a composed scale channel that registers its
-        // stopper with the coordinator.
-        const hoverEnd = hoverCallback!(el)
-        expect(hoverEnd).toBeTruthy()
-        expect(stoppers.size).toBe(1)
-
-        // Teardown must drain the coordinator; the leak leaves the stopper
-        // closure retained in the Set.
-        cleanup()
-        expect(stoppers.size).toBe(0)
     })
 
     describe('CSS variable preservation', () => {

@@ -1,10 +1,4 @@
-import {
-    animate,
-    inView as motionInView,
-    type AnimationOptions,
-    type DOMKeyframesDefinition
-} from 'motion'
-import type { MotionViewport } from '../types.js'
+import { inView as motionInView, type AnimationOptions } from 'motion'
 import { createAttachable } from './attachable.js'
 import { createBooleanSnapshot, type BooleanSnapshot } from './booleanSnapshot.svelte.js'
 import { type ElementOrGetter } from './dom.js'
@@ -163,130 +157,10 @@ export const computeInViewBaseline = (
     return baseline
 }
 
-/**
- * Wire a `whileInView` interaction onto an element using motion's
- * `inView` primitive. On viewport entry the element animates to the
- * supplied keyframes; on exit it animates back to a baseline computed
- * via {@link computeInViewBaseline}.
- *
- * Used internally by `motion.<tag>` components to power the
- * `whileInView` prop, and exposed for callers that want the same
- * declarative behavior without going through a motion component.
- *
- * When `viewport.once` is `true`, the element latches on first entry
- * — no exit animation runs, and the IntersectionObserver is detached
- * via a `queueMicrotask(stop)` after the entry handler returns.
- *
- * @param el Target element to observe and animate.
- * @param whileInView Keyframes to apply on entry. May carry a nested
- *   `transition` config (extracted via {@link splitInViewDefinition}).
- *   If `undefined`, the function returns a no-op cleanup without
- *   creating an observer.
- * @param mergedTransition Default transition used both when
- *   `whileInView` has no nested `transition` and for the exit
- *   animation back to baseline.
- * @param callbacks Optional lifecycle hooks:
- *   - `onStart` — fires on viewport entry, before the entry animation.
- *   - `onEnd` — fires on viewport exit, after the baseline restore
- *     animation kicks off. Not called when `viewport.once` is `true`.
- *   - `onAnimationComplete` — fires when the entry animation
- *     resolves; passed the keyframes that ran.
- * @param baselineSources Sources for {@link computeInViewBaseline}'s
- *   per-key walk:
- *   - `initial` — the component's `initial` record.
- *   - `animate` — the component's `animate` record.
- * @param viewport IntersectionObserver options:
- *   - `root` — scroll container (default page).
- *   - `margin` — `rootMargin` string.
- *   - `amount` — fraction visible required (defaults to `0` here so
- *     any pixel counts).
- *   - `once` — latch on first entry; skip exit animation.
- * @returns A cleanup function that detaches the IntersectionObserver
- *   on call. Safe to invoke after a `once` latch has already fired.
- *
- * @example
- * ```ts
- * const cleanup = attachWhileInView(
- *   element,
- *   { opacity: 1, y: 0, transition: { duration: 0.5 } },
- *   { duration: 0.3 },
- *   {
- *     onStart: () => trackImpression(),
- *     onEnd: () => console.log('left viewport')
- *   },
- *   { initial: { opacity: 0, y: 50 } },
- *   { once: true, amount: 0.5 }
- * )
- * // Later — typically component teardown:
- * cleanup()
- * ```
- */
-export const attachWhileInView = (
-    el: HTMLElement,
-    whileInView: Record<string, unknown> | undefined,
-    mergedTransition: AnimationOptions,
-    callbacks?: {
-        onStart?: () => void
-        onEnd?: () => void
-        onAnimationComplete?: (definition: DOMKeyframesDefinition | undefined) => void
-    },
-    baselineSources?: { initial?: Record<string, unknown>; animate?: Record<string, unknown> },
-    viewport?: MotionViewport
-): (() => void) => {
-    if (!whileInView) return () => {}
-
-    let latched = false
-
-    const stop = motionInView(
-        el,
-        () => {
-            if (latched) return
-            const inViewBaseline = computeInViewBaseline(el, {
-                initial: baselineSources?.initial,
-                animate: baselineSources?.animate,
-                whileInView
-            })
-            callbacks?.onStart?.()
-            const { keyframes, transition } = splitInViewDefinition(whileInView)
-            const animation = animate(
-                el,
-                keyframes as unknown as DOMKeyframesDefinition,
-                transition ?? mergedTransition
-            )
-            animation.finished
-                .then(() => {
-                    callbacks?.onAnimationComplete?.(keyframes as unknown as DOMKeyframesDefinition)
-                })
-                .catch(() => {
-                    /* animation cancelled — skip completion callback */
-                })
-
-            if (viewport?.once) {
-                latched = true
-                queueMicrotask(stop)
-                return
-            }
-
-            return () => {
-                if (Object.keys(inViewBaseline).length > 0) {
-                    animate(
-                        el,
-                        inViewBaseline as unknown as DOMKeyframesDefinition,
-                        mergedTransition
-                    )
-                }
-                callbacks?.onEnd?.()
-            }
-        },
-        {
-            root: viewport?.root,
-            margin: viewport?.margin as never,
-            amount: viewport?.amount ?? 0
-        }
-    )
-
-    return stop
-}
+// `attachWhileInView` lived here. Deleted by plan 003: whileInView is
+// `attachInViewGesture` in gestures.ts now, which flips
+// `setActive('whileInView', …)` and lets the animationState animate. The
+// `useInView` hook below is untouched public API.
 
 /**
  * Options accepted by `useInView`.

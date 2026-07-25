@@ -46,16 +46,17 @@
     import { VOID_TAGS } from '$lib/utils/constants'
     import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation'
     import { isAnimationControls } from '$lib/utils/animationControls.svelte'
-    import { attachWhileTap } from '$lib/utils/interaction'
     import {
-        attachWhileHover,
+        attachFocusGesture,
+        attachHoverGesture,
+        attachInViewGesture,
+        attachPressGesture
+    } from '$lib/utils/gestures'
+    import {
         computeHoverBaseline,
         readTransformChannels,
         splitHoverDefinition
     } from '$lib/utils/hover'
-    import { createGestureCoordinator } from '$lib/utils/gestureCoordinator'
-    import { attachWhileFocus } from '$lib/utils/focus'
-    import { attachWhileInView } from '$lib/utils/inView.svelte'
     import {
         measureRect,
         computeFlipTransforms,
@@ -353,25 +354,20 @@
         }
         return values
     }
-    // Non-transform authored base values (currently `opacity`) captured ONCE
-    // from the DOM at element creation while at rest, mirroring upstream
-    // `VisualElement.baseTarget` (read once, never per gesture). Threaded into
-    // `computeHoverBaseline` so hover-end restores the true rest value instead
-    // of a mid-animation transient — reading live `getComputedStyle` at each
-    // hover START would capture a partway value on rapid hover/unhover cycles.
-    // Only keys NOT driven by `initial`/`animate` matter here: for driven keys
-    // the baseline resolves from those records first, so a value captured mid
-    // enter-animation is never consulted. Populated in the mount effect below.
-    let baseStyleValues: Record<string, string | number> | null = null
-    const captureBaseStyleValues = () => {
-        if (baseStyleValues || !element) return
-        const cs = getComputedStyle(element)
-        const opacity = cs.getPropertyValue('opacity')
-        baseStyleValues = opacity ? { opacity } : {}
-    }
-    const getBaseStyleValues = (): Record<string, unknown> => baseStyleValues ?? {}
+    // The gesture baseline getters (`baseStyleValues`, `captureBaseStyleValues`,
+    // `getBaseStyleValues`) and hover's `liveGestureTransformValues` mirror lived
+    // here. Gone with plan 003: gestures no longer write the element's transform —
+    // they flip `setActive` and the animationState animates the same MotionValues
+    // everything else uses, so `latestValues` is the single source for gesture
+    // transforms too, and hover-end restoration is the animationState's
+    // removed-key handling via `baseTarget` (what `getBaseStyleValues`
+    // approximated).
+    //
+    // `liveGestureTransform` itself STAYS: despite the name it is DRAG's composed
+    // transform channel (`attachDrag`'s `onVisualUpdate` writes it), and drag is
+    // plan 005's subject. It keeps its splice into the serialized style so a
+    // Svelte style rewrite cannot drop a live drag transform.
     let liveGestureTransform = $state<string | null>(null)
-    let liveGestureTransformValues: Record<string, string | number> | null = null
     const serializedStyleWithLiveGestureTransform = $derived.by(() => {
         if (!liveGestureTransform) return serializedStyleProp
 
@@ -1097,13 +1093,13 @@
     // variant keys. Mirrors framer-motion's `whileHover` etc. surface
     // (#349).
     const resolvedWhileTap = $derived(resolveWhile(whileTapProp, variantsProp, effectiveCustom))
-    const resolvedWhileHover = $derived(resolveWhile(whileHoverProp, variantsProp, effectiveCustom))
-    const resolvedWhileFocus = $derived(resolveWhile(whileFocusProp, variantsProp, effectiveCustom))
     const resolvedWhileDrag = $derived(resolveWhile(whileDragProp, variantsProp, effectiveCustom))
     const resolvedWhilePan = $derived(resolveWhile(whilePanProp, variantsProp, effectiveCustom))
-    const resolvedWhileInView = $derived(
-        resolveWhile(whileInViewProp, variantsProp, effectiveCustom)
-    )
+    // `resolvedWhileHover` / `resolvedWhileFocus` / `resolvedWhileInView` are
+    // gone with plan 003: the animationState resolves variant LABELS against
+    // `variants` itself, so pre-resolving them here was redundant. `whileTap`,
+    // `whileDrag` and `whilePan` keep theirs — tap's `tabindex` affordance reads
+    // it, and drag/pan still animate their own targets until plan 005.
 
     // Extract keyframes from resolved initial, handling initial={false}
     const initialKeyframes = $derived(
@@ -1297,9 +1293,11 @@
         visualElement.values.forEach((value, key) => {
             values[key] = value.get()
         })
-        // A live gesture transform is spliced into the base string above and
-        // must win: drop the transform channels so the merge cannot override it
-        // with the resting composition. (Gestures move onto the VE in plan 003.)
+        // A live DRAG transform is spliced into the base string above and must
+        // win: drop the transform channels so the merge cannot override it with
+        // the resting composition. Hover/tap/focus/inView no longer take this
+        // path at all — they animate `latestValues` (plan 003). Drag moves onto
+        // the VE in plan 005, and this splice goes with it.
         if (liveGestureTransform) {
             for (const key of Object.keys(values)) {
                 if (transformProps.has(key)) delete values[key]
@@ -1507,8 +1505,26 @@
                 },
                 onVisualUpdate: (transform: string, values: Record<string, string | number>) => {
                     liveGestureTransform = transform || null
-                    // `values` is freshly allocated per composer frame, so no copy.
-                    liveGestureTransformValues = values
+                    // Mirror drag's composed channels into the node.
+                    //
+                    // Drag still writes `element.style.transform` itself (plan
+                    // 005 moves it onto the VE), but the VE now composes the
+                    // transform for EVERY other source from `latestValues`. Once
+                    // gestures went through the animationState, a hover-end render
+                    // composed only `scale` and wiped a settled drag translate —
+                    // the case the retired hover writer covered by merging drag's
+                    // live channels. Mirroring keeps both writers producing the
+                    // same composition until 005 unifies them.
+                    //
+                    // Only channels the node does NOT already own: a bound style
+                    // MotionValue (e.g. the mobile drawer's `y`) is already in
+                    // `latestValues` AND is a baseline source drag composes from,
+                    // so mirroring it would apply the offset twice.
+                    if (!visualElement) return
+                    for (const [key, value] of Object.entries(values)) {
+                        if (visualElement.values.has(key)) continue
+                        visualElement.setStaticValue(key, value)
+                    }
                 }
             },
             baselineSources: dragRuntimeOptions.baselineSources,
@@ -2528,127 +2544,67 @@
         runFlipAnimation(element, transforms, prev.transition ?? mergedTransition ?? {})
     })
 
-    // Shared per-element coordination between the hover and tap gesture
-    // systems: active-state flags + a single-writer animation registry
-    // (upstream setActive / protected-keys semantics — see
-    // gestureCoordinator.ts).
-    const gestureCoordinator = createGestureCoordinator()
-
-    // Per-element registry of persistent per-channel MotionValues the hover
-    // composed writer drives. Sharing it with the tap system lets a mid-flight
-    // hover→tap press read each channel's live velocity for a momentum-carrying
-    // handoff (upstream re-targets the same MotionValue). Owned here so it
-    // survives independent re-runs of the hover/tap effects.
-    const gestureChannelValues = new Map<string, MotionValue<number>>()
-
-    // whileTap handling via motion-dom's press()
+    // ── Gestures (#449 plan 003) ─────────────────────────────────────────────
+    //
+    // Four thin attachers, each of which only flips
+    // `animationState.setActive('whileX', …)`. The animationState owns priority
+    // ordering (`variantPriorityOrder`) and protected keys, so the
+    // `gestureCoordinator` that hand-approximated both — plus the per-gesture
+    // animation stacks and the shared `gestureChannelValues` registry — are gone.
+    //
+    // Velocity handoff is structural now: hover and tap retarget the SAME
+    // MotionValue and `animateMotionValue` seeds each new generation with
+    // `value.getVelocity()`.
+    //
+    // The while* DEFINITIONS are not passed here — the attachers read them from
+    // `ve.props`, which `buildMotionNodeProps` supplies raw (variant labels
+    // included, resolved by the animationState). Only `element`, the node and the
+    // callback props are needed.
     $effect(() => {
-        if (
-            !(element && isLoaded === 'ready' && hasGestureFeatures && isNotEmpty(resolvedWhileTap))
-        )
-            return
-        return attachWhileTap(
-            element!,
-            (resolvedWhileTap ?? {}) as Record<string, unknown>,
-            (resolvedInitial ?? {}) as Record<string, unknown>,
-            (resolvedAnimate ?? {}) as Record<string, unknown>,
-            {
-                onTapStart: onTapStartProp,
-                onTap: onTapProp,
-                onTapCancel: onTapCancelProp,
-                hoverDef: isNotEmpty(resolvedWhileHover ?? {})
-                    ? ((resolvedWhileHover ?? {}) as Record<string, unknown>)
-                    : undefined,
-                hoverFallbackTransition: mergedTransition ?? {},
-                tapTransition: mergedTransition ?? {},
-                coordinator: gestureCoordinator,
-                getBaseStyleValues,
-                getSharedChannelValue: (key: string) => gestureChannelValues.get(key)
-            }
-        )
-    })
-
-    // whileHover handling, gated to true-hover devices to avoid sticky states on touch
-    $effect(() => {
-        if (
-            !(
-                element &&
-                isLoaded === 'ready' &&
-                hasGestureFeatures &&
-                isNotEmpty(resolvedWhileHover)
+        if (!(element && visualElement && isLoaded === 'ready' && hasGestureFeatures)) return
+        const node = visualElement
+        const target = element
+        // Gate each attacher on its own props, exactly as upstream's
+        // feature-enable lists do (`motion/features/definitions.ts`). Attaching
+        // unconditionally would, among other things, create an
+        // IntersectionObserver for every motion element on the page.
+        const cleanups: (() => void)[] = []
+        if (whileHoverProp || onHoverStartProp || onHoverEndProp) {
+            cleanups.push(
+                attachHoverGesture(target, node, {
+                    onHoverStart: onHoverStartProp,
+                    onHoverEnd: onHoverEndProp
+                })
             )
-        )
-            return
-        return attachWhileHover(
-            element!,
-            (resolvedWhileHover ?? {}) as Record<string, unknown>,
-            mergedTransition ?? {},
-            { onStart: onHoverStartProp, onEnd: onHoverEndProp },
-            {
-                initial: (resolvedInitial ?? {}) as Record<string, unknown>,
-                animate: (resolvedAnimate ?? {}) as Record<string, unknown>
-            },
-            {
-                getBaseTransformValues: getStyleTransformValues,
-                getLiveTransformValues: () => liveGestureTransformValues,
-                getBaseTransform: () => userBaseTransform,
-                transformTemplate: transformTemplateProp,
-                getBaseStyleValues,
-                channelValues: gestureChannelValues
-            },
-            gestureCoordinator
-        )
-    })
-
-    // whileFocus handling for keyboard focus interactions
-    $effect(() => {
-        if (
-            !(
-                element &&
-                isLoaded === 'ready' &&
-                hasGestureFeatures &&
-                isNotEmpty(resolvedWhileFocus)
+        }
+        if (whileTapProp || onTapStartProp || onTapProp || onTapCancelProp) {
+            cleanups.push(
+                attachPressGesture(target, node, {
+                    onTapStart: onTapStartProp,
+                    onTap: onTapProp,
+                    onTapCancel: onTapCancelProp
+                })
             )
-        )
-            return
-        return attachWhileFocus(
-            element!,
-            (resolvedWhileFocus ?? {}) as Record<string, unknown>,
-            mergedTransition ?? {},
-            { onStart: onFocusStartProp, onEnd: onFocusEndProp },
-            {
-                initial: (resolvedInitial ?? {}) as Record<string, unknown>,
-                animate: (resolvedAnimate ?? {}) as Record<string, unknown>
-            }
-        )
-    })
-
-    // whileInView handling for viewport intersection
-    $effect(() => {
-        if (
-            !(
-                element &&
-                isLoaded === 'ready' &&
-                hasGestureFeatures &&
-                isNotEmpty(resolvedWhileInView)
+        }
+        if (whileFocusProp || onFocusStartProp || onFocusEndProp) {
+            cleanups.push(
+                attachFocusGesture(target, node, {
+                    onFocusStart: onFocusStartProp,
+                    onFocusEnd: onFocusEndProp
+                })
             )
-        )
-            return
-        return attachWhileInView(
-            element!,
-            (resolvedWhileInView ?? {}) as Record<string, unknown>,
-            mergedTransition ?? {},
-            {
-                onStart: onInViewStartProp,
-                onEnd: onInViewEndProp,
-                onAnimationComplete: onAnimationCompleteProp
-            },
-            {
-                initial: (resolvedInitial ?? {}) as Record<string, unknown>,
-                animate: (resolvedAnimate ?? {}) as Record<string, unknown>
-            },
-            viewportProp
-        )
+        }
+        if (whileInViewProp || onInViewStartProp || onInViewEndProp) {
+            cleanups.push(
+                attachInViewGesture(target, node, viewportProp, {
+                    onInViewStart: onInViewStartProp,
+                    onInViewEnd: onInViewEndProp
+                })
+            )
+        }
+        return () => {
+            for (const cleanup of cleanups) cleanup()
+        }
     })
 
     // Legacy animation controls (`animate={controls}`) mirror upstream's
@@ -2921,11 +2877,6 @@
         if (!(element && isLoaded === 'mounting')) return
         markMotionMounted()
 
-        // Capture non-transform authored base values (opacity) from the DOM at
-        // rest, BEFORE any enter/gesture animation runs below, so hover-end can
-        // restore the true authored value rather than a mid-animation transient.
-        captureBaseStyleValues()
-
         pwLog('[motion] main effect running', {
             effectiveAnimate: !!effectiveAnimate,
             effectiveInitialProp,
@@ -3038,13 +2989,15 @@
             // `initial` with no `animate`: the seeded render already applied it, so
             // there is nothing to write and nothing to animate.
             //
-            // The gate still has to OPEN. It exists only to stop the props effect
-            // racing the enter ordering; leaving it shut means a later prop change
-            // can never animate. That is reachable in practice: a node with
-            // `animate={controls}` has no declarative `animate` at all, so it
-            // mounts here — and swapping it to a declarative target afterwards
-            // produced no animation until this flag was set.
-            firstAnimatePassDone = true
+            // The first pass must actually RUN, not just be marked done. It is a
+            // no-op animation-wise, but `animateChanges` flips its own private
+            // `isInitialRender`, and while that stays true motion-dom swallows the
+            // next pass whenever `props.initial === props.animate`
+            // (animation-state.mjs:318-325) — which is trivially true for a node
+            // with neither. Marking without running left gesture `setActive` calls
+            // firing with `animState.whileHover === true` and NO animation
+            // (measured on hover-velocity-continuity: latestValues stayed {}).
+            runAnimation()
             dataPath = 3
             isLoaded = 'initial'
             // rAF expects a void return; see above.
@@ -3056,9 +3009,9 @@
             }
             requestAnimationFrame(() => void promoteToReady())
         } else {
-            // Nothing to animate on mount, but open the gate for later changes
-            // (see the dataPath 3 note above).
-            firstAnimatePassDone = true
+            // Nothing to animate on mount, but the first pass must still RUN so
+            // `isInitialRender` flips (see the dataPath 3 note above).
+            runAnimation()
             dataPath = 4
             isLoaded = 'ready'
         }
