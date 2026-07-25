@@ -35,6 +35,16 @@ export interface MotionDomProjectionOptions {
      * legacy `ProjectionNode`'s `resolveBaseTransform` contract.
      */
     getBaseTransform?: () => string
+    /**
+     * The component's own motion-dom VisualElement, when it owns one (#449).
+     *
+     * `visualElementStore` is a `WeakMap<instance, VisualElement>` populated in
+     * `VisualElement.mount()`, so two VisualElements mounted on the same DOM
+     * element would overwrite each other in the store and double-render. When
+     * `_MotionContainer` owns a VisualElement it must inject it here so this
+     * adapter drives the SAME instance rather than constructing a second one.
+     */
+    visualElement?: ProjectionVisualElement
 }
 
 /**
@@ -145,20 +155,32 @@ export class MotionDomProjectionAdapter {
     /** Handle for the pending refreshCachedLayout frame, cancelled on unmount. */
     private refreshRafId: number | null = null
     private readonly getBaseTransform: (() => string) | undefined
+    /**
+     * False when the VisualElement was injected by the owning component (#449).
+     * The owner then holds the props contract, so `updateOptions` must not
+     * overwrite `visualElement.props` behind its back.
+     */
+    private readonly ownsVisualElement: boolean
     private readonly measureListeners = new Set<(rect: RectLike) => void>()
 
     constructor(options: MotionDomProjectionOptions = {}) {
         const parent = options.parent ?? null
         this.getBaseTransform = options.getBaseTransform
-        this.visualElement = new HTMLVisualElement(
-            {
-                parent: parent?.visualElement,
-                props: {},
-                presenceContext: null,
-                visualState: createVisualState()
-            },
-            { allowProjection: true }
-        )
+        this.ownsVisualElement = !options.visualElement
+        // Use the component's VisualElement when one is injected (#449); only
+        // construct a private one as a fallback (standalone adapter use, e.g.
+        // unit tests and SSR-free consumers that own no component VE).
+        this.visualElement =
+            options.visualElement ??
+            new HTMLVisualElement(
+                {
+                    parent: parent?.visualElement,
+                    props: {},
+                    presenceContext: null,
+                    visualState: createVisualState()
+                },
+                { allowProjection: true }
+            )
         this.projection = new HTMLProjectionNode(
             this.visualElement.latestValues,
             parent?.projection as unknown as IProjectionNode | undefined
@@ -183,8 +205,15 @@ export class MotionDomProjectionAdapter {
         this.layoutId = options.layoutId
         this.transition = options.transition
 
+        // An injected VisualElement's props are the owning component's contract
+        // (#449), so MERGE rather than replace: a bare `{ transition, style }`
+        // write would drop the owner's `animate`/`variants`/`while*`. The
+        // `style` write itself is load-bearing and must keep happening — it is
+        // what binds the style MotionValues onto the node, mirroring them into
+        // `latestValues` for the projection transform math.
         this.visualElement.update(
             {
+                ...(this.ownsVisualElement ? {} : this.visualElement.props),
                 transition: options.transition,
                 style: options.style
             } as never,
@@ -217,7 +246,12 @@ export class MotionDomProjectionAdapter {
 
         this.element = element
         MotionDomProjectionAdapter.adapters.set(this.projection, this)
-        this.visualElement.mount(element)
+        // An injected VisualElement may already be mounted by its owner; a
+        // second mount would re-register it in `visualElementStore` and
+        // re-bind its motion values. Seeding the layout still has to run.
+        if (this.visualElement.current !== element) {
+            this.visualElement.mount(element)
+        }
         this.seedLayout()
     }
 
@@ -235,7 +269,9 @@ export class MotionDomProjectionAdapter {
         if (!this.element) return
         const element = this.element
         this.projection.scheduleCheckAfterUnmount()
-        this.visualElement.unmount()
+        // An injected VisualElement may already have been unmounted by its
+        // owner; unmounting twice would re-run the projection/feature teardown.
+        if (this.visualElement.current) this.visualElement.unmount()
         visualElementStore.delete(element)
         MotionDomProjectionAdapter.adapters.delete(this.projection)
         if (this.refreshRafId !== null && typeof window !== 'undefined') {

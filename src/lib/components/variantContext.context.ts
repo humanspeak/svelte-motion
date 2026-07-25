@@ -3,6 +3,7 @@ import type { Writable } from 'svelte/store'
 
 const VARIANT_CONTEXT_KEY = Symbol('variant-context')
 const INITIAL_FALSE_CONTEXT_KEY = Symbol('initial-false-context')
+const INITIAL_VARIANT_CONTEXT_KEY = Symbol('initial-variant-context')
 const CUSTOM_CONTEXT_KEY = Symbol('custom-context')
 
 /**
@@ -41,6 +42,52 @@ export const setInitialFalseContext = (value: boolean): void => {
  */
 export const getInitialFalseContext = (): boolean => {
     return getContext<boolean>(INITIAL_FALSE_CONTEXT_KEY) ?? false
+}
+
+/**
+ * Publish the current component's `initial` VARIANT LABEL to descendants.
+ *
+ * The sibling of {@link setVariantContext} for the other half of upstream's
+ * variant context. `getCurrentTreeVariants`
+ * (`framer-motion/src/context/MotionContext/utils.ts`) publishes BOTH labels: a
+ * variant-controlling node contributes its own `initial`/`animate` labels, and a
+ * non-controlling node passes its parent's straight through. Without the
+ * `initial` half, children that carry only a `variants` map have nothing to seed
+ * their first paint from and render at their natural pose (#449, plan 006).
+ *
+ * A plain value, not a store: `makeLatestValues` consumes `context.initial` once
+ * at VisualElement creation, so there is nothing to react to afterwards — unlike
+ * the animate label, which drives ongoing animations. Matches the convention of
+ * {@link setInitialFalseContext}.
+ *
+ * `initial={false}` is NOT carried here — it stays on the boolean channel
+ * ({@link setInitialFalseContext}), exactly as upstream keeps them separate.
+ *
+ * @param label The variant label (or label list) to publish, or `undefined`.
+ * @returns Nothing.
+ *
+ * @example
+ * ```ts
+ * setInitialVariantContext('closed')
+ * ```
+ */
+export const setInitialVariantContext = (label: string | string[] | undefined): void => {
+    setContext<string | string[] | undefined>(INITIAL_VARIANT_CONTEXT_KEY, label)
+}
+
+/**
+ * Read the nearest motion ancestor's `initial` variant label.
+ *
+ * @returns The inherited label (or label list), or `undefined` when no ancestor
+ *     published one.
+ *
+ * @example
+ * ```ts
+ * const inherited = getInitialVariantContext()
+ * ```
+ */
+export const getInitialVariantContext = (): string | string[] | undefined => {
+    return getContext<string | string[] | undefined>(INITIAL_VARIANT_CONTEXT_KEY)
 }
 
 /**

@@ -71,6 +71,22 @@ vi.mock('$lib/utils/testing.js', () => ({
 
 import MotionContainer from './_MotionContainer.svelte'
 
+/**
+ * Read the VisualElement's `latestValues` for an element.
+ *
+ * The animationState is the declarative writer now (plan 002 Step 3), so
+ * behaviour is asserted on the values the node actually holds rather than on
+ * call counts of the deleted `animate()` writer. `animateMotionValue` is mocked
+ * above to jump each MotionValue straight to its target, so a completed pass is
+ * observable synchronously.
+ */
+const latestValuesOf = async (el: Element | null): Promise<Record<string, unknown>> => {
+    if (!el) return {}
+    const { visualElementStore } = await import('motion-dom')
+    const ve = visualElementStore.get(el)
+    return ve ? { ...ve.latestValues } : {}
+}
+
 // Resolve requestAnimationFrame immediately to move component to "ready"
 beforeEach(() => {
     animateMock.mockClear()
@@ -131,16 +147,25 @@ describe('_MotionContainer', () => {
         // Flush RAF + timers to move to ready and complete finished promise
         await flushTimers()
 
-        // animate should be called at least twice: initial (duration:0) and main animate
-        expect(animateMock).toHaveBeenCalled()
-        // Depending on effects ordering, animate may run more than once; ensure at least 1 lifecycle pair
+        // The animationState is the writer now, so the lifecycle comes from the
+        // VisualElement's AnimationStart/AnimationComplete events rather than
+        // from the retired `animate()` call. Assert the callbacks, not the
+        // mechanism.
         expect(onStart.mock.calls.length).toBeGreaterThanOrEqual(1)
         expect(onComplete.mock.calls.length).toBeGreaterThanOrEqual(1)
         expect(onStart).toHaveBeenCalledWith({ opacity: 1 })
         expect(onComplete).toHaveBeenCalledWith({ opacity: 1 })
     })
 
-    it('whileTap resets overlapping keys to animate values (fallback to initial)', async () => {
+    it('settles at the animate values so a whileTap release has the right baseline', async () => {
+        // The animate-over-initial RESET RULE itself is covered by three
+        // dedicated tests on the pure function in `interaction.spec.ts`
+        // ("buildTapResetRecord: prefers animate over initial" and friends).
+        // What only the container can pin — and what this test now asserts — is
+        // the other half of that contract: the node must SETTLE at the `animate`
+        // values, because those are the baseline the tap writer restores to on
+        // release. Before plan 002 this was asserted via the reset payload
+        // handed to the retired `animate()` writer.
         const initial = { scale: 1, backgroundColor: '#111' }
         const animate = { scale: 1.1, backgroundColor: '#000' }
         const whileTap = { scale: 0.9, backgroundColor: '#f00' }
@@ -154,17 +179,15 @@ describe('_MotionContainer', () => {
 
         const el = container.firstElementChild as HTMLElement
         expect(el).toBeTruthy()
+        expect(await latestValuesOf(el)).toMatchObject({ scale: 1.1 })
 
-        // pointerdown -> whileTap animate call
+        // A full press/release cycle must leave the animate baseline intact
+        // rather than stranding the element on the whileTap values.
         await fireEvent.pointerDown(el)
-        // pointerup -> reset record to animate-or-initial
         await fireEvent.pointerUp(el)
+        await flushTimers()
 
-        // Grab the last call args for reset
-        const lastCall = animateMock.mock.calls.at(-1)
-        expect(lastCall).toBeTruthy()
-        const resetDef = lastCall![1] as Record<string, unknown>
-        expect(resetDef).toMatchObject({ scale: 1.1, backgroundColor: '#000' })
+        expect(await latestValuesOf(el)).toMatchObject({ scale: 1.1 })
     })
 
     it('whileHover accepts a variant key string and resolves it against `variants` (#349)', async () => {
@@ -205,11 +228,11 @@ describe('_MotionContainer', () => {
         await fireEvent.pointerEnter(el)
         await flushTimers()
 
-        // Post plan-001 the composed writer retargets the channel's persistent
-        // MotionValue via animateMotionValue(name, value, target, transition).
-        const enterScaleCall = animateMotionValueMock.mock.calls.at(-1)
-        expect(enterScaleCall?.[0]).toBe('scale')
-        expect(enterScaleCall?.[2]).toBe(1.2)
+        // Plan 003: whileHover is `setActive('whileHover', true)` and the
+        // animationState resolves the label against `variants` itself, so the
+        // assertion is on the value the node lands at, not on the retired
+        // writer's call args.
+        expect(await latestValuesOf(el)).toMatchObject({ scale: 1.2 })
     })
 
     it('whileHover accepts an array of variant keys, merging later-wins (#349)', async () => {
@@ -252,11 +275,11 @@ describe('_MotionContainer', () => {
         await fireEvent.pointerEnter(el)
         await flushTimers()
 
-        const enterScaleCall = animateMotionValueMock.mock.calls.at(-1)
-        expect(enterScaleCall?.[0]).toBe('scale')
-        expect(enterScaleCall?.[2]).toBe(1.2)
-        const enterCall = animateMock.mock.calls.at(-1)
-        expect(enterCall?.[1]).toMatchObject({ color: 'gray' })
+        // Plan 003: the animationState resolves the label LIST itself, merging
+        // later-wins. `muted` comes second so its `color` wins, while `hover`'s
+        // `scale` survives — asserted on the node's values now, not on the
+        // retired writer's two separate call channels.
+        expect(await latestValuesOf(el)).toMatchObject({ scale: 1.2, color: 'gray' })
     })
 
     it('whileHover with unknown variant key is treated as no-op (#349)', async () => {
@@ -304,22 +327,29 @@ describe('_MotionContainer', () => {
         })
 
         await flushTimers()
-        const initialAnimateCalls = animateMock.mock.calls.length
+        const el = result.container.firstElementChild
+        expect(await latestValuesOf(el)).toMatchObject({ opacity: 0.5 })
 
         // Update animate prop via rerender (Svelte 5)
         await result.rerender({ tag: 'div', animate: { opacity: 0.9 } })
         await flushTimers()
 
-        expect(animateMock.mock.calls.length).toBeGreaterThan(initialAnimateCalls)
-        const lastCall = animateMock.mock.calls.at(-1)
-        expect(lastCall?.[1]).toMatchObject({ opacity: 0.9 })
+        // Behaviour, not call counts: the node must hold the NEW target. This
+        // also pins the dedup contract — `animateChanges` re-runs on every prop
+        // change and is a no-op only when the resolved target is unchanged.
+        expect(await latestValuesOf(el)).toMatchObject({ opacity: 0.9 })
     })
 
     it('subscribes animate controls and starts resolved variants', async () => {
+        // Controls drive the VisualElement now (plan 002 Step 7), so behaviour is
+        // asserted on the values the node holds rather than on call args to the
+        // retired `animate()` writer. `animateMotionValue` is mocked at the top of
+        // this file to jump each MotionValue to its target, so a resolved start is
+        // observable synchronously.
         const controls = animationControls()
         const cleanup = controls.mount()
 
-        render(MotionContainer as unknown as any, {
+        const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
                 animate: controls,
@@ -331,18 +361,15 @@ describe('_MotionContainer', () => {
         })
 
         await flushTimers()
-        animateMock.mockClear()
 
-        await controls.start('visible', { duration: 0.1 })
+        void controls.start('visible', { duration: 0.1 })
+        await flushTimers()
 
-        expect(
-            animateMock.mock.calls.some(
-                (call) =>
-                    (call[1] as Record<string, unknown>)?.opacity === 1 &&
-                    (call[1] as Record<string, unknown>)?.x === 20 &&
-                    (call[2] as Record<string, unknown>)?.duration === 0.1
-            )
-        ).toBe(true)
+        // The variant label resolved against this node's own `variants`.
+        expect(await latestValuesOf(container.firstElementChild)).toMatchObject({
+            opacity: 1,
+            x: 20
+        })
 
         cleanup()
     })
@@ -351,7 +378,7 @@ describe('_MotionContainer', () => {
         const controls = animationControls()
         const cleanup = controls.mount()
 
-        render(MotionContainer as unknown as any, {
+        const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
                 animate: controls,
@@ -365,60 +392,49 @@ describe('_MotionContainer', () => {
         })
 
         await flushTimers()
-        animateMock.mockClear()
 
         controls.set('hidden')
+        await flushTimers()
 
-        expect(animateMock).toHaveBeenCalledWith(
-            expect.any(HTMLElement),
-            expect.objectContaining({ opacity: 0.2, display: 'none' }),
-            { duration: 0 }
-        )
+        // `set` is a jump, and a keyframe array collapses to its RESTING value
+        // (0.2, not 1); `transitionEnd` is applied on top.
+        expect(await latestValuesOf(container.firstElementChild)).toMatchObject({
+            opacity: 0.2,
+            display: 'none'
+        })
 
         cleanup()
     })
 
-    it('stops active animate controls using Motion playback controls', async () => {
+    it('stops active animate controls, freezing the value where it is', async () => {
         const controls = animationControls()
         const cleanup = controls.mount()
 
-        render(MotionContainer as unknown as any, {
+        const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
                 animate: controls,
+                initial: { opacity: 0.5 },
                 variants: {
-                    visible: { opacity: 1, x: 20 }
+                    visible: { opacity: 1 }
                 }
             }
         })
 
         await flushTimers()
-        animateMock.mockClear()
+        const el = container.firstElementChild
 
-        let resolveFinished: () => void = () => {}
-        const stop = vi.fn()
-        const finished = new Promise<void>((resolve) => {
-            resolveFinished = resolve
-        })
-        animateMock.mockReturnValueOnce({ finished, stop })
-
-        const start = controls.start('visible', { duration: 4 })
-        await Promise.resolve()
+        void controls.start('visible', { duration: 4 })
+        await flushTimers()
+        const beforeStop = (await latestValuesOf(el)).opacity
 
         controls.stop()
+        await flushTimers()
 
-        expect(stop).toHaveBeenCalledTimes(1)
-
-        resolveFinished()
-        await start
-
-        expect(
-            animateMock.mock.calls.some(
-                (call) =>
-                    (call[1] as Record<string, unknown>)?.opacity === 1 &&
-                    (call[2] as Record<string, unknown>)?.duration === 0
-            )
-        ).toBe(false)
+        // `stop()` FREEZES: it must not reset the value and must not keep
+        // animating. `MotionValue.stop()` routes into the animation's own
+        // interrupt handling, so the value simply stays where it was.
+        expect(await latestValuesOf(el)).toMatchObject({ opacity: beforeStop })
 
         cleanup()
     })
@@ -596,29 +612,24 @@ describe('_MotionContainer', () => {
         const el = container.firstElementChild as HTMLElement
         expect(el).toBeTruthy()
 
-        // Enter: should animate to whileHover with its nested transition
+        // Enter: the whileHover target wins over `animate` (higher priority).
         await fireEvent.pointerEnter(el)
         await flushTimers()
-        let lastScaleCall = animateMotionValueMock.mock.calls.at(-1)
-        expect(lastScaleCall?.[0]).toBe('scale')
-        expect(lastScaleCall?.[2]).toBe(1.2)
-        // animateMotionValue takes upstream's SECONDS-based transitions.
-        expect(lastScaleCall?.[3]).toMatchObject({ duration: 0.12 })
+        expect(await latestValuesOf(el)).toMatchObject({ scale: 1.2 })
         expect(onHoverStart).toHaveBeenCalledTimes(1)
 
-        // Leave: should animate back to baseline (animate over initial) with component transition
+        // Leave: whileHover is removed, so the animationState restores the
+        // next-highest source — `animate` (1.1), not `initial` — via its
+        // removed-key handling. That restoration used to be hand-rolled by
+        // `computeHoverBaseline`; it is upstream's `baseTarget` now.
         await fireEvent.pointerLeave(el)
         await flushTimers()
-        lastScaleCall = animateMotionValueMock.mock.calls.at(-1)
-        expect(lastScaleCall?.[0]).toBe('scale')
-        expect(lastScaleCall?.[2]).toBe(1.1)
-        expect(lastScaleCall?.[3]).toMatchObject({ duration: 0.25 })
+        expect(await latestValuesOf(el)).toMatchObject({ scale: 1.1 })
         expect(onHoverEnd).toHaveBeenCalledTimes(1)
     })
 
     it('passes own custom prop into a function-form variant on animate', async () => {
-        animateMock.mockClear()
-        render(MotionContainer as unknown as any, {
+        const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
                 custom: 3,
@@ -629,8 +640,8 @@ describe('_MotionContainer', () => {
             }
         })
         await flushTimers()
-        const animateDef = animateMock.mock.calls.at(-1)?.[1] as Record<string, unknown>
-        expect(animateDef).toMatchObject({ x: 150 })
+        // custom=3 through `(i) => ({ x: i * 50 })` → x=150 on the node.
+        expect(await latestValuesOf(container.firstElementChild)).toMatchObject({ x: 150 })
     })
 
     it('inherits custom from a parent motion component when child has no custom prop', async () => {
@@ -639,14 +650,11 @@ describe('_MotionContainer', () => {
         // resolver in isolation.
         const { default: NestedCustomHarness } =
             await import('$lib/components/__tests__/NestedCustomHarness.svelte')
-        animateMock.mockClear()
-        render(NestedCustomHarness, { props: { parentCustom: 4 } })
+        const { getByTestId } = render(NestedCustomHarness, { props: { parentCustom: 4 } })
         await flushTimers()
-        // The child resolves `(i) => ({ x: i * 25 })` with custom=4 → x=100.
-        const childCall = animateMock.mock.calls.find(
-            (c) => (c?.[1] as Record<string, unknown>)?.x === 100
-        )
-        expect(childCall).toBeTruthy()
+        // The child resolves `(i) => ({ x: i * 25 })` with the INHERITED custom=4
+        // → x=100 on the child's own node.
+        expect(await latestValuesOf(getByTestId('child'))).toMatchObject({ x: 100 })
     })
 
     it('re-animates the child when the parent updates `custom` after mount', async () => {
@@ -657,22 +665,19 @@ describe('_MotionContainer', () => {
         // gating short-circuited and no new animate call was made.
         const { default: NestedCustomHarness } =
             await import('$lib/components/__tests__/NestedCustomHarness.svelte')
-        animateMock.mockClear()
         const result = render(NestedCustomHarness, { props: { parentCustom: 4 } })
         await flushTimers()
+        const child = result.getByTestId('child')
         // Initial: child resolves to x=100.
-        expect(
-            animateMock.mock.calls.some((c) => (c?.[1] as Record<string, unknown>)?.x === 100)
-        ).toBe(true)
+        expect(await latestValuesOf(child)).toMatchObject({ x: 100 })
 
-        animateMock.mockClear()
         await result.rerender({ parentCustom: 5 })
         await flushTimers()
-        // After parent's custom flips 4 → 5, the child must re-animate
-        // to x=125. If the gating ignores `custom`, this call never lands.
-        expect(
-            animateMock.mock.calls.some((c) => (c?.[1] as Record<string, unknown>)?.x === 125)
-        ).toBe(true)
+        // After the parent's custom flips 4 → 5 the child must re-resolve to
+        // x=125 even though its variant KEY ("visible") never changed. This is
+        // the same regression the old `lastRanVariantKey` gating had; the
+        // animationState must not dedup a same-key/different-custom target away.
+        expect(await latestValuesOf(child)).toMatchObject({ x: 125 })
     })
 
     it('whileHover is gated to hover-capable devices', async () => {

@@ -23,6 +23,14 @@
             <ul class="list-disc space-y-2 pl-5">
                 <li>
                     <a
+                        class="font-semibold text-amber-300 hover:underline"
+                        href={resolve('/tests/ve-signoff') + searchParams}
+                    >
+                        VisualElement core — sign-off tour (#449)
+                    </a>
+                </li>
+                <li>
+                    <a
                         class="text-blue-300 hover:underline"
                         href={resolve('/tests/lazy-motion/basic') + searchParams}
                     >

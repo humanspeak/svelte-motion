@@ -1,0 +1,246 @@
+# Guard log — 002-animate-through-animation-state
+
+## Checkpoint 2026-07-24 — STOP review (executor run 1)
+
+- **Snapshot**: commits `36adbca` (retained Step-2 slice), `c6b336b` (BLOCKED
+  status) on `issue-449-visual-element-core`; working tree clean at review.
+- **Verdict**: **ON TRACK** (executor) + **PLAN AMENDED** (guard). The STOP was
+  correct, evidence-based, and exactly what the STOP-condition design exists
+  for. No drift; the defect was in the guard's own revision-#1 mandate.
+
+### What the executor did right
+
+- Ran the mandatory Step-1 characterization baseline before touching code
+  (unit 844; e2e main 195+1 skipped; animate-presence 62).
+- Landed the independently-valuable slice (`36adbca`): VE as single writer for
+  style MotionValues + `transformTemplate` carried on props. Guard re-verified:
+  `pnpm check` 0 errors; `pnpm test:only` 844 passed; e2e spot
+  (`e2e/vanilla-values e2e/motion e2e/svg`) re-run by guard.
+- Hit the seed-flip failure, made ONE principled fix attempt
+  (`scheduleRenderMicrotask()` per upstream `use-visual-element.ts:148`), then
+  observed the live page per CLAUDE.md's failed-e2e workflow instead of
+  guessing: clone at `2.36px` = 128px × scale 0.018 — `latestValues` frozen at
+  the `initial` target because nothing drives it until `animateChanges()` is
+  wired AND the legacy WAAPI writer is deleted.
+- Reverted the unsafe change, re-verified green against baseline, marked the
+  README row BLOCKED, and reported with measurements. Did not improvise around
+  a guard mandate — correctly identified it as the reviewer's call.
+
+### Classification
+
+**Plan defect (guard's revision #1).** "Flip the seed in the same step that
+makes the VE the renderer" was right as a constraint, wrong as a Step-2
+mandate: Step 2 makes the VE the renderer of style MotionValues only; animated
+keys become VE-driven only when `animateChanges()` runs and the legacy writer
+is gone (former Steps 3+4). An intermediate seeded-but-undriven state is
+unreachable-green by construction.
+
+### PLAN AMENDED (revision #2)
+
+- Former Steps 2/3/4 restructured: Step 2 marked landed (`36adbca`); new
+  ATOMIC Step 3 = seed flip + `scheduleRenderMicrotask()` + `animateChanges()`
+  wiring + legacy-writer deletion + `renderedInlineStyle` collapse (retaining
+  the gesture splice, wait-mode holds, pathLength hold) in one commit, with
+  the full e2e gate on that step; former Step 4 merged in.
+- Executor's line-reference corrections (~+123 shift) and the `skipAnimations`
+  answer (nothing to wire) recorded in the revision note.
+- No done criterion was weakened; the amendment re-sequences, adds gates.
+- README row 002: BLOCKED → TODO (amended, ready for re-dispatch).
+
+## Checkpoint 2026-07-24 #2 — STOP review (executor run 2, atomic Step 3)
+
+- **Snapshot**: working branch carries only `2efc9a2` (BLOCKED docs) since the
+  last checkpoint — guard verified `git diff e4f05a4..HEAD --stat` = README
+  only, `pnpm test:only` 844 passed, tree clean. The full Step-3 attempt is
+  preserved off-branch at `plan002-step3-attempt` / `129a394`
+  (−497/+308 lines in the container).
+- **Verdict**: **ON TRACK** (executor) + **PLAN AMENDED** (guard, revision #3).
+  Correct STOP on "verification fails twice"; the residual failures were
+  provably outside Step 3's fixable scope.
+
+### Findings
+
+1. **Gate mis-scoped (plan defect)**: Step 3's gate included `e2e/variants`,
+   whose subject (variant tree/stagger through the VE tree) is Step 5's work.
+   Unsatisfiable by construction. Gate re-scoped in revision #3.
+2. **Un-enumerated 5th writer (plan defect)**: the key-change transition
+   (`runKeyTransition`) was missing from Step 3c's deletion list; its enter
+   no-ops under `animateChanges` (no prop change). New sub-item 3e with the
+   reset+jump mechanism.
+3. **Library extension gap (plan defect)**: `'+=N'` relative keyframes are a
+   svelte-motion extension with no motion-dom equivalent; the deleted
+   `executeAnimation` was its only resolver. New sub-item 3f.
+4. **White-box unit specs**: 6 `_MotionContainer.spec.ts` tests pin the
+   mocked legacy `animate()` call counts — mechanism assertions, not
+   behavior. New sub-item 3g to rewrite them.
+5. **Executor quality notes**: inherited-variant fix (declarative-only
+   `animate` prop + `getVariantContext(parent)`) matches upstream and
+   recovered 2 failures; branch hygiene excellent (no red commit on the
+   working branch, attempt preserved for cherry-pick). Disclosed process
+   slip (two self-corrected file corruptions, never committed) — verified
+   harmless via clean diffstat + green suite; lesson recorded in revision #3.
+
+## Checkpoint 2026-07-24 #3 — landing ruling (executor run 3, Step 3 complete)
+
+- **Snapshot**: working branch carries only `7cce600` (docs) since `37e59a0`;
+  guard verified tree clean + docs-only diff. Full Step 3 (incl. sub-items
+  3e/3f/3g) preserved at `plan002-step3-attempt` / `e4fe515`
+  (+522/−565, net −43 lines).
+- **Executor verdict**: **ON TRACK** — gate 157/159; the 2 failures are one
+  root cause (wait-mode key-change exit coordination) that the plan's
+  Out-of-scope section assigns to plan 004. Correct STOP rather than
+  improvising past the boundary.
+- **Guard ruling: ACCEPT-AND-LAND** (`PLAN AMENDED`, revision #4). Folding the
+  exit half into 002 would execute plan 004's core ad hoc; instead the two
+  specs become documented known-failures excluded BY NAME from 002's gates,
+  owned by 004's done criteria, and 004 is re-ordered before 003 to minimize
+  the known-red window. No other criterion weakened; the batch-level bar
+  (those specs pass before the batch completes) is unchanged.
+- **Correction to checkpoint #2's review**: the `renderedInlineStyle` collapse
+  approved there was correct in intent but carried a reactivity bug the
+  executor found and fixed itself — a `$derived` slot over mutable
+  `latestValues` computes once and freezes at the seed. The slot must be a
+  plain function (never memoized). Recorded as a constraint in revision #4.
+- Landing + Steps 5–8 delegated back to the executor under revision #4;
+  guard verifies the landed state at the next checkpoint.
+
+## Checkpoint 2026-07-24 #4 — STOP review (executor run 4, Steps 3 landed + 5 partial)
+
+- **Snapshot**: `dc2d197` (Step 3, guard-accepted), `91d31d9` (Step 5 partial),
+  `bc2c5be` (docs) on the working branch; tree clean; guard re-ran
+  `pnpm test:only` → 844 passed.
+- **Verdict**: **ON TRACK** (executor) + **PLAN AMENDED** (guard, revision #5).
+  The material finding is a GUARD DEFECT: the revision-#3/#4 Step-3 gate
+  omitted `e2e/utilities` (which the original Step-8 gate included), masking
+  3 real Step-3 regressions (reduced-motion policy ×2, transformTemplate
+  removal ×1). The executor found this adversarially — stashing its Step-5
+  work and re-running utilities at exactly `dc2d197` (7 failures there).
+  Checkpoint #3's ACCEPT ruling stands, but its gate basis was too narrow;
+  the acceptance is repaired by revision #5's Step 3h completion items rather
+  than reverted (the landed swap is still strictly closer to done and the
+  regressions are enumerated, owned, and gated).
+- **Step 5 partial accepted**: strictly-better-by-every-suite, labelled, with
+  the load-bearing props-vs-context inheritance model and the
+  never-skip-first-`animateChanges` constraint recorded in revision #5.
+- Current full-suite state: 280 passed / 7 failed = 2 documented 004
+  exclusions + 3 Step-3h items + 1 Step-5 remainder (stagger-interrupt) +
+  1 Step-7 subject (controls re-attach).
+
+## Checkpoint 2026-07-24 #5 — STOP review (executor run 5, 3h partial + Step 5 done)
+
+- **Snapshot**: `6bda8bc`, `b14859d`, `6193fb3` since last checkpoint; tree
+  clean; guard re-ran unit suite (844 passed) and reproduced the single real
+  e2e failure in isolation.
+- **Verdict**: **ON TRACK** (executor) + **PLAN AMENDED** (guard, revision #6).
+  Full-suite 283/287: only the two 004 exclusions, the named Step-7
+  allowance, and one real failure remain. Step 5 is DONE (7/7 variants,
+  stagger-interrupt fixed by the per-commit microtask flush).
+- **Guard investigation of `policy='always'`**: the executor's remount
+  hypothesis was WRONG (the page defaults to `always`, so `.check()` is a
+  no-op and `{#key}` never fires) — but its refusal to modify the spec was
+  right. Guard reproduced: assertion read opacity **0.0198** AFTER the wait
+  helper (which requires > 0.99) returned — the fade completes then RE-RUNS.
+  Real behavioral bug (double-fade flash), spec correct. Prime suspect: the
+  one-shot post-mount policy strip. Recorded in revision #6 with fix
+  directions and a 3-consecutive-run verify.
+- **Step 6 SKIPPED by guard ruling** (executor's recommendation accepted):
+  `e2e/svg` is fully green; migration is churn with no observable gain.
+  Becomes a follow-up issue at batch close-out.
+- **Constraints recorded**: per-commit flush must be
+  `scheduleRenderMicrotask()` (frameloop variant provably leaves renderState
+  stale when idle); controls flush-guard removal is part of Step 7's commit.
+- Notable executor quality: bisected the flush regression on the controls
+  path (12/13 → 9/13) instead of shipping it guarded-by-luck; disclosed an
+  unproven hypothesis as unproven.
+
+## Checkpoint 2026-07-24 #6 — STOP review (executor run 6) + guard instrumentation
+
+- **Snapshot**: `d3dddfa` (strip deletion, kept as a regression-free
+  simplification), `0cb9401` (docs); tree clean.
+- **Verdict**: **ON TRACK** (executor) + **PLAN AMENDED** (guard, revision #7).
+  The executor's run was short but high-value: three theories empirically
+  disproven (the strip, async policy resolution, fresh-object
+  variantDidChange), each with evidence, plus an honest "could not reproduce
+  outside the harness."
+- **Guard took the executor's recommended next step itself** (instrumentation)
+  since guard can reproduce the failure: WAAPI lifecycle hooks + rAF sampler
+  in a scratchpad harness script. Result — the smoking gun: an IDENTICAL
+  second enter animation (`{opacity:[0,1]}`, 1200ms) starts 2.4ms after the
+  first one's finished/commitStyles/cancel, exactly once. Full keyframes
+  `[0,1]` (not resolved from current=1) implicate a completion-time trigger
+  reading stale opacity=0 — the enter ran accelerated (WAAPI), which
+  bypasses per-frame value sync. Recorded with the trace and three concrete
+  investigation probes in revision #7. The spec remains correct.
+- Step 6 skip confirmed in effect (SVG untouched); Step 7 constraints carry
+  forward unchanged.
+
+## Checkpoint 2026-07-24 #7 — STOP review (executor run 7, 3h(a) closed)
+
+- **Snapshot**: `de134ac` (3h(a) fix), `dcb1ae2` (docs) on the working branch;
+  Step 7 attempt preserved at `plan002-step7-attempt` / `219046c`. Guard
+  re-verified: unit 844 passed; `motion-config-reduced-motion` suite 3/3.
+- **Verdict**: **ON TRACK** (executor) + **PLAN AMENDED** (guard, revision #8).
+- **3h(a) root cause confirmed and closed**: guard's probe (b) was correct —
+  accelerated WAAPI channels short-circuit `bindToMotionValue`'s change
+  subscription (`VisualElement.mjs:262-281`), so after the optimized-appear
+  fade the MotionValue still held 0 and the handoff's `animateChanges()`
+  replayed the full fade. Fix (`de134ac`): jump values to the resolved
+  animate resting state before priming the animationState. The reducing
+  policy was never the cause — it only determined which assertion could
+  observe the replay.
+- **Step 7 STOP correct**: landing it red would have gone from 3 accounted
+  failures to 8. Guard read motion-dom's installed
+  `NativeAnimationExtended.updateMotionValue()` and identified the right
+  freeze mechanism (per-channel `value.stop()` routes into a double-sampled
+  renderless JSAnimation that restores value+velocity and covers the cancel
+  gap) — recorded in revision #8 with the instruction to DELETE the
+  hand-rolled freeze, not fix it, plus the mandatory diagnosis of the
+  `+=50` regression on the attempt branch before landing.
+- Working-branch state: **284/287, zero unaccounted failures** — 2 × 004
+  layout-button + 1 × controls re-attach (ends with Step 7).
+
+## Checkpoint 2026-07-24 #8 — STOP review (executor run 8) + INCIDENT
+
+- **Snapshot**: `c1bbfcb` (docs) on the working branch; attempt v2 preserved
+  at `plan002-step7-attempt` / `b3165ac`; tree clean.
+- **INCIDENT — guard commit dropped, restored.** The executor's revert used
+  `git reset --hard dcb1ae2`, one commit past its own work, silently
+  removing guard checkpoint `1f3ba85` (revision #8 + log entry) from the
+  branch. Reflog evidence: commit `1f3ba85` → executor commit `b3165ac` on
+  top → `reset: moving to dcb1ae2` → `c1bbfcb`. **Classification: process
+  error, NOT plan tampering** — the plan text was never edited, the commit
+  survives in the side branch's ancestry, and the executor demonstrably
+  followed revision #8's instructions (it adopted `value.stop()`). Guard
+  restored the commit by cherry-pick (`c0a26cb`) and added a binding
+  process rule to revision #9: never reset past commits you did not author;
+  verify guard checkpoints are in history before reporting.
+- **Verdict on the work**: **ON TRACK**. Freeze confirmed solved via
+  upstream-shaped per-channel `value.stop()` (measured: frozen x holds at
+  16.096 through the stop). Correct STOP on the remaining unidentified
+  writer; branch kept green (still 284/287, guard re-confirmed via the
+  executor's reported gate and clean tree).
+- **Guard eliminations recorded in revision #9**: string-style scrape
+  returns `{}` (installed source read), so `updateMotionValuesFromProps`
+  is a no-op on the poke; and that function cannot animate smoothly at all
+  — narrowing the writer to `animateTarget`-family callers (if animated)
+  or value recreation (if instant).
+- **Scope deadline set**: one more run on Step 7; if not landed, 002 closes
+  with a named Step-7 exclusion and controls become their own plan so 004
+  and 003 stop waiting.
+
+## Checkpoint 2026-07-24 #9 — FINAL (executor run 9, plan 002 DONE)
+
+- **Snapshot**: `8d89017` (Step 7, one commit incl. flush-guard removal),
+  `cad0d2c` (DONE docs); tree clean; all 9 guard checkpoints verified in
+  history by both executor and guard.
+- **Verdict**: **ON TRACK — plan 002 CLOSED with PASS.** Close-out report
+  written: `002-animate-through-animation-state.guard-report.md`.
+- The revision-#9 probes named the writer in one run: `xValue.jump(0)` from
+  `HTMLVisualElement.mount()` via the adapter's mount effect reactively
+  tracking `styleProp` — a remount rewinds all values to `initialValues`.
+  Three real bugs fixed with evidence; two guard eliminations held.
+- Guard close-out ran the FULL `e2e/` directory: 375 passed / 2 failed
+  (exactly the two 004-owned exclusions) / 2 skipped; unit 844; typecheck 0
+  errors; SSR pin byte-identical; grep criteria met (comments only).
+- No PR per operator sign-off policy; publication deferred to batch close.
+- Next: plan 004 (owns the two exclusions), then 003, then 005 (P2).

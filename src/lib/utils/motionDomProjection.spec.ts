@@ -1,5 +1,7 @@
+import { visualElementStore } from 'motion-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MotionDomProjectionAdapter } from './motionDomProjection.js'
+import { createMotionVisualElement } from './visualElementCore.js'
 
 /**
  * Page-space measurement math (Plan 004 Step 3, #437).
@@ -212,6 +214,79 @@ describe('MotionDomProjectionAdapter.measurePageRect', () => {
         expect(element.style.transform).toBe('translate(50px, 40px)')
         expect(adapter.projection.isAnimationBlocked).toBe(false)
         expect(adapter.projection.currentAnimation).toBeUndefined()
+        adapter.unmount()
+    })
+})
+
+/**
+ * Single-VisualElement invariant (#449, plan 001).
+ *
+ * `visualElementStore` is a `WeakMap<instance, VisualElement>` written in
+ * `VisualElement.mount()`. If the container and this adapter each mounted their
+ * own VisualElement on the same element they would overwrite each other in the
+ * store and double-render, so the container injects its instance here.
+ */
+describe('MotionDomProjectionAdapter visual-element injection', () => {
+    let element: HTMLElement
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        element = document.createElement('div')
+        document.body.appendChild(element)
+    })
+
+    it('uses an injected VisualElement and registers exactly that one in the store', () => {
+        const visualElement = createMotionVisualElement({ props: { animate: { opacity: 1 } } })
+        const adapter = new MotionDomProjectionAdapter({ visualElement })
+        expect(adapter.visualElement).toBe(visualElement)
+
+        adapter.updateOptions({ layout: true })
+        adapter.mount(element)
+
+        expect(visualElementStore.get(element)).toBe(visualElement)
+        expect(visualElement.projection).toBe(adapter.projection)
+        adapter.unmount()
+    })
+
+    it('tolerates an injected VisualElement that its owner already mounted', () => {
+        const visualElement = createMotionVisualElement({ props: {} })
+        const adapter = new MotionDomProjectionAdapter({ visualElement })
+        adapter.updateOptions({ layout: true })
+
+        // Owner mounts first (the container's element-bind effect).
+        visualElement.mount(element)
+        const mountSpy = vi.spyOn(visualElement, 'mount')
+        adapter.mount(element)
+
+        expect(mountSpy).not.toHaveBeenCalled()
+        expect(visualElementStore.get(element)).toBe(visualElement)
+        // The layout is still seeded despite the skipped mount.
+        expect(adapter.lastMeasuredRect).not.toBeNull()
+        adapter.unmount()
+    })
+
+    it('merges into an injected VisualElement props instead of replacing them', () => {
+        const visualElement = createMotionVisualElement({
+            props: { animate: { opacity: 1 }, variants: { a: { opacity: 0 } } }
+        })
+        const adapter = new MotionDomProjectionAdapter({ visualElement })
+        adapter.updateOptions({ layout: true, transition: { duration: 1 }, style: { x: 5 } })
+
+        // The owner's props survive…
+        expect(visualElement.getProps().animate).toEqual({ opacity: 1 })
+        expect(visualElement.getProps().variants).toEqual({ a: { opacity: 0 } })
+        // …and the adapter's own contributions land.
+        expect(visualElement.getProps().transition).toEqual({ duration: 1 })
+        expect((visualElement.getProps() as { style?: unknown }).style).toEqual({ x: 5 })
+    })
+
+    it('still constructs its own VisualElement with no injection', () => {
+        const adapter = new MotionDomProjectionAdapter()
+        adapter.updateOptions({ layout: true, transition: { duration: 1 } })
+        adapter.mount(element)
+
+        expect(visualElementStore.get(element)).toBe(adapter.visualElement)
+        expect(adapter.visualElement.getProps().transition).toEqual({ duration: 1 })
         adapter.unmount()
     })
 })
