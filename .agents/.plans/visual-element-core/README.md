@@ -48,6 +48,19 @@ REJECTED (with one-line rationale)
 - Work on branch `issue-449-visual-element-core`; conventional commits; never
   push or open a PR; the operator signs off on live demos before any PR.
 
+## Operator sign-off (live demo, 2026-07-25)
+
+Driven by the operator on the sign-off tour (`/tests/ve-signoff`, uncommitted):
+
+- §1 enter, §3 gesture handoff, §4 controls freeze, §5 wait-mode rolling
+  label, §6 reduced-motion — **PASSED**.
+- §7 drag interop — **PASSED with known defect accepted**: hover does not
+  respond while the box is in motion (drag = upstream-correct; post-release
+  glide = deliberate interim strictness). Recorded as a named acceptance
+  criterion + required e2e spec in plan 005's revision note.
+- §2 variant stagger — FAILED on first paint (inherited `initial` label);
+  plan 006 in flight (red test first). Operator re-check pending.
+
 ## Findings considered and rejected
 
 - Replacing the AnimatePresence clone-based exit architecture: out of #449's
