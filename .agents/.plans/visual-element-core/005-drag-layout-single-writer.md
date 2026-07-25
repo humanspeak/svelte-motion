@@ -48,6 +48,17 @@
 > the whileDrag `setActive` work, never alone. The plan-003 scaffolding
 > (drag-channel mirror + dataset guard) remains live and commented as
 > plan-005 work.
+>
+> Operator-observed acceptance criterion (2026-07-25, live sign-off): hover
+> on a drag+whileHover element does NOT respond during the post-release
+> momentum glide — the dataset guard is cleared only after the glide
+> settles (`drag.ts:675-682`), which is STRICTER than upstream (framer's
+> drag lock releases at pointer-up, so hover responds mid-glide). Suppression
+> while the pointer is down is upstream-correct and must stay. When this
+> plan lands the writer swap + drag lock, hover-during-glide becomes safe
+> (single writer) and MUST work — add an e2e spec: drag, release with
+> velocity, hover mid-glide → whileHover scale composes with the in-flight
+> translate.
 
 ## Why this matters
 
