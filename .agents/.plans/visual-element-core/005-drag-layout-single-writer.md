@@ -20,6 +20,35 @@
 - **Category**: tech-debt (architecture migration, GitHub issue #449)
 - **Planned at**: commit `7eba0bd`, 2026-07-24
 
+> Revision 2026-07-25 (guard, after executor BLOCKED at `fa4d4fe`): the
+> deferral is ACCEPTED — branch left fully green (377/0/2), zero source
+> changes. Two plan defects MUST be resolved before any re-attempt:
+>
+> 1. **Done-criterion contradiction**: this plan requires deleting
+>    `data-svelte-motion-drag-transform`, but
+>    `e2e/drag/while-drag-write-coalescing.spec.ts` measures recompositions
+>    via a MutationObserver on that attribute — deleting it makes the
+>    `composesPerFrame <= 1.25` budget pass VACUOUSLY and silently untests
+>    the duplicate-recomposition guard. The re-scope must bring that spec
+>    into scope with a replacement measurement (counting VE renders is the
+>    natural one) or consciously drop the criterion, with the operator's
+>    knowledge.
+> 2. **`whilePan` is a distinct writer** with its own attach path, its own
+>    pre-resolution, and dependencies on `hover.ts` helpers + the container's
+>    `liveGestureTransform` channel — while `pan.ts` is out of scope here.
+>    The re-scope must either add a whilePan sub-step (bringing `pan.ts`
+>    in scope) or explicitly carve it out with its own follow-up.
+>
+> Banked findings for the re-attempt: the Step-2 identity assumption is
+> VERIFIED in-browser (`ve.values.get('y') === ve.props.style.y` on the
+> mobile drawer — a bound style MotionValue IS the node's axis value, so
+> `ve.getValue('x'|'y')` is the correct writer handle). The Step-3 global
+> drag lock is RISKIER than the current per-element dataset flag (an
+> unreleased lock kills hover/press globally) — land it only paired with
+> the whileDrag `setActive` work, never alone. The plan-003 scaffolding
+> (drag-channel mirror + dataset guard) remains live and commented as
+> plan-005 work.
+
 ## Why this matters
 
 Drag is the last writer that bypasses the VisualElement: it composes a
