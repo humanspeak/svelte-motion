@@ -6,15 +6,17 @@ const ROUTE = '/tests/svg/motion-value-attributes'
  * A MotionValue bound to an SVG presentation attribute must be subscribed to,
  * not spread raw onto the element (which stringifies as `[object Object]`).
  *
- * Upstream parity: motion-dom `svgEffect` (effects/svg/index.ts) routes each key
- * to one of two DOM channels:
+ * Upstream parity: bound SVG values render through the `SVGVisualElement`
+ * (`buildSVGAttrs` moves every non-transform value into `renderState.attrs`
+ * for non-`<svg>` tags; `renderSVG` writes them with `setAttribute`) — the
+ * same single ATTRIBUTE channel React framer-motion uses. Transforms stay on
+ * the style attribute, also matching upstream.
  *
- * - `attr*`, `points`, `viewBox`, `x1/y1/x2/y2` -> `setAttribute`
- * - `cx cy r x y width height d stroke-*` -> `element.style`, because
- *   `key in element.style` is true for these in Chromium
- *
- * Tests must read the channel the key actually routes to. Polling
- * `getAttribute('cx')` never observes a change and hangs until timeout.
+ * Reading `getComputedStyle(el)` remains a valid probe for geometry keys
+ * (`cx`, `r`, …): presentation attributes reflect into computed style. What
+ * changed with the channel move is the cascade — presentation attributes lose
+ * to author CSS where the old inline-style writes won (accepted, documented
+ * behavior change matching React framer-motion).
  */
 
 /** Reads a resolved CSS property, e.g. `cx` -> `"40px"`. */
@@ -72,7 +74,9 @@ test.describe('SVG MotionValue attributes', () => {
         expect(Number.isFinite(Number(cx))).toBe(true)
     })
 
-    test('updates cx on the style channel when the MotionValue changes', async ({ page }) => {
+    test('updates cx through the SVGVisualElement when the MotionValue changes', async ({
+        page
+    }) => {
         await page.goto(ROUTE)
 
         const circle = page.getByTestId('mv-circle')
@@ -272,8 +276,9 @@ test.describe('SVG MotionValue attributes', () => {
         // as hidden. Attachment is the meaningful check here.
         await expect(line).toBeAttached()
 
-        // x1/y1/x2/y2 are not in element.style, so svgEffect writes them via
-        // setAttribute even though they carry no `attr` prefix.
+        // x1/y1/x2/y2 land on the attribute channel like every other bound SVG
+        // value (SVGVisualElement renders attrs via setAttribute), with no
+        // `attr` prefix required.
         const before = await attrNumber(line, 'x2')
         expect(Number.isFinite(before)).toBe(true)
 
@@ -294,8 +299,9 @@ test.describe('SVG MotionValue attributes', () => {
         await expect(staticCircle).toBeVisible()
         expect(await staticCircle.getAttribute('cx')).toBe('5')
 
-        // Read the style channel, the one a bound cx would move. Asserting the
-        // attribute is unchanged would pass even if the subscription were broken.
+        // Read computed style, which reflects whichever channel a bound cx
+        // would move. Asserting the raw attribute alone could pass even if
+        // the subscription were broken.
         const before = await computedNumber(staticCircle, 'cx')
         expect(before).toBe(5)
 
