@@ -1367,6 +1367,19 @@
                 if (transformProps.has(key)) delete values[key]
             }
         }
+        // An SVG element other than `<svg>` itself renders every non-transform
+        // animated value on the ATTRIBUTE channel: `buildSVGAttrs` moves
+        // `state.style` wholesale into `state.attrs` and `renderSVG` writes them
+        // with `setAttribute`. An inline style for one of those keys WINS the
+        // cascade over the presentation attribute the VE writes, freezing the
+        // element at the seeded value (measured: `style="cx: 40"` pinned the
+        // computed `cx` at 40px while the attribute tracked the MotionValue to 60).
+        if (svgAttrSplit && String(tag).toLowerCase() !== 'svg') {
+            for (const key of Object.keys(values)) {
+                if (!transformProps.has(key) && !key.startsWith('origin')) delete values[key]
+            }
+            return isNotEmpty(values) ? values : undefined
+        }
         if (isNotEmpty(values)) return values
         // First-paint fallback, for a node with its OWN `animate` only.
         // `initial={}` (or no `initial`) resolves to no seeded values, but this
