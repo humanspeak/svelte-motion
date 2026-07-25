@@ -259,6 +259,49 @@
 > After Step 7 lands (flush guard removed in the same commit, re-attach
 > allowance ends), run Step 8's full gate: allowed failures ONLY the two
 > 004-owned layout-button specs. That completes plan 002.
+>
+> Revision 2026-07-24 #9 (guard, after executor STOP at `c1bbfcb`):
+>
+> **PROCESS RULE (binding, after an incident)**: the run-8 revert was done
+> with `git reset --hard dcb1ae2`, which silently DROPPED the guard's
+> checkpoint commit `1f3ba85` from the working branch (restored by guard as
+> `c0a26cb`). Never `git reset` the working branch past a commit you did not
+> author. To revert your own work: create/point the side branch FIRST, then
+> `git revert` or reset only across your own contiguous commits, and verify
+> with `git log` that every `docs(plans): guard checkpoint` commit is still
+> in history before reporting.
+>
+> On the Step 7 blocker — the freeze is CONFIRMED solved (per-channel
+> `value.stop()`); the open item is an unidentified writer returning frozen
+> values to `initial` on a benign re-render. Guard eliminated two suspects
+> from installed sources:
+>
+> - `scrapeHTMLMotionValuesFromProps` with a STRING style returns `{}`
+>   (index keys fail every check), so `updateMotionValuesFromProps` is a
+>   no-op on the outline poke. The string-style suspicion is DEAD.
+> - `updateMotionValuesFromProps` can only `set()`/`jump()` (instant) or
+>   `removeValue()` — it cannot smoothly animate toward `baseTarget`. If
+>   the return-to-initial is ANIMATED, the writer is an
+>   `animateTarget`-family caller; if INSTANT, look at value recreation
+>   (`removeValue`+`addValue` recreates at the static value).
+>
+> Next run is PROBES FIRST, code second (use the addInitScript
+> method-wrapping technique from revision #7):
+>
+> 1. Wrap `set`/`jump`/`stop` on the three frozen MotionValues plus
+>    `visualElement.addValue`/`removeValue`; capture `new Error().stack`
+>    per call during the poke — this NAMES the writer. Also wrap
+>    `animateTarget`-entry if reachable.
+> 2. Log `latestValues.x` vs `xValue.get()` at freeze and after the poke —
+>    and confirm the v2 `readAnimationStateStyleSlot` (prefer
+>    `value.get()`) is actually active in the tested build.
+> 3. Distinguish value-layer writes from DOM-layer reads in the failing
+>    assertions.
+>
+> SCOPE DEADLINE: if this run does not land Step 7, do NOT run again.
+> Report with the probe evidence, and guard will re-scope: 002 closes with
+> a named Step-7 exclusion and the controls migration becomes its own
+> follow-up plan, so plans 004/003 stop waiting.
 
 ## Status
 

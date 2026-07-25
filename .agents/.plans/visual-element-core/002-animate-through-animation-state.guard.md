@@ -198,3 +198,32 @@ unreachable-green by construction.
   `+=50` regression on the attempt branch before landing.
 - Working-branch state: **284/287, zero unaccounted failures** — 2 × 004
   layout-button + 1 × controls re-attach (ends with Step 7).
+
+## Checkpoint 2026-07-24 #8 — STOP review (executor run 8) + INCIDENT
+
+- **Snapshot**: `c1bbfcb` (docs) on the working branch; attempt v2 preserved
+  at `plan002-step7-attempt` / `b3165ac`; tree clean.
+- **INCIDENT — guard commit dropped, restored.** The executor's revert used
+  `git reset --hard dcb1ae2`, one commit past its own work, silently
+  removing guard checkpoint `1f3ba85` (revision #8 + log entry) from the
+  branch. Reflog evidence: commit `1f3ba85` → executor commit `b3165ac` on
+  top → `reset: moving to dcb1ae2` → `c1bbfcb`. **Classification: process
+  error, NOT plan tampering** — the plan text was never edited, the commit
+  survives in the side branch's ancestry, and the executor demonstrably
+  followed revision #8's instructions (it adopted `value.stop()`). Guard
+  restored the commit by cherry-pick (`c0a26cb`) and added a binding
+  process rule to revision #9: never reset past commits you did not author;
+  verify guard checkpoints are in history before reporting.
+- **Verdict on the work**: **ON TRACK**. Freeze confirmed solved via
+  upstream-shaped per-channel `value.stop()` (measured: frozen x holds at
+  16.096 through the stop). Correct STOP on the remaining unidentified
+  writer; branch kept green (still 284/287, guard re-confirmed via the
+  executor's reported gate and clean tree).
+- **Guard eliminations recorded in revision #9**: string-style scrape
+  returns `{}` (installed source read), so `updateMotionValuesFromProps`
+  is a no-op on the poke; and that function cannot animate smoothly at all
+  — narrowing the writer to `animateTarget`-family callers (if animated)
+  or value recreation (if instant).
+- **Scope deadline set**: one more run on Step 7; if not landed, 002 closes
+  with a named Step-7 exclusion and controls become their own plan so 004
+  and 003 stop waiting.
