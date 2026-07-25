@@ -119,7 +119,6 @@
     } from '$lib/components/variantContext.context'
     import { writable } from 'svelte/store'
     import {
-        transformSVGPathProperties,
         computeNormalizedSVGInitialAttrs,
         computeSSRSVGAttrValues,
         extractSVGMotionValueAttributes,
@@ -1288,10 +1287,13 @@
     // `animateSVGPathAttributes` / `stripSVGPathKeyframes` / `isSVGPathElement`
     // lived here. They were used ONLY by the two deleted legacy writers
     // (`executeAnimation` and `startAnimationControlsDefinition`), so they are
-    // unreferenced now. SVG path HANDLING itself is untouched per the Step 6
-    // skip ruling: `svgEffect`, `transformSVGPathProperties`,
-    // `readSVGPathDrawingState` and the mount-effect dash-attribute seeding all
-    // remain, and `e2e/svg` stays green.
+    // unreferenced now.
+    //
+    // The Step 6 skip ruling that kept SVG handling out of plan 002 has since
+    // been lifted (svg-through-ve plan 001): the `svgEffect` subscription and
+    // both `transformSVGPathProperties` call sites are gone too. The
+    // SVGVisualElement is the single writer for SVG attributes AND path
+    // drawing — `buildSVGAttrs`/`buildSVGPath` compose, `renderSVG` writes.
 
     let waitCallbackRegistered = $state(false)
     let waitUnsubscribe: (() => void) | null = null
@@ -2871,28 +2873,12 @@
                     animationState.reset()
                 }
 
-                // SVG dash attrs are presentation attributes the style render
-                // cannot rewind; keep writing them directly.
-                if (keyChangeInitialKeyframes && element) {
-                    const transformedInitial = transformSVGPathProperties(
-                        element,
-                        keyChangeInitialKeyframes
-                    )
-                    for (const [key, value] of Object.entries(transformedInitial)) {
-                        if (key === 'strokeDasharray' || key === 'stroke-dasharray') {
-                            element.setAttribute(
-                                'stroke-dasharray',
-                                String(Array.isArray(value) ? value[0] : value)
-                            )
-                        }
-                        if (key === 'strokeDashoffset' || key === 'stroke-dashoffset') {
-                            element.setAttribute(
-                                'stroke-dashoffset',
-                                String(Array.isArray(value) ? value[0] : value)
-                            )
-                        }
-                    }
-                }
+                // The dash attributes used to be rewound here by hand. They are
+                // composed by the VE now: the rewind above jumps the RAW
+                // `pathLength`/`pathSpacing`/`pathOffset` values, `buildSVGPath`
+                // turns them into `stroke-dasharray`/`stroke-dashoffset` (plus
+                // `pathLength="1"`) at build time, and `renderSVG` writes them —
+                // so the `scheduleRenderMicrotask()` above already rewinds them.
 
                 runAnimation()
             } finally {
@@ -2992,24 +2978,17 @@
                 }
                 pwLog('[motion] path: has initialKeyframes, will animate to target')
 
-                // SVG dash properties are presentation ATTRIBUTES, not styles, so
-                // the VE's style render cannot seed them. Keep the synchronous
-                // attribute write that prevents a mount flash.
-                const transformedInitial = transformSVGPathProperties(element!, initialKeyframes)
-                if (
-                    'strokeDasharray' in transformedInitial ||
-                    'strokeDashoffset' in transformedInitial
-                ) {
-                    Object.entries(transformedInitial).forEach(([key, value]) => {
-                        const v = String(Array.isArray(value) ? value[0] : value)
-                        if (key === 'strokeDasharray' || key === 'stroke-dasharray') {
-                            element!.setAttribute('stroke-dasharray', v)
-                        }
-                        if (key === 'strokeDashoffset' || key === 'stroke-dashoffset') {
-                            element!.setAttribute('stroke-dashoffset', v)
-                        }
-                    })
-                }
+                // The synchronous dash-attribute seed that used to live here is
+                // gone. Three things now cover the mount flash it guarded against,
+                // all of them earlier than it was:
+                //   1. `computeNormalizedSVGInitialAttrs(initialKeyframes)` in
+                //      `derivedAttrs` emits `pathLength`/`stroke-dasharray`/
+                //      `stroke-dashoffset` on the FIRST (and server) paint;
+                //   2. `buildSVGPath` composes the same attributes from the seeded
+                //      `latestValues`, which `renderSVG` writes on the VE's first
+                //      render;
+                //   3. the `visibility:hidden` hold in `inlineStyleBaseWithHolds`
+                //      covers the `mounting` window regardless.
 
                 // Expose 'initial': the seeded render already put the from-state on
                 // the element, and this drops the pathLength visibility hold.
