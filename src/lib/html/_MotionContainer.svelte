@@ -2523,6 +2523,44 @@
     // ~0.02). plan 002 Step 3h(a).
 
     /**
+     * Sync the node's values to the resolved `animate` resting state.
+     *
+     * Accelerated channels (`opacity`, `transform`, `clipPath`, `filter`) run as
+     * native WAAPI animations, and `bindToMotionValue` SHORT-CIRCUITS for them —
+     * it builds a `NativeAnimation` and returns before installing the
+     * `on("change")` subscription (`VisualElement.mjs:262-281`). So while such an
+     * animation plays, and after it finishes, the MotionValue and `latestValues`
+     * still hold the FROM state even though the element is visually at the
+     * target.
+     *
+     * That matters at the optimized-appear handoff: the appear animation has
+     * already played the fade, but `animateChanges()` would read `value.get()`
+     * as the from-value and animate the identical range a second time — a
+     * visible double-fade (guard-measured: a second `{opacity:[0,1]}` 1200ms
+     * animation starting 2.4ms after the first one's `finished`, dropping the
+     * element back to ~0.02). Jumping the values first means `animateChanges`
+     * finds them already at target, protects those keys, and only drives the
+     * channels the appear animation could not.
+     *
+     * @returns Nothing.
+     */
+    const syncValuesToAnimateTarget = (): void => {
+        if (!visualElement) return
+        const resting = resolveRestingValues(
+            animateKeyframes as DOMKeyframesDefinition | undefined
+        ) as Record<string, unknown> | undefined
+        if (!resting) return
+        for (const [key, value] of Object.entries(resting)) {
+            if (value === undefined || value === null) continue
+            const resolved = value as string | number
+            // `jump`, not `set`: this is a catch-up to a state the element is
+            // already in, so it must not leave velocity behind.
+            visualElement.getValue(key)?.jump(resolved)
+            visualElement.setStaticValue(key, resolved)
+        }
+    }
+
+    /**
      * True once the mount/enter effect has run the first `animateChanges()`
      * pass. Until then the props effect must not fire one — the enter path owns
      * the initial ordering (phase transitions + the wait-mode gate).
@@ -3546,6 +3584,11 @@
                             // WAAPI-accelerated channels (opacity/transform), so
                             // without this pass a non-accelerated channel such as
                             // `filter` would never leave its `initial` value.
+                            //
+                            // Sync FIRST: the appear animation was accelerated, so
+                            // the node's values still read the from-state and
+                            // `animateChanges` would replay the whole enter.
+                            syncValuesToAnimateTarget()
                             runAnimation()
                             isLoaded = 'ready'
                             onAnimationCompleteProp?.(resolvedAnimate)
