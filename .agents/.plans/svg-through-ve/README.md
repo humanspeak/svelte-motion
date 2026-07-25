@@ -8,9 +8,9 @@ and path drawing move onto the `SVGVisualElement` the elements already have.
 
 ## Execution order & status
 
-| Plan | Title                                                  | Priority | Effort | Risk | Depends on                  | Status                                                                                                |
-| ---- | ------------------------------------------------------ | -------- | ------ | ---- | --------------------------- | ----------------------------------------------------------------------------------------------------- |
-| 001  | SVG attributes + path drawing through SVGVisualElement | P2       | M      | MED  | visual-element-core 001–004 | BLOCKED — `e2e/svg` pins `cx` on the style channel; the VE writes it as an attribute (needs a ruling) |
+| Plan | Title                                                  | Priority | Effort | Risk | Depends on                  | Status |
+| ---- | ------------------------------------------------------ | -------- | ------ | ---- | --------------------------- | ------ |
+| 001  | SVG attributes + path drawing through SVGVisualElement | P2       | M      | MED  | visual-element-core 001–004 | DONE   |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
@@ -25,7 +25,43 @@ REJECTED (with one-line rationale)
   (`.agents/.plans/visual-element-core/002-*.md` revisions #4–#9).
 - Operator sign-off precedes any push/PR.
 
-## Executor STOP record (2026-07-25, plan 001 Step 2)
+## Outcome (2026-07-25) — plan 001 COMPLETE
+
+Resolved by the operator ruling in plan revision #2: MotionValue-bound SVG
+attributes adopt upstream's presentation-attribute channel. All four steps
+landed.
+
+Final gate: `pnpm check` 0 errors · `trunk check` no issues ·
+`pnpm test:only` **799 passed** (813 baseline − 18 tests for the four deleted
+helpers + 4 new) · `pnpm test:e2e e2e/svg e2e/motion e2e/vanilla-values`
+**100 passed, 1 skipped** (the pre-existing `test.skip` for `pathOffset`) ·
+SSR pin 4 passed unchanged.
+
+**Documented behavior change**: bound SVG values move from the inline-style
+channel to the presentation-attribute channel, so they now LOSE to author CSS
+where inline style used to win. This matches React framer-motion.
+
+Two follow-ups a reviewer should know about, neither blocking:
+
+1. `e2e/svg/motion-value-attributes.spec.ts` carries STALE PROSE describing
+   the old channel split — the file header ("`cx cy r x y width height d
+stroke-*` -> `element.style`… Polling `getAttribute('cx')` never observes a
+   change"), the `attrNumber` doc block, and the test NAMES "updates cx on the
+   style channel" / "leaves a plain numeric cx static on the channel the live
+   element reads". Those tests pass (computed style follows a presentation
+   attribute) and their assertions were out of scope, so only the one
+   authorized assertion changed. The prose now actively misdescribes the
+   system and should be corrected in a docs-only pass.
+2. The operator-suggested probe shape (zero MutationObserver mutations on an
+   unrelated spread-routed attribute) is NOT sufficient on its own — Svelte's
+   spread diffs against its previous values, so a recomputation yielding
+   unchanged values writes nothing. Verified: the `untrack`-removed build
+   leaves `cy`/`r`/`fill` untouched too and passes that check. The landed
+   spec therefore asserts the WRITER COUNT on `cx` (measured: 3 bumps → 3
+   mutations correct, 6 when the spread tracks) and fails on the tracked
+   build. The weaker check is kept alongside, labelled as such.
+
+## Executor STOP record (2026-07-25, plan 001 Step 2) — RESOLVED, kept for history
 
 Baseline (Step 1): `e2e/svg` 25 passed; `pnpm test:only` 813 passed
 (69 files). Attribute-exact pins live in

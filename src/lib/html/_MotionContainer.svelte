@@ -1290,8 +1290,8 @@
     // unreferenced now.
     //
     // The Step 6 skip ruling that kept SVG handling out of plan 002 has since
-    // been lifted (svg-through-ve plan 001): the `svgEffect` subscription and
-    // both `transformSVGPathProperties` call sites are gone too. The
+    // been lifted (svg-through-ve plan 001): the SVG attribute subscription and
+    // both hand-rolled path-conversion call sites are gone too. The
     // SVGVisualElement is the single writer for SVG attributes AND path
     // drawing — `buildSVGAttrs`/`buildSVGPath` compose, `renderSVG` writes.
 
