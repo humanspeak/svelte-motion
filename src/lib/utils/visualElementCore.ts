@@ -30,6 +30,7 @@ import {
     isControllingVariants,
     isVariantNode,
     resolveMotionValue,
+    resolveVariant,
     resolveVariantFromProps,
     scrapeHTMLMotionValuesFromProps,
     scrapeSVGMotionValuesFromProps,
@@ -149,6 +150,116 @@ export class AnimationFeature extends Feature<unknown> {
 export const isAnimationFeatureEnabled = (props: MotionNodeOptions): boolean =>
     ANIMATION_FEATURE_PROPS.some((name) => !!props[name as keyof MotionNodeOptions])
 
+/** Monotonic id per exit-feature instance, mirroring upstream's module counter. */
+let exitFeatureId = 0
+
+/**
+ * The exit feature: turns presence changes into `setActive('exit', …)`.
+ *
+ * Port of `framer-motion/src/motion/features/animation/exit.ts`. Exit is the
+ * HIGHEST priority entry in `variantPriorityOrder`, so routing it through the
+ * animationState gives it the same protected-keys semantics as every other
+ * variant type instead of a bespoke sequence.
+ *
+ * Three behaviours, all upstream's:
+ * - `mount()` reports completion for the previous occupant of this id and
+ *   registers with the presence context (`exit.ts:74-84`).
+ * - leaving (`isPresent` false) → `setActive('exit', true)`, and
+ *   `onExitComplete(id)` once that promise resolves (`exit.ts:64-72`).
+ * - re-entering after a COMPLETED exit → jump values to the resolved `initial`,
+ *   `animationState.reset()`, `animateChanges()`; re-entering mid-exit just
+ *   deactivates exit (`exit.ts:19-62`).
+ */
+export class ExitAnimationFeature extends Feature<unknown> {
+    private id: number = exitFeatureId++
+    private isExitComplete = false
+
+    /**
+     * React to a presence flip.
+     *
+     * @returns Nothing.
+     */
+    update(): void {
+        const presenceContext = this.node.presenceContext
+        if (!presenceContext) return
+
+        const { isPresent, onExitComplete } = presenceContext
+        const { isPresent: prevIsPresent } = this.node.prevPresenceContext ?? {}
+
+        if (!this.node.animationState || isPresent === prevIsPresent) return
+
+        if (isPresent && prevIsPresent === false) {
+            // Re-entering. If the exit already finished the element sits at the
+            // exit target, so rewind to `initial` before replaying the enter —
+            // otherwise the enter animates from the exited position.
+            if (this.isExitComplete) {
+                const { initial, custom } = this.node.getProps() as {
+                    initial?: unknown
+                    custom?: unknown
+                }
+                if (
+                    typeof initial === 'string' ||
+                    (typeof initial === 'object' && initial !== null && !Array.isArray(initial))
+                ) {
+                    const resolved = resolveVariant(this.node, initial as never, custom)
+                    if (resolved) {
+                        const target = { ...resolved } as Record<string, unknown>
+                        delete target.transition
+                        delete target.transitionEnd
+                        for (const key of Object.keys(target)) {
+                            const value = target[key] as string | number | undefined | null
+                            if (value === undefined || value === null) continue
+                            this.node.getValue(key)?.jump(value)
+                        }
+                    }
+                }
+                this.node.animationState.reset()
+                void this.node.animationState.animateChanges()
+            } else {
+                void this.node.animationState.setActive('exit', false)
+            }
+
+            this.isExitComplete = false
+            return
+        }
+
+        const exitAnimation = this.node.animationState.setActive('exit', !isPresent)
+
+        if (onExitComplete && !isPresent) {
+            void exitAnimation.then(() => {
+                this.isExitComplete = true
+                onExitComplete(this.id)
+            })
+        }
+    }
+
+    /**
+     * Register with the presence context.
+     *
+     * @returns Nothing.
+     */
+    mount(): void {
+        const { register, onExitComplete } = this.node.presenceContext ?? {}
+        if (onExitComplete) onExitComplete(this.id)
+        if (register) this.unmount = register(this.id)
+    }
+
+    /**
+     * Replaced by `register`'s unregister function in {@link mount}.
+     *
+     * @returns Nothing.
+     */
+    unmount(): void {}
+}
+
+/**
+ * Whether the exit feature applies to a set of motion props.
+ *
+ * @param props Motion node props.
+ * @returns `true` when an `exit` definition is present.
+ */
+export const isExitFeatureEnabled = (props: MotionNodeOptions): boolean => !!props.exit
+
 let featuresRegistered = false
 
 /**
@@ -175,6 +286,10 @@ export const registerMotionFeatures = (): void => {
         animation: {
             isEnabled: isAnimationFeatureEnabled,
             Feature: AnimationFeature as never
+        },
+        exit: {
+            isEnabled: isExitFeatureEnabled,
+            Feature: ExitAnimationFeature as never
         }
     })
 }

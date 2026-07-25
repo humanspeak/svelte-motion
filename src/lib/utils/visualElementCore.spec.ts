@@ -6,12 +6,14 @@ import {
     visualElementStore,
     type MotionNodeOptions
 } from 'motion-dom'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MotionDomProjectionAdapter } from './motionDomProjection.js'
 import {
+    ExitAnimationFeature,
     createMotionVisualElement,
     createRenderState,
     isAnimationFeatureEnabled,
+    isExitFeatureEnabled,
     makeLatestValues,
     registerMotionFeatures
 } from './visualElementCore.js'
@@ -176,6 +178,170 @@ describe('registerMotionFeatures', () => {
         // Identity, not just presence: a second registration must not clobber
         // the global registry (LazyMotion mounts many components).
         expect(getFeatureDefinitions().animation).toBe(first)
+    })
+})
+
+describe('isExitFeatureEnabled', () => {
+    it('is true only when an `exit` definition is present', () => {
+        expect(isExitFeatureEnabled({})).toBe(false)
+        expect(isExitFeatureEnabled({ animate: {} })).toBe(false)
+        expect(isExitFeatureEnabled({ exit: { opacity: 0 } })).toBe(true)
+    })
+})
+
+describe('ExitAnimationFeature', () => {
+    /** A mounted VE with an `exit` prop and a spied animationState. */
+    const mountWithExit = (presence: Record<string, unknown> | null) => {
+        const element = document.createElement('div')
+        const ve = createMotionVisualElement({
+            props: { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } },
+            presenceContext: presence as never
+        })
+        ve.mount(element)
+        ve.updateFeatures()
+        const setActive = vi
+            .spyOn(ve.animationState!, 'setActive')
+            .mockImplementation(() => Promise.resolve())
+        const animateChanges = vi
+            .spyOn(ve.animationState!, 'animateChanges')
+            .mockImplementation(() => Promise.resolve())
+        const reset = vi.spyOn(ve.animationState!, 'reset')
+        return { element, ve, setActive, animateChanges, reset }
+    }
+
+    it('registers with the presence context on mount and reports the previous occupant', () => {
+        const onExitComplete = vi.fn()
+        const unregister = vi.fn()
+        const register = vi.fn(() => unregister)
+        const { ve, element } = mountWithExit({
+            id: 'p1',
+            isPresent: true,
+            register,
+            onExitComplete
+        })
+
+        // Upstream `exit.ts:74-84`: report completion for whoever held this id,
+        // then register and keep the unregister as the feature's unmount.
+        expect(onExitComplete).toHaveBeenCalledTimes(1)
+        expect(register).toHaveBeenCalledTimes(1)
+        expect(typeof register.mock.results[0].value).toBe('function')
+
+        ve.unmount()
+        expect(unregister).toHaveBeenCalledTimes(1)
+        visualElementStore.delete(element)
+    })
+
+    it('drives setActive("exit", true) when presence flips to absent, then reports completion', async () => {
+        const onExitComplete = vi.fn()
+        const { ve, element, setActive } = mountWithExit({
+            id: 'p1',
+            isPresent: true,
+            register: () => () => {},
+            onExitComplete
+        })
+        onExitComplete.mockClear()
+
+        ve.update(ve.getProps(), {
+            id: 'p1',
+            isPresent: false,
+            register: () => () => {},
+            onExitComplete
+        })
+        ve.updateFeatures()
+
+        expect(setActive).toHaveBeenCalledWith('exit', true)
+        // Completion is reported only after the exit animation resolves.
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(onExitComplete).toHaveBeenCalledTimes(1)
+
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    it('resets and replays the enter when re-entering after a COMPLETED exit', async () => {
+        const onExitComplete = vi.fn()
+        const present = {
+            id: 'p1',
+            isPresent: true,
+            register: () => () => {},
+            onExitComplete
+        }
+        const { ve, element, setActive, animateChanges, reset } = mountWithExit(present)
+
+        // Give `opacity` a live MotionValue sitting at the EXIT target, which is
+        // where a completed exit leaves it. `animateChanges` is mocked here, so
+        // nothing else would create one, and upstream only rewinds values that
+        // already exist (`getValue(key)?.jump(...)`).
+        ve.getValue('opacity', 0)?.jump(0.87)
+        expect(ve.getValue('opacity')?.get()).toBe(0.87)
+
+        // Leave, and let the exit promise settle so `isExitComplete` is set.
+        ve.update(ve.getProps(), { ...present, isPresent: false })
+        ve.updateFeatures()
+        await Promise.resolve()
+        await Promise.resolve()
+
+        setActive.mockClear()
+        animateChanges.mockClear()
+
+        // Re-enter.
+        ve.update(ve.getProps(), { ...present, isPresent: true })
+        ve.updateFeatures()
+
+        // Values rewound to the resolved `initial`, state reset, enter replayed
+        // (upstream `exit.ts:19-56`).
+        expect(ve.getValue('opacity')?.get()).toBe(0)
+        expect(reset).toHaveBeenCalled()
+        expect(animateChanges).toHaveBeenCalled()
+
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    it('only deactivates exit when re-entering MID-exit (no reset, no replay)', () => {
+        const present = {
+            id: 'p1',
+            isPresent: true,
+            register: () => () => {},
+            onExitComplete: undefined
+        }
+        const { ve, element, setActive, animateChanges, reset } = mountWithExit(present)
+
+        // Leave, but do NOT let the exit complete (no onExitComplete wired, so
+        // `isExitComplete` never flips).
+        ve.update(ve.getProps(), { ...present, isPresent: false })
+        ve.updateFeatures()
+        setActive.mockClear()
+        reset.mockClear()
+        animateChanges.mockClear()
+
+        ve.update(ve.getProps(), { ...present, isPresent: true })
+        ve.updateFeatures()
+
+        expect(setActive).toHaveBeenCalledWith('exit', false)
+        expect(reset).not.toHaveBeenCalled()
+        expect(animateChanges).not.toHaveBeenCalled()
+
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    it('is inert without a presence context', () => {
+        const { ve, element, setActive } = mountWithExit(null)
+        ve.update(ve.getProps(), null)
+        ve.updateFeatures()
+        expect(setActive).not.toHaveBeenCalled()
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    it('is registered in the feature registry under `exit`', () => {
+        registerMotionFeatures()
+        const definitions = getFeatureDefinitions()
+        expect(definitions.exit).toBeDefined()
+        expect(definitions.exit!.Feature).toBe(ExitAnimationFeature)
+        expect(definitions.exit!.isEnabled({ exit: {} })).toBe(true)
     })
 })
 
