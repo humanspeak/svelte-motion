@@ -1186,6 +1186,18 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         // that follows.
         releaseDragLockIfHeld()
         markDragTransformActive(false)
+        // Deactivate `whileDrag` BEFORE any release animation starts, which is
+        // upstream's ownership order: `stop()` calls `this.cancel()` first — and
+        // `cancel()` is where `animationState.setActive("whileDrag", false)` lives
+        // (`VisualElementDragControls.ts:305`) — and only THEN
+        // `this.startAnimation(velocity)` (`:270-276`). The restore retarget
+        // therefore lands first and momentum retargets the axis values after it.
+        //
+        // With this after the releases (as it was), a `whileDrag` containing `x`
+        // or `y` had its restore `value.start()` CANCEL the just-started glide:
+        // measured y frozen at its release position, trace `-9, 108, 108, 108, …`.
+        // It also never ran at all on the early-return paths below.
+        setWhileDragActive(false)
 
         velocity = computeReleaseVelocity(history, now())
 
@@ -1598,8 +1610,9 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             }
         }
 
+        // Upstream fires `onDragEnd` after `startAnimation`, from a postRender
+        // (`VisualElementDragControls.ts:278-281`).
         opts.callbacks?.onEnd?.(e, computeInfo())
-        setWhileDragActive(false)
     }
 
     // Wire dragControls. The cancelInertia thunk reads the *current*

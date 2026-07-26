@@ -88,20 +88,21 @@ test.describe('drag/axis-handoff', () => {
             await page.waitForTimeout(45)
         }
 
-        // (i) momentum owns `y` after release. The card was flung ~108px down, so
-        // it must SETTLE down-range: the whileDrag restore must not drag it home.
-        // Today the restore's `value.start()` cancels the y inertia and y
-        // collapses to 0 (measured: -9, 84, 55, 23, 10, 1, -2, …).
+        // (i) momentum owns `y` after release: travel keeps INCREASING across the
+        // first samples and the card settles down-range at its bottom constraint.
+        // Today the whileDrag restore's `value.start()` cancels the y inertia and
+        // y collapses home instead (measured: -12, 84, 44, 17, 3, -1, -2, …).
         const trace = samples.map((sample) => sample.y.toFixed(0)).join(', ')
-        const peakY = Math.max(...samples.map((sample) => sample.y))
+        expect(samples[1].y, `y did not glide onward — trace: ${trace}`).toBeGreaterThan(
+            samples[0].y
+        )
+        expect(samples[2].y, `y did not glide onward — trace: ${trace}`).toBeGreaterThan(
+            samples[1].y
+        )
         const settledY = samples[samples.length - 1].y
         expect(settledY, `y settled at ${settledY.toFixed(1)}px — trace: ${trace}`).toBeGreaterThan(
             60
         )
-        expect(
-            settledY,
-            `y fell back ${(peakY - settledY).toFixed(1)}px from its peak — trace: ${trace}`
-        ).toBeGreaterThanOrEqual(peakY - 8)
 
         // (ii) the non-axis whileDrag key still restores.
         await expect

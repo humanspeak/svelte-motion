@@ -65,7 +65,8 @@
         <h2>2 · whileDrag owns the dragged axis</h2>
         <p>
             Fling the card downward and let go. Pass: it keeps travelling on <code>y</code> after
-            release (momentum owns the axis), and <code>scale</code> still restores.
+            release (momentum owns the axis) and comes to rest at the bottom constraint;
+            <code>scale</code> still restores.
         </p>
         <div class="lane lane-tall" data-testid="axis-lane">
             <motion.div
@@ -74,7 +75,8 @@
                 data-transition-ends={axisTransitionEnds}
                 drag
                 dragMomentum
-                dragTransition={{ power: 0.5, timeConstant: 900, restDelta: 0.5, restSpeed: 4 }}
+                dragConstraints={{ top: -20, bottom: 130, left: -80, right: 80 }}
+                dragTransition={{ power: 0.6, timeConstant: 260, restDelta: 0.5, restSpeed: 10 }}
                 whileDrag={{ y: -14, scale: 1.06 }}
                 transition={{ type: 'spring', stiffness: 320, damping: 28 }}
                 onDragTransitionEnd={() => (axisTransitionEnds += 1)}
