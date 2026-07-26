@@ -7,6 +7,7 @@ import {
 } from 'motion-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { applyElastic, attachDrag, buildDragTransform, resolveConstraints } from './drag.js'
+import { createDragControls } from './dragControls.js'
 
 vi.mock('motion', () => {
     const animateMock = vi.fn(() => ({ finished: Promise.resolve() }))
@@ -362,5 +363,140 @@ describe('utils/drag', () => {
         )
         expect(callbacks.onEnd).toHaveBeenCalledTimes(2)
         cleanup()
+    })
+
+    describe('release cleanup routes', () => {
+        /**
+         * One idempotent `finalizeRelease` serves every way a release can end.
+         * These pin all four routes, and in particular that `onDragTransitionEnd`
+         * fires ONLY for a release that ran out naturally — upstream's
+         * `Promise.all(momentumAnimations).then(onDragTransitionEnd)`
+         * (`VisualElementDragControls.ts:511`) never settles for an interrupted
+         * release, because `MotionValue.start()` resolves only from the
+         * animation's `onComplete` (motion-dom `value/index.mjs:260-274`) and
+         * `JSAnimation.stop()` calls `onStop` instead
+         * (`animation/JSAnimation.mjs:44-54`).
+         */
+        const fling = (el: HTMLElement, id = 1) => {
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: id })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 60, clientY: 10, pointerId: id })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 140, clientY: 10, pointerId: id })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: 140, clientY: 10, pointerId: id })
+            )
+        }
+
+        /** A stand-in foreign animation, registered as the value's own. */
+        const takeOver = (value: MotionValue) =>
+            void value.start(() => ({ stop: vi.fn() }) as never)
+
+        it('route 1 — natural completion fires onDragTransitionEnd exactly once', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            registerStubNode(el)
+            const onTransitionEnd = vi.fn()
+
+            // `elastic: 0` with no momentum settles synchronously, which is the
+            // natural-completion route with no frameloop in the way.
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                elastic: 0,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                callbacks: { onTransitionEnd }
+            })
+            fling(el)
+
+            expect(onTransitionEnd).toHaveBeenCalledTimes(1)
+            cleanup()
+            el.remove()
+        })
+
+        it('route 2 — our own cancel stops the axis and skips onDragTransitionEnd', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const node = registerStubNode(el)
+            const onTransitionEnd = vi.fn()
+            const controls = createDragControls()
+
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                controls,
+                mergedTransition: { duration: 0 },
+                callbacks: { onTransitionEnd }
+            })
+            fling(el)
+            const x = node.values.get('x') as MotionValue
+            expect(x.isAnimating()).toBe(true)
+
+            controls.cancel()
+
+            expect(x.isAnimating()).toBe(false)
+            expect(onTransitionEnd).not.toHaveBeenCalled()
+            cleanup()
+            el.remove()
+        })
+
+        it('route 3 — a foreign takeover cleans up without stopping the new owner', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const node = registerStubNode(el)
+            const onTransitionEnd = vi.fn()
+            const controls = createDragControls()
+
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                controls,
+                mergedTransition: { duration: 0 },
+                callbacks: { onTransitionEnd }
+            })
+            fling(el)
+            const x = node.values.get('x') as MotionValue
+
+            takeOver(x)
+            expect(x.isAnimating()).toBe(true)
+            expect(onTransitionEnd).not.toHaveBeenCalled()
+
+            // The dead release disarmed itself, so cancelling the finished drag
+            // cannot reach an axis it no longer owns.
+            controls.cancel()
+            expect(x.isAnimating()).toBe(true)
+
+            cleanup()
+            el.remove()
+        })
+
+        it('route 4 — teardown drops the bookkeeping without killing the glide', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const node = registerStubNode(el)
+            const onTransitionEnd = vi.fn()
+            const controls = createDragControls()
+
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                controls,
+                mergedTransition: { duration: 0 },
+                callbacks: { onTransitionEnd }
+            })
+            fling(el)
+            const x = node.values.get('x') as MotionValue
+
+            // A detach can be a benign re-attach (the drag effect re-running), so
+            // a legitimate glide must survive it.
+            cleanup()
+            expect(x.isAnimating()).toBe(true)
+            expect(onTransitionEnd).not.toHaveBeenCalled()
+
+            controls.cancel()
+            expect(x.isAnimating()).toBe(true)
+            el.remove()
+        })
     })
 })

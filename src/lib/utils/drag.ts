@@ -492,6 +492,15 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     const axisWriteStarted = { x: false, y: false }
     let postReleaseAnimationActive = false
     let stopInertia: (() => void) | null = null
+    /**
+     * Detach-mode cleanup for the release currently in flight, if any.
+     *
+     * Same idempotent `finalizeRelease` as every other exit route, in the mode
+     * that drops this gesture's bookkeeping WITHOUT stopping the animation —
+     * used by `teardown`, which may run on a benign re-attach (the drag effect
+     * re-running) while a legitimate glide is still on screen.
+     */
+    let detachRelease: (() => void) | null = null
 
     /**
      * Per-element marker for "this element is being dragged RIGHT NOW".
@@ -839,6 +848,42 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             applied[axisKey] = numeric - release.base
             if (release.local) setXYImmediate(applied.x, applied.y)
         })
+
+    /**
+     * Notice when somebody else takes an axis away from a live release.
+     *
+     * Upstream detects nothing here and needs to: its completion bookkeeping is
+     * `Promise.all(momentumAnimations).then(onDragTransitionEnd)`
+     * (`VisualElementDragControls.ts:511`), and that promise simply never settles
+     * for an interrupted release — `MotionValue.start()` resolves only from the
+     * animation's `onComplete` (installed motion-dom, `value/index.mjs:260-274`)
+     * and `JSAnimation.stop()` calls `onStop`, not `onComplete`
+     * (`animation/JSAnimation.mjs:44-54`). Upstream therefore SKIPS
+     * `onDragTransitionEnd` on interruption, which this port matches — but it has
+     * per-release state upstream does not (tracking subscriptions,
+     * `postReleaseAnimationActive`, an armed `stopInertia`) that must not survive
+     * the release it belongs to.
+     *
+     * So the promise route is unusable and we use the value's own lifecycle
+     * events instead: `animationStart` fires when a new animation takes the value
+     * (`value/index.mjs:265-267`) and `animationCancel` when one is stopped
+     * (`:283-285`) — including by a foreign `jump()`. Subscribed only AFTER our
+     * own release has started, so our own start/jump never trips it, and the
+     * cleanup it calls is idempotent, so our own stop route re-entering through
+     * `animationCancel` is a no-op.
+     *
+     * @param release The axis release to watch.
+     * @param onForeign Invoked when another writer takes the value.
+     * @returns The unsubscribe function.
+     */
+    const watchAxisTakeover = (release: AxisRelease, onForeign: () => void): (() => void) => {
+        const stopStartWatch = release.value.on('animationStart', onForeign)
+        const stopCancelWatch = release.value.on('animationCancel', onForeign)
+        return () => {
+            stopStartWatch()
+            stopCancelWatch()
+        }
+    }
 
     /**
      * Paint the settled position once the gesture and every post-release
@@ -1313,45 +1358,99 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 while (untrack.length) untrack.pop()?.()
             }
 
+            // Declared before `finalizeRelease` so it can never be read in its
+            // temporal dead zone; both only call it later, from callbacks.
+            const cancelRelease = () => finalizeRelease('stop')
+            const handOffRelease = () => finalizeRelease('handoff')
+
+            /**
+             * The ONE release-cleanup path for this momentum release, idempotent
+             * and reached from every exit route:
+             *
+             * - `'complete'` — the last axis animation ran out naturally.
+             * - `'stop'` — WE ended it (`stopInertia`: a re-grab, `controls.cancel`,
+             *   a constraints resize). Per-channel `value.stop()` freezes each
+             *   axis where it stands, through motion-dom's own interruption
+             *   machinery (accelerated channels included, via
+             *   `NativeAnimationExtended.updateMotionValue`).
+             * - `'handoff'` — somebody ELSE now drives an axis (a foreign
+             *   animation took it, or the gesture is detaching). Stops nothing:
+             *   the new owner is mid-flight on these values.
+             *
+             * `onDragTransitionEnd` fires on `'complete'` only. That matches
+             * upstream, whose `Promise.all(...).then(onDragTransitionEnd)`
+             * (`VisualElementDragControls.ts:511`) never settles for an
+             * interrupted release — see {@link watchAxisTakeover}.
+             */
+            const finalizeRelease = (mode: 'complete' | 'stop' | 'handoff') => {
+                if (!running) return
+                running = false
+
+                if (mode === 'complete') {
+                    // Safety clamp: inertia settles inside its bounds, but a
+                    // modifyTarget or a boundary handoff can land a hair outside.
+                    if (applyX)
+                        applied.x = applyFloatConstraints(applied.x, {
+                            min: finalMinX,
+                            max: finalMaxX
+                        })
+                    if (applyY)
+                        applied.y = applyFloatConstraints(applied.y, {
+                            min: finalMinY,
+                            max: finalMaxY
+                        })
+                } else if (mode === 'stop') {
+                    pwLog('❌ MOMENTUM CANCELLED')
+                    // `applied` is already current — the tracking subscription saw
+                    // the last frame.
+                    for (const { release } of releases) release.value.stop()
+                }
+
+                stopTracking()
+
+                if (mode === 'complete') {
+                    for (const { axisKey, release } of releases) {
+                        release.value.set(applied[axisKey] + release.base)
+                    }
+                    if (releases.some(({ release }) => release.local)) {
+                        setXYImmediate(applied.x, applied.y)
+                    }
+                    pwLog('✅ REST REACHED', {
+                        finalX: applied.x,
+                        finalY: applied.y,
+                        power,
+                        timeConstant,
+                        restDelta,
+                        restSpeed
+                    })
+                } else if (mode === 'stop') {
+                    pwLog('[drag] inertia cancelled → sync applied', {
+                        el: EL_ID,
+                        applied: { x: applied.x, y: applied.y }
+                    })
+                } else {
+                    pwLog('[drag] release handed off → cleanup only', {
+                        el: EL_ID,
+                        applied: { x: applied.x, y: applied.y }
+                    })
+                }
+
+                // Disarm, but only if we are still the armed release: a later
+                // drag may already have installed its own.
+                if (stopInertia === cancelRelease) stopInertia = null
+                if (detachRelease === handOffRelease) detachRelease = null
+                postReleaseAnimationActive = false
+                maybeReleaseDragActive()
+                if (mode === 'complete') opts.callbacks?.onTransitionEnd?.()
+            }
+
+            detachRelease = handOffRelease
+
             const completeAxis = () => {
                 if (!running) return
                 remainingAnimations--
                 if (remainingAnimations > 0) return
-
-                // Safety clamp: inertia settles inside its bounds, but a
-                // modifyTarget or a boundary handoff can land a hair outside.
-                if (applyX)
-                    applied.x = applyFloatConstraints(applied.x, {
-                        min: finalMinX,
-                        max: finalMaxX
-                    })
-                if (applyY)
-                    applied.y = applyFloatConstraints(applied.y, {
-                        min: finalMinY,
-                        max: finalMaxY
-                    })
-                running = false
-                stopTracking()
-                for (const { axisKey, release } of releases) {
-                    release.value.set(applied[axisKey] + release.base)
-                }
-                if (releases.some(({ release }) => release.local)) {
-                    setXYImmediate(applied.x, applied.y)
-                }
-
-                pwLog('✅ REST REACHED', {
-                    finalX: applied.x,
-                    finalY: applied.y,
-                    power,
-                    timeConstant,
-                    restDelta,
-                    restSpeed
-                })
-
-                stopInertia = null
-                postReleaseAnimationActive = false
-                maybeReleaseDragActive()
-                opts.callbacks?.onTransitionEnd?.()
+                finalizeRelease('complete')
             }
 
             const startAxisMomentum = (
@@ -1383,34 +1482,20 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                     }),
                     onComplete: completeAxis
                 })
+                // AFTER our own start, so our own `jump()`/`start()` do not read as
+                // a foreign takeover.
+                untrack.push(watchAxisTakeover(release, handOffRelease))
             }
 
             if (applyX) startAxisMomentum('x', velocity.x, inertiaMinX, inertiaMaxX)
             if (applyY) startAxisMomentum('y', velocity.y, inertiaMinY, inertiaMaxY)
 
             if (!releases.length) {
-                postReleaseAnimationActive = false
-                maybeReleaseDragActive()
-                opts.callbacks?.onTransitionEnd?.()
+                finalizeRelease('complete')
                 return
             }
 
-            stopInertia = () => {
-                pwLog('❌ MOMENTUM CANCELLED')
-                running = false
-                // Per-channel `value.stop()`: motion-dom freezes the value at its
-                // sampled position itself (upstream `stopAnimation`). `applied` is
-                // already current — the tracking subscription saw the last frame.
-                for (const { release } of releases) release.value.stop()
-                stopTracking()
-                postReleaseAnimationActive = false
-                maybeReleaseDragActive()
-                pwLog('[drag] inertia cancelled → sync applied', {
-                    el: EL_ID,
-                    applied: { x: applied.x, y: applied.y }
-                })
-                stopInertia = null
-            }
+            stopInertia = cancelRelease
 
             pwLog('🏁 STARTED MOTION-DOM INERTIA', {
                 animations: releases.length,
@@ -1509,18 +1594,50 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 return
             }
 
-            const finishSettle = () => {
+            // Declared before `finalizeRelease` so neither can be read in its
+            // temporal dead zone; both only call it later, from callbacks.
+            const cancelRelease = () => finalizeRelease('stop')
+            const handOffRelease = () => finalizeRelease('handoff')
+
+            /**
+             * The ONE release-cleanup path for this settle, idempotent and reached
+             * from every exit route — the momentum branch's `finalizeRelease` with
+             * this branch's clamp/paint. See it for the mode semantics and for why
+             * `onDragTransitionEnd` fires on `'complete'` only.
+             */
+            const finalizeRelease = (mode: 'complete' | 'stop' | 'handoff') => {
                 if (!running) return
-                if (applyX) applied.x = applyFloatConstraints(applied.x, { min: minX, max: maxX })
-                if (applyY) applied.y = applyFloatConstraints(applied.y, { min: minY, max: maxY })
                 running = false
-                stopTracking()
-                paintSettled()
-                stopInertia = null
+
+                if (mode === 'complete') {
+                    if (applyX)
+                        applied.x = applyFloatConstraints(applied.x, { min: minX, max: maxX })
+                    if (applyY)
+                        applied.y = applyFloatConstraints(applied.y, { min: minY, max: maxY })
+                    stopTracking()
+                    paintSettled()
+                } else if (mode === 'stop') {
+                    pwLog('❌ settle (no momentum) cancelled')
+                    // Per-channel freeze, as on the momentum path.
+                    for (const { release } of releases) release.value.stop()
+                    stopTracking()
+                    if (releases.some(({ release }) => release.local)) {
+                        setXYImmediate(applied.x, applied.y)
+                    }
+                } else {
+                    // Handed off: the new owner drives these values now.
+                    stopTracking()
+                }
+
+                if (stopInertia === cancelRelease) stopInertia = null
+                if (detachRelease === handOffRelease) detachRelease = null
                 postReleaseAnimationActive = false
                 maybeReleaseDragActive()
-                opts.callbacks?.onTransitionEnd?.()
+                if (mode === 'complete') opts.callbacks?.onTransitionEnd?.()
             }
+
+            const finishSettle = () => finalizeRelease('complete')
+            detachRelease = handOffRelease
 
             let remainingAnimations = 0
             const completeAxis = () => {
@@ -1580,21 +1697,12 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                               onComplete: completeAxis
                           }
                 )
+                // AFTER our own start, so our own `jump()`/`start()` do not read as
+                // a foreign takeover.
+                untrack.push(watchAxisTakeover(release, handOffRelease))
             }
 
-            stopInertia = () => {
-                pwLog('❌ settle (no momentum) cancelled')
-                running = false
-                // Per-channel freeze, as on the momentum path.
-                for (const { release } of releases) release.value.stop()
-                stopTracking()
-                if (releases.some(({ release }) => release.local)) {
-                    setXYImmediate(applied.x, applied.y)
-                }
-                postReleaseAnimationActive = false
-                maybeReleaseDragActive()
-                stopInertia = null
-            }
+            stopInertia = cancelRelease
 
             if (maxElastic === 0) {
                 if (applyX) applied.x = x
@@ -1639,6 +1747,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         // from `cancel()`, which its unmount path also calls).
         releaseDragLockIfHeld()
         markDragTransformActive(false)
+        // Drop the bookkeeping of any in-flight release without stopping it: a
+        // detach can be a benign re-attach (the drag effect re-running) while a
+        // legitimate glide is on screen, and the fresh gesture re-derives its
+        // offset from the axis values at drag start anyway.
+        detachRelease?.()
         stopConstraintResizeObserver?.()
         el.removeEventListener('pointerdown', onPointerDown)
         el.removeEventListener('pointermove', onPointerMove as EventListener)
