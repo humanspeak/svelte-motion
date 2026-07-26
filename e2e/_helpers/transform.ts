@@ -42,8 +42,15 @@ export const readTranslate = async (page: Page, selector = '[data-testid="drag-c
 }
 
 /**
- * Read the drag-owned transform channel from the test element.
- * Unlike the computed matrix, this excludes authored/base transforms.
+ * Read the live `translateX`/`translateY` channels out of an element's INLINE
+ * transform, before the browser flattens them into a matrix.
+ *
+ * Reads `style.transform` rather than the computed matrix: the composed string
+ * exposes the translate channels separately from rotate/scale/skew, so a card
+ * with an authored tilt still reports its translation exactly. Since #449 the
+ * VisualElement is the single writer of that string, so this is the drag
+ * position as painted (it was read off `data-svelte-motion-drag-transform`
+ * while drag had a writer — and an attribute — of its own).
  */
 export const readDragTranslate = (
     page: Page,
@@ -51,7 +58,7 @@ export const readDragTranslate = (
 ): Promise<{ tx: number; ty: number }> =>
     page.evaluate((sel) => {
         const el = document.querySelector<HTMLElement>(sel)
-        const transform = el?.dataset.svelteMotionDragTransform ?? ''
+        const transform = el?.style.transform ?? ''
         const read = (axis: 'X' | 'Y') => {
             const match = transform.match(new RegExp(`translate${axis}\\((-?[0-9.]+)px\\)`))
             return match ? Number.parseFloat(match[1]) : 0

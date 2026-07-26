@@ -120,6 +120,14 @@
             <span class="lane-marker lane-marker-authored-left">left limit</span>
             <span class="lane-marker lane-marker-authored-origin">authored +40px</span>
             <span class="lane-marker lane-marker-authored-right">right limit</span>
+            <!--
+                The authored base is expressed as transform CHANNELS, which is
+                how a persistent authored transform composes with animated
+                channels: the VisualElement builds `style.transform` from
+                `latestValues`, so channel values survive every writer while an
+                opaque `transform` STRING is overwritten (see the raw-string
+                card below — upstream framer-motion behaves identically).
+            -->
             <motion.div
                 class="drag-card drag-card-teal"
                 drag="x"
@@ -128,6 +136,37 @@
                 dragElastic={0.25}
                 dragTransition={slowBaseTransition}
                 data-testid="base-transform-card"
+                style={{ x: 40, rotate: 3 }}
+            />
+        </div>
+    </section>
+    <section class="case-card">
+        <div>
+            <p class="case-index">4. raw string transform</p>
+            <p class="case-title">Authored transform STRING (upstream parity)</p>
+            <p class="case-copy">
+                Try: drag this card. Expected: the authored <code
+                    >translateX(40px) rotate(3deg)</code
+                >
+                string is dropped as soon as drag animates transform channels — React framer-motion drops
+                it identically, because the renderer composes
+                <code>style.transform</code> from channel values. Use
+                <code>transformTemplate</code> (or channels, card 3) for a transform that must persist.
+                Issue #458 tracks composing the authored string automatically.
+            </p>
+        </div>
+        <div class="demo-lane demo-lane-authored">
+            <span class="lane-marker lane-marker-authored-left">left limit</span>
+            <span class="lane-marker lane-marker-authored-origin">authored +40px</span>
+            <span class="lane-marker lane-marker-authored-right">right limit</span>
+            <motion.div
+                class="drag-card drag-card-teal"
+                drag="x"
+                dragMomentum={!data.slow}
+                dragConstraints={{ left: -160, right: 160 }}
+                dragElastic={0.25}
+                dragTransition={slowBaseTransition}
+                data-testid="raw-transform-card"
                 style="transform:translateX(40px) rotate(3deg);"
             />
         </div>
