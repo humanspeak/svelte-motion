@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { readRotation, sampleFrames } from '../_helpers/transform'
+import { maxFrameNormalizedJump, readRotation, sampleRotationTimed } from '../_helpers/transform'
 
 const URL = '/tests/motion/hover-authored-transforms?@isPlaywright=true'
 
@@ -33,20 +33,23 @@ test.describe('motion/whileHover over authored transforms', () => {
         // Leave: move the pointer well away from the card.
         await page.mouse.move(4, 4)
 
-        const samples = await sampleFrames(page, () => readRotation(card), 45)
+        const samples = await sampleRotationTimed(page, 'hover-authored-rotate-card', 750)
 
         // The restore must be continuous: settling to neutral and then
-        // snapping to the authored angle shows up as a single-frame jump.
-        const maxJump = Math.max(...samples.slice(1).map((deg, i) => Math.abs(deg - samples[i])))
+        // snapping to the authored angle shows up as a within-one-frame jump.
+        // Deltas are frame-normalized (per 16.7ms) so a delayed sample frame
+        // under load does not masquerade as a discontinuity — a true snap
+        // happens inside ONE frame and normalizes to a huge value regardless.
+        const { jump, raw, dt } = maxFrameNormalizedJump(samples)
         expect(
-            maxJump,
-            `max single-frame rotation jump: ${maxJump.toFixed(2)}deg — samples: ${samples
-                .map((d) => d.toFixed(1))
+            jump,
+            `max frame-normalized rotation jump: ${jump.toFixed(2)}deg/frame (raw ${raw.toFixed(2)}deg over ${dt.toFixed(1)}ms) — samples: ${samples
+                .map((s) => s.deg.toFixed(1))
                 .join(', ')}`
         ).toBeLessThan(4)
 
         // And it must settle on the style-authored angle, not neutral.
-        const settled = samples.at(-1)!
+        const settled = samples.at(-1)!.deg
         expect(
             Math.abs(settled - -8),
             `settled rotation: ${settled.toFixed(2)}deg (authored -8deg)`

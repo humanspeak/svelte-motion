@@ -92,6 +92,72 @@ export const sampleFrames = async <T>(page: Page, read: () => Promise<T>, count 
 }
 
 /**
+ * Sample an element's rotation once per rendered frame, entirely in-page, with
+ * a `performance.now()` timestamp per sample.
+ *
+ * `sampleFrames` pays a protocol round-trip per sample, so under load two
+ * consecutive samples can be many REAL frames apart — a smooth animation then
+ * reads as a "single-frame jump" purely from the sampling gap. One in-page
+ * rAF loop has no protocol gaps; consumers normalize deltas by the recorded
+ * `dt` instead of assuming one-frame spacing.
+ *
+ * @param page Playwright page.
+ * @param testId `data-testid` of the element to sample.
+ * @param durationMs How long to sample for.
+ * @returns Timestamped rotation samples `{ deg, t }`, one per rendered frame.
+ */
+export const sampleRotationTimed = (
+    page: Page,
+    testId: string,
+    durationMs = 750
+): Promise<Array<{ deg: number; t: number }>> =>
+    page.evaluate(
+        ({ testId, durationMs }) =>
+            new Promise<Array<{ deg: number; t: number }>>((resolve) => {
+                const el = document.querySelector(`[data-testid="${testId}"]`)
+                if (!el) {
+                    resolve([])
+                    return
+                }
+                const out: Array<{ deg: number; t: number }> = []
+                const start = performance.now()
+                const tick = () => {
+                    const matrix = new DOMMatrixReadOnly(getComputedStyle(el).transform)
+                    out.push({
+                        deg: (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI,
+                        t: performance.now()
+                    })
+                    if (performance.now() - start < durationMs) requestAnimationFrame(tick)
+                    else resolve(out)
+                }
+                requestAnimationFrame(tick)
+            }),
+        { testId, durationMs }
+    )
+
+/**
+ * The largest frame-normalized delta in a timed sample series: each raw delta
+ * is scaled to a per-16.7ms (one 60fps frame) equivalent, so a long frame
+ * does not masquerade as a discontinuity. A true snap (a jump within ONE
+ * frame) normalizes to a huge value regardless of frame timing.
+ *
+ * @param samples Timestamped values from {@link sampleRotationTimed}.
+ * @returns The maximum per-frame-equivalent delta, and its raw context.
+ */
+export const maxFrameNormalizedJump = (
+    samples: Array<{ deg: number; t: number }>
+): { jump: number; raw: number; dt: number } => {
+    let worst = { jump: 0, raw: 0, dt: 16.7 }
+    for (let i = 1; i < samples.length; i++) {
+        const raw = Math.abs(samples[i].deg - samples[i - 1].deg)
+        const dt = Math.max(samples[i].t - samples[i - 1].t, 1)
+        const jump = raw / Math.max(dt / 16.7, 1)
+        if (jump > worst.jump) worst = { jump, raw, dt }
+    }
+    return worst
+}
+
+/**
  * Press the pointer at a locator's center and drag 56px right, leaving the
  * pointer held down. Returns the press origin.
  */
