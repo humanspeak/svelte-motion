@@ -24,7 +24,7 @@ import { pwLog } from '$lib/utils/log'
  * - For nested drags, set `propagation` as needed to avoid parent-child contention.
  */
 import { isDomElement } from '$lib/utils/dom'
-import { startDragInertia } from '$lib/utils/dragInertia'
+import { createDragInertiaOptions, startAxisRelease } from '$lib/utils/dragInertia'
 import {
     applyConstraints as applyFloatConstraints,
     parseMatrixTranslate
@@ -37,10 +37,9 @@ import {
 } from '$lib/utils/transformComposer'
 import { type AnimationOptions } from 'motion'
 import {
-    animateValue,
+    motionValue,
     setDragLock,
     visualElementStore,
-    type AnimationPlaybackControlsWithThen,
     type AnyResolvedKeyframe,
     type MotionValue,
     type TransformTemplate,
@@ -748,6 +747,100 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     }
 
     /**
+     * The MotionValue a release animation drives for one axis.
+     *
+     * `base` is the offset between the value's own space and the gesture's
+     * `applied` offset space (`value = applied + base`): zero for a bound style
+     * MotionValue, which drag writes in offset space, and the authored channel
+     * value for an unbound axis, which drag composes its offset onto.
+     *
+     * `local` marks the fallback value — see {@link resolveAxisRelease}.
+     */
+    type AxisRelease = {
+        value: MotionValue<AnyResolvedKeyframe>
+        base: number
+        local: boolean
+    }
+
+    /**
+     * Read an authored channel value as a number of pixels.
+     *
+     * `undefined` means "no authored value" → 0. A `%`, `calc()` or otherwise
+     * non-px channel cannot be composed numerically and returns `null`, which
+     * routes the axis onto the fallback release value.
+     */
+    const readPixelChannel = (raw: AnyResolvedKeyframe | undefined): number | null => {
+        if (raw === undefined) return 0
+        if (typeof raw === 'number') return raw
+        const match = /^(-?(?:\d+(?:\.\d+)?|\.\d+))px$/.exec(raw)
+        return match ? Number.parseFloat(match[1]) : null
+    }
+
+    /** The authored/resting value of an axis channel, before the drag offset. */
+    const authoredAxisChannel = (axisKey: 'x' | 'y'): AnyResolvedKeyframe | undefined =>
+        (opts.getBaseTransformValues?.() ?? {})[axisKey] ?? restingTransformValues[axisKey]
+
+    /**
+     * Fallback release values, for axes with no MotionValue to drive: no
+     * VisualElement at all (standalone `attachDrag`, unit tests), or an authored
+     * channel that is not numerically composable (`50%`, `calc(…)`).
+     *
+     * They are still MotionValues, so the release machinery — including
+     * `value.stop()`'s freeze semantics — stays on ONE code path; the difference
+     * is only who paints, which `setXYImmediate` handles for these (it composes
+     * the transform string itself and preserves non-px units).
+     */
+    const fallbackAxisValues: Partial<Record<'x' | 'y', MotionValue<AnyResolvedKeyframe>>> = {}
+
+    /**
+     * Resolve the axis value a release animation should drive.
+     *
+     * Upstream's `getAxisMotionValue` (`VisualElementDragControls.ts:544-556`),
+     * with this library's bound-value contract (#421) and a fallback for the
+     * cases upstream cannot have (no node, non-px authored channel).
+     */
+    const resolveAxisRelease = (axisKey: 'x' | 'y'): AxisRelease => {
+        const bound = axisKey === 'x' ? boundX : boundY
+        if (bound) {
+            return { value: bound as MotionValue<AnyResolvedKeyframe>, base: 0, local: false }
+        }
+
+        const node = getNode()
+        const base = node ? readPixelChannel(authoredAxisChannel(axisKey)) : null
+        if (node && base !== null) {
+            return {
+                value: node.getValue(axisKey, base) as MotionValue<AnyResolvedKeyframe>,
+                base,
+                local: false
+            }
+        }
+
+        const local = (fallbackAxisValues[axisKey] ??= motionValue<AnyResolvedKeyframe>(
+            applied[axisKey]
+        ))
+        return { value: local, base: 0, local: true }
+    }
+
+    /**
+     * Keep the gesture's own bookkeeping in step with a release animation.
+     *
+     * The animation drives the value and the VisualElement renders from it, so
+     * this subscription is state only, not paint: `applied` feeds the next
+     * drag's origin, `constraintsBase`, `computeInfo`, and the ResizeObserver
+     * rescale, all of which can be read mid-glide. Fallback axes additionally
+     * paint from here, since nothing else is watching their value.
+     *
+     * @returns The unsubscribe function.
+     */
+    const trackAxisRelease = (axisKey: 'x' | 'y', release: AxisRelease): (() => void) =>
+        release.value.on('change', (latest) => {
+            const numeric = typeof latest === 'number' ? latest : Number.parseFloat(latest)
+            if (Number.isNaN(numeric)) return
+            applied[axisKey] = numeric - release.base
+            if (release.local) setXYImmediate(applied.x, applied.y)
+        })
+
+    /**
      * Paint the settled position once the gesture and every post-release
      * animation have finished. Deferred by a frame so a re-grab (or a settle
      * that starts on the next frame) supersedes it.
@@ -1156,12 +1249,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             const applyX = (axis === true || axis === 'x') && lockAxis !== 'y'
             const applyY = (axis === true || axis === 'y') && lockAxis !== 'x'
 
-            let latestX = applied.x
-            let latestY = applied.y
-            let frameCount = 0
             let running = true
             postReleaseAnimationActive = true
-            const animations: AnimationPlaybackControlsWithThen[] = []
             let remainingAnimations = (applyX ? 1 : 0) + (applyY ? 1 : 0)
             const transitionMin = opts.transition?.min
             const transitionMax = opts.transition?.max
@@ -1176,19 +1265,13 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             const finalMinY = snapY ? 0 : minY
             const finalMaxY = snapY ? 0 : maxY
 
-            const renderLatest = () => {
-                if (!running) return
-                frameCount++
-                setXYImmediate(latestX, latestY)
-
-                if (frameCount <= 3 || frameCount % 10 === 0) {
-                    pwLog(`🔄 FRAME ${frameCount}`, {
-                        px: latestX.toFixed?.(2) ?? latestX,
-                        py: latestY.toFixed?.(2) ?? latestY,
-                        boundsX: { minX, maxX },
-                        boundsY: { minY, maxY }
-                    })
-                }
+            // The release animations run ON the axis values: each animation
+            // drives its value, the value drives the render (upstream
+            // `startAxisValueAnimation`). No per-frame writer call from here.
+            const releases: Array<{ axisKey: 'x' | 'y'; release: AxisRelease }> = []
+            const untrack: Array<() => void> = []
+            const stopTracking = () => {
+                while (untrack.length) untrack.pop()?.()
             }
 
             const completeAxis = () => {
@@ -1196,14 +1279,28 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 remainingAnimations--
                 if (remainingAnimations > 0) return
 
+                // Safety clamp: inertia settles inside its bounds, but a
+                // modifyTarget or a boundary handoff can land a hair outside.
                 if (applyX)
-                    applied.x = applyFloatConstraints(latestX, { min: finalMinX, max: finalMaxX })
+                    applied.x = applyFloatConstraints(applied.x, {
+                        min: finalMinX,
+                        max: finalMaxX
+                    })
                 if (applyY)
-                    applied.y = applyFloatConstraints(latestY, { min: finalMinY, max: finalMaxY })
-                setXYImmediate(applied.x, applied.y)
+                    applied.y = applyFloatConstraints(applied.y, {
+                        min: finalMinY,
+                        max: finalMaxY
+                    })
+                running = false
+                stopTracking()
+                for (const { axisKey, release } of releases) {
+                    release.value.set(applied[axisKey] + release.base)
+                }
+                if (releases.some(({ release }) => release.local)) {
+                    setXYImmediate(applied.x, applied.y)
+                }
 
                 pwLog('✅ REST REACHED', {
-                    frameCount,
                     finalX: applied.x,
                     finalY: applied.y,
                     power,
@@ -1212,68 +1309,47 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                     restSpeed
                 })
 
-                running = false
                 stopInertia = null
                 postReleaseAnimationActive = false
                 maybeReleaseDragActive()
                 opts.callbacks?.onTransitionEnd?.()
             }
 
-            if (applyX) {
-                animations.push(
-                    startDragInertia(
-                        {
-                            value: applied.x,
-                            velocity: velocity.x,
-                            min: inertiaMinX,
-                            max: inertiaMaxX,
-                            power,
-                            timeConstant,
-                            restDelta,
-                            restSpeed,
-                            modifyTarget: opts.transition?.modifyTarget,
-                            bounceStiffness,
-                            bounceDamping
-                        },
-                        {
-                            onUpdate: (value) => {
-                                latestX = value
-                                renderLatest()
-                            },
-                            onComplete: completeAxis
-                        }
-                    )
-                )
+            const startAxisMomentum = (
+                axisKey: 'x' | 'y',
+                axisVelocity: number,
+                min: number | undefined,
+                max: number | undefined
+            ) => {
+                const release = resolveAxisRelease(axisKey)
+                releases.push({ axisKey, release })
+                // Normalise the value into numeric px space before animating: a
+                // drag over an authored `'40px'` channel leaves a unit STRING
+                // there, which has no numeric mixer.
+                release.value.jump(applied[axisKey] + release.base)
+                untrack.push(trackAxisRelease(axisKey, release))
+                void startAxisRelease(axisKey, release.value, {
+                    ...createDragInertiaOptions({
+                        value: applied[axisKey] + release.base,
+                        velocity: axisVelocity,
+                        min: min === undefined ? undefined : min + release.base,
+                        max: max === undefined ? undefined : max + release.base,
+                        power,
+                        timeConstant,
+                        restDelta,
+                        restSpeed,
+                        modifyTarget: opts.transition?.modifyTarget,
+                        bounceStiffness,
+                        bounceDamping
+                    }),
+                    onComplete: completeAxis
+                })
             }
 
-            if (applyY) {
-                animations.push(
-                    startDragInertia(
-                        {
-                            value: applied.y,
-                            velocity: velocity.y,
-                            min: inertiaMinY,
-                            max: inertiaMaxY,
-                            power,
-                            timeConstant,
-                            restDelta,
-                            restSpeed,
-                            modifyTarget: opts.transition?.modifyTarget,
-                            bounceStiffness,
-                            bounceDamping
-                        },
-                        {
-                            onUpdate: (value) => {
-                                latestY = value
-                                renderLatest()
-                            },
-                            onComplete: completeAxis
-                        }
-                    )
-                )
-            }
+            if (applyX) startAxisMomentum('x', velocity.x, inertiaMinX, inertiaMaxX)
+            if (applyY) startAxisMomentum('y', velocity.y, inertiaMinY, inertiaMaxY)
 
-            if (!animations.length) {
+            if (!releases.length) {
                 postReleaseAnimationActive = false
                 maybeReleaseDragActive()
                 opts.callbacks?.onTransitionEnd?.()
@@ -1283,10 +1359,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             stopInertia = () => {
                 pwLog('❌ MOMENTUM CANCELLED')
                 running = false
-                for (const animation of animations) animation.stop()
-                if (applyX) applied.x = latestX
-                if (applyY) applied.y = latestY
-                setXYImmediate(applied.x, applied.y)
+                // Per-channel `value.stop()`: motion-dom freezes the value at its
+                // sampled position itself (upstream `stopAnimation`). `applied` is
+                // already current — the tracking subscription saw the last frame.
+                for (const { release } of releases) release.value.stop()
+                stopTracking()
                 postReleaseAnimationActive = false
                 maybeReleaseDragActive()
                 pwLog('[drag] inertia cancelled → sync applied', {
@@ -1297,7 +1374,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             }
 
             pwLog('🏁 STARTED MOTION-DOM INERTIA', {
-                animations: animations.length,
+                animations: releases.length,
                 applyX,
                 applyY
             })
@@ -1363,22 +1440,30 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             })
 
             postReleaseAnimationActive = true
-            let latestX = applied.x
-            let latestY = applied.y
             let running = true
-            const animations: AnimationPlaybackControlsWithThen[] = []
             const { timeConstant, restDelta, restSpeed, bounceStiffness, bounceDamping } =
                 deriveBoundaryPhysics(maxElastic, opts.transition)
 
-            const renderLatest = () => {
-                if (!running) return
-                setXYImmediate(latestX, latestY)
+            // As on the momentum path: the settle springs drive the axis values.
+            const releases: Array<{ axisKey: 'x' | 'y'; release: AxisRelease }> = []
+            const untrack: Array<() => void> = []
+            const stopTracking = () => {
+                while (untrack.length) untrack.pop()?.()
+            }
+            /** Write the settled offsets back through the axis values. */
+            const paintSettled = () => {
+                for (const { axisKey, release } of releases) {
+                    release.value.set(applied[axisKey] + release.base)
+                }
+                if (!releases.length || releases.some(({ release }) => release.local)) {
+                    setXYImmediate(applied.x, applied.y)
+                }
             }
 
             if (cancelled) {
-                if (applyX) latestX = x
-                if (applyY) latestY = y
-                setXYImmediate(latestX, latestY)
+                if (applyX) applied.x = x
+                if (applyY) applied.y = y
+                setXYImmediate(applied.x, applied.y)
                 postReleaseAnimationActive = false
                 maybeReleaseDragActive()
                 opts.callbacks?.onTransitionEnd?.()
@@ -1387,10 +1472,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
 
             const finishSettle = () => {
                 if (!running) return
-                if (applyX) applied.x = applyFloatConstraints(latestX, { min: minX, max: maxX })
-                if (applyY) applied.y = applyFloatConstraints(latestY, { min: minY, max: maxY })
-                setXYImmediate(applied.x, applied.y)
+                if (applyX) applied.x = applyFloatConstraints(applied.x, { min: minX, max: maxX })
+                if (applyY) applied.y = applyFloatConstraints(applied.y, { min: minY, max: maxY })
                 running = false
+                stopTracking()
+                paintSettled()
                 stopInertia = null
                 postReleaseAnimationActive = false
                 maybeReleaseDragActive()
@@ -1404,80 +1490,82 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             }
 
             const addSettleAnimation = (
+                axisKey: 'x' | 'y',
                 from: number,
                 to: number,
                 min: number,
-                max: number,
-                onUpdate: (value: number) => void
+                max: number
             ) => {
                 const shouldSpringBoundary = from < min || from > max
                 if (Math.abs(from - to) < 0.01 && !shouldSpringBoundary) {
-                    onUpdate(to)
+                    applied[axisKey] = to
                     return
                 }
 
+                const release = resolveAxisRelease(axisKey)
+                releases.push({ axisKey, release })
+                release.value.jump(from + release.base)
+                untrack.push(trackAxisRelease(axisKey, release))
+
                 remainingAnimations++
-                animations.push(
+                // Velocity stays 0 on this path, as it was when these springs ran
+                // detached: a no-momentum release is an elastic snap-back, not a
+                // continuation of the pointer's motion.
+                void startAxisRelease(
+                    axisKey,
+                    release.value,
                     shouldSpringBoundary
-                        ? startDragInertia(
-                              {
-                                  value: from,
+                        ? {
+                              ...createDragInertiaOptions({
+                                  value: from + release.base,
                                   velocity: 0,
-                                  min,
-                                  max,
+                                  min: min + release.base,
+                                  max: max + release.base,
                                   power: 0,
                                   timeConstant,
                                   restDelta,
                                   restSpeed,
                                   bounceStiffness,
                                   bounceDamping
-                              },
-                              { onUpdate, onComplete: completeAxis }
-                          )
-                        : animateValue({
-                              keyframes: [from, to],
+                              }),
+                              onComplete: completeAxis
+                          }
+                        : {
+                              keyframes: [from + release.base, to + release.base],
                               type: 'spring',
+                              velocity: 0,
                               stiffness: bounceStiffness,
                               damping: bounceDamping,
                               restDelta,
                               restSpeed,
-                              onUpdate,
                               onComplete: completeAxis
-                          })
+                          }
                 )
             }
 
             stopInertia = () => {
                 pwLog('❌ settle (no momentum) cancelled')
                 running = false
-                for (const animation of animations) animation.stop()
-                if (applyX) applied.x = latestX
-                if (applyY) applied.y = latestY
-                setXYImmediate(applied.x, applied.y)
+                // Per-channel freeze, as on the momentum path.
+                for (const { release } of releases) release.value.stop()
+                stopTracking()
+                if (releases.some(({ release }) => release.local)) {
+                    setXYImmediate(applied.x, applied.y)
+                }
                 postReleaseAnimationActive = false
                 maybeReleaseDragActive()
                 stopInertia = null
             }
 
             if (maxElastic === 0) {
-                latestX = applyX ? x : applied.x
-                latestY = applyY ? y : applied.y
+                if (applyX) applied.x = x
+                if (applyY) applied.y = y
                 finishSettle()
             } else {
-                if (applyX) {
-                    addSettleAnimation(applied.x, x, minX, maxX, (value) => {
-                        latestX = value
-                        renderLatest()
-                    })
-                }
-                if (applyY) {
-                    addSettleAnimation(applied.y, y, minY, maxY, (value) => {
-                        latestY = value
-                        renderLatest()
-                    })
-                }
+                if (applyX) addSettleAnimation('x', applied.x, x, minX, maxX)
+                if (applyY) addSettleAnimation('y', applied.y, y, minY, maxY)
 
-                if (!animations.length) {
+                if (!releases.length) {
                     finishSettle()
                 }
             }
