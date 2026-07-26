@@ -30,26 +30,19 @@ import {
     parseMatrixTranslate
 } from '$lib/utils/dragMath'
 import { deriveBoundaryPhysics } from '$lib/utils/dragParams'
-import { computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
 import {
     buildGestureTransform,
     collectGestureTransformValues as collectTransformValues,
-    splitGestureTransformValues as splitTransformValues,
     type GestureTransformValues as DragTransformValues
 } from '$lib/utils/transformComposer'
-import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
+import { type AnimationOptions } from 'motion'
 import {
-    animateMotionValue,
     animateValue,
-    getValueAsType,
-    motionValue,
-    numberValueTypes,
     visualElementStore,
     type AnimationPlaybackControlsWithThen,
     type AnyResolvedKeyframe,
     type MotionValue,
     type TransformTemplate,
-    type ValueAnimationTransition,
     type VisualElement
 } from 'motion-dom'
 
@@ -466,7 +459,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     const elastic = resolveDragElastic(opts.elastic)
     const maxElastic = getMaxElastic(elastic)
     const momentum = opts.momentum !== false
-    const mergedTransition = opts.mergedTransition ?? {}
 
     let constraints = resolveConstraints(el, opts.constraints)
     // Anchor constraints base:
@@ -489,22 +481,17 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     // History for velocity smoothing (last N samples)
     let history: Array<{ x: number; y: number; t: number }> = []
 
-    let whileDragBaseline: Record<string, unknown> | null = null
+    // Transform channels authored by `initial`/`animate`, used as the resting
+    // baseline the drag offset composes onto. `whileDrag` channels are NOT here:
+    // the animationState owns them (`setWhileDragActive`).
     const restingTransformValues: DragTransformValues = {
         ...collectTransformValues(opts.baselineSources?.initial),
         ...collectTransformValues(opts.baselineSources?.animate)
     }
-    const gestureTransformValues: DragTransformValues = {}
     const crossAxisOffset = { x: 0, y: 0 }
-    const transformAnimations = new Map<
-        string,
-        { value: MotionValue<AnyResolvedKeyframe>; unsubscribe: () => void }
-    >()
     // Which axis channels this gesture has taken ownership of on the node.
     const axisWriteStarted = { x: false, y: false }
     let postReleaseAnimationActive = false
-    let whileDragRestoreActive = false
-    let whileDragAnimationGeneration = 0
     let stopInertia: (() => void) | null = null
 
     const markDragTransformActive = (active: boolean) => {
@@ -632,8 +619,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
 
         const latestValues: DragTransformValues = {
             ...(opts.getBaseTransformValues?.() ?? {}),
-            ...restingTransformValues,
-            ...gestureTransformValues
+            ...restingTransformValues
         }
         // The authored/resting channel values BEFORE the gesture offsets, used as
         // the created axis value's default so a removed target animates back to
@@ -654,27 +640,24 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         }
 
         // Preserve the bound-MotionValue empty writer branch: when every drag
-        // axis is node-owned and no gesture/projection channel is active, this
-        // path has nothing of its own to paint (#421).
+        // axis is node-owned and no projection offset is active, this path has
+        // nothing of its own to paint (#421).
         const shouldWrite =
             (dragX && !boundX) ||
             (dragY && !boundY) ||
             crossAxisOffset.x !== 0 ||
-            crossAxisOffset.y !== 0 ||
-            Object.keys(gestureTransformValues).length > 0
+            crossAxisOffset.y !== 0
 
         const node = getNode()
         if (node) {
             if (shouldWrite) {
-                // Non-axis channels (whileDrag overrides, authored style
-                // channels) go into the node's `latestValues` so its single
-                // composition sees them. Channels the node owns as MotionValues
-                // are left alone unless a whileDrag animation is overriding
-                // them — that override is drag's, and it must win for as long as
-                // the gesture holds it.
+                // Authored channels the node does not own itself are seeded into
+                // its `latestValues` so the single composition sees them.
+                // `whileDrag` channels are absent by design — the animationState
+                // owns those, on the node's own MotionValues.
                 for (const [key, value] of Object.entries(latestValues)) {
                     if (key === 'x' || key === 'y') continue
-                    if (node.values.has(key) && !(key in gestureTransformValues)) continue
+                    if (node.values.has(key)) continue
                     node.setStaticValue(key, value)
                 }
                 if (dragX && !boundX) axisWriteStarted.x = true
@@ -714,105 +697,17 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     }
 
     /**
-     * Release the drag-active flag once the gesture and every post-release
+     * Paint the settled position once the gesture and every post-release
      * animation have finished. Deferred by a frame so a re-grab (or a settle
-     * that starts on the next frame) keeps the flag continuously set.
-     *
-     * The flag itself is plan 002's subject: it is the guard that suppresses
-     * hover/press while a drag owns the element.
+     * that starts on the next frame) supersedes it.
      */
     const maybeReleaseDragActive = () => {
-        if (dragging || postReleaseAnimationActive || whileDragRestoreActive) return
+        if (dragging || postReleaseAnimationActive) return
 
         requestAnimationFrame(() => {
-            if (dragging || postReleaseAnimationActive || whileDragRestoreActive) return
+            if (dragging || postReleaseAnimationActive) return
             setXYImmediate(applied.x, applied.y)
-            markDragTransformActive(false)
         })
-    }
-
-    const stopTransformAnimation = (key: string) => {
-        const active = transformAnimations.get(key)
-        if (!active) return
-        active.value.stop()
-        active.unsubscribe()
-        transformAnimations.delete(key)
-    }
-
-    const stopTransformAnimations = () => {
-        for (const key of [...transformAnimations.keys()]) stopTransformAnimation(key)
-    }
-
-    const normalizeTransformTarget = (
-        key: string,
-        target: unknown
-    ): AnyResolvedKeyframe | Array<AnyResolvedKeyframe | null> | undefined => {
-        const normalize = (value: unknown): AnyResolvedKeyframe | null | undefined => {
-            if (value === null) return null
-            if (typeof value !== 'string' && typeof value !== 'number') return undefined
-            const typedValue: unknown = getValueAsType(value, numberValueTypes[key])
-            return typeof typedValue === 'string' || typeof typedValue === 'number'
-                ? typedValue
-                : value
-        }
-
-        if (!Array.isArray(target)) return normalize(target) ?? undefined
-        const keyframes = target.map(normalize).filter((value) => value !== undefined)
-        return keyframes.length ? keyframes : undefined
-    }
-
-    const startTransformAnimation = (
-        key: string,
-        target: unknown,
-        transition: AnimationOptions | undefined
-    ): AnimationPlaybackControlsWithThen | null => {
-        const normalizedTarget = normalizeTransformTarget(key, target)
-        if (normalizedTarget === undefined) return null
-
-        stopTransformAnimation(key)
-        const baseValues = opts.getBaseTransformValues?.() ?? {}
-        const neutral = key.startsWith('scale') ? 1 : 0
-        // Seed with the same value type as the normalized target. Style-authored
-        // channels arrive as raw numbers, but the target above is typed (4 ->
-        // '4deg'); spring generators emit NaN when asked to animate a raw number
-        // into a unit string, and one NaN channel invalidates the entire
-        // composed transform ('rotate(NaNdeg)' -> the browser drops the write).
-        const current = getValueAsType(
-            gestureTransformValues[key] ??
-                restingTransformValues[key] ??
-                baseValues[key] ??
-                neutral,
-            numberValueTypes[key]
-        ) as AnyResolvedKeyframe
-        const value = motionValue<AnyResolvedKeyframe>(current)
-        gestureTransformValues[key] = current
-        // Mirror the channel onto the node and let the VisualElement coalesce:
-        // `scheduleRender()` de-duplicates per frame (`VisualElement.mjs:136-142`),
-        // so N animating channels still cost ONE composition + one style write
-        // per frame. Recomposing here per channel instead would multiply the
-        // per-frame work by the number of animated channels — the duplication
-        // `e2e/drag/while-drag-write-coalescing.spec.ts` budgets against.
-        const unsubscribe = value.on('change', (latest) => {
-            gestureTransformValues[key] = latest
-            const node = getNode()
-            if (!node) {
-                setXYImmediate(applied.x, applied.y)
-                return
-            }
-            node.setStaticValue(key, latest)
-            node.scheduleRender()
-        })
-        transformAnimations.set(key, { value, unsubscribe })
-        setXYImmediate(applied.x, applied.y)
-        void value.start(
-            animateMotionValue(
-                key,
-                value,
-                normalizedTarget,
-                (transition ?? mergedTransition) as unknown as ValueAnimationTransition
-            )
-        )
-        return value.animation ?? null
     }
 
     /**
@@ -859,73 +754,32 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         setXYImmediate(applied.x + (dragX ? dx : 0), applied.y + (dragY ? dy : 0))
     }
 
-    const startWhileDrag = () => {
-        if (!opts.whileDrag) return
-        whileDragAnimationGeneration++
-        whileDragRestoreActive = false
-        stopTransformAnimations()
-        // Baseline restore target: compute from sources. baseValues carries the
-        // style-authored transform channels so release restores to the authored
-        // value instead of settling to neutral and snapping.
-        whileDragBaseline = computeHoverBaseline(el, {
-            initial: opts.baselineSources?.initial,
-            animate: opts.baselineSources?.animate,
-            whileHover: (opts.whileDrag ?? {}) as Record<string, unknown>,
-            baseValues: opts.getBaseTransformValues?.()
-        })
-        const { keyframes, transition } = splitHoverDefinition(
-            opts.whileDrag as Record<string, unknown>
-        )
-        const { transform, native: nativeKeyframes } = splitTransformValues(keyframes)
-        for (const [key, target] of Object.entries(transform)) {
-            startTransformAnimation(key, target, transition)
-        }
-        if (Object.keys(nativeKeyframes).length > 0) {
-            animate(el, nativeKeyframes as DOMKeyframesDefinition, transition ?? mergedTransition)
-        }
-    }
-
-    const endWhileDrag = () => {
-        const baseline = whileDragBaseline
-        if (!baseline || Object.keys(baseline).length === 0) {
-            maybeReleaseDragActive()
-            return
-        }
-        whileDragRestoreActive = true
-        const generation = ++whileDragAnimationGeneration
-        const { transform, native: nativeBaseline } = splitTransformValues(baseline)
-        const restore =
-            Object.keys(nativeBaseline).length > 0
-                ? animate(el, nativeBaseline as unknown as DOMKeyframesDefinition, mergedTransition)
-                : null
-        whileDragBaseline = null
-
-        const finishRestore = () => {
-            if (generation !== whileDragAnimationGeneration) return
-            stopTransformAnimations()
-            for (const key of Object.keys(transform)) delete gestureTransformValues[key]
-            setXYImmediate(applied.x, applied.y)
-            whileDragRestoreActive = false
-            maybeReleaseDragActive()
-        }
-
-        const restorePromises: PromiseLike<unknown>[] = []
-        for (const [key, target] of Object.entries(transform)) {
-            const control = startTransformAnimation(key, target, mergedTransition)
-            if (control) restorePromises.push(control.finished)
-        }
-        if (restore && typeof (restore as PromiseLike<unknown>).then === 'function') {
-            restorePromises.push(restore as PromiseLike<unknown>)
-        }
-
-        if (restorePromises.length > 0) {
-            // Fire-and-forget: `allSettled` never rejects, and the caller must not
-            // block on the restore animations finishing.
-            void Promise.allSettled(restorePromises).then(finishRestore)
-            return
-        }
-
-        finishRestore()
+    /**
+     * Toggle `whileDrag` on the node's animationState.
+     *
+     * Upstream's drag controls do exactly this and nothing more —
+     * `animationState.setActive("whileDrag", true)` at drag start
+     * (`VisualElementDragControls.ts:176`) and `false` from `cancel()` at
+     * session end (`:305`). The resolver then owns priority ordering (whileDrag
+     * outranks whileTap and whileHover in `variantPriorityOrder`), protected
+     * keys, and — crucially — restoring the previous target on release, which is
+     * what the hand-rolled `computeHoverBaseline` restore approximated here.
+     *
+     * The definition itself travels on the node (`props.whileDrag`, carried by
+     * `buildMotionNodeProps` since #449), so variant LABELS resolve through
+     * `getVariant` for free.
+     *
+     * @param isActive Whether the drag gesture currently owns the element.
+     */
+    const setWhileDragActive = (isActive: boolean) => {
+        const node = getNode()
+        if (!node?.animationState) return
+        // Guarded on the prop, as upstream's gesture features are: an element
+        // with drag callbacks but no `whileDrag` must not start an empty
+        // animation.
+        const props = node.getProps() as Record<string, unknown>
+        if (!props.whileDrag) return
+        void node.animationState.setActive('whileDrag', isActive)
     }
 
     const onPointerDown = (e: PointerEvent) => {
@@ -1003,7 +857,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             pwLog('[drag] snapToCursor origin', { el: EL_ID, origin })
         }
 
-        startWhileDrag()
+        setWhileDragActive(true)
         opts.callbacks?.onStart?.(e, computeInfo())
 
         // Listen on element (to receive captured events) and window as fallback.
@@ -1565,7 +1419,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         }
 
         opts.callbacks?.onEnd?.(e, computeInfo())
-        endWhileDrag()
+        setWhileDragActive(false)
     }
 
     // Wire dragControls. The cancelInertia thunk reads the *current*
@@ -1589,7 +1443,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     const teardown = () => {
         pwLog('[drag] detach', { el: EL_ID })
         markDragTransformActive(false)
-        stopTransformAnimations()
         stopConstraintResizeObserver?.()
         el.removeEventListener('pointerdown', onPointerDown)
         el.removeEventListener('pointermove', onPointerMove as EventListener)
