@@ -2526,8 +2526,22 @@
         }
     })
 
-    // Shared layout animation via layoutId.
-    // On mount, consume the previous snapshot and FLIP from its position.
+    /**
+     * Shared layout animation via `layoutId`: on mount, consume the departing
+     * element's snapshot and animate from its position.
+     *
+     * `layout`-carrying nodes already ran through the projection
+     * (`commitObservedLayoutChange` on the observer path), and since
+     * drag-single-writer 005 so does a `layoutId`-only node: the snapshot rect
+     * seeds the projection the same way an observed layout change does, so the
+     * animation is a projection transform on the node's own VisualElement rather
+     * than a hand-written FLIP.
+     *
+     * One behavioural consequence, deliberate: the animation now uses the
+     * ARRIVING element's transition (the node's own projection option) instead of
+     * the departing element's snapshotted one. That matches upstream, where a
+     * shared-layout animation is driven by the promoted node.
+     */
     $effect(() => {
         if (
             !(
@@ -2544,11 +2558,7 @@
         if (!prev) return // First appearance, no animation needed
         if (motionDomProjection && layoutProp) return
 
-        const next = measureRect(element, resolveLayoutScrollAncestors())
-        const transforms = computeFlipTransforms(prev.rect, next, true)
-
-        setCompositorHints(element, true)
-        runFlipAnimation(element, transforms, prev.transition ?? mergedTransition ?? {})
+        motionDomProjection?.commitObservedLayoutChange(prev.rect)
     })
 
     // ── Gestures (#449 plan 003) ─────────────────────────────────────────────
