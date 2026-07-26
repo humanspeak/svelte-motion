@@ -26,6 +26,7 @@
     import { sleep } from '$lib/utils/testing'
     import { type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
     import {
+        animateTarget,
         calcBoxDelta,
         cancelFrame,
         createDelta,
@@ -38,14 +39,19 @@
         isVariantLabel,
         transformProps,
         visualElementStore,
+        type AnyResolvedKeyframe,
         type MotionNodeOptions,
         type PresenceContextProps,
-        type MotionValue
+        type MotionValue,
+        type TargetAndTransition,
+        type Transition
     } from 'motion-dom'
     import { isPlaywrightEnv, pwLog } from '$lib/utils/log'
     import { onDestroy, untrack, type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants'
-    import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation'
+    // `animateWithLifecycle` is gone from this file with whilePan's swap onto
+    // `animateTarget` — the container no longer animates an ELEMENT anywhere.
+    import { mergeTransitions } from '$lib/utils/animation'
     import { isAnimationControls } from '$lib/utils/animationControls.svelte'
     import {
         attachFocusGesture,
@@ -53,11 +59,7 @@
         attachInViewGesture,
         attachPressGesture
     } from '$lib/utils/gestures'
-    import {
-        computeHoverBaseline,
-        readTransformChannels,
-        splitHoverDefinition
-    } from '$lib/utils/hover'
+    import { readTransformChannels } from '$lib/utils/hover'
     import {
         measureRect,
         computeFlipTransforms,
@@ -1571,8 +1573,23 @@
      *    keyframes leak.
      */
     let teardownPan: AttachPanCleanup | null = null
-    let activeWhilePanKeyframes: Record<string, unknown> | null = null
-    let whilePanBaseline: Record<string, unknown> | null = null
+    /**
+     * The pre-pan target for every key `whilePan` took over, captured at
+     * pan-start and replayed at pan-end.
+     *
+     * `whilePan` is a svelte-motion EXTENSION: upstream has `onPan*` callbacks
+     * but no pan variant type, so `variantPriorityOrder` has no slot for it and
+     * it cannot ride `animationState.setActive` without forking motion-dom's
+     * fixed type list. It therefore animates the node's MotionValues directly via
+     * `animateTarget` — single-writer compliant and velocity-continuous — with
+     * the restore driven by the node's OWN base target
+     * (`getBaseTarget`/`readValue`), which is what the animationState would use
+     * for a removed key. Consequence of being outside the resolver: priority
+     * against whileHover/whileTap is by construction (pan owns the pointer
+     * session), not resolver-enforced. If upstream ever adds a pan type, this
+     * becomes a `setActive` call and this map goes away.
+     */
+    let whilePanRestore: Record<string, unknown> | null = null
 
     /**
      * Boolean presence-check for "is any pan surface active?". Derived
@@ -1600,42 +1617,43 @@
     } => ({
         onSessionStart: onPanSessionStartProp,
         onStart: (event, info) => {
-            if (resolvedWhilePan && element) {
-                // Snapshot the values we'll revert to BEFORE applying — same
-                // `computeHoverBaseline` path the other while-* gestures
-                // (whileHover/whileFocus/drag) use. Covers animatable transform
-                // shorthands (scale, rotate, x, y) AND restores non-animatable
-                // inline writes (cursor, pointer-events) since the baseline
-                // sniffs `animate` → `initial` → computed style → inline style.
-                whilePanBaseline = computeHoverBaseline(element, {
-                    initial: initialKeyframes ?? {},
-                    animate: (resolvedAnimate ?? {}) as Record<string, unknown>,
-                    whileHover: (resolvedWhilePan ?? {}) as Record<string, unknown>,
-                    baseValues: getStyleTransformValues()
+            if (resolvedWhilePan && visualElement) {
+                const definition = resolvedWhilePan as Record<string, unknown>
+                // Capture what each key reverts to BEFORE animating, from the
+                // node itself: `getBaseTarget` is the same source the
+                // animationState uses when a key drops out of a target
+                // (props.initial → props.style → the value read at creation).
+                // `readValue` is the fallback for a key whilePan INTRODUCES —
+                // motion-dom's own instance reader, which hydrates `baseTarget`
+                // as a side effect. Deliberately NOT a computed-style snapshot:
+                // that reads whatever is on screen, including an in-flight
+                // animation's mid-frame value.
+                const restore: Record<string, unknown> = {}
+                for (const key of Object.keys(definition)) {
+                    if (key === 'transition') continue
+                    const base = visualElement.getBaseTarget(key)
+                    restore[key] =
+                        base ?? visualElement.readValue(key, definition[key] as AnyResolvedKeyframe)
+                }
+                whilePanRestore = restore
+                // `animateTarget` destructures `transition` out of the definition
+                // itself, so the nested-transition form needs no pre-split.
+                animateTarget(visualElement, definition as TargetAndTransition, {
+                    transitionOverride: definition.transition
+                        ? undefined
+                        : (mergedTransition as Transition | undefined)
                 })
-                const { keyframes, transition } = splitHoverDefinition(
-                    resolvedWhilePan as Record<string, unknown>
-                )
-                activeWhilePanKeyframes = keyframes
-                animateWithLifecycle(
-                    element,
-                    keyframes as unknown as DOMKeyframesDefinition,
-                    transition ?? mergedTransition ?? {}
-                )
             }
             onPanStartProp?.(event, info)
         },
         onMove: onPanProp,
         onEnd: (event, info) => {
-            if (activeWhilePanKeyframes && whilePanBaseline && element) {
-                animateWithLifecycle(
-                    element,
-                    whilePanBaseline as unknown as DOMKeyframesDefinition,
-                    mergedTransition ?? {}
-                )
+            if (whilePanRestore && visualElement) {
+                animateTarget(visualElement, whilePanRestore as TargetAndTransition, {
+                    transitionOverride: mergedTransition as Transition | undefined
+                })
             }
-            activeWhilePanKeyframes = null
-            whilePanBaseline = null
+            whilePanRestore = null
             onPanEndProp?.(event, info)
         }
     })
@@ -1686,8 +1704,7 @@
             // natural release won't replay the lifecycle pair.
             teardownPan?.()
             teardownPan = null
-            activeWhilePanKeyframes = null
-            whilePanBaseline = null
+            whilePanRestore = null
         }
     })
 

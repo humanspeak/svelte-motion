@@ -91,23 +91,3 @@ export const collectGestureTransformValues = (
     }
     return values
 }
-
-/**
- * Partition a Motion target into transform and native style channels.
- *
- * @param source Motion target to partition.
- * @returns Separate transform and native style records.
- * @example
- * splitGestureTransformValues({ rotate: 4, cursor: 'grabbing' })
- * // => { transform: { rotate: 4 }, native: { cursor: 'grabbing' } }
- */
-export const splitGestureTransformValues = (source: Record<string, unknown>) => {
-    const transform: Record<string, unknown> = {}
-    const native: Record<string, unknown> = {}
-
-    for (const [key, value] of Object.entries(source)) {
-        if (transformProps.has(key)) transform[key] = value
-        else native[key] = value
-    }
-    return { transform, native }
-}
