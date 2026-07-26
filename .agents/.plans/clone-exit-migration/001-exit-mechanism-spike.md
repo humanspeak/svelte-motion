@@ -6,7 +6,7 @@
 > specifies. Follow the steps, honor STOP conditions, and update the status
 > row in `.agents/.plans/clone-exit-migration/README.md` when done.
 >
-> **Drift check (run first)**: `git diff --stat 4758dcd..HEAD -- src/lib/utils/presence.ts src/lib/components/AnimatePresence.svelte src/lib/components/PresenceChild.svelte`
+> **Drift check (run first)**: `git diff --stat 7eba0bd..HEAD -- src/lib/utils/presence.ts src/lib/components/AnimatePresence.svelte src/lib/components/PresenceChild.svelte`
 > Expect empty (the clone path has been deliberately untouched since before
 > the visual-element-core batch).
 
@@ -17,10 +17,10 @@
   plan after this spike's decision
 - **Risk**: LOW for the spike itself (throwaway code); the decision it feeds
   is HIGH-consequence
-- **Depends on**: visual-element-core plans 002 + 004 (DONE at `4758dcd`)
+- **Depends on**: visual-element-core plans 002 + 004 (merged to main via PR #454)
 - **Category**: direction / tech-debt (documented deviation from upstream;
   GitHub issue #449 follow-up)
-- **Planned at**: commit `4758dcd`, 2026-07-25
+- **Planned at**: commit `843dc26`, 2026-07-26 (re-stamped post-squash-merges; the clone path is verified byte-identical to `7eba0bd`, so all excerpts and line references hold)
 
 ## Why this matters
 
@@ -40,7 +40,7 @@ migration therefore starts with a MECHANISM DECISION, not code.
 
 ## Current state
 
-(All verified at `4758dcd`; the clone path is byte-identical to pre-batch.)
+(All verified at `843dc26`; the clone path is byte-identical to `7eba0bd` — untouched through PRs #454, #457, and #459.)
 
 - `src/lib/components/AnimatePresence.svelte` — 66 lines; thin shell over
   the context.
