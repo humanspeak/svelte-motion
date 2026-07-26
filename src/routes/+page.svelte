@@ -31,6 +31,14 @@
                 </li>
                 <li>
                     <a
+                        class="font-semibold text-orange-300 hover:underline"
+                        href={resolve('/tests/drag-signoff') + searchParams}
+                    >
+                        Drag single-writer — sign-off tour (#449 follow-up)
+                    </a>
+                </li>
+                <li>
+                    <a
                         class="text-blue-300 hover:underline"
                         href={resolve('/tests/lazy-motion/basic') + searchParams}
                     >
