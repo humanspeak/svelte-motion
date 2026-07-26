@@ -55,6 +55,47 @@ test.describe('motion/whilePan over authored transforms', () => {
         ).toBeLessThan(1.5)
     })
 
+    /**
+     * Characterization pin added BEFORE whilePan moved onto the VisualElement
+     * (drag-single-writer 004). The two specs above only exercise a channel the
+     * element authors on `style`; the restore path's real risk is keys whilePan
+     * INTRODUCES — an animatable one over an `animate` value, and a
+     * non-animatable inline one — because the pre-pan value for those has to be
+     * recovered from the node rather than read off the authored props.
+     */
+    test('restores whilePan keys the element never authored', async ({ page }) => {
+        const card = page.getByTestId('pan-unauthored-keys-card')
+        await card.scrollIntoViewIfNeeded()
+        const readState = () =>
+            card.evaluate((element) => ({
+                opacity: Number.parseFloat(getComputedStyle(element).opacity),
+                cursor: getComputedStyle(element).cursor
+            }))
+
+        await expect
+            .poll(async () => (await readState()).opacity, { timeout: 2000 })
+            .toBeCloseTo(0.9, 1)
+        const authored = await readState()
+        expect(authored.cursor).not.toBe('grabbing')
+
+        await beginPan(page, card)
+        try {
+            await expect
+                .poll(async () => (await readState()).opacity, { timeout: 2000 })
+                .toBeLessThan(0.6)
+            expect((await readState()).cursor).toBe('grabbing')
+        } finally {
+            await page.mouse.up()
+        }
+
+        // Pan end reverts BOTH: opacity back to the animate target, cursor back
+        // to what it was before the gesture.
+        await expect
+            .poll(async () => (await readState()).opacity, { timeout: 2000 })
+            .toBeCloseTo(0.9, 1)
+        expect((await readState()).cursor).toBe(authored.cursor)
+    })
+
     test('is linked from the root test index', async ({ page }) => {
         await page.goto('/?@isPlaywright=true')
         await expect(
