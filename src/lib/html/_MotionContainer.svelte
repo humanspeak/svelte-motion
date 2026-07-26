@@ -2120,8 +2120,17 @@
     $effect(() => {
         if (!visualElement) return
         const next = buildMotionNodeProps()
+        // Build outside `untrack` so a PresenceChild isPresent flip reruns this
+        // effect. The object must be fresh on every pass: ExitAnimationFeature
+        // compares it with `prevPresenceContext` to detect exit and re-entry.
+        const nextPresenceContext = buildPresenceContext()
         untrack(() => {
-            visualElement.update(next, buildPresenceContext())
+            visualElement.update(next, nextPresenceContext)
+            // Upstream runs feature updates after every VisualElement update.
+            // Without this, a motion.* child held by PresenceChild receives the
+            // new context but ExitAnimationFeature never observes the flip, so
+            // its exit never runs and safeToRemove is never called.
+            visualElement.updateFeatures()
             // `update()` can change what the node renders WITHOUT scheduling a
             // render of its own: `addValue()` writes `latestValues[key]` directly
             // when a MotionValue instance is replaced (VisualElement.mjs:437-447),

@@ -5,11 +5,12 @@
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
-    import { ArrowLeftRight, Sparkles, Waves } from '@lucide/svelte'
+    import { ArrowLeftRight, Box, ShieldCheck, Sparkles, Waves } from '@lucide/svelte'
     import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import AnimatePresenceDefault from '$lib/examples/animate-presence/demos/Default.svelte'
+    import PresenceChildMotion from '$lib/examples/animate-presence/demos/PresenceChildMotion.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
@@ -51,6 +52,18 @@
             notes: defaultNotes,
             barCells: [{ k: 'pattern', v: 'enter + exit' }],
             sourceUrl: `${SOURCE_URL}animate-presence/demos/Default.svelte`
+        },
+        {
+            figId: 'FIG-002',
+            tag: 'PRESENCE-CHILD',
+            title: { prefix: 'exit the ', accent: 'real node', end: '.' },
+            description:
+                '`PresenceChild` holds its original DOM subtree while a nested `motion.*` element runs `exit`, then removes it on exact animation completion.',
+            snippet: presenceChildSection,
+            codeSnippet: presenceChildCode,
+            notes: presenceChildNotes,
+            barCells: [{ k: 'mechanism', v: 'real node' }],
+            sourceUrl: `${SOURCE_URL}animate-presence/demos/PresenceChildMotion.svelte`
         }
     ]
 </script>
@@ -95,6 +108,47 @@
                 'animate-presence/demos/Default.svelte',
                 'animate-presence-default',
                 'Default.svelte'
+            )
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#snippet presenceChildSection()}
+    <PresenceChildMotion />
+{/snippet}
+{#snippet presenceChildNotes()}
+    <ul>
+        <li>
+            <Box />
+            <span>
+                The element that exits is the original DOM node, so live state and its VisualElement
+                remain available for the whole animation.
+            </span>
+        </li>
+        <li>
+            <ShieldCheck />
+            <span>
+                Use this existing API when clone fidelity is not sufficient—for example,
+                focus-sensitive content or a canvas-driven integration.
+            </span>
+        </li>
+        <li>
+            <ArrowLeftRight />
+            <span>
+                Toggling <code>present</code> back to true cancels an in-flight exit and keeps stale completion
+                callbacks from removing the re-entered node.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet presenceChildCode()}
+    <CodeReferenceV2
+        samples={[
+            demoCodeSample(
+                'animate-presence/demos/PresenceChildMotion.svelte',
+                'animate-presence-presence-child-motion',
+                'PresenceChildMotion.svelte'
             )
         ]}
         columns={1}

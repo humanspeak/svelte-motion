@@ -680,6 +680,24 @@ describe('_MotionContainer', () => {
         expect(await latestValuesOf(child)).toMatchObject({ x: 125 })
     })
 
+    it('runs a motion child exit when PresenceChild flips to not present', async () => {
+        const { default: PresenceMotionExitHarness } =
+            await import('$lib/components/__tests__/PresenceMotionExitHarness.svelte')
+        const onExitComplete = vi.fn()
+        const result = render(PresenceMotionExitHarness, {
+            props: { present: true, onExitComplete }
+        })
+        await flushTimers()
+        expect(result.queryByTestId('presence-motion-child')).toBeTruthy()
+
+        await result.rerender({ present: false, onExitComplete })
+        await flushTimers()
+        await flushTimers()
+
+        expect(result.queryByTestId('presence-motion-child')).toBeNull()
+        expect(onExitComplete).toHaveBeenCalledTimes(1)
+    })
+
     it('whileHover is gated to hover-capable devices', async () => {
         const { container } = render(MotionContainer as unknown as any, {
             props: { tag: 'div', whileHover: { scale: 1.05 } }

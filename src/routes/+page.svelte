@@ -561,6 +561,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/clone-fidelity') + searchParams}
+                    >
+                        Clone fidelity (PresenceChild, a11y, media)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/animate-presence/grid-exit') + searchParams}
                     >
                         Grid exit (siblings hold slots)

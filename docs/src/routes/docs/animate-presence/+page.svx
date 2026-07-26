@@ -6,6 +6,7 @@ description: Animate components when they are added to or removed from the DOM
 <script>
   import Example from '$lib/components/general/Example.svelte'
   import AnimatePresenceExample from '$lib/examples/animate-presence/demos/Default.svelte'
+  import PresenceChildMotionExample from '$lib/examples/animate-presence/demos/PresenceChildMotion.svelte'
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()
@@ -56,6 +57,41 @@ When a `motion` component inside `AnimatePresence` is conditionally removed:
 4. Once complete, the clone is removed from the DOM
 
 This approach ensures smooth exit animations even though the original Svelte component has already unmounted.
+
+Exit clones are non-interactive (`inert`) and hidden from the accessibility tree. A subtree containing `canvas`, `iframe`, `video`, or `audio` is removed immediately instead of animating a clone that would lose its live bitmap, browsing context, or playback state.
+
+## Real-node exits with PresenceChild
+
+Use `PresenceChild` when the exiting node must remain the original DOM node. Its `present` prop controls the presence phase, and a nested `motion.*` component now runs its normal `exit` prop before `PresenceChild` removes it.
+
+```svelte
+<script lang="ts">
+  import {
+    AnimatePresence,
+    PresenceChild,
+    motion
+  } from '@humanspeak/svelte-motion'
+
+  let present = $state(true)
+</script>
+
+<AnimatePresence>
+  <PresenceChild {present}>
+    <motion.div
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+    >
+      This is the real node during exit.
+    </motion.div>
+  </PresenceChild>
+</AnimatePresence>
+```
+
+<Example isSmall exampleUrl="/examples/animate-presence">
+  <PresenceChildMotionExample />
+</Example>
+
+`PresenceChild` is useful for stateful elements, focus-sensitive interfaces, and integrations that need live DOM state during the exit. Direct conditional children still use the clone path.
 
 ## Usage
 
