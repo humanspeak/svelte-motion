@@ -15,6 +15,39 @@
 > whole visual-element-core batch untouched. Container/gestures changes
 > since `7eba0bd` are expected and irrelevant to this drift check.
 
+> Revision 2026-07-25 (guard, after executor BLOCKED at `b36431a`; ruling
+> under the operator's standing parity doctrine): the Step-3 blocker — the VE
+> cannot compose an authored RAW transform string — is resolved as **UPSTREAM
+> PARITY**. Guard verified the executor's claim in the installed source:
+> `renderHTML`/`buildHTMLStyles` overwrite `style.transform` from channels
+> whenever any transform channel exists; React framer-motion drops authored
+> raw strings identically, and `transformTemplate` is upstream's sanctioned
+> persistent-transform mechanism. Issue #458 ledgers the post-1.x
+> enhancement (transformTemplate auto-wrap; note the WAAPI-acceleration cost
+> the executor identified at `_MotionContainer.svelte:1192-1200`).
+>
+> Scope amendments for the re-attempt:
+>
+> 1. `e2e/drag/settle-cancel.spec.ts` AND its fixture page come into scope
+>    for a re-scope that PRESERVES #401's intent: the authored base moves
+>    from a raw string (`style="transform:translateX(40px) rotate(3deg)"`)
+>    to channel form (`style={{ x: 40, rotate: -8 }}` or equivalent — the
+>    executor verified object-style channels are node-owned and survive the
+>    swap structurally). Every #401 assertion (release cancellation must not
+>    wipe the authored base on re-grab) stays, expressed against the channel
+>    base. Do NOT weaken any timing/continuity assertion.
+> 2. Add one new pin (same spec file or a sibling): raw string transform +
+>    drag → the authored string is dropped once channels animate,
+>    upstream-identical — annotated to flip when #458 lands.
+> 3. `e2e/_helpers/transform.ts` comes into scope for exactly one change:
+>    `readDragTranslate` re-pointed off the deleted
+>    `data-svelte-motion-drag-transform` attribute onto the live style
+>    transform (3 call sites in settle-cancel.spec.ts).
+> 4. Resume from the preserved attempt `plan001-step3-attempt` (`30b89cc`) —
+>    cherry-pick it; the Step-4 mirror-inertness proof (0 writes/0 mismatches
+>    across four pages, probe self-validated against the legacy writer) and
+>    the zero layout/projection fallout finding both stand.
+
 ## Status
 
 - **Priority**: P2
