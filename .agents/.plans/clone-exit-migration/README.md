@@ -11,10 +11,10 @@ genuine open design question. This batch therefore starts with a spike.
 
 ## Execution order & status
 
-| Plan | Title                                                         | Priority | Effort | Risk | Depends on                  | Status          |
-| ---- | ------------------------------------------------------------- | -------- | ------ | ---- | --------------------------- | --------------- |
-| 001  | Spike: choose the real-node exit mechanism                    | P3       | M      | LOW  | visual-element-core 002+004 | TODO            |
-| 002  | (written after 001's decision) Implement the chosen mechanism | —        | L      | HIGH | 001                         | NOT YET WRITTEN |
+| Plan | Title                                                         | Priority | Effort | Risk | Depends on                  | Status                                                                                                        |
+| ---- | ------------------------------------------------------------- | -------- | ------ | ---- | --------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 001  | Spike: choose the real-node exit mechanism                    | P3       | M      | LOW  | visual-element-core 002+004 | DONE — see `spike-report.md`: recommend Candidate B (data-driven children); Candidate A refuted by experiment |
+| 002  | (written after 001's decision) Implement the chosen mechanism | —        | L      | HIGH | 001                         | NOT YET WRITTEN                                                                                               |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
@@ -42,3 +42,23 @@ REJECTED (with one-line rationale)
   PresenceChild internally"): impossible as stated — AnimatePresence renders
   an opaque snippet and cannot re-render children the consumer removed;
   that impossibility is why the clone path exists. Hence the spike.
+- Candidate A (bridging exits through a Svelte `out:` transition): REJECTED by
+  the spike's experiments — local outros silently skip a nested-block removal
+  while `|global` delays boundary teardown, exact completion needs Svelte
+  runtime internals, the exiting component's `$effect`s are frozen, and
+  mid-exit reversal leaves the node stuck at the exit end state. See
+  `spike-report.md` §3.
+
+## Spike outcome (001)
+
+Recommendation: **Candidate B** — `<AnimatePresence items={…}>` + a `child`
+snippet, with an internal lagging array keeping exiting items rendered inside
+the existing `PresenceChild` + `setActive('exit')` machinery. Payoff: ~546 of
+`presence.ts`'s 1238 lines are clone-only and become deletable, and the
+library's last legacy `animate()` call goes with them.
+
+Blocking prerequisite the spike uncovered: a `motion.*` child of the shipped
+`PresenceChild` never exits today (the container calls
+`visualElement.updateFeatures()` only at mount and builds the presence context
+inside `untrack()`), so plan 002's first step is that two-line fix plus a
+red-first e2e — worth landing on its own regardless of the mechanism decision.
