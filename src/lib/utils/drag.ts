@@ -961,6 +961,33 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             stopInertia = null
         }
 
+        // Take ownership of the axis values — upstream's `onSessionStart` calls
+        // `stopAnimation()` (`VisualElementDragControls.ts:114`), which is
+        // `eachAxis(axis => this.getAxisMotionValue(axis).stop())` (`:534-536`).
+        // Their comment on the same call from `resolveRefConstraints` (`:598-601`)
+        // states the reason: "Stop current animations as there can be visual
+        // glitching if we try to do this mid-animation". The stop above only ends
+        // OUR release; ANY other writer of x/y (a declarative `animate`, a
+        // `controls.start`, another gesture's retarget) must hand the axis to the
+        // pointer too, or it keeps writing against the drag.
+        //
+        // Per-channel `value.stop()` is the ledger's freeze mechanism: motion-dom
+        // samples the interrupted animation and leaves the value — and its
+        // velocity — at the sampled position, WAAPI-accelerated channels included
+        // (`NativeAnimationExtended.updateMotionValue`).
+        for (const axisKey of ['x', 'y'] as const) {
+            if (!(axisKey === 'x' ? dragX : dragY)) continue
+            const release = resolveAxisRelease(axisKey)
+            release.value.stop()
+            // Re-derive the gesture's offset from the frozen value: the writer we
+            // just stopped may have moved the axis without `applied` ever seeing
+            // it, and `applied` is what seeds `origin` and `constraintsBase`
+            // below. `value = applied + base`, so invert that.
+            const frozen = release.value.get()
+            const numeric = typeof frozen === 'number' ? frozen : Number.parseFloat(frozen)
+            if (!Number.isNaN(numeric)) applied[axisKey] = numeric - release.base
+        }
+
         // Recompute constraints in case bounding boxes changed since last drag
         constraints = resolveConstraints(el, opts.constraints)
         pwLog('[drag] constraints (px)', { el: EL_ID, constraints })
