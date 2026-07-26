@@ -103,7 +103,6 @@ export type AttachDragOptions = {
         onEnd?: (e: PointerEvent, info: DragInfo) => void
         onDirectionLock?: (axis: 'x' | 'y') => void
         onTransitionEnd?: () => void
-        onVisualUpdate?: (transform: string, values: DragTransformValues) => void
     }
     baselineSources?: { initial?: Record<string, unknown>; animate?: Record<string, unknown> }
     getBaseTransformValues?: () => DragTransformValues
@@ -730,7 +729,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                     node.getValue('y', baseY ?? 0).set(latestValues.y ?? 0)
                 }
             }
-            opts.callbacks?.onVisualUpdate?.('', latestValues)
             node.render()
             return
         }
@@ -739,17 +737,14 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         // synchronously. Nothing else writes this element's transform, so the
         // race-winning repeats the VE model makes redundant are not needed here
         // either.
-        let composedTransform = ''
         if (shouldWrite) {
-            composedTransform =
+            el.style.transform =
                 buildDragTransform(
                     latestValues,
                     opts.getBaseTransform?.() ?? '',
                     opts.transformTemplate
                 ) || 'none'
-            el.style.transform = composedTransform
         }
-        opts.callbacks?.onVisualUpdate?.(composedTransform, latestValues)
     }
 
     /**

@@ -1,4 +1,10 @@
-import { motionValue, visualElementStore, type MotionValue, type VisualElement } from 'motion-dom'
+import {
+    isDragActive,
+    motionValue,
+    visualElementStore,
+    type MotionValue,
+    type VisualElement
+} from 'motion-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { applyElastic, attachDrag, buildDragTransform, resolveConstraints } from './drag.js'
 
@@ -193,6 +199,114 @@ describe('utils/drag', () => {
         expect(node.values.get('x')?.get()).toBe(65)
         cleanup()
         el.remove()
+    })
+
+    describe('global drag lock', () => {
+        // A leaked lock is worse than no lock: `isDragActive()` gates
+        // motion-dom's own hover()/press() recognizers globally, so every route
+        // out of a drag session is pinned here.
+        const drag = (el: HTMLElement, id = 1) => {
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 5, clientY: 5, pointerId: id })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 25, clientY: 5, pointerId: id })
+            )
+        }
+
+        it('holds the lock for the pointer session and releases it on pointerup', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const cleanup = attachDrag(el, { axis: 'x', mergedTransition: { duration: 0 } })
+
+            expect(isDragActive()).toBe(false)
+            drag(el)
+            expect(isDragActive()).toBe(true)
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: 25, clientY: 5, pointerId: 1 })
+            )
+            // Released at pointer-up, NOT after the momentum glide — this is what
+            // lets hover respond mid-glide (e2e/drag/hover-during-glide).
+            expect(isDragActive()).toBe(false)
+
+            cleanup()
+            el.remove()
+        })
+
+        it('releases the lock on pointercancel and on teardown mid-drag', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const cleanup = attachDrag(el, { axis: 'x', mergedTransition: { duration: 0 } })
+
+            drag(el)
+            window.dispatchEvent(
+                new PointerEvent('pointercancel', { clientX: 25, clientY: 5, pointerId: 1 })
+            )
+            expect(isDragActive()).toBe(false)
+
+            // Unmount mid-drag: teardown is the only remaining exit.
+            drag(el, 2)
+            expect(isDragActive()).toBe(true)
+            cleanup()
+            expect(isDragActive()).toBe(false)
+            el.remove()
+        })
+
+        it('does not take the lock when propagation is allowed', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                mergedTransition: { duration: 0 },
+                propagation: true
+            })
+
+            drag(el)
+            // `dragPropagation` opts out of the lock so nested draggables move
+            // together — upstream `VisualElementDragControls.ts:121`.
+            expect(isDragActive()).toBe(false)
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: 25, clientY: 5, pointerId: 1 })
+            )
+            cleanup()
+            el.remove()
+        })
+
+        it('a second element cannot start a drag while the lock is held', () => {
+            const first = document.createElement('div')
+            const second = document.createElement('div')
+            document.body.append(first, second)
+            const stopFirst = attachDrag(first, { axis: 'x', mergedTransition: { duration: 0 } })
+            const onStart = vi.fn()
+            const stopSecond = attachDrag(second, {
+                axis: 'x',
+                mergedTransition: { duration: 0 },
+                callbacks: { onStart }
+            })
+
+            drag(first)
+            second.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 5, clientY: 5, pointerId: 9 })
+            )
+            expect(onStart).not.toHaveBeenCalled()
+
+            // …and once the first session ends, the second element can drag.
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: 25, clientY: 5, pointerId: 1 })
+            )
+            drag(second, 10)
+            expect(onStart).toHaveBeenCalled()
+            expect(isDragActive()).toBe(true)
+
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: 25, clientY: 5, pointerId: 10 })
+            )
+            expect(isDragActive()).toBe(false)
+            stopFirst()
+            stopSecond()
+            first.remove()
+            second.remove()
+        })
     })
 
     it('attachDrag: ends the gesture when a child stops pointerup propagation (motion#3731)', () => {

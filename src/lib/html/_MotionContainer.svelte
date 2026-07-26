@@ -312,32 +312,6 @@
         return refs.filter((el): el is HTMLElement => Boolean(el))
     }
 
-    const splitSerializedTransform = (style: string): { rest: string; transform: string } => {
-        const rest: string[] = []
-        let transform = ''
-
-        for (const declaration of style.split(';')) {
-            const trimmed = declaration.trim()
-            if (!trimmed) continue
-
-            const separator = trimmed.indexOf(':')
-            if (separator === -1) {
-                rest.push(trimmed)
-                continue
-            }
-
-            const property = trimmed.slice(0, separator).trim()
-            const value = trimmed.slice(separator + 1).trim()
-            if (property === 'transform') {
-                transform = value === 'none' ? '' : value
-            } else {
-                rest.push(trimmed)
-            }
-        }
-
-        return { rest: rest.join('; '), transform }
-    }
-
     const serializedStyleProp = $derived(serializeMotionStyle(styleProp, transformTemplateProp))
     // The user-authored transform, sourced from the `style` prop rather
     // than the live inline transform — the latter already carries any
@@ -356,33 +330,16 @@
         }
         return values
     }
-    // The gesture baseline getters (`baseStyleValues`, `captureBaseStyleValues`,
-    // `getBaseStyleValues`) and hover's `liveGestureTransformValues` mirror lived
-    // here. Gone with plan 003: gestures no longer write the element's transform —
-    // they flip `setActive` and the animationState animates the same MotionValues
-    // everything else uses, so `latestValues` is the single source for gesture
-    // transforms too, and hover-end restoration is the animationState's
-    // removed-key handling via `baseTarget` (what `getBaseStyleValues`
-    // approximated).
-    //
-    // `liveGestureTransform` itself STAYS: despite the name it is DRAG's composed
-    // transform channel (`attachDrag`'s `onVisualUpdate` writes it), and drag is
-    // plan 005's subject. It keeps its splice into the serialized style so a
-    // Svelte style rewrite cannot drop a live drag transform.
-    let liveGestureTransform = $state<string | null>(null)
-    const serializedStyleWithLiveGestureTransform = $derived.by(() => {
-        if (!liveGestureTransform) return serializedStyleProp
-
-        const { rest } = splitSerializedTransform(serializedStyleProp)
-        return `${rest}${rest ? '; ' : ''}transform: ${liveGestureTransform}`
-    })
-
-    $effect(() => {
-        if (!element || !liveGestureTransform) return
-        if (element.style.transform === liveGestureTransform) return
-
-        element.style.transform = liveGestureTransform
-    })
+    // Every gesture writer that used to live here is gone. Hover/tap/focus/inView
+    // flip `setActive` (plan 003) and drag writes the node's axis values
+    // (drag-single-writer 001), so `latestValues` is the single source for every
+    // animated channel and the VisualElement is the single writer of the element's
+    // style. The pieces this replaced, in order: the gesture baseline getters
+    // (`baseStyleValues`/`captureBaseStyleValues`/`getBaseStyleValues` —
+    // superseded by the animationState's `baseTarget` handling of removed keys),
+    // hover's `liveGestureTransformValues` mirror, and drag's `liveGestureTransform`
+    // composed-string splice with the effect that re-wrote `element.style.transform`
+    // from it.
 
     const resolvePresenceCustom = () => {
         const presenceCustom = context?.custom
@@ -1309,13 +1266,14 @@
     const waitEnterBlockedBeforeMount = $derived(
         context?.mode === 'wait' && !waitEnterReleased && context.isEnterBlocked(presenceKey)
     )
-    // The three holds this string carries are RETAINED verbatim through the
-    // plan-002 collapse — none of them is an animated-key concern:
-    //   1. the `liveGestureTransform` splice (gestures stay legacy until 003),
-    //   2. the wait-mode `display:none` holds,
-    //   3. the `pathLength` mounting `visibility:hidden` hold.
+    // The holds this string carries are RETAINED verbatim through the plan-002
+    // collapse — neither is an animated-key concern:
+    //   1. the wait-mode `display:none` holds,
+    //   2. the `pathLength` mounting `visibility:hidden` hold.
+    // (A third hold, drag's `liveGestureTransform` splice, is gone with the
+    // single-writer swap — the VisualElement composes the live drag transform.)
     const inlineStyleBaseWithHolds = $derived(
-        `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleWithLiveGestureTransform};visibility:hidden` : serializedStyleWithLiveGestureTransform}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`
+        `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleProp};visibility:hidden` : serializedStyleProp}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`
     )
 
     /**
@@ -1359,16 +1317,6 @@
         visualElement.values.forEach((value, key) => {
             values[key] = value.get()
         })
-        // A live DRAG transform is spliced into the base string above and must
-        // win: drop the transform channels so the merge cannot override it with
-        // the resting composition. Hover/tap/focus/inView no longer take this
-        // path at all — they animate `latestValues` (plan 003). Drag moves onto
-        // the VE in plan 005, and this splice goes with it.
-        if (liveGestureTransform) {
-            for (const key of Object.keys(values)) {
-                if (transformProps.has(key)) delete values[key]
-            }
-        }
         // An SVG element other than `<svg>` itself renders every non-transform
         // animated value on the ATTRIBUTE channel: `buildSVGAttrs` moves
         // `state.style` wholesale into `state.attrs` and `renderSVG` writes them
@@ -1560,30 +1508,14 @@
                 onDirectionLock: onDirectionLockProp as (axis: 'x' | 'y') => void,
                 onTransitionEnd: () => {
                     onDragTransitionEndProp?.()
-                },
-                onVisualUpdate: (transform: string, values: Record<string, string | number>) => {
-                    liveGestureTransform = transform || null
-                    // Mirror drag's composed channels into the node.
-                    //
-                    // Drag still writes `element.style.transform` itself (plan
-                    // 005 moves it onto the VE), but the VE now composes the
-                    // transform for EVERY other source from `latestValues`. Once
-                    // gestures went through the animationState, a hover-end render
-                    // composed only `scale` and wiped a settled drag translate —
-                    // the case the retired hover writer covered by merging drag's
-                    // live channels. Mirroring keeps both writers producing the
-                    // same composition until 005 unifies them.
-                    //
-                    // Only channels the node does NOT already own: a bound style
-                    // MotionValue (e.g. the mobile drawer's `y`) is already in
-                    // `latestValues` AND is a baseline source drag composes from,
-                    // so mirroring it would apply the offset twice.
-                    if (!visualElement) return
-                    for (const [key, value] of Object.entries(values)) {
-                        if (visualElement.values.has(key)) continue
-                        visualElement.setStaticValue(key, value)
-                    }
                 }
+                // `onVisualUpdate` is gone with the drag-channel mirror: drag
+                // writes the node's own values, so mirroring composed channels
+                // back into `latestValues` had nothing left to contribute.
+                // Measured before deletion (drag-single-writer 001 Step 4): ZERO
+                // mirror writes across brutalist-stage, while-drag-transforms,
+                // settle-cancel and the mobile drawer, against 350/66/2/0 writes
+                // for the same probe on the pre-001 writer.
             },
             baselineSources: dragRuntimeOptions.baselineSources,
             getBaseTransformValues: dragRuntimeOptions.getBaseTransformValues,

@@ -1,4 +1,4 @@
-import { frame, type VisualElement } from 'motion-dom'
+import { frame, setDragLock, type VisualElement } from 'motion-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
     attachFocusGesture,
@@ -87,15 +87,24 @@ describe('attachHoverGesture', () => {
         stop()
     })
 
-    it('ignores hover while a drag owns the element', () => {
+    it('ignores hover while a drag holds the global lock', () => {
         const { node, setActive } = makeNode({ whileHover: { scale: 1.1 } })
-        // The guard our drag writer already maintains; plan 005 replaces it with
-        // motion-dom's global drag lock.
-        element.dataset.svelteMotionDragActive = 'true'
+        // Suppression is the LOCK's job now: `drag.ts` holds it for the pointer
+        // session and motion-dom's own `hover()` filters on `isDragActive()`
+        // before it ever calls back (`gestures/hover.mjs` `isValidHover`). This
+        // asserts the same behaviour the retired dataset guard did, through the
+        // mechanism that actually ships.
+        const releaseLock = setDragLock(true)
         const stop = attachHoverGesture(element, node)
 
         element.dispatchEvent(pointer('pointerenter'))
         expect(setActive).not.toHaveBeenCalled()
+
+        // …and hover works again the moment the drag session ends, which is what
+        // makes hover-during-glide possible.
+        releaseLock?.()
+        element.dispatchEvent(pointer('pointerenter'))
+        expect(setActive).toHaveBeenCalledWith('whileHover', true)
 
         stop()
     })
@@ -179,13 +188,19 @@ describe('attachPressGesture', () => {
         button.remove()
     })
 
-    it('ignores press while a drag owns the element', () => {
+    it('ignores press while a drag holds the global lock', () => {
         const { node, setActive } = makeNode({ whileTap: { scale: 0.9 } })
-        element.dataset.svelteMotionDragActive = 'true'
+        // As for hover: motion-dom's `press()` filters on `isDragActive()` via
+        // `isValidPressEvent` (`gestures/press/index.mjs`).
+        const releaseLock = setDragLock(true)
         const stop = attachPressGesture(element, node)
 
         element.dispatchEvent(pointer('pointerdown'))
         expect(setActive).not.toHaveBeenCalled()
+
+        releaseLock?.()
+        element.dispatchEvent(pointer('pointerdown'))
+        expect(setActive).toHaveBeenCalledWith('whileTap', true)
 
         stop()
     })
