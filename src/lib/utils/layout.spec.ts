@@ -3,7 +3,7 @@ import {
     computeFlipTransforms,
     measureRect,
     observeLayoutChanges,
-    runFlipAnimation,
+    runLayoutSizeAnimation,
     selectLayoutDependencies,
     setCompositorHints,
     stripNonChildLayoutStyle
@@ -211,45 +211,57 @@ describe('utils/layout', () => {
         expect(h.shouldScale).toBe(false)
     })
 
-    it('runFlipAnimation: animates only when needed', () => {
+    it('runLayoutSizeAnimation: no-ops for a box with no size-corrected descendants', () => {
+        // The plain-FLIP branch this writer used to carry (a direct
+        // transform write plus `animate(el, …)`) is gone with
+        // drag-single-writer 005: every layout change that does not need
+        // width/height size correction goes through the projection, so an
+        // element with no `[data-svelte-motion-layout]` descendant has nothing
+        // for this writer to do — whatever the transforms say.
         const el = document.createElement('div')
         animateMock.mockClear()
-        runFlipAnimation(
+
+        runLayoutSizeAnimation(
             el,
             { dx: 0, dy: 0, sx: 1, sy: 1, shouldTranslate: false, shouldScale: false },
             {}
         )
-        expect(animateMock).not.toHaveBeenCalled()
-
-        runFlipAnimation(
+        runLayoutSizeAnimation(
             el,
             { dx: 10, dy: 0, sx: 1, sy: 1, shouldTranslate: true, shouldScale: false },
             {}
         )
-        expect(animateMock).toHaveBeenCalled()
-    })
-
-    it('runFlipAnimation: animates scale-only path', () => {
-        const el = document.createElement('div')
-        animateMock.mockClear()
-        runFlipAnimation(
+        runLayoutSizeAnimation(
             el,
             { dx: 0, dy: 0, sx: 1.2, sy: 1.1, shouldTranslate: false, shouldScale: true },
             {}
         )
-        // Inline style should have only scale pre-applied
-        expect(el.style.transform).toBe('scale(1.2, 1.1)')
-        // Animate called with keyframes containing only scale, not translate
-        expect(animateMock).toHaveBeenCalled()
-        const call = animateMock.mock.calls[0]
-        expect(call?.[0]).toBe(el)
-        const keyframes = call?.[1] as Record<string, unknown>
-        expect(keyframes).toMatchObject({ scaleX: [1.2, 1], scaleY: [1.1, 1] })
-        expect('x' in keyframes).toBe(false)
-        expect('y' in keyframes).toBe(false)
+
+        expect(animateMock).not.toHaveBeenCalled()
+        expect(el.style.transform).toBe('')
     })
 
-    it('runFlipAnimation: animates box size when scaling would distort layout descendants', async () => {
+    it('runLayoutSizeAnimation: no-ops for a translate-only change with correction targets', () => {
+        // Translation alone never distorts a descendant, so it stays with the
+        // projection too.
+        const el = document.createElement('div')
+        const child = document.createElement('span')
+        child.setAttribute('data-svelte-motion-layout', '')
+        el.appendChild(child)
+        animateMock.mockClear()
+
+        runLayoutSizeAnimation(
+            el,
+            { dx: 24, dy: -8, sx: 1, sy: 1, shouldTranslate: true, shouldScale: false },
+            {}
+        )
+
+        expect(animateMock).not.toHaveBeenCalled()
+        expect(el.style.transform).toBe('')
+        expect(el.hasAttribute('data-layout-size-animation')).toBe(false)
+    })
+
+    it('runLayoutSizeAnimation: animates box size when scaling would distort layout descendants', async () => {
         const el = document.createElement('button')
         const child = document.createElement('span')
         child.setAttribute('data-svelte-motion-layout', '')
@@ -262,7 +274,7 @@ describe('utils/layout', () => {
         })
 
         animateMock.mockClear()
-        runFlipAnimation(
+        runLayoutSizeAnimation(
             el,
             { dx: 0, dy: 0, sx: 0.75, sy: 1, shouldTranslate: false, shouldScale: true },
             {}

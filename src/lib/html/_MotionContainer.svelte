@@ -63,7 +63,7 @@
     import {
         measureRect,
         computeFlipTransforms,
-        runFlipAnimation,
+        runLayoutSizeAnimation,
         finishFlipAnimations,
         setCompositorHints,
         observeLayoutChanges,
@@ -2430,11 +2430,11 @@
                 const shouldUseSizeCorrectedFallback =
                     transforms.shouldScale && hasSizeCorrectionTarget
 
-                if (motionDomProjection && !shouldUseSizeCorrectedFallback) {
-                    motionDomProjection.commitObservedLayoutChange(previous)
-                } else {
+                if (shouldUseSizeCorrectedFallback) {
                     finishFlipAnimations(element!)
-                    runFlipAnimation(element!, transforms, mergedTransition ?? {})
+                    runLayoutSizeAnimation(element!, transforms, mergedTransition ?? {})
+                } else {
+                    motionDomProjection?.commitObservedLayoutChange(previous)
                 }
             }
         }
@@ -2464,16 +2464,13 @@
             const hasSizeCorrectionTarget = !!element!.querySelector('[data-svelte-motion-layout]')
             const shouldUseSizeCorrectedFallback = transforms.shouldScale && hasSizeCorrectionTarget
 
-            if (
-                !shouldSkipLayoutAnimation &&
-                (!motionDomProjection || shouldUseSizeCorrectedFallback)
-            ) {
+            if (!shouldSkipLayoutAnimation && shouldUseSizeCorrectedFallback) {
                 finishFlipAnimations(element!)
-                runFlipAnimation(element!, transforms, mergedTransition ?? {})
+                runLayoutSizeAnimation(element!, transforms, mergedTransition ?? {})
             }
             if (!shouldSkipLayoutAnimation && hasRectChanged(previous, next)) {
-                if (motionDomProjection && !shouldUseSizeCorrectedFallback) {
-                    motionDomProjection.commitObservedLayoutChange(previous)
+                if (!shouldUseSizeCorrectedFallback) {
+                    motionDomProjection?.commitObservedLayoutChange(previous)
                 }
             } else if (shouldSkipLayoutAnimation) {
                 motionDomProjection?.finishAnimation()
