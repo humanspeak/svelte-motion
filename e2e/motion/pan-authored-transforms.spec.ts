@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test'
-import { beginHorizontalDrag as beginPan, readRotation, sampleFrames } from '../_helpers/transform'
+import {
+    beginHorizontalDrag as beginPan,
+    maxFrameNormalizedJump,
+    readRotation,
+    sampleRotationTimed
+} from '../_helpers/transform'
 
 const URL = '/tests/motion/pan-authored-transforms?@isPlaywright=true'
 
@@ -35,24 +40,68 @@ test.describe('motion/whilePan over authored transforms', () => {
         await page.waitForTimeout(600)
         await page.mouse.up()
 
-        const samples = await sampleFrames(page, () => readRotation(card), 45)
+        const samples = await sampleRotationTimed(page, 'pan-authored-rotate-card', 750)
 
         // The restore must be continuous: settling to neutral and then
-        // snapping to the authored angle shows up as a single-frame jump.
-        const maxJump = Math.max(...samples.slice(1).map((deg, i) => Math.abs(deg - samples[i])))
+        // snapping to the authored angle shows up as a within-one-frame jump.
+        // Deltas are frame-normalized (per 16.7ms) so a delayed sample frame
+        // under load does not masquerade as a discontinuity — a true snap
+        // happens inside ONE frame and normalizes to a huge value regardless.
+        const { jump, raw, dt } = maxFrameNormalizedJump(samples)
         expect(
-            maxJump,
-            `max single-frame rotation jump: ${maxJump.toFixed(2)}deg — samples: ${samples
-                .map((d) => d.toFixed(1))
+            jump,
+            `max frame-normalized rotation jump: ${jump.toFixed(2)}deg/frame (raw ${raw.toFixed(2)}deg over ${dt.toFixed(1)}ms) — samples: ${samples
+                .map((s) => s.deg.toFixed(1))
                 .join(', ')}`
         ).toBeLessThan(4)
 
         // And it must settle on the style-authored angle, not neutral.
-        const settled = samples.at(-1)!
+        const settled = samples.at(-1)!.deg
         expect(
             Math.abs(settled - -8),
             `settled rotation: ${settled.toFixed(2)}deg (authored -8deg)`
         ).toBeLessThan(1.5)
+    })
+
+    /**
+     * Characterization pin added BEFORE whilePan moved onto the VisualElement
+     * (drag-single-writer 004). The two specs above only exercise a channel the
+     * element authors on `style`; the restore path's real risk is keys whilePan
+     * INTRODUCES — an animatable one over an `animate` value, and a
+     * non-animatable inline one — because the pre-pan value for those has to be
+     * recovered from the node rather than read off the authored props.
+     */
+    test('restores whilePan keys the element never authored', async ({ page }) => {
+        const card = page.getByTestId('pan-unauthored-keys-card')
+        await card.scrollIntoViewIfNeeded()
+        const readState = () =>
+            card.evaluate((element) => ({
+                opacity: Number.parseFloat(getComputedStyle(element).opacity),
+                cursor: getComputedStyle(element).cursor
+            }))
+
+        await expect
+            .poll(async () => (await readState()).opacity, { timeout: 2000 })
+            .toBeCloseTo(0.9, 1)
+        const authored = await readState()
+        expect(authored.cursor).not.toBe('grabbing')
+
+        await beginPan(page, card)
+        try {
+            await expect
+                .poll(async () => (await readState()).opacity, { timeout: 2000 })
+                .toBeLessThan(0.6)
+            expect((await readState()).cursor).toBe('grabbing')
+        } finally {
+            await page.mouse.up()
+        }
+
+        // Pan end reverts BOTH: opacity back to the animate target, cursor back
+        // to what it was before the gesture.
+        await expect
+            .poll(async () => (await readState()).opacity, { timeout: 2000 })
+            .toBeCloseTo(0.9, 1)
+        expect((await readState()).cursor).toBe(authored.cursor)
     })
 
     test('is linked from the root test index', async ({ page }) => {

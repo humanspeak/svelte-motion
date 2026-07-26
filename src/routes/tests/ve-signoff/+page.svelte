@@ -413,13 +413,14 @@
                     when a hover ends (the settled-translate wipe the bridge exists to prevent).
                 </p>
                 <p
-                    class="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm md:col-span-2"
+                    class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm md:col-span-2"
                 >
-                    <strong class="text-amber-400">KNOWN (plan 005):</strong> hover does NOT respond while
-                    the box is moving — during the drag itself (upstream-correct: framer suppresses it
-                    too) AND during the post-release glide (stricter than upstream, deliberate: two writers
-                    can't safely share the transform until the drag writer moves onto the VisualElement).
-                    Hover-during-glide is now a named acceptance criterion in plan 005.
+                    <strong class="text-emerald-400">RESOLVED (drag-single-writer batch):</strong>
+                    drag now writes through the VisualElement, so hover responds DURING the post-release
+                    glide (composing with the in-flight translate) — see the
+                    <a class="text-cyan-300 hover:underline" href="/tests/drag-signoff"
+                        >drag sign-off tour</a
+                    > §1. Suppression while the pointer is down remains, matching upstream.
                 </p>
             </div>
         </section>

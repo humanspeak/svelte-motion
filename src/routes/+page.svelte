@@ -31,6 +31,14 @@
                 </li>
                 <li>
                     <a
+                        class="font-semibold text-orange-300 hover:underline"
+                        href={resolve('/tests/drag-signoff') + searchParams}
+                    >
+                        Drag single-writer — sign-off tour (#449 follow-up)
+                    </a>
+                </li>
+                <li>
+                    <a
                         class="text-blue-300 hover:underline"
                         href={resolve('/tests/lazy-motion/basic') + searchParams}
                     >
@@ -471,6 +479,22 @@
                         href={resolve('/tests/drag/while-drag-transforms') + searchParams}
                     >
                         Drag: whileDrag transform composition
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/hover-during-glide') + searchParams}
+                    >
+                        Drag: hover during the momentum glide
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/axis-handoff') + searchParams}
+                    >
+                        Drag: axis ownership handoff (start + release)
                     </a>
                 </li>
                 <li>

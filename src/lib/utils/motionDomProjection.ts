@@ -552,7 +552,13 @@ export class MotionDomProjectionAdapter {
      * ```
      */
     commitObservedLayoutChange(previousRect?: RectLike): void {
-        if (!this.element || !this.layout) return
+        // A `layoutId`-only node counts: it has a measured layout (`seedLayout`
+        // runs on mount regardless of props) and motion-dom already knows its
+        // `layoutId` from `setOptions`, so seeding a snapshot animates it exactly
+        // as it animates a `layout` node. That is what lets the container's
+        // shared-layout effect hand a departing element's rect to the projection
+        // instead of hand-writing a FLIP (drag-single-writer 005).
+        if (!this.element || !(this.layout || this.layoutId)) return
         const snapshot = previousRect
             ? measurementsFromRect(previousRect, this.lastLayout ?? this.projection.layout)
             : this.lastLayout
@@ -642,7 +648,8 @@ export class MotionDomProjectionAdapter {
                 : adapter?.lastLayout
         )
 
-        if (snapshot && projection.options.layout) {
+        // `layoutId`-only nodes are seeded too — see `commitObservedLayoutChange`.
+        if (snapshot && (projection.options.layout || projection.options.layoutId)) {
             this.prepareSnapshotPath(projection)
             projection.snapshot = snapshot
             projection.isLayoutDirty = true

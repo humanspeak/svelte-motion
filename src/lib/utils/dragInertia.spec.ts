@@ -1,6 +1,10 @@
-import { inertia } from 'motion-dom'
+import { inertia, motionValue, type AnyResolvedKeyframe } from 'motion-dom'
 import { describe, expect, it } from 'vitest'
-import { createDragInertiaGenerator, createDragInertiaOptions } from './dragInertia'
+import {
+    createDragInertiaGenerator,
+    createDragInertiaOptions,
+    startAxisRelease
+} from './dragInertia'
 
 describe('drag inertia', () => {
     it('uses upstream Motion inertia when no drag defaults are supplied', () => {
@@ -42,6 +46,36 @@ describe('drag inertia', () => {
         expect(options.min).toBe(-10)
         expect(options.max).toBe(120)
         expect(options.modifyTarget).toBe(modifyTarget)
+    })
+
+    it('startAxisRelease builds a real glide, not an instant landing', () => {
+        // Regression guard for the seed-keyframe trap: `createDragInertiaOptions`
+        // seeds `keyframes: [v, v]` and lets the inertia generator compute the
+        // target, but `canAnimate` reads unchanged keyframes as "nothing to
+        // animate" and makes the animation INSTANT (duration 0). `startAxisRelease`
+        // must take the synchronous `JSAnimation` path so the glide actually glides.
+        const value = motionValue<AnyResolvedKeyframe>(0)
+        void startAxisRelease('x', value, {
+            ...createDragInertiaOptions({
+                value: 0,
+                velocity: 800,
+                power: 0.8,
+                timeConstant: 750
+            })
+        })
+
+        // Registered as the value's OWN animation, which is what makes
+        // `value.stop()` freeze it through motion-dom's interruption machinery
+        // (the constraint-ledger rule against hand-rolled sampling).
+        const animation = value.animation
+        expect(animation, 'the release animation was not registered on the value').toBeDefined()
+        expect(
+            animation!.duration,
+            'the release animation was flattened to an instant landing'
+        ).toBeGreaterThan(0.1)
+
+        value.stop()
+        expect(value.animation).toBeUndefined()
     })
 
     it('samples identically to motion-dom inertia for constrained bounce', () => {

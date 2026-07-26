@@ -24,31 +24,26 @@ import { pwLog } from '$lib/utils/log'
  * - For nested drags, set `propagation` as needed to avoid parent-child contention.
  */
 import { isDomElement } from '$lib/utils/dom'
-import { startDragInertia } from '$lib/utils/dragInertia'
+import { createDragInertiaOptions, startAxisRelease } from '$lib/utils/dragInertia'
 import {
     applyConstraints as applyFloatConstraints,
     parseMatrixTranslate
 } from '$lib/utils/dragMath'
 import { deriveBoundaryPhysics } from '$lib/utils/dragParams'
-import { computeHoverBaseline, splitHoverDefinition } from '$lib/utils/hover'
 import {
     buildGestureTransform,
     collectGestureTransformValues as collectTransformValues,
-    splitGestureTransformValues as splitTransformValues,
     type GestureTransformValues as DragTransformValues
 } from '$lib/utils/transformComposer'
-import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
+import { type AnimationOptions } from 'motion'
 import {
-    animateMotionValue,
-    animateValue,
-    getValueAsType,
     motionValue,
-    numberValueTypes,
-    type AnimationPlaybackControlsWithThen,
+    setDragLock,
+    visualElementStore,
     type AnyResolvedKeyframe,
     type MotionValue,
     type TransformTemplate,
-    type ValueAnimationTransition
+    type VisualElement
 } from 'motion-dom'
 
 /**
@@ -107,7 +102,6 @@ export type AttachDragOptions = {
         onEnd?: (e: PointerEvent, info: DragInfo) => void
         onDirectionLock?: (axis: 'x' | 'y') => void
         onTransitionEnd?: () => void
-        onVisualUpdate?: (transform: string, values: DragTransformValues) => void
     }
     baselineSources?: { initial?: Record<string, unknown>; animate?: Record<string, unknown> }
     getBaseTransformValues?: () => DragTransformValues
@@ -464,7 +458,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     const elastic = resolveDragElastic(opts.elastic)
     const maxElastic = getMaxElastic(elastic)
     const momentum = opts.momentum !== false
-    const mergedTransition = opts.mergedTransition ?? {}
 
     let constraints = resolveConstraints(el, opts.constraints)
     // Anchor constraints base:
@@ -487,30 +480,89 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     // History for velocity smoothing (last N samples)
     let history: Array<{ x: number; y: number; t: number }> = []
 
-    let whileDragBaseline: Record<string, unknown> | null = null
+    // Transform channels authored by `initial`/`animate`, used as the resting
+    // baseline the drag offset composes onto. `whileDrag` channels are NOT here:
+    // the animationState owns them (`setWhileDragActive`).
     const restingTransformValues: DragTransformValues = {
         ...collectTransformValues(opts.baselineSources?.initial),
         ...collectTransformValues(opts.baselineSources?.animate)
     }
-    const gestureTransformValues: DragTransformValues = {}
     const crossAxisOffset = { x: 0, y: 0 }
-    const transformAnimations = new Map<
-        string,
-        { value: MotionValue<AnyResolvedKeyframe>; unsubscribe: () => void }
-    >()
-    let transformComposerRaf = 0
-    let transformComposerActive = false
+    // Which axis channels this gesture has taken ownership of on the node.
+    const axisWriteStarted = { x: false, y: false }
     let postReleaseAnimationActive = false
-    let whileDragRestoreActive = false
-    let whileDragAnimationGeneration = 0
     let stopInertia: (() => void) | null = null
+    /**
+     * Detach-mode cleanup for the release currently in flight, if any.
+     *
+     * Same idempotent `finalizeRelease` as every other exit route, in the mode
+     * that drops this gesture's bookkeeping WITHOUT stopping the animation —
+     * used by `teardown`, which may run on a benign re-attach (the drag effect
+     * re-running) while a legitimate glide is still on screen.
+     */
+    let detachRelease: (() => void) | null = null
 
+    /**
+     * Per-element marker for "this element is being dragged RIGHT NOW".
+     *
+     * No longer a gesture guard — motion-dom's own `hover()`/`press()` filter on
+     * the global drag lock this module now holds. It survives for the
+     * container's layout-observer branch, which needs to know whether THIS
+     * element (not any element) owns a live drag, so a slot change routes to
+     * `adjustOrigin` cursor pinning instead of a FLIP
+     * (`_MotionContainer.svelte`, grep `svelteMotionDragActive`). A global flag
+     * cannot answer that question.
+     *
+     * Session-scoped, exactly like the lock: set at drag start, cleared at
+     * pointer-up/cancel. `adjustOrigin` is a no-op outside a live drag anyway,
+     * so the marker and the behaviour it gates now agree.
+     */
     const markDragTransformActive = (active: boolean) => {
         if (active) {
             el.dataset.svelteMotionDragActive = 'true'
         } else {
             delete el.dataset.svelteMotionDragActive
         }
+    }
+
+    /**
+     * The global drag lock's release function while this gesture holds it.
+     *
+     * Upstream acquires the lock at drag-session start and releases it from
+     * `cancel()` — i.e. at pointer-up, BEFORE the momentum animation starts
+     * (`VisualElementDragControls.ts:118-128` and `:300-303`). That is what
+     * makes hover respond during the post-release glide: the glide is not a
+     * gesture. motion-dom's `hover()`/`press()` consult the same lock
+     * internally (`gestures/hover.mjs` `isValidHover`, `gestures/press/index.mjs`
+     * `isValidPressEvent`), so holding it is all the suppression this library
+     * needs.
+     */
+    let releaseDragLock: (() => void) | null = null
+
+    /**
+     * Take the global drag lock for this gesture.
+     *
+     * `dragPropagation` (our `propagation`) opts out of the lock entirely, which
+     * is how upstream allows nested draggables to move together. Without it, a
+     * second element cannot start a drag while this one holds the lock —
+     * upstream returns from `onStart` in that case, and so do we.
+     *
+     * @returns `true` when the drag may proceed.
+     */
+    const acquireDragLock = (): boolean => {
+        if (opts.propagation) return true
+        // Release a stale lock from a previous session on this element first
+        // (upstream does the same before re-acquiring).
+        if (releaseDragLock) releaseDragLock()
+        releaseDragLock = setDragLock(axis) ?? null
+        return releaseDragLock !== null
+    }
+
+    /** Release the global lock if this gesture holds it. Idempotent. */
+    const releaseDragLockIfHeld = () => {
+        if (!releaseDragLock) return
+        releaseDragLock()
+        releaseDragLock = null
     }
 
     const computeInfo = (): DragInfo => ({
@@ -584,30 +636,60 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             : null
 
     /**
-     * Write the complete live transform directly and synchronously.
+     * The VisualElement that renders `el`, resolved from motion-dom's
+     * `visualElementStore` and cached for the gesture's lifetime.
      *
-     * Drag translation, projection compensation, style/animate baselines,
-     * and active gesture transforms all flow through motion-dom's canonical
-     * `buildTransform` ordering. The synchronous + microtask + rAF writes are
-     * intentional: projection compensation must paint in the same frame as a
-     * layout swap (#379), while the follow-up writes win races with reactive
-     * style effects without adding pointer lag.
+     * Resolved lazily rather than at attach time: `attachDrag` runs from its own
+     * Svelte effect, so the node may or may not have been mounted into the store
+     * by then, and the lookup is a WeakMap hit.
+     *
+     * `null` only outside a motion component (unit tests, standalone
+     * `attachDrag`), which takes the composed-string fallback below.
+     */
+    let cachedNode: VisualElement | null = null
+    const getNode = (): VisualElement | null => {
+        if (!cachedNode) cachedNode = visualElementStore.get(el) ?? null
+        return cachedNode
+    }
+
+    /**
+     * Write the live drag position through the element's VisualElement.
+     *
+     * Upstream's drag controls own no writer of their own: they set the axis
+     * MotionValues from `visualElement.getValue(axis, …)` and call
+     * `visualElement.render()` synchronously
+     * (`VisualElementDragControls.ts:319-337`, `:544-556`, `:216`). This is that
+     * model. The VE composes drag translation together with every other channel
+     * from `latestValues`, so there is exactly one transform writer — the triple
+     * sync/microtask/rAF write and the `data-svelte-motion-drag-transform`
+     * bookkeeping existed only to win races against writers that no longer exist
+     * (#449).
+     *
+     * The render is SYNCHRONOUS, matching upstream: a pointermove must paint in
+     * the frame it arrives in, and projection compensation must paint in the same
+     * frame as the layout swap that caused it (#379).
      */
     const setXYImmediate = (x: number, y: number) => {
         if (dragX) applied.x = x
         if (dragY) applied.y = y
 
-        // Bound MotionValues remain the public source of truth (#421). Update
-        // them before reading base transform values so the full composer sees
-        // the same value that styleEffect will render.
+        // Bound MotionValues remain the public source of truth (#421) — and
+        // post-#449 a bound style MotionValue IS the node's axis value
+        // (`ve.values.get('y') === ve.props.style.y`), so this already is the
+        // VisualElement write for that axis.
         if (boundX && boundX.get() !== x) boundX.set(x)
         if (boundY && boundY.get() !== y) boundY.set(y)
 
         const latestValues: DragTransformValues = {
             ...(opts.getBaseTransformValues?.() ?? {}),
-            ...restingTransformValues,
-            ...gestureTransformValues
+            ...restingTransformValues
         }
+        // The authored/resting channel values BEFORE the gesture offsets, used as
+        // the created axis value's default so a removed target animates back to
+        // the authored channel rather than to zero (upstream passes
+        // `latestValues[axis] ?? 0` for the same reason).
+        const baseX = latestValues.x
+        const baseY = latestValues.y
 
         // Unbound drag axes are offsets from their authored/resting channel.
         // Bound axes are already represented by getBaseTransformValues().
@@ -621,141 +703,200 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         }
 
         // Preserve the bound-MotionValue empty writer branch: when every drag
-        // axis is styleEffect-owned and no gesture/projection channel is active,
-        // there is nothing for this synchronous path to paint (#421).
+        // axis is node-owned and no projection offset is active, this path has
+        // nothing of its own to paint (#421).
         const shouldWrite =
             (dragX && !boundX) ||
             (dragY && !boundY) ||
             crossAxisOffset.x !== 0 ||
-            crossAxisOffset.y !== 0 ||
-            Object.keys(gestureTransformValues).length > 0
+            crossAxisOffset.y !== 0
 
-        let composedTransform = ''
+        const node = getNode()
+        if (node) {
+            if (shouldWrite) {
+                // Authored channels the node does not own itself are seeded into
+                // its `latestValues` so the single composition sees them.
+                // `whileDrag` channels are absent by design — the animationState
+                // owns those, on the node's own MotionValues.
+                for (const [key, value] of Object.entries(latestValues)) {
+                    if (key === 'x' || key === 'y') continue
+                    if (node.values.has(key)) continue
+                    node.setStaticValue(key, value)
+                }
+                if (dragX && !boundX) axisWriteStarted.x = true
+                if (dragY && !boundY) axisWriteStarted.y = true
+                if (crossAxisOffset.x !== 0) axisWriteStarted.x = true
+                if (crossAxisOffset.y !== 0) axisWriteStarted.y = true
+                // Once an axis has been written it keeps being written, so a
+                // cross-axis offset returning to zero paints its way back to the
+                // authored channel instead of freezing at the last offset.
+                if (axisWriteStarted.x && !boundX) {
+                    node.getValue('x', baseX ?? 0).set(latestValues.x ?? 0)
+                }
+                if (axisWriteStarted.y && !boundY) {
+                    node.getValue('y', baseY ?? 0).set(latestValues.y ?? 0)
+                }
+            }
+            node.render()
+            return
+        }
+
+        // No VisualElement (standalone `attachDrag`, unit tests): compose once,
+        // synchronously. Nothing else writes this element's transform, so the
+        // race-winning repeats the VE model makes redundant are not needed here
+        // either.
         if (shouldWrite) {
-            composedTransform =
+            el.style.transform =
                 buildDragTransform(
                     latestValues,
                     opts.getBaseTransform?.() ?? '',
                     opts.transformTemplate
                 ) || 'none'
-            el.dataset.svelteMotionDragTransform = composedTransform
-            const writeComposedTransform = () => {
-                if (el.dataset.svelteMotionDragTransform !== composedTransform) return
-                el.style.transform = composedTransform
+        }
+    }
+
+    /**
+     * The MotionValue a release animation drives for one axis.
+     *
+     * `base` is the offset between the value's own space and the gesture's
+     * `applied` offset space (`value = applied + base`): zero for a bound style
+     * MotionValue, which drag writes in offset space, and the authored channel
+     * value for an unbound axis, which drag composes its offset onto.
+     *
+     * `local` marks the fallback value — see {@link resolveAxisRelease}.
+     */
+    type AxisRelease = {
+        value: MotionValue<AnyResolvedKeyframe>
+        base: number
+        local: boolean
+    }
+
+    /**
+     * Read an authored channel value as a number of pixels.
+     *
+     * `undefined` means "no authored value" → 0. A `%`, `calc()` or otherwise
+     * non-px channel cannot be composed numerically and returns `null`, which
+     * routes the axis onto the fallback release value.
+     */
+    const readPixelChannel = (raw: AnyResolvedKeyframe | undefined): number | null => {
+        if (raw === undefined) return 0
+        if (typeof raw === 'number') return raw
+        const match = /^(-?(?:\d+(?:\.\d+)?|\.\d+))px$/.exec(raw)
+        return match ? Number.parseFloat(match[1]) : null
+    }
+
+    /** The authored/resting value of an axis channel, before the drag offset. */
+    const authoredAxisChannel = (axisKey: 'x' | 'y'): AnyResolvedKeyframe | undefined =>
+        (opts.getBaseTransformValues?.() ?? {})[axisKey] ?? restingTransformValues[axisKey]
+
+    /**
+     * Fallback release values, for axes with no MotionValue to drive: no
+     * VisualElement at all (standalone `attachDrag`, unit tests), or an authored
+     * channel that is not numerically composable (`50%`, `calc(…)`).
+     *
+     * They are still MotionValues, so the release machinery — including
+     * `value.stop()`'s freeze semantics — stays on ONE code path; the difference
+     * is only who paints, which `setXYImmediate` handles for these (it composes
+     * the transform string itself and preserves non-px units).
+     */
+    const fallbackAxisValues: Partial<Record<'x' | 'y', MotionValue<AnyResolvedKeyframe>>> = {}
+
+    /**
+     * Resolve the axis value a release animation should drive.
+     *
+     * Upstream's `getAxisMotionValue` (`VisualElementDragControls.ts:544-556`),
+     * with this library's bound-value contract (#421) and a fallback for the
+     * cases upstream cannot have (no node, non-px authored channel).
+     */
+    const resolveAxisRelease = (axisKey: 'x' | 'y'): AxisRelease => {
+        const bound = axisKey === 'x' ? boundX : boundY
+        if (bound) {
+            return { value: bound as MotionValue<AnyResolvedKeyframe>, base: 0, local: false }
+        }
+
+        const node = getNode()
+        const base = node ? readPixelChannel(authoredAxisChannel(axisKey)) : null
+        if (node && base !== null) {
+            return {
+                value: node.getValue(axisKey, base) as MotionValue<AnyResolvedKeyframe>,
+                base,
+                local: false
             }
-
-            writeComposedTransform()
-            queueMicrotask(writeComposedTransform)
-            requestAnimationFrame(writeComposedTransform)
-        }
-        opts.callbacks?.onVisualUpdate?.(composedTransform, latestValues)
-    }
-
-    const startTransformComposer = () => {
-        if (transformComposerActive) return
-        transformComposerActive = true
-
-        const tick = () => {
-            if (!transformComposerActive) return
-            setXYImmediate(applied.x, applied.y)
-            transformComposerRaf = requestAnimationFrame(tick)
         }
 
-        transformComposerRaf = requestAnimationFrame(tick)
+        const local = (fallbackAxisValues[axisKey] ??= motionValue<AnyResolvedKeyframe>(
+            applied[axisKey]
+        ))
+        return { value: local, base: 0, local: true }
     }
 
-    const stopTransformComposer = () => {
-        transformComposerActive = false
-        if (!transformComposerRaf) return
-        cancelAnimationFrame(transformComposerRaf)
-        transformComposerRaf = 0
+    /**
+     * Keep the gesture's own bookkeeping in step with a release animation.
+     *
+     * The animation drives the value and the VisualElement renders from it, so
+     * this subscription is state only, not paint: `applied` feeds the next
+     * drag's origin, `constraintsBase`, `computeInfo`, and the ResizeObserver
+     * rescale, all of which can be read mid-glide. Fallback axes additionally
+     * paint from here, since nothing else is watching their value.
+     *
+     * @returns The unsubscribe function.
+     */
+    const trackAxisRelease = (axisKey: 'x' | 'y', release: AxisRelease): (() => void) =>
+        release.value.on('change', (latest) => {
+            const numeric = typeof latest === 'number' ? latest : Number.parseFloat(latest)
+            if (Number.isNaN(numeric)) return
+            applied[axisKey] = numeric - release.base
+            if (release.local) setXYImmediate(applied.x, applied.y)
+        })
+
+    /**
+     * Notice when somebody else takes an axis away from a live release.
+     *
+     * Upstream detects nothing here and needs to: its completion bookkeeping is
+     * `Promise.all(momentumAnimations).then(onDragTransitionEnd)`
+     * (`VisualElementDragControls.ts:511`), and that promise simply never settles
+     * for an interrupted release — `MotionValue.start()` resolves only from the
+     * animation's `onComplete` (installed motion-dom, `value/index.mjs:260-274`)
+     * and `JSAnimation.stop()` calls `onStop`, not `onComplete`
+     * (`animation/JSAnimation.mjs:44-54`). Upstream therefore SKIPS
+     * `onDragTransitionEnd` on interruption, which this port matches — but it has
+     * per-release state upstream does not (tracking subscriptions,
+     * `postReleaseAnimationActive`, an armed `stopInertia`) that must not survive
+     * the release it belongs to.
+     *
+     * So the promise route is unusable and we use the value's own lifecycle
+     * events instead: `animationStart` fires when a new animation takes the value
+     * (`value/index.mjs:265-267`) and `animationCancel` when one is stopped
+     * (`:283-285`) — including by a foreign `jump()`. Subscribed only AFTER our
+     * own release has started, so our own start/jump never trips it, and the
+     * cleanup it calls is idempotent, so our own stop route re-entering through
+     * `animationCancel` is a no-op.
+     *
+     * @param release The axis release to watch.
+     * @param onForeign Invoked when another writer takes the value.
+     * @returns The unsubscribe function.
+     */
+    const watchAxisTakeover = (release: AxisRelease, onForeign: () => void): (() => void) => {
+        const stopStartWatch = release.value.on('animationStart', onForeign)
+        const stopCancelWatch = release.value.on('animationCancel', onForeign)
+        return () => {
+            stopStartWatch()
+            stopCancelWatch()
+        }
     }
 
-    const maybeStopTransformComposer = () => {
-        if (dragging || postReleaseAnimationActive || whileDragRestoreActive) return
+    /**
+     * Paint the settled position once the gesture and every post-release
+     * animation have finished. Deferred by a frame so a re-grab (or a settle
+     * that starts on the next frame) supersedes it.
+     */
+    const maybeReleaseDragActive = () => {
+        if (dragging || postReleaseAnimationActive) return
 
         requestAnimationFrame(() => {
-            if (dragging || postReleaseAnimationActive || whileDragRestoreActive) return
+            if (dragging || postReleaseAnimationActive) return
             setXYImmediate(applied.x, applied.y)
-            stopTransformComposer()
-            markDragTransformActive(false)
         })
-    }
-
-    const stopTransformAnimation = (key: string) => {
-        const active = transformAnimations.get(key)
-        if (!active) return
-        active.value.stop()
-        active.unsubscribe()
-        transformAnimations.delete(key)
-    }
-
-    const stopTransformAnimations = () => {
-        for (const key of [...transformAnimations.keys()]) stopTransformAnimation(key)
-    }
-
-    const normalizeTransformTarget = (
-        key: string,
-        target: unknown
-    ): AnyResolvedKeyframe | Array<AnyResolvedKeyframe | null> | undefined => {
-        const normalize = (value: unknown): AnyResolvedKeyframe | null | undefined => {
-            if (value === null) return null
-            if (typeof value !== 'string' && typeof value !== 'number') return undefined
-            const typedValue: unknown = getValueAsType(value, numberValueTypes[key])
-            return typeof typedValue === 'string' || typeof typedValue === 'number'
-                ? typedValue
-                : value
-        }
-
-        if (!Array.isArray(target)) return normalize(target) ?? undefined
-        const keyframes = target.map(normalize).filter((value) => value !== undefined)
-        return keyframes.length ? keyframes : undefined
-    }
-
-    const startTransformAnimation = (
-        key: string,
-        target: unknown,
-        transition: AnimationOptions | undefined
-    ): AnimationPlaybackControlsWithThen | null => {
-        const normalizedTarget = normalizeTransformTarget(key, target)
-        if (normalizedTarget === undefined) return null
-
-        stopTransformAnimation(key)
-        const baseValues = opts.getBaseTransformValues?.() ?? {}
-        const neutral = key.startsWith('scale') ? 1 : 0
-        // Seed with the same value type as the normalized target. Style-authored
-        // channels arrive as raw numbers, but the target above is typed (4 ->
-        // '4deg'); spring generators emit NaN when asked to animate a raw number
-        // into a unit string, and one NaN channel invalidates the entire
-        // composed transform ('rotate(NaNdeg)' -> the browser drops the write).
-        const current = getValueAsType(
-            gestureTransformValues[key] ??
-                restingTransformValues[key] ??
-                baseValues[key] ??
-                neutral,
-            numberValueTypes[key]
-        ) as AnyResolvedKeyframe
-        const value = motionValue<AnyResolvedKeyframe>(current)
-        gestureTransformValues[key] = current
-        // Record only: the transform composer's frame loop is the single
-        // writer and repaints the latest channel values once per frame.
-        // Composing here as well multiplies the per-frame work by the number
-        // of animated channels (N getBaseTransformValues() scans + N
-        // buildTransform calls per frame).
-        const unsubscribe = value.on('change', (latest) => {
-            gestureTransformValues[key] = latest
-        })
-        transformAnimations.set(key, { value, unsubscribe })
-        setXYImmediate(applied.x, applied.y)
-        void value.start(
-            animateMotionValue(
-                key,
-                value,
-                normalizedTarget,
-                (transition ?? mergedTransition) as unknown as ValueAnimationTransition
-            )
-        )
-        return value.animation ?? null
     }
 
     /**
@@ -802,74 +943,32 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         setXYImmediate(applied.x + (dragX ? dx : 0), applied.y + (dragY ? dy : 0))
     }
 
-    const startWhileDrag = () => {
-        if (!opts.whileDrag) return
-        whileDragAnimationGeneration++
-        whileDragRestoreActive = false
-        stopTransformAnimations()
-        // Baseline restore target: compute from sources. baseValues carries the
-        // style-authored transform channels so release restores to the authored
-        // value instead of settling to neutral and snapping.
-        whileDragBaseline = computeHoverBaseline(el, {
-            initial: opts.baselineSources?.initial,
-            animate: opts.baselineSources?.animate,
-            whileHover: (opts.whileDrag ?? {}) as Record<string, unknown>,
-            baseValues: opts.getBaseTransformValues?.()
-        })
-        const { keyframes, transition } = splitHoverDefinition(
-            opts.whileDrag as Record<string, unknown>
-        )
-        startTransformComposer()
-        const { transform, native: nativeKeyframes } = splitTransformValues(keyframes)
-        for (const [key, target] of Object.entries(transform)) {
-            startTransformAnimation(key, target, transition)
-        }
-        if (Object.keys(nativeKeyframes).length > 0) {
-            animate(el, nativeKeyframes as DOMKeyframesDefinition, transition ?? mergedTransition)
-        }
-    }
-
-    const endWhileDrag = () => {
-        const baseline = whileDragBaseline
-        if (!baseline || Object.keys(baseline).length === 0) {
-            maybeStopTransformComposer()
-            return
-        }
-        whileDragRestoreActive = true
-        const generation = ++whileDragAnimationGeneration
-        const { transform, native: nativeBaseline } = splitTransformValues(baseline)
-        const restore =
-            Object.keys(nativeBaseline).length > 0
-                ? animate(el, nativeBaseline as unknown as DOMKeyframesDefinition, mergedTransition)
-                : null
-        whileDragBaseline = null
-
-        const finishRestore = () => {
-            if (generation !== whileDragAnimationGeneration) return
-            stopTransformAnimations()
-            for (const key of Object.keys(transform)) delete gestureTransformValues[key]
-            setXYImmediate(applied.x, applied.y)
-            whileDragRestoreActive = false
-            maybeStopTransformComposer()
-        }
-
-        const restorePromises: PromiseLike<unknown>[] = []
-        for (const [key, target] of Object.entries(transform)) {
-            const control = startTransformAnimation(key, target, mergedTransition)
-            if (control) restorePromises.push(control.finished)
-        }
-        if (restore && typeof (restore as PromiseLike<unknown>).then === 'function') {
-            restorePromises.push(restore as PromiseLike<unknown>)
-        }
-
-        if (restorePromises.length > 0) {
-            // Fire-and-forget: `allSettled` never rejects, and the caller must not
-            // block on the restore animations finishing.
-            void Promise.allSettled(restorePromises).then(finishRestore)
-            return
-        }
-
-        finishRestore()
+    /**
+     * Toggle `whileDrag` on the node's animationState.
+     *
+     * Upstream's drag controls do exactly this and nothing more —
+     * `animationState.setActive("whileDrag", true)` at drag start
+     * (`VisualElementDragControls.ts:176`) and `false` from `cancel()` at
+     * session end (`:305`). The resolver then owns priority ordering (whileDrag
+     * outranks whileTap and whileHover in `variantPriorityOrder`), protected
+     * keys, and — crucially — restoring the previous target on release, which is
+     * what the hand-rolled `computeHoverBaseline` restore approximated here.
+     *
+     * The definition itself travels on the node (`props.whileDrag`, carried by
+     * `buildMotionNodeProps` since #449), so variant LABELS resolve through
+     * `getVariant` for free.
+     *
+     * @param isActive Whether the drag gesture currently owns the element.
+     */
+    const setWhileDragActive = (isActive: boolean) => {
+        const node = getNode()
+        if (!node?.animationState) return
+        // Guarded on the prop, as upstream's gesture features are: an element
+        // with drag callbacks but no `whileDrag` must not start an empty
+        // animation.
+        const props = node.getProps() as Record<string, unknown>
+        if (!props.whileDrag) return
+        void node.animationState.setActive('whileDrag', isActive)
     }
 
     const onPointerDown = (e: PointerEvent) => {
@@ -887,6 +986,13 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             pointer: { id: e.pointerId, x: e.clientX, y: e.clientY },
             snapToCursor
         })
+        // Take the global lock FIRST: an aborted start must not capture the
+        // pointer, cancel in-flight inertia, or touch any gesture state
+        // (upstream returns from `onStart` before recording the origin).
+        if (!acquireDragLock()) {
+            pwLog('[drag] another drag holds the lock → not starting', { el: EL_ID })
+            return
+        }
         try {
             if ('setPointerCapture' in el && typeof e.pointerId === 'number')
                 el.setPointerCapture(e.pointerId)
@@ -898,6 +1004,33 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         if (stopInertia) {
             stopInertia()
             stopInertia = null
+        }
+
+        // Take ownership of the axis values — upstream's `onSessionStart` calls
+        // `stopAnimation()` (`VisualElementDragControls.ts:114`), which is
+        // `eachAxis(axis => this.getAxisMotionValue(axis).stop())` (`:534-536`).
+        // Their comment on the same call from `resolveRefConstraints` (`:598-601`)
+        // states the reason: "Stop current animations as there can be visual
+        // glitching if we try to do this mid-animation". The stop above only ends
+        // OUR release; ANY other writer of x/y (a declarative `animate`, a
+        // `controls.start`, another gesture's retarget) must hand the axis to the
+        // pointer too, or it keeps writing against the drag.
+        //
+        // Per-channel `value.stop()` is the ledger's freeze mechanism: motion-dom
+        // samples the interrupted animation and leaves the value — and its
+        // velocity — at the sampled position, WAAPI-accelerated channels included
+        // (`NativeAnimationExtended.updateMotionValue`).
+        for (const axisKey of ['x', 'y'] as const) {
+            if (!(axisKey === 'x' ? dragX : dragY)) continue
+            const release = resolveAxisRelease(axisKey)
+            release.value.stop()
+            // Re-derive the gesture's offset from the frozen value: the writer we
+            // just stopped may have moved the axis without `applied` ever seeing
+            // it, and `applied` is what seeds `origin` and `constraintsBase`
+            // below. `value = applied + base`, so invert that.
+            const frozen = release.value.get()
+            const numeric = typeof frozen === 'number' ? frozen : Number.parseFloat(frozen)
+            if (!Number.isNaN(numeric)) applied[axisKey] = numeric - release.base
         }
 
         // Recompute constraints in case bounding boxes changed since last drag
@@ -930,7 +1063,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         lastPoint = { ...startPoint }
         velocity = { x: 0, y: 0 }
         history = [{ x: e.clientX, y: e.clientY, t: now() }]
-        startTransformComposer()
 
         const applyXAxis = axis === true || axis === 'x'
         const applyYAxis = axis === true || axis === 'y'
@@ -948,7 +1080,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             pwLog('[drag] snapToCursor origin', { el: EL_ID, origin })
         }
 
-        startWhileDrag()
+        setWhileDragActive(true)
         opts.callbacks?.onStart?.(e, computeInfo())
 
         // Listen on element (to receive captured events) and window as fallback.
@@ -1092,6 +1224,25 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     const finishDrag = (e: PointerEvent, cancelled = false) => {
         dragging = false
         postReleaseAnimationActive = false
+        // The SESSION ends here — at pointer-up/cancel, before any momentum
+        // animation starts. Both the global lock and the per-element marker are
+        // session-scoped (upstream `cancel()` releases the lock from `stop()`
+        // before `startAnimation`), so hover and press respond during the glide
+        // that follows.
+        releaseDragLockIfHeld()
+        markDragTransformActive(false)
+        // Deactivate `whileDrag` BEFORE any release animation starts, which is
+        // upstream's ownership order: `stop()` calls `this.cancel()` first — and
+        // `cancel()` is where `animationState.setActive("whileDrag", false)` lives
+        // (`VisualElementDragControls.ts:305`) — and only THEN
+        // `this.startAnimation(velocity)` (`:270-276`). The restore retarget
+        // therefore lands first and momentum retargets the axis values after it.
+        //
+        // With this after the releases (as it was), a `whileDrag` containing `x`
+        // or `y` had its restore `value.start()` CANCEL the just-started glide:
+        // measured y frozen at its release position, trace `-9, 108, 108, 108, …`.
+        // It also never ran at all on the early-return paths below.
+        setWhileDragActive(false)
 
         velocity = computeReleaseVelocity(history, now())
 
@@ -1182,12 +1333,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             const applyX = (axis === true || axis === 'x') && lockAxis !== 'y'
             const applyY = (axis === true || axis === 'y') && lockAxis !== 'x'
 
-            let latestX = applied.x
-            let latestY = applied.y
-            let frameCount = 0
             let running = true
             postReleaseAnimationActive = true
-            const animations: AnimationPlaybackControlsWithThen[] = []
             let remainingAnimations = (applyX ? 1 : 0) + (applyY ? 1 : 0)
             const transitionMin = opts.transition?.min
             const transitionMax = opts.transition?.max
@@ -1202,128 +1349,159 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             const finalMinY = snapY ? 0 : minY
             const finalMaxY = snapY ? 0 : maxY
 
-            const renderLatest = () => {
-                if (!running) return
-                frameCount++
-                setXYImmediate(latestX, latestY)
+            // The release animations run ON the axis values: each animation
+            // drives its value, the value drives the render (upstream
+            // `startAxisValueAnimation`). No per-frame writer call from here.
+            const releases: Array<{ axisKey: 'x' | 'y'; release: AxisRelease }> = []
+            const untrack: Array<() => void> = []
+            const stopTracking = () => {
+                while (untrack.length) untrack.pop()?.()
+            }
 
-                if (frameCount <= 3 || frameCount % 10 === 0) {
-                    pwLog(`🔄 FRAME ${frameCount}`, {
-                        px: latestX.toFixed?.(2) ?? latestX,
-                        py: latestY.toFixed?.(2) ?? latestY,
-                        boundsX: { minX, maxX },
-                        boundsY: { minY, maxY }
+            // Declared before `finalizeRelease` so it can never be read in its
+            // temporal dead zone; both only call it later, from callbacks.
+            const cancelRelease = () => finalizeRelease('stop')
+            const handOffRelease = () => finalizeRelease('handoff')
+
+            /**
+             * The ONE release-cleanup path for this momentum release, idempotent
+             * and reached from every exit route:
+             *
+             * - `'complete'` — the last axis animation ran out naturally.
+             * - `'stop'` — WE ended it (`stopInertia`: a re-grab, `controls.cancel`,
+             *   a constraints resize). Per-channel `value.stop()` freezes each
+             *   axis where it stands, through motion-dom's own interruption
+             *   machinery (accelerated channels included, via
+             *   `NativeAnimationExtended.updateMotionValue`).
+             * - `'handoff'` — somebody ELSE now drives an axis (a foreign
+             *   animation took it, or the gesture is detaching). Stops nothing:
+             *   the new owner is mid-flight on these values.
+             *
+             * `onDragTransitionEnd` fires on `'complete'` only. That matches
+             * upstream, whose `Promise.all(...).then(onDragTransitionEnd)`
+             * (`VisualElementDragControls.ts:511`) never settles for an
+             * interrupted release — see {@link watchAxisTakeover}.
+             */
+            const finalizeRelease = (mode: 'complete' | 'stop' | 'handoff') => {
+                if (!running) return
+                running = false
+
+                if (mode === 'complete') {
+                    // Safety clamp: inertia settles inside its bounds, but a
+                    // modifyTarget or a boundary handoff can land a hair outside.
+                    if (applyX)
+                        applied.x = applyFloatConstraints(applied.x, {
+                            min: finalMinX,
+                            max: finalMaxX
+                        })
+                    if (applyY)
+                        applied.y = applyFloatConstraints(applied.y, {
+                            min: finalMinY,
+                            max: finalMaxY
+                        })
+                } else if (mode === 'stop') {
+                    pwLog('❌ MOMENTUM CANCELLED')
+                    // `applied` is already current — the tracking subscription saw
+                    // the last frame.
+                    for (const { release } of releases) release.value.stop()
+                }
+
+                stopTracking()
+
+                if (mode === 'complete') {
+                    for (const { axisKey, release } of releases) {
+                        release.value.set(applied[axisKey] + release.base)
+                    }
+                    if (releases.some(({ release }) => release.local)) {
+                        setXYImmediate(applied.x, applied.y)
+                    }
+                    pwLog('✅ REST REACHED', {
+                        finalX: applied.x,
+                        finalY: applied.y,
+                        power,
+                        timeConstant,
+                        restDelta,
+                        restSpeed
+                    })
+                } else if (mode === 'stop') {
+                    pwLog('[drag] inertia cancelled → sync applied', {
+                        el: EL_ID,
+                        applied: { x: applied.x, y: applied.y }
+                    })
+                } else {
+                    pwLog('[drag] release handed off → cleanup only', {
+                        el: EL_ID,
+                        applied: { x: applied.x, y: applied.y }
                     })
                 }
+
+                // Disarm, but only if we are still the armed release: a later
+                // drag may already have installed its own.
+                if (stopInertia === cancelRelease) stopInertia = null
+                if (detachRelease === handOffRelease) detachRelease = null
+                postReleaseAnimationActive = false
+                // Only an owner paints. After a handoff the axis belongs to
+                // somebody else, and the deferred settle write would put this
+                // gesture's now-stale offset back on their value for a frame.
+                if (mode !== 'handoff') maybeReleaseDragActive()
+                if (mode === 'complete') opts.callbacks?.onTransitionEnd?.()
             }
+
+            detachRelease = handOffRelease
 
             const completeAxis = () => {
                 if (!running) return
                 remainingAnimations--
                 if (remainingAnimations > 0) return
+                finalizeRelease('complete')
+            }
 
-                if (applyX)
-                    applied.x = applyFloatConstraints(latestX, { min: finalMinX, max: finalMaxX })
-                if (applyY)
-                    applied.y = applyFloatConstraints(latestY, { min: finalMinY, max: finalMaxY })
-                setXYImmediate(applied.x, applied.y)
-
-                pwLog('✅ REST REACHED', {
-                    frameCount,
-                    finalX: applied.x,
-                    finalY: applied.y,
-                    power,
-                    timeConstant,
-                    restDelta,
-                    restSpeed
+            const startAxisMomentum = (
+                axisKey: 'x' | 'y',
+                axisVelocity: number,
+                min: number | undefined,
+                max: number | undefined
+            ) => {
+                const release = resolveAxisRelease(axisKey)
+                releases.push({ axisKey, release })
+                // Normalise the value into numeric px space before animating: a
+                // drag over an authored `'40px'` channel leaves a unit STRING
+                // there, which has no numeric mixer.
+                release.value.jump(applied[axisKey] + release.base)
+                untrack.push(trackAxisRelease(axisKey, release))
+                void startAxisRelease(axisKey, release.value, {
+                    ...createDragInertiaOptions({
+                        value: applied[axisKey] + release.base,
+                        velocity: axisVelocity,
+                        min: min === undefined ? undefined : min + release.base,
+                        max: max === undefined ? undefined : max + release.base,
+                        power,
+                        timeConstant,
+                        restDelta,
+                        restSpeed,
+                        modifyTarget: opts.transition?.modifyTarget,
+                        bounceStiffness,
+                        bounceDamping
+                    }),
+                    onComplete: completeAxis
                 })
-
-                running = false
-                stopInertia = null
-                postReleaseAnimationActive = false
-                maybeStopTransformComposer()
-                opts.callbacks?.onTransitionEnd?.()
+                // AFTER our own start, so our own `jump()`/`start()` do not read as
+                // a foreign takeover.
+                untrack.push(watchAxisTakeover(release, handOffRelease))
             }
 
-            if (applyX) {
-                animations.push(
-                    startDragInertia(
-                        {
-                            value: applied.x,
-                            velocity: velocity.x,
-                            min: inertiaMinX,
-                            max: inertiaMaxX,
-                            power,
-                            timeConstant,
-                            restDelta,
-                            restSpeed,
-                            modifyTarget: opts.transition?.modifyTarget,
-                            bounceStiffness,
-                            bounceDamping
-                        },
-                        {
-                            onUpdate: (value) => {
-                                latestX = value
-                                renderLatest()
-                            },
-                            onComplete: completeAxis
-                        }
-                    )
-                )
-            }
+            if (applyX) startAxisMomentum('x', velocity.x, inertiaMinX, inertiaMaxX)
+            if (applyY) startAxisMomentum('y', velocity.y, inertiaMinY, inertiaMaxY)
 
-            if (applyY) {
-                animations.push(
-                    startDragInertia(
-                        {
-                            value: applied.y,
-                            velocity: velocity.y,
-                            min: inertiaMinY,
-                            max: inertiaMaxY,
-                            power,
-                            timeConstant,
-                            restDelta,
-                            restSpeed,
-                            modifyTarget: opts.transition?.modifyTarget,
-                            bounceStiffness,
-                            bounceDamping
-                        },
-                        {
-                            onUpdate: (value) => {
-                                latestY = value
-                                renderLatest()
-                            },
-                            onComplete: completeAxis
-                        }
-                    )
-                )
-            }
-
-            if (!animations.length) {
-                postReleaseAnimationActive = false
-                maybeStopTransformComposer()
-                opts.callbacks?.onTransitionEnd?.()
+            if (!releases.length) {
+                finalizeRelease('complete')
                 return
             }
 
-            stopInertia = () => {
-                pwLog('❌ MOMENTUM CANCELLED')
-                running = false
-                for (const animation of animations) animation.stop()
-                if (applyX) applied.x = latestX
-                if (applyY) applied.y = latestY
-                setXYImmediate(applied.x, applied.y)
-                postReleaseAnimationActive = false
-                maybeStopTransformComposer()
-                pwLog('[drag] inertia cancelled → sync applied', {
-                    el: EL_ID,
-                    applied: { x: applied.x, y: applied.y }
-                })
-                stopInertia = null
-            }
+            stopInertia = cancelRelease
 
             pwLog('🏁 STARTED MOTION-DOM INERTIA', {
-                animations: animations.length,
+                animations: releases.length,
                 applyX,
                 applyY
             })
@@ -1389,39 +1567,81 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             })
 
             postReleaseAnimationActive = true
-            let latestX = applied.x
-            let latestY = applied.y
             let running = true
-            const animations: AnimationPlaybackControlsWithThen[] = []
             const { timeConstant, restDelta, restSpeed, bounceStiffness, bounceDamping } =
                 deriveBoundaryPhysics(maxElastic, opts.transition)
 
-            const renderLatest = () => {
-                if (!running) return
-                setXYImmediate(latestX, latestY)
+            // As on the momentum path: the settle springs drive the axis values.
+            const releases: Array<{ axisKey: 'x' | 'y'; release: AxisRelease }> = []
+            const untrack: Array<() => void> = []
+            const stopTracking = () => {
+                while (untrack.length) untrack.pop()?.()
+            }
+            /** Write the settled offsets back through the axis values. */
+            const paintSettled = () => {
+                for (const { axisKey, release } of releases) {
+                    release.value.set(applied[axisKey] + release.base)
+                }
+                if (!releases.length || releases.some(({ release }) => release.local)) {
+                    setXYImmediate(applied.x, applied.y)
+                }
             }
 
             if (cancelled) {
-                if (applyX) latestX = x
-                if (applyY) latestY = y
-                setXYImmediate(latestX, latestY)
+                if (applyX) applied.x = x
+                if (applyY) applied.y = y
+                setXYImmediate(applied.x, applied.y)
                 postReleaseAnimationActive = false
-                maybeStopTransformComposer()
+                maybeReleaseDragActive()
                 opts.callbacks?.onTransitionEnd?.()
                 return
             }
 
-            const finishSettle = () => {
+            // Declared before `finalizeRelease` so neither can be read in its
+            // temporal dead zone; both only call it later, from callbacks.
+            const cancelRelease = () => finalizeRelease('stop')
+            const handOffRelease = () => finalizeRelease('handoff')
+
+            /**
+             * The ONE release-cleanup path for this settle, idempotent and reached
+             * from every exit route — the momentum branch's `finalizeRelease` with
+             * this branch's clamp/paint. See it for the mode semantics and for why
+             * `onDragTransitionEnd` fires on `'complete'` only.
+             */
+            const finalizeRelease = (mode: 'complete' | 'stop' | 'handoff') => {
                 if (!running) return
-                if (applyX) applied.x = applyFloatConstraints(latestX, { min: minX, max: maxX })
-                if (applyY) applied.y = applyFloatConstraints(latestY, { min: minY, max: maxY })
-                setXYImmediate(applied.x, applied.y)
                 running = false
-                stopInertia = null
+
+                if (mode === 'complete') {
+                    if (applyX)
+                        applied.x = applyFloatConstraints(applied.x, { min: minX, max: maxX })
+                    if (applyY)
+                        applied.y = applyFloatConstraints(applied.y, { min: minY, max: maxY })
+                    stopTracking()
+                    paintSettled()
+                } else if (mode === 'stop') {
+                    pwLog('❌ settle (no momentum) cancelled')
+                    // Per-channel freeze, as on the momentum path.
+                    for (const { release } of releases) release.value.stop()
+                    stopTracking()
+                    if (releases.some(({ release }) => release.local)) {
+                        setXYImmediate(applied.x, applied.y)
+                    }
+                } else {
+                    // Handed off: the new owner drives these values now.
+                    stopTracking()
+                }
+
+                if (stopInertia === cancelRelease) stopInertia = null
+                if (detachRelease === handOffRelease) detachRelease = null
                 postReleaseAnimationActive = false
-                maybeStopTransformComposer()
-                opts.callbacks?.onTransitionEnd?.()
+                // Only an owner paints — see the momentum branch.
+                if (mode !== 'handoff') maybeReleaseDragActive()
+                if (mode === 'complete') opts.callbacks?.onTransitionEnd?.()
             }
+
+            const finishSettle = () => finalizeRelease('complete')
+            detachRelease = handOffRelease
 
             let remainingAnimations = 0
             const completeAxis = () => {
@@ -1430,87 +1650,81 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             }
 
             const addSettleAnimation = (
+                axisKey: 'x' | 'y',
                 from: number,
                 to: number,
                 min: number,
-                max: number,
-                onUpdate: (value: number) => void
+                max: number
             ) => {
                 const shouldSpringBoundary = from < min || from > max
                 if (Math.abs(from - to) < 0.01 && !shouldSpringBoundary) {
-                    onUpdate(to)
+                    applied[axisKey] = to
                     return
                 }
 
+                const release = resolveAxisRelease(axisKey)
+                releases.push({ axisKey, release })
+                release.value.jump(from + release.base)
+                untrack.push(trackAxisRelease(axisKey, release))
+
                 remainingAnimations++
-                animations.push(
+                // Velocity stays 0 on this path, as it was when these springs ran
+                // detached: a no-momentum release is an elastic snap-back, not a
+                // continuation of the pointer's motion.
+                void startAxisRelease(
+                    axisKey,
+                    release.value,
                     shouldSpringBoundary
-                        ? startDragInertia(
-                              {
-                                  value: from,
+                        ? {
+                              ...createDragInertiaOptions({
+                                  value: from + release.base,
                                   velocity: 0,
-                                  min,
-                                  max,
+                                  min: min + release.base,
+                                  max: max + release.base,
                                   power: 0,
                                   timeConstant,
                                   restDelta,
                                   restSpeed,
                                   bounceStiffness,
                                   bounceDamping
-                              },
-                              { onUpdate, onComplete: completeAxis }
-                          )
-                        : animateValue({
-                              keyframes: [from, to],
+                              }),
+                              onComplete: completeAxis
+                          }
+                        : {
+                              keyframes: [from + release.base, to + release.base],
                               type: 'spring',
+                              velocity: 0,
                               stiffness: bounceStiffness,
                               damping: bounceDamping,
                               restDelta,
                               restSpeed,
-                              onUpdate,
                               onComplete: completeAxis
-                          })
+                          }
                 )
+                // AFTER our own start, so our own `jump()`/`start()` do not read as
+                // a foreign takeover.
+                untrack.push(watchAxisTakeover(release, handOffRelease))
             }
 
-            stopInertia = () => {
-                pwLog('❌ settle (no momentum) cancelled')
-                running = false
-                for (const animation of animations) animation.stop()
-                if (applyX) applied.x = latestX
-                if (applyY) applied.y = latestY
-                setXYImmediate(applied.x, applied.y)
-                postReleaseAnimationActive = false
-                maybeStopTransformComposer()
-                stopInertia = null
-            }
+            stopInertia = cancelRelease
 
             if (maxElastic === 0) {
-                latestX = applyX ? x : applied.x
-                latestY = applyY ? y : applied.y
+                if (applyX) applied.x = x
+                if (applyY) applied.y = y
                 finishSettle()
             } else {
-                if (applyX) {
-                    addSettleAnimation(applied.x, x, minX, maxX, (value) => {
-                        latestX = value
-                        renderLatest()
-                    })
-                }
-                if (applyY) {
-                    addSettleAnimation(applied.y, y, minY, maxY, (value) => {
-                        latestY = value
-                        renderLatest()
-                    })
-                }
+                if (applyX) addSettleAnimation('x', applied.x, x, minX, maxX)
+                if (applyY) addSettleAnimation('y', applied.y, y, minY, maxY)
 
-                if (!animations.length) {
+                if (!releases.length) {
                     finishSettle()
                 }
             }
         }
 
+        // Upstream fires `onDragEnd` after `startAnimation`, from a postRender
+        // (`VisualElementDragControls.ts:278-281`).
         opts.callbacks?.onEnd?.(e, computeInfo())
-        endWhileDrag()
     }
 
     // Wire dragControls. The cancelInertia thunk reads the *current*
@@ -1533,9 +1747,15 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
 
     const teardown = () => {
         pwLog('[drag] detach', { el: EL_ID })
+        // Unmount mid-drag must not leak the global lock (upstream releases it
+        // from `cancel()`, which its unmount path also calls).
+        releaseDragLockIfHeld()
         markDragTransformActive(false)
-        stopTransformComposer()
-        stopTransformAnimations()
+        // Drop the bookkeeping of any in-flight release without stopping it: a
+        // detach can be a benign re-attach (the drag effect re-running) while a
+        // legitimate glide is on screen, and the fresh gesture re-derives its
+        // offset from the axis values at drag start anyway.
+        detachRelease?.()
         stopConstraintResizeObserver?.()
         el.removeEventListener('pointerdown', onPointerDown)
         el.removeEventListener('pointermove', onPointerMove as EventListener)

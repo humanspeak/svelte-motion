@@ -35,6 +35,29 @@
             </motion.div>
         </div>
     </section>
+
+    <h2>whilePan keys with no authored value</h2>
+    <p>
+        <code>whilePan</code> also owns keys the element never authored: an animatable one (<code
+            >opacity</code
+        >, over an <code>animate</code> value) and a non-animatable inline one (<code>cursor</code
+        >). Both must revert when the pan ends — the restore has to come from the node's own base
+        target, not from whatever the element happens to look like mid-pan.
+    </p>
+
+    <section>
+        <div class="stage">
+            <motion.div
+                class="card"
+                data-testid="pan-unauthored-keys-card"
+                whilePan={{ opacity: 0.4, cursor: 'grabbing' }}
+                animate={{ opacity: 0.9 }}
+                transition={{ duration: 0.15 }}
+            >
+                animate 0.9 · pan 0.4
+            </motion.div>
+        </div>
+    </section>
 </main>
 
 <style>

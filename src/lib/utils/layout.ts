@@ -1,8 +1,39 @@
+/**
+ * Layout-animation helpers that sit BESIDE motion-dom's projection system.
+ *
+ * What used to be a general "legacy FLIP fallback" is now one narrow, load-bearing
+ * writer plus pure helpers. drag-single-writer 005 audited every entry point with a
+ * reachability probe over all sixteen layout/presence/projection/reorder test routes:
+ *
+ * - The `!projectionAdapter` fallback never fires — the adapter is constructed for
+ *   every client-side motion component, so that disjunct was dead and is gone.
+ * - `layoutId`-without-`layout` used to hand-FLIP here; it now seeds the projection
+ *   (`commitObservedLayoutChange`) like every other layout change.
+ * - The plain-FLIP branch (a direct `transform` write plus `animate(el, …)`) had no
+ *   reachable caller left and is deleted. No transform-animating writer outside the
+ *   VisualElement remains.
+ *
+ * What DOES remain reachable, deliberately: {@link runLayoutSizeAnimation} →
+ * `runBoxSizeAnimation`, the size-corrected layout animation for a SCALING box that
+ * contains `[data-svelte-motion-layout]` descendants. It animates WIDTH/HEIGHT (plus
+ * a positional residual) while the descendants track at identity, because scaling a
+ * text-bearing button distorts its glyphs — projection's scale-correction model
+ * cannot express it. Measured: forcing that case through the projection instead
+ * regresses `e2e/animate-presence/layout-button` ("restores button size after the
+ * page scrolls during layout animation", "wait mode settles copied size when release
+ * happens fully offscreen"). Replacing it means porting width-based size correction
+ * INTO the projection adapter — tracked as a follow-up, out of scope here.
+ *
+ * Pure helpers with live callers: `measureRect`, `computeFlipTransforms`,
+ * `finishFlipAnimations`, `setCompositorHints`, `observeLayoutChanges`,
+ * `selectLayoutDependencies`, `stripNonChildLayoutStyle`, and the two
+ * size-correction events.
+ */
+
 import {
     animate,
     type AnimationOptions,
     type AnimationPlaybackControls,
-    type DOMKeyframesDefinition,
     type ValueAnimationTransition
 } from 'motion'
 
@@ -421,7 +452,7 @@ export const computeFlipTransforms = (
  * @param transforms Deltas computed by `computeFlipTransforms`.
  * @param transition Timing/options for the animation.
  */
-export const runFlipAnimation = (
+export const runLayoutSizeAnimation = (
     el: HTMLElement,
     transforms: {
         dx: number
@@ -433,36 +464,14 @@ export const runFlipAnimation = (
     },
     transition: AnimationOptions
 ): void => {
-    const { dx, dy, sx, sy, shouldTranslate, shouldScale } = transforms
-    if (!(shouldTranslate || shouldScale)) return
+    const { dx, dy, sx, sy, shouldScale } = transforms
+    if (!shouldScale) return
+    // The caller only reaches here for a SCALING box that contains
+    // size-corrected descendants; without one there is nothing this writer does
+    // that the projection does not do better.
+    if (!el.querySelector('[data-svelte-motion-layout]')) return
 
-    const correctionTargets = shouldScale
-        ? Array.from(el.querySelectorAll<HTMLElement>('[data-svelte-motion-layout]'))
-        : []
-
-    if (shouldScale && correctionTargets.length > 0) {
-        runBoxSizeAnimation(el, { dx, dy, sx, sy }, transition)
-        return
-    }
-
-    const keyframes: Record<string, unknown> = {}
-    if (shouldTranslate) {
-        keyframes.x = [dx, 0]
-        keyframes.y = [dy, 0]
-    }
-    if (shouldScale) {
-        keyframes.scaleX = [sx, 1]
-        keyframes.scaleY = [sy, 1]
-    }
-
-    const parts: string[] = []
-    if (shouldTranslate) parts.push(`translate(${dx}px, ${dy}px)`)
-    if (shouldScale) parts.push(`scale(${sx}, ${sy})`)
-    el.style.transformOrigin = '0 0'
-    el.style.transform = parts.join(' ')
-
-    const animation = animate(el, keyframes as unknown as DOMKeyframesDefinition, transition)
-    rememberFlipAnimation(el, animation)
+    runBoxSizeAnimation(el, { dx, dy, sx, sy }, transition)
 }
 
 /**

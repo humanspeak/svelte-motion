@@ -15,7 +15,7 @@ import { expect, test } from '@playwright/test'
  * pointer position (within elastic), not drift back toward 0 / clamp.
  */
 
-import { readDragTranslate, readTranslateX } from '../_helpers/transform'
+import { readDragTranslate, readRotation, readTranslateX } from '../_helpers/transform'
 
 test.describe('drag/settle-cancel', () => {
     test('snapToOrigin animation freezes when user re-grabs without moving', async ({ page }) => {
@@ -173,9 +173,17 @@ test.describe('drag/settle-cancel', () => {
     })
 
     test('release cancellation preserves authored base transform on re-grab', async ({ page }) => {
+        // The authored base is a transform CHANNEL pair (`style={{ x: 40,
+        // rotate: 3 }}`): drag composes onto the same channels, so the authored
+        // offset and tilt must both survive the release-cancel re-grab. The
+        // raw-string form of the same authoring is pinned separately below
+        // (upstream parity — the string is dropped, channels are not).
         await page.goto('/tests/drag/settle-cancel?@isPlaywright=true')
         const card = page.getByTestId('base-transform-card')
         await card.waitFor({ state: 'visible' })
+
+        const authoredRotation = await readRotation(card)
+        expect(authoredRotation).toBeCloseTo(3, 1)
 
         const start = await card.boundingBox()
         if (!start) throw new Error('no start bbox')
@@ -204,5 +212,70 @@ test.describe('drag/settle-cancel', () => {
 
         expect(Math.abs(grabbed.tx - beforeRegrab.tx)).toBeLessThanOrEqual(8)
         expect(Math.abs(held.tx - grabbed.tx)).toBeLessThanOrEqual(8)
+
+        // The authored base itself is still there: the tilt never dropped, and
+        // the painted translation carries the authored +40px on top of the
+        // drag-owned offset (which the constraints cap at 160 + elastic).
+        expect(await readRotation(card)).toBeCloseTo(3, 1)
+        expect(held.tx).toBeGreaterThan(40)
+        await page.waitForTimeout(400)
+        const settled = await readDragTranslate(page, '[data-testid="base-transform-card"]')
+        expect(settled.tx).toBeGreaterThanOrEqual(40)
+        expect(await readRotation(card)).toBeCloseTo(3, 1)
+    })
+
+    /**
+     * Upstream-parity pin (see issue #458).
+     *
+     * An authored transform STRING (`style="transform:translateX(40px)
+     * rotate(3deg)"`) is NOT composed with animated transform channels: the
+     * renderer builds `style.transform` from `latestValues` whenever any
+     * transform channel exists (`buildHTMLStyles` in motion-dom), overwriting
+     * the authored string. React framer-motion drops it identically —
+     * `transformTemplate`, or channel authoring (card 3 above), is the
+     * supported way to keep a transform that must persist.
+     *
+     * FLIP THIS PIN when #458 lands (transformTemplate auto-wrap): the authored
+     * string would then survive, and this test should assert composition
+     * instead of replacement.
+     */
+    test('an authored transform STRING is replaced once drag animates channels', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/settle-cancel?@isPlaywright=true')
+        const card = page.getByTestId('raw-transform-card')
+        await card.waitFor({ state: 'visible' })
+        // Last card on the page: bring it into the viewport before driving the
+        // pointer, or the synthesised coordinates land below the fold.
+        await card.scrollIntoViewIfNeeded()
+
+        // Authored state, before any channel animates: string honoured as-is.
+        expect(await card.evaluate((el) => el.style.transform)).toBe(
+            'translateX(40px) rotate(3deg)'
+        )
+        expect(await readRotation(card)).toBeCloseTo(3, 1)
+
+        const start = await card.boundingBox()
+        if (!start) throw new Error('no start bbox')
+        const cy = start.y + start.height / 2
+        const cx = start.x + start.width / 2
+        await page.mouse.move(cx, cy)
+        await page.mouse.down()
+        await page.mouse.move(cx + 100, cy, { steps: 8 })
+
+        // Drag owns the transform now: channels only, authored string gone.
+        const dragging = await card.evaluate((el) => el.style.transform)
+        expect(dragging).toContain('translateX(')
+        expect(dragging).not.toContain('rotate(')
+        expect(await readRotation(card)).toBeCloseTo(0, 1)
+
+        // The gesture itself still tracks the pointer normally.
+        const draggingTranslate = await readDragTranslate(
+            page,
+            '[data-testid="raw-transform-card"]'
+        )
+        expect(draggingTranslate.tx).toBeGreaterThan(80)
+
+        await page.mouse.up()
     })
 })

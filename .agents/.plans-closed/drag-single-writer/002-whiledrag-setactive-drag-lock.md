@@ -19,7 +19,7 @@
   everywhere), which is exactly why it lands HERE, paired, and not alone
 - **Depends on**: 001-axis-writer-through-ve.md (DONE)
 - **Category**: tech-debt + operator acceptance criterion (#449 follow-up)
-- **Planned at**: commit `bb99032`, 2026-07-25
+- **Planned at**: `04418be` (re-stamped: `bb99032` was squashed away by PRs #454/#457; drag-surface files verified byte-identical to `7eba0bd`; container line references may have shifted with #457's svgEffect removal — locate by grep), 2026-07-25
 
 ## Why this matters
 

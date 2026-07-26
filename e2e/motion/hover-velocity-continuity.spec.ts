@@ -53,7 +53,19 @@ test.describe('Hover→tap velocity continuity', () => {
         // The press fires the first frame the scale crosses 1.15 (spring still
         // climbing hard toward 1.5), and the next frames are sampled with no
         // protocol gap.
-        const { samples, pressIndex, pressScale } = await page.evaluate((sel) => {
+        //
+        // Sampling-gap hardening: the overshoot window is 1–2 frames wide, so a
+        // delayed rAF at the wrong moment makes the PRECONDITION unachievable —
+        // the press lands near the 1.5 peak with little upward velocity left, or
+        // the observation frames right after the press are missing. That is
+        // harness luck, not library behavior. Each attempt therefore VALIDATES
+        // its own precondition (press in the mid-band, measured upward velocity
+        // at press, intact post-press frames) and invalid attempts are retried
+        // after a settle-reset, up to 5 times. The ASSERTIONS below are
+        // unchanged — a velocity-dropping regression still fails every valid
+        // attempt, because a valid attempt guarantees the carried velocity was
+        // really there to observe.
+        const { samples, pressIndex, pressScale, attempts, valid } = await page.evaluate((sel) => {
             const el = document.querySelector(sel) as HTMLElement
             const read = () => {
                 const t = getComputedStyle(el).transform
@@ -70,34 +82,108 @@ test.describe('Hover→tap velocity continuity', () => {
                     buttons: type === 'pointerdown' ? 1 : 0,
                     bubbles: true
                 })
-            return new Promise<{ samples: number[]; pressIndex: number; pressScale: number }>(
-                (resolve) => {
-                    const out: number[] = []
-                    let pressIndex = -1
-                    let pressScale = -1
-                    el.dispatchEvent(pe('pointerenter'))
-                    const start = performance.now()
-                    const tick = () => {
-                        const s = read()
-                        out.push(s)
-                        if (pressIndex === -1 && s > 1.15) {
-                            pressScale = s
-                            pressIndex = out.length
-                            el.dispatchEvent(pe('pointerdown'))
-                        }
-                        if (performance.now() - start < 400) requestAnimationFrame(tick)
-                        else {
-                            window.dispatchEvent(pe('pointerup'))
-                            resolve({ samples: out, pressIndex, pressScale })
-                        }
-                    }
-                    requestAnimationFrame(tick)
+            const raf = () => new Promise<void>((r) => requestAnimationFrame(() => r()))
+
+            const settleToRest = async () => {
+                window.dispatchEvent(pe('pointerup'))
+                el.dispatchEvent(pe('pointerleave'))
+                const deadline = performance.now() + 900
+                while (performance.now() < deadline) {
+                    await raf()
+                    if (Math.abs(read() - 1) < 0.02) return
                 }
-            )
+            }
+
+            type Attempt = {
+                samples: number[]
+                pressIndex: number
+                pressScale: number
+                velocityAtPress: number
+                postGapsOk: boolean
+            }
+            const runOnce = async (): Promise<Attempt> => {
+                const out: number[] = []
+                const times: number[] = []
+                let pressIndex = -1
+                let pressScale = -1
+                let velocityAtPress = 0
+                el.dispatchEvent(pe('pointerenter'))
+                const start = performance.now()
+                while (performance.now() - start < 400) {
+                    await raf()
+                    const now = performance.now()
+                    const s = read()
+                    out.push(s)
+                    times.push(now)
+                    if (pressIndex === -1 && s > 1.15) {
+                        pressScale = s
+                        pressIndex = out.length
+                        const i = out.length - 1
+                        if (i > 0) {
+                            const dt = (times[i] - times[i - 1]) / 1000
+                            velocityAtPress = dt > 0 ? (out[i] - out[i - 1]) / dt : 0
+                        }
+                        el.dispatchEvent(pe('pointerdown'))
+                    }
+                }
+                window.dispatchEvent(pe('pointerup'))
+                // The overshoot peaks ~10-20ms after the press (spring
+                // physics: t_peak ~ v / (k*dx + c*v)), so it is only
+                // observable if the very next frame renders within ~20ms.
+                let postGapsOk = pressIndex > 0 && pressIndex < times.length
+                if (postGapsOk && times[pressIndex] - times[pressIndex - 1] > 20) {
+                    postGapsOk = false
+                }
+                return { samples: out, pressIndex, pressScale, velocityAtPress, postGapsOk }
+            }
+
+            return (async () => {
+                let last: Attempt | null = null
+                for (let attempt = 1; attempt <= 5; attempt++) {
+                    const a = await runOnce()
+                    last = a
+                    const validAttempt =
+                        a.pressIndex > 0 &&
+                        a.pressScale > 1.15 &&
+                        a.pressScale < 1.28 &&
+                        // Physically sufficient, not merely nonzero: at
+                        // v >= 3.5 scale/s the retargeted 550/30 spring
+                        // stays above pressScale for >= ~20ms, so the next
+                        // sampled frame MUST show the overshoot. Below
+                        // that, the overshoot is real but sub-frame — an
+                        // unobservable precondition, so retry.
+                        a.velocityAtPress > 3.5 &&
+                        a.postGapsOk &&
+                        a.samples.length - a.pressIndex > 6
+                    if (validAttempt)
+                        return {
+                            samples: a.samples,
+                            pressIndex: a.pressIndex,
+                            pressScale: a.pressScale,
+                            attempts: attempt,
+                            valid: true
+                        }
+                    await settleToRest()
+                }
+                return {
+                    samples: last?.samples ?? [],
+                    pressIndex: last?.pressIndex ?? -1,
+                    pressScale: last?.pressScale ?? -1,
+                    attempts: 5,
+                    valid: false
+                }
+            })()
         }, SEL)
 
-        // The press must have fired mid-climb — genuinely between rest and the
-        // 1.5 target with plenty of upward velocity left, never at the peak.
+        // The harness must have achieved its precondition within 5 attempts —
+        // a distinct, loud failure mode separate from a behavioral regression.
+        expect(
+            valid,
+            `harness could not land a mid-climb press with measured upward velocity in ${attempts} attempts`
+        ).toBe(true)
+
+        // The press fired mid-climb — the harness validated this (mid-band +
+        // measured upward velocity), but keep the direct pins for the report.
         expect(pressIndex).toBeGreaterThan(0)
         expect(pressScale).toBeGreaterThan(1.1)
         expect(pressScale).toBeLessThan(1.4)

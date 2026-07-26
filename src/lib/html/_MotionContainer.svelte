@@ -26,6 +26,7 @@
     import { sleep } from '$lib/utils/testing'
     import { type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
     import {
+        animateTarget,
         calcBoxDelta,
         cancelFrame,
         createDelta,
@@ -38,14 +39,19 @@
         isVariantLabel,
         transformProps,
         visualElementStore,
+        type AnyResolvedKeyframe,
         type MotionNodeOptions,
         type PresenceContextProps,
-        type MotionValue
+        type MotionValue,
+        type TargetAndTransition,
+        type Transition
     } from 'motion-dom'
     import { isPlaywrightEnv, pwLog } from '$lib/utils/log'
     import { onDestroy, untrack, type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants'
-    import { mergeTransitions, animateWithLifecycle } from '$lib/utils/animation'
+    // `animateWithLifecycle` is gone from this file with whilePan's swap onto
+    // `animateTarget` — the container no longer animates an ELEMENT anywhere.
+    import { mergeTransitions } from '$lib/utils/animation'
     import { isAnimationControls } from '$lib/utils/animationControls.svelte'
     import {
         attachFocusGesture,
@@ -53,15 +59,11 @@
         attachInViewGesture,
         attachPressGesture
     } from '$lib/utils/gestures'
-    import {
-        computeHoverBaseline,
-        readTransformChannels,
-        splitHoverDefinition
-    } from '$lib/utils/hover'
+    import { readTransformChannels } from '$lib/utils/hover'
     import {
         measureRect,
         computeFlipTransforms,
-        runFlipAnimation,
+        runLayoutSizeAnimation,
         finishFlipAnimations,
         setCompositorHints,
         observeLayoutChanges,
@@ -312,32 +314,6 @@
         return refs.filter((el): el is HTMLElement => Boolean(el))
     }
 
-    const splitSerializedTransform = (style: string): { rest: string; transform: string } => {
-        const rest: string[] = []
-        let transform = ''
-
-        for (const declaration of style.split(';')) {
-            const trimmed = declaration.trim()
-            if (!trimmed) continue
-
-            const separator = trimmed.indexOf(':')
-            if (separator === -1) {
-                rest.push(trimmed)
-                continue
-            }
-
-            const property = trimmed.slice(0, separator).trim()
-            const value = trimmed.slice(separator + 1).trim()
-            if (property === 'transform') {
-                transform = value === 'none' ? '' : value
-            } else {
-                rest.push(trimmed)
-            }
-        }
-
-        return { rest: rest.join('; '), transform }
-    }
-
     const serializedStyleProp = $derived(serializeMotionStyle(styleProp, transformTemplateProp))
     // The user-authored transform, sourced from the `style` prop rather
     // than the live inline transform — the latter already carries any
@@ -356,33 +332,16 @@
         }
         return values
     }
-    // The gesture baseline getters (`baseStyleValues`, `captureBaseStyleValues`,
-    // `getBaseStyleValues`) and hover's `liveGestureTransformValues` mirror lived
-    // here. Gone with plan 003: gestures no longer write the element's transform —
-    // they flip `setActive` and the animationState animates the same MotionValues
-    // everything else uses, so `latestValues` is the single source for gesture
-    // transforms too, and hover-end restoration is the animationState's
-    // removed-key handling via `baseTarget` (what `getBaseStyleValues`
-    // approximated).
-    //
-    // `liveGestureTransform` itself STAYS: despite the name it is DRAG's composed
-    // transform channel (`attachDrag`'s `onVisualUpdate` writes it), and drag is
-    // plan 005's subject. It keeps its splice into the serialized style so a
-    // Svelte style rewrite cannot drop a live drag transform.
-    let liveGestureTransform = $state<string | null>(null)
-    const serializedStyleWithLiveGestureTransform = $derived.by(() => {
-        if (!liveGestureTransform) return serializedStyleProp
-
-        const { rest } = splitSerializedTransform(serializedStyleProp)
-        return `${rest}${rest ? '; ' : ''}transform: ${liveGestureTransform}`
-    })
-
-    $effect(() => {
-        if (!element || !liveGestureTransform) return
-        if (element.style.transform === liveGestureTransform) return
-
-        element.style.transform = liveGestureTransform
-    })
+    // Every gesture writer that used to live here is gone. Hover/tap/focus/inView
+    // flip `setActive` (plan 003) and drag writes the node's axis values
+    // (drag-single-writer 001), so `latestValues` is the single source for every
+    // animated channel and the VisualElement is the single writer of the element's
+    // style. The pieces this replaced, in order: the gesture baseline getters
+    // (`baseStyleValues`/`captureBaseStyleValues`/`getBaseStyleValues` —
+    // superseded by the animationState's `baseTarget` handling of removed keys),
+    // hover's `liveGestureTransformValues` mirror, and drag's `liveGestureTransform`
+    // composed-string splice with the effect that re-wrote `element.style.transform`
+    // from it.
 
     const resolvePresenceCustom = () => {
         const presenceCustom = context?.custom
@@ -1309,13 +1268,14 @@
     const waitEnterBlockedBeforeMount = $derived(
         context?.mode === 'wait' && !waitEnterReleased && context.isEnterBlocked(presenceKey)
     )
-    // The three holds this string carries are RETAINED verbatim through the
-    // plan-002 collapse — none of them is an animated-key concern:
-    //   1. the `liveGestureTransform` splice (gestures stay legacy until 003),
-    //   2. the wait-mode `display:none` holds,
-    //   3. the `pathLength` mounting `visibility:hidden` hold.
+    // The holds this string carries are RETAINED verbatim through the plan-002
+    // collapse — neither is an animated-key concern:
+    //   1. the wait-mode `display:none` holds,
+    //   2. the `pathLength` mounting `visibility:hidden` hold.
+    // (A third hold, drag's `liveGestureTransform` splice, is gone with the
+    // single-writer swap — the VisualElement composes the live drag transform.)
     const inlineStyleBaseWithHolds = $derived(
-        `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleWithLiveGestureTransform};visibility:hidden` : serializedStyleWithLiveGestureTransform}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`
+        `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleProp};visibility:hidden` : serializedStyleProp}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`
     )
 
     /**
@@ -1359,16 +1319,6 @@
         visualElement.values.forEach((value, key) => {
             values[key] = value.get()
         })
-        // A live DRAG transform is spliced into the base string above and must
-        // win: drop the transform channels so the merge cannot override it with
-        // the resting composition. Hover/tap/focus/inView no longer take this
-        // path at all — they animate `latestValues` (plan 003). Drag moves onto
-        // the VE in plan 005, and this splice goes with it.
-        if (liveGestureTransform) {
-            for (const key of Object.keys(values)) {
-                if (transformProps.has(key)) delete values[key]
-            }
-        }
         // An SVG element other than `<svg>` itself renders every non-transform
         // animated value on the ATTRIBUTE channel: `buildSVGAttrs` moves
         // `state.style` wholesale into `state.attrs` and `renderSVG` writes them
@@ -1560,30 +1510,14 @@
                 onDirectionLock: onDirectionLockProp as (axis: 'x' | 'y') => void,
                 onTransitionEnd: () => {
                     onDragTransitionEndProp?.()
-                },
-                onVisualUpdate: (transform: string, values: Record<string, string | number>) => {
-                    liveGestureTransform = transform || null
-                    // Mirror drag's composed channels into the node.
-                    //
-                    // Drag still writes `element.style.transform` itself (plan
-                    // 005 moves it onto the VE), but the VE now composes the
-                    // transform for EVERY other source from `latestValues`. Once
-                    // gestures went through the animationState, a hover-end render
-                    // composed only `scale` and wiped a settled drag translate —
-                    // the case the retired hover writer covered by merging drag's
-                    // live channels. Mirroring keeps both writers producing the
-                    // same composition until 005 unifies them.
-                    //
-                    // Only channels the node does NOT already own: a bound style
-                    // MotionValue (e.g. the mobile drawer's `y`) is already in
-                    // `latestValues` AND is a baseline source drag composes from,
-                    // so mirroring it would apply the offset twice.
-                    if (!visualElement) return
-                    for (const [key, value] of Object.entries(values)) {
-                        if (visualElement.values.has(key)) continue
-                        visualElement.setStaticValue(key, value)
-                    }
                 }
+                // `onVisualUpdate` is gone with the drag-channel mirror: drag
+                // writes the node's own values, so mirroring composed channels
+                // back into `latestValues` had nothing left to contribute.
+                // Measured before deletion (drag-single-writer 001 Step 4): ZERO
+                // mirror writes across brutalist-stage, while-drag-transforms,
+                // settle-cancel and the mobile drawer, against 350/66/2/0 writes
+                // for the same probe on the pre-001 writer.
             },
             baselineSources: dragRuntimeOptions.baselineSources,
             getBaseTransformValues: dragRuntimeOptions.getBaseTransformValues,
@@ -1639,8 +1573,23 @@
      *    keyframes leak.
      */
     let teardownPan: AttachPanCleanup | null = null
-    let activeWhilePanKeyframes: Record<string, unknown> | null = null
-    let whilePanBaseline: Record<string, unknown> | null = null
+    /**
+     * The pre-pan target for every key `whilePan` took over, captured at
+     * pan-start and replayed at pan-end.
+     *
+     * `whilePan` is a svelte-motion EXTENSION: upstream has `onPan*` callbacks
+     * but no pan variant type, so `variantPriorityOrder` has no slot for it and
+     * it cannot ride `animationState.setActive` without forking motion-dom's
+     * fixed type list. It therefore animates the node's MotionValues directly via
+     * `animateTarget` — single-writer compliant and velocity-continuous — with
+     * the restore driven by the node's OWN base target
+     * (`getBaseTarget`/`readValue`), which is what the animationState would use
+     * for a removed key. Consequence of being outside the resolver: priority
+     * against whileHover/whileTap is by construction (pan owns the pointer
+     * session), not resolver-enforced. If upstream ever adds a pan type, this
+     * becomes a `setActive` call and this map goes away.
+     */
+    let whilePanRestore: Record<string, unknown> | null = null
 
     /**
      * Boolean presence-check for "is any pan surface active?". Derived
@@ -1668,42 +1617,43 @@
     } => ({
         onSessionStart: onPanSessionStartProp,
         onStart: (event, info) => {
-            if (resolvedWhilePan && element) {
-                // Snapshot the values we'll revert to BEFORE applying — same
-                // `computeHoverBaseline` path the other while-* gestures
-                // (whileHover/whileFocus/drag) use. Covers animatable transform
-                // shorthands (scale, rotate, x, y) AND restores non-animatable
-                // inline writes (cursor, pointer-events) since the baseline
-                // sniffs `animate` → `initial` → computed style → inline style.
-                whilePanBaseline = computeHoverBaseline(element, {
-                    initial: initialKeyframes ?? {},
-                    animate: (resolvedAnimate ?? {}) as Record<string, unknown>,
-                    whileHover: (resolvedWhilePan ?? {}) as Record<string, unknown>,
-                    baseValues: getStyleTransformValues()
+            if (resolvedWhilePan && visualElement) {
+                const definition = resolvedWhilePan as Record<string, unknown>
+                // Capture what each key reverts to BEFORE animating, from the
+                // node itself: `getBaseTarget` is the same source the
+                // animationState uses when a key drops out of a target
+                // (props.initial → props.style → the value read at creation).
+                // `readValue` is the fallback for a key whilePan INTRODUCES —
+                // motion-dom's own instance reader, which hydrates `baseTarget`
+                // as a side effect. Deliberately NOT a computed-style snapshot:
+                // that reads whatever is on screen, including an in-flight
+                // animation's mid-frame value.
+                const restore: Record<string, unknown> = {}
+                for (const key of Object.keys(definition)) {
+                    if (key === 'transition') continue
+                    const base = visualElement.getBaseTarget(key)
+                    restore[key] =
+                        base ?? visualElement.readValue(key, definition[key] as AnyResolvedKeyframe)
+                }
+                whilePanRestore = restore
+                // `animateTarget` destructures `transition` out of the definition
+                // itself, so the nested-transition form needs no pre-split.
+                animateTarget(visualElement, definition as TargetAndTransition, {
+                    transitionOverride: definition.transition
+                        ? undefined
+                        : (mergedTransition as Transition | undefined)
                 })
-                const { keyframes, transition } = splitHoverDefinition(
-                    resolvedWhilePan as Record<string, unknown>
-                )
-                activeWhilePanKeyframes = keyframes
-                animateWithLifecycle(
-                    element,
-                    keyframes as unknown as DOMKeyframesDefinition,
-                    transition ?? mergedTransition ?? {}
-                )
             }
             onPanStartProp?.(event, info)
         },
         onMove: onPanProp,
         onEnd: (event, info) => {
-            if (activeWhilePanKeyframes && whilePanBaseline && element) {
-                animateWithLifecycle(
-                    element,
-                    whilePanBaseline as unknown as DOMKeyframesDefinition,
-                    mergedTransition ?? {}
-                )
+            if (whilePanRestore && visualElement) {
+                animateTarget(visualElement, whilePanRestore as TargetAndTransition, {
+                    transitionOverride: mergedTransition as Transition | undefined
+                })
             }
-            activeWhilePanKeyframes = null
-            whilePanBaseline = null
+            whilePanRestore = null
             onPanEndProp?.(event, info)
         }
     })
@@ -1754,8 +1704,7 @@
             // natural release won't replay the lifecycle pair.
             teardownPan?.()
             teardownPan = null
-            activeWhilePanKeyframes = null
-            whilePanBaseline = null
+            whilePanRestore = null
         }
     })
 
@@ -2481,11 +2430,11 @@
                 const shouldUseSizeCorrectedFallback =
                     transforms.shouldScale && hasSizeCorrectionTarget
 
-                if (motionDomProjection && !shouldUseSizeCorrectedFallback) {
-                    motionDomProjection.commitObservedLayoutChange(previous)
-                } else {
+                if (shouldUseSizeCorrectedFallback) {
                     finishFlipAnimations(element!)
-                    runFlipAnimation(element!, transforms, mergedTransition ?? {})
+                    runLayoutSizeAnimation(element!, transforms, mergedTransition ?? {})
+                } else {
+                    motionDomProjection?.commitObservedLayoutChange(previous)
                 }
             }
         }
@@ -2515,16 +2464,13 @@
             const hasSizeCorrectionTarget = !!element!.querySelector('[data-svelte-motion-layout]')
             const shouldUseSizeCorrectedFallback = transforms.shouldScale && hasSizeCorrectionTarget
 
-            if (
-                !shouldSkipLayoutAnimation &&
-                (!motionDomProjection || shouldUseSizeCorrectedFallback)
-            ) {
+            if (!shouldSkipLayoutAnimation && shouldUseSizeCorrectedFallback) {
                 finishFlipAnimations(element!)
-                runFlipAnimation(element!, transforms, mergedTransition ?? {})
+                runLayoutSizeAnimation(element!, transforms, mergedTransition ?? {})
             }
             if (!shouldSkipLayoutAnimation && hasRectChanged(previous, next)) {
-                if (motionDomProjection && !shouldUseSizeCorrectedFallback) {
-                    motionDomProjection.commitObservedLayoutChange(previous)
+                if (!shouldUseSizeCorrectedFallback) {
+                    motionDomProjection?.commitObservedLayoutChange(previous)
                 }
             } else if (shouldSkipLayoutAnimation) {
                 motionDomProjection?.finishAnimation()
@@ -2577,8 +2523,22 @@
         }
     })
 
-    // Shared layout animation via layoutId.
-    // On mount, consume the previous snapshot and FLIP from its position.
+    /**
+     * Shared layout animation via `layoutId`: on mount, consume the departing
+     * element's snapshot and animate from its position.
+     *
+     * `layout`-carrying nodes already ran through the projection
+     * (`commitObservedLayoutChange` on the observer path), and since
+     * drag-single-writer 005 so does a `layoutId`-only node: the snapshot rect
+     * seeds the projection the same way an observed layout change does, so the
+     * animation is a projection transform on the node's own VisualElement rather
+     * than a hand-written FLIP.
+     *
+     * One behavioural consequence, deliberate: the animation now uses the
+     * ARRIVING element's transition (the node's own projection option) instead of
+     * the departing element's snapshotted one. That matches upstream, where a
+     * shared-layout animation is driven by the promoted node.
+     */
     $effect(() => {
         if (
             !(
@@ -2595,11 +2555,7 @@
         if (!prev) return // First appearance, no animation needed
         if (motionDomProjection && layoutProp) return
 
-        const next = measureRect(element, resolveLayoutScrollAncestors())
-        const transforms = computeFlipTransforms(prev.rect, next, true)
-
-        setCompositorHints(element, true)
-        runFlipAnimation(element, transforms, prev.transition ?? mergedTransition ?? {})
+        motionDomProjection?.commitObservedLayoutChange(prev.rect)
     })
 
     // ── Gestures (#449 plan 003) ─────────────────────────────────────────────

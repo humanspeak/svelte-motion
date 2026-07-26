@@ -1,6 +1,13 @@
-import { motionValue } from 'motion-dom'
+import {
+    isDragActive,
+    motionValue,
+    visualElementStore,
+    type MotionValue,
+    type VisualElement
+} from 'motion-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { applyElastic, attachDrag, buildDragTransform, resolveConstraints } from './drag.js'
+import { createDragControls } from './dragControls.js'
 
 vi.mock('motion', () => {
     const animateMock = vi.fn(() => ({ finished: Promise.resolve() }))
@@ -8,6 +15,43 @@ vi.mock('motion', () => {
 })
 const { animate: animateMock } = (await import('motion')) as unknown as {
     animate: ReturnType<typeof vi.fn> & { mockClear: () => void; mock: { calls: unknown[][] } }
+}
+
+/**
+ * Minimal stand-in for the element's VisualElement, registered in motion-dom's
+ * `visualElementStore` exactly as a mounted node would be.
+ *
+ * Drag resolves its writer handles from that store (upstream
+ * `VisualElementDragControls.getAxisMotionValue`), so a stub is enough to pin
+ * WHAT drag writes and WHEN it renders, without standing up a real renderer.
+ */
+const registerStubNode = (element: HTMLElement, seed: Record<string, number> = {}) => {
+    const values = new Map<string, MotionValue>()
+    const latestValues: Record<string, unknown> = { ...seed }
+    const render = vi.fn()
+    const node = {
+        values,
+        latestValues,
+        render,
+        scheduleRender: vi.fn(),
+        setStaticValue: (key: string, value: unknown) => {
+            latestValues[key] = value
+        },
+        getValue: (key: string, defaultValue?: number) => {
+            let value = values.get(key)
+            if (!value) {
+                value = motionValue(defaultValue ?? 0)
+                values.set(key, value)
+                latestValues[key] = value.get()
+                value.on('change', (latest) => {
+                    latestValues[key] = latest
+                })
+            }
+            return value
+        }
+    }
+    visualElementStore.set(element, node as unknown as VisualElement)
+    return node
 }
 
 describe('utils/drag', () => {
@@ -103,6 +147,169 @@ describe('utils/drag', () => {
         cleanup()
     })
 
+    it('writes the axis MotionValues on the VisualElement and renders synchronously', () => {
+        const el = document.createElement('div')
+        document.body.appendChild(el)
+        const node = registerStubNode(el)
+
+        const cleanup = attachDrag(el, { axis: true, mergedTransition: { duration: 0 } })
+        el.dispatchEvent(
+            new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 1 })
+        )
+        el.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: 40, clientY: 25, pointerId: 1 })
+        )
+
+        // The gesture owns the node's x/y channels — no composed string of its
+        // own, so the VisualElement stays the single writer of `transform`.
+        expect(node.values.get('x')?.get()).toBe(30)
+        expect(node.values.get('y')?.get()).toBe(15)
+        expect(node.latestValues.x).toBe(30)
+        expect(node.latestValues.y).toBe(15)
+        // Synchronous render per pointer batch (upstream
+        // `VisualElementDragControls.ts:216`) — a pointermove must paint in the
+        // frame it arrives in.
+        expect(node.render).toHaveBeenCalled()
+        expect(el.style.transform).toBe('')
+        expect(el.dataset.svelteMotionDragTransform).toBeUndefined()
+
+        el.dispatchEvent(new PointerEvent('pointerup', { clientX: 40, clientY: 25, pointerId: 1 }))
+        cleanup()
+        el.remove()
+    })
+
+    it('composes an unbound drag axis onto its authored channel value', () => {
+        const el = document.createElement('div')
+        document.body.appendChild(el)
+        // Authored `style={{ x: 40 }}`: drag is an offset from the authored
+        // channel, and both live on the same node value.
+        const node = registerStubNode(el, { x: 40 })
+
+        const cleanup = attachDrag(el, {
+            axis: 'x',
+            mergedTransition: { duration: 0 },
+            getBaseTransformValues: () => ({ x: 40 })
+        })
+        el.dispatchEvent(
+            new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 1 })
+        )
+        el.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: 35, clientY: 10, pointerId: 1 })
+        )
+
+        expect(node.values.get('x')?.get()).toBe(65)
+        cleanup()
+        el.remove()
+    })
+
+    describe('global drag lock', () => {
+        // A leaked lock is worse than no lock: `isDragActive()` gates
+        // motion-dom's own hover()/press() recognizers globally, so every route
+        // out of a drag session is pinned here.
+        const drag = (el: HTMLElement, id = 1) => {
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 5, clientY: 5, pointerId: id })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 25, clientY: 5, pointerId: id })
+            )
+        }
+
+        it('holds the lock for the pointer session and releases it on pointerup', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const cleanup = attachDrag(el, { axis: 'x', mergedTransition: { duration: 0 } })
+
+            expect(isDragActive()).toBe(false)
+            drag(el)
+            expect(isDragActive()).toBe(true)
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: 25, clientY: 5, pointerId: 1 })
+            )
+            // Released at pointer-up, NOT after the momentum glide — this is what
+            // lets hover respond mid-glide (e2e/drag/hover-during-glide).
+            expect(isDragActive()).toBe(false)
+
+            cleanup()
+            el.remove()
+        })
+
+        it('releases the lock on pointercancel and on teardown mid-drag', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const cleanup = attachDrag(el, { axis: 'x', mergedTransition: { duration: 0 } })
+
+            drag(el)
+            window.dispatchEvent(
+                new PointerEvent('pointercancel', { clientX: 25, clientY: 5, pointerId: 1 })
+            )
+            expect(isDragActive()).toBe(false)
+
+            // Unmount mid-drag: teardown is the only remaining exit.
+            drag(el, 2)
+            expect(isDragActive()).toBe(true)
+            cleanup()
+            expect(isDragActive()).toBe(false)
+            el.remove()
+        })
+
+        it('does not take the lock when propagation is allowed', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                mergedTransition: { duration: 0 },
+                propagation: true
+            })
+
+            drag(el)
+            // `dragPropagation` opts out of the lock so nested draggables move
+            // together — upstream `VisualElementDragControls.ts:121`.
+            expect(isDragActive()).toBe(false)
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: 25, clientY: 5, pointerId: 1 })
+            )
+            cleanup()
+            el.remove()
+        })
+
+        it('a second element cannot start a drag while the lock is held', () => {
+            const first = document.createElement('div')
+            const second = document.createElement('div')
+            document.body.append(first, second)
+            const stopFirst = attachDrag(first, { axis: 'x', mergedTransition: { duration: 0 } })
+            const onStart = vi.fn()
+            const stopSecond = attachDrag(second, {
+                axis: 'x',
+                mergedTransition: { duration: 0 },
+                callbacks: { onStart }
+            })
+
+            drag(first)
+            second.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 5, clientY: 5, pointerId: 9 })
+            )
+            expect(onStart).not.toHaveBeenCalled()
+
+            // …and once the first session ends, the second element can drag.
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: 25, clientY: 5, pointerId: 1 })
+            )
+            drag(second, 10)
+            expect(onStart).toHaveBeenCalled()
+            expect(isDragActive()).toBe(true)
+
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: 25, clientY: 5, pointerId: 10 })
+            )
+            expect(isDragActive()).toBe(false)
+            stopFirst()
+            stopSecond()
+            first.remove()
+            second.remove()
+        })
+    })
+
     it('attachDrag: ends the gesture when a child stops pointerup propagation (motion#3731)', () => {
         const el = document.createElement('div')
         const child = document.createElement('button')
@@ -156,5 +363,140 @@ describe('utils/drag', () => {
         )
         expect(callbacks.onEnd).toHaveBeenCalledTimes(2)
         cleanup()
+    })
+
+    describe('release cleanup routes', () => {
+        /**
+         * One idempotent `finalizeRelease` serves every way a release can end.
+         * These pin all four routes, and in particular that `onDragTransitionEnd`
+         * fires ONLY for a release that ran out naturally — upstream's
+         * `Promise.all(momentumAnimations).then(onDragTransitionEnd)`
+         * (`VisualElementDragControls.ts:511`) never settles for an interrupted
+         * release, because `MotionValue.start()` resolves only from the
+         * animation's `onComplete` (motion-dom `value/index.mjs:260-274`) and
+         * `JSAnimation.stop()` calls `onStop` instead
+         * (`animation/JSAnimation.mjs:44-54`).
+         */
+        const fling = (el: HTMLElement, id = 1) => {
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: id })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 60, clientY: 10, pointerId: id })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 140, clientY: 10, pointerId: id })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: 140, clientY: 10, pointerId: id })
+            )
+        }
+
+        /** A stand-in foreign animation, registered as the value's own. */
+        const takeOver = (value: MotionValue) =>
+            void value.start(() => ({ stop: vi.fn() }) as never)
+
+        it('route 1 — natural completion fires onDragTransitionEnd exactly once', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            registerStubNode(el)
+            const onTransitionEnd = vi.fn()
+
+            // `elastic: 0` with no momentum settles synchronously, which is the
+            // natural-completion route with no frameloop in the way.
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                elastic: 0,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                callbacks: { onTransitionEnd }
+            })
+            fling(el)
+
+            expect(onTransitionEnd).toHaveBeenCalledTimes(1)
+            cleanup()
+            el.remove()
+        })
+
+        it('route 2 — our own cancel stops the axis and skips onDragTransitionEnd', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const node = registerStubNode(el)
+            const onTransitionEnd = vi.fn()
+            const controls = createDragControls()
+
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                controls,
+                mergedTransition: { duration: 0 },
+                callbacks: { onTransitionEnd }
+            })
+            fling(el)
+            const x = node.values.get('x') as MotionValue
+            expect(x.isAnimating()).toBe(true)
+
+            controls.cancel()
+
+            expect(x.isAnimating()).toBe(false)
+            expect(onTransitionEnd).not.toHaveBeenCalled()
+            cleanup()
+            el.remove()
+        })
+
+        it('route 3 — a foreign takeover cleans up without stopping the new owner', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const node = registerStubNode(el)
+            const onTransitionEnd = vi.fn()
+            const controls = createDragControls()
+
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                controls,
+                mergedTransition: { duration: 0 },
+                callbacks: { onTransitionEnd }
+            })
+            fling(el)
+            const x = node.values.get('x') as MotionValue
+
+            takeOver(x)
+            expect(x.isAnimating()).toBe(true)
+            expect(onTransitionEnd).not.toHaveBeenCalled()
+
+            // The dead release disarmed itself, so cancelling the finished drag
+            // cannot reach an axis it no longer owns.
+            controls.cancel()
+            expect(x.isAnimating()).toBe(true)
+
+            cleanup()
+            el.remove()
+        })
+
+        it('route 4 — teardown drops the bookkeeping without killing the glide', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const node = registerStubNode(el)
+            const onTransitionEnd = vi.fn()
+            const controls = createDragControls()
+
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                controls,
+                mergedTransition: { duration: 0 },
+                callbacks: { onTransitionEnd }
+            })
+            fling(el)
+            const x = node.values.get('x') as MotionValue
+
+            // A detach can be a benign re-attach (the drag effect re-running), so
+            // a legitimate glide must survive it.
+            cleanup()
+            expect(x.isAnimating()).toBe(true)
+            expect(onTransitionEnd).not.toHaveBeenCalled()
+
+            controls.cancel()
+            expect(x.isAnimating()).toBe(true)
+            el.remove()
+        })
     })
 })
