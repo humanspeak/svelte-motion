@@ -13,6 +13,16 @@ batch every element-style write in the library flows through one VE per
 component, and hover responds during the post-release glide (the operator's
 criterion).
 
+Reached, with one measured exception (see 005): no TRANSFORM-animating writer
+outside the VisualElement remains anywhere in the library. The single surviving
+element writer is `runBoxSizeAnimation` — the size-corrected WIDTH/HEIGHT
+animation for a scaling box containing `[data-svelte-motion-layout]`
+descendants, which motion-dom's scale-based projection cannot express (scaling a
+text-bearing button distorts its glyphs). Forcing that case through the
+projection regresses two `animate-presence/layout-button` specs; replacing it
+means porting width-based size correction into the projection adapter, ledgered
+as a follow-up. Presence clones remain excepted, pending the clone-exit batch.
+
 ## Execution order & status
 
 | Plan | Title                                                           | Priority | Effort | Risk | Depends on | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
