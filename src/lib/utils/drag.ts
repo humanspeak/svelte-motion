@@ -1440,7 +1440,10 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 if (stopInertia === cancelRelease) stopInertia = null
                 if (detachRelease === handOffRelease) detachRelease = null
                 postReleaseAnimationActive = false
-                maybeReleaseDragActive()
+                // Only an owner paints. After a handoff the axis belongs to
+                // somebody else, and the deferred settle write would put this
+                // gesture's now-stale offset back on their value for a frame.
+                if (mode !== 'handoff') maybeReleaseDragActive()
                 if (mode === 'complete') opts.callbacks?.onTransitionEnd?.()
             }
 
@@ -1632,7 +1635,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 if (stopInertia === cancelRelease) stopInertia = null
                 if (detachRelease === handOffRelease) detachRelease = null
                 postReleaseAnimationActive = false
-                maybeReleaseDragActive()
+                // Only an owner paints — see the momentum branch.
+                if (mode !== 'handoff') maybeReleaseDragActive()
                 if (mode === 'complete') opts.callbacks?.onTransitionEnd?.()
             }
 

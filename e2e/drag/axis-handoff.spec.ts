@@ -198,4 +198,9 @@ test.describe('drag/axis-handoff', () => {
         ).toBeGreaterThan(-70)
         expect(moved).toBeLessThan(-50)
     })
+
+    test('is linked from the root test index', async ({ page }) => {
+        await page.goto('/?@isPlaywright=true')
+        await expect(page.locator('a[href*="/tests/drag/axis-handoff"]')).toHaveCount(1)
+    })
 })

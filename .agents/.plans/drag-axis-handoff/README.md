@@ -12,7 +12,7 @@ with cleanup that misses foreign interruption. Both repaid here red-first.
 
 | Plan | Title                                     | Priority | Effort | Risk | Depends on | Status |
 | ---- | ----------------------------------------- | -------- | ------ | ---- | ---------- | ------ |
-| 001  | Axis ownership at start + release cleanup | P1       | M      | MED  | —          | TODO   |
+| 001  | Axis ownership at start + release cleanup | P1       | M      | MED  | —          | DONE   |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED | REJECTED
 
@@ -25,3 +25,23 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED | REJECTED
 - Guard provenance for the findings is in this plan's Why section and the
   archived `drag-single-writer/002-*.guard-report.md` (the accepted ordering
   deviation this repays).
+
+## Executor note (001, verify-don't-assume outcomes)
+
+Both of plan 001's verify-don't-assume clauses were resolved against the
+installed sources, and one falsified the plan's own sketch:
+
+1. **motion-dom animation promises do NOT settle on stop.**
+   `MotionValue.start()` resolves only from the animation's `onComplete`
+   (`value/index.mjs:260-274`) and `JSAnimation.stop()` calls `onStop`
+   (`animation/JSAnimation.mjs:44-54`). So Step 4's preferred mechanism was
+   unusable; the sanctioned fallback — the value's own
+   `animationStart`/`animationCancel` events — is what shipped.
+2. **Upstream SKIPS `onDragTransitionEnd` on interruption.** It hangs off
+   `Promise.all(momentumAnimations).then(onDragTransitionEnd)`
+   (`VisualElementDragControls.ts:511`), which by (1) never settles for an
+   interrupted release. Step 4's "match what upstream DOES" therefore
+   overrides Step 1c's sketched "fires exactly once": the spec and the unit
+   pins assert 0 on interruption, and scenario (c) observes "cleanup runs"
+   through its real consequence instead — a stale `stopInertia` freezing the
+   axis's new owner when the finished drag is cancelled.
