@@ -15,13 +15,13 @@ criterion).
 
 ## Execution order & status
 
-| Plan | Title                                                           | Priority | Effort | Risk | Depends on | Status |
-| ---- | --------------------------------------------------------------- | -------- | ------ | ---- | ---------- | ------ |
-| 001  | Drag axis writer through VE values (+ coalescing re-measure)    | P2       | M      | HIGH | —          | TODO   |
-| 002  | whileDrag via setActive + global drag lock (+ glide-hover spec) | P2       | M      | MED  | 001        | TODO   |
-| 003  | Inertia + settle retargeted onto axis values                    | P2       | S      | MED  | 001        | TODO   |
-| 004  | whilePan through VE values (extension semantics)                | P3       | S      | MED  | 001        | TODO   |
-| 005  | Retire the legacy layout FLIP fallback                          | P3       | S      | MED  | 001        | TODO   |
+| Plan | Title                                                           | Priority | Effort | Risk | Depends on | Status                                                                                                                                                                                                                                                                                |
+| ---- | --------------------------------------------------------------- | -------- | ------ | ---- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 001  | Drag axis writer through VE values (+ coalescing re-measure)    | P2       | M      | HIGH | —          | BLOCKED — Step 2 landed; Step 3 preserved on `plan001-step3-attempt` (`30b89cc`): an authored RAW `style="transform:…"` cannot be composed by the VE (`e2e/drag/settle-cancel` #401 card drops its 40px + 3deg base), and the fix is container-side, which plan 001 puts out of scope |
+| 002  | whileDrag via setActive + global drag lock (+ glide-hover spec) | P2       | M      | MED  | 001        | TODO                                                                                                                                                                                                                                                                                  |
+| 003  | Inertia + settle retargeted onto axis values                    | P2       | S      | MED  | 001        | TODO                                                                                                                                                                                                                                                                                  |
+| 004  | whilePan through VE values (extension semantics)                | P3       | S      | MED  | 001        | TODO                                                                                                                                                                                                                                                                                  |
+| 005  | Retire the legacy layout FLIP fallback                          | P3       | S      | MED  | 001        | TODO                                                                                                                                                                                                                                                                                  |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
