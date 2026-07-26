@@ -5,8 +5,9 @@ monolith's re-scope proved itself: what took the original attempt to a
 sanctioned BLOCKED completed in five gated runs with one plan-defect ruling
 and zero behavioral regressions.
 **Closed at** the batch-final gate, 2026-07-26 · **Batch planned at** `04418be`
-**Integrated** — not pushed; operator tour drive precedes the PR
-(`/tests/drag-signoff`).
+**Integrated** — PR opened after operator sign-off:
+<https://github.com/humanspeak/svelte-motion/pull/459> (refs #449, #401,
+#456, #458). Merging remains the operator's call.
 
 ## Plan-by-plan (each has its own guard report beside it)
 
