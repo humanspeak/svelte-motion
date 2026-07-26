@@ -44,11 +44,13 @@ import {
     getValueAsType,
     motionValue,
     numberValueTypes,
+    visualElementStore,
     type AnimationPlaybackControlsWithThen,
     type AnyResolvedKeyframe,
     type MotionValue,
     type TransformTemplate,
-    type ValueAnimationTransition
+    type ValueAnimationTransition,
+    type VisualElement
 } from 'motion-dom'
 
 /**
@@ -498,8 +500,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         string,
         { value: MotionValue<AnyResolvedKeyframe>; unsubscribe: () => void }
     >()
-    let transformComposerRaf = 0
-    let transformComposerActive = false
+    // Which axis channels this gesture has taken ownership of on the node.
+    const axisWriteStarted = { x: false, y: false }
     let postReleaseAnimationActive = false
     let whileDragRestoreActive = false
     let whileDragAnimationGeneration = 0
@@ -584,22 +586,47 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             : null
 
     /**
-     * Write the complete live transform directly and synchronously.
+     * The VisualElement that renders `el`, resolved from motion-dom's
+     * `visualElementStore` and cached for the gesture's lifetime.
      *
-     * Drag translation, projection compensation, style/animate baselines,
-     * and active gesture transforms all flow through motion-dom's canonical
-     * `buildTransform` ordering. The synchronous + microtask + rAF writes are
-     * intentional: projection compensation must paint in the same frame as a
-     * layout swap (#379), while the follow-up writes win races with reactive
-     * style effects without adding pointer lag.
+     * Resolved lazily rather than at attach time: `attachDrag` runs from its own
+     * Svelte effect, so the node may or may not have been mounted into the store
+     * by then, and the lookup is a WeakMap hit.
+     *
+     * `null` only outside a motion component (unit tests, standalone
+     * `attachDrag`), which takes the composed-string fallback below.
+     */
+    let cachedNode: VisualElement | null = null
+    const getNode = (): VisualElement | null => {
+        if (!cachedNode) cachedNode = visualElementStore.get(el) ?? null
+        return cachedNode
+    }
+
+    /**
+     * Write the live drag position through the element's VisualElement.
+     *
+     * Upstream's drag controls own no writer of their own: they set the axis
+     * MotionValues from `visualElement.getValue(axis, …)` and call
+     * `visualElement.render()` synchronously
+     * (`VisualElementDragControls.ts:319-337`, `:544-556`, `:216`). This is that
+     * model. The VE composes drag translation together with every other channel
+     * from `latestValues`, so there is exactly one transform writer — the triple
+     * sync/microtask/rAF write and the `data-svelte-motion-drag-transform`
+     * bookkeeping existed only to win races against writers that no longer exist
+     * (#449).
+     *
+     * The render is SYNCHRONOUS, matching upstream: a pointermove must paint in
+     * the frame it arrives in, and projection compensation must paint in the same
+     * frame as the layout swap that caused it (#379).
      */
     const setXYImmediate = (x: number, y: number) => {
         if (dragX) applied.x = x
         if (dragY) applied.y = y
 
-        // Bound MotionValues remain the public source of truth (#421). Update
-        // them before reading base transform values so the full composer sees
-        // the same value that styleEffect will render.
+        // Bound MotionValues remain the public source of truth (#421) — and
+        // post-#449 a bound style MotionValue IS the node's axis value
+        // (`ve.values.get('y') === ve.props.style.y`), so this already is the
+        // VisualElement write for that axis.
         if (boundX && boundX.get() !== x) boundX.set(x)
         if (boundY && boundY.get() !== y) boundY.set(y)
 
@@ -608,6 +635,12 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             ...restingTransformValues,
             ...gestureTransformValues
         }
+        // The authored/resting channel values BEFORE the gesture offsets, used as
+        // the created axis value's default so a removed target animates back to
+        // the authored channel rather than to zero (upstream passes
+        // `latestValues[axis] ?? 0` for the same reason).
+        const baseX = latestValues.x
+        const baseY = latestValues.y
 
         // Unbound drag axes are offsets from their authored/resting channel.
         // Bound axes are already represented by getBaseTransformValues().
@@ -621,8 +654,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         }
 
         // Preserve the bound-MotionValue empty writer branch: when every drag
-        // axis is styleEffect-owned and no gesture/projection channel is active,
-        // there is nothing for this synchronous path to paint (#421).
+        // axis is node-owned and no gesture/projection channel is active, this
+        // path has nothing of its own to paint (#421).
         const shouldWrite =
             (dragX && !boundX) ||
             (dragY && !boundY) ||
@@ -630,6 +663,43 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             crossAxisOffset.y !== 0 ||
             Object.keys(gestureTransformValues).length > 0
 
+        const node = getNode()
+        if (node) {
+            if (shouldWrite) {
+                // Non-axis channels (whileDrag overrides, authored style
+                // channels) go into the node's `latestValues` so its single
+                // composition sees them. Channels the node owns as MotionValues
+                // are left alone unless a whileDrag animation is overriding
+                // them — that override is drag's, and it must win for as long as
+                // the gesture holds it.
+                for (const [key, value] of Object.entries(latestValues)) {
+                    if (key === 'x' || key === 'y') continue
+                    if (node.values.has(key) && !(key in gestureTransformValues)) continue
+                    node.setStaticValue(key, value)
+                }
+                if (dragX && !boundX) axisWriteStarted.x = true
+                if (dragY && !boundY) axisWriteStarted.y = true
+                if (crossAxisOffset.x !== 0) axisWriteStarted.x = true
+                if (crossAxisOffset.y !== 0) axisWriteStarted.y = true
+                // Once an axis has been written it keeps being written, so a
+                // cross-axis offset returning to zero paints its way back to the
+                // authored channel instead of freezing at the last offset.
+                if (axisWriteStarted.x && !boundX) {
+                    node.getValue('x', baseX ?? 0).set(latestValues.x ?? 0)
+                }
+                if (axisWriteStarted.y && !boundY) {
+                    node.getValue('y', baseY ?? 0).set(latestValues.y ?? 0)
+                }
+            }
+            opts.callbacks?.onVisualUpdate?.('', latestValues)
+            node.render()
+            return
+        }
+
+        // No VisualElement (standalone `attachDrag`, unit tests): compose once,
+        // synchronously. Nothing else writes this element's transform, so the
+        // race-winning repeats the VE model makes redundant are not needed here
+        // either.
         let composedTransform = ''
         if (shouldWrite) {
             composedTransform =
@@ -638,46 +708,25 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                     opts.getBaseTransform?.() ?? '',
                     opts.transformTemplate
                 ) || 'none'
-            el.dataset.svelteMotionDragTransform = composedTransform
-            const writeComposedTransform = () => {
-                if (el.dataset.svelteMotionDragTransform !== composedTransform) return
-                el.style.transform = composedTransform
-            }
-
-            writeComposedTransform()
-            queueMicrotask(writeComposedTransform)
-            requestAnimationFrame(writeComposedTransform)
+            el.style.transform = composedTransform
         }
         opts.callbacks?.onVisualUpdate?.(composedTransform, latestValues)
     }
 
-    const startTransformComposer = () => {
-        if (transformComposerActive) return
-        transformComposerActive = true
-
-        const tick = () => {
-            if (!transformComposerActive) return
-            setXYImmediate(applied.x, applied.y)
-            transformComposerRaf = requestAnimationFrame(tick)
-        }
-
-        transformComposerRaf = requestAnimationFrame(tick)
-    }
-
-    const stopTransformComposer = () => {
-        transformComposerActive = false
-        if (!transformComposerRaf) return
-        cancelAnimationFrame(transformComposerRaf)
-        transformComposerRaf = 0
-    }
-
-    const maybeStopTransformComposer = () => {
+    /**
+     * Release the drag-active flag once the gesture and every post-release
+     * animation have finished. Deferred by a frame so a re-grab (or a settle
+     * that starts on the next frame) keeps the flag continuously set.
+     *
+     * The flag itself is plan 002's subject: it is the guard that suppresses
+     * hover/press while a drag owns the element.
+     */
+    const maybeReleaseDragActive = () => {
         if (dragging || postReleaseAnimationActive || whileDragRestoreActive) return
 
         requestAnimationFrame(() => {
             if (dragging || postReleaseAnimationActive || whileDragRestoreActive) return
             setXYImmediate(applied.x, applied.y)
-            stopTransformComposer()
             markDragTransformActive(false)
         })
     }
@@ -737,13 +786,21 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         ) as AnyResolvedKeyframe
         const value = motionValue<AnyResolvedKeyframe>(current)
         gestureTransformValues[key] = current
-        // Record only: the transform composer's frame loop is the single
-        // writer and repaints the latest channel values once per frame.
-        // Composing here as well multiplies the per-frame work by the number
-        // of animated channels (N getBaseTransformValues() scans + N
-        // buildTransform calls per frame).
+        // Mirror the channel onto the node and let the VisualElement coalesce:
+        // `scheduleRender()` de-duplicates per frame (`VisualElement.mjs:136-142`),
+        // so N animating channels still cost ONE composition + one style write
+        // per frame. Recomposing here per channel instead would multiply the
+        // per-frame work by the number of animated channels — the duplication
+        // `e2e/drag/while-drag-write-coalescing.spec.ts` budgets against.
         const unsubscribe = value.on('change', (latest) => {
             gestureTransformValues[key] = latest
+            const node = getNode()
+            if (!node) {
+                setXYImmediate(applied.x, applied.y)
+                return
+            }
+            node.setStaticValue(key, latest)
+            node.scheduleRender()
         })
         transformAnimations.set(key, { value, unsubscribe })
         setXYImmediate(applied.x, applied.y)
@@ -819,7 +876,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         const { keyframes, transition } = splitHoverDefinition(
             opts.whileDrag as Record<string, unknown>
         )
-        startTransformComposer()
         const { transform, native: nativeKeyframes } = splitTransformValues(keyframes)
         for (const [key, target] of Object.entries(transform)) {
             startTransformAnimation(key, target, transition)
@@ -832,7 +888,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     const endWhileDrag = () => {
         const baseline = whileDragBaseline
         if (!baseline || Object.keys(baseline).length === 0) {
-            maybeStopTransformComposer()
+            maybeReleaseDragActive()
             return
         }
         whileDragRestoreActive = true
@@ -850,7 +906,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             for (const key of Object.keys(transform)) delete gestureTransformValues[key]
             setXYImmediate(applied.x, applied.y)
             whileDragRestoreActive = false
-            maybeStopTransformComposer()
+            maybeReleaseDragActive()
         }
 
         const restorePromises: PromiseLike<unknown>[] = []
@@ -930,7 +986,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         lastPoint = { ...startPoint }
         velocity = { x: 0, y: 0 }
         history = [{ x: e.clientX, y: e.clientY, t: now() }]
-        startTransformComposer()
 
         const applyXAxis = axis === true || axis === 'x'
         const applyYAxis = axis === true || axis === 'y'
@@ -1241,7 +1296,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 running = false
                 stopInertia = null
                 postReleaseAnimationActive = false
-                maybeStopTransformComposer()
+                maybeReleaseDragActive()
                 opts.callbacks?.onTransitionEnd?.()
             }
 
@@ -1301,7 +1356,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
 
             if (!animations.length) {
                 postReleaseAnimationActive = false
-                maybeStopTransformComposer()
+                maybeReleaseDragActive()
                 opts.callbacks?.onTransitionEnd?.()
                 return
             }
@@ -1314,7 +1369,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 if (applyY) applied.y = latestY
                 setXYImmediate(applied.x, applied.y)
                 postReleaseAnimationActive = false
-                maybeStopTransformComposer()
+                maybeReleaseDragActive()
                 pwLog('[drag] inertia cancelled → sync applied', {
                     el: EL_ID,
                     applied: { x: applied.x, y: applied.y }
@@ -1406,7 +1461,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 if (applyY) latestY = y
                 setXYImmediate(latestX, latestY)
                 postReleaseAnimationActive = false
-                maybeStopTransformComposer()
+                maybeReleaseDragActive()
                 opts.callbacks?.onTransitionEnd?.()
                 return
             }
@@ -1419,7 +1474,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 running = false
                 stopInertia = null
                 postReleaseAnimationActive = false
-                maybeStopTransformComposer()
+                maybeReleaseDragActive()
                 opts.callbacks?.onTransitionEnd?.()
             }
 
@@ -1481,7 +1536,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 if (applyY) applied.y = latestY
                 setXYImmediate(applied.x, applied.y)
                 postReleaseAnimationActive = false
-                maybeStopTransformComposer()
+                maybeReleaseDragActive()
                 stopInertia = null
             }
 
@@ -1534,7 +1589,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     const teardown = () => {
         pwLog('[drag] detach', { el: EL_ID })
         markDragTransformActive(false)
-        stopTransformComposer()
         stopTransformAnimations()
         stopConstraintResizeObserver?.()
         el.removeEventListener('pointerdown', onPointerDown)
