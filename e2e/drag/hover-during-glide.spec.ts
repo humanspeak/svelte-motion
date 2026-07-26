@@ -68,13 +68,22 @@ test.describe('drag/hover-during-glide', () => {
             `glide travelled ${Math.abs(stillMoving.tx - left.tx).toFixed(2)}px while the pointer was away`
         ).toBeGreaterThan(2)
 
-        // Re-enter the card at its CURRENT position, mid-glide.
-        const midBox = await card.boundingBox()
-        if (!midBox) throw new Error('no mid bbox')
-        await page.mouse.move(midBox.x + midBox.width / 2, midBox.y + midBox.height / 2)
-
-        // Sample the next frames: hover must engage while the glide continues.
+        // Re-enter the card mid-glide. The card is MOVING, so a single move at a
+        // stale bounding box can land behind its trailing edge and never
+        // hit-test onto it: chase its live position until a move lands on the
+        // card (each attempt is one real pointermove, so `pointerenter` fires the
+        // moment one does).
         const samples: Array<{ tx: number; scale: number }> = []
+        for (let attempt = 0; attempt < 12; attempt++) {
+            const midBox = await card.boundingBox()
+            if (!midBox) throw new Error('no mid bbox')
+            await page.mouse.move(midBox.x + midBox.width / 2, midBox.y + midBox.height / 2)
+            const sample = await readState(page)
+            samples.push(sample)
+            if (sample.scale > 1.05) break
+        }
+
+        // Sample the following frames: hover must engage while the glide continues.
         for (let frame = 0; frame < 30; frame++) {
             samples.push(await readState(page))
             await page.evaluate(() => new Promise(requestAnimationFrame))

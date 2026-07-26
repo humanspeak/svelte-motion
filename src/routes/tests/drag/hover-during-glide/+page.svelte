@@ -9,8 +9,10 @@
      * suppressed hover until the glide had fully settled, which is stricter than
      * upstream and was visible in review.
      *
-     * The card is deliberately unconstrained with a long momentum tail, so the
-     * glide lasts long enough to move the pointer off and back on again.
+     * The card is deliberately unconstrained with a LONG, SLOW momentum tail: the
+     * glide has to outlast moving the pointer off and back on, and the card has
+     * to stay under a stationary pointer long enough for the hover animation to
+     * be observable while it is still travelling.
      */
     import { motion } from '$lib'
 </script>
@@ -32,7 +34,7 @@
             data-testid="glide-card"
             drag="x"
             dragMomentum
-            dragTransition={{ power: 1.1, timeConstant: 1100, restDelta: 0.5, restSpeed: 4 }}
+            dragTransition={{ power: 0.45, timeConstant: 2600, restDelta: 0.4, restSpeed: 2 }}
             whileHover={{ scale: 1.3 }}
             whileDrag={{ cursor: 'grabbing' }}
             transition={{ type: 'spring', stiffness: 260, damping: 22 }}

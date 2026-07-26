@@ -38,6 +38,7 @@ import {
 import { type AnimationOptions } from 'motion'
 import {
     animateValue,
+    setDragLock,
     visualElementStore,
     type AnimationPlaybackControlsWithThen,
     type AnyResolvedKeyframe,
@@ -494,12 +495,67 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     let postReleaseAnimationActive = false
     let stopInertia: (() => void) | null = null
 
+    /**
+     * Per-element marker for "this element is being dragged RIGHT NOW".
+     *
+     * No longer a gesture guard — motion-dom's own `hover()`/`press()` filter on
+     * the global drag lock this module now holds. It survives for the
+     * container's layout-observer branch, which needs to know whether THIS
+     * element (not any element) owns a live drag, so a slot change routes to
+     * `adjustOrigin` cursor pinning instead of a FLIP
+     * (`_MotionContainer.svelte`, grep `svelteMotionDragActive`). A global flag
+     * cannot answer that question.
+     *
+     * Session-scoped, exactly like the lock: set at drag start, cleared at
+     * pointer-up/cancel. `adjustOrigin` is a no-op outside a live drag anyway,
+     * so the marker and the behaviour it gates now agree.
+     */
     const markDragTransformActive = (active: boolean) => {
         if (active) {
             el.dataset.svelteMotionDragActive = 'true'
         } else {
             delete el.dataset.svelteMotionDragActive
         }
+    }
+
+    /**
+     * The global drag lock's release function while this gesture holds it.
+     *
+     * Upstream acquires the lock at drag-session start and releases it from
+     * `cancel()` — i.e. at pointer-up, BEFORE the momentum animation starts
+     * (`VisualElementDragControls.ts:118-128` and `:300-303`). That is what
+     * makes hover respond during the post-release glide: the glide is not a
+     * gesture. motion-dom's `hover()`/`press()` consult the same lock
+     * internally (`gestures/hover.mjs` `isValidHover`, `gestures/press/index.mjs`
+     * `isValidPressEvent`), so holding it is all the suppression this library
+     * needs.
+     */
+    let releaseDragLock: (() => void) | null = null
+
+    /**
+     * Take the global drag lock for this gesture.
+     *
+     * `dragPropagation` (our `propagation`) opts out of the lock entirely, which
+     * is how upstream allows nested draggables to move together. Without it, a
+     * second element cannot start a drag while this one holds the lock —
+     * upstream returns from `onStart` in that case, and so do we.
+     *
+     * @returns `true` when the drag may proceed.
+     */
+    const acquireDragLock = (): boolean => {
+        if (opts.propagation) return true
+        // Release a stale lock from a previous session on this element first
+        // (upstream does the same before re-acquiring).
+        if (releaseDragLock) releaseDragLock()
+        releaseDragLock = setDragLock(axis) ?? null
+        return releaseDragLock !== null
+    }
+
+    /** Release the global lock if this gesture holds it. Idempotent. */
+    const releaseDragLockIfHeld = () => {
+        if (!releaseDragLock) return
+        releaseDragLock()
+        releaseDragLock = null
     }
 
     const computeInfo = (): DragInfo => ({
@@ -797,6 +853,13 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             pointer: { id: e.pointerId, x: e.clientX, y: e.clientY },
             snapToCursor
         })
+        // Take the global lock FIRST: an aborted start must not capture the
+        // pointer, cancel in-flight inertia, or touch any gesture state
+        // (upstream returns from `onStart` before recording the origin).
+        if (!acquireDragLock()) {
+            pwLog('[drag] another drag holds the lock → not starting', { el: EL_ID })
+            return
+        }
         try {
             if ('setPointerCapture' in el && typeof e.pointerId === 'number')
                 el.setPointerCapture(e.pointerId)
@@ -1001,6 +1064,13 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     const finishDrag = (e: PointerEvent, cancelled = false) => {
         dragging = false
         postReleaseAnimationActive = false
+        // The SESSION ends here — at pointer-up/cancel, before any momentum
+        // animation starts. Both the global lock and the per-element marker are
+        // session-scoped (upstream `cancel()` releases the lock from `stop()`
+        // before `startAnimation`), so hover and press respond during the glide
+        // that follows.
+        releaseDragLockIfHeld()
+        markDragTransformActive(false)
 
         velocity = computeReleaseVelocity(history, now())
 
@@ -1442,6 +1512,9 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
 
     const teardown = () => {
         pwLog('[drag] detach', { el: EL_ID })
+        // Unmount mid-drag must not leak the global lock (upstream releases it
+        // from `cancel()`, which its unmount path also calls).
+        releaseDragLockIfHeld()
         markDragTransformActive(false)
         stopConstraintResizeObserver?.()
         el.removeEventListener('pointerdown', onPointerDown)

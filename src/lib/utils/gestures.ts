@@ -21,23 +21,20 @@
 import type { MotionViewport } from '$lib/types.js'
 import { addDomEvent, frame, hover, press, type VisualElement } from 'motion-dom'
 
-/** Dataset flag our drag writer sets while a drag is in flight. */
-const DRAG_ACTIVE_ATTRIBUTE = 'svelteMotionDragActive'
-
-/**
- * Whether a drag currently owns this element.
+/*
+ * Drag suppression is NOT handled here any more.
  *
- * motion-dom's own `hover()`/`press()` filter on the global drag lock
- * (`isDragActive`), but our drag implementation does not set that lock yet —
- * plan 005 moves it over. Until then the dataset flag our drag writer already
- * maintains is the guard, so a drag gesture cannot trigger a hover/press
- * variant mid-drag.
- *
- * @param element The gesture target.
- * @returns `true` while a drag is active on the element.
+ * `drag.ts` holds motion-dom's global drag lock for the duration of a drag
+ * SESSION (`setDragLock`, released at pointer-up), and the recognizers this
+ * module wraps consult that lock themselves before they ever call back:
+ * `hover()` filters on `isValidHover` → `!(touch || isDragActive())`
+ * (`motion-dom/dist/es/gestures/hover.mjs:4-6`) and `press()` on
+ * `isValidPressEvent` → `isPrimaryPointer(event) && !isDragActive()`
+ * (`gestures/press/index.mjs:14-16`). The per-element dataset guard this file
+ * used to consult is gone with the lock's arrival, and suppression now matches
+ * upstream exactly: active while the pointer is down, released for the
+ * post-release momentum glide.
  */
-const isDragActiveOn = (element: Element): boolean =>
-    (element as HTMLElement).dataset?.[DRAG_ACTIVE_ATTRIBUTE] === 'true'
 
 /**
  * Activate a variant type on the node, when the matching prop exists.
@@ -95,8 +92,6 @@ export const attachHoverGesture = (
     callbacks?: HoverGestureCallbacks
 ): (() => void) => {
     return hover(element, () => {
-        // See `isDragActiveOn` — plan 005 replaces this with the global lock.
-        if (isDragActiveOn(element)) return
         setGestureActive(visualElement, 'whileHover', true)
         postRender(callbacks?.onHoverStart)
 
@@ -136,7 +131,7 @@ export const attachPressGesture = (
     const isDisabledButton = () => element instanceof HTMLButtonElement && element.disabled
 
     return press(element, () => {
-        if (isDisabledButton() || isDragActiveOn(element)) return
+        if (isDisabledButton()) return
         setGestureActive(visualElement, 'whileTap', true)
         postRender(callbacks?.onTapStart)
 
