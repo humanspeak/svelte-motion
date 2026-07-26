@@ -62,6 +62,7 @@ RED evidence, spike-measured survivorship.
 
 ## Operator sign-off
 
-PENDING — tour at `/tests/drag-signoff` (six sections; §1 is the
-hover-during-glide headline). The ve-signoff tour's §7 panel is updated from
-KNOWN to RESOLVED, cross-linking the new tour.
+**COMPLETE (2026-07-26)** — operator drove the tour at `/tests/drag-signoff`
+and approved ("working wonderfully"). Guard additionally smoke-verified the
+headline live: mid-glide `translateX(180px)` composing with hover
+`scale(1.25)` on the same frame.
