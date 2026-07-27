@@ -6,6 +6,10 @@
     let legacyExitCount = $state(0)
     let ownedExitCount = $state(0)
     let ownedCanvas: HTMLCanvasElement | undefined = $state()
+    let legacyInput: HTMLInputElement | undefined = $state()
+    let ownedInput: HTMLInputElement | undefined = $state()
+    let legacyFocusStatus = $state('focus the input, then press Escape')
+    let ownedFocusStatus = $state('focus the input, then press Escape')
 
     const comparisonExit = { opacity: 0, y: -32, rotate: -3, scale: 0.92 }
     const comparisonTransition = { duration: 0.8, ease: 'linear' as const }
@@ -18,6 +22,53 @@
     const resetBoth = () => {
         legacyVisible = true
         ownedVisible = true
+        legacyFocusStatus = 'focus the input, then press Escape'
+        ownedFocusStatus = 'focus the input, then press Escape'
+    }
+
+    const toggleLegacy = () => {
+        legacyVisible = !legacyVisible
+        if (legacyVisible) {
+            legacyFocusStatus = 'focus the input, then press Escape'
+        }
+    }
+
+    const toggleOwned = () => {
+        ownedVisible = !ownedVisible
+        if (ownedVisible) {
+            ownedFocusStatus = 'focus the input, then press Escape'
+        }
+    }
+
+    const exitLegacyFromFocusedInput = (event: KeyboardEvent) => {
+        if (event.key !== 'Escape') return
+        event.preventDefault()
+        legacyVisible = false
+        requestAnimationFrame(() => {
+            legacyFocusStatus =
+                document.activeElement === legacyInput
+                    ? 'focus retained during exit'
+                    : 'focus lost on removal'
+        })
+    }
+
+    const exitOwnedFromFocusedInput = (event: KeyboardEvent) => {
+        if (event.key !== 'Escape') return
+        event.preventDefault()
+        ownedVisible = false
+        requestAnimationFrame(() => {
+            ownedFocusStatus =
+                document.activeElement === ownedInput
+                    ? 'focus retained during exit'
+                    : 'focus moved before exit'
+        })
+    }
+
+    const completeOwnedExit = () => {
+        ownedExitCount += 1
+        if (ownedFocusStatus === 'focus retained during exit') {
+            ownedFocusStatus = 'focus released after unmount'
+        }
     }
 
     $effect(() => {
@@ -115,8 +166,21 @@
                                 <b style="height: 42%"></b>
                             </div>
                             <label>
-                                DOM input
-                                <input data-testid="legacy-input" value="focus is lost" />
+                                DOM input · focus test
+                                <input
+                                    bind:this={legacyInput}
+                                    data-testid="legacy-input"
+                                    value="press Escape to exit"
+                                    aria-describedby="legacy-focus-instruction"
+                                    onfocus={() =>
+                                        (legacyFocusStatus = 'input focused — press Escape')}
+                                    onblur={() => {
+                                        if (legacyVisible) {
+                                            legacyFocusStatus = 'focus moved before exit'
+                                        }
+                                    }}
+                                    onkeydown={exitLegacyFromFocusedInput}
+                                />
                             </label>
                         </motion.div>
                     {/if}
@@ -127,14 +191,19 @@
             </div>
 
             <div class="lane-controls">
-                <button
-                    data-testid="legacy-toggle"
-                    onclick={() => (legacyVisible = !legacyVisible)}
-                >
+                <button data-testid="legacy-toggle" onclick={toggleLegacy}>
                     {legacyVisible ? 'Exit clone path' : 'Mount new node'}
                 </button>
                 <output data-testid="legacy-exit-count">
                     exits completed: {legacyExitCount}
+                </output>
+            </div>
+            <div class="focus-proof">
+                <p id="legacy-focus-instruction">
+                    Focus the input, then press <kbd>Esc</kbd> without clicking this lane’s button.
+                </p>
+                <output data-testid="legacy-focus-status" aria-live="polite">
+                    {legacyFocusStatus}
                 </output>
             </div>
 
@@ -171,10 +240,7 @@
 
             <div class="stage">
                 <div class="stage-grid"></div>
-                <AnimatePresence
-                    present={ownedVisible}
-                    onExitComplete={() => (ownedExitCount += 1)}
-                >
+                <AnimatePresence present={ownedVisible} onExitComplete={completeOwnedExit}>
                     {#snippet child()}
                         <motion.div
                             data-testid="owned-child"
@@ -196,8 +262,21 @@
                                 aria-label="Live canvas retained during exit"
                             ></canvas>
                             <label>
-                                DOM input
-                                <input data-testid="owned-input" value="focus is retained" />
+                                DOM input · focus test
+                                <input
+                                    bind:this={ownedInput}
+                                    data-testid="owned-input"
+                                    value="press Escape to exit"
+                                    aria-describedby="owned-focus-instruction"
+                                    onfocus={() =>
+                                        (ownedFocusStatus = 'input focused — press Escape')}
+                                    onblur={() => {
+                                        if (ownedVisible) {
+                                            ownedFocusStatus = 'focus moved before exit'
+                                        }
+                                    }}
+                                    onkeydown={exitOwnedFromFocusedInput}
+                                />
                             </label>
                         </motion.div>
                     {/snippet}
@@ -208,11 +287,19 @@
             </div>
 
             <div class="lane-controls">
-                <button data-testid="owned-toggle" onclick={() => (ownedVisible = !ownedVisible)}>
+                <button data-testid="owned-toggle" onclick={toggleOwned}>
                     {ownedVisible ? 'Exit real node' : 'Mount / reverse'}
                 </button>
                 <output data-testid="owned-exit-count">
                     exits completed: {ownedExitCount}
+                </output>
+            </div>
+            <div class="focus-proof">
+                <p id="owned-focus-instruction">
+                    Focus the input, then press <kbd>Esc</kbd> without clicking this lane’s button.
+                </p>
+                <output data-testid="owned-focus-status" aria-live="polite">
+                    {ownedFocusStatus}
                 </output>
             </div>
 
@@ -595,6 +682,46 @@
     output {
         color: #929da8;
         font-size: 0.62rem;
+    }
+
+    .focus-proof {
+        display: grid;
+        gap: 8px;
+        padding: 12px 16px;
+        border-bottom: 1px solid #343a40;
+        background: #090d10;
+    }
+
+    .focus-proof p {
+        margin: 0;
+        color: #929da8;
+        font-family: ui-monospace, monospace;
+        font-size: 0.68rem;
+        line-height: 1.5;
+    }
+
+    .focus-proof kbd {
+        border: 1px solid #56606a;
+        border-bottom-width: 2px;
+        background: #171c21;
+        padding: 1px 5px;
+        color: #f8fafc;
+        font: inherit;
+    }
+
+    .focus-proof output {
+        width: fit-content;
+        border: 1px solid currentColor;
+        padding: 5px 7px;
+        letter-spacing: 0.06em;
+    }
+
+    .legacy .focus-proof output {
+        color: #fda4af;
+    }
+
+    .owned .focus-proof output {
+        color: #5eead4;
     }
 
     dl {

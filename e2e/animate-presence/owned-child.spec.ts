@@ -56,13 +56,18 @@ test.describe('AnimatePresence owned child', () => {
             )
             .toBe(255)
         await input.focus()
-
-        await page
-            .getByTestId('owned-toggle')
-            .evaluate((button: HTMLButtonElement) => button.click())
+        await input.press('Escape')
         await page.waitForTimeout(120)
 
         await expect(input).toBeFocused()
+        await expect(page.getByTestId('owned-focus-status')).toHaveText(
+            'focus retained during exit'
+        )
+        expect(
+            await page
+                .getByTestId('owned-child')
+                .evaluate((node) => Number.parseFloat(getComputedStyle(node).opacity))
+        ).toBeLessThan(0.95)
         const pixel = await canvas.evaluate((node: HTMLCanvasElement) => [
             ...node.getContext('2d')!.getImageData(12, 12, 1, 1).data
         ])
@@ -70,6 +75,29 @@ test.describe('AnimatePresence owned child', () => {
         expect(pixel[1]).toBeGreaterThan(pixel[2])
         expect(pixel[3]).toBe(255)
         await expect(page.locator('[data-clone="true"]')).toHaveCount(0)
+        await expect(input).toHaveCount(0)
+        await expect(page.getByTestId('owned-focus-status')).toHaveText(
+            'focus released after unmount'
+        )
+    })
+
+    test('makes legacy focus loss visible when the original is removed', async ({ page }) => {
+        await gotoOwnedChild(page)
+        const input = page.getByTestId('legacy-input')
+        await input.focus()
+        await input.press('Escape')
+        await page.waitForTimeout(120)
+
+        await expect(page.getByTestId('legacy-focus-status')).toHaveText('focus lost on removal')
+        await expect(
+            page.locator(
+                '[data-testid="legacy-child"]:not([data-clone="true"]) [data-testid="legacy-input"]'
+            )
+        ).toHaveCount(0)
+        await expect(page.locator('[data-testid="legacy-child"][data-clone="true"]')).toHaveCount(1)
+        expect(
+            await page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? null)
+        ).not.toBe('legacy-input')
     })
 
     test('cancels an exit on re-entry without replacing the node', async ({ page }) => {
