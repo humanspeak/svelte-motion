@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { Snippet } from 'svelte'
+    import PresenceChild from '$lib/components/PresenceChild.svelte'
     import type { AnimatePresenceMode } from '$lib/types'
     import {
         createAnimatePresenceContext,
@@ -15,23 +16,50 @@
      * animations can run after teardown. When a motion element unmounts, a
      * styled clone is animated out before being removed from the DOM.
      *
-     * @prop children Slotted content participating in presence.
+     * Pass `present` with a named `child` snippet when AnimatePresence should
+     * own the conditional rendering. This keeps the real DOM node mounted
+     * until its exit completes instead of animating a clone.
+     *
+     * @prop children Legacy slotted content participating through clone exits.
+     * @prop child Named snippet retained for a real-node exit. Requires `present`.
+     * @prop present Whether the owned `child` snippet is present. Requires `child`.
      * @prop initial When false, children skip their enter animation on initial mount.
      * @prop custom Data forwarded to exiting dynamic variants.
      * @prop mode Controls enter/exit coordination: 'sync' (default), 'wait', or 'popLayout'.
      * @prop onExitComplete Optional callback invoked once all exits complete.
      */
-    type Props = {
-        children?: Snippet
+    type SharedProps = {
         custom?: unknown
         initial?: boolean
         mode?: AnimatePresenceMode
         onExitComplete?: () => void
     }
 
+    type Props = SharedProps &
+        (
+            | {
+                  children?: Snippet
+                  child?: never
+                  present?: never
+              }
+            | {
+                  children?: never
+                  child: Snippet
+                  present: boolean
+              }
+        )
+
     // `$props<T>()` is the removed Svelte 4-era form: Svelte 5's `$props()` takes
     // no type argument, so it resolved to `any` and these props were untyped.
-    let { children, custom, initial = true, mode = 'sync', onExitComplete }: Props = $props()
+    let {
+        children,
+        child,
+        present,
+        custom,
+        initial = true,
+        mode = 'sync',
+        onExitComplete
+    }: Props = $props()
 
     pwLog('[AnimatePresence] mounting', {
         initial,
@@ -56,7 +84,13 @@
 </script>
 
 <div class="animate-presence-container">
-    {@render children?.()}
+    {#if child}
+        <PresenceChild present={present ?? true}>
+            {@render child()}
+        </PresenceChild>
+    {:else}
+        {@render children?.()}
+    {/if}
 </div>
 
 <style>

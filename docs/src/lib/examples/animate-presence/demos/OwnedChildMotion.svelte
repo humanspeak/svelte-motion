@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { AnimatePresence, PresenceChild, motion, styleString } from '@humanspeak/svelte-motion'
+    import { AnimatePresence, motion, styleString } from '@humanspeak/svelte-motion'
 
-    let present = $state(true)
+    let visible = $state(true)
     let completed = $state(0)
 </script>
 
@@ -9,8 +9,8 @@
 <div class="dk-demo-shell">
     <div class="demo">
         <div class="stage">
-            <AnimatePresence onExitComplete={() => (completed += 1)}>
-                <PresenceChild {present}>
+            <AnimatePresence present={visible} onExitComplete={() => (completed += 1)}>
+                {#snippet child()}
                     <motion.div
                         initial={{ opacity: 0, y: 18 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -26,16 +26,16 @@
                         }))}
                     >
                         <p class="label">real DOM node</p>
-                        <strong>PresenceChild + motion.*</strong>
+                        <strong>AnimatePresence owns this child</strong>
                         <p class="detail">Exit completes before this node is removed.</p>
                     </motion.div>
-                </PresenceChild>
+                {/snippet}
             </AnimatePresence>
         </div>
 
         <div class="controls">
             <motion.button
-                onclick={() => (present = !present)}
+                onclick={() => (visible = !visible)}
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.96 }}
                 style={styleString(() => ({
@@ -46,7 +46,7 @@
                     cursor: 'pointer'
                 }))}
             >
-                {present ? 'run real-node exit' : 'mount again'}
+                {visible ? 'run real-node exit' : 'mount again'}
             </motion.button>
             <span>completed: {completed}</span>
         </div>
@@ -55,14 +55,17 @@
 
 <style>
     .dk-demo-shell {
+        width: 100%;
         min-height: 340px;
         display: grid;
         place-items: center;
+        box-sizing: border-box;
         padding: 1.5rem;
     }
 
     .demo {
-        width: min(100%, 420px);
+        width: 520px;
+        max-width: 100%;
     }
 
     .stage {

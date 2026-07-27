@@ -279,6 +279,49 @@ test.describe('AnimatePresence re-entry animation', () => {
         }
     })
 
+    test('second exit clone uses the settled re-entry dimensions', async ({ page }) => {
+        await page.goto('/tests/animate-presence/basic')
+        await page.waitForFunction(() => window.MotionIsMounted === true)
+
+        const liveBox = page.locator('[data-testid="box"]:not([data-clone="true"])')
+        const toggle = page.getByTestId('toggle')
+        const clone = page.locator('[data-clone="true"]')
+
+        const waitForSettledBox = async () => {
+            await page.waitForFunction(() => {
+                const element = document.querySelector<HTMLElement>(
+                    '[data-testid="box"]:not([data-clone="true"])'
+                )
+                return (
+                    element &&
+                    element.getAnimations().length === 0 &&
+                    element.getBoundingClientRect().width >= 126
+                )
+            })
+        }
+
+        await waitForSettledBox()
+        await toggle.click()
+        await expect(clone).toHaveCount(1)
+        await expect(clone).toHaveCount(0, { timeout: 3000 })
+
+        await toggle.click()
+        await waitForSettledBox()
+        const settledRect = await liveBox.boundingBox()
+        expect(settledRect).toBeTruthy()
+
+        await toggle.click()
+        await expect(clone).toHaveCount(1)
+
+        const cloneBaseWidth = await clone.evaluate((element) =>
+            Number.parseFloat((element as HTMLElement).style.width)
+        )
+
+        // A re-entering node registers while its `initial` scale is near zero.
+        // The clone must use the later settled rect, not that stale tiny box.
+        expect(cloneBaseWidth).toBeCloseTo(settledRect!.width, 0)
+    })
+
     test('rapid toggle leaves only one element after animations complete', async ({ page }) => {
         await page.goto('/tests/animate-presence/basic?@isPlaywright=true')
 

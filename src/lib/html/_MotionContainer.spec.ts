@@ -698,6 +698,42 @@ describe('_MotionContainer', () => {
         expect(onExitComplete).toHaveBeenCalledTimes(1)
     })
 
+    it('owns a named child snippet until its real-node exit completes', async () => {
+        const { default: AnimatePresenceOwnedChildHarness } =
+            await import('$lib/components/__tests__/AnimatePresenceOwnedChildHarness.svelte')
+        const onExitComplete = vi.fn()
+        const result = render(AnimatePresenceOwnedChildHarness, {
+            props: { present: true, onExitComplete }
+        })
+        await flushTimers()
+
+        expect(result.queryByTestId('owned-presence-child')).toBeTruthy()
+
+        await result.rerender({ present: false, onExitComplete })
+        await flushTimers()
+        await flushTimers()
+
+        expect(result.queryByTestId('owned-presence-child')).toBeNull()
+        expect(result.container.querySelector('[data-clone="true"]')).toBeNull()
+        expect(onExitComplete).toHaveBeenCalledTimes(1)
+    })
+
+    it('mounts an owned child when present changes from false to true', async () => {
+        const { default: AnimatePresenceOwnedChildHarness } =
+            await import('$lib/components/__tests__/AnimatePresenceOwnedChildHarness.svelte')
+        const result = render(AnimatePresenceOwnedChildHarness, {
+            props: { present: false }
+        })
+        await flushTimers()
+        expect(result.queryByTestId('owned-presence-child')).toBeNull()
+
+        await result.rerender({ present: true })
+        await flushTimers()
+
+        expect(result.queryByTestId('owned-presence-child')).toBeTruthy()
+        expect(result.container.querySelector('[data-clone="true"]')).toBeNull()
+    })
+
     it('whileHover is gated to hover-capable devices', async () => {
         const { container } = render(MotionContainer as unknown as any, {
             props: { tag: 'div', whileHover: { scale: 1.05 } }

@@ -55,33 +55,91 @@ const installAppearGlobals = (): void => {
     const store = getAppearStore()
     if (!store) return
 
-    window.MotionHasOptimisedAnimation ??= (elementId?: string, valueName?: string) => {
+    // Replace the minimal inline-bootstrap functions with the runtime versions.
+    // The bootstrap only knows the composite `transform` name; the runtime also
+    // receives decomposed MotionValue names such as `x`, `y`, and `scale`.
+    window.MotionHasOptimisedAnimation = (elementId?: string, valueName?: string) => {
         if (!elementId) return false
         if (!valueName) return store.complete.has(elementId)
         return store.animations.has(appearStoreId(elementId, valueName))
     }
 
-    window.MotionHandoffMarkAsComplete ??= (elementId: string) => {
+    window.MotionHandoffMarkAsComplete = (elementId: string) => {
         if (store.complete.has(elementId)) {
             store.complete.set(elementId, true)
         }
     }
 
-    window.MotionHandoffIsComplete ??= (elementId: string) => {
+    window.MotionHandoffIsComplete = (elementId: string) => {
         return store.complete.get(elementId) === true
     }
 
-    window.MotionCancelOptimisedAnimation ??= (elementId?: string, valueName?: string) => {
+    window.MotionCancelOptimisedAnimation = (elementId, valueName, frame) => {
         if (!elementId || !valueName) return
         const animationId = appearStoreId(elementId, valueName)
         const data = store.animations.get(animationId)
         if (!data) return
-        data.animation.cancel()
+
+        // Match Motion's handoff ordering: leave the compositor animation in
+        // place until the runtime animation has resolved and rendered its first
+        // frame. Cancelling synchronously can expose the SSR initial style for a
+        // frame between the two animation owners.
+        if (frame) {
+            frame.postRender(() => {
+                frame.postRender(() => data.animation.cancel())
+            })
+        } else {
+            data.animation.cancel()
+        }
         store.animations.delete(animationId)
         if (!store.animations.size) {
             window.MotionCancelOptimisedAnimation = undefined
         }
     }
+
+    window.MotionHandoffAnimation = (elementId, valueName, frame) => {
+        const data = store.animations.get(appearStoreId(elementId, valueName))
+        if (!data) return null
+
+        const cancelAnimation = () => {
+            window.MotionCancelOptimisedAnimation?.(elementId, valueName, frame)
+        }
+        data.animation.onfinish = cancelAnimation
+
+        // A null start time identifies the paint-ready sentinel. Once the first
+        // runtime pass has been marked complete, any later animation is an
+        // interruption (exit, gesture, changed animate target), not a handoff.
+        if (data.startTime === null || window.MotionHandoffIsComplete?.(elementId)) {
+            cancelAnimation()
+            return null
+        }
+
+        return data.startTime
+    }
+}
+
+/**
+ * Install the browser bridge used by MotionValue animations to adopt an
+ * optimized SSR appear animation.
+ *
+ * @returns Nothing.
+ */
+export const prepareOptimizedAppearHandoff = (): void => {
+    installAppearGlobals()
+}
+
+/**
+ * Mark an element's first runtime animation pass as handed off.
+ *
+ * Later animations should interrupt the adopted enter from its current frame
+ * instead of sharing the SSR animation's original start time.
+ *
+ * @param elementId Optimized appear id.
+ * @returns Nothing.
+ */
+export const completeOptimizedAppearHandoff = (elementId: string | undefined): void => {
+    if (!elementId || typeof window === 'undefined') return
+    window.MotionHandoffMarkAsComplete?.(elementId)
 }
 
 const readStyleProp = (style: string, prop: string): string | undefined => {

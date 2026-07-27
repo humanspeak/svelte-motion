@@ -9,8 +9,9 @@
     import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+    import CloneVsOwned from '$lib/examples/animate-presence/demos/CloneVsOwned.svelte'
     import AnimatePresenceDefault from '$lib/examples/animate-presence/demos/Default.svelte'
-    import PresenceChildMotion from '$lib/examples/animate-presence/demos/PresenceChildMotion.svelte'
+    import OwnedChildMotion from '$lib/examples/animate-presence/demos/OwnedChildMotion.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
@@ -46,7 +47,7 @@
             tag: 'ANIMATE-PRESENCE',
             title: { prefix: 'enter + exit with ', accent: 'AnimatePresence', end: '.' },
             description:
-                'A `motion.*` element inside `<AnimatePresence>` runs its `exit` prop when it leaves the DOM. The same spring carries it in (`initial → animate`) and out (`animate → exit`).',
+                'The existing conditional API snapshots a removed `motion.*` element and runs its `exit` prop on a visual clone.',
             snippet: defaultSection,
             codeSnippet: defaultCode,
             notes: defaultNotes,
@@ -55,15 +56,27 @@
         },
         {
             figId: 'FIG-002',
-            tag: 'PRESENCE-CHILD',
+            tag: 'OWNED-CHILD',
             title: { prefix: 'exit the ', accent: 'real node', end: '.' },
             description:
-                '`PresenceChild` holds its original DOM subtree while a nested `motion.*` element runs `exit`, then removes it on exact animation completion.',
+                '`present` plus a named `child` snippet lets AnimatePresence retain the original DOM subtree until its nested `motion.*` exit completes.',
             snippet: presenceChildSection,
             codeSnippet: presenceChildCode,
             notes: presenceChildNotes,
             barCells: [{ k: 'mechanism', v: 'real node' }],
-            sourceUrl: `${SOURCE_URL}animate-presence/demos/PresenceChildMotion.svelte`
+            sourceUrl: `${SOURCE_URL}animate-presence/demos/OwnedChildMotion.svelte`
+        },
+        {
+            figId: 'FIG-003',
+            tag: 'MECHANISM-COMPARISON',
+            title: { prefix: 'clone ghost ', accent: 'vs. live node', end: '.' },
+            description:
+                'Toggle each lane twice quickly. The conditional form mounts a new node beside an exiting ghost; `present={visible}` reverses the original node in place.',
+            snippet: comparisonSection,
+            codeSnippet: comparisonCode,
+            notes: comparisonNotes,
+            barCells: [{ k: 'decisive test', v: 'rapid re-entry' }],
+            sourceUrl: `${SOURCE_URL}animate-presence/demos/CloneVsOwned.svelte`
         }
     ]
 </script>
@@ -77,17 +90,18 @@
             <Sparkles />
             <span>
                 The unit card has <code>initial</code>, <code>animate</code>, and <code>exit</code>
-                props. On mount, motion tweens from <code>initial → animate</code>; on unmount
-                inside <code>AnimatePresence</code>, it tweens from <code>animate → exit</code> before
-                the DOM node is removed.
+                props. On mount, the real node tweens from <code>initial → animate</code>. On
+                removal, Svelte destroys that node and AnimatePresence runs
+                <code>animate → exit</code> on its captured clone.
             </span>
         </li>
         <li>
             <ArrowLeftRight />
             <span>
                 Without <code>AnimatePresence</code>, a Svelte <code>&#123;#if&#125;</code> would
-                tear the node down immediately and the <code>exit</code> animation would never get a
-                chance to run. The wrapper holds the node alive until <code>exit</code> finishes.
+                tear the node down immediately and the <code>exit</code> animation would never get a chance
+                to run. The conditional AnimatePresence form captures a clone before teardown and animates
+                that detached snapshot.
             </span>
         </li>
         <li>
@@ -115,7 +129,7 @@
 {/snippet}
 
 {#snippet presenceChildSection()}
-    <PresenceChildMotion />
+    <OwnedChildMotion />
 {/snippet}
 {#snippet presenceChildNotes()}
     <ul>
@@ -129,8 +143,8 @@
         <li>
             <ShieldCheck />
             <span>
-                Use this existing API when clone fidelity is not sufficient—for example,
-                focus-sensitive content or a canvas-driven integration.
+                Use the owned API when clone fidelity is not sufficient—for example, focus-sensitive
+                content, reversible exits, or a canvas-driven integration.
             </span>
         </li>
         <li>
@@ -146,9 +160,50 @@
     <CodeReferenceV2
         samples={[
             demoCodeSample(
-                'animate-presence/demos/PresenceChildMotion.svelte',
-                'animate-presence-presence-child-motion',
-                'PresenceChildMotion.svelte'
+                'animate-presence/demos/OwnedChildMotion.svelte',
+                'animate-presence-owned-child-motion',
+                'OwnedChildMotion.svelte'
+            )
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#snippet comparisonSection()}
+    <CloneVsOwned />
+{/snippet}
+{#snippet comparisonNotes()}
+    <ul>
+        <li>
+            <ArrowLeftRight />
+            <span>
+                Click a lane’s button twice before its exit finishes. This makes node identity
+                visible instead of comparing two similar-looking one-way fades.
+            </span>
+        </li>
+        <li>
+            <Box />
+            <span>
+                The clone lane has two identities during rapid re-entry: a new live node and the old
+                detached ghost. The owned lane keeps one identity and reverses it.
+            </span>
+        </li>
+        <li>
+            <ShieldCheck />
+            <span>
+                Edit each input before toggling. Only the owned lane can preserve that live browser
+                state while an exit is reversed.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet comparisonCode()}
+    <CodeReferenceV2
+        samples={[
+            demoCodeSample(
+                'animate-presence/demos/CloneVsOwned.svelte',
+                'animate-presence-clone-vs-owned',
+                'CloneVsOwned.svelte'
             )
         ]}
         columns={1}

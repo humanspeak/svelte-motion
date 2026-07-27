@@ -569,6 +569,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/owned-child') + searchParams}
+                    >
+                        Clone vs owned child (real-node exit)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/animate-presence/grid-exit') + searchParams}
                     >
                         Grid exit (siblings hold slots)

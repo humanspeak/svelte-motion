@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+    completeOptimizedAppearHandoff,
     createOptimizedAppearData,
     createOptimizedAppearScript,
     handoffOptimizedAppearAnimation,
     optimizedAppearDataAttribute,
+    prepareOptimizedAppearHandoff,
     startOptimizedAppearAnimation
 } from './optimizedAppear'
 
@@ -13,6 +15,7 @@ afterEach(() => {
     window.MotionHasOptimisedAnimation = undefined
     window.MotionHandoffMarkAsComplete = undefined
     window.MotionHandoffIsComplete = undefined
+    window.MotionHandoffAnimation = undefined
     window.MotionCancelOptimisedAnimation = undefined
     window.__SvelteMotionAppear = undefined
 })
@@ -90,6 +93,41 @@ describe('optimizedAppear', () => {
         expect(commitStyles).toHaveBeenCalled()
         expect(cancel).toHaveBeenCalled()
         expect(window.MotionHandoffIsComplete?.('appear-2')).toBe(true)
+    })
+
+    it('hands decomposed transform values to the runtime animation owner', () => {
+        const element = document.createElement('div')
+        element.dataset.framerAppearId = 'appear-transform'
+        const cancel = vi.fn()
+        const animation = { cancel, startTime: null } as unknown as Animation
+        vi.spyOn(element, 'animate').mockReturnValue(animation)
+
+        startOptimizedAppearAnimation(element, 'transform', ['translateY(20px)', 'none'], {
+            duration: 0.8
+        })
+        prepareOptimizedAppearHandoff()
+
+        const postRenderCallbacks: Array<() => void> = []
+        const frame = {
+            postRender: vi.fn((callback: () => void) => {
+                postRenderCallbacks.push(callback)
+            })
+        }
+
+        expect(window.MotionHandoffAnimation?.('appear-transform', 'y', frame as never)).toEqual(
+            expect.any(Number)
+        )
+
+        completeOptimizedAppearHandoff('appear-transform')
+        expect(
+            window.MotionHandoffAnimation?.('appear-transform', 'scale', frame as never)
+        ).toBeNull()
+        expect(window.MotionHasOptimisedAnimation?.('appear-transform', 'transform')).toBe(false)
+
+        cancel.mockClear()
+        postRenderCallbacks.shift()?.()
+        postRenderCallbacks.shift()?.()
+        expect(cancel).toHaveBeenCalledOnce()
     })
 
     it('creates an SSR bootstrap script with one shared ready animation gate', () => {
