@@ -2,6 +2,7 @@ import { animate } from 'motion'
 import { getContext, setContext } from 'svelte'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+    containsStatefulCloneContent,
     createAnimatePresenceContext,
     getPresenceDepth,
     measurePopLayoutSnapshot,
@@ -102,6 +103,42 @@ describe('presence context', () => {
         // Clone should be added then removed after animation finishes
         const clone = document.querySelector<HTMLElement>('[data-clone="true"]')
         expect(clone).toBeTruthy()
+    })
+
+    it('marks exit clones inert and hidden from the accessibility tree', () => {
+        const ctx = createAnimatePresenceContext({})
+        ctx.registerChild('a11y', el, { opacity: 0 })
+        ctx.unregisterChild('a11y')
+
+        const clone = document.querySelector<HTMLElement>('[data-clone="true"]')
+        expect(clone).toBeTruthy()
+        expect(clone?.inert).toBe(true)
+        expect(clone?.getAttribute('aria-hidden')).toBe('true')
+    })
+
+    it.each(['canvas', 'iframe', 'video', 'audio'])(
+        'detects a nested %s as stateful clone content',
+        (tag) => {
+            const media = document.createElement(tag)
+            el.appendChild(media)
+            expect(containsStatefulCloneContent(el)).toBe(true)
+        }
+    )
+
+    it('detects stateful content when the exit root is itself a canvas', () => {
+        expect(containsStatefulCloneContent(document.createElement('canvas'))).toBe(true)
+        expect(containsStatefulCloneContent(document.createElement('div'))).toBe(false)
+    })
+
+    it('removes stateful media exits immediately instead of animating a blank clone', () => {
+        el.appendChild(document.createElement('canvas'))
+        const ctx = createAnimatePresenceContext({})
+        ctx.registerChild('canvas-card', el, { opacity: 0 })
+        ctx.unregisterChild('canvas-card')
+
+        expect(document.querySelector('[data-clone="true"]')).toBeFalsy()
+        expect(document.querySelector('[data-presence-placeholder="true"]')).toBeFalsy()
+        expect(animate).not.toHaveBeenCalled()
     })
 
     it('unregisterChild without exit just deletes child (no clone)', () => {

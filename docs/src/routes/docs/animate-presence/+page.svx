@@ -6,6 +6,7 @@ description: Animate components when they are added to or removed from the DOM
 <script>
   import Example from '$lib/components/general/Example.svelte'
   import AnimatePresenceExample from '$lib/examples/animate-presence/demos/Default.svelte'
+  import OwnedChildMotionExample from '$lib/examples/animate-presence/demos/OwnedChildMotion.svelte'
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()
@@ -46,9 +47,19 @@ description: Animate components when they are added to or removed from the DOM
   <AnimatePresenceExample />
 </Example>
 
-## How it works
+## Existing conditional form: clone exits
 
-When a `motion` component inside `AnimatePresence` is conditionally removed:
+The existing `{#if}` API remains supported:
+
+```svelte
+<AnimatePresence>
+  {#if visible}
+    <motion.div key="card" exit={{ opacity: 0 }} />
+  {/if}
+</AnimatePresence>
+```
+
+When the condition becomes false:
 
 1. The component's last position and styles are captured
 2. A visual clone is created at that exact position
@@ -56,6 +67,50 @@ When a `motion` component inside `AnimatePresence` is conditionally removed:
 4. Once complete, the clone is removed from the DOM
 
 This approach ensures smooth exit animations even though the original Svelte component has already unmounted.
+
+Exit clones are non-interactive (`inert`) and hidden from the accessibility tree. A subtree containing `canvas`, `iframe`, `video`, or `audio` is removed immediately instead of animating a clone that would lose its live bitmap, browsing context, or playback state.
+
+## Owned real-node exits
+
+Pass `present` and a named `child` snippet when the exiting element must remain the original DOM node. `AnimatePresence` owns the conditional rendering, holds the snippet while it exits, and removes it after the nested `motion.*` component reports completion.
+
+```svelte
+<script lang="ts">
+  import {
+    AnimatePresence,
+    motion
+  } from '@humanspeak/svelte-motion'
+
+  let visible = $state(true)
+</script>
+
+<AnimatePresence present={visible}>
+  {#snippet child()}
+    <motion.div
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+    >
+      This is the real node during exit.
+    </motion.div>
+  {/snippet}
+</AnimatePresence>
+```
+
+<Example isSmall exampleUrl="/examples/animate-presence">
+  <OwnedChildMotionExample />
+</Example>
+
+Use the owned form for stateful elements, focus-sensitive interfaces, reversible exits, and integrations that need a live VisualElement or DOM node throughout the exit. It does not require a `key` because it owns one child.
+
+| Behavior | `{#if visible}` | `present={visible}` |
+| --- | --- | --- |
+| Exiting DOM node | Detached clone | Original node |
+| `key` requirement | Required on a direct `motion.*` child | Not required for the owned child |
+| Rapid re-entry | New node appears while the old ghost exits | The same node reverses its exit |
+| Focus, canvas, media, live state | Not retained by the clone | Retained while exit is in progress |
+| VisualElement during exit | Disconnected | Live |
+
+`PresenceChild` remains available as the lower-level primitive for custom CSS, GSAP, canvas, or other manually completed exit work.
 
 ## Usage
 

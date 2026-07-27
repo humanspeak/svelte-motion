@@ -105,6 +105,22 @@ export type PopLayoutAnchorY = 'top' | 'bottom'
 const isHTMLElement = (element: Element | null): element is HTMLElement =>
     element instanceof HTMLElement
 
+const statefulCloneContentSelector = 'canvas, iframe, video, audio'
+
+/**
+ * Determine whether cloning an exit subtree would visibly lose live state.
+ *
+ * `cloneNode(true)` copies markup but not canvas pixels, browsing contexts, or
+ * active media playback state. In those cases an immediate removal is less
+ * misleading than animating a blank or reset ghost.
+ *
+ * @param element The prospective exit-clone root.
+ * @returns Whether the root or one of its descendants contains stateful media.
+ */
+export const containsStatefulCloneContent = (element: Element): boolean =>
+    element.matches(statefulCloneContentSelector) ||
+    element.querySelector(statefulCloneContentSelector) !== null
+
 const readNumericStyle = (value: string, fallback: number): number => {
     const parsed = parseFloat(value)
     return Number.isFinite(parsed) ? parsed : fallback
@@ -820,6 +836,16 @@ export const createAnimatePresenceContext = (context: {
             return
         }
 
+        if (containsStatefulCloneContent(child.element)) {
+            pwLog(
+                '[presence] unregisterChild - stateful media cannot be cloned faithfully, removing immediately',
+                { key }
+            )
+            children.delete(key)
+            refreshSiblingAnchors()
+            return
+        }
+
         const elementIsLive = child.element.isConnected
         const staleScrollDelta = measureScrollDelta(child.lastScrollSnapshot)
         let rect = elementIsLive
@@ -977,6 +1003,8 @@ export const createAnimatePresenceContext = (context: {
             clone.style.height = `${rect.height}px`
         }
         clone.style.pointerEvents = 'none'
+        clone.inert = true
+        clone.setAttribute('aria-hidden', 'true')
         clone.style.visibility = 'visible'
         // Preserve flex/grid layout, only force 'block' if it was 'none' or 'contents'
         if (originalDisplay === 'none' || originalDisplay === 'contents') {

@@ -129,12 +129,13 @@
         SVG_NAMESPACE
     } from '$lib/utils/svg'
     import {
+        completeOptimizedAppearHandoff,
         createOptimizedAppearData,
         createOptimizedAppearScript,
-        finishOptimizedAppearAnimation,
         hasOptimizedAppearAnimation,
         markMotionMounted,
-        optimizedAppearDataAttribute
+        optimizedAppearDataAttribute,
+        prepareOptimizedAppearHandoff
     } from '$lib/utils/optimizedAppear'
     import { getLayoutIdRegistry } from '$lib/utils/layoutId'
     import {
@@ -429,6 +430,11 @@
      * (a ReferenceError that blanks the whole component).
      */
     let visualElementForRelatives: { latestValues: Record<string, unknown> } | null = null
+    // `buildMotionNodeProps()` is invoked while the VisualElement itself is
+    // being created, before the optimized-appear derived values below have
+    // initialized. Mirror the id after initialization to avoid that TDZ while
+    // still supplying it on the pre-animation props update.
+    let optimizedAppearIdForNode: string | undefined = undefined
 
     /**
      * Resolve `'+=N'` / `'-=N'` relative keyframes into concrete values before
@@ -561,6 +567,10 @@
             // `initialKeyframes` was already filtered, which is why only the
             // animate half of the regression was visible).
             initial: filterReducedMotionDefinition(effectiveInitialProp),
+            // motion-dom's optimized-appear handoff reads this id from the
+            // VisualElement props (not from the DOM attribute). Keeping both in
+            // sync lets animateTarget adopt the SSR compositor animation.
+            [optimizedAppearDataAttribute]: optimizedAppearIdForNode,
             // The node's OWN animate only. Passing the INHERITED variant label
             // here would make `isControllingVariants(props)` true, which stops
             // motion-dom registering this node as a variant CHILD
@@ -686,10 +696,21 @@
     $effect(() => {
         if (!(element && shouldRegisterPresenceExit)) return
         let rafId: number
+        let wasAnimating = false
         const capture = () => {
-            if (element && element.isConnected && element.getAnimations().length > 0) {
-                const cs = getComputedStyle(element)
-                context.updateChildAnimatedStyle(presenceKey, cs.opacity, cs.transform)
+            if (element && element.isConnected) {
+                const isAnimating = element.getAnimations().length > 0
+                // ResizeObserver doesn't fire for transform-only animations.
+                // Capture their visual rect while they run, plus one final
+                // settled frame, so a later clone exit never reuses the tiny
+                // registration rect from `initial={{ scale: 0 }}`.
+                if (isAnimating || wasAnimating) {
+                    const rect = element.getBoundingClientRect()
+                    const cs = getComputedStyle(element)
+                    context.updateChildState(presenceKey, rect, cs)
+                    context.updateChildAnimatedStyle(presenceKey, cs.opacity, cs.transform)
+                }
+                wasAnimating = isAnimating
             }
             rafId = requestAnimationFrame(capture)
         }
@@ -1167,6 +1188,9 @@
             ? `svelte-motion-${componentHydrationId}`
             : undefined
     )
+    $effect.pre(() => {
+        optimizedAppearIdForNode = optimizedAppearId
+    })
     const optimizedAppearScript = $derived(
         createOptimizedAppearScript(optimizedAppearId, optimizedAppearEntries)
     )
@@ -1865,44 +1889,6 @@
     // ~0.02). plan 002 Step 3h(a).
 
     /**
-     * Sync the node's values to the resolved `animate` resting state.
-     *
-     * Accelerated channels (`opacity`, `transform`, `clipPath`, `filter`) run as
-     * native WAAPI animations, and `bindToMotionValue` SHORT-CIRCUITS for them —
-     * it builds a `NativeAnimation` and returns before installing the
-     * `on("change")` subscription (`VisualElement.mjs:262-281`). So while such an
-     * animation plays, and after it finishes, the MotionValue and `latestValues`
-     * still hold the FROM state even though the element is visually at the
-     * target.
-     *
-     * That matters at the optimized-appear handoff: the appear animation has
-     * already played the fade, but `animateChanges()` would read `value.get()`
-     * as the from-value and animate the identical range a second time — a
-     * visible double-fade (guard-measured: a second `{opacity:[0,1]}` 1200ms
-     * animation starting 2.4ms after the first one's `finished`, dropping the
-     * element back to ~0.02). Jumping the values first means `animateChanges`
-     * finds them already at target, protects those keys, and only drives the
-     * channels the appear animation could not.
-     *
-     * @returns Nothing.
-     */
-    const syncValuesToAnimateTarget = (): void => {
-        if (!visualElement) return
-        const resting = resolveRestingValues(
-            animateKeyframes as DOMKeyframesDefinition | undefined
-        ) as Record<string, unknown> | undefined
-        if (!resting) return
-        for (const [key, value] of Object.entries(resting)) {
-            if (value === undefined || value === null) continue
-            const resolved = value as string | number
-            // `jump`, not `set`: this is a catch-up to a state the element is
-            // already in, so it must not leave velocity behind.
-            visualElement.getValue(key)?.jump(resolved)
-            visualElement.setStaticValue(key, resolved)
-        }
-    }
-
-    /**
      * True once the mount/enter effect has run the first `animateChanges()`
      * pass. Until then the props effect must not fire one — the enter path owns
      * the initial ordering (phase transitions + the wait-mode gate).
@@ -2120,8 +2106,17 @@
     $effect(() => {
         if (!visualElement) return
         const next = buildMotionNodeProps()
+        // Build outside `untrack` so a PresenceChild isPresent flip reruns this
+        // effect. The object must be fresh on every pass: ExitAnimationFeature
+        // compares it with `prevPresenceContext` to detect exit and re-entry.
+        const nextPresenceContext = buildPresenceContext()
         untrack(() => {
-            visualElement.update(next, buildPresenceContext())
+            visualElement.update(next, nextPresenceContext)
+            // Upstream runs feature updates after every VisualElement update.
+            // Without this, a motion.* child held by PresenceChild receives the
+            // new context but ExitAnimationFeature never observes the flip, so
+            // its exit never runs and safeToRemove is never called.
+            visualElement.updateFeatures()
             // `update()` can change what the node renders WITHOUT scheduling a
             // render of its own: `addValue()` writes `latestValues[key]` directly
             // when a MotionValue instance is replaced (VisualElement.mjs:437-447),
@@ -2905,31 +2900,18 @@
                     pwLog('[motion] path: optimized appear handoff')
                     dataPath = 6
                     isLoaded = 'initial'
-                    // The appear animation owns the values while it is in flight,
-                    // so block the props effect from starting a competing pass.
-                    firstAnimatePassDone = true
-                    finishOptimizedAppearAnimation(optimizedAppearId)
-                        .then(() => {
-                            // Hand off to the animationState only AFTER the appear
-                            // animation resolves (plan 002 scope note; upstream
-                            // does the same in use-visual-element.ts:163-176).
-                            // This is load-bearing, not belt-and-braces: the
-                            // optimized-appear bootstrap only animates
-                            // WAAPI-accelerated channels (opacity/transform), so
-                            // without this pass a non-accelerated channel such as
-                            // `filter` would never leave its `initial` value.
-                            //
-                            // Sync FIRST: the appear animation was accelerated, so
-                            // the node's values still read the from-state and
-                            // `animateChanges` would replay the whole enter.
-                            syncValuesToAnimateTarget()
-                            runAnimation()
-                            isLoaded = 'ready'
-                            onAnimationCompleteProp?.(resolvedAnimate)
-                        })
-                        .catch(() => {
-                            isLoaded = 'ready'
-                        })
+                    // Install Motion's browser bridge before the first
+                    // animationState pass. Accelerated opacity/transform values
+                    // adopt the compositor animation's start time, while
+                    // non-accelerated values (for example filter) start normally.
+                    // This also gives a later exit a live MotionValue animation to
+                    // interrupt from its current frame.
+                    prepareOptimizedAppearHandoff()
+                    runAnimation()
+                    queueMicrotask(() => {
+                        completeOptimizedAppearHandoff(optimizedAppearId)
+                    })
+                    isLoaded = 'ready'
                     return
                 }
                 pwLog('[motion] path: has initialKeyframes, will animate to target')
@@ -2956,6 +2938,17 @@
                 const runEnterAnimation = async () => {
                     if (isPlaywright) {
                         await sleep(10)
+                    }
+                    // The rAF (and Playwright's diagnostic delay above) leaves
+                    // a window where an owned child can begin exiting before its
+                    // enter pass starts. Never let that stale enter retarget and
+                    // cancel the live exit. Mark the mount pass handled so a
+                    // later re-entry/prop update follows the normal update path.
+                    if (presenceChildContext?.isPresent === false) {
+                        pwLog('[motion] RAF: skip enter after exit started')
+                        firstAnimatePassDone = true
+                        isLoaded = 'ready'
+                        return
                     }
                     pwLog('[motion] RAF: promoting to ready and running animation')
 
