@@ -80,6 +80,10 @@ import H6 from '$lib/html/H6.svelte'
 import Header from '$lib/html/Header.svelte'
 import Hgroup from '$lib/html/Hgroup.svelte'
 import Hr from '$lib/html/Hr.svelte'
+import HtmlMap from '$lib/html/HtmlMap.svelte'
+import HtmlMath from '$lib/html/HtmlMath.svelte'
+import HtmlObject from '$lib/html/HtmlObject.svelte'
+import HtmlSymbol from '$lib/html/HtmlSymbol.svelte'
 import I from '$lib/html/I.svelte'
 import Iframe from '$lib/html/Iframe.svelte'
 import Image from '$lib/html/Image.svelte'
@@ -93,18 +97,15 @@ import Li from '$lib/html/Li.svelte'
 import Line from '$lib/html/Line.svelte'
 import Lineargradient from '$lib/html/Lineargradient.svelte'
 import Main from '$lib/html/Main.svelte'
-import Map from '$lib/html/Map.svelte'
 import Mark from '$lib/html/Mark.svelte'
 import Marker from '$lib/html/Marker.svelte'
 import Mask from '$lib/html/Mask.svelte'
-import Math from '$lib/html/Math.svelte'
 import Menu from '$lib/html/Menu.svelte'
 import Metadata from '$lib/html/Metadata.svelte'
 import Meter from '$lib/html/Meter.svelte'
 import Mpath from '$lib/html/Mpath.svelte'
 import Nav from '$lib/html/Nav.svelte'
 import Noscript from '$lib/html/Noscript.svelte'
-import Object from '$lib/html/Object.svelte'
 import Ol from '$lib/html/Ol.svelte'
 import Optgroup from '$lib/html/Optgroup.svelte'
 import Option from '$lib/html/Option.svelte'
@@ -130,7 +131,7 @@ import Search from '$lib/html/Search.svelte'
 import Section from '$lib/html/Section.svelte'
 import Select from '$lib/html/Select.svelte'
 import Selectedcontent from '$lib/html/Selectedcontent.svelte'
-import Set from '$lib/html/SetElement.svelte'
+import HtmlSet from '$lib/html/SetElement.svelte'
 import Slot from '$lib/html/Slot.svelte'
 import Small from '$lib/html/Small.svelte'
 import Source from '$lib/html/Source.svelte'
@@ -143,7 +144,6 @@ import Summary from '$lib/html/Summary.svelte'
 import Sup from '$lib/html/Sup.svelte'
 import Svg from '$lib/html/Svg.svelte'
 import Switch from '$lib/html/Switch.svelte'
-import Symbol from '$lib/html/Symbol.svelte'
 import Table from '$lib/html/Table.svelte'
 import Tbody from '$lib/html/Tbody.svelte'
 import Td from '$lib/html/Td.svelte'
@@ -264,18 +264,18 @@ export {
     Line,
     Lineargradient,
     Main,
-    Map,
+    HtmlMap as Map,
     Mark,
     Marker,
     Mask,
-    Math,
+    HtmlMath as Math,
     Menu,
     Metadata,
     Meter,
     Mpath,
     Nav,
     Noscript,
-    Object,
+    HtmlObject as Object,
     Ol,
     Optgroup,
     Option,
@@ -301,7 +301,7 @@ export {
     Section,
     Select,
     Selectedcontent,
-    Set,
+    HtmlSet as Set,
     Slot,
     Small,
     Source,
@@ -314,7 +314,7 @@ export {
     Sup,
     Svg,
     Switch,
-    Symbol,
+    HtmlSymbol as Symbol,
     Table,
     Tbody,
     Td,
@@ -3331,7 +3331,7 @@ export type MotionComponents = {
      * Note: Some motion features are still under development.
      * Check documentation for latest updates.
      */
-    map: typeof Map
+    map: typeof HtmlMap
 
     /**
      * A motion-enhanced mark element with animation capabilities.
@@ -3467,7 +3467,7 @@ export type MotionComponents = {
      * Note: Some motion features are still under development.
      * Check documentation for latest updates.
      */
-    math: typeof Math
+    math: typeof HtmlMath
 
     /**
      * A motion-enhanced menu element with animation capabilities.
@@ -3705,7 +3705,7 @@ export type MotionComponents = {
      * Note: Some motion features are still under development.
      * Check documentation for latest updates.
      */
-    object: typeof Object
+    object: typeof HtmlObject
 
     /**
      * A motion-enhanced ol element with animation capabilities.
@@ -4589,7 +4589,7 @@ export type MotionComponents = {
      * Note: Some motion features are still under development.
      * Check documentation for latest updates.
      */
-    set: typeof Set
+    set: typeof HtmlSet
 
     /**
      * A motion-enhanced slot element with animation capabilities.
@@ -4997,7 +4997,7 @@ export type MotionComponents = {
      * Note: Some motion features are still under development.
      * Check documentation for latest updates.
      */
-    symbol: typeof Symbol
+    symbol: typeof HtmlSymbol
 
     /**
      * A motion-enhanced table element with animation capabilities.

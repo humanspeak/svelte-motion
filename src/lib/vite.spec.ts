@@ -315,6 +315,55 @@ describe('svelteMotionOptimize', () => {
         expect(importMatches).toHaveLength(1)
     })
 
+    it('rewrites tags whose component was renamed to avoid JS-global collisions', () => {
+        const code = `<script>
+    import { motion } from '@humanspeak/svelte-motion'
+</script>
+
+<motion.object>o</motion.object>
+<motion.map>m</motion.map>
+<motion.math>h</motion.math>
+<motion.symbol>s</motion.symbol>`
+
+        const result = transform(code)
+        expect(result).not.toBeNull()
+        // The import path must match the actual file in dist/html/ (renamed),
+        // not the JS-global PascalCase name (`Object.svelte` etc.).
+        expect(result).toContain(
+            "import SvelteMotionHtmlObject from '@humanspeak/svelte-motion/html/HtmlObject.svelte'"
+        )
+        expect(result).toContain(
+            "import SvelteMotionHtmlMap from '@humanspeak/svelte-motion/html/HtmlMap.svelte'"
+        )
+        expect(result).toContain(
+            "import SvelteMotionHtmlMath from '@humanspeak/svelte-motion/html/HtmlMath.svelte'"
+        )
+        expect(result).toContain(
+            "import SvelteMotionHtmlSymbol from '@humanspeak/svelte-motion/html/HtmlSymbol.svelte'"
+        )
+        expect(result).toContain('<SvelteMotionHtmlObject>o</SvelteMotionHtmlObject>')
+        expect(result).toContain('<SvelteMotionHtmlMap>m</SvelteMotionHtmlMap>')
+        expect(result).toContain('<SvelteMotionHtmlMath>h</SvelteMotionHtmlMath>')
+        expect(result).toContain('<SvelteMotionHtmlSymbol>s</SvelteMotionHtmlSymbol>')
+    })
+
+    it('rewrites motion.set to the SetElement file', () => {
+        // `set` maps to `SetElement.svelte` (not `Set.svelte`): the filename is
+        // already non-colliding, only the barrel binding is renamed.
+        const code = `<script>
+    import { motion } from '@humanspeak/svelte-motion'
+</script>
+
+<motion.set />`
+
+        const result = transform(code)
+        expect(result).not.toBeNull()
+        expect(result).toContain(
+            "import SvelteMotionHtmlSet from '@humanspeak/svelte-motion/html/SetElement.svelte'"
+        )
+        expect(result).toContain('<SvelteMotionHtmlSet />')
+    })
+
     it('returns the plugin with correct metadata', () => {
         const plugin = svelteMotionOptimize()
         expect(plugin.name).toBe('svelte-motion-optimize')
