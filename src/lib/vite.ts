@@ -1,6 +1,6 @@
 import { Parser, type Node } from 'acorn'
 import type { Plugin } from 'vite'
-import { toComponentFileName, toComponentName } from './html/componentNames'
+import { toComponentFileName, toComponentName } from './html/componentNames.js'
 
 /**
  * Tag-to-component-name mapping. Each key is the lowercase HTML/SVG tag,
