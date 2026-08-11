@@ -23,50 +23,74 @@ const toPascalCase = (tag: string): string =>
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
         .join('')
 
+type ComponentNameOverride = Readonly<{
+    componentName: string
+    fileName: string
+    publicName: string
+}>
+
 /**
- * Tags whose PascalCase name collides with a JS global AND is used verbatim
- * as the component filename (`object` → `Object.svelte`). Renamed in both the
- * filename and the barrel binding.
+ * Exceptional tag names whose generated identifiers or filenames would
+ * collide with JavaScript globals. This table is the single source of truth
+ * for the safe internal binding, on-disk filename, and stable public export.
  */
-const GLOBAL_COLLIDING_FILENAMES: Record<string, string> = {
-    object: 'HtmlObject',
-    map: 'HtmlMap',
-    math: 'HtmlMath',
-    symbol: 'HtmlSymbol'
+const COMPONENT_NAME_OVERRIDES: Readonly<Record<string, ComponentNameOverride>> = {
+    map: { componentName: 'HtmlMap', fileName: 'HtmlMap', publicName: 'Map' },
+    math: { componentName: 'HtmlMath', fileName: 'HtmlMath', publicName: 'Math' },
+    object: { componentName: 'HtmlObject', fileName: 'HtmlObject', publicName: 'Object' },
+    set: { componentName: 'HtmlSet', fileName: 'SetElement', publicName: 'Set' },
+    symbol: { componentName: 'HtmlSymbol', fileName: 'HtmlSymbol', publicName: 'Symbol' }
 }
 
 /**
- * Tags whose PascalCase name collides with a JS global only as a barrel
- * import binding — the underlying file is already non-colliding (`set` →
- * `SetElement.svelte`). Renaming the binding is defensive: a barrel module has
- * no default export, so Vite's boilerplate never references the binding, but
- * keeping a top-level `Set`/`Object`-style identifier shadowing the global is
- * fragile against future tooling changes.
+ * Returns the safe internal component binding for an HTML or SVG tag.
+ *
+ * @param tag The lowercase HTML or SVG tag name.
+ * @returns The internal component identifier, such as `HtmlObject`.
  */
-const GLOBAL_COLLIDING_BINDINGS: Record<string, string> = {
-    set: 'HtmlSet'
-}
-
-/** The safe component/binding identifier for a tag (`object` → `HtmlObject`). */
 export const toComponentName = (tag: string): string =>
-    GLOBAL_COLLIDING_BINDINGS[tag] ?? GLOBAL_COLLIDING_FILENAMES[tag] ?? toPascalCase(tag)
-
-/** The component filename stem for a tag (`object` → `HtmlObject`, `set` → `SetElement`). */
-export const toComponentFileName = (tag: string): string =>
-    tag === 'set' ? 'SetElement' : (GLOBAL_COLLIDING_FILENAMES[tag] ?? toPascalCase(tag))
-
-/** The PascalCase form of the tag, i.e. the public barrel export name (`set` → `Set`). */
-export const toPublicName = (tag: string): string => toPascalCase(tag)
+    COMPONENT_NAME_OVERRIDES[tag]?.componentName ?? toPascalCase(tag)
 
 /**
- * JS globals that a generated component name or filename must never shadow.
+ * Returns the generated component filename stem for an HTML or SVG tag.
+ *
+ * @param tag The lowercase HTML or SVG tag name.
+ * @returns The filename stem without `.svelte`, such as `SetElement`.
+ */
+export const toComponentFileName = (tag: string): string =>
+    COMPONENT_NAME_OVERRIDES[tag]?.fileName ?? toPascalCase(tag)
+
+/**
+ * Returns the stable public barrel export name for an HTML or SVG tag.
+ *
+ * @param tag The lowercase HTML or SVG tag name.
+ * @returns The public PascalCase export name, such as `Object`.
+ */
+export const toPublicName = (tag: string): string =>
+    COMPONENT_NAME_OVERRIDES[tag]?.publicName ?? toPascalCase(tag)
+
+/**
+ * Returns the barrel export specifier for an HTML or SVG tag.
+ *
+ * @param tag The lowercase HTML or SVG tag name.
+ * @returns A direct or aliased export specifier, such as `HtmlObject as Object`.
+ */
+export const toExportSpecifier = (tag: string): string => {
+    const componentName = toComponentName(tag)
+    const publicName = toPublicName(tag)
+    return componentName === publicName ? componentName : `${componentName} as ${publicName}`
+}
+
+/**
+ * Identifiers that generated component bindings and filenames must not use.
+ *
  * Svelte names the compiled function after the filename, so a component named
  * `Object`/`Map`/`Math`/`Symbol`/… would shadow the global inside the module
  * and break Vite's SSR export boilerplate (`Object.defineProperty is not a
- * function`). Used by the generator guard (and its test) to fail loudly if a
- * new `html-tags`/`svg-tags` entry would reintroduce a collision.
+ * function`). This intentionally conservative guard is not intended to model
+ * every global exposed by every JavaScript runtime.
  */
-export const JS_GLOBAL_NAMES = new Set([
+export const FORBIDDEN_GENERATED_IDENTIFIERS: ReadonlySet<string> = new Set([
     'Array',
     'Atomics',
     'BigInt',

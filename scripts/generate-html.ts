@@ -4,10 +4,10 @@ import { htmlVoidElements } from 'html-void-elements'
 import path from 'path'
 import svgTags from 'svg-tags'
 import {
-    JS_GLOBAL_NAMES,
+    FORBIDDEN_GENERATED_IDENTIFIERS,
     toComponentFileName,
     toComponentName,
-    toPublicName
+    toExportSpecifier
 } from '../src/lib/html/componentNames'
 
 // Elements that should be excluded entirely
@@ -46,15 +46,6 @@ const OUTPUT_DIR = 'src/lib/html'
 
 const template = fs.readFileSync(TEMPLATE_PATH, 'utf-8')
 const voidTemplate = fs.readFileSync(VOID_TEMPLATE_PATH, 'utf-8')
-
-// Barrel export specifier. Components whose identifier was renamed keep their
-// PascalCase export name (via `as`) so `motion`'s lowercase keys
-// (`motion.object`, `motion.set`) are unchanged.
-const toExportSpecifier = (tag: string): string => {
-    const name = toComponentName(tag)
-    const publicName = toPublicName(tag)
-    return name === publicName ? name : `${name} as ${publicName}`
-}
 
 const needsQuoting = (tag: string): boolean => tag.includes('-')
 
@@ -105,7 +96,7 @@ const ALL_TAGS = [...new Set([...FILTERED_HTML, ...FILTERED_SVG])].sort()
 // Fail loudly instead of silently regenerating a JS-global-named component.
 for (const tag of ALL_TAGS) {
     for (const name of [toComponentName(tag), toComponentFileName(tag)]) {
-        if (JS_GLOBAL_NAMES.has(name)) {
+        if (FORBIDDEN_GENERATED_IDENTIFIERS.has(name)) {
             throw new Error(
                 `Generated component "${name}" (tag "${tag}") collides with a JavaScript ` +
                     'global and would shadow it in the compiled SSR module. Rename it in ' +
