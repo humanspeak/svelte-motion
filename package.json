@@ -75,6 +75,18 @@
             "types": "./dist/vite.d.ts",
             "default": "./dist/vite.js"
         },
+        "./html/Map.svelte": {
+            "svelte": "./dist/html/HtmlMap.svelte"
+        },
+        "./html/Math.svelte": {
+            "svelte": "./dist/html/HtmlMath.svelte"
+        },
+        "./html/Object.svelte": {
+            "svelte": "./dist/html/HtmlObject.svelte"
+        },
+        "./html/Symbol.svelte": {
+            "svelte": "./dist/html/HtmlSymbol.svelte"
+        },
         "./html/*.svelte": {
             "svelte": "./dist/html/*.svelte"
         }

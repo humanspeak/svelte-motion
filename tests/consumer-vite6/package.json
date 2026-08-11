@@ -1,0 +1,14 @@
+{
+    "name": "@humanspeak/svelte-motion-consumer-vite6",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "test": "node verify.mjs"
+    },
+    "dependencies": {
+        "@humanspeak/svelte-motion": "workspace:*",
+        "@sveltejs/vite-plugin-svelte": "5.1.1",
+        "svelte": "5.56.4",
+        "vite": "6.4.3"
+    }
+}

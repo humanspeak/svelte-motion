@@ -3,6 +3,12 @@ import htmlTags from 'html-tags'
 import { htmlVoidElements } from 'html-void-elements'
 import path from 'path'
 import svgTags from 'svg-tags'
+import {
+    FORBIDDEN_GENERATED_IDENTIFIERS,
+    toComponentFileName,
+    toComponentName,
+    toExportSpecifier
+} from '../src/lib/html/componentNames'
 
 // Elements that should be excluded entirely
 const EXCLUDED_TAGS = new Set(['script', 'style', 'link', 'meta', 'title', 'head', 'html', 'body'])
@@ -40,20 +46,6 @@ const OUTPUT_DIR = 'src/lib/html'
 
 const template = fs.readFileSync(TEMPLATE_PATH, 'utf-8')
 const voidTemplate = fs.readFileSync(VOID_TEMPLATE_PATH, 'utf-8')
-
-const toComponentName = (tag: string): string =>
-    tag
-        .split('-')
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join('')
-
-const toComponentFileName = (tag: string): string =>
-    tag === 'set'
-        ? 'SetElement'
-        : tag
-              .split('-')
-              .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-              .join('')
 
 const needsQuoting = (tag: string): boolean => tag.includes('-')
 
@@ -98,6 +90,22 @@ const generateComponentDocs = (tag: string, isVoid: boolean): string => {
     ].join('\n')
 }
 
+// All generated tags (HTML ∪ SVG), in canonical order
+const ALL_TAGS = [...new Set([...FILTERED_HTML, ...FILTERED_SVG])].sort()
+
+// Fail loudly instead of silently regenerating a JS-global-named component.
+for (const tag of ALL_TAGS) {
+    for (const name of [toComponentName(tag), toComponentFileName(tag)]) {
+        if (FORBIDDEN_GENERATED_IDENTIFIERS.has(name)) {
+            throw new Error(
+                `Generated component "${name}" (tag "${tag}") collides with a JavaScript ` +
+                    'global and would shadow it in the compiled SSR module. Rename it in ' +
+                    'src/lib/html/componentNames.ts.'
+            )
+        }
+    }
+}
+
 // Generate HTML components
 FILTERED_HTML.forEach((tag) => {
     const isVoid = VOID_ELEMENTS.has(tag)
@@ -114,43 +122,43 @@ FILTERED_SVG.forEach((tag) => {
 })
 
 // Generate index.ts
-const ALL_TAGS = [...new Set([...FILTERED_HTML, ...FILTERED_SVG])].sort()
 
-const imports = ALL_TAGS.map((tag) => {
-    const componentName = toComponentName(tag)
-    return `import ${componentName} from '$lib/html/${toComponentFileName(tag)}.svelte'`
-}).join('\n')
+// Imports are ordered by source path (matching prettier-plugin-organize-imports),
+// not by binding name — `HtmlSet` (renamed binding) still sorts under `SetElement.svelte`.
+const imports = ALL_TAGS.map((tag) => ({
+    fileName: toComponentFileName(tag),
+    statement: `import ${toComponentName(tag)} from '$lib/html/${toComponentFileName(tag)}.svelte'`
+}))
+    .sort((a, b) => a.fileName.localeCompare(b.fileName))
+    .map(({ statement }) => statement)
+    .join('\n')
 
 const regularElements = [
     ...new Set([...FILTERED_HTML.filter((t) => !VOID_ELEMENTS.has(t)), ...FILTERED_SVG])
 ].sort()
 const voidElements = FILTERED_HTML.filter((tag) => VOID_ELEMENTS.has(tag)).sort()
 
-const typeDefinition = `
-export type MotionComponents = {
-    ${regularElements
-        .map((tag) => {
-            const componentName = toComponentName(tag)
-            const key = needsQuoting(tag) ? `'${tag}'` : tag
-            return `${generateComponentDocs(tag, false)}
+const typeDefinition = `export type MotionComponents = {
+${regularElements
+    .map((tag) => {
+        const componentName = toComponentName(tag)
+        const key = needsQuoting(tag) ? `'${tag}'` : tag
+        return `${generateComponentDocs(tag, false)}
     ${key}: typeof ${componentName}`
-        })
-        .join('\n\n    ')}
+    })
+    .join('\n\n')}
 
-    ${voidElements
-        .map((tag) => {
-            const componentName = toComponentName(tag)
-            const key = needsQuoting(tag) ? `'${tag}'` : tag
-            return `${generateComponentDocs(tag, true)}
+${voidElements
+    .map((tag) => {
+        const componentName = toComponentName(tag)
+        const key = needsQuoting(tag) ? `'${tag}'` : tag
+        return `${generateComponentDocs(tag, true)}
     ${key}: typeof ${componentName}`
-        })
-        .join('\n\n    ')}
-}
-`
+    })
+    .join('\n\n')}
+}`
 
-const indexContent = `${imports}\n\nexport { ${ALL_TAGS.map(
-    (tag) => `${toComponentName(tag)}`
-).join(', ')} }\n\n${typeDefinition}\n`
+const indexContent = `${imports}\n\nexport {\n    ${ALL_TAGS.map(toExportSpecifier).join(',\n    ')}\n}\n\n${typeDefinition}\n`
 
 fs.writeFileSync(path.join(OUTPUT_DIR, 'index.ts'), indexContent)
 

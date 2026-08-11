@@ -65,12 +65,18 @@ jobs:
                       ${{ runner.os }}-vitest-
 
             - name: Install dependencies
-              run: pnpm install --filter . --frozen-lockfile --config.engine-strict=false
+              run: >-
+                  pnpm install --filter .
+                  --filter @humanspeak/svelte-motion-consumer-vite6
+                  --frozen-lockfile --config.engine-strict=false
 
             - name: Run unit tests
               run: |
                   pnpm build
                   pnpm test
+
+            - name: Test Vite 6 consumer compatibility
+              run: pnpm --filter @humanspeak/svelte-motion-consumer-vite6 test
 
             - name: Upload unit test results
               if: always()

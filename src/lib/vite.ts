@@ -1,17 +1,16 @@
 import { Parser, type Node } from 'acorn'
 import type { Plugin } from 'vite'
+import { toComponentFileName, toComponentName } from './html/componentNames.js'
 
 /**
- * Tag-to-component name mapping. Each key is the lowercase HTML/SVG tag,
+ * Tag-to-component-name mapping. Each key is the lowercase HTML/SVG tag,
  * and the value is the PascalCase component filename (without .svelte).
  *
  * This is used by the Vite plugin to rewrite `motion.div` → `import Div from '…/Div.svelte'`.
+ *
+ * The mapping lives in `./html/componentNames` (shared with the generator) so
+ * the import paths emitted here always match the files in `dist/html/`.
  */
-const toComponentName = (tag: string): string =>
-    tag
-        .split('-')
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join('')
 
 /** Set of valid HTML/SVG element names that have motion component wrappers. */
 const VALID_TAGS = new Set([
@@ -296,10 +295,11 @@ export const svelteMotionOptimize = (): Plugin => ({
 
         for (const tag of usedTags) {
             const componentName = toComponentName(tag)
+            const fileName = toComponentFileName(tag)
             const localName = `SvelteMotion${componentName}`
             tagToLocal.set(tag, localName)
             componentImports.push(
-                `import ${localName} from '@humanspeak/svelte-motion/html/${componentName}.svelte'`
+                `import ${localName} from '@humanspeak/svelte-motion/html/${fileName}.svelte'`
             )
         }
 

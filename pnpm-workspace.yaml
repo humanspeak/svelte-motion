@@ -1,6 +1,7 @@
 packages:
     - .
     - docs
+    - tests/consumer-vite6
 allowBuilds:
     # pnpm 11.9 matches git-hosted deps by name@resolved-url (pnpm#10522) — a
     # plain package-name key does NOT match. This key embeds the resolved
