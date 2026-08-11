@@ -16,7 +16,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { playwright } from '@vitest/browser-playwright'
 import devtoolsJson from 'vite-plugin-devtools-json'
 import { defineConfig } from 'vitest/config'
-import { competitors } from './src/lib/compare-data'
+import { competitors, ours } from './src/lib/compare-data'
 import { docsConfig } from './src/lib/docs-config'
 
 // const __filename = fileURLToPath(import.meta.url)
@@ -43,7 +43,13 @@ export default defineConfig({
         // (`sync-examples-catalog.mjs`) now owns only the
         // `examples/+page.ts` metadata sync. `blogDir: false` disables
         // docs-kit's default blog-folder scan — we don't have a blog.
-        sitemapManifestPlugin({ blogDir: false }),
+        sitemapManifestPlugin({
+            blogDir: false,
+            extraPages: competitors.map((competitor) => ({
+                route: `/compare/${competitor.slug}`,
+                source: 'src/lib/compare-data.ts'
+            }))
+        }),
         // Scans `src/lib/examples/<slug>/demos/*.svelte`, pre-highlights each
         // demo's source with Shiki (light + dark), and emits a lightweight
         // `src/lib/demo-manifest.json` index. The heavy code + Shiki HTML stay
@@ -91,7 +97,8 @@ export default defineConfig({
             siteUrl: docsConfig.url,
             pkgName: docsConfig.name,
             description: docsConfig.description,
-            prepend: 'llms-positioning.md'
+            prepend: 'llms-positioning.md',
+            comparisons: { ours, competitors }
         }),
         llmsFullPlugin({
             siteUrl: docsConfig.url,

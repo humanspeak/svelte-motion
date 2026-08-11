@@ -54,6 +54,7 @@ static/examples/
 # Generated llms.txt + llms-full.txt (docs-kit's llmsPlugin / llmsFullPlugin —
 # discovery index + concatenated dump for LLM agents)
 static/llms*.txt
+static/compare/
 
 .dev.vars*
 !.dev.vars.example
