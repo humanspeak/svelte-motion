@@ -71,19 +71,52 @@ describe('optimizedAppear', () => {
         ])
     })
 
-    it('emits a backgroundColor entry with the first concrete scalar from initial and the resting scalar from animate', () => {
+    it('keeps backgroundColor on the main thread, mirroring upstream acceleratedValues', () => {
         const entries = createOptimizedAppearData(
             { backgroundColor: ['#ff0000', '#00ff00'] },
             { backgroundColor: ['#0000ff', '#ffff00'] }
         )
 
-        expect(entries).toEqual([
+        expect(entries).toEqual([])
+    })
+
+    it('omits Motion pseudo-properties and unnormalized dimensional values', () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0, originX: 0, originY: 1, width: 100, borderRadius: 0 },
+            { opacity: 1, originX: 1, originY: 0, width: 200, borderRadius: 12 }
+        )
+
+        expect(entries.map((e) => e.name)).toEqual(['opacity'])
+    })
+
+    it('resolves per-key transitions like upstream getValueTransition', () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0, y: 8, filter: 'blur(8px)' },
+            { opacity: 1, y: 0, filter: 'blur(0px)' },
             {
-                name: 'backgroundColor',
-                keyframes: ['#ff0000', '#ffff00'],
-                options: expect.objectContaining({ fill: 'both' })
-            }
-        ])
+                duration: 0.4,
+                opacity: { duration: 0.2 },
+                filter: { duration: 2 }
+            } as never
+        )
+
+        const byName = Object.fromEntries(entries.map((e) => [e.name, e.options]))
+        expect(byName.opacity.duration).toBe(200)
+        expect(byName.filter.duration).toBe(2000)
+        expect(byName.transform.duration).toBe(400)
+    })
+
+    it('falls back to transition.default before the top-level transition', () => {
+        const entries = createOptimizedAppearData(
+            { filter: 'blur(8px)' },
+            { filter: 'blur(0px)' },
+            {
+                duration: 0.4,
+                default: { duration: 1 }
+            } as never
+        )
+
+        expect(entries[0]?.options.duration).toBe(1000)
     })
 
     it('omits properties that are equal between initial and animate', () => {

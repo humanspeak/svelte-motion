@@ -171,15 +171,40 @@ const toNativeOptions = (transition: AnimationOptions | undefined): KeyframeAnim
     return options
 }
 
-const NON_APPEAR_KEYS = new Set([
-    'pathLength',
-    'pathOffset',
-    'pathSpacing',
-    'strokeDasharray',
-    'stroke-dasharray',
-    'strokeDashoffset',
-    'stroke-dashoffset'
-])
+/**
+ * Non-composite values the appear bootstrap may animate by name. Mirrors
+ * upstream motion-dom's `acceleratedValues` allowlist: WAAPI-safe properties
+ * that need no Motion-side normalization. `opacity` and the composite
+ * `transform` are handled by their dedicated paths in
+ * {@link createOptimizedAppearData}; `backgroundColor` stays on the main
+ * thread, matching upstream (disabled pending Chromium issue 41491098).
+ */
+const APPEAR_VALUES = new Set(['filter', 'clipPath'])
+
+/**
+ * Resolve the transition for a single value, mirroring upstream motion-dom's
+ * `getValueTransition`: a per-key transition replaces the top-level options
+ * (merging them only when it opts in via `inherit: true`), falling back to
+ * `default` and then the top-level transition.
+ */
+const getValueTransition = (
+    transition: AnimationOptions | undefined,
+    key: string
+): AnimationOptions | undefined => {
+    const record = transition as Record<string, unknown> | undefined
+    const valueTransition = (record?.[key] ?? record?.default ?? transition) as
+        | (AnimationOptions & { inherit?: boolean })
+        | undefined
+    if (valueTransition !== transition && valueTransition?.inherit && transition) {
+        const merged: AnimationOptions & { inherit?: boolean } = {
+            ...transition,
+            ...valueTransition
+        }
+        delete merged.inherit
+        return merged
+    }
+    return valueTransition
+}
 
 const extractKeyframeScalar = (value: unknown): string | number | undefined => {
     if (Array.isArray(value)) {
@@ -195,13 +220,16 @@ const extractKeyframeScalar = (value: unknown): string | number | undefined => {
  * Build serialisable optimized-appear animation entries from an initial and
  * animate pair.
  *
- * Emits one entry per animatable CSS property that has a defined value in
- * both the initial and animate keyframe maps. The `transform` composite is
- * built from the resolved inline-style string (so decomposed channels like
- * `x`/`y`/`scale` merge into a single WAAPI entry); every other property
- * — `opacity`, `filter`, `clipPath`, `backgroundColor`, etc. — is emitted
- * by name so the SSR bootstrap can hand it off to the runtime WAAPI
- * animation owner.
+ * Emits one entry per WAAPI-safe property that has a defined value in both
+ * the initial and animate keyframe maps. The `transform` composite is built
+ * from the resolved inline-style string (so decomposed channels like
+ * `x`/`y`/`scale` merge into a single WAAPI entry); `opacity` and the
+ * {@link APPEAR_VALUES} allowlist (`filter`, `clipPath`) are emitted by
+ * name. Anything else — colors, dimensions, Motion pseudo-properties like
+ * `originX` — stays on the main-thread runtime, mirroring upstream
+ * motion-dom's `acceleratedValues`. Each entry resolves its own per-key
+ * transition (`transition[name] ?? transition.default ?? transition`) so the
+ * bootstrap's timing matches what the hydrated runtime will adopt.
  *
  * @param initial Initial keyframes reflected into SSR markup.
  * @param animate Target keyframes for the enter animation.
@@ -226,7 +254,6 @@ export const createOptimizedAppearData = (
 
     const target = resolveRestingValues(animate as never) as Record<string, unknown> | undefined
     if (!target) return []
-    const options = toNativeOptions(transition)
     const entries: OptimizedAppearEntry[] = []
 
     if (initial.opacity != null && target.opacity != null) {
@@ -236,7 +263,7 @@ export const createOptimizedAppearData = (
                 Array.isArray(initial.opacity) ? initial.opacity[0] : initial.opacity,
                 Array.isArray(target.opacity) ? target.opacity[0] : target.opacity
             ] as [string | number, string | number],
-            options
+            options: toNativeOptions(getValueTransition(transition, 'opacity'))
         })
     }
 
@@ -246,17 +273,20 @@ export const createOptimizedAppearData = (
         entries.push({
             name: 'transform',
             keyframes: [initialTransform, targetTransform],
-            options
+            options: toNativeOptions(getValueTransition(transition, 'transform'))
         })
     }
 
     for (const key of Object.keys(initial)) {
-        if (key === 'opacity' || key === 'transform' || transformProps.has(key)) continue
-        if (NON_APPEAR_KEYS.has(key)) continue
+        if (!APPEAR_VALUES.has(key)) continue
         const from = extractKeyframeScalar(initial[key])
         const to = extractKeyframeScalar(target[key])
         if (from === undefined || to === undefined || from === to) continue
-        entries.push({ name: key, keyframes: [from, to], options })
+        entries.push({
+            name: key,
+            keyframes: [from, to],
+            options: toNativeOptions(getValueTransition(transition, key))
+        })
     }
 
     return entries

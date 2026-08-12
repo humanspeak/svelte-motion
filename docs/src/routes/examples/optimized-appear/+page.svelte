@@ -52,7 +52,7 @@
             tag: 'FILTER',
             title: { prefix: 'blur fade ', accent: 'beyond transforms', end: '.' },
             description:
-                'Any animatable CSS property declared in initial/animate — filter, clip-path, color — now rides the same SSR appear path, so blur-fade entrances start before hydration.',
+                'WAAPI-safe properties beyond opacity and transform — filter and clip-path — now ride the same SSR appear path, so blur-fade entrances start before hydration.',
             snippet: blurFadeSection,
             codeSnippet: blurFadeCode,
             notes: blurFadeNotes,
