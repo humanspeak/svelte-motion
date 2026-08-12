@@ -11,7 +11,6 @@
     </p>
 
     <Reorder.Group
-        axis="x"
         dir="rtl"
         values={items}
         onReorder={(next: string[]) => (items = next)}

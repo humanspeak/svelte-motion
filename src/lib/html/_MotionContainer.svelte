@@ -2145,6 +2145,8 @@
 
     let explicitLayoutSnapshot: RectLike | null = null
     let lastRect: RectLike | null = null
+    let observerRestartRect: RectLike | null = null
+    let observerRestartElement: HTMLElement | null = null
     // Coordinates the two delivery paths so one layout change produces exactly
     // one FLIP commit (upstream guarantees one measure/animate pass per commit:
     // MeasureLayout.tsx getSnapshotBeforeUpdate→componentDidUpdate + the
@@ -2208,6 +2210,25 @@
     // postRender callback runs, the serial advances past this captured value.
     let reactiveCommitSerialAtSchedule = 0
 
+    /**
+     * Route a live dragged element's slot change through upstream-style drag
+     * compensation instead of starting a FLIP animation.
+     *
+     * Both the observer and reactive layout paths can discover the same DOM
+     * change. Their existing `lastRect`/serial arbitration decides which path
+     * consumes it; sharing this branch ensures either winner shifts the live
+     * drag origin and MotionValues in exactly the same way.
+     */
+    const commitDraggedLayoutChange = (previous: RectLike): boolean => {
+        if (!(element?.dataset.svelteMotionDragActive === 'true' && teardownDrag)) return false
+
+        const activeDrag = teardownDrag
+        motionDomProjection?.commitDraggedLayoutChange(previous, (dx, dy) => {
+            activeDrag.adjustOrigin(dx, dy)
+        })
+        return true
+    }
+
     const runReactiveCommit = () => {
         const prev = reactiveCommitPrevious
         reactiveCommitPrevious = null
@@ -2245,7 +2266,9 @@
         emitProjectionUpdate(prev, next)
         if (hasRectChanged(prev, next)) {
             lastRect = next
-            motionDomProjection?.commitObservedLayoutChange(prev)
+            if (!commitDraggedLayoutChange(prev)) {
+                motionDomProjection?.commitObservedLayoutChange(prev)
+            }
         }
         // No delta from THIS path's snapshot: leave `lastRect` alone. The
         // snapshot may have raced the DOM patch (measured post-patch, so
@@ -2321,13 +2344,41 @@
     // observers, and real layout changes now diff scroll-clean rects —
     // including offscreen, which animates like upstream instead of snapping.
     $effect(() => {
-        if (!(element && layoutProp && isLoaded === 'ready' && hasLayoutFeatures)) return
+        const observedElement = element
+        const layoutMode =
+            layoutProp && isLoaded === 'ready' && hasLayoutFeatures ? layoutProp : false
+        if (!(observedElement && layoutMode)) {
+            lastRect = null
+            observerRestartRect = null
+            observerRestartElement = null
+            return
+        }
 
         let rafId: number | null = null
-        const flipLayoutMode = layoutProp === 'position' ? 'position' : true
+        const flipLayoutMode = layoutMode === 'position' ? 'position' : true
+        // A keyed each update reassigns every child's props after moving its
+        // existing DOM node. That restarts this effect before the old parent
+        // MutationObserver can deliver its child-list record. Preserve the
+        // prior slot across that restart: startup's post-patch measurement is
+        // the only path that still owns both sides of the keyed move.
+        const previousBeforeObserverRestart =
+            observerRestartElement === observedElement ? observerRestartRect : null
+        observerRestartRect = null
+        observerRestartElement = null
         motionDomProjection?.seedLayout()
         lastRect = measureLayoutRect()
-        setCompositorHints(element!, true)
+        if (
+            previousBeforeObserverRestart &&
+            lastRect &&
+            hasRectChanged(previousBeforeObserverRestart, lastRect)
+        ) {
+            observerCommitSerial += 1
+            emitProjectionUpdate(previousBeforeObserverRestart, lastRect)
+            if (!commitDraggedLayoutChange(previousBeforeObserverRestart)) {
+                motionDomProjection?.commitObservedLayoutChange(previousBeforeObserverRestart)
+            }
+        }
+        setCompositorHints(observedElement, true)
 
         const commitObservedLayout = () => {
             if (element!.hasAttribute('data-layout-size-animation')) {
@@ -2377,12 +2428,6 @@
                 return
             }
 
-            // A live drag's slot change routes to the `adjustOrigin`
-            // compensation below instead of a FLIP (measurements are
-            // page-coordinate, so the delta is scroll-clean).
-            const isDragActiveElement =
-                element!.dataset.svelteMotionDragActive === 'true' && !!teardownDrag
-
             const next = measureLayoutRect()
             if (!next) return
             const previous = lastRect
@@ -2411,13 +2456,7 @@
                 // task — so the gesture transform is compensated before
                 // Reorder's checkReorder can see the uncompensated
                 // element and double-fire the swap.
-                if (isDragActiveElement && teardownDrag) {
-                    const activeDrag = teardownDrag
-                    motionDomProjection?.commitDraggedLayoutChange(previous, (dx, dy) => {
-                        activeDrag.adjustOrigin(dx, dy)
-                    })
-                    return
-                }
+                if (commitDraggedLayoutChange(previous)) return
 
                 const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
                 const shouldUseSizeCorrectedFallback =
@@ -2508,6 +2547,8 @@
             element?.removeEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
             element?.removeEventListener(sizeCorrectionSeedEvent, handleSizeCorrectionSeed)
             element?.removeEventListener(sizeCorrectionEndEvent, handleSizeCorrectionEnd)
+            observerRestartRect = lastRect
+            observerRestartElement = observedElement
             lastRect = null
             if (element) {
                 setCompositorHints(element, false)

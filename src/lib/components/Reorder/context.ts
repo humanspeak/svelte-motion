@@ -22,8 +22,9 @@ export interface ItemData<V> {
  * (consumer). Mirrors framer-motion's `ReorderContextProps<T>`
  * (`context/ReorderContext.ts`), with two Svelte-specific adaptations:
  *
- * - `axis` is a getter-backed property so items observe prop changes
- *   without re-creating the context (Svelte context is set once).
+ * - `axis` is a getter-backed property that items bridge through a local
+ *   `$derived`, so post-measure detection propagates without re-creating the
+ *   context (Svelte context is set once).
  * - `unregisterItem` exists because our order registry persists across
  *   renders — React rebuilds `order` from scratch every render, so
  *   unmounted items vanish for free; here they must deregister.
