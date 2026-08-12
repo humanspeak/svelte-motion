@@ -193,8 +193,7 @@ const getValueTransition = (
 ): AnimationOptions | undefined => {
     const record = transition as Record<string, unknown> | undefined
     const valueTransition = (record?.[key] ?? record?.default ?? transition) as
-        | (AnimationOptions & { inherit?: boolean })
-        | undefined
+        (AnimationOptions & { inherit?: boolean }) | undefined
     if (valueTransition !== transition && valueTransition?.inherit && transition) {
         const merged: AnimationOptions & { inherit?: boolean } = {
             ...transition,
