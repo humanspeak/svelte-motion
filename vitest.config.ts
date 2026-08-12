@@ -66,6 +66,9 @@ export default defineConfig({
         maxWorkers: '50%',
         testTimeout: 10000,
         hookTimeout: 10000,
-        reporters: process.env.CI ? ['verbose'] : ['default']
+        // junit feeds the trunk analytics uploader in CI (junit-vitest.xml
+        // matches the workflow's junit-paths)
+        reporters: process.env.CI ? ['verbose', 'junit'] : ['default'],
+        outputFile: { junit: 'junit-vitest.xml' }
     }
 })

@@ -9,7 +9,9 @@ export default defineConfig({
     fullyParallel: false,
     // Retry flaky tests once
     retries: process.env.CI ? 1 : 0,
-    reporter: [['junit', { outputFile: 'junit-playwright.xml' }]],
+    // Written into test-results/ so CI's trunk analytics uploader and the
+    // playwright-results artifact both find it (junit-paths in npm-publish.yml)
+    reporter: [['junit', { outputFile: 'test-results/junit-playwright.xml' }]],
     webServer: {
         // Project-specific port: vite's default preview port (4173) is
         // shared by every repo on the machine, so concurrent e2e sessions
