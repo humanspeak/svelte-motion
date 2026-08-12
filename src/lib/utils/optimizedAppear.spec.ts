@@ -61,7 +61,10 @@ describe('optimizedAppear', () => {
 
         expect(entries).toHaveLength(4)
         expect(entries.map((e) => e.name)).toEqual(['opacity', 'transform', 'filter', 'clipPath'])
-        expect(entries.find((e) => e.name === 'filter')?.keyframes).toEqual(['blur(8px)', 'blur(0px)'])
+        expect(entries.find((e) => e.name === 'filter')?.keyframes).toEqual([
+            'blur(8px)',
+            'blur(0px)'
+        ])
         expect(entries.find((e) => e.name === 'clipPath')?.keyframes).toEqual([
             'inset(0 0 100% 0)',
             'inset(0)'
