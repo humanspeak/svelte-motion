@@ -2,24 +2,24 @@
 
 **Recommendation: PASS** — Motion 13.1 Reorder parity and inherited runtime outcomes are implemented, manually reviewed, and covered by green focused and CI gates.
 **Reviewed at** `1fb2a4f` · 2026-08-12 18:16 · **Plan planned at** `1fb2a4f` (revised from `96b166c`)
-**Integrated** — PR https://github.com/humanspeak/svelte-motion/pull/469 opened via the `pr` skill for the reviewed snapshot commit.
+**Integrated** — [PR #469](https://github.com/humanspeak/svelte-motion/pull/469) opened via the `pr` skill for the reviewed snapshot commit.
 
 ## Done criteria
 
-| Criterion | Result | Evidence |
-| --- | --- | --- |
-| `package.json` resolves `motion` 13.1.0 and `motion-dom` 13.0.0 through the lockfile. | met | `pnpm-lock.yaml:3471,7634` and `pnpm-lock.yaml:3465,7628`. |
-| Public `ReorderAxis` is documented and equals `'x' \| 'y' \| 'xy'`. | met | `src/lib/components/Reorder/types.ts:8`; exported from `src/lib/index.ts`. |
-| Omitting `axis` automatically detects horizontal, vertical, and wrapped layouts. | met | `detectAxis.spec.ts`, component coverage, and `axis-auto.spec.ts`; Reorder e2e 22/22. |
-| `axis="xy"` reorders within and across wrapped rows. | met | `checkReorder.spec.ts`, `grid.spec.ts`, and operator review of `/tests/reorder/grid`. |
-| Horizontal and wrapped reordering behave correctly in RTL without reversing `values`. | met | `rtl.spec.ts` covers two continuous swaps and sibling FLIP; operator reviewed `/tests/reorder/rtl`. |
-| Unmeasured values, Svelte unregistration, item drag overrides, and edge auto-scroll remain covered and passing. | met | `order.spec.ts`, `reorder.component.spec.ts`, `autoScroll.spec.ts`, and Reorder browser suite. |
-| Three new test/demo routes exist, are linked, and each has a passing e2e spec. | met | Links at `src/routes/+page.svelte:346,354,362`; `axis-auto`, `grid`, and `rtl` e2e passed. |
-| Public Reorder docs/examples describe and demonstrate Motion 13.1 behavior. | met | `/docs/reorder` and `/examples/reorder` include automatic axis, grid, and RTL demos; operator reviewed locally. |
-| Motion 12.43/13.0 inherited SVG/color/presence outcomes have passing focused regression coverage. | met | SVG 27/27; exact final-style test 3/3 with hydration wait; presence 73/74 under load with the sole existing timing sample passing 3/3 isolated. |
-| Repository release gates exit successfully. | met | PR #469: unit, build, docs-build, Trunk, and both e2e shards passed; local unit suite 815/815, direct `svelte-check` 0 errors, docs build passed, package/publint passed via installed binaries. |
-| `git diff --check` exits 0 and scope is clean. | met | Reproduced after final source commit; all scope expansions are recorded operator-approved revisions. |
-| Sibling batch status is updated. | met | Batch README marks Plan 001 DONE and carries the CLOSED note. |
+| Criterion                                                                                                       | Result | Evidence                                                                                                                                                                                         |
+| --------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `package.json` resolves `motion` 13.1.0 and `motion-dom` 13.0.0 through the lockfile.                           | met    | `pnpm-lock.yaml:3471,7634` and `pnpm-lock.yaml:3465,7628`.                                                                                                                                       |
+| Public `ReorderAxis` is documented and equals `'x' \| 'y' \| 'xy'`.                                             | met    | `src/lib/components/Reorder/types.ts:8`; exported from `src/lib/index.ts`.                                                                                                                       |
+| Omitting `axis` automatically detects horizontal, vertical, and wrapped layouts.                                | met    | `detectAxis.spec.ts`, component coverage, and `axis-auto.spec.ts`; Reorder e2e 22/22.                                                                                                            |
+| `axis="xy"` reorders within and across wrapped rows.                                                            | met    | `checkReorder.spec.ts`, `grid.spec.ts`, and operator review of `/tests/reorder/grid`.                                                                                                            |
+| Horizontal and wrapped reordering behave correctly in RTL without reversing `values`.                           | met    | `rtl.spec.ts` covers two continuous swaps and sibling FLIP; operator reviewed `/tests/reorder/rtl`.                                                                                              |
+| Unmeasured values, Svelte unregistration, item drag overrides, and edge auto-scroll remain covered and passing. | met    | `order.spec.ts`, `reorder.component.spec.ts`, `autoScroll.spec.ts`, and Reorder browser suite.                                                                                                   |
+| Three new test/demo routes exist, are linked, and each has a passing e2e spec.                                  | met    | Links at `src/routes/+page.svelte:346,354,362`; `axis-auto`, `grid`, and `rtl` e2e passed.                                                                                                       |
+| Public Reorder docs/examples describe and demonstrate Motion 13.1 behavior.                                     | met    | `/docs/reorder` and `/examples/reorder` include automatic axis, grid, and RTL demos; operator reviewed locally.                                                                                  |
+| Motion 12.43/13.0 inherited SVG/color/presence outcomes have passing focused regression coverage.               | met    | SVG 27/27; exact final-style test 3/3 with hydration wait; presence 73/74 under load with the sole existing timing sample passing 3/3 isolated.                                                  |
+| Repository release gates exit successfully.                                                                     | met    | PR #469: unit, build, docs-build, Trunk, and both e2e shards passed; local unit suite 815/815, direct `svelte-check` 0 errors, docs build passed, package/publint passed via installed binaries. |
+| `git diff --check` exits 0 and scope is clean.                                                                  | met    | Reproduced after final source commit; all scope expansions are recorded operator-approved revisions.                                                                                             |
+| Sibling batch status is updated.                                                                                | met    | Batch README marks Plan 001 DONE and carries the CLOSED note.                                                                                                                                    |
 
 ## Spirit
 
