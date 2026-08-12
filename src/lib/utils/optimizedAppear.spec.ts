@@ -52,6 +52,107 @@ describe('optimizedAppear', () => {
         ])
     })
 
+    it('emits a WAAPI entry per non-transform CSS property in initial/animate', () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0, y: 8, filter: 'blur(8px)', clipPath: 'inset(0 0 100% 0)' },
+            { opacity: 1, y: -8, filter: 'blur(0px)', clipPath: 'inset(0)' },
+            { duration: 0.4, ease: 'easeOut' }
+        )
+
+        expect(entries).toHaveLength(4)
+        expect(entries.map((e) => e.name)).toEqual(['opacity', 'transform', 'filter', 'clipPath'])
+        expect(entries.find((e) => e.name === 'filter')?.keyframes).toEqual([
+            'blur(8px)',
+            'blur(0px)'
+        ])
+        expect(entries.find((e) => e.name === 'clipPath')?.keyframes).toEqual([
+            'inset(0 0 100% 0)',
+            'inset(0)'
+        ])
+    })
+
+    it('keeps backgroundColor on the main thread, mirroring upstream acceleratedValues', () => {
+        const entries = createOptimizedAppearData(
+            { backgroundColor: ['#ff0000', '#00ff00'] },
+            { backgroundColor: ['#0000ff', '#ffff00'] }
+        )
+
+        expect(entries).toEqual([])
+    })
+
+    it('omits Motion pseudo-properties and unnormalized dimensional values', () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0, originX: 0, originY: 1, width: 100, borderRadius: 0 },
+            { opacity: 1, originX: 1, originY: 0, width: 200, borderRadius: 12 }
+        )
+
+        expect(entries.map((e) => e.name)).toEqual(['opacity'])
+    })
+
+    it('resolves per-key transitions like upstream getValueTransition', () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0, y: 8, filter: 'blur(8px)' },
+            { opacity: 1, y: 0, filter: 'blur(0px)' },
+            {
+                duration: 0.4,
+                opacity: { duration: 0.2 },
+                filter: { duration: 2 }
+            } as never
+        )
+
+        const byName = Object.fromEntries(entries.map((e) => [e.name, e.options]))
+        expect(byName.opacity.duration).toBe(200)
+        expect(byName.filter.duration).toBe(2000)
+        expect(byName.transform.duration).toBe(400)
+    })
+
+    it('falls back to transition.default before the top-level transition', () => {
+        const entries = createOptimizedAppearData(
+            { filter: 'blur(8px)' },
+            { filter: 'blur(0px)' },
+            {
+                duration: 0.4,
+                default: { duration: 1 }
+            } as never
+        )
+
+        expect(entries[0]?.options.duration).toBe(1000)
+    })
+
+    it('omits properties that are equal between initial and animate', () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0, filter: 'blur(4px)' },
+            { opacity: 1, filter: 'blur(4px)' }
+        )
+
+        expect(entries.find((e) => e.name === 'filter')).toBeUndefined()
+        expect(entries.map((e) => e.name)).toEqual(['opacity'])
+    })
+
+    it('skips SVG path-only keys and transform channels', () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0, pathLength: 0, strokeDasharray: '0 1', x: -10 },
+            { opacity: 1, pathLength: 1, strokeDasharray: '1 0', x: 0 }
+        )
+
+        const names = entries.map((e) => e.name)
+        expect(names).toContain('opacity')
+        expect(names).toContain('transform')
+        expect(names).not.toContain('pathLength')
+        expect(names).not.toContain('strokeDasharray')
+        expect(names).not.toContain('x')
+    })
+
+    it('omits non-string/non-number values and MotionValue-like objects', () => {
+        const motionValue = { get: () => 'blur(4px)' }
+        const entries = createOptimizedAppearData(
+            { opacity: 0, filter: motionValue },
+            { opacity: 1, filter: 'blur(0px)' }
+        )
+
+        expect(entries.find((e) => e.name === 'filter')).toBeUndefined()
+    })
+
     it('creates an SSR bootstrap script with the upstream data attribute', () => {
         const script = createOptimizedAppearScript('appear-1', [
             {
