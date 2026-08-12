@@ -5,6 +5,7 @@
     // transform/accelerated prop animates on the element it's attached to.
     const transformWillChange = useWillChange()
     const colorWillChange = useWillChange()
+    const borderRadiusWillChange = useWillChange()
     const controlsWillChange = useWillChange()
 
     // Imperative animation controls path: animating a transform via
@@ -20,6 +21,7 @@
     let started = $state(false)
     let moved = $state(false)
     let recolored = $state(false)
+    let rounded = $state(false)
 
     // Stay at "auto" (no transform key) until the first interaction, then
     // toggle x back and forth so the box animates both directions. will-change
@@ -78,10 +80,11 @@
         </article>
 
         <article>
-            <h2>Non-transform animation</h2>
+            <h2>Accelerated color animation</h2>
             <p class="expectation">
-                Animating only <code>backgroundColor</code> leaves will-change at
-                <code>auto</code>.
+                Motion 12.43+ accelerates <code>backgroundColor</code>, so animating it flips
+                will-change to <code>transform</code>. The hint stays latched after the first
+                animation, matching upstream.
             </p>
             <p class="readout" data-testid="color-value">value: {colorWillChange.current}</p>
             <div class="track">
@@ -123,6 +126,32 @@
             </div>
             <button type="button" data-testid="run-controls" onclick={runControls}>
                 Run controls
+            </button>
+        </article>
+
+        <article>
+            <h2>Non-accelerated animation</h2>
+            <p class="expectation">
+                Animating <code>borderRadius</code> changes the shape without promoting it, so
+                will-change remains <code>auto</code>.
+            </p>
+            <p class="readout" data-testid="border-radius-value">
+                value: {borderRadiusWillChange.current}
+            </p>
+            <div class="track">
+                <motion.div
+                    class="orb cyan"
+                    data-testid="border-radius-box"
+                    style={{ willChange: borderRadiusWillChange }}
+                    initial={false}
+                    animate={{ borderRadius: rounded ? '50%' : '10px' }}
+                    transition={{ duration: 0.5 }}
+                >
+                    B
+                </motion.div>
+            </div>
+            <button type="button" data-testid="round" onclick={() => (rounded = !rounded)}>
+                {rounded ? 'Reset' : 'Animate radius'}
             </button>
         </article>
     </section>

@@ -33,21 +33,22 @@ test.describe('useWillChange (#327)', () => {
         await expect.poll(computedWillChange(page, 'transform-box')).toBe('transform')
     })
 
-    test('leaves will-change at "auto" for a non-transform animation', async ({ page }) => {
+    test('flips will-change for an accelerated backgroundColor animation', async ({ page }) => {
         await page.goto(URL)
         await waitForMotionReady(page, 'color-box')
 
         await expect.poll(valueText(page, 'color-value')).toBe('value: auto')
 
-        // Animating only backgroundColor must not promote the element.
+        // Motion 12.43+ accelerates backgroundColor, so it promotes the element.
         await page.getByTestId('recolor').click()
-        await expect.poll(computedWillChange(page, 'color-box')).toBe('auto')
-        await expect.poll(valueText(page, 'color-value')).toBe('value: auto')
+        await expect.poll(computedWillChange(page, 'color-box')).toBe('transform')
+        await expect.poll(valueText(page, 'color-value')).toBe('value: transform')
 
-        // Edge: repeated non-transform animations still must not promote.
+        // The upstream will-change value is a one-way latch: resetting the color
+        // does not demote the element after the accelerated animation ran.
         await page.getByTestId('recolor').click()
-        await expect.poll(computedWillChange(page, 'color-box')).toBe('auto')
-        await expect.poll(valueText(page, 'color-value')).toBe('value: auto')
+        await expect.poll(computedWillChange(page, 'color-box')).toBe('transform')
+        await expect.poll(valueText(page, 'color-value')).toBe('value: transform')
     })
 
     test('flips will-change via imperative animation controls', async ({ page }) => {
@@ -61,6 +62,25 @@ test.describe('useWillChange (#327)', () => {
         await page.getByTestId('run-controls').click()
         await expect.poll(valueText(page, 'controls-value')).toBe('value: transform')
         await expect.poll(computedWillChange(page, 'controls-box')).toBe('transform')
+    })
+
+    test('leaves will-change at "auto" for a nonaccelerated borderRadius animation', async ({
+        page
+    }) => {
+        await page.goto(URL)
+        await waitForMotionReady(page, 'border-radius-box')
+
+        await expect.poll(valueText(page, 'border-radius-value')).toBe('value: auto')
+        await expect.poll(computedWillChange(page, 'border-radius-box')).toBe('auto')
+
+        await page.getByTestId('round').click()
+        await expect.poll(computedWillChange(page, 'border-radius-box')).toBe('auto')
+        await expect.poll(valueText(page, 'border-radius-value')).toBe('value: auto')
+
+        // Reversing a nonaccelerated animation must not promote the element.
+        await page.getByTestId('round').click()
+        await expect.poll(computedWillChange(page, 'border-radius-box')).toBe('auto')
+        await expect.poll(valueText(page, 'border-radius-value')).toBe('value: auto')
     })
 
     test('triggers the transform flip via keyboard activation', async ({ page }) => {
