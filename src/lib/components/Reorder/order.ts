@@ -1,22 +1,17 @@
-import type { Axis } from '$lib/utils/projection'
+import type { Box } from '$lib/utils/projection'
 import type { ItemData } from './context'
 
-const compareMin = <V>(a: ItemData<V>, b: ItemData<V>): number => a.layout.min - b.layout.min
-
 /**
- * Record or refresh an item's measured slot in the group's working
- * order, keeping the array sorted by slot start. Mutates `order` in
- * place — the group owns a single persistent array (unlike upstream
- * React, which rebuilds it every render; see `Group.tsx` `registerItem`).
+ * Record or refresh an item's complete measured slot in registration
+ * order. Mutates `order` in place.
  */
-export const upsertOrderEntry = <V>(order: ItemData<V>[], value: V, layout: Axis): void => {
+export const upsertOrderEntry = <V>(order: ItemData<V>[], value: V, layout: Box): void => {
     const index = order.findIndex((entry) => entry.value === value)
     if (index !== -1) {
         order[index].layout = layout
     } else {
         order.push({ value, layout })
     }
-    order.sort(compareMin)
 }
 
 /**
@@ -32,13 +27,11 @@ export const removeOrderEntry = <V>(order: ItemData<V>[], value: V): void => {
 }
 
 /**
- * Translate a swap detected between `order` and `newOrder` (the
- * `checkReorder` result) onto the full `values` array.
+ * Translate an arbitrary measured reorder onto the corresponding
+ * measured slots in the full `values` array.
  *
- * Only the measured items appear in `order`, so applying the single
- * swapped pair — rather than mapping `newOrder` back to values —
- * preserves unmeasured entries, e.g. offscreen rows in a virtualized
- * list. Direct port of the swap loop in framer-motion `Group.tsx`.
+ * Only measured items appear in `order`; unmeasured values retain their
+ * positions, which preserves virtualized or conditionally mounted rows.
  */
 export const applyOrderSwap = <V>(
     values: V[],
@@ -46,15 +39,10 @@ export const applyOrderSwap = <V>(
     newOrder: ItemData<V>[]
 ): V[] => {
     const newValues = [...values]
-    for (let i = 0; i < newOrder.length; i++) {
-        if (order[i].value !== newOrder[i].value) {
-            const a = values.indexOf(order[i].value)
-            const b = values.indexOf(newOrder[i].value)
-            if (a !== -1 && b !== -1) {
-                ;[newValues[a], newValues[b]] = [newValues[b], newValues[a]]
-            }
-            break
-        }
-    }
+    const measuredIndexes = order.map(({ value }) => values.indexOf(value))
+    newOrder.forEach(({ value }, index) => {
+        const measuredIndex = measuredIndexes[index]
+        if (measuredIndex !== -1) newValues[measuredIndex] = value
+    })
     return newValues
 }

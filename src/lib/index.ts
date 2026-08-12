@@ -5,6 +5,7 @@ import MotionConfig from '$lib/components/MotionConfig.svelte'
 import PresenceChild from '$lib/components/PresenceChild.svelte'
 
 export type {
+    ReorderAxis,
     ReorderElementTag,
     ReorderGroupProps,
     ReorderItemProps

@@ -26,6 +26,18 @@ describe('Reorder.Group / Reorder.Item', () => {
         expect(group.querySelectorAll('li')).toHaveLength(3)
     })
 
+    it('accepts an omitted axis for automatic detection', async () => {
+        render(ReorderHarness)
+        const group = await screen.findByTestId('group')
+        expect(group.querySelectorAll('li')).toHaveLength(3)
+    })
+
+    it('accepts axis="xy" and enables two-axis dragging', async () => {
+        render(ReorderHarness, { props: { axis: 'xy' } })
+        const item = await screen.findByTestId('item-0')
+        expect(item.getAttribute('draggable')).not.toBe('false')
+    })
+
     it('respects the `as` prop on both group and item', async () => {
         render(ReorderHarness, { props: { as: 'article', itemAs: 'section' } })
         const group = await screen.findByTestId('group')

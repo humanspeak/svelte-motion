@@ -20,7 +20,7 @@
     import { isMotionValueChild } from '$lib/utils/motionValueChild'
     import { parseStyleString } from '$lib/utils/style'
     import { useTransform } from '$lib/utils/transform.svelte'
-    import { autoScrollIfNeeded, resetAutoScrollState } from './autoScroll'
+    import { autoScrollIfNeeded, resetAutoScrollState, selectAutoScrollAxis } from './autoScroll'
     import { getReorderContext } from './context'
     import type { ReorderItemProps } from './types'
 
@@ -62,8 +62,16 @@
         const { axis } = context
         // The bound style MotionValue is dual-written by the drag
         // gesture, so it reads as the live offset from the item's slot.
-        context.updateOrder(value, point[axis].get() as number, info.velocity[axis])
-        autoScrollIfNeeded(context.getGroupElement(), info.point[axis], axis, info.velocity[axis])
+        const offset = { x: point.x.get() as number, y: point.y.get() as number }
+        context.updateOrder(value, offset, info.velocity)
+
+        const scrollAxis = selectAutoScrollAxis(axis, info.velocity)
+        autoScrollIfNeeded(
+            context.getGroupElement(),
+            info.point[scrollAxis],
+            scrollAxis,
+            info.velocity[scrollAxis]
+        )
         onDrag?.(event, info)
     }
 
@@ -98,7 +106,7 @@
 <MotionContainer
     bind:ref
     tag={as}
-    drag={context.axis}
+    drag={context.axis === 'xy' ? true : context.axis}
     {...rest}
     dragSnapToOrigin
     style={itemStyle}

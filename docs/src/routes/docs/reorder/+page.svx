@@ -1,6 +1,6 @@
 ---
 title: Reorder
-description: Drag-to-reorder lists with automatic layout animations, axis locking, and edge auto-scroll
+description: Drag-to-reorder lists and wrapped grids with automatic axis detection, RTL, layout animations, and edge auto-scroll
 ---
 
 <script>
@@ -11,17 +11,17 @@ description: Drag-to-reorder lists with automatic layout animations, axis lockin
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'Reorder | Docs | Svelte Motion'
-      seo.description = 'Drag-to-reorder lists with automatic layout animations using Svelte Motion. Framer Motion-compatible Reorder.Group and Reorder.Item components.'
+      seo.description = 'Drag-to-reorder lists and wrapped grids with automatic axis detection, RTL-aware insertion, and layout animations using Svelte Motion.'
       seo.ogTitle = 'Reorder'
       seo.ogTagline = 'Drag-to-reorder lists with automatic layout animations'
-      seo.ogFeatures = ['Drag To Reorder', 'FLIP Siblings', 'Axis Locking', 'Edge Auto-Scroll']
+      seo.ogFeatures = ['Wrapped Grids', 'Auto Axis', 'RTL', 'Edge Auto-Scroll']
       seo.ogSlug = 'docs-reorder'
   }
 </script>
 
 # Reorder
 
-`Reorder.Group` and `Reorder.Item` create drag-to-reorder lists — sortable tabs, to-do items, playlists — with a couple of lines of markup. Dragged items lock to the list axis and stay pinned under the cursor while their siblings spring out of the way.
+`Reorder.Group` and `Reorder.Item` create drag-to-reorder lists and wrapped grids — sortable tabs, dashboards, playlists — with a couple of lines of markup. The group detects its layout axis, dragged items stay pinned under the cursor, and siblings spring out of the way.
 
 ```svelte
 <script lang="ts">
@@ -30,7 +30,7 @@ description: Drag-to-reorder lists with automatic layout animations, axis lockin
     let items = $state([0, 1, 2, 3])
 </script>
 
-<Reorder.Group axis="y" values={items} onReorder={(next) => (items = next)}>
+<Reorder.Group values={items} onReorder={(next) => (items = next)}>
     {#each items as item (item)}
         <Reorder.Item value={item}>{item}</Reorder.Item>
     {/each}
@@ -73,7 +73,28 @@ The group renders a `ul` and items render `li` by default. Change either with `a
 
 ## Axis
 
-Lists reorder along one axis — `"y"` by default, `"x"` for horizontal lists — and items drag-lock to it. To let an item move freely on both axes while still reordering on the list axis, pass `drag` to the item:
+Omit `axis` to detect `"x"`, `"y"`, or `"xy"` from measured item geometry. Detection starts safely at `"y"` until enough items are measured. Pass an explicit axis when you want to override the layout:
+
+```svelte
+<Reorder.Group axis="x" values={tabs} onReorder={setTabs} />
+```
+
+Use `axis="xy"` for a wrapped layout. A single drag can move an item between columns and rows while displaced siblings animate into their new slots:
+
+```svelte
+<Reorder.Group
+    axis="xy"
+    values={tiles}
+    onReorder={(next) => (tiles = next)}
+    style="display: flex; flex-wrap: wrap"
+>
+    {#each tiles as tile (tile.id)}
+        <Reorder.Item value={tile}>{tile.label}</Reorder.Item>
+    {/each}
+</Reorder.Group>
+```
+
+Explicit `"x"` and `"y"` axes lock item dragging to one direction. To let an item move freely while the group still reorders on one axis, pass `drag` to the item:
 
 ```svelte
 <Reorder.Item value={item} drag>{item}</Reorder.Item>
@@ -113,6 +134,22 @@ Mark the scrollable container with `layoutScroll` so layout measurements stay co
 
 The window works as the scroll container too — lists below the fold reorder correctly at any scroll position, and dragging near the viewport edge scrolls the page.
 
+For `axis="xy"`, only the dominant velocity axis can auto-scroll on each drag frame. This prevents a diagonal gesture from double-scrolling horizontal and vertical containers; equal x/y speeds prefer vertical scrolling.
+
+## Right-to-left layouts
+
+Horizontal and wrapped groups read `direction` from the rendered group. In an RTL region, visual insertion direction is reversed automatically while `values` remains in logical order:
+
+```svelte
+<Reorder.Group dir="rtl" values={items} onReorder={setItems}>
+    {#each items as item (item)}
+        <Reorder.Item value={item}>{item}</Reorder.Item>
+    {/each}
+</Reorder.Group>
+```
+
+Direction is read from the group itself, so nested LTR/RTL regions work without changing the document direction or reversing consumer data.
+
 ## Observing the drag offset
 
 Items accept external MotionValues for `x`/`y` through `style`, so you can observe or drive the live drag offset — for example to fade a shadow in while an item is lifted:
@@ -149,9 +186,9 @@ Items are motion components underneath — every [drag prop](/docs/drag) (`while
 
 ## Notes
 
-- Reordering swaps values only while the pointer moves — a swap fires when the dragged item's edge crosses the midpoint of its neighbor.
+- One-dimensional reordering moves values only while the pointer moves — a swap fires when the dragged item's edge crosses the midpoint of its neighbor.
 - `values` can hold any type — strings, numbers, or objects (compared by reference). Keep the `{#each}` key and the item `value` in sync.
-- Wrap-around grids (an `x` drag causing a `y` slot shift) aren't supported yet — reordering is single-axis, matching Framer Motion.
+- Wrapped `axis="xy"` layouts choose the closest visual row and horizontal slot from complete item measurements.
 
 ## Props
 
@@ -161,7 +198,7 @@ Items are motion components underneath — every [drag prop](/docs/drag) (`while
 |------|------|---------|-------------|
 | `values` | `V[]` | — | The current order of item values (required) |
 | `onReorder` | `(newOrder: V[]) => void` | — | Fires with the new order after a swap (required) |
-| `axis` | `'x' \| 'y'` | `'y'` | The axis to reorder along |
+| `axis` | `'x' \| 'y' \| 'xy'` | detected | Override the detected reorder axis; use `'xy'` for wrapped layouts |
 | `as` | `string` | `'ul'` | The HTML element to render |
 
 All other motion props are forwarded to the underlying motion element.

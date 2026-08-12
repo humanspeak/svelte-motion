@@ -61,6 +61,9 @@
      */
     let highlight = $state(false)
 
+    /** Motion 13.0 regression: accelerated SVG styles must commit exact final values. */
+    let svgHidden = $state(false)
+
     /** Live readout of both DOM channels, sampled every frame. */
     type Row = { label: string; prop: string; channel: string; attr: string; style: string }
     let rows = $state<Row[]>([])
@@ -285,6 +288,11 @@
                     class="col-span-2 rounded bg-slate-700 px-2 py-1 text-sm hover:bg-slate-600"
                     onclick={reset}>Reset all</button
                 >
+                <button
+                    data-testid="toggle-svg-final"
+                    class="col-span-2 rounded bg-emerald-700 px-2 py-1 text-sm hover:bg-emerald-600"
+                    onclick={() => (svgHidden = !svgHidden)}>Toggle accelerated SVG</button
+                >
             </div>
 
             <div class="space-y-2 border-t border-slate-700 pt-3 text-sm">
@@ -309,6 +317,35 @@
         <!-- Live figures -->
         <section class="space-y-6">
             {#if mounted}
+                <div>
+                    <h3 class="mb-1 text-sm font-medium text-slate-300">
+                        Accelerated SVG final styles
+                    </h3>
+                    <svg width="220" height="70" viewBox="0 0 220 70" class="rounded bg-slate-800">
+                        <motion.rect
+                            data-testid="accelerated-svg"
+                            x={10}
+                            y={15}
+                            width={40}
+                            height={40}
+                            rx={6}
+                            fill="#22c55e"
+                            initial={false}
+                            animate={{
+                                opacity: svgHidden ? 0 : 1,
+                                transform: svgHidden ? 'translateX(50px)' : 'translateX(0px)'
+                            }}
+                            transition={svgHidden
+                                ? { duration: 0.12 }
+                                : {
+                                      duration: 0.12,
+                                      opacity: { duration: 0 },
+                                      transform: { duration: 0 }
+                                  }}
+                        />
+                    </svg>
+                </div>
+
                 <div>
                     <h3 class="mb-1 text-sm font-medium text-slate-300">
                         One attribute channel: cx, stroke-width, x2

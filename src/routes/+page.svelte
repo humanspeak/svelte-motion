@@ -343,6 +343,30 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/axis-auto') + searchParams}
+                    >
+                        Reorder Automatic Axis Detection
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/grid') + searchParams}
+                    >
+                        Reorder Wrapped Grid (XY)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/rtl') + searchParams}
+                    >
+                        Reorder RTL
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/reorder/siblings-flip') + searchParams}
                     >
                         Reorder Siblings FLIP (live drag)

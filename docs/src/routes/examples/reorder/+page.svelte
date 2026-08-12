@@ -5,11 +5,24 @@
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
-    import { GripVertical, Hand, Layers, MoveVertical, ScrollText, Zap } from '@lucide/svelte'
+    import {
+        Grid3x3,
+        GripVertical,
+        Hand,
+        Languages,
+        Layers,
+        MoveHorizontal,
+        MoveVertical,
+        ScanSearch,
+        ScrollText,
+        Zap
+    } from '@lucide/svelte'
     import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import ReorderDefault from '$lib/examples/reorder/demos/Default.svelte'
+    import ReorderAutoAxisRtl from '$lib/examples/reorder/demos/AutoAxisRtl.svelte'
+    import ReorderGrid from '$lib/examples/reorder/demos/Grid.svelte'
     import ReorderScrollable from '$lib/examples/reorder/demos/Scrollable.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
@@ -20,11 +33,11 @@
     if (seo) {
         seo.title = 'Reorder | Svelte Motion'
         seo.description =
-            'Drag-to-reorder lists with Reorder.Group and Reorder.Item — axis-locked dragging, FLIP siblings, and edge auto-scroll in scrollable containers.'
+            'Drag-to-reorder lists and wrapped grids with automatic axis detection, RTL-aware insertion, FLIP siblings, and edge auto-scroll.'
         seo.ogTitle = 'Reorder'
         seo.h1 = { title: 'Reorder', mode: 'sr-only' }
         seo.ogTagline = 'Drag-to-reorder lists with automatic layout animations'
-        seo.ogFeatures = ['Drag To Reorder', 'FLIP Siblings', 'Axis Locking', 'Edge Auto-Scroll']
+        seo.ogFeatures = ['Wrapped Grids', 'Auto Axis', 'RTL', 'Edge Auto-Scroll']
         seo.ogSlug = 'examples-reorder'
     }
 
@@ -46,6 +59,30 @@
         },
         {
             figId: 'FIG-002',
+            tag: 'GRID',
+            title: { prefix: 'reorder in ', accent: 'two dimensions', end: '.' },
+            description:
+                'Drag one tile horizontally and vertically across wrapped rows. Every displaced tile springs into its new slot during the same continuous gesture.',
+            snippet: gridSection,
+            codeSnippet: gridCode,
+            notes: gridNotes,
+            barCells: [{ k: 'axis', v: 'xy' }],
+            sourceUrl: `${SOURCE_URL}reorder/demos/Grid.svelte`
+        },
+        {
+            figId: 'FIG-003',
+            tag: 'RTL',
+            title: { prefix: 'detect direction, ', accent: 'respect intent', end: '.' },
+            description:
+                'This horizontal group omits axis and renders RTL. Geometry selects horizontal dragging automatically, and visual leftward movement advances the logical data order without reversing the array.',
+            snippet: autoAxisRtlSection,
+            codeSnippet: autoAxisRtlCode,
+            notes: autoAxisRtlNotes,
+            barCells: [{ k: 'axis', v: 'auto' }],
+            sourceUrl: `${SOURCE_URL}reorder/demos/AutoAxisRtl.svelte`
+        },
+        {
+            figId: 'FIG-004',
             tag: 'SCROLL',
             title: { prefix: 'reordering ', accent: 'long lists', end: '.' },
             description:
@@ -93,6 +130,82 @@
     <CodeReferenceV2
         samples={[
             demoCodeSample('reorder/demos/Default.svelte', 'reorder-default', 'Default.svelte')
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#snippet gridSection()}
+    <ReorderGrid />
+{/snippet}
+{#snippet gridNotes()}
+    <ul>
+        <li>
+            <Grid3x3 />
+            <span>
+                <code>axis="xy"</code> clusters overlapping boxes into visual rows and chooses the nearest
+                row and horizontal insertion slot as the tile moves.
+            </span>
+        </li>
+        <li>
+            <MoveHorizontal />
+            <span>
+                One uninterrupted gesture can cross both axes while keyed siblings FLIP into every
+                newly vacated slot.
+            </span>
+        </li>
+        <li>
+            <Layers />
+            <span>
+                The consumer still owns one flat <code>values</code> array; Reorder maps the visual wrapped
+                layout back to that logical order.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet gridCode()}
+    <CodeReferenceV2
+        samples={[demoCodeSample('reorder/demos/Grid.svelte', 'reorder-grid', 'Grid.svelte')]}
+        columns={1}
+    />
+{/snippet}
+
+{#snippet autoAxisRtlSection()}
+    <ReorderAutoAxisRtl />
+{/snippet}
+{#snippet autoAxisRtlNotes()}
+    <ul>
+        <li>
+            <ScanSearch />
+            <span>
+                Omitting <code>axis</code> lets measured geometry select <code>x</code>,
+                <code>y</code>, or <code>xy</code>; no orientation prop is needed for this row.
+            </span>
+        </li>
+        <li>
+            <Languages />
+            <span>
+                Direction comes from the group's computed style, so nested RTL regions behave
+                correctly without changing document direction.
+            </span>
+        </li>
+        <li>
+            <MoveHorizontal />
+            <span>
+                Consumers keep values in logical order. Reorder interprets horizontal insertion in
+                the visual direction instead of asking you to reverse the array.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet autoAxisRtlCode()}
+    <CodeReferenceV2
+        samples={[
+            demoCodeSample(
+                'reorder/demos/AutoAxisRtl.svelte',
+                'reorder-auto-axis-rtl',
+                'AutoAxisRtl.svelte'
+            )
         ]}
         columns={1}
     />

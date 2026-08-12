@@ -53,6 +53,25 @@ const attrNumber = async (locator: Locator, name: string): Promise<number> =>
 const STRINGIFIED_MOTION_VALUE = /="\[object Object\]"/
 
 test.describe('SVG MotionValue attributes', () => {
+    test('commits exact final CSS styles after accelerated SVG animation', async ({ page }) => {
+        await page.goto(ROUTE)
+
+        const target = page.getByTestId('accelerated-svg')
+        const toggle = page.getByTestId('toggle-svg-final')
+        await expect(target).toBeVisible()
+
+        await toggle.click()
+        await expect
+            .poll(() => target.evaluate((element) => getComputedStyle(element).opacity))
+            .toBe('0')
+        await expect(target).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 50, 0)')
+
+        await toggle.click()
+        await expect(target).toHaveCSS('opacity', '1')
+        await expect(target).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)')
+        await expect(target).toHaveAttribute('fill', '#22c55e')
+    })
+
     test('never stringifies a MotionValue into the DOM', async ({ page }) => {
         await page.goto(ROUTE)
         await expect(page.getByTestId('mv-circle')).toBeVisible()

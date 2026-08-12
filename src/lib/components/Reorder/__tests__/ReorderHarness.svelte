@@ -4,14 +4,14 @@
 
     let {
         values = [0, 1, 2],
-        axis = 'y',
+        axis,
         as = 'ul',
         itemAs = 'li',
         groupStyle,
         onReorder = () => {}
     }: {
         values?: number[]
-        axis?: 'x' | 'y'
+        axis?: 'x' | 'y' | 'xy'
         as?: ReorderElementTag
         itemAs?: ReorderElementTag
         groupStyle?: string

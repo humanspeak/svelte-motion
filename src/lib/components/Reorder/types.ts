@@ -4,6 +4,9 @@ import type { SvelteHTMLElements } from 'svelte/elements'
 /** Element tags a Reorder component can render as, via the `as` prop. */
 export type ReorderElementTag = keyof SvelteHTMLElements
 
+/** Axes supported by `Reorder.Group`, including wrapped two-dimensional layouts. */
+export type ReorderAxis = 'x' | 'y' | 'xy'
+
 /**
  * Props for `Reorder.Group`. Mirrors framer-motion's `Reorder.Group`
  * (`Reorder/Group.tsx`): all motion props are accepted and forwarded
@@ -13,11 +16,10 @@ export type ReorderGroupProps<V> = HTMLElementProps & {
     /** The HTML element to render. @default 'ul' */
     as?: ReorderElementTag
     /**
-     * The axis to reorder along. Items drag-lock to this axis by
-     * default; pass `drag` on an item to free both axes.
-     * @default 'y'
+     * The axis to reorder along. When omitted, the group detects the
+     * axis from its measured item layout. Use `'xy'` for wrapped grids.
      */
-    axis?: 'x' | 'y'
+    axis?: ReorderAxis
     /**
      * The current order of values. Each `Reorder.Item` inside the
      * group must appear here via its `value` prop.
