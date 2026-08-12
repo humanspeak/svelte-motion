@@ -24,12 +24,12 @@ REJECTED (with one-line rationale)
 
 ## Delta disposition
 
-| Upstream area                                         | Disposition                                                                     |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Reorder automatic axis, multidimensional layouts, RTL | Implement locally; Svelte Motion owns this port.                                |
-| SVG and color WAAPI acceleration/final styles         | Inherited from motion-dom; verify with focused regressions.                     |
-| AnimatePresence ordering/empty propagation            | Verify equivalent observable Svelte behavior; do not port React reconciliation. |
-| `@emotion/is-prop-valid`, custom React refs           | Not applicable to generated Svelte motion elements.                             |
+| Upstream area                                         | Disposition                                                                               |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Reorder automatic axis, multidimensional layouts, RTL | Implement locally; Svelte Motion owns this port.                                          |
+| SVG and color WAAPI acceleration/final styles         | Inherited; assert `backgroundColor` enables will-change while `background` stays ignored. |
+| AnimatePresence ordering/empty propagation            | Verify equivalent observable Svelte behavior; do not port React reconciliation.           |
+| `@emotion/is-prop-valid`, custom React refs           | Not applicable to generated Svelte motion elements.                                       |
 
 ## Findings considered and rejected
 
@@ -41,3 +41,11 @@ REJECTED (with one-line rationale)
   cleanup; only the data model and observable algorithm should reach parity.
 - Enable all dependency build scripts to make the package update easier: rejected
   because it weakens pnpm's supply-chain boundary and is unrelated to runtime parity.
+
+## Checks refined during the package update
+
+- Motion 12.43 added `backgroundColor` to `motion-dom`'s `acceleratedValues`.
+  The parity gate must inspect stale negative assertions, not only add missing
+  positive tests: `src/lib/utils/willChange.svelte.spec.ts` previously grouped
+  `backgroundColor` with nonaccelerated properties and therefore failed after
+  the dependency bump. The required split is now explicit in Plan 001 Step 7.

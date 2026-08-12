@@ -45,7 +45,7 @@ Svelte conventions.
 
 | Release | Upstream change                                                                            | Required Svelte Motion treatment                                                                                                                                               |
 | ------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 12.43.0 | WAAPI acceleration for `backgroundColor`/`color`                                           | Inherited from `motion-dom`; run existing color/will-change tests and add a focused regression only if coverage cannot observe the new path.                                   |
+| 12.43.0 | WAAPI acceleration for `backgroundColor`/`color`                                           | Inherited from `motion-dom`; assert `useWillChange().add('backgroundColor')` produces `'transform'`, while nonaccelerated `background` and `borderRadius` remain `'auto'`.     |
 | 12.43.0 | WAAPI acceleration for SVG                                                                 | Inherited through `SVGVisualElement`; run focused SVG tests/e2e.                                                                                                               |
 | 12.43.0 | AnimatePresence child ordering fix                                                         | React reconciliation-specific; verify existing Svelte mode tests, but do not port React internals.                                                                             |
 | 12.43.0 | Actionable invalid custom-ref error                                                        | React custom-component-ref-specific; not applicable to Svelte's generated motion elements.                                                                                     |
@@ -94,19 +94,20 @@ live under `src/routes/tests/<feature>/`; each fixture has an e2e file under
 
 ## Commands you will need
 
-| Purpose                    | Command                                                                                    | Expected on success                        |
-| -------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------ |
-| Install                    | `pnpm install --frozen-lockfile --config.engine-strict=false`                              | exit 0                                     |
-| Focused Reorder unit tests | `pnpm test:only -- src/lib/components/Reorder`                                             | all tests pass                             |
-| Typecheck                  | `pnpm check`                                                                               | exit 0, no errors                          |
-| Package validation         | `pnpm package`                                                                             | exit 0 and publint passes                  |
-| Focused Reorder e2e        | `pnpm exec playwright test e2e/reorder`                                                    | all tests pass                             |
-| Motion DOM regression e2e  | `pnpm exec playwright test e2e/svg e2e/animate-presence e2e/utilities/will-change.spec.ts` | all selected tests pass                    |
-| Unit suite                 | `pnpm test`                                                                                | exit 0                                     |
-| Full e2e suite             | `pnpm test:e2e`                                                                            | exit 0                                     |
-| Lint                       | `trunk check`                                                                              | exit 0                                     |
-| Format verification/fix    | `trunk fmt`                                                                                | formatter completes; review resulting diff |
-| Docs build                 | `pnpm --dir docs run build`                                                                | exit 0                                     |
+| Purpose                    | Command                                                       | Expected on success                        |
+| -------------------------- | ------------------------------------------------------------- | ------------------------------------------ |
+| Install                    | `pnpm install --frozen-lockfile --config.engine-strict=false` | exit 0                                     |
+| Focused Reorder unit tests | `pnpm test:only -- src/lib/components/Reorder`                | all tests pass                             |
+| Typecheck                  | `pnpm check`                                                  | exit 0, no errors                          |
+| Package validation         | `pnpm package`                                                | exit 0 and publint passes                  |
+| Focused Reorder e2e        | `pnpm exec playwright test e2e/reorder`                       | all tests pass                             |
+| Motion DOM regression unit | `pnpm test:only -- src/lib/utils/willChange.svelte.spec.ts`   | all tests pass                             |
+| Motion DOM regression e2e  | `pnpm exec playwright test e2e/svg e2e/animate-presence`      | all selected tests pass                    |
+| Unit suite                 | `pnpm test`                                                   | exit 0                                     |
+| Full e2e suite             | `pnpm test:e2e`                                               | exit 0                                     |
+| Lint                       | `trunk check`                                                 | exit 0                                     |
+| Format verification/fix    | `trunk fmt`                                                   | formatter completes; review resulting diff |
+| Docs build                 | `pnpm --dir docs run build`                                   | exit 0                                     |
 
 If the locally installed pnpm wrapper reports that `@pnpm/exe.darwin-x64` is
 missing from `pnpm-lock.yaml`, STOP and report the environment problem. Do not
@@ -294,10 +295,17 @@ without consumers reversing their data.
 ### Step 7: Characterize inherited Motion 12.43/13.0 runtime behavior
 
 Run the focused existing suites for SVG, color/will-change, and AnimatePresence.
-Inspect whether they assert these observable outcomes:
+Before treating the dependency migration as green, inspect existing negative
+assertions as well as missing positive coverage: an upstream capability can make
+a previously correct "unsupported" assertion stale. Assert these observable
+outcomes explicitly:
 
 - an accelerated SVG animation applies its exact final CSS/attribute state,
-- `backgroundColor`/`color` is accepted by the accelerated/will-change path,
+- `useWillChange().add('backgroundColor')` returns `'transform'`, matching Motion
+  13.1's `acceleratedValues` and `WillChangeMotionValue`; the same test covers
+  `opacity`,
+- `useWillChange().add('background')` and `.add('borderRadius')` leave the value
+  at `'auto'`, proving nonaccelerated properties are still ignored,
 - interrupted/synchronized presence does not reorder surviving keyed children,
 - a propagated exit with no motion descendant completes if Svelte Motion exposes
   equivalent behavior.
@@ -306,7 +314,12 @@ Only add focused regressions in existing relevant test files for missing
 observable coverage. Do not port React-specific implementation tests and do not
 invent a Svelte `isValidProp` API.
 
-**Verify**: `pnpm exec playwright test e2e/svg e2e/animate-presence e2e/utilities/will-change.spec.ts` exits 0, and any newly touched unit specs pass via `pnpm test:only -- <files>`.
+**Verify**:
+
+1. `pnpm test:only -- src/lib/utils/willChange.svelte.spec.ts` exits 0 and includes
+   positive assertions for both `opacity` and `backgroundColor`.
+2. `pnpm exec playwright test e2e/svg e2e/animate-presence` exits 0.
+3. Any other newly touched unit specs pass via `pnpm test:only -- <files>`.
 
 ### Step 8: Run the complete release gate
 
