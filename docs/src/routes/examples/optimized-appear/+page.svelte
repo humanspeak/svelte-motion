@@ -5,10 +5,11 @@
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
-    import { Gauge, Sparkles } from '@lucide/svelte'
+    import { Focus, Gauge, Sparkles, Timer } from '@lucide/svelte'
     import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+    import OptimizedAppearBlurFade from '$lib/examples/optimized-appear/demos/BlurFade.svelte'
     import OptimizedAppearDefault from '$lib/examples/optimized-appear/demos/Default.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
@@ -26,7 +27,7 @@
         seo.ogTitle = 'Optimized appear'
         seo.h1 = { title: 'Optimized appear', mode: 'sr-only' }
         seo.ogTagline = 'SSR entrance animations without the flash'
-        seo.ogFeatures = ['SSR', 'Hydration', 'WAAPI', 'Appear handoff']
+        seo.ogFeatures = ['SSR', 'Hydration', 'WAAPI', 'Blur fade']
         seo.ogSlug = 'examples-optimized-appear'
     }
 
@@ -45,6 +46,18 @@
             notes: defaultNotes,
             barCells: [{ k: 'handoff', v: 'data-framer-appear-id' }],
             sourceUrl: `${SOURCE_URL}optimized-appear/demos/Default.svelte`
+        },
+        {
+            figId: 'FIG-002',
+            tag: 'FILTER',
+            title: { prefix: 'blur fade ', accent: 'beyond transforms', end: '.' },
+            description:
+                'Any animatable CSS property declared in initial/animate — filter, clip-path, color — now rides the same SSR appear path, so blur-fade entrances start before hydration.',
+            snippet: blurFadeSection,
+            codeSnippet: blurFadeCode,
+            notes: blurFadeNotes,
+            barCells: [{ k: 'filter', v: 'blur(8px) → blur(0px)' }],
+            sourceUrl: `${SOURCE_URL}optimized-appear/demos/BlurFade.svelte`
         }
     ]
 </script>
@@ -77,6 +90,39 @@
                 'optimized-appear/demos/Default.svelte',
                 'optimized-appear-default',
                 'Default.svelte'
+            )
+        ]}
+        columns={1}
+    />
+{/snippet}
+{#snippet blurFadeSection()}
+    <OptimizedAppearBlurFade />
+{/snippet}
+{#snippet blurFadeNotes()}
+    <ul>
+        <li>
+            <Focus />
+            <span>
+                The SSR bootstrap emits a WAAPI entry for <code>filter</code> alongside opacity and transform,
+                so the first frame is already mid blur-fade.
+            </span>
+        </li>
+        <li>
+            <Timer />
+            <span>
+                Staggered <code>delay</code> values ride along too — each line holds its blurred
+                initial state with <code>fill: both</code> until its turn.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet blurFadeCode()}
+    <CodeReferenceV2
+        samples={[
+            demoCodeSample(
+                'optimized-appear/demos/BlurFade.svelte',
+                'optimized-appear-blur-fade',
+                'BlurFade.svelte'
             )
         ]}
         columns={1}
