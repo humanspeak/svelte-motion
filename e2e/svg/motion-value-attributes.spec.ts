@@ -55,21 +55,42 @@ const STRINGIFIED_MOTION_VALUE = /="\[object Object\]"/
 test.describe('SVG MotionValue attributes', () => {
     test('commits exact final CSS styles after accelerated SVG animation', async ({ page }) => {
         await page.goto(ROUTE)
+        await page.waitForFunction(() => window.MotionIsMounted === true)
 
         const target = page.getByTestId('accelerated-svg')
         const toggle = page.getByTestId('toggle-svg-final')
         await expect(target).toBeVisible()
+        await expect(page.getByTestId('accelerated-svg-destination')).toBeVisible()
+        await expect(page.getByTestId('accelerated-svg-explainer')).toContainText(
+            'commit opacity: 0'
+        )
+        await expect(page.getByTestId('accelerated-svg-state')).toContainText('source restored')
 
         await toggle.click()
         await expect
             .poll(() => target.evaluate((element) => getComputedStyle(element).opacity))
             .toBe('0')
         await expect(target).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 50, 0)')
+        await expect(target).toHaveCSS('fill', 'rgb(168, 85, 247)')
+        await expect(page.getByTestId('accelerated-svg-opacity')).toHaveText('0')
+        await expect(page.getByTestId('accelerated-svg-transform')).toHaveText(
+            'matrix(1, 0, 0, 1, 50, 0)'
+        )
+        await expect(page.getByTestId('accelerated-svg-fill')).toHaveText('rgb(168, 85, 247)')
+        await expect(page.getByTestId('accelerated-svg-state')).toContainText(
+            'destination committed'
+        )
 
         await toggle.click()
         await expect(target).toHaveCSS('opacity', '1')
         await expect(target).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)')
         await expect(target).toHaveAttribute('fill', '#22c55e')
+        await expect(target).toHaveCSS('fill', 'rgb(34, 197, 94)')
+        await expect(page.getByTestId('accelerated-svg-opacity')).toHaveText('1')
+        await expect(page.getByTestId('accelerated-svg-transform')).toHaveText(
+            'matrix(1, 0, 0, 1, 0, 0)'
+        )
+        await expect(page.getByTestId('accelerated-svg-fill')).toHaveText('rgb(34, 197, 94)')
     })
 
     test('never stringifies a MotionValue into the DOM', async ({ page }) => {

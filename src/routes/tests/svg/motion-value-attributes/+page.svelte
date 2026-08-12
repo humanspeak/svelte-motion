@@ -63,6 +63,26 @@
 
     /** Motion 13.0 regression: accelerated SVG styles must commit exact final values. */
     let svgHidden = $state(false)
+    let acceleratedOpacity = $state('1')
+    let acceleratedTransform = $state('none')
+    let acceleratedFill = $state('rgb(34, 197, 94)')
+
+    /** Samples the actual DOM result so manual review sees what the browser committed. */
+    $effect(() => {
+        let raf = 0
+        const sample = () => {
+            const element = document.querySelector('[data-testid="accelerated-svg"]')
+            if (element) {
+                const style = getComputedStyle(element)
+                acceleratedOpacity = style.opacity
+                acceleratedTransform = style.transform
+                acceleratedFill = style.fill
+            }
+            raf = requestAnimationFrame(sample)
+        }
+        sample()
+        return () => cancelAnimationFrame(raf)
+    })
 
     /** Live readout of both DOM channels, sampled every frame. */
     type Row = { label: string; prop: string; channel: string; attr: string; style: string }
@@ -291,7 +311,8 @@
                 <button
                     data-testid="toggle-svg-final"
                     class="col-span-2 rounded bg-emerald-700 px-2 py-1 text-sm hover:bg-emerald-600"
-                    onclick={() => (svgHidden = !svgHidden)}>Toggle accelerated SVG</button
+                    onclick={() => (svgHidden = !svgHidden)}
+                    >{svgHidden ? 'Restore SVG source' : 'Commit SVG destination'}</button
                 >
             </div>
 
@@ -319,9 +340,31 @@
             {#if mounted}
                 <div>
                     <h3 class="mb-1 text-sm font-medium text-slate-300">
-                        Accelerated SVG final styles
+                        Motion 13 accelerated SVG final-style commitment
                     </h3>
+                    <p
+                        data-testid="accelerated-svg-explainer"
+                        class="mb-3 max-w-xl text-xs leading-relaxed text-slate-400"
+                    >
+                        Upstream fixed accelerated SVG animations that looked finished but left
+                        stale inline styles behind. Launch the block: it must dock at the dashed
+                        marker, commit <code>opacity: 0</code>, a 50px transform, and purple fill.
+                        Restore must commit the exact green, opaque source state—with no flash or
+                        stale frame.
+                    </p>
                     <svg width="220" height="70" viewBox="0 0 220 70" class="rounded bg-slate-800">
+                        <rect
+                            data-testid="accelerated-svg-destination"
+                            x={60}
+                            y={15}
+                            width={40}
+                            height={40}
+                            rx={6}
+                            fill="none"
+                            stroke="#a855f7"
+                            stroke-width="2"
+                            stroke-dasharray="5 4"
+                        />
                         <motion.rect
                             data-testid="accelerated-svg"
                             x={10}
@@ -333,7 +376,8 @@
                             initial={false}
                             animate={{
                                 opacity: svgHidden ? 0 : 1,
-                                transform: svgHidden ? 'translateX(50px)' : 'translateX(0px)'
+                                transform: svgHidden ? 'translateX(50px)' : 'translateX(0px)',
+                                fill: svgHidden ? '#a855f7' : '#22c55e'
                             }}
                             transition={svgHidden
                                 ? { duration: 0.12 }
@@ -344,6 +388,30 @@
                                   }}
                         />
                     </svg>
+                    <div
+                        data-testid="accelerated-svg-diagnostics"
+                        class="mt-3 grid max-w-xl grid-cols-1 gap-2 font-mono text-xs sm:grid-cols-3"
+                    >
+                        <div class="rounded bg-slate-900 p-2">
+                            <span class="block text-slate-500">opacity</span>
+                            <strong data-testid="accelerated-svg-opacity"
+                                >{acceleratedOpacity}</strong
+                            >
+                        </div>
+                        <div class="rounded bg-slate-900 p-2">
+                            <span class="block text-slate-500">transform</span>
+                            <strong data-testid="accelerated-svg-transform"
+                                >{acceleratedTransform}</strong
+                            >
+                        </div>
+                        <div class="rounded bg-slate-900 p-2">
+                            <span class="block text-slate-500">fill</span>
+                            <strong data-testid="accelerated-svg-fill">{acceleratedFill}</strong>
+                        </div>
+                    </div>
+                    <p data-testid="accelerated-svg-state" class="mt-2 text-xs text-slate-400">
+                        State: {svgHidden ? 'destination committed' : 'source restored'}
+                    </p>
                 </div>
 
                 <div>

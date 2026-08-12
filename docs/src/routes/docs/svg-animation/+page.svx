@@ -1,20 +1,21 @@
 ---
 title: 'SVG Animation'
-description: 'Bind MotionValues to SVG presentation attributes, draw paths, and use attrX/attrY/attrScale.'
+description: 'Bind MotionValues to SVG attributes, draw paths, and commit exact final styles after accelerated animation.'
 ---
 
 <script>
   import Example from '$lib/components/general/Example.svelte';
   import SvgAnimationExample from '$lib/examples/svg-animation/demos/Default.svelte';
+  import SignalDock from '$lib/examples/svg-animation/demos/SignalDock.svelte';
   import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
 
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'SVG Animation | Docs | Svelte Motion'
-      seo.description = 'Drive SVG presentation attributes with MotionValues, animate pathLength, and reach SVG attributes with attrX, attrY, and attrScale.'
+      seo.description = 'Drive SVG attributes with MotionValues, animate paths, and commit exact final opacity, transform, and fill after accelerated animations.'
       seo.ogTitle = 'SVG Animation'
       seo.ogTagline = 'MotionValues bound straight to SVG attributes'
-      seo.ogFeatures = ['SVG', 'MotionValue', 'pathLength', 'attrX']
+      seo.ogFeatures = ['SVG', 'MotionValue', 'Accelerated styles', 'pathLength']
       seo.ogSlug = 'docs-svg-animation'
   }
 </script>
@@ -40,6 +41,47 @@ component re-render when the value changes.
 <Example exampleUrl="/examples/svg-animation">
   <SvgAnimationExample />
 </Example>
+
+## Motion 13: accelerated animations commit their final styles
+
+Motion 13 tightened SVG animation completion: when a browser-accelerated animation
+finishes, Motion commits its exact final `opacity`, `transform`, and paint values to
+the SVG element. This matters when an animation fades an element out, when a later
+interaction reverses it, or when application state is read immediately after
+completion. Without the commit, the picture can look correct for one frame while
+computed style still contains the previous value.
+
+```svelte
+<script lang="ts">
+  import { motion } from '@humanspeak/svelte-motion'
+
+  let docked = $state(false)
+</script>
+
+<motion.circle
+  cx={24}
+  cy={24}
+  r={10}
+  initial={false}
+  animate={{
+    opacity: docked ? 0 : 1,
+    transform: docked ? 'translateX(120px)' : 'translateX(0px)',
+    fill: docked ? '#a855f7' : '#247768'
+  }}
+/>
+```
+
+The important detail is `initial={false}` plus state-driven final values. Once the
+transition ends, `getComputedStyle(circle)` reports the destination values exactly;
+reversing the state commits the source values again.
+
+<Example exampleUrl="/examples/svg-animation#fig-002">
+  <SignalDock />
+</Example>
+
+The signal-dock demo makes the behavior visible: the ghost ring marks the destination,
+the packet blooms and fades there, and its telemetry reads the actual browser-computed
+opacity, transform, and fill. Use **Replay** and **Reverse** to exercise both commits.
 
 ## One DOM channel
 
