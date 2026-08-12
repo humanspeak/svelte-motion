@@ -3,8 +3,7 @@
     import OG from '$lib/components/shared-link/OG.svelte'
 
     const cardType: 'og' | 'twitter' = $derived(page.url.searchParams.get('type') || 'og') as
-        | 'og'
-        | 'twitter'
+        'og' | 'twitter'
 </script>
 
 <OG type={cardType} url={page.url.origin} />

@@ -374,11 +374,9 @@ export type MotionViewport = {
  * Animation lifecycle callbacks for motion components.
  */
 export type MotionAnimationStart =
-    | ((_definition: DOMKeyframesDefinition | undefined) => void)
-    | undefined
+    ((_definition: DOMKeyframesDefinition | undefined) => void) | undefined
 export type MotionAnimationComplete =
-    | ((_definition: DOMKeyframesDefinition | undefined) => void)
-    | undefined
+    ((_definition: DOMKeyframesDefinition | undefined) => void) | undefined
 
 /** Hover lifecycle callbacks */
 export type MotionOnHoverStart = (() => void) | undefined

@@ -82,7 +82,7 @@
                 bottom: 0.5
             }}
         >
-            <div class="absolute left-0 right-0 top-0 z-10 flex justify-center bg-neutral-900 p-4">
+            <div class="absolute top-0 right-0 left-0 z-10 flex justify-center bg-neutral-900 p-4">
                 <button
                     aria-label="Drag handle"
                     data-testid="drag-handle"

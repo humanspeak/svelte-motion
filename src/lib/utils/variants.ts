@@ -236,11 +236,7 @@ export const resolveExit = (
  */
 export const resolveWhile = (
     value:
-        | MotionWhileTap
-        | MotionWhileHover
-        | MotionWhileFocus
-        | MotionWhileDrag
-        | MotionWhileInView,
+        MotionWhileTap | MotionWhileHover | MotionWhileFocus | MotionWhileDrag | MotionWhileInView,
     variants: Variants | undefined,
     custom?: unknown
 ): DOMKeyframesDefinition | undefined => {

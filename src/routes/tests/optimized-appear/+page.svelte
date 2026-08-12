@@ -5,7 +5,7 @@
 <main class="min-h-screen bg-slate-950 px-6 py-12 text-white">
     <section class="mx-auto grid max-w-4xl gap-8 md:grid-cols-[1fr_1.2fr] md:items-center">
         <div>
-            <p class="text-sm font-medium uppercase tracking-wide text-cyan-300">
+            <p class="text-sm font-medium tracking-wide text-cyan-300 uppercase">
                 Optimized appear
             </p>
             <h1 class="mt-3 text-3xl font-semibold">SSR handoff without the cold-start flash</h1>

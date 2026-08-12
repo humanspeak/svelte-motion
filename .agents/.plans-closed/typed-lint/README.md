@@ -85,8 +85,8 @@ REJECTED (with one-line rationale)
   site comments don't hide _future_ occurrences of the deliberate pattern;
   scoped config blocks do.
 - **Typed linting for `docs/**`** — separate workspace with a generated,
-gitignored ESLint config owned by docs-kit; out of this repo's lint story
-(the plan adds a `disableTypeChecked` guard so root config can never apply
+  gitignored ESLint config owned by docs-kit; out of this repo's lint story
+  (the plan adds a `disableTypeChecked` guard so root config can never apply
   typed rules there).
 
 ## Batch close-out — 2026-07-23

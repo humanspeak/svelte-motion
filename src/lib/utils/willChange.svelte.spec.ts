@@ -43,18 +43,22 @@ describe('utils/willChange - useWillChange', () => {
         })
     })
 
-    it('flips to "transform" for accelerated values like opacity', () => {
+    it('flips to "transform" for accelerated values', () => {
         inRoot(() => {
             const wc = useWillChange()
             wc.add('opacity')
             expect(wc.get()).toBe('transform')
+
+            const backgroundColor = useWillChange()
+            backgroundColor.add('backgroundColor')
+            expect(backgroundColor.get()).toBe('transform')
         })
     })
 
     it('ignores non-transform, non-accelerated properties', () => {
         inRoot(() => {
             const wc = useWillChange()
-            wc.add('backgroundColor')
+            wc.add('background')
             wc.add('borderRadius')
             expect(wc.get()).toBe('auto')
         })

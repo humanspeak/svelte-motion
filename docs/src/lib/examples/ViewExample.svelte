@@ -40,7 +40,7 @@
             <button class="view-back" onclick={close}> Back </button>
         </div>
     {:else}
-        <p class="text-text-muted text-sm">Click a tile — it morphs into the hero</p>
+        <p class="text-sm text-text-muted">Click a tile — it morphs into the hero</p>
         <div class="flex gap-3">
             {#each tiles as tile (tile.id)}
                 <button

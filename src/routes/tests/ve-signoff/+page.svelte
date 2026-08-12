@@ -189,7 +189,7 @@
                     whileHover={{ scale: 1.18, y: -10 }}
                     whileTap={{ scale: 0.82, y: 2 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-                    class="flex h-32 w-64 cursor-pointer select-none items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 text-xl font-black text-white"
+                    class="flex h-32 w-64 cursor-pointer items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 text-xl font-black text-white select-none"
                     data-testid="gesture-box"
                 >
                     HOVER · PRESS · MASH
@@ -395,7 +395,7 @@
                         drag
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
-                        class="absolute left-4 top-4 flex h-20 w-20 cursor-grab items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-3xl active:cursor-grabbing"
+                        class="absolute top-4 left-4 flex h-20 w-20 cursor-grab items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-3xl active:cursor-grabbing"
                         data-testid="drag-box"
                     >
                         🧲

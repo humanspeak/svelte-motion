@@ -412,9 +412,7 @@
             return channels ? channels[key] : undefined
         }
         const computed = getComputedStyle(element)[key as keyof CSSStyleDeclaration] as
-            | string
-            | number
-            | undefined
+            string | number | undefined
         const parsed = typeof computed === 'number' ? computed : Number.parseFloat(String(computed))
         return Number.isFinite(parsed) ? parsed : undefined
     }
@@ -2535,15 +2533,13 @@
      * shared-layout animation is driven by the promoted node.
      */
     $effect(() => {
-        if (
-            !(
-                element &&
-                scopedLayoutId &&
-                layoutIdRegistry &&
-                isLoaded === 'ready' &&
-                hasLayoutFeatures
-            )
-        )
+        if (!(
+            element &&
+            scopedLayoutId &&
+            layoutIdRegistry &&
+            isLoaded === 'ready' &&
+            hasLayoutFeatures
+        ))
             return
 
         const prev = layoutIdRegistry.consume(scopedLayoutId)
@@ -2798,8 +2794,7 @@
                     // arrays rewind to element [0] — the from-state.
                     for (const [key, value] of Object.entries(keyChangeInitialKeyframes ?? {})) {
                         const resolved = (Array.isArray(value) ? value[0] : value) as
-                            | string
-                            | number
+                            string | number
                         if (resolved === undefined || resolved === null) continue
                         // `jump`, not `set`: a rewind must not leave velocity
                         // behind for the re-enter to inherit.

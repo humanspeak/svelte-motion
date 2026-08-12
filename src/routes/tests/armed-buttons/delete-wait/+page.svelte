@@ -93,7 +93,7 @@
                         {secondsLeft}
                     </span>
                 {:else if armed && !deleted}
-                    <span class="text-xs uppercase tracking-widest" data-testid="delete-test-ready">
+                    <span class="text-xs tracking-widest uppercase" data-testid="delete-test-ready">
                         Ready
                     </span>
                 {/if}
