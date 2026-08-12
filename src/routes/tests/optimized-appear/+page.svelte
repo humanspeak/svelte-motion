@@ -28,5 +28,19 @@
                 The browser starts opacity and transform before Svelte Motion takes ownership.
             </p>
         </motion.div>
+
+        <motion.div
+            data-testid="optimized-appear-blur"
+            class="rounded-lg border border-fuchsia-300/30 bg-fuchsia-300/10 p-8 shadow-2xl shadow-fuchsia-950/50"
+            initial={{ opacity: 0, y: 16, filter: 'blur(8px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+        >
+            <div class="h-2 w-24 rounded-full bg-fuchsia-300"></div>
+            <h2 class="mt-6 text-xl font-semibold">Non-transform appear</h2>
+            <p class="mt-3 text-sm leading-6 text-slate-200">
+                Filter and opacity both start in the SSR bootstrap and hand off to the runtime.
+            </p>
+        </motion.div>
     </section>
 </main>

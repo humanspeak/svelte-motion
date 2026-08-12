@@ -67,4 +67,36 @@ test.describe('optimized appear animations', () => {
         })
         expect(new Set(ids).size).toBe(1)
     })
+
+    test('starts a WAAPI appear for non-transform CSS properties like filter', async ({ page }) => {
+        await page.goto('/tests/optimized-appear?@isPlaywright=true')
+
+        const blur = page.getByTestId('optimized-appear-blur')
+        await expect(blur).toBeVisible()
+        await expect(blur).toHaveAttribute('data-framer-appear-id', /svelte-motion-/)
+
+        const started = await page.evaluate(() => {
+            return (
+                (
+                    window as unknown as {
+                        __SvelteMotionAppear?: { started: Array<{ name: string }> }
+                    }
+                ).__SvelteMotionAppear?.started.map((entry) => entry.name) ?? []
+            )
+        })
+        expect(started).toContain('opacity')
+        expect(started).toContain('transform')
+        expect(started).toContain('filter')
+
+        await expect
+            .poll(
+                async () => {
+                    const value = await blur.evaluate((el) => getComputedStyle(el).filter)
+                    const match = value.match(/blur\(([\d.]+)px\)/)
+                    return match ? Number(match[1]) : Number.POSITIVE_INFINITY
+                },
+                { timeout: 3000, message: 'filter never animated through a blur value' }
+            )
+            .toBeLessThan(0.5)
+    })
 })

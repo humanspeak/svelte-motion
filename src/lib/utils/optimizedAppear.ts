@@ -8,10 +8,10 @@ import {
     transformProps
 } from 'motion-dom'
 
-type AppearValueName = 'opacity' | 'transform'
+type OptimizedValueName = 'opacity' | 'transform' | (string & {})
 
 type OptimizedAppearEntry = {
-    name: AppearValueName
+    name: OptimizedValueName
     keyframes: [string | number, string | number]
     options: KeyframeAnimationOptions
 }
@@ -171,14 +171,42 @@ const toNativeOptions = (transition: AnimationOptions | undefined): KeyframeAnim
     return options
 }
 
+const NON_APPEAR_KEYS = new Set([
+    'pathLength',
+    'pathOffset',
+    'pathSpacing',
+    'strokeDasharray',
+    'stroke-dasharray',
+    'strokeDashoffset',
+    'stroke-dashoffset'
+])
+
+const extractKeyframeScalar = (value: unknown): string | number | undefined => {
+    if (Array.isArray(value)) {
+        for (const element of value) {
+            if (typeof element === 'string' || typeof element === 'number') return element
+        }
+        return undefined
+    }
+    return typeof value === 'string' || typeof value === 'number' ? value : undefined
+}
+
 /**
  * Build serialisable optimized-appear animation entries from an initial and
  * animate pair.
  *
+ * Emits one entry per animatable CSS property that has a defined value in
+ * both the initial and animate keyframe maps. The `transform` composite is
+ * built from the resolved inline-style string (so decomposed channels like
+ * `x`/`y`/`scale` merge into a single WAAPI entry); every other property
+ * — `opacity`, `filter`, `clipPath`, `backgroundColor`, etc. — is emitted
+ * by name so the SSR bootstrap can hand it off to the runtime WAAPI
+ * animation owner.
+ *
  * @param initial Initial keyframes reflected into SSR markup.
  * @param animate Target keyframes for the enter animation.
  * @param transition Motion transition options.
- * @returns Appear entries for WAAPI-supported opacity and transform values.
+ * @returns Appear entries for the WAAPI-supported properties in `initial`/`animate`.
  *
  * @example
  * ```ts
@@ -220,6 +248,15 @@ export const createOptimizedAppearData = (
             keyframes: [initialTransform, targetTransform],
             options
         })
+    }
+
+    for (const key of Object.keys(initial)) {
+        if (key === 'opacity' || key === 'transform' || transformProps.has(key)) continue
+        if (NON_APPEAR_KEYS.has(key)) continue
+        const from = extractKeyframeScalar(initial[key])
+        const to = extractKeyframeScalar(target[key])
+        if (from === undefined || to === undefined || from === to) continue
+        entries.push({ name: key, keyframes: [from, to], options })
     }
 
     return entries
@@ -272,7 +309,7 @@ export const createOptimizedAppearScript = (
  */
 export const startOptimizedAppearAnimation = (
     element: HTMLElement,
-    name: AppearValueName,
+    name: OptimizedValueName,
     keyframes: string[] | number[],
     options: AnimationOptions,
     onReady?: (animation: Animation) => void
