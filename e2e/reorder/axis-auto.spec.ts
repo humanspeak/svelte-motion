@@ -22,7 +22,9 @@ test.describe('reorder/axis-auto', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/tests/reorder/axis-auto?@isPlaywright=true')
         await page.getByTestId('horizontal-red').waitFor({ state: 'visible' })
-        await page.waitForTimeout(300)
+        // Auto-axis detection has no DOM readiness signal. Give layout measurement
+        // and the resulting drag rewire time to replace the safe initial `y` axis.
+        await page.waitForTimeout(1000)
     })
 
     test('detects a horizontal row and locks out perpendicular drift', async ({ page }) => {
