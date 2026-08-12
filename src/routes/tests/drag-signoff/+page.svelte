@@ -214,7 +214,7 @@ PASS looks like, and what a FAILURE would look like.
                 <motion.div
                     whilePan={{ scale: 0.97, opacity: 0.7 }}
                     onPanEnd={() => panCount++}
-                    class="flex h-32 w-full max-w-2xl cursor-crosshair select-none items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-700 text-lg font-bold"
+                    class="flex h-32 w-full max-w-2xl cursor-crosshair items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-700 text-lg font-bold select-none"
                     data-testid="pan-pad"
                 >
                     PAN ACROSS ME — completed pans: {panCount}

@@ -12,10 +12,7 @@ import {
  * Mirrors framer-motion's `useMotionTemplate` signature.
  */
 export type MotionTemplateInput =
-    | AugmentedMotionValue<number | string>
-    | Readable<number | string>
-    | number
-    | string
+    AugmentedMotionValue<number | string> | Readable<number | string> | number | string
 
 /**
  * Tagged template literal that builds an augmented `MotionValue<string>`

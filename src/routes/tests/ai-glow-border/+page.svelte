@@ -293,10 +293,10 @@
         <motion.div class="frame" style={{ scale: pulse }}>
             <!-- Haze: STATIC wide blurred ring. No filter animation, no children,
                  no per-frame changes — only its opacity springs on toggle. -->
-            <motion.div class="ring haze" style={{ opacity: hazeOpacity }} aria-hidden="true" />
+            <motion.div class="haze ring" style={{ opacity: hazeOpacity }} aria-hidden="true" />
 
             <!-- Bloom: mid ring, displaced + blurred. -->
-            <motion.div class="ring bloom" style={{ opacity: bloomOpacity }} aria-hidden="true">
+            <motion.div class="bloom ring" style={{ opacity: bloomOpacity }} aria-hidden="true">
                 <!-- The band extends ~16px UNDER the opaque card so its
                      displaced inner edge can never pull away and open a dark
                      gap between card and glow. -->
@@ -323,7 +323,7 @@
 
             <!-- Base: thin crisp band hugging the card. -->
             <motion.div
-                class="ring base"
+                class="base ring"
                 style={{ opacity: baseOpacity }}
                 aria-hidden="true"
                 data-testid="ring-base"

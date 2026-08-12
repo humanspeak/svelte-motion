@@ -5,7 +5,7 @@
 </script>
 
 <div class="flex flex-col items-center gap-4">
-    <p class="text-text-muted text-sm">Drag items to reorder the list</p>
+    <p class="text-sm text-text-muted">Drag items to reorder the list</p>
     <Reorder.Group
         axis="y"
         values={items}

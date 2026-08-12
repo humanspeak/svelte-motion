@@ -33,7 +33,7 @@
             <LazyMotion features={card.features}>
                 <section class="rounded-lg border border-slate-700 bg-slate-900 p-4">
                     <h2 class="font-medium">{card.label}</h2>
-                    <p class="mb-5 mt-1 text-sm text-slate-400">{card.description}</p>
+                    <p class="mt-1 mb-5 text-sm text-slate-400">{card.description}</p>
                     <div
                         class="grid h-44 place-items-center rounded-md border border-dashed border-slate-700"
                     >

@@ -3,10 +3,10 @@ packages:
     - docs
     - tests/consumer-vite6
 allowBuilds:
-    # pnpm 11.9 matches git-hosted deps by name@resolved-url (pnpm#10522) — a
-    # plain package-name key does NOT match. This key embeds the resolved
-    # commit of docs-kit#<tag>, so it must be refreshed whenever the docs-kit
-    # tag in docs/package.json bumps (pnpm approve-builds will prompt).
+    # pnpm 11 can identify this GitHub dependency by either its source URL or
+    # its resolved codeload tarball while updating. Keep both exact identities
+    # pinned to the same commit so the prepare script is allowed in either phase.
+    '@humanspeak/docs-kit@git+https://github.com/humanspeak/docs-kit.git#cb293900ffe271d0df0e2d50f44ccd0bd9ec56e8': true
     '@humanspeak/docs-kit@https://codeload.github.com/humanspeak/docs-kit/tar.gz/cb293900ffe271d0df0e2d50f44ccd0bd9ec56e8': true
     core-js: true
     esbuild: true

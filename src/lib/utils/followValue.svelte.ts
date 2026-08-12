@@ -126,8 +126,7 @@ export function useFollowValue(
         ssrValue.set = () => undefined
         ssrValue.jump = () => undefined
         return augmentMotionValue(ssrValue) as unknown as
-            | FollowMotionValue<number>
-            | FollowMotionValue<string>
+            FollowMotionValue<number> | FollowMotionValue<string>
     }
 
     // Resolve the follow source through the shared machinery: MotionValues
@@ -163,6 +162,5 @@ export function useFollowValue(
     $effect(() => () => value.destroy())
 
     return augmentMotionValue(value, dispose) as unknown as
-        | FollowMotionValue<number>
-        | FollowMotionValue<string>
+        FollowMotionValue<number> | FollowMotionValue<string>
 }

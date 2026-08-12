@@ -262,8 +262,7 @@ export const attachInViewGesture = (
         },
         {
             root: (typeof root === 'function' ? (root as () => Element)() : root) as
-                | Element
-                | undefined,
+                Element | undefined,
             rootMargin,
             threshold: typeof amount === 'number' ? amount : thresholdNames[amount]
         }
