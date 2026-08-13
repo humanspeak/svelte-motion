@@ -10,6 +10,13 @@
 > `git diff --stat 96b166c..HEAD -- package.json pnpm-lock.yaml src/lib/components/Reorder src/routes/+page.svelte src/routes/tests/reorder e2e/reorder docs/src/routes/docs/reorder docs/src/routes/examples/reorder docs/src/lib/examples/reorder README.md`
 > If an in-scope file changed, compare it with the Current state section before
 > proceeding. A semantic mismatch is a STOP condition.
+>
+> Revision 2026-08-12: During operator-led browser review, repeated swaps exposed
+> a projection handoff defect outside the originally named Reorder files. The
+> operator explicitly approved extending scope to `_MotionContainer.svelte` and
+> its drag regression coverage, then approved expanding the SVG fixture into a
+> documented public example. The close-out baseline is commit `1fb2a4f`; the
+> original planning baseline was `96b166c`.
 
 ## Status
 
@@ -18,7 +25,7 @@
 - **Risk**: MED
 - **Depends on**: none
 - **Category**: migration
-- **Planned at**: commit `96b166c`, 2026-08-12
+- **Planned at**: commit `1fb2a4f`, 2026-08-12 (revised; original `96b166c`)
 
 ## Why this matters
 
@@ -358,18 +365,18 @@ then decide with the operator whether behavior or test is wrong before editing.
 
 ## Done criteria
 
-- [ ] `package.json` resolves `motion` 13.1.0 and `motion-dom` 13.0.0 through the lockfile.
-- [ ] Public `ReorderAxis` is documented and equals `'x' | 'y' | 'xy'`.
-- [ ] Omitting `axis` automatically detects horizontal, vertical, and wrapped layouts.
-- [ ] `axis="xy"` reorders within and across wrapped rows.
-- [ ] Horizontal and wrapped reordering behave correctly in RTL without reversing `values`.
-- [ ] Unmeasured values, Svelte unregistration, item drag overrides, and edge auto-scroll remain covered and passing.
-- [ ] Three new test/demo routes exist, are linked from `src/routes/+page.svelte`, and each has a passing e2e spec.
-- [ ] Public Reorder docs/examples describe and demonstrate the Motion 13.1 behavior.
-- [ ] Motion 12.43/13.0 inherited SVG/color/presence outcomes have passing focused regression coverage.
-- [ ] `trunk check`, `pnpm check`, `pnpm package`, `pnpm test`, `pnpm test:e2e`, and the docs build exit 0.
-- [ ] `git diff --check` exits 0 and no out-of-scope files are modified.
-- [ ] The sibling batch `README.md` status is updated.
+- [x] `package.json` resolves `motion` 13.1.0 and `motion-dom` 13.0.0 through the lockfile.
+- [x] Public `ReorderAxis` is documented and equals `'x' | 'y' | 'xy'`.
+- [x] Omitting `axis` automatically detects horizontal, vertical, and wrapped layouts.
+- [x] `axis="xy"` reorders within and across wrapped rows.
+- [x] Horizontal and wrapped reordering behave correctly in RTL without reversing `values`.
+- [x] Unmeasured values, Svelte unregistration, item drag overrides, and edge auto-scroll remain covered and passing.
+- [x] Three new test/demo routes exist, are linked from `src/routes/+page.svelte`, and each has a passing e2e spec.
+- [x] Public Reorder docs/examples describe and demonstrate the Motion 13.1 behavior.
+- [x] Motion 12.43/13.0 inherited SVG/color/presence outcomes have passing focused regression coverage.
+- [x] `trunk check`, `pnpm check`, `pnpm package`, `pnpm test`, `pnpm test:e2e`, and the docs build exit 0.
+- [x] `git diff --check` exits 0 and no unapproved out-of-scope files are modified.
+- [x] The sibling batch `README.md` status is updated.
 
 ## STOP conditions
 

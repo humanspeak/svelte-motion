@@ -184,6 +184,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'styleString',
         description: 'Interactive styleString animation example using Svelte Motion.'
     },
+    'svg-animation': {
+        title: 'SVG Animation',
+        description:
+            'Drive SVG attributes with MotionValues, then launch the luminous Signal Dock and inspect exact accelerated final-style telemetry.'
+    },
     'tab-select': {
         title: 'Tab Select',
         description: 'Interactive tab select animation example using Svelte Motion.'

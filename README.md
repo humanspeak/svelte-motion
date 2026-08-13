@@ -46,7 +46,7 @@ Goal: Framer Motion API parity for Svelte where common React examples can be tra
 | `AnimatePresence` (`initial`, `mode`, `onExitComplete`)                | Supported                                  |
 | Layout (`layout`, `layout="position"`)                                 | Supported (single-element FLIP)            |
 | Shared layout (`layoutId`, `LayoutGroup`, `layoutScroll`)              | Supported                                  |
-| Reorder (`Reorder.Group`, `Reorder.Item`, edge auto-scroll)            | Supported                                  |
+| Reorder (Motion 13.1 auto-axis, wrapped grids, RTL, edge auto-scroll)  | Supported                                  |
 | View Transitions (`animateView`, shared-element morphs)                | Supported                                  |
 | Vanilla values (`motionValue`, `styleEffect`, `toMotionValue` bridge)  | Supported                                  |
 | Pan gesture API (`onPan*`, `onPanSessionStart`)                        | Supported                                  |

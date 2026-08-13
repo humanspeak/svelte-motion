@@ -20,7 +20,7 @@
     import { isMotionValueChild } from '$lib/utils/motionValueChild'
     import { parseStyleString } from '$lib/utils/style'
     import { useTransform } from '$lib/utils/transform.svelte'
-    import { autoScrollIfNeeded, resetAutoScrollState } from './autoScroll'
+    import { autoScrollIfNeeded, resetAutoScrollState, selectAutoScrollAxis } from './autoScroll'
     import { getReorderContext } from './context'
     import type { ReorderItemProps } from './types'
 
@@ -41,6 +41,13 @@
         throw new Error('Reorder.Item must be a child of Reorder.Group')
     }
 
+    // Context is published once, so bridge its getter-backed axis into an
+    // item-local reactive dependency. Automatic detection runs after layout
+    // measurement; without this bridge the motion child can retain the safe
+    // initial `y` constraint instead of re-wiring drag to the detected axis.
+    const reorderAxis = $derived(context.axis)
+    const itemDrag = $derived(reorderAxis === 'xy' ? true : reorderAxis)
+
     const motionValueChild = $derived(isMotionValueChild(children) ? children : undefined)
     const childSnippet = $derived(typeof children === 'function' ? children : undefined)
 
@@ -59,11 +66,18 @@
     const zIndex = useTransform([x, y], ([latestX, latestY]) => (latestX || latestY ? 1 : 'unset'))
 
     const handleDrag = (event: PointerEvent, info: DragInfo) => {
-        const { axis } = context
         // The bound style MotionValue is dual-written by the drag
         // gesture, so it reads as the live offset from the item's slot.
-        context.updateOrder(value, point[axis].get() as number, info.velocity[axis])
-        autoScrollIfNeeded(context.getGroupElement(), info.point[axis], axis, info.velocity[axis])
+        const offset = { x: point.x.get() as number, y: point.y.get() as number }
+        context.updateOrder(value, offset, info.velocity)
+
+        const scrollAxis = selectAutoScrollAxis(reorderAxis, info.velocity)
+        autoScrollIfNeeded(
+            context.getGroupElement(),
+            info.point[scrollAxis],
+            scrollAxis,
+            info.velocity[scrollAxis]
+        )
         onDrag?.(event, info)
     }
 
@@ -98,7 +112,7 @@
 <MotionContainer
     bind:ref
     tag={as}
-    drag={context.axis}
+    drag={itemDrag}
     {...rest}
     dragSnapToOrigin
     style={itemStyle}

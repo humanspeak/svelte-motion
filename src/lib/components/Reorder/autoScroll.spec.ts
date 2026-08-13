@@ -1,5 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { autoScrollIfNeeded, resetAutoScrollState } from './autoScroll'
+import { autoScrollIfNeeded, resetAutoScrollState, selectAutoScrollAxis } from './autoScroll'
+
+describe('selectAutoScrollAxis', () => {
+    it('preserves a one-dimensional group axis', () => {
+        expect(selectAutoScrollAxis('x', { x: 0, y: 100 })).toBe('x')
+        expect(selectAutoScrollAxis('y', { x: 100, y: 0 })).toBe('y')
+    })
+
+    it('selects the dominant velocity axis for xy and prefers y on ties', () => {
+        expect(selectAutoScrollAxis('xy', { x: 20, y: 5 })).toBe('x')
+        expect(selectAutoScrollAxis('xy', { x: 5, y: -20 })).toBe('y')
+        expect(selectAutoScrollAxis('xy', { x: 10, y: -10 })).toBe('y')
+    })
+})
 
 /**
  * jsdom performs no layout, so the scroll container's geometry and

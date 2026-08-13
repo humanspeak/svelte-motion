@@ -6,12 +6,11 @@ import { describe, expect, it } from 'vitest'
 import {
     computeNormalizedSVGInitialAttrs,
     computeSSRSVGAttrValues,
+    computeSSRSVGStyleValues,
     extractSVGMotionValueAttributes,
     isSVGMotionValueAttribute,
     resolveSVGAttrKey,
     resolveSVGTagName,
-    SVG_ATTRIBUTE_PROPERTIES,
-    SVG_PATH_PROPERTIES,
     SVG_TAG_CASING,
     SVG_TAGS
 } from './svg'
@@ -127,75 +126,6 @@ describe('motion-dom casing primitives', () => {
     })
 })
 
-describe('SVG_ATTRIBUTE_PROPERTIES', () => {
-    it('should include the geometry attributes upstream animates', () => {
-        for (const key of [
-            'cx',
-            'cy',
-            'r',
-            'rx',
-            'ry',
-            'x',
-            'y',
-            'x1',
-            'y1',
-            'x2',
-            'y2',
-            'width',
-            'height',
-            'points',
-            'd',
-            'viewBox'
-        ]) {
-            expect(SVG_ATTRIBUTE_PROPERTIES.has(key)).toBe(true)
-        }
-    })
-
-    it('should include presentation attributes that svgEffect routes to style', () => {
-        // These live in `element.style`, so svgEffect sends them through addStyleValue.
-        // We still claim them out of the raw spread so they never stringify.
-        for (const key of [
-            'offset',
-            'stopColor',
-            'stopOpacity',
-            'fillOpacity',
-            'strokeOpacity',
-            'strokeWidth'
-        ]) {
-            expect(SVG_ATTRIBUTE_PROPERTIES.has(key)).toBe(true)
-        }
-    })
-
-    it('should include the kebab-case DOM spellings a Svelte template actually uses', () => {
-        // Upstream's list is React-facing (JSX camelCase). Svelte templates take the
-        // DOM spelling, so `<motion.circle stroke-width={mv}>` is the common form. A
-        // kebab key missing from the allowlist is never claimed out of the raw spread
-        // and renders stroke-width="[object Object]" — the bug this feature kills.
-        for (const key of [
-            'stop-color',
-            'stop-opacity',
-            'fill-opacity',
-            'stroke-opacity',
-            'stroke-width',
-            'stroke-dashoffset',
-            'stroke-dasharray'
-        ]) {
-            expect(SVG_ATTRIBUTE_PROPERTIES.has(key)).toBe(true)
-        }
-    })
-
-    it('should not overlap with SVG_PATH_PROPERTIES (no double handling)', () => {
-        const overlap = [...SVG_PATH_PROPERTIES].filter((key) => SVG_ATTRIBUTE_PROPERTIES.has(key))
-        expect(overlap).toEqual([])
-    })
-
-    it('should not enumerate attr-prefixed keys (handled by prefix, not allowlist)', () => {
-        expect(SVG_ATTRIBUTE_PROPERTIES.has('attrX')).toBe(false)
-        expect(SVG_ATTRIBUTE_PROPERTIES.has('attrY')).toBe(false)
-        expect(SVG_ATTRIBUTE_PROPERTIES.has('attrScale')).toBe(false)
-    })
-})
-
 describe('resolveSVGAttrKey', () => {
     it('should map attrX/attrY/attrScale to their SVG attribute names', () => {
         // Upstream: buildSVGAttrs renders attrX -> attrs.x (build-attrs.ts:82-85)
@@ -231,15 +161,16 @@ describe('isSVGMotionValueAttribute', () => {
         expect(isSVGMotionValueAttribute('stop-color')).toBe(true)
     })
 
-    it('should reject path props so the path pipeline keeps ownership', () => {
-        expect(isSVGMotionValueAttribute('pathLength')).toBe(false)
-        expect(isSVGMotionValueAttribute('pathOffset')).toBe(false)
-        expect(isSVGMotionValueAttribute('pathSpacing')).toBe(false)
+    it('should accept path props so svgEffect can select its path writer', () => {
+        expect(isSVGMotionValueAttribute('pathLength')).toBe(true)
+        expect(isSVGMotionValueAttribute('pathOffset')).toBe(true)
+        expect(isSVGMotionValueAttribute('pathSpacing')).toBe(true)
     })
 
-    it('should reject unrelated props', () => {
-        expect(isSVGMotionValueAttribute('class')).toBe(false)
-        expect(isSVGMotionValueAttribute('onclick')).toBe(false)
+    it('should claim every MotionValue prop like upstream SVG scraping', () => {
+        for (const key of ['fill', 'stroke', 'opacity', 'transform', 'offsetDistance', 'custom']) {
+            expect(isSVGMotionValueAttribute(key)).toBe(true)
+        }
     })
 })
 
@@ -293,20 +224,20 @@ describe('extractSVGMotionValueAttributes', () => {
         expect(staticAttrs).toEqual({})
     })
 
-    it('should not claim path props even when they hold MotionValues', () => {
+    it('should claim path props for the SVG path pipeline', () => {
         const pathLength = motionValue(0.5)
         const { motionValueAttrs, staticAttrs } = extractSVGMotionValueAttributes({ pathLength })
 
-        expect(motionValueAttrs).toEqual({})
-        expect(staticAttrs).toEqual({ pathLength })
+        expect(motionValueAttrs).toEqual({ pathLength })
+        expect(staticAttrs).toEqual({})
     })
 
-    it('should not claim MotionValues on non-attribute keys', () => {
+    it('should claim custom MotionValue attributes like upstream', () => {
         const custom = motionValue(1)
         const { motionValueAttrs, staticAttrs } = extractSVGMotionValueAttributes({ custom })
 
-        expect(motionValueAttrs).toEqual({})
-        expect(staticAttrs).toEqual({ custom })
+        expect(motionValueAttrs).toEqual({ custom })
+        expect(staticAttrs).toEqual({})
     })
 
     it('should leave plain objects that are not MotionValues untouched', () => {
@@ -371,18 +302,15 @@ describe('filter-primitive attributes', () => {
         expect(staticAttrs).toEqual({})
     })
 
-    it('should still refuse pathLength even though camelCaseAttributes lists it', () => {
-        // `pathLength` IS in camelCaseAttributes. Resolving against that set must not
-        // hand the path pipeline's props to svgEffect's attribute writer, or
-        // stroke-dasharray gets written twice.
+    it("should claim pathLength for svgEffect's dedicated path writer", () => {
         expect(camelCaseAttributes.has('pathLength')).toBe(true)
-        expect(isSVGMotionValueAttribute('pathLength')).toBe(false)
+        expect(isSVGMotionValueAttribute('pathLength')).toBe(true)
 
         const pathLength = motionValue(0.5)
         const { motionValueAttrs, staticAttrs } = extractSVGMotionValueAttributes({ pathLength })
 
-        expect(motionValueAttrs).toEqual({})
-        expect(staticAttrs).toEqual({ pathLength })
+        expect(motionValueAttrs).toEqual({ pathLength })
+        expect(staticAttrs).toEqual({})
     })
 
     it('should keep static filter values out of motionValueAttrs', () => {
@@ -395,12 +323,12 @@ describe('filter-primitive attributes', () => {
         expect(staticAttrs).toEqual({ stdDeviation: 4, dx: 3 })
     })
 
-    it('should still reject unrelated keys that hold MotionValues', () => {
+    it('should claim custom MotionValue keys', () => {
         const custom = motionValue(1)
         const { motionValueAttrs, staticAttrs } = extractSVGMotionValueAttributes({ custom })
 
-        expect(motionValueAttrs).toEqual({})
-        expect(staticAttrs).toEqual({ custom })
+        expect(motionValueAttrs).toEqual({ custom })
+        expect(staticAttrs).toEqual({})
     })
 
     it('should SSR filter keys with their camelCase names preserved', () => {
@@ -422,6 +350,16 @@ describe('computeSSRSVGAttrValues', () => {
             cx: '10',
             r: '4.5'
         })
+    })
+
+    it('should leave Motion 13 CSS channels out of the attribute spread', () => {
+        expect(
+            computeSSRSVGAttrValues({
+                opacity: motionValue(0.5),
+                transform: motionValue('translateX(10px)'),
+                fill: motionValue('red')
+            })
+        ).toEqual({ fill: 'red' })
     })
 
     it('should resolve attr-prefixed keys to their attribute names', () => {
@@ -509,5 +447,22 @@ describe('computeSSRSVGAttrValues', () => {
 
     it('should return an empty object when there are no MotionValue attrs', () => {
         expect(computeSSRSVGAttrValues({})).toEqual({})
+    })
+})
+
+describe('computeSSRSVGStyleValues', () => {
+    it('should seed the Motion 13 SVG CSS channels and exclude paint attributes', () => {
+        expect(
+            computeSSRSVGStyleValues({
+                opacity: motionValue(0.5),
+                transform: motionValue('translateX(10px)'),
+                offsetDistance: motionValue('25%'),
+                fill: motionValue('red')
+            })
+        ).toEqual({
+            opacity: 0.5,
+            transform: 'translateX(10px)',
+            offsetDistance: '25%'
+        })
     })
 })

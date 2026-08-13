@@ -375,6 +375,7 @@ const computeReleaseVelocity = (
  */
 export type AttachDragCleanup = (() => void) & {
     adjustOrigin: (dx: number, dy: number) => void
+    updateOptions: (options: AttachDragOptions) => void
 }
 
 /**
@@ -445,19 +446,19 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         snapToOrigin: opts.snapToOrigin,
         propagation: opts.propagation
     })
-    const axis = opts.axis
-    const dragX = axis === true || axis === 'x'
-    const dragY = axis === true || axis === 'y'
+    let axis = opts.axis
+    let dragX = axis === true || axis === 'x'
+    let dragY = axis === true || axis === 'y'
     // Bound `style` MotionValues for the dragged axes (e.g. `style={{ y }}`).
     // Constant for this gesture's lifetime, so resolved once here rather than
     // per `setXYImmediate` frame (#421).
-    const boundX = dragX ? opts.boundMotionValues?.x : undefined
-    const boundY = dragY ? opts.boundMotionValues?.y : undefined
-    const directionLock = !!opts.directionLock
-    const listenerEnabled = opts.listener !== false
-    const elastic = resolveDragElastic(opts.elastic)
-    const maxElastic = getMaxElastic(elastic)
-    const momentum = opts.momentum !== false
+    let boundX = opts.boundMotionValues?.x
+    let boundY = opts.boundMotionValues?.y
+    let directionLock = !!opts.directionLock
+    let listenerEnabled = opts.listener !== false
+    let elastic = resolveDragElastic(opts.elastic)
+    let maxElastic = getMaxElastic(elastic)
+    let momentum = opts.momentum !== false
 
     let constraints = resolveConstraints(el, opts.constraints)
     // Anchor constraints base:
@@ -501,6 +502,22 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
      * re-running) while a legitimate glide is still on screen.
      */
     let detachRelease: (() => void) | null = null
+
+    /** Adopt changed drag props without ending the active pointer session. */
+    const updateOptions = (nextOptions: AttachDragOptions) => {
+        Object.assign(opts, nextOptions)
+        axis = nextOptions.axis
+        dragX = axis === true || axis === 'x'
+        dragY = axis === true || axis === 'y'
+        boundX = nextOptions.boundMotionValues?.x
+        boundY = nextOptions.boundMotionValues?.y
+        directionLock = !!nextOptions.directionLock
+        listenerEnabled = nextOptions.listener !== false
+        elastic = resolveDragElastic(nextOptions.elastic)
+        maxElastic = getMaxElastic(elastic)
+        momentum = nextOptions.momentum !== false
+        constraints = resolveConstraints(el, nextOptions.constraints)
+    }
 
     /**
      * Per-element marker for "this element is being dragged RIGHT NOW".
@@ -1778,5 +1795,5 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         )
     }
 
-    return Object.assign(teardown, { adjustOrigin })
+    return Object.assign(teardown, { adjustOrigin, updateOptions })
 }

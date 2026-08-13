@@ -178,6 +178,40 @@ describe('utils/drag', () => {
         el.remove()
     })
 
+    it('shifts the live MotionValue and drag origin when its layout slot moves', () => {
+        const el = document.createElement('div')
+        document.body.appendChild(el)
+        const node = registerStubNode(el)
+
+        const cleanup = attachDrag(el, { axis: 'x', mergedTransition: { duration: 0 } })
+        el.dispatchEvent(
+            new PointerEvent('pointerdown', { clientX: 200, clientY: 10, pointerId: 1 })
+        )
+        window.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: 140, clientY: 10, pointerId: 1 })
+        )
+        expect(node.values.get('x')?.get()).toBe(-60)
+
+        // A keyed reorder moved the element's underlying slot 100px left.
+        // Projection reports previous - next (+100), which must immediately
+        // move the displayed transform and the gesture origin together.
+        cleanup.adjustOrigin(100, 0)
+        expect(node.values.get('x')?.get()).toBe(40)
+
+        // A stationary pointer sample must retain the compensated value. If
+        // only the visual value moved (and not the origin), this snaps to -60.
+        window.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: 140, clientY: 10, pointerId: 1 })
+        )
+        expect(node.values.get('x')?.get()).toBe(40)
+
+        window.dispatchEvent(
+            new PointerEvent('pointerup', { clientX: 140, clientY: 10, pointerId: 1 })
+        )
+        cleanup()
+        el.remove()
+    })
+
     it('composes an unbound drag axis onto its authored channel value', () => {
         const el = document.createElement('div')
         document.body.appendChild(el)

@@ -5,11 +5,12 @@
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
-    import { Route, Signal, Wand } from '@lucide/svelte'
+    import { Gauge, Route, Signal, Sparkles, Wand } from '@lucide/svelte'
     import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import SvgAnimationDefault from '$lib/examples/svg-animation/demos/Default.svelte'
+    import SignalDock from '$lib/examples/svg-animation/demos/SignalDock.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
@@ -21,11 +22,12 @@
     }
     if (seo) {
         seo.title = 'SVG Animation | Svelte Motion'
-        seo.description = 'Bind MotionValues straight to SVG presentation attributes.'
+        seo.description =
+            'Bind MotionValues to SVG attributes and commit exact final styles after accelerated animation.'
         seo.ogTitle = 'SVG Animation'
         seo.h1 = { title: 'SVG Animation', mode: 'sr-only' }
         seo.ogTagline = 'MotionValues bound straight to SVG attributes'
-        seo.ogFeatures = ['SVG', 'MotionValue', 'useSpring', 'useTransform']
+        seo.ogFeatures = ['SVG', 'MotionValue', 'Accelerated styles', 'useReducedMotion']
         seo.ogSlug = 'examples-svg-animation'
     }
 
@@ -48,12 +50,69 @@
                 { k: 'channel', v: 'attribute' }
             ],
             sourceUrl: `${SOURCE_URL}svg-animation/demos/Default.svelte`
+        },
+        {
+            figId: 'FIG-002',
+            tag: 'MOTION 13',
+            title: { prefix: 'launch bright, ', accent: 'land exact', end: '.' },
+            description:
+                'Motion 12.43 introduced accelerated SVG style animations; Motion 13 fixed their final-style restore. A luminous vector packet crosses a compositor-friendly transform track, blooms at its dock, and fades to a committed final state. Live telemetry reports the browser’s actual opacity, transform, and fill so replay and reverse make stale CSS impossible to miss.',
+            snippet: signalDockSection,
+            codeSnippet: signalDockCode,
+            notes: signalDockNotes,
+            barCells: [
+                { k: 'wow', v: 'signal dock' },
+                { k: 'proof', v: 'computed style' },
+                { k: 'a11y', v: 'reduced motion' }
+            ],
+            sourceUrl: `${SOURCE_URL}svg-animation/demos/SignalDock.svelte`
         }
     ]
 </script>
 
 {#snippet defaultSection()}
     <SvgAnimationDefault />
+{/snippet}
+{#snippet signalDockSection()}
+    <SignalDock />
+{/snippet}
+{#snippet signalDockNotes()}
+    <ul>
+        <li>
+            <Sparkles />
+            <span>
+                The WOW moment is the signal’s luminous dock: it travels, changes fill, disappears,
+                and leaves a bloom precisely on the marked destination.
+            </span>
+        </li>
+        <li>
+            <Gauge />
+            <span>
+                Telemetry reads <em>computed</em> opacity, transform, and fill from the SVG node—not merely
+                the intended animation state. Opacity and transform are the accelerated CSS channels;
+                fill is an SVG paint attribute shown alongside them, not an acceleration claim.
+            </span>
+        </li>
+        <li>
+            <Wand />
+            <span>
+                Replay and reverse exercise both final-style commits; reduced-motion users get the
+                same states without the travel animation.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet signalDockCode()}
+    <CodeReferenceV2
+        samples={[
+            demoCodeSample(
+                'svg-animation/demos/SignalDock.svelte',
+                'svg-animation-signal-dock',
+                'SignalDock.svelte'
+            )
+        ]}
+        columns={1}
+    />
 {/snippet}
 {#snippet defaultNotes()}
     <ul>

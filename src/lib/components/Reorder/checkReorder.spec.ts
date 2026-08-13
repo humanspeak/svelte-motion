@@ -1,14 +1,39 @@
+import type { Box } from '$lib/utils/projection'
 import { describe, expect, it } from 'vitest'
 import { checkReorder, moveItem } from './checkReorder'
 import type { ItemData } from './context'
 
-const item = <V>(value: V, min: number, max: number): ItemData<V> => ({
-    value,
-    layout: { min, max }
+const box = (xMin: number, xMax: number, yMin: number, yMax: number): Box => ({
+    x: { min: xMin, max: xMax },
+    y: { min: yMin, max: yMax }
 })
 
-/** Three 100px slots stacked at 0, 100 and 200. */
-const makeOrder = () => [item('a', 0, 100), item('b', 100, 200), item('c', 200, 300)]
+const item = <V>(value: V, layout: Box): ItemData<V> => ({ value, layout })
+
+const verticalOrder = () => [
+    item('a', box(0, 100, 0, 100)),
+    item('b', box(0, 100, 100, 200)),
+    item('c', box(0, 100, 200, 300))
+]
+
+const horizontalOrder = () => [
+    item('a', box(0, 100, 0, 100)),
+    item('b', box(100, 200, 0, 100)),
+    item('c', box(200, 300, 0, 100))
+]
+
+const rtlHorizontalOrder = () => [
+    item('a', box(200, 300, 0, 100)),
+    item('b', box(100, 200, 0, 100)),
+    item('c', box(0, 100, 0, 100))
+]
+
+const gridOrder = () => [
+    item('a', box(0, 100, 0, 100)),
+    item('b', box(100, 200, 0, 100)),
+    item('c', box(0, 100, 100, 200)),
+    item('d', box(100, 200, 100, 200))
+]
 
 describe('moveItem', () => {
     it('moves an item forward without mutating the input', () => {
@@ -31,51 +56,68 @@ describe('moveItem', () => {
 })
 
 describe('checkReorder', () => {
-    it('returns the same array when velocity is zero', () => {
-        const order = makeOrder()
-        expect(checkReorder(order, 'a', 500, 0)).toBe(order)
+    it('returns the same array when the relevant velocity is zero', () => {
+        const order = verticalOrder()
+        expect(checkReorder(order, 'a', { x: 0, y: 500 }, { x: 1, y: 0 }, 'y')).toBe(order)
     })
 
     it('returns the same array for an unknown value', () => {
-        const order = makeOrder()
-        expect(checkReorder(order, 'z', 500, 1)).toBe(order)
+        const order = verticalOrder()
+        expect(checkReorder(order, 'z', { x: 0, y: 500 }, { x: 0, y: 1 }, 'y')).toBe(order)
     })
 
-    it('swaps forward once the leading edge passes the next item center', () => {
-        const order = makeOrder()
-        // Item a: max=100. Item b center=150. Offset 51 → 151 > 150.
-        const next = checkReorder(order, 'a', 51, 1)
+    it('keeps vertical midpoint swaps unchanged', () => {
+        const order = verticalOrder()
+        const next = checkReorder(order, 'a', { x: 0, y: 51 }, { x: 0, y: 1 }, 'y')
         expect(next).not.toBe(order)
         expect(next.map((entry) => entry.value)).toEqual(['b', 'a', 'c'])
+        expect(checkReorder(order, 'a', { x: 0, y: 49 }, { x: 0, y: 1 }, 'y')).toBe(order)
     })
 
-    it('does not swap forward before the next item center', () => {
-        const order = makeOrder()
-        // 100 + 49 = 149 < 150 → no swap.
-        expect(checkReorder(order, 'a', 49, 1)).toBe(order)
-    })
-
-    it('swaps backward once the leading edge passes the previous item center', () => {
-        const order = makeOrder()
-        // Item c: min=200. Item b center=150. Offset -51 → 149 < 150.
-        const next = checkReorder(order, 'c', -51, -1)
+    it('keeps horizontal midpoint swaps unchanged', () => {
+        const order = horizontalOrder()
+        const next = checkReorder(order, 'c', { x: -51, y: 0 }, { x: -1, y: 0 }, 'x')
         expect(next.map((entry) => entry.value)).toEqual(['a', 'c', 'b'])
-    })
-
-    it('does not swap backward before the previous item center', () => {
-        const order = makeOrder()
-        expect(checkReorder(order, 'c', -49, -1)).toBe(order)
+        expect(checkReorder(order, 'c', { x: -49, y: 0 }, { x: -1, y: 0 }, 'x')).toBe(order)
     })
 
     it('ignores boundary items with no neighbour in the travel direction', () => {
-        const order = makeOrder()
-        expect(checkReorder(order, 'c', 500, 1)).toBe(order)
-        expect(checkReorder(order, 'a', -500, -1)).toBe(order)
+        const order = verticalOrder()
+        expect(checkReorder(order, 'c', { x: 0, y: 500 }, { x: 0, y: 1 }, 'y')).toBe(order)
+        expect(checkReorder(order, 'a', { x: 0, y: -500 }, { x: 0, y: -1 }, 'y')).toBe(order)
     })
 
-    it('requires velocity direction and offset direction to agree', () => {
-        const order = makeOrder()
-        // Positive velocity looks forward even with a negative offset.
-        expect(checkReorder(order, 'c', -500, 1)).toBe(order)
+    it('moves within a row toward the closest neighboring box', () => {
+        const order = gridOrder()
+        const next = checkReorder(order, 'a', { x: 110, y: 0 }, { x: 1, y: 0 }, 'xy')
+        expect(next.map((entry) => entry.value)).toEqual(['b', 'a', 'c', 'd'])
+    })
+
+    it('inserts at the closest horizontal slot when crossing into another row', () => {
+        const order = gridOrder()
+        const afterLast = checkReorder(order, 'a', { x: 150, y: 150 }, { x: 1, y: 1 }, 'xy')
+        expect(afterLast.map((entry) => entry.value)).toEqual(['b', 'c', 'd', 'a'])
+
+        const beforeFirst = checkReorder(order, 'b', { x: -150, y: 150 }, { x: -1, y: 1 }, 'xy')
+        expect(beforeFirst.map((entry) => entry.value)).toEqual(['a', 'b', 'c', 'd'])
+        expect(beforeFirst).toBe(order)
+    })
+
+    it('follows real right-to-left geometry for a horizontal list', () => {
+        const order = rtlHorizontalOrder()
+        const next = checkReorder(order, 'a', { x: -51, y: 0 }, { x: -1, y: 0 }, 'x', 'rtl')
+        expect(next.map((entry) => entry.value)).toEqual(['b', 'a', 'c'])
+        expect(checkReorder(order, 'a', { x: -49, y: 0 }, { x: -1, y: 0 }, 'x', 'rtl')).toBe(order)
+    })
+
+    it('reverses cross-row insertion in RTL for xy', () => {
+        const order = gridOrder()
+        const next = checkReorder(order, 'a', { x: -150, y: 150 }, { x: -1, y: 1 }, 'xy', 'rtl')
+        expect(next.map((entry) => entry.value)).toEqual(['b', 'c', 'd', 'a'])
+    })
+
+    it('returns the same array for an unchanged xy position', () => {
+        const order = gridOrder()
+        expect(checkReorder(order, 'a', { x: 0, y: 0 }, { x: 0, y: 0 }, 'xy')).toBe(order)
     })
 })

@@ -12,10 +12,27 @@
  * `window.scrollX/Y` subtraction is omitted here.
  */
 
+import type { DragPoint } from '$lib/types'
+import type { ReorderAxis } from './types'
+
 const threshold = 50
 const maxSpeed = 25
 
 const overflowStyles = new Set(['auto', 'scroll'])
+
+/**
+ * Select the one axis eligible for edge auto-scroll during this drag frame.
+ *
+ * Two-dimensional reorder uses the dominant velocity axis so a diagonal
+ * gesture never scrolls two containers at once. Ties prefer the vertical
+ * axis, matching Motion 13.1.
+ *
+ * @param axis - The group's configured or detected reorder axis.
+ * @param velocity - Current pointer velocity on both axes.
+ * @returns The axis to pass to {@link autoScrollIfNeeded}.
+ */
+export const selectAutoScrollAxis = (axis: ReorderAxis, velocity: DragPoint): 'x' | 'y' =>
+    axis === 'xy' ? (Math.abs(velocity.x) > Math.abs(velocity.y) ? 'x' : 'y') : axis
 
 /**
  * Scroll limits captured when an edge first activates, so a gesture

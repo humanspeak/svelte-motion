@@ -1,19 +1,20 @@
-import type { Axis, Box } from '$lib/utils/projection'
+import type { DragPoint } from '$lib/types'
+import type { Box } from '$lib/utils/projection'
 import { getContext, setContext } from 'svelte'
+import type { ReorderAxis } from './types'
 
 /**
  * A measured entry in a `Reorder.Group`'s working order.
  *
- * `layout` is the item's slot on the group's reorder axis (the `x` or
- * `y` half of the measured {@link Box}), captured with motion-applied
- * transforms stripped — i.e. where the item *lives*, not where a live
- * drag has visually carried it.
+ * `layout` is the item's complete measured slot, captured with
+ * motion-applied transforms stripped — i.e. where the item *lives*,
+ * not where a live drag has visually carried it.
  *
  * Mirrors framer-motion `Reorder/types.ts` `ItemData<T>`.
  */
 export interface ItemData<V> {
     value: V
-    layout: Axis
+    layout: Box
 }
 
 /**
@@ -21,15 +22,16 @@ export interface ItemData<V> {
  * (consumer). Mirrors framer-motion's `ReorderContextProps<T>`
  * (`context/ReorderContext.ts`), with two Svelte-specific adaptations:
  *
- * - `axis` is a getter-backed property so items observe prop changes
- *   without re-creating the context (Svelte context is set once).
+ * - `axis` is a getter-backed property that items bridge through a local
+ *   `$derived`, so post-measure detection propagates without re-creating the
+ *   context (Svelte context is set once).
  * - `unregisterItem` exists because our order registry persists across
  *   renders — React rebuilds `order` from scratch every render, so
  *   unmounted items vanish for free; here they must deregister.
  */
 export interface ReorderContextProps<V> {
     /** The group's reorder axis. Items drag-lock to this by default. */
-    readonly axis: 'x' | 'y'
+    readonly axis: ReorderAxis
     /**
      * Record (or refresh) an item's measured layout slot. Called from
      * the item's `onLayoutMeasure`, so entries stay current as
@@ -40,11 +42,10 @@ export interface ReorderContextProps<V> {
     unregisterItem: (value: V) => void
     /**
      * Ask the group to re-evaluate the order for a live drag. `offset`
-     * is the dragged item's current axis offset from its slot and
-     * `velocity` its axis velocity; the group runs `checkReorder` and
-     * fires `onReorder` when a swap is due.
+     * and `velocity` contain both axes so wrapped layouts can choose a
+     * row and insertion slot.
      */
-    updateOrder: (value: V, offset: number, velocity: number) => void
+    updateOrder: (value: V, offset: DragPoint, velocity: DragPoint) => void
     /** The group's rendered element, for edge auto-scrolling. */
     getGroupElement: () => HTMLElement | null
 }

@@ -4,16 +4,18 @@
 
     let {
         values = [0, 1, 2],
-        axis = 'y',
+        axis,
         as = 'ul',
         itemAs = 'li',
+        itemSizeAnimation = false,
         groupStyle,
         onReorder = () => {}
     }: {
         values?: number[]
-        axis?: 'x' | 'y'
+        axis?: 'x' | 'y' | 'xy'
         as?: ReorderElementTag
         itemAs?: ReorderElementTag
+        itemSizeAnimation?: boolean
         groupStyle?: string
         onReorder?: (next: number[]) => void
     } = $props()
@@ -21,7 +23,12 @@
 
 <Reorder.Group {as} {axis} {values} {onReorder} style={groupStyle} data-testid="group">
     {#each values as item (item)}
-        <Reorder.Item as={itemAs} value={item} data-testid={`item-${item}`}>
+        <Reorder.Item
+            as={itemAs}
+            value={item}
+            data-testid={`item-${item}`}
+            data-layout-size-animation={itemSizeAnimation ? '' : undefined}
+        >
             {item}
         </Reorder.Item>
     {/each}
