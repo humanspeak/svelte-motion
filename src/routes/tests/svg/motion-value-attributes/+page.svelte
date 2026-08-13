@@ -35,12 +35,22 @@
      * unclaimed key would render `stdDeviation="[object Object]"`.
      */
     const blurStdDeviation = motionValue(2)
+    const boundFill = motionValue('#ef4444')
+    const boundStroke = motionValue('#f8fafc')
+    const boundOpacity = motionValue(1)
+    const boundTransform = motionValue('translateX(0px)')
 
     // Buttons (used by e2e) and sliders both drive the same MotionValues.
     const bumpCx = () => cx.set(Math.min(280, cx.get() + 20))
     const bumpStrokeWidth = () => strokeWidth.set(Math.min(20, strokeWidth.get() + 3))
     const advanceProgress = () => dashOffset.set(Math.max(0, dashOffset.get() - 40))
     const bumpAttrX = () => attrX.set(Math.min(240, attrX.get() + 15))
+    const updateArbitraryProps = () => {
+        boundFill.set('#a855f7')
+        boundStroke.set('#facc15')
+        boundOpacity.set(0.5)
+        boundTransform.set('translateX(24px)')
+    }
 
     const reset = () => {
         cx.set(40)
@@ -50,6 +60,10 @@
         attrY.set(10)
         attrScale.set(12)
         blurStdDeviation.set(2)
+        boundFill.set('#ef4444')
+        boundStroke.set('#f8fafc')
+        boundOpacity.set(1)
+        boundTransform.set('translateX(0px)')
     }
 
     /** Toggle: unmount/remount the whole SVG to exercise subscription teardown. */
@@ -61,7 +75,7 @@
      */
     let highlight = $state(false)
 
-    /** Motion 13.0 regression: accelerated SVG styles must commit exact final values. */
+    /** Motion 13 fix: accelerated SVG styles must commit exact final values. */
     let svgHidden = $state(false)
     let acceleratedOpacity = $state('1')
     let acceleratedTransform = $state('none')
@@ -89,6 +103,25 @@
     let rows = $state<Row[]>([])
 
     const WATCHED: { testid: string; label: string; prop: string; channel: string }[] = [
+        { testid: 'arbitrary-mv-svg', label: 'rect (bound)', prop: 'fill', channel: 'attribute' },
+        {
+            testid: 'arbitrary-mv-svg',
+            label: 'rect (bound)',
+            prop: 'stroke',
+            channel: 'attribute'
+        },
+        {
+            testid: 'arbitrary-mv-svg',
+            label: 'rect (bound)',
+            prop: 'opacity',
+            channel: 'attribute'
+        },
+        {
+            testid: 'arbitrary-mv-svg',
+            label: 'rect (bound)',
+            prop: 'transform',
+            channel: 'style'
+        },
         { testid: 'mv-circle', label: 'circle (bound)', prop: 'cx', channel: 'attribute' },
         { testid: 'static-circle', label: 'circle (plain 5)', prop: 'cx', channel: 'attribute' },
         { testid: 'kebab-circle', label: 'circle', prop: 'stroke-width', channel: 'attribute' },
@@ -151,7 +184,8 @@
             <code class="rounded bg-slate-800 px-1">MotionValue</code> straight to an SVG
             presentation attribute — <code class="rounded bg-slate-800 px-1">cx</code>,
             <code class="rounded bg-slate-800 px-1">stroke-width</code>,
-            <code class="rounded bg-slate-800 px-1">attrX</code> — instead of animating it. Before
+            <code class="rounded bg-slate-800 px-1">attrX</code>, or any other prop such as
+            <code class="rounded bg-slate-800 px-1">fill</code> — instead of animating it. Before
             this feature the value was spread raw onto the element and rendered as the literal
             string <code class="rounded bg-slate-800 px-1">[object Object]</code>.
         </p>
@@ -304,6 +338,11 @@
                     onclick={bumpAttrX}>Bump attrX</button
                 >
                 <button
+                    data-testid="update-arbitrary-svg-values"
+                    class="col-span-2 rounded bg-fuchsia-700 px-2 py-1 text-sm hover:bg-fuchsia-600"
+                    onclick={updateArbitraryProps}>Update fill/stroke/opacity/transform</button
+                >
+                <button
                     data-testid="reset"
                     class="col-span-2 rounded bg-slate-700 px-2 py-1 text-sm hover:bg-slate-600"
                     onclick={reset}>Reset all</button
@@ -348,9 +387,10 @@
                     >
                         Upstream fixed accelerated SVG animations that looked finished but left
                         stale inline styles behind. Launch the block: it must dock at the dashed
-                        marker, commit <code>opacity: 0</code>, a 50px transform, and purple fill.
-                        Restore must commit the exact green, opaque source state—with no flash or
-                        stale frame.
+                        marker and promptly commit <code>opacity: 0</code> plus a 50px transform. Fill
+                        changes alongside those accelerated CSS channels, but is painted on the SVG attribute
+                        channel. Restore must commit the exact green, opaque source state—with no flash
+                        or stale frame.
                     </p>
                     <svg width="220" height="70" viewBox="0 0 220 70" class="rounded bg-slate-800">
                         <rect
@@ -380,9 +420,9 @@
                                 fill: svgHidden ? '#a855f7' : '#22c55e'
                             }}
                             transition={svgHidden
-                                ? { duration: 0.12 }
+                                ? { duration: 0.3 }
                                 : {
-                                      duration: 0.12,
+                                      duration: 0.3,
                                       opacity: { duration: 0 },
                                       transform: { duration: 0 }
                                   }}
@@ -412,6 +452,31 @@
                     <p data-testid="accelerated-svg-state" class="mt-2 text-xs text-slate-400">
                         State: {svgHidden ? 'destination committed' : 'source restored'}
                     </p>
+                </div>
+
+                <div>
+                    <h3 class="mb-1 text-sm font-medium text-slate-300">
+                        Every MotionValue prop is claimed
+                    </h3>
+                    <p class="mb-3 max-w-xl text-xs leading-relaxed text-slate-400">
+                        This deliberately includes names outside the old geometry allowlist. None
+                        may reach Svelte's attribute spread as <code>[object Object]</code>.
+                    </p>
+                    <svg width="180" height="70" viewBox="0 0 180 70" class="rounded bg-slate-800">
+                        <motion.rect
+                            data-testid="arbitrary-mv-svg"
+                            x={20}
+                            y={15}
+                            width={50}
+                            height={40}
+                            rx={6}
+                            fill={boundFill}
+                            stroke={boundStroke}
+                            stroke-width={3}
+                            opacity={boundOpacity}
+                            transform={boundTransform}
+                        />
+                    </svg>
                 </div>
 
                 <div>

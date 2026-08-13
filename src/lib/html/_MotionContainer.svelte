@@ -88,7 +88,7 @@
         setPresenceDepth
     } from '$lib/utils/presence'
     import { getInitialKeyframes } from '$lib/utils/initial'
-    import { attachDrag, type AttachDragCleanup } from '$lib/utils/drag'
+    import { attachDrag, type AttachDragCleanup, type AttachDragOptions } from '$lib/utils/drag'
     import { attachPan, type AttachPanCleanup } from '$lib/utils/pan'
     import { boxFromRect, MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
     import {
@@ -123,9 +123,11 @@
     import {
         computeNormalizedSVGInitialAttrs,
         computeSSRSVGAttrValues,
+        computeSSRSVGStyleValues,
         extractSVGMotionValueAttributes,
         isSVGTag,
         resolveSVGTagName,
+        SVG_CSS_STYLE_PROPERTIES,
         SVG_NAMESPACE
     } from '$lib/utils/svg'
     import {
@@ -1350,7 +1352,13 @@
         // computed `cx` at 40px while the attribute tracked the MotionValue to 60).
         if (svgAttrSplit && String(tag).toLowerCase() !== 'svg') {
             for (const key of Object.keys(values)) {
-                if (!transformProps.has(key) && !key.startsWith('origin')) delete values[key]
+                if (
+                    !transformProps.has(key) &&
+                    !SVG_CSS_STYLE_PROPERTIES.has(key) &&
+                    !key.startsWith('origin')
+                ) {
+                    delete values[key]
+                }
             }
             return isNotEmpty(values) ? values : undefined
         }
@@ -1389,9 +1397,14 @@
             : mergeInlineStyles(
                   inlineStyleBaseWithHolds,
                   isLoaded === 'mounting' || isLoaded === 'initial' ? initialKeyframes : undefined,
-                  isNotEmpty(initialKeyframes) && !effectiveAnimate
-                      ? initialKeyframes
-                      : renderedAnimateBaseline,
+                  {
+                      ...((isNotEmpty(initialKeyframes) && !effectiveAnimate
+                          ? initialKeyframes
+                          : renderedAnimateBaseline) ?? {}),
+                      ...(svgAttrSplit
+                          ? computeSSRSVGStyleValues(svgAttrSplit.motionValueAttrs)
+                          : {})
+                  },
                   transformTemplateProp
               )
     )
@@ -1474,47 +1487,19 @@
     // - If second drags "jump", ensure `attachDrag` syncs the internal `applied` origin
     //   after any non-zero duration settle animation.
     let teardownDrag: AttachDragCleanup | null = null
-    $effect(() => {
-        if (!(element && isLoaded === 'ready' && hasDragFeatures)) return
-        // Only attach if drag enabled
-        if (!dragProp) return
-        // Clean up previous
-        teardownDrag?.()
 
+    const resolveDragOptions = (): AttachDragOptions => {
+        const currentDragProp = dragProp
         const axis: DragAxis =
-            dragProp === true || dragProp === 'x' || dragProp === 'y' ? dragProp : !!dragProp
-        if (!axis) return
+            currentDragProp === true || currentDragProp === 'x' || currentDragProp === 'y'
+                ? currentDragProp
+                : !!currentDragProp
+        const styleValues = collectMotionStyleValues(styleProp)
+        const boundMotionValues: { x?: MotionValue<number>; y?: MotionValue<number> } = {}
+        if (styleValues?.x) boundMotionValues.x = styleValues.x as MotionValue<number>
+        if (styleValues?.y) boundMotionValues.y = styleValues.y as MotionValue<number>
 
-        // If constraints are provided via an element ref but it's not yet bound (null),
-        // defer attaching drag until the ref exists to avoid an unconstrained first drag.
-        if (dragConstraintsProp === null) return
-
-        const controls = dragControlsProp
-        const dragRuntimeOptions = untrack(() => ({
-            whileDrag: resolvedWhileDrag,
-            mergedTransition: mergedTransition ?? {},
-            baselineSources: {
-                initial: initialKeyframes ?? {},
-                animate: (resolvedAnimate ?? {}) as Record<string, unknown>
-            },
-            // Bound `style` MotionValues (e.g. `style={{ y }}`) for the dragged
-            // axes, so the gesture writes through to them and `y.get()` /
-            // `animate(y, …)` stay in sync with the drag (#421). Read inside
-            // `untrack` so the drag effect doesn't re-run (re-attaching the
-            // gesture) every time `styleProp` changes — e.g. an object-style
-            // `rotate` derived from a $state updates each frame mid-drag.
-            boundMotionValues: (() => {
-                // collectMotionStyleValues already filters to MotionValues only.
-                const styleValues = collectMotionStyleValues(styleProp)
-                if (!styleValues) return undefined
-                const bound: { x?: MotionValue<number>; y?: MotionValue<number> } = {}
-                if (styleValues.x) bound.x = styleValues.x as MotionValue<number>
-                if (styleValues.y) bound.y = styleValues.y as MotionValue<number>
-                return bound.x || bound.y ? bound : undefined
-            })(),
-            getBaseTransformValues: getStyleTransformValues
-        }))
-        const opts = {
+        return {
             axis,
             constraints: dragConstraintsProp,
             elastic: dragElasticProp,
@@ -1522,33 +1507,44 @@
             transition: dragTransitionProp,
             directionLock: !!dragDirectionLockProp,
             listener: dragListenerProp !== false,
-            controls,
-            whileDrag: dragRuntimeOptions.whileDrag,
-            mergedTransition: dragRuntimeOptions.mergedTransition,
+            controls: dragControlsProp,
+            whileDrag: resolvedWhileDrag,
+            mergedTransition: mergedTransition ?? {},
             callbacks: {
                 onStart: onDragStartProp as (e: PointerEvent, info: DragInfo) => void,
                 onMove: onDragProp as (e: PointerEvent, info: DragInfo) => void,
                 onEnd: onDragEndProp as (e: PointerEvent, info: DragInfo) => void,
                 onDirectionLock: onDirectionLockProp as (axis: 'x' | 'y') => void,
-                onTransitionEnd: () => {
-                    onDragTransitionEndProp?.()
-                }
-                // `onVisualUpdate` is gone with the drag-channel mirror: drag
-                // writes the node's own values, so mirroring composed channels
-                // back into `latestValues` had nothing left to contribute.
-                // Measured before deletion (drag-single-writer 001 Step 4): ZERO
-                // mirror writes across brutalist-stage, while-drag-transforms,
-                // settle-cancel and the mobile drawer, against 350/66/2/0 writes
-                // for the same probe on the pre-001 writer.
+                onTransitionEnd: () => onDragTransitionEndProp?.()
             },
-            baselineSources: dragRuntimeOptions.baselineSources,
-            getBaseTransformValues: dragRuntimeOptions.getBaseTransformValues,
+            baselineSources: {
+                initial: initialKeyframes ?? {},
+                animate: (resolvedAnimate ?? {}) as Record<string, unknown>
+            },
+            getBaseTransformValues: getStyleTransformValues,
             getBaseTransform: () => userBaseTransform,
             transformTemplate: transformTemplateProp,
             propagation: !!dragPropagationProp,
             snapToOrigin: dragSnapToOriginProp,
-            boundMotionValues: dragRuntimeOptions.boundMotionValues
+            boundMotionValues:
+                boundMotionValues.x || boundMotionValues.y ? boundMotionValues : undefined
         }
+    }
+
+    $effect(() => {
+        if (!(element && isLoaded === 'ready' && hasDragFeatures)) return
+        const currentDragProp = untrack(() => dragProp)
+        // Only attach if drag enabled
+        if (!currentDragProp) return
+        // Clean up previous
+        teardownDrag?.()
+
+        // If constraints are provided via an element ref but it's not yet bound (null),
+        // defer attaching drag until the ref exists to avoid an unconstrained first drag.
+        if (untrack(() => dragConstraintsProp) === null) return
+
+        const opts = untrack(resolveDragOptions)
+        const controls = opts.controls
 
         // Attach and hold teardown so we can re-attach if props change
         teardownDrag = attachDrag(element, opts)
@@ -1566,6 +1562,15 @@
             teardownDrag?.()
             teardownDrag = null
         }
+    })
+
+    // Axis detection and consumer prop updates can happen while the pointer is
+    // still pressed. Update the live session in place: tearing down here removes
+    // its window listeners, and a replacement session cannot resume without a
+    // second pointerdown.
+    $effect(() => {
+        const nextOptions = resolveDragOptions()
+        if (nextOptions.axis) teardownDrag?.updateOptions(nextOptions)
     })
 
     /**
@@ -2341,6 +2346,35 @@
     // viewport scroll between two reads can never masquerade as a layout
     // delta. This is what allowed the former viewport-scroll/offscreen
     // suppression heuristic to be deleted (#437): pure scrolls fire no layout
+    const suppressObservedLayoutCommit = (): boolean => {
+        if (!element || element.hasAttribute('data-layout-size-animation')) return true
+
+        if (element.parentElement?.closest('[data-layout-size-animation]')) {
+            finishFlipAnimations(element)
+            lastRect = measureLayoutRect()
+            motionDomProjection?.seedLayout()
+            motionDomProjection?.finishAnimation()
+            return true
+        }
+
+        const hasPresenceHold = element.hasAttribute(presenceLayoutHoldAttribute)
+        const hasHiddenWaitEnter = !!element.querySelector('[data-presence-wait-hidden="true"]')
+        const hasPresencePlaceholder =
+            !!element.querySelector('[data-presence-placeholder="true"]') ||
+            !!element.parentElement?.querySelector('[data-presence-placeholder="true"]')
+        const hasSizeCorrectionTarget = !!element.querySelector('[data-svelte-motion-layout]')
+
+        if (hasPresenceHold || hasHiddenWaitEnter) return true
+        if (hasPresencePlaceholder && !hasSizeCorrectionTarget) {
+            finishFlipAnimations(element)
+            lastRect = measureLayoutRect()
+            motionDomProjection?.seedLayout()
+            motionDomProjection?.finishAnimation()
+            return true
+        }
+        return false
+    }
+
     // observers, and real layout changes now diff scroll-clean rects —
     // including offscreen, which animates like upstream instead of snapping.
     $effect(() => {
@@ -2370,7 +2404,8 @@
         if (
             previousBeforeObserverRestart &&
             lastRect &&
-            hasRectChanged(previousBeforeObserverRestart, lastRect)
+            hasRectChanged(previousBeforeObserverRestart, lastRect) &&
+            !suppressObservedLayoutCommit()
         ) {
             observerCommitSerial += 1
             emitProjectionUpdate(previousBeforeObserverRestart, lastRect)
@@ -2381,52 +2416,7 @@
         setCompositorHints(observedElement, true)
 
         const commitObservedLayout = () => {
-            if (element!.hasAttribute('data-layout-size-animation')) {
-                return
-            }
-
-            // A PROPER ANCESTOR mid size-corrected FLIP (`runBoxSizeAnimation`,
-            // e.g. a `layout` button whose width springs between "copy" and
-            // "copied") re-slots this `layout`/`layout="position"` child every
-            // frame as it grows. The child must NOT FLIP each frame (that would
-            // fight the parent), so it tracks its natural reflowed slot — but
-            // its cached layout must stay fresh, or the parent's single-step
-            // completion re-slot surfaces the whole accumulated delta as a
-            // one-frame phantom FLIP (an ~8px pop that then glides back).
-            // Seed to the current slot instead: keep the cache aligned with the
-            // in-flight animation so completion produces a zero delta and no
-            // uncompensated frame ever renders.
-            const hasSizeAnimatingAncestor = !!element!.parentElement?.closest(
-                '[data-layout-size-animation]'
-            )
-            if (hasSizeAnimatingAncestor) {
-                finishFlipAnimations(element!)
-                lastRect = measureLayoutRect()
-                motionDomProjection?.seedLayout()
-                motionDomProjection?.finishAnimation()
-                return
-            }
-
-            const hasPresenceHold = element!.hasAttribute(presenceLayoutHoldAttribute)
-            const hasHiddenWaitEnter = !!element!.querySelector(
-                '[data-presence-wait-hidden="true"]'
-            )
-            const hasPresencePlaceholder =
-                !!element!.querySelector('[data-presence-placeholder="true"]') ||
-                !!element!.parentElement?.querySelector('[data-presence-placeholder="true"]')
-            const hasSizeCorrectionTarget = !!element!.querySelector('[data-svelte-motion-layout]')
-
-            if (hasPresenceHold || hasHiddenWaitEnter) {
-                return
-            }
-
-            if (hasPresencePlaceholder && !hasSizeCorrectionTarget) {
-                finishFlipAnimations(element!)
-                lastRect = measureLayoutRect()
-                motionDomProjection?.seedLayout()
-                motionDomProjection?.finishAnimation()
-                return
-            }
+            if (suppressObservedLayoutCommit()) return
 
             const next = measureLayoutRect()
             if (!next) return
@@ -2459,6 +2449,9 @@
                 if (commitDraggedLayoutChange(previous)) return
 
                 const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
+                const hasSizeCorrectionTarget = !!element!.querySelector(
+                    '[data-svelte-motion-layout]'
+                )
                 const shouldUseSizeCorrectedFallback =
                     transforms.shouldScale && hasSizeCorrectionTarget
 

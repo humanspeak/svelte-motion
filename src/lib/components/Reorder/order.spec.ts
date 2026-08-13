@@ -1,49 +1,11 @@
 import type { Box } from '$lib/utils/projection'
 import { describe, expect, it } from 'vitest'
 import type { ItemData } from './context'
-import { applyOrderSwap, removeOrderEntry, upsertOrderEntry } from './order'
+import { applyOrderSwap } from './order'
 
 const box = (xMin: number, xMax: number, yMin: number, yMax: number): Box => ({
     x: { min: xMin, max: xMax },
     y: { min: yMin, max: yMax }
-})
-
-describe('upsertOrderEntry', () => {
-    it('inserts entries in registration order', () => {
-        const order: ItemData<string>[] = []
-        upsertOrderEntry(order, 'b', box(100, 200, 0, 100))
-        upsertOrderEntry(order, 'a', box(0, 100, 0, 100))
-        upsertOrderEntry(order, 'c', box(0, 100, 100, 200))
-        expect(order.map((entry) => entry.value)).toEqual(['b', 'a', 'c'])
-    })
-
-    it('updates an existing full box in place', () => {
-        const order: ItemData<string>[] = []
-        upsertOrderEntry(order, 'a', box(0, 100, 0, 100))
-        upsertOrderEntry(order, 'b', box(100, 200, 0, 100))
-        const moved = box(0, 100, 100, 200)
-        upsertOrderEntry(order, 'a', moved)
-        expect(order).toHaveLength(2)
-        expect(order.map((entry) => entry.value)).toEqual(['a', 'b'])
-        expect(order[0].layout).toEqual(moved)
-    })
-})
-
-describe('removeOrderEntry', () => {
-    it('removes the matching entry', () => {
-        const order: ItemData<string>[] = []
-        upsertOrderEntry(order, 'a', box(0, 100, 0, 100))
-        upsertOrderEntry(order, 'b', box(100, 200, 0, 100))
-        removeOrderEntry(order, 'a')
-        expect(order.map((entry) => entry.value)).toEqual(['b'])
-    })
-
-    it('is a no-op for unknown values', () => {
-        const order: ItemData<string>[] = []
-        upsertOrderEntry(order, 'a', box(0, 100, 0, 100))
-        removeOrderEntry(order, 'z')
-        expect(order).toHaveLength(1)
-    })
 })
 
 describe('applyOrderSwap', () => {

@@ -13,6 +13,8 @@ const isSeparated = (a: Axis, b: Axis): boolean => a.max <= b.min || b.max <= a.
  * @returns The detected one- or two-dimensional reorder axis.
  */
 export const detectAxis = (layouts: Box[]): ReorderAxis => {
+    if (layouts.some(({ x, y }) => x.max <= x.min || y.max <= y.min)) return 'y'
+
     let x = false
     let y = false
 

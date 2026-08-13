@@ -22,9 +22,8 @@ test.describe('reorder/axis-auto', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/tests/reorder/axis-auto?@isPlaywright=true')
         await page.getByTestId('horizontal-red').waitFor({ state: 'visible' })
-        // Auto-axis detection has no DOM readiness signal. Give layout measurement
-        // and the resulting drag rewire time to replace the safe initial `y` axis.
-        await page.waitForTimeout(1000)
+        await expect(page.getByTestId('horizontal-group')).toHaveAttribute('data-reorder-axis', 'x')
+        await expect(page.getByTestId('vertical-group')).toHaveAttribute('data-reorder-axis', 'y')
     })
 
     test('detects a horizontal row and locks out perpendicular drift', async ({ page }) => {

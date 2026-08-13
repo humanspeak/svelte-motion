@@ -1,30 +1,4 @@
-import type { Box } from '$lib/utils/projection'
 import type { ItemData } from './context'
-
-/**
- * Record or refresh an item's complete measured slot in registration
- * order. Mutates `order` in place.
- */
-export const upsertOrderEntry = <V>(order: ItemData<V>[], value: V, layout: Box): void => {
-    const index = order.findIndex((entry) => entry.value === value)
-    if (index !== -1) {
-        order[index].layout = layout
-    } else {
-        order.push({ value, layout })
-    }
-}
-
-/**
- * Drop an item's entry from the working order when it unmounts.
- * Svelte-specific counterpart to the rebuild-per-render behaviour that
- * makes this implicit upstream.
- */
-export const removeOrderEntry = <V>(order: ItemData<V>[], value: V): void => {
-    const index = order.findIndex((entry) => entry.value === value)
-    if (index !== -1) {
-        order.splice(index, 1)
-    }
-}
 
 /**
  * Translate an arbitrary measured reorder onto the corresponding

@@ -77,6 +77,75 @@ describe('Reorder.Group / Reorder.Item', () => {
         )
     })
 
+    it('keeps the active pointer session alive when the group axis changes', async () => {
+        const result = render(ReorderHarness, {
+            props: { axis: 'x', values: [0, 1, 2] }
+        })
+        const item = await screen.findByTestId('item-0')
+        await vi.advanceTimersByTimeAsync(1000)
+
+        item.dispatchEvent(
+            new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 22 })
+        )
+        window.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: 40, clientY: 30, pointerId: 22 })
+        )
+
+        const visualElement = visualElementStore.get(item)
+        expect(visualElement?.getValue('x')?.get()).toBe(30)
+        expect(visualElement?.getValue('y')?.get() ?? 0).toBe(0)
+
+        await result.rerender({ axis: 'xy', values: [0, 1, 2] })
+        await vi.advanceTimersByTimeAsync(0)
+
+        window.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: 60, clientY: 60, pointerId: 22 })
+        )
+        expect(item.dataset.svelteMotionDragActive).toBe('true')
+        expect(visualElement?.getValue('x')?.get()).toBe(50)
+        expect(visualElement?.getValue('y')?.get()).toBe(50)
+
+        window.dispatchEvent(
+            new PointerEvent('pointercancel', { clientX: 60, clientY: 60, pointerId: 22 })
+        )
+    })
+
+    it('continues proposing swaps when a controlled consumer rejects one', async () => {
+        const onReorder = vi.fn()
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+            this: HTMLElement
+        ) {
+            if (!this.dataset.testid?.startsWith('item-')) return new DOMRect()
+            const index = Array.from(this.parentElement?.children ?? []).indexOf(this)
+            return new DOMRect(index * 100, 0, 100, 100)
+        })
+
+        render(ReorderHarness, {
+            props: { axis: 'x', values: [0, 1, 2], onReorder }
+        })
+        const item = await screen.findByTestId('item-0')
+        await vi.advanceTimersByTimeAsync(1000)
+
+        item.dispatchEvent(
+            new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 23 })
+        )
+        window.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: 70, clientY: 10, pointerId: 23 })
+        )
+        expect(onReorder).toHaveBeenCalledOnce()
+        expect(onReorder).toHaveBeenLastCalledWith([1, 0, 2])
+
+        await vi.advanceTimersByTimeAsync(20)
+        window.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: 71, clientY: 10, pointerId: 23 })
+        )
+        expect(onReorder).toHaveBeenCalledTimes(2)
+
+        window.dispatchEvent(
+            new PointerEvent('pointercancel', { clientX: 71, clientY: 10, pointerId: 23 })
+        )
+    })
+
     it('accepts axis="xy" and enables two-axis dragging', async () => {
         render(ReorderHarness, { props: { axis: 'xy' } })
         const item = await screen.findByTestId('item-0')
@@ -236,6 +305,40 @@ describe('Reorder.Group / Reorder.Item', () => {
             width: 100,
             height: 100
         })
+    })
+
+    it('suppresses keyed-restart projection while the item is size-animating', async () => {
+        const projectionCommit = vi.spyOn(
+            MotionDomProjectionAdapter.prototype,
+            'commitObservedLayoutChange'
+        )
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+            this: HTMLElement
+        ) {
+            if (!this.dataset.testid?.startsWith('item-')) return new DOMRect()
+            const index = Array.from(this.parentElement?.children ?? []).indexOf(this)
+            return new DOMRect(index * 100, 0, 100, 100)
+        })
+
+        const result = render(ReorderHarness, {
+            props: {
+                axis: 'x',
+                values: [0, 1, 2],
+                itemSizeAnimation: true
+            }
+        })
+        await screen.findByTestId('item-0')
+        await vi.advanceTimersByTimeAsync(1000)
+        projectionCommit.mockClear()
+
+        await result.rerender({
+            axis: 'x',
+            values: [1, 0, 2],
+            itemSizeAnimation: true
+        })
+        await vi.advanceTimersByTimeAsync(1000)
+
+        expect(projectionCommit).not.toHaveBeenCalled()
     })
 
     it('respects the `as` prop on both group and item', async () => {

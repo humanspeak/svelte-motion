@@ -66,12 +66,14 @@
     }
 
     /**
-     * Swap-in-flight guard: set when `onReorder` fires, released one
-     * frame after the new `values` reach us, by which point the
-     * MutationObserver-driven re-measure has refreshed `order`. Blocks
-     * `checkReorder` from running against stale slots mid-swap.
+     * Swap-in-flight guard: set when `onReorder` fires and released on
+     * the next frame, after an accepted synchronous values update has
+     * patched the keyed children. Releasing independently of `values`
+     * also lets controlled consumers reject a proposed reorder without
+     * permanently disabling the gesture.
      */
     let isReordering = false
+    let reorderingFrame: number | null = null
 
     setReorderContext<V>({
         get axis() {
@@ -98,6 +100,10 @@
             if (order !== newOrder) {
                 isReordering = true
                 onReorder(applyOrderSwap(values, order, newOrder))
+                reorderingFrame = requestAnimationFrame(() => {
+                    isReordering = false
+                    reorderingFrame = null
+                })
             }
         },
         getGroupElement: () => ref ?? null
@@ -109,11 +115,10 @@
             if (!valuesSet.has(value)) itemLayouts.delete(value)
         })
         updateDetectedAxis()
+    })
 
-        const frame = requestAnimationFrame(() => {
-            isReordering = false
-        })
-        return () => cancelAnimationFrame(frame)
+    $effect(() => () => {
+        if (reorderingFrame !== null) cancelAnimationFrame(reorderingFrame)
     })
 
     /**
@@ -128,6 +133,13 @@
     )
 </script>
 
-<MotionContainer bind:ref tag={as} {...rest} style={groupStyle} {motionValueChild}>
+<MotionContainer
+    bind:ref
+    tag={as}
+    {...rest}
+    style={groupStyle}
+    data-reorder-axis={axis}
+    {motionValueChild}
+>
     {@render childSnippet?.()}
 </MotionContainer>

@@ -56,7 +56,7 @@
             tag: 'MOTION 13',
             title: { prefix: 'launch bright, ', accent: 'land exact', end: '.' },
             description:
-                'A luminous vector packet crosses a compositor-friendly transform track, blooms at its dock, and fades to a committed final state. Live telemetry reports the browser’s actual opacity, transform, and fill so replay and reverse make stale final styles impossible to miss.',
+                'Motion 12.43 introduced accelerated SVG style animations; Motion 13 fixed their final-style restore. A luminous vector packet crosses a compositor-friendly transform track, blooms at its dock, and fades to a committed final state. Live telemetry reports the browser’s actual opacity, transform, and fill so replay and reverse make stale CSS impossible to miss.',
             snippet: signalDockSection,
             codeSnippet: signalDockCode,
             notes: signalDockNotes,
@@ -89,7 +89,8 @@
             <Gauge />
             <span>
                 Telemetry reads <em>computed</em> opacity, transform, and fill from the SVG node—not merely
-                the intended animation state.
+                the intended animation state. Opacity and transform are the accelerated CSS channels;
+                fill is an SVG paint attribute shown alongside them, not an acceleration claim.
             </span>
         </li>
         <li>

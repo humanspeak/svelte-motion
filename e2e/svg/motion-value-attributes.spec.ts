@@ -68,7 +68,29 @@ test.describe('SVG MotionValue attributes', () => {
 
         await toggle.click()
         await expect
-            .poll(() => target.evaluate((element) => getComputedStyle(element).opacity))
+            .poll(
+                () =>
+                    target.evaluate((element) =>
+                        element
+                            .getAnimations()
+                            .flatMap(
+                                (animation) =>
+                                    (animation.effect as KeyframeEffect | null)?.getKeyframes() ??
+                                    []
+                            )
+                    ),
+                { timeout: 250 }
+            )
+            .toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ opacity: expect.any(String) }),
+                    expect.objectContaining({ transform: expect.any(String) })
+                ])
+            )
+        await expect
+            .poll(() => target.evaluate((element) => getComputedStyle(element).opacity), {
+                timeout: 800
+            })
             .toBe('0')
         await expect(target).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 50, 0)')
         await expect(target).toHaveCSS('fill', 'rgb(168, 85, 247)')
@@ -91,6 +113,44 @@ test.describe('SVG MotionValue attributes', () => {
             'matrix(1, 0, 0, 1, 0, 0)'
         )
         await expect(page.getByTestId('accelerated-svg-fill')).toHaveText('rgb(34, 197, 94)')
+    })
+
+    test('an interrupted accelerated SVG animation cannot commit a stale destination', async ({
+        page
+    }) => {
+        await page.goto(ROUTE)
+        await page.waitForFunction(() => window.MotionIsMounted === true)
+
+        const target = page.getByTestId('accelerated-svg')
+        const toggle = page.getByTestId('toggle-svg-final')
+        await toggle.click()
+        await page.waitForTimeout(60)
+        await toggle.click()
+
+        await expect(target).toHaveCSS('opacity', '1', { timeout: 800 })
+        await expect(target).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)', {
+            timeout: 800
+        })
+        await page.waitForTimeout(350)
+        await expect(target).toHaveCSS('opacity', '1')
+        await expect(target).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)')
+    })
+
+    test('claims and updates MotionValues for arbitrary SVG prop names', async ({ page }) => {
+        await page.goto(ROUTE)
+        const target = page.getByTestId('arbitrary-mv-svg')
+        await expect(target).toBeVisible()
+
+        await expect(target).not.toHaveAttribute('fill', '[object Object]')
+        await expect(target).not.toHaveAttribute('stroke', '[object Object]')
+        await expect(target).not.toHaveAttribute('opacity', '[object Object]')
+        await expect(target).not.toHaveAttribute('transform', '[object Object]')
+
+        await page.getByTestId('update-arbitrary-svg-values').click()
+        await expect(target).toHaveCSS('fill', 'rgb(168, 85, 247)')
+        await expect(target).toHaveCSS('stroke', 'rgb(250, 204, 21)')
+        await expect(target).toHaveCSS('opacity', '0.5')
+        await expect(target).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 24, 0)')
     })
 
     test('never stringifies a MotionValue into the DOM', async ({ page }) => {

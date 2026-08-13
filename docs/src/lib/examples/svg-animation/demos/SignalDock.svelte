@@ -8,7 +8,7 @@
     let opacity = $state('1')
     let transform = $state('none')
     let fill = $state('rgb(36, 119, 104)')
-    let packetElement = $state<SVGGElement>()
+    let packetElement = $state<HTMLElement>()
 
     const isDocked = $derived(docked)
     const duration = $derived(reducedMotion.current ? 0 : 0.9)
@@ -122,8 +122,9 @@
                 }}
             />
             <motion.g
-                bind:this={packetElement}
+                bind:ref={packetElement}
                 data-signal-packet
+                data-testid="signal-packet"
                 initial={false}
                 animate={{
                     opacity: isDocked ? 0 : 1,
@@ -146,9 +147,11 @@
         </svg>
 
         <div class="telemetry" aria-live="polite">
-            <div><span>opacity</span><strong>{opacity}</strong></div>
-            <div><span>transform</span><strong>{transform}</strong></div>
-            <div><span>fill</span><strong>{fill}</strong></div>
+            <div><span>opacity</span><strong data-testid="signal-opacity">{opacity}</strong></div>
+            <div>
+                <span>transform</span><strong data-testid="signal-transform">{transform}</strong>
+            </div>
+            <div><span>fill</span><strong data-testid="signal-fill">{fill}</strong></div>
             <div><span>commit</span><strong>{isDocked ? 'FINAL' : 'SOURCE'}</strong></div>
         </div>
     </div>

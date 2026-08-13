@@ -14,6 +14,27 @@ test.describe('reorder/grid', () => {
         const cx = before.x + before.width / 2
         const cy = before.y + before.height / 2
 
+        await page.evaluate(() => {
+            const probe = { b: 0, c: 0, d: 0, e: 0, running: true }
+            ;(window as Window & { __gridFlipProbe?: typeof probe }).__gridFlipProbe = probe
+
+            const sample = () => {
+                for (const value of ['b', 'c', 'd', 'e'] as const) {
+                    const element = document.querySelector<HTMLElement>(
+                        `[data-testid="tile-${value}"]`
+                    )
+                    if (!element) throw new Error(`missing tile-${value}`)
+                    const transform = getComputedStyle(element).transform
+                    if (transform !== 'none') {
+                        const matrix = new DOMMatrixReadOnly(transform)
+                        probe[value] = Math.max(probe[value], Math.hypot(matrix.m41, matrix.m42))
+                    }
+                }
+                if (probe.running) requestAnimationFrame(sample)
+            }
+            requestAnimationFrame(sample)
+        })
+
         await page.mouse.move(cx, cy)
         await page.mouse.down()
         for (let i = 1; i <= 16; i++) {
@@ -22,13 +43,20 @@ test.describe('reorder/grid', () => {
         }
 
         await expect(page.getByTestId('order')).toHaveText('b,c,d,e,a,f')
-        const siblingTransforms = await page
-            .getByTestId('grid-group')
-            .locator('[data-testid^="tile-"]:not([data-testid="tile-a"])')
-            .evaluateAll((elements) =>
-                elements.map((element) => getComputedStyle(element).transform)
-            )
-        expect(siblingTransforms.some((transform) => transform !== 'none')).toBe(true)
+        const displacedTranslations = await page.evaluate(() => {
+            const probeWindow = window as Window & {
+                __gridFlipProbe?: { b: number; c: number; d: number; e: number; running: boolean }
+            }
+            if (!probeWindow.__gridFlipProbe) throw new Error('missing grid FLIP probe')
+            probeWindow.__gridFlipProbe.running = false
+            return probeWindow.__gridFlipProbe
+        })
+        for (const value of ['b', 'c', 'd', 'e'] as const) {
+            expect(
+                displacedTranslations[value],
+                `tile-${value} should receive its own FLIP translation`
+            ).toBeGreaterThan(1)
+        }
 
         await page.mouse.up()
         await page.waitForTimeout(800)

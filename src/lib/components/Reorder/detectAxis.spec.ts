@@ -13,6 +13,10 @@ describe('detectAxis', () => {
         expect(detectAxis([box(0, 100, 0, 100)])).toBe('y')
     })
 
+    it('keeps the safe y default while boxes have no measurable size', () => {
+        expect(detectAxis([box(0, 0, 0, 0), box(0, 0, 0, 0)])).toBe('y')
+    })
+
     it('detects a vertical stack', () => {
         expect(detectAxis([box(0, 100, 0, 100), box(0, 100, 110, 210)])).toBe('y')
     })

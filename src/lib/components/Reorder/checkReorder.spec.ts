@@ -22,6 +22,12 @@ const horizontalOrder = () => [
     item('c', box(200, 300, 0, 100))
 ]
 
+const rtlHorizontalOrder = () => [
+    item('a', box(200, 300, 0, 100)),
+    item('b', box(100, 200, 0, 100)),
+    item('c', box(0, 100, 0, 100))
+]
+
 const gridOrder = () => [
     item('a', box(0, 100, 0, 100)),
     item('b', box(100, 200, 0, 100)),
@@ -97,12 +103,11 @@ describe('checkReorder', () => {
         expect(beforeFirst).toBe(order)
     })
 
-    it('reverses horizontal insertion in RTL for x', () => {
-        const order = horizontalOrder()
-        const ltr = checkReorder(order, 'a', { x: 51, y: 0 }, { x: 1, y: 0 }, 'x', 'ltr')
-        const rtl = checkReorder(order, 'a', { x: -51, y: 0 }, { x: -1, y: 0 }, 'x', 'rtl')
-        expect(ltr.map((entry) => entry.value)).toEqual(['b', 'a', 'c'])
-        expect(rtl.map((entry) => entry.value)).toEqual(['b', 'a', 'c'])
+    it('follows real right-to-left geometry for a horizontal list', () => {
+        const order = rtlHorizontalOrder()
+        const next = checkReorder(order, 'a', { x: -51, y: 0 }, { x: -1, y: 0 }, 'x', 'rtl')
+        expect(next.map((entry) => entry.value)).toEqual(['b', 'a', 'c'])
+        expect(checkReorder(order, 'a', { x: -49, y: 0 }, { x: -1, y: 0 }, 'x', 'rtl')).toBe(order)
     })
 
     it('reverses cross-row insertion in RTL for xy', () => {

@@ -31,13 +31,16 @@ export const moveItem = <T>([...arr]: T[], fromIndex: number, toIndex: number): 
  * forward, `layout.min + offset` when moving backward) must cross the
  * neighbour's center before a swap fires — so a swap happens exactly
  * when the dragged item covers more than half of its neighbour.
- * Velocity supplies the direction; a stationary pointer (`velocity ===
- * 0`) never reorders.
+ * Velocity supplies the direction for one-dimensional lists. Wrapped
+ * layouts use the dragged item's geometric center and can therefore
+ * reorder without a non-zero velocity sample.
  *
  * Returns the same `order` array reference when nothing changes, so
  * callers can detect a swap with an identity check.
  *
- * Direct port of framer-motion `Reorder/utils/check-reorder.ts`.
+ * Port of framer-motion `Reorder/utils/check-reorder.ts`. Motion 13.1
+ * only applies `direction` to wrapped layouts; the single-axis branch
+ * also applies it here so real RTL geometry follows visual drag direction.
  */
 export const checkReorder = <V>(
     order: ItemData<V>[],
