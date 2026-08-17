@@ -5,11 +5,12 @@
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
-    import { Gauge, Layers, Zap } from '@lucide/svelte'
+    import { ArrowUpToLine, Gauge, Layers, ListOrdered, Zap } from '@lucide/svelte'
     import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import LayoutDependencyDefault from '$lib/examples/layout-dependency/demos/Default.svelte'
+    import LayoutDependencyKeyedList from '$lib/examples/layout-dependency/demos/KeyedList.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
@@ -49,6 +50,22 @@
                 { k: 'mode', v: 'live' }
             ],
             sourceUrl: `${SOURCE_URL}layout-dependency/demos/Default.svelte`
+        },
+        {
+            figId: 'FIG-002',
+            tag: 'LAYOUT',
+            title: { prefix: 'keyed list, ', accent: 'what to gate on', end: '.' },
+            description:
+                'Rows are `layout="position"` in a keyed `{#each}` sorted by activity. Gated on a per-row field, only the bumped row animates and the rows it displaces jump — upstream parity. Gate on the row index and every moved row slides.',
+            snippet: keyedListSection,
+            codeSnippet: keyedListCode,
+            notes: keyedListNotes,
+            barCells: [
+                { k: 'api', v: 'layoutDependency' },
+                { k: 'input', v: 'keyed each' },
+                { k: 'mode', v: 'live' }
+            ],
+            sourceUrl: `${SOURCE_URL}layout-dependency/demos/KeyedList.svelte`
         }
     ]
 </script>
@@ -88,6 +105,48 @@
                 'layout-dependency/demos/Default.svelte',
                 'layout-dependency-default',
                 'Default.svelte'
+            )
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#snippet keyedListSection()}
+    <LayoutDependencyKeyedList />
+{/snippet}
+{#snippet keyedListNotes()}
+    <ul>
+        <li>
+            <ArrowUpToLine />
+            <span>
+                Bumping a row re-sorts the list. With <code>layoutDependency={'{row.ts}'}</code>
+                only that row's dependency changed, so only it FLIPs — the displaced rows jump, exactly
+                as upstream <code>MeasureLayout</code> behaves.
+            </span>
+        </li>
+        <li>
+            <ListOrdered />
+            <span>
+                Switch to <code>layoutDependency={'{i}'}</code>: the index changes for every row
+                whose slot changed, so every moved row animates and untouched rows stay gated.
+            </span>
+        </li>
+        <li>
+            <Layers />
+            <span>
+                Don't need the gate in a list? Omit <code>layoutDependency</code> and every reorder animates
+                every row.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet keyedListCode()}
+    <CodeReferenceV2
+        samples={[
+            demoCodeSample(
+                'layout-dependency/demos/KeyedList.svelte',
+                'layout-dependency-keyed-list',
+                'KeyedList.svelte'
             )
         ]}
         columns={1}

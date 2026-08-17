@@ -59,19 +59,65 @@ Reach for `layoutDependency` when a `layout` element:
 - only changes layout box on a specific, known signal.
 
 Pass a value that changes **exactly when the layout should be re-measured** —
-commonly a counter, a sorted key, or the array length / order of a list.
-
-```svelte
-<motion.ul layout layoutDependency={items.length}>
-  {#each items as item (item.id)}
-    <motion.li layout layoutDependency={items.length}>{item.label}</motion.li>
-  {/each}
-</motion.ul>
-```
+commonly a counter, a sort key, or the element's position in a list.
 
 Any defined value gates — including falsy ones like `0`, `''`, or `null`. Leave
 it `undefined` (the default) to keep framer-motion's "measure on every render"
 behavior.
+
+## What the gate blocks
+
+While `layoutDependency` is set, **only a change to that value** re-measures the
+element. This matches upstream `MeasureLayout`, which snapshots when `drag` is
+set, the dependency changed, or the element's **own** presence flipped — and
+never otherwise. Layout changes that arrive any other way do **not** animate a
+gated element, and don't fire its `onProjectionUpdate` / `onLayoutMeasure`; it
+jumps to its new slot:
+
+- a sibling reorder that re-slots it,
+- a resize or a parent style change that moves it,
+- a sibling's `AnimatePresence` enter/exit,
+- an `AnimatePresence mode="wait"` child swap *inside* a gated `layout` parent
+  (that's the child's presence, not the parent's).
+
+Two escape hatches, both from upstream: `drag` opts the element out of gating
+entirely, and the element's own `isPresent` flip (an owned
+`<AnimatePresence present={…}>{#snippet child()}…` exit or re-entry) still
+snapshots it.
+
+### What the gate costs
+
+The parity is *behavioral*. Upstream can skip a gated node entirely because
+React lets it snapshot before the DOM commits; Svelte reconciles a keyed
+`{#each}` before a child can look. So a gated element still refreshes its
+cached slot with **one silent DOM read** when an observed change re-slots it
+(no snapshot, no FLIP, no callbacks) — that cached slot is the origin its next
+dependency-driven FLIP animates from. Unrelated renders cost a gated element
+nothing. Observers are shared per parent/ancestor, so a 1,000-row list runs one
+observer per target, not one per row.
+
+## Keyed lists
+
+In a keyed `{#each}` the dependency must change for **every row that moves**.
+Bind it to the row's index (or sort position), not to a field of the row's data:
+
+```svelte
+{#each rows as row, i (row.id)}
+  <!-- ✅ index changes for exactly the rows whose slot changed -->
+  <motion.li layout="position" layoutDependency={i}>{row.label}</motion.li>
+{/each}
+```
+
+```svelte
+{#each rows as row (row.id)}
+  <!-- ❌ only the row whose timestamp changed animates; the rows it
+       displaces have an unchanged dependency and jump -->
+  <motion.li layout="position" layoutDependency={row.updatedAt}>{row.label}</motion.li>
+{/each}
+```
+
+If you don't need the gate, simply omit `layoutDependency` and every row
+animates on every reorder.
 
 ## API Reference
 
