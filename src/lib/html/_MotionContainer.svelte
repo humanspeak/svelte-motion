@@ -66,6 +66,7 @@
         runLayoutSizeAnimation,
         finishFlipAnimations,
         setCompositorHints,
+        isLayoutMeasurementGated,
         observeLayoutChanges,
         selectLayoutDependencies,
         sizeCorrectionSeedEvent,
@@ -633,10 +634,13 @@
     // `layoutScroll` offsets folded in. A viewport scroll between the
     // 'snapshot' (pre-patch) and 'measure' (post-patch) phases cancels
     // exactly, so it can never masquerade as a layout delta.
-    const measureLayoutRect = (phase: 'snapshot' | 'measure' = 'measure'): RectLike | null =>
+    const measureLayoutRect = (
+        phase: 'snapshot' | 'measure' = 'measure',
+        options?: { silent?: boolean }
+    ): RectLike | null =>
         // Null without a window (SSR) — every caller lives inside a
         // client-only effect, so the null branch is never animated against.
-        motionDomProjection?.measurePageRect(phase) ?? null
+        motionDomProjection?.measurePageRect(phase, options) ?? null
 
     // Get current presence depth (0 = direct child of AnimatePresence, undefined = not in AnimatePresence)
     const presenceDepth = getPresenceDepth()
@@ -2165,23 +2169,40 @@
     // committed — so it skips the duplicate re-commit that would otherwise
     // restart the FLIP from origin and double-fire `onProjectionUpdate`.
     let observerCommitSerial = 0
+    // Upstream `MeasureLayout.getSnapshotBeforeUpdate` snapshots only when
+    // `drag || layoutDependency changed || layoutDependency === undefined ||
+    // own presence flipped`; otherwise the node is never marked layout-dirty
+    // and `updateLayout()` skips it (create-projection-node.ts). So while the
+    // gate is closed, NOTHING re-measures this element — not a render, and not
+    // a DOM change the observer path would otherwise catch (a sibling reorder
+    // that re-slots it, a resize, a sibling's presence toggle). #470.
+    const layoutMeasurementGated = $derived(
+        isLayoutMeasurementGated(layoutDependencyProp, dragProp)
+    )
     // Reactive deps the measure effects read to decide when to re-snapshot and
-    // FLIP. When `layoutDependency` is set, gate measurement on *only* that
-    // value so frequent renders that touch class/style/etc. no longer force a
-    // re-measure. The fallback list stays a thunk so those props are tracked
-    // only when gating is off. See `selectLayoutDependencies` for the contract.
+    // FLIP. When gated, track *only* `layoutDependency` so frequent renders that
+    // touch class/style/etc. no longer force a re-measure. The fallback list
+    // stays a thunk so those props are tracked only when gating is off. See
+    // `selectLayoutDependencies` for the contract.
     //
-    // Drag escape hatch: upstream `MeasureLayout` also forces a snapshot while a
-    // drag is active, regardless of `layoutDependency` (MeasureLayout.tsx:92).
-    // We mirror that by ignoring the gate while `drag` is set, so a draggable
-    // `layout` element keeps measuring as the user moves it.
-    const trackLayoutProjectionDependencies = () =>
-        selectLayoutDependencies(dragProp ? undefined : layoutDependencyProp, () => [
-            classProp,
-            styleProp,
-            scopedLayoutId,
-            mergedTransition
-        ])
+    // Drag escape hatch: upstream `MeasureLayout` forces a snapshot whenever the
+    // `drag` prop is set, regardless of `layoutDependency` (MeasureLayout.tsx:92).
+    // `isLayoutMeasurementGated` folds that in, so a draggable `layout` element
+    // keeps measuring like an ungated one.
+    //
+    // Own-presence escape hatch: upstream also snapshots when THIS element's
+    // `isPresent` flips (MeasureLayout.tsx `prevProps.isPresent !== isPresent`)
+    // — exit start and re-entry — regardless of the dependency. Read the
+    // PresenceChild flag here so that flip re-runs the measure effects (and,
+    // via the pending reactive commit, opens the observer gate for exactly
+    // that update). A sibling's presence change is NOT this element's flip.
+    const trackLayoutProjectionDependencies = () => {
+        void presenceChildContext?.isPresent
+        return selectLayoutDependencies(
+            layoutMeasurementGated ? layoutDependencyProp : undefined,
+            () => [classProp, styleProp, scopedLayoutId, mergedTransition]
+        )
+    }
 
     $effect.pre(() => {
         const shouldProject = element && layoutProp && isLoaded === 'ready' && hasLayoutFeatures
@@ -2274,12 +2295,24 @@
             if (!commitDraggedLayoutChange(prev)) {
                 motionDomProjection?.commitObservedLayoutChange(prev)
             }
+            return
         }
         // No delta from THIS path's snapshot: leave `lastRect` alone. The
         // snapshot may have raced the DOM patch (measured post-patch, so
         // prev === next), and overwriting the cache here would poison the
         // observer path's diff — it would compare new-vs-new and skip the
         // FLIP entirely (an intermittent snap, ordering-dependent).
+        //
+        // Still close the update: upstream pairs EVERY getSnapshotBeforeUpdate
+        // `willUpdate()` with a componentDidUpdate `root.didUpdate()`, and the
+        // root update is what clears the projection snapshot (`updateSnapshot`
+        // keeps an existing one). Without this, the snapshot the `$effect.pre`
+        // took lingers, and the NEXT root update — triggered by any sibling's
+        // commit, possibly long after this element was re-slotted without
+        // measuring (a `layoutDependency`-gated row displaced by a keyed
+        // reorder, #470) — diffs that stale snapshot against the fresh layout
+        // and animates a move that never happened in this update.
+        motionDomProjection?.didUpdate()
     }
 
     $effect(() => {
@@ -2399,13 +2432,27 @@
             observerRestartElement === observedElement ? observerRestartRect : null
         observerRestartRect = null
         observerRestartElement = null
-        motionDomProjection?.seedLayout()
-        lastRect = measureLayoutRect()
+        // One read seeds the projection AND primes the observer cache
+        // (`seedLayout()` + `measureLayoutRect()` would read the box twice —
+        // and a keyed reorder restarts this effect for every moved row).
+        // Loud on purpose: this is the mount / restart slot `onLayoutMeasure`
+        // consumers (Reorder.Item) register from.
+        lastRect = motionDomProjection?.refreshLayout() ?? measureLayoutRect()
+        // Upstream gate (#470): a `layoutDependency`-gated node only snapshots
+        // when the dependency changed in THIS update (MeasureLayout.tsx:93-100
+        // `prevProps.layoutDependency !== layoutDependency`). A pending reactive
+        // commit is exactly that signal here — the `$effect.pre` that tracks the
+        // dependency queued it. Read untracked: flipping the gate must not tear
+        // down and re-wire the observers (that restart would itself look like a
+        // keyed move via `observerRestartRect`).
+        const isObservedCommitGated = () =>
+            untrack(() => layoutMeasurementGated) && reactiveCommitPrevious === null
         if (
             previousBeforeObserverRestart &&
             lastRect &&
             hasRectChanged(previousBeforeObserverRestart, lastRect) &&
-            !suppressObservedLayoutCommit()
+            !suppressObservedLayoutCommit() &&
+            !isObservedCommitGated()
         ) {
             observerCommitSerial += 1
             emitProjectionUpdate(previousBeforeObserverRestart, lastRect)
@@ -2415,8 +2462,30 @@
         }
         setCompositorHints(observedElement, true)
 
+        // Gated on `layoutDependency` with no dependency (or own-presence)
+        // change in this update: upstream takes no snapshot, so the node is
+        // never layout-dirty and skips measure, FLIP, and every layout
+        // listener — it jumps to its new slot (a sibling reorder, a resize, a
+        // sibling's presence toggle). Mirror that: no FLIP, no
+        // `onProjectionUpdate`, no `onLayoutMeasure`. The cache still tracks
+        // the live slot (Svelte patches the DOM before the dependency's
+        // `$effect.pre` can snapshot a keyed move, so `lastRect` is the only
+        // pre-move origin a later dependency change can FLIP from), and the
+        // projection's own layout is re-seeded so later animation targets the
+        // box the element actually has.
+        const refreshGatedLayoutCache = () => {
+            // ONE DOM read: seeds the projection layout and returns the rect
+            // (`measurePageRect` + `seedLayout` would read the box twice).
+            const next = motionDomProjection?.refreshLayout({ silent: true }) ?? null
+            if (next) lastRect = next
+        }
+
         const commitObservedLayout = () => {
             if (suppressObservedLayoutCommit()) return
+            if (isObservedCommitGated()) {
+                refreshGatedLayoutCache()
+                return
+            }
 
             const next = measureLayoutRect()
             if (!next) return
@@ -2471,6 +2540,16 @@
                     viewportScrolledDuringHold?: boolean
                 }>
             ).detail
+            // A wait-mode child swap is a CHILD's presence change, not this
+            // parent's dependency or own presence — upstream never
+            // `willUpdate()`s the parent for it, so a gated parent must not
+            // FLIP from the held box to its natural size (#470 review).
+            // Decided before any DOM read: the gated branch needs neither the
+            // viewport rect nor the held `previousRect`.
+            if (isObservedCommitGated()) {
+                refreshGatedLayoutCache()
+                return
+            }
             const previous = detail?.previousRect
             const viewportRect = element!.getBoundingClientRect()
             const next = measureLayoutRect()

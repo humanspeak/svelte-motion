@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
     computeFlipTransforms,
+    isLayoutMeasurementGated,
     measureRect,
     observeLayoutChanges,
     runLayoutSizeAnimation,
@@ -319,7 +320,9 @@ describe('utils/layout', () => {
             }
             observe(target: Element, options?: unknown) {
                 resizeObserveCalls.push({ target, options })
-                this._cb([], this as unknown as ResizeObserver)
+                // Real ResizeObserver delivers one entry per target; the shared
+                // registry routes by `entry.target`.
+                this._cb([{ target } as ResizeObserverEntry], this as unknown as ResizeObserver)
             }
             disconnect() {}
         }
@@ -374,6 +377,65 @@ describe('utils/layout', () => {
         vi.unstubAllGlobals()
     })
 
+    it('observeLayoutChanges: siblings share ONE observer per (target, options) and the last release disconnects', () => {
+        const parent = document.createElement('div')
+        const a = document.createElement('div')
+        const b = document.createElement('div')
+        parent.append(a, b)
+        document.body.appendChild(parent)
+
+        const instances: Array<{
+            target: Node
+            options: MutationObserverInit
+            disconnected: boolean
+        }> = []
+        class CountingMutationObserver {
+            private record?: { target: Node; options: MutationObserverInit; disconnected: boolean }
+            constructor(private readonly _cb: MutationCallback) {}
+            observe(target: Node, options: MutationObserverInit) {
+                this.record = { target, options, disconnected: false }
+                instances.push(this.record)
+            }
+            disconnect() {
+                if (this.record) this.record.disconnected = true
+            }
+        }
+        class NoopResizeObserver {
+            observe() {}
+            unobserve() {}
+            disconnect() {}
+        }
+        vi.stubGlobal('MutationObserver', CountingMutationObserver)
+        vi.stubGlobal('ResizeObserver', NoopResizeObserver)
+
+        const cleanupA = observeLayoutChanges(a, vi.fn())
+        const parentChildListBefore = instances.filter(
+            (i) => i.target === parent && i.options.childList
+        ).length
+        const cleanupB = observeLayoutChanges(b, vi.fn())
+        const parentChildListAfter = instances.filter(
+            (i) => i.target === parent && i.options.childList
+        ).length
+
+        // The immediate parent's childList observer is created once and shared:
+        // b's subscription must not add a second observer on `parent`.
+        expect(parentChildListBefore).toBe(1)
+        expect(parentChildListAfter).toBe(1)
+        // Likewise the parent's attribute observer (style/class re-slot signal).
+        expect(instances.filter((i) => i.target === parent && i.options.attributes).length).toBe(1)
+
+        // Ref-counted: releasing a keeps the shared observer alive for b ...
+        cleanupA()
+        const parentEntry = instances.find((i) => i.target === parent && i.options.childList)!
+        expect(parentEntry.disconnected).toBe(false)
+        // ... and the last release disconnects it.
+        cleanupB()
+        expect(parentEntry.disconnected).toBe(true)
+
+        vi.unstubAllGlobals()
+        parent.remove()
+    })
+
     it('observeLayoutChanges: throttles via requestAnimationFrame and cancels on cleanup (no parent)', () => {
         const el = document.createElement('div')
         const cb = vi.fn()
@@ -406,8 +468,10 @@ describe('utils/layout', () => {
             constructor(cb2: ResizeObserverCallback) {
                 this._cb = cb2
             }
-            observe() {
-                this._cb([], this as unknown as ResizeObserver)
+            observe(target: Element) {
+                // Real ResizeObserver delivers one entry per target; the shared
+                // registry routes by `entry.target`.
+                this._cb([{ target } as ResizeObserverEntry], this as unknown as ResizeObserver)
             }
             disconnect() {}
         }
@@ -470,8 +534,10 @@ describe('utils/layout', () => {
             constructor(cb2: ResizeObserverCallback) {
                 this._cb = cb2
             }
-            observe() {
-                this._cb([], this as unknown as ResizeObserver)
+            observe(target: Element) {
+                // Real ResizeObserver delivers one entry per target; the shared
+                // registry routes by `entry.target`.
+                this._cb([{ target } as ResizeObserverEntry], this as unknown as ResizeObserver)
             }
             disconnect() {}
         }
@@ -529,8 +595,10 @@ describe('utils/layout', () => {
             constructor(cb2: ResizeObserverCallback) {
                 this._cb = cb2
             }
-            observe() {
-                this._cb([], this as unknown as ResizeObserver)
+            observe(target: Element) {
+                // Real ResizeObserver delivers one entry per target; the shared
+                // registry routes by `entry.target`.
+                this._cb([{ target } as ResizeObserverEntry], this as unknown as ResizeObserver)
             }
             disconnect() {}
         }
@@ -791,6 +859,31 @@ describe('utils/layout', () => {
             expect(selectLayoutDependencies(obj, fallback)).toEqual([obj])
             expect(selectLayoutDependencies(arr, fallback)).toEqual([arr])
             expect(fallback).not.toHaveBeenCalled()
+        })
+    })
+
+    // Upstream MeasureLayout.getSnapshotBeforeUpdate: willUpdate() runs when
+    // `drag || layoutDependency changed || layoutDependency === undefined ||
+    // presence flipped`; otherwise NOTHING re-measures — including DOM changes
+    // our observers would otherwise catch (sibling reorder, resize). #470.
+    describe('isLayoutMeasurementGated (#470 upstream parity)', () => {
+        it('is open (not gated) when layoutDependency is undefined', () => {
+            expect(isLayoutMeasurementGated(undefined, undefined)).toBe(false)
+            expect(isLayoutMeasurementGated(undefined, false)).toBe(false)
+        })
+
+        it('is closed for any defined dependency, including falsy ones', () => {
+            expect(isLayoutMeasurementGated('key', undefined)).toBe(true)
+            expect(isLayoutMeasurementGated(0, undefined)).toBe(true)
+            expect(isLayoutMeasurementGated('', false)).toBe(true)
+            expect(isLayoutMeasurementGated(null, false)).toBe(true)
+            expect(isLayoutMeasurementGated(false, false)).toBe(true)
+        })
+
+        it('is forced open by the drag prop (any truthy drag value)', () => {
+            expect(isLayoutMeasurementGated('key', true)).toBe(false)
+            expect(isLayoutMeasurementGated(0, 'x')).toBe(false)
+            expect(isLayoutMeasurementGated(0, 'y')).toBe(false)
         })
     })
 })

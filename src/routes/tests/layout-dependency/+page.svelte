@@ -1,5 +1,6 @@
 <script lang="ts">
     import { AnimatePresence, motion } from '$lib'
+    import { layoutMeasureStats } from '$lib/utils/motionDomProjection'
 
     // A high-frequency render driver. Each tick changes both boxes' inline
     // `style` (the background hue), forcing a re-render that — without
@@ -23,10 +24,71 @@
     // Drag: a gated box with `drag` should ignore the gate and keep measuring.
     let dragMeasures = $state(0)
     let noDragMeasures = $state(0)
-    // Presence: a gated box whose sibling toggles via AnimatePresence should
-    // still measure when the real layout shift happens (observer path).
+    // Presence: a gated box whose SIBLING toggles via AnimatePresence must NOT
+    // measure — upstream only re-snapshots on the element's OWN presence flip
+    // (MeasureLayout.tsx `prevProps.isPresent !== isPresent`), so a sibling
+    // reflow with an unchanged dependency jumps.
     let presenceMeasures = $state(0)
     let siblingPresent = $state(true)
+
+    // Keyed list (#470): rows gated on a PER-ROW field. Bumping one row's
+    // timestamp re-sorts the list. Upstream only measures the row whose
+    // dependency changed; the rows it displaces have an unchanged dependency
+    // and jump. Gate on the row's index instead to animate every row that
+    // moves — that value changes for exactly the rows whose slot changed.
+    type Row = { id: string; ts: number }
+    let rows = $state<Row[]>([
+        { id: 'a', ts: 5 },
+        { id: 'b', ts: 4 },
+        { id: 'c', ts: 3 },
+        { id: 'd', ts: 2 },
+        { id: 'e', ts: 1 }
+    ])
+    let nextTs = 10
+    let listGate = $state<'field' | 'index'>('field')
+    const sortedRows = $derived([...rows].sort((x, y) => y.ts - x.ts))
+    let rowMeasures = $state<Record<string, number>>({})
+    // `onLayoutMeasure` counter per row: a gated row that merely gets
+    // re-slotted must not surface a measurement (upstream never runs
+    // `updateLayout()` for it), so this stays flat for displaced rows.
+    // Deliberately NON-reactive (a plain object on `window`, read by the e2e
+    // via `page.evaluate`): `onLayoutMeasure` fires from inside layout effects,
+    // and writing `$state` there re-enters the measure cycle.
+    const rowLayoutMeasures: Record<string, number> = {}
+    if (typeof window !== 'undefined') {
+        const w = window as unknown as {
+            __rowLayoutMeasures: Record<string, number>
+            __layoutMeasureStats: typeof layoutMeasureStats
+        }
+        w.__rowLayoutMeasures = rowLayoutMeasures
+        // Library-internal DOM-read counters (public callbacks can't see the
+        // silent cache refresh a gated element does when a sibling re-slots it).
+        w.__layoutMeasureStats = layoutMeasureStats
+    }
+
+    // Own-presence escape hatch: upstream also snapshots when THIS element's
+    // isPresent flips (exit / re-entry), regardless of the dependency.
+    let selfPresent = $state(true)
+    let selfPresenceMeasures = $state(0)
+
+    // Wait-mode parent: a `layout` parent wrapping AnimatePresence
+    // mode="wait". A child swap is a CHILD's presence change, so a gated
+    // parent must not FLIP from the held box to its new size; the ungated
+    // parent keeps our hold/release size animation.
+    let waitChild = $state<'a' | 'b'>('a')
+    let gatedWaitChild = $state<'a' | 'b'>('a')
+
+    function bumpRow(id: string) {
+        rows = rows.map((row) => (row.id === id ? { ...row, ts: nextTs++ } : row))
+    }
+
+    function countRowMeasure(id: string) {
+        rowMeasures = { ...rowMeasures, [id]: (rowMeasures[id] ?? 0) + 1 }
+    }
+
+    function countRowLayoutMeasure(id: string) {
+        rowLayoutMeasures[id] = (rowLayoutMeasures[id] ?? 0) + 1
+    }
 
     let autoTicking = $state(false)
 
@@ -52,6 +114,11 @@
         dragMeasures = 0
         noDragMeasures = 0
         presenceMeasures = 0
+        selfPresenceMeasures = 0
+        rowMeasures = {}
+        for (const id of Object.keys(rowLayoutMeasures)) rowLayoutMeasures[id] = 0
+        layoutMeasureStats.reads = 0
+        layoutMeasureStats.silentReads = 0
     }
 
     function toggleSibling() {
@@ -95,9 +162,6 @@
             {autoTicking ? 'Stop' : 'Start'} auto-render
         </button>
         <button type="button" data-testid="reflow" onclick={reflow}>Reflow + bump dep</button>
-        <button type="button" data-testid="toggle-sibling" onclick={toggleSibling}>
-            Toggle sibling
-        </button>
         <button type="button" data-testid="reset" onclick={resetCounters}>Reset counters</button>
         <span class="readout" data-testid="tick-count">renders: {tick}</span>
     </section>
@@ -149,9 +213,11 @@
     <section class="escape">
         <h2 class="section-title">Escape hatches (upstream parity)</h2>
         <p class="section-note">
-            Upstream <code>MeasureLayout</code> ignores the gate while a drag is active, and re-snapshots
-            on presence changes. These two panels show both, with the dependency held constant (never
-            bumped).
+            Upstream <code>MeasureLayout</code> ignores the gate while <code>drag</code> is set, and
+            re-snapshots on the element's <em>own</em> presence flip — nothing else. These panels
+            hold the dependency constant (never bumped) and show that a sibling's presence toggle
+            does
+            <strong>not</strong> re-measure a gated box.
         </p>
 
         <div class="grid">
@@ -196,13 +262,20 @@
             </article>
 
             <article>
-                <h2>presence-driven reflow</h2>
+                <h2>sibling presence reflow (stays gated)</h2>
                 <p class="expectation">
-                    The gated box (constant <code>layoutDependency={0}</code>) ignores renders, but
-                    when its AnimatePresence sibling enters/exits the real layout shift still
-                    measures via the observer path.
+                    The gated box (constant <code>layoutDependency={0}</code>) ignores renders —
+                    and, matching upstream, also ignores the reflow when its AnimatePresence sibling
+                    enters/exits. Its dependency didn't change, so it jumps to the new slot.
                 </p>
-                <p class="measure" data-testid="presence-measures">measures: {presenceMeasures}</p>
+                <div class="panel-controls">
+                    <button type="button" data-testid="toggle-sibling" onclick={toggleSibling}>
+                        Toggle sibling
+                    </button>
+                    <p class="measure" data-testid="presence-measures">
+                        measures: {presenceMeasures}
+                    </p>
+                </div>
                 <div class="track column">
                     <AnimatePresence>
                         {#if siblingPresent}
@@ -233,6 +306,192 @@
                 </div>
             </article>
         </div>
+    </section>
+
+    <section class="escape" data-testid="own-presence-section">
+        <h2 class="section-title">Own presence & wait-mode parent (upstream parity)</h2>
+        <p class="section-note">
+            Upstream re-snapshots a gated element when <em>its own</em> presence flips (exit /
+            re-entry) — but a <code>layout</code> parent whose
+            <code>AnimatePresence mode="wait"</code>
+            child swaps is only seeing a <em>child's</em> presence change, so a gated parent must not
+            FLIP to its new size. The ungated parent keeps the hold/release size animation.
+        </p>
+        <div class="grid">
+            <article>
+                <h2>own presence flip measures</h2>
+                <p class="expectation">
+                    Gated (<code>layoutDependency={0}</code>) owned child of
+                    <code>AnimatePresence present child</code> — the real node stays mounted for its
+                    exit, so its own <code>isPresent</code> flips in place. Renders never measure
+                    it; toggling <em>its own</em> presence does.
+                </p>
+                <div class="panel-controls">
+                    <button
+                        type="button"
+                        data-testid="toggle-self"
+                        onclick={() => (selfPresent = !selfPresent)}
+                    >
+                        Toggle self
+                    </button>
+                    <p class="measure" data-testid="self-presence-measures">
+                        measures: {selfPresenceMeasures}
+                    </p>
+                </div>
+                <div class="track">
+                    <AnimatePresence present={selfPresent}>
+                        {#snippet child()}
+                            <motion.div
+                                class="orb"
+                                data-testid="self-presence-box"
+                                layout
+                                layoutDependency={0}
+                                style={boxStyle}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.25 }}
+                                onProjectionUpdate={() => (selfPresenceMeasures += 1)}
+                            >
+                                S
+                            </motion.div>
+                        {/snippet}
+                    </AnimatePresence>
+                </div>
+            </article>
+
+            <article>
+                <h2>wait-mode parent: gated vs ungated</h2>
+                <p class="expectation">
+                    Both parents have <code>layout</code> and wrap an
+                    <code>AnimatePresence mode="wait"</code>
+                    swapping a small child for a large one. The ungated parent animates its size; the
+                    gated parent (<code>layoutDependency={0}</code>) jumps.
+                </p>
+                <div class="panel-controls">
+                    <button
+                        type="button"
+                        data-testid="swap-wait-child"
+                        onclick={() => (waitChild = waitChild === 'a' ? 'b' : 'a')}
+                    >
+                        Swap ungated ({waitChild})
+                    </button>
+                    <button
+                        type="button"
+                        data-testid="swap-gated-wait-child"
+                        onclick={() => (gatedWaitChild = gatedWaitChild === 'a' ? 'b' : 'a')}
+                    >
+                        Swap gated ({gatedWaitChild})
+                    </button>
+                </div>
+                <div class="track two wait-track">
+                    <motion.div
+                        class="wait-parent"
+                        data-testid="wait-parent"
+                        layout
+                        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                        <AnimatePresence mode="wait" initial={false}>
+                            {#if waitChild === 'a'}
+                                <motion.div
+                                    key="a"
+                                    class="wait-child small"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    a
+                                </motion.div>
+                            {:else}
+                                <motion.div
+                                    key="b"
+                                    class="wait-child large"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    b
+                                </motion.div>
+                            {/if}
+                        </AnimatePresence>
+                    </motion.div>
+                    <motion.div
+                        class="wait-parent gated"
+                        data-testid="gated-wait-parent"
+                        layout
+                        layoutDependency={0}
+                        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                        <AnimatePresence mode="wait" initial={false}>
+                            {#if gatedWaitChild === 'a'}
+                                <motion.div
+                                    key="a"
+                                    class="wait-child small"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    a
+                                </motion.div>
+                            {:else}
+                                <motion.div
+                                    key="b"
+                                    class="wait-child large"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    b
+                                </motion.div>
+                            {/if}
+                        </AnimatePresence>
+                    </motion.div>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <section class="escape" data-testid="keyed-list-section">
+        <h2 class="section-title">Keyed list (#470)</h2>
+        <p class="section-note">
+            Every row is <code>layout="position"</code>. With <code>List gate: field</code> each row
+            passes <code>layoutDependency={'{row.ts}'}</code>; bumping E re-sorts it to the top, but
+            only E's dependency changed — the four rows it displaces jump (upstream parity). Switch
+            to
+            <code>List gate: index</code> and every row whose slot changed animates.
+        </p>
+        <div class="panel-controls">
+            <button type="button" data-testid="bump-row-e" onclick={() => bumpRow('e')}>
+                Bump row E
+            </button>
+            <button
+                type="button"
+                data-testid="toggle-list-gate"
+                onclick={() => (listGate = listGate === 'field' ? 'index' : 'field')}
+            >
+                List gate: {listGate}
+            </button>
+        </div>
+        <ul class="rows" data-testid="keyed-list">
+            {#each sortedRows as row, i (row.id)}
+                <motion.li
+                    class="row"
+                    data-testid={`row-${row.id}`}
+                    layout="position"
+                    layoutDependency={listGate === 'field' ? row.ts : i}
+                    transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                    onProjectionUpdate={() => countRowMeasure(row.id)}
+                    onLayoutMeasure={() => countRowLayoutMeasure(row.id)}
+                >
+                    <span>{row.id}</span>
+                    <span class="row-meta">ts {row.ts} · measures {rowMeasures[row.id] ?? 0}</span>
+                </motion.li>
+            {/each}
+        </ul>
     </section>
 </main>
 
@@ -399,7 +658,7 @@
         color: #64748b;
     }
 
-    .sibling {
+    :global(.sibling) {
         width: 100%;
         padding: 14px 16px;
         border: 1px solid rgba(125, 211, 252, 0.35);
@@ -410,6 +669,83 @@
         text-transform: uppercase;
         font-size: 12px;
         box-sizing: border-box;
+    }
+
+    .rows {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        width: min(420px, 100%);
+        display: grid;
+        gap: 8px;
+    }
+
+    :global(.row) {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 48px;
+        padding: 0 14px;
+        border: 1px solid rgba(125, 211, 252, 0.35);
+        background: #102332;
+        color: #ecfeff;
+        font-weight: 850;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .row-meta {
+        color: #67e8f9;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+
+    .panel-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .panel-controls .measure {
+        margin-left: 6px;
+    }
+
+    .wait-track {
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    :global(.wait-parent) {
+        display: inline-block;
+        padding: 12px;
+        border: 1px solid rgba(125, 211, 252, 0.45);
+        background: #102332;
+    }
+
+    :global(.wait-parent.gated) {
+        border-color: #f0abfc;
+    }
+
+    :global(.wait-child) {
+        display: grid;
+        place-items: center;
+        background: #67e8f9;
+        color: #031316;
+        font-weight: 900;
+    }
+
+    :global(.wait-child.small) {
+        width: 72px;
+        height: 40px;
+    }
+
+    :global(.wait-child.large) {
+        width: 160px;
+        height: 96px;
     }
 
     :global(.orb) {

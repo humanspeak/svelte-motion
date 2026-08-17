@@ -1,6 +1,6 @@
 import { visualElementStore } from 'motion-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MotionDomProjectionAdapter } from './motionDomProjection.js'
+import { MotionDomProjectionAdapter, layoutMeasureStats } from './motionDomProjection.js'
 import { createMotionVisualElement } from './visualElementCore.js'
 
 /**
@@ -86,6 +86,63 @@ describe('MotionDomProjectionAdapter.measurePageRect', () => {
         setScrollAndRect(element, 700, 100)
         const second = adapter.measurePageRect('measure')
         expect(second!.top).toBe(100)
+        adapter.unmount()
+    })
+
+    it('notifies onMeasure listeners by default and skips them for a silent read (#470 gate)', () => {
+        setScrollAndRect(element, 0, 100)
+        adapter.mount(element)
+        const listener = vi.fn()
+        const off = adapter.onMeasure(listener)
+
+        const loud = adapter.measurePageRect('measure')
+        expect(loud).not.toBeNull()
+        expect(listener).toHaveBeenCalledTimes(1)
+        expect(listener).toHaveBeenLastCalledWith(loud)
+
+        // A `layoutDependency`-gated node re-slotted by a sibling refreshes its
+        // cache without surfacing a measurement — upstream never runs
+        // `updateLayout()` for it, so `onLayoutMeasure` must stay silent.
+        const quiet = adapter.measurePageRect('measure', { silent: true })
+        expect(quiet).toEqual(loud)
+        expect(listener).toHaveBeenCalledTimes(1)
+
+        off()
+        adapter.unmount()
+    })
+
+    it('refreshLayout seeds the projection and returns the rect in ONE DOM read (silent skips listeners)', () => {
+        setScrollAndRect(element, 0, 100)
+        adapter.mount(element)
+        const listener = vi.fn()
+        const off = adapter.onMeasure(listener)
+        const readSpy = vi.spyOn(element, 'getBoundingClientRect')
+        readSpy.mockClear()
+        const silentBefore = layoutMeasureStats.silentReads
+        const loudBefore = layoutMeasureStats.reads
+
+        // The observer bridge used to do measurePageRect() + seedLayout(),
+        // reading the box twice; the gated cache refresh must read it once.
+        const rect = adapter.refreshLayout({ silent: true })
+        expect(rect).toEqual({ left: 10, top: 100, width: 100, height: 50 })
+        expect(readSpy).toHaveBeenCalledTimes(1)
+        // Seeded: the projection's cached slot equals the returned rect.
+        expect(adapter.lastMeasuredRect).toEqual(rect)
+        // Silent: no `onLayoutMeasure` fan-out, only the silent counter moves.
+        expect(listener).not.toHaveBeenCalled()
+        expect(layoutMeasureStats.silentReads).toBe(silentBefore + 1)
+        expect(layoutMeasureStats.reads).toBe(loudBefore)
+
+        // Loud variant notifies once and counts as a public read.
+        readSpy.mockClear()
+        const loud = adapter.refreshLayout()
+        expect(readSpy).toHaveBeenCalledTimes(1)
+        expect(listener).toHaveBeenCalledTimes(1)
+        expect(listener).toHaveBeenLastCalledWith(loud)
+        expect(layoutMeasureStats.reads).toBe(loudBefore + 1)
+
+        readSpy.mockRestore()
+        off()
         adapter.unmount()
     })
 

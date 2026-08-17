@@ -519,6 +519,173 @@ export const selectLayoutDependencies = (
 ): unknown[] => (layoutDependency !== undefined ? [layoutDependency] : fallback())
 
 /**
+ * Whether `layout` measurement is currently closed by `layoutDependency`.
+ *
+ * Mirrors upstream `MeasureLayout.getSnapshotBeforeUpdate`, which calls
+ * `projection.willUpdate()` only when `drag` is set, `layoutDependency`
+ * changed, `layoutDependency` is `undefined`, or the element's own presence
+ * flipped — and otherwise takes no snapshot at all. While the gate is closed
+ * NOTHING animates the element: not a render, and not a DOM change the
+ * observer system would otherwise catch (a sibling reorder that re-slots it, a
+ * resize, a sibling's presence toggle). Those changes only refresh the cached
+ * slot; no snapshot, FLIP, or `onProjectionUpdate` happens until the dependency
+ * value itself changes.
+ *
+ * `drag` keys off the PROP, not active-gesture state, exactly like upstream
+ * (MeasureLayout.tsx `if (drag || ...)`), so a draggable `layout` element is
+ * never gated.
+ *
+ * @param layoutDependency The user-supplied `layoutDependency` prop value.
+ * @param drag The user-supplied `drag` prop value.
+ * @returns `true` when measurement is gated on `layoutDependency` changes only.
+ * @example
+ * ```ts
+ * isLayoutMeasurementGated(undefined, undefined) // => false (default)
+ * isLayoutMeasurementGated(order, undefined) // => true
+ * isLayoutMeasurementGated(order, true) // => false (drag opens the gate)
+ * ```
+ */
+export const isLayoutMeasurementGated = (layoutDependency: unknown, drag: unknown): boolean =>
+    layoutDependency !== undefined && !drag
+
+/**
+ * Shared observer registries.
+ *
+ * Every `layout` element used to own its own `ResizeObserver` plus one
+ * `MutationObserver` per observed target (self attributes, self subtree, the
+ * parent's child list, and each observed ancestor's attributes). A 1,000-row
+ * list therefore ran ~1,000 resize observers and ~6,000 mutation observers,
+ * and one parent `childList` mutation fanned out through 1,000 separate
+ * observer callbacks. Native observers accept many targets, so these
+ * registries hold ONE observer per (target, options) and dispatch to every
+ * subscriber. Ref-counted: the last release disconnects.
+ *
+ * Instances are keyed on the current global constructor so a test that swaps
+ * `ResizeObserver` / `MutationObserver` for a shim gets fresh observers.
+ */
+type ObserverHandler = () => void
+
+interface SharedResizeRegistry {
+    ctor: typeof ResizeObserver
+    observer: ResizeObserver
+    handlers: Map<Element, Set<ObserverHandler>>
+}
+let sharedResize: SharedResizeRegistry | null = null
+
+const acquireResizeObserver = (target: Element, handler: ObserverHandler): (() => void) => {
+    const Ctor = globalThis.ResizeObserver
+    if (!sharedResize || sharedResize.ctor !== Ctor) {
+        const handlers = new Map<Element, Set<ObserverHandler>>()
+        const observer = new Ctor((entries) => {
+            for (const entry of entries) {
+                const set = handlers.get(entry.target)
+                if (set) for (const h of [...set]) h()
+            }
+        })
+        sharedResize = { ctor: Ctor, observer, handlers }
+    }
+    const registry = sharedResize
+    let set = registry.handlers.get(target)
+    const isFirst = !set
+    if (!set) {
+        set = new Set()
+        registry.handlers.set(target, set)
+    }
+    // Subscribe BEFORE observe(): a synchronously-firing observer double
+    // (tests) must reach this handler on its first delivery.
+    set.add(handler)
+    if (isFirst) registry.observer.observe(target)
+    return () => {
+        const current = registry.handlers.get(target)
+        if (!current) return
+        current.delete(handler)
+        if (current.size === 0) {
+            registry.handlers.delete(target)
+            // Test shims may lack `unobserve`.
+            registry.observer.unobserve?.(target)
+        }
+    }
+}
+
+type MutationHandler = (records: MutationRecord[]) => void
+interface SharedMutationEntry {
+    ctor: typeof MutationObserver
+    observer: MutationObserver
+    handlers: Set<MutationHandler>
+}
+/** Keyed by a stable serialization of the observe() options, then by target. */
+const sharedMutation = new Map<string, WeakMap<Node, SharedMutationEntry>>()
+
+const acquireMutationObserver = (
+    target: Node,
+    init: MutationObserverInit,
+    handler: MutationHandler
+): (() => void) => {
+    const Ctor = globalThis.MutationObserver
+    const key = JSON.stringify(init)
+    let byTarget = sharedMutation.get(key)
+    if (!byTarget) {
+        byTarget = new WeakMap()
+        sharedMutation.set(key, byTarget)
+    }
+    const targets = byTarget
+    let entry = targets.get(target)
+    let isFirst = false
+    if (!entry || entry.ctor !== Ctor) {
+        const handlers = new Set<MutationHandler>()
+        const observer = new Ctor((records) => {
+            for (const h of [...handlers]) h(records)
+        })
+        entry = { ctor: Ctor, observer, handlers }
+        targets.set(target, entry)
+        isFirst = true
+    }
+    const owned = entry
+    // Subscribe BEFORE observe(): a synchronously-firing observer double
+    // (tests) must reach this handler on its first delivery.
+    owned.handlers.add(handler)
+    if (isFirst) owned.observer.observe(target, init)
+    return () => {
+        owned.handlers.delete(handler)
+        if (owned.handlers.size === 0) {
+            owned.observer.disconnect()
+            if (targets.get(target) === owned) targets.delete(target)
+        }
+    }
+}
+
+const SELF_ATTRIBUTE_INIT: MutationObserverInit = {
+    attributes: true,
+    attributeFilter: ['class', 'data-presence-layout-hold']
+}
+const CHILD_LIST_INIT: MutationObserverInit = { childList: true, subtree: true }
+const ANCESTOR_ATTRIBUTE_INIT: MutationObserverInit = {
+    attributes: true,
+    attributeFilter: ['style', 'class'],
+    attributeOldValue: true
+}
+
+/**
+ * Whether an ancestor attribute mutation batch can re-slot children. Style
+ * mutations that only touch animation channels (transforms / opacity /
+ * will-change — written every frame by gesture and FLIP animations) never
+ * re-slot children, so they are filtered out to avoid commit storms.
+ */
+const ancestorMutationsAffectLayout = (mutations: MutationRecord[]): boolean => {
+    for (const mutation of mutations) {
+        if (mutation.attributeName === 'style') {
+            const before = stripNonChildLayoutStyle(mutation.oldValue ?? '')
+            const after = stripNonChildLayoutStyle(
+                (mutation.target as HTMLElement).getAttribute('style') ?? ''
+            )
+            if (before === after) continue
+        }
+        return true
+    }
+    return false
+}
+
+/**
  * Observe size/attribute changes that commonly trigger layout changes.
  *
  * Returns a cleanup function that disconnects observers. The callback is called
@@ -578,39 +745,11 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
             }, 50)
         }
     }
-    const ro = new ResizeObserver(() => schedule())
-    const attributeObserver = new MutationObserver(() => schedule())
-    const childListObserver = new MutationObserver(() => schedule())
-    // The element's OWN childList (subtree) observation. Kept separate from the
-    // ancestor wiring below so a re-parent can disconnect/re-attach the ancestor
-    // observers without dropping this self-observation.
-    const observeSelfChildList = () =>
-        childListObserver.observe(el, {
-            childList: true,
-            subtree: true
-        })
-    // An ANCESTOR's style/class change can re-slot this element (e.g. the
-    // classic toggle-switch: align-items flip on the track, or the same flip
-    // two levels up) with no childList or resize signal, and the Svelte-owned
-    // reactive path can't snapshot it — the ancestor patches before this
-    // element's effects run. Watch each observed ancestor's attributes and let
-    // the commit path diff against the cached rect. Style mutations that only
-    // touch animation channels (transforms / opacity / will-change — written
-    // every frame by gesture and FLIP animations) never re-slot children, so
-    // they're filtered out at EVERY observed level to avoid commit storms.
-    const parentAttributeObserver = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-            if (mutation.attributeName === 'style') {
-                const before = stripNonChildLayoutStyle(mutation.oldValue ?? '')
-                const after = stripNonChildLayoutStyle(
-                    (mutation.target as HTMLElement).getAttribute('style') ?? ''
-                )
-                if (before === after) continue
-            }
-            schedule()
-            return
-        }
-    })
+    // The element's OWN observers: resize, class / presence-hold attributes,
+    // and childList (subtree). Shared instances — see the registries above.
+    const releaseSelf: Array<() => void> = []
+    // Ancestor subscriptions are re-acquired on re-parenting.
+    let releaseAncestors: Array<() => void> = []
 
     /**
      * Collect the bounded ancestor chain (closest first) up to
@@ -632,8 +771,12 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
     // empty placeholder — real MutationObserver/ResizeObserver never fire on
     // `observe()`, so in production this is simply the initial chain.
     let observedAncestors: HTMLElement[] = collectAncestors()
+    const onAncestorAttributes: MutationHandler = (mutations) => {
+        if (ancestorMutationsAffectLayout(mutations)) schedule()
+    }
     const wireAncestors = () => {
-        observedAncestors.forEach((ancestor, index) => {
+        releaseAncestors = observedAncestors.flatMap((ancestor, index) => {
+            const releases: Array<() => void> = []
             // Only the IMMEDIATE parent gets childList: `subtree: true` already
             // covers sibling reorders/insertions that re-slot this element.
             // Higher levels intentionally SKIP childList — a higher-level DOM
@@ -641,19 +784,25 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
             // rect, which surfaces on the attribute path; adding childList at
             // every level only widens noise without catching a distinct case.
             if (index === 0) {
-                childListObserver.observe(ancestor, { childList: true, subtree: true })
+                releases.push(acquireMutationObserver(ancestor, CHILD_LIST_INIT, schedule))
             }
-            parentAttributeObserver.observe(ancestor, {
-                attributes: true,
-                attributeFilter: ['style', 'class'],
-                attributeOldValue: true
-            })
+            // An ANCESTOR's style/class change can re-slot this element (e.g.
+            // the classic toggle-switch: align-items flip on the track, or the
+            // same flip two levels up) with no childList or resize signal, and
+            // the Svelte-owned reactive path can't snapshot it — the ancestor
+            // patches before this element's effects run. Watch each observed
+            // ancestor's attributes and let the commit path diff against the
+            // cached rect.
+            releases.push(
+                acquireMutationObserver(ancestor, ANCESTOR_ATTRIBUTE_INIT, onAncestorAttributes)
+            )
+            return releases
         })
     }
 
     /**
      * If the element's ancestor chain has changed since it was last wired
-     * (portal, imperative move), disconnect the stale ancestor observers and
+     * (portal, imperative move), release the stale ancestor subscriptions and
      * re-attach to the new chain. Cheap array-of-references equality.
      */
     const rewireIfReparented = () => {
@@ -662,13 +811,8 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
             next.length === observedAncestors.length &&
             next.every((ancestor, index) => ancestor === observedAncestors[index])
         if (unchanged) return
-        // Drop every stale-chain observer and re-attach to the new chain.
-        // childListObserver also carries el's own self-observation, so
-        // disconnect() wipes that too — re-establish it before re-wiring.
-        childListObserver.disconnect()
-        parentAttributeObserver.disconnect()
+        for (const release of releaseAncestors) release()
         observedAncestors = next
-        observeSelfChildList()
         wireAncestors()
     }
 
@@ -676,19 +820,15 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
     // observer double that fires synchronously on `observe()` (used in tests)
     // would otherwise re-enter `schedule` → `rewireIfReparented` before those
     // closures exist. Real observers never fire on `observe()`.
-    ro.observe(el)
-    attributeObserver.observe(el, {
-        attributes: true,
-        attributeFilter: ['class', 'data-presence-layout-hold']
-    })
-    observeSelfChildList()
+    releaseSelf.push(acquireResizeObserver(el, schedule))
+    releaseSelf.push(acquireMutationObserver(el, SELF_ATTRIBUTE_INIT, schedule))
+    releaseSelf.push(acquireMutationObserver(el, CHILD_LIST_INIT, schedule))
     wireAncestors()
 
     return () => {
-        ro.disconnect()
-        attributeObserver.disconnect()
-        childListObserver.disconnect()
-        parentAttributeObserver.disconnect()
+        for (const release of releaseSelf) release()
+        for (const release of releaseAncestors) release()
+        releaseAncestors = []
         if (pendingRaf !== null && typeof cancelAnimationFrame === 'function') {
             cancelAnimationFrame(pendingRaf)
             pendingRaf = null

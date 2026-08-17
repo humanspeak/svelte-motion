@@ -705,19 +705,41 @@ export type MotionProps = {
      * When `undefined` (the default), measurement runs on every layout-affecting
      * render, matching framer-motion. Mirrors framer-motion's `layoutDependency`.
      *
+     * While gated, **only** a change to this value (or, matching upstream, the
+     * element's *own* presence flip inside an owned `AnimatePresence present
+     * child`) snapshots and animates the element — upstream `MeasureLayout`
+     * snapshots when `drag` is set, the dependency changed, or its own
+     * `isPresent` flipped, and otherwise never marks the node layout-dirty.
+     * Layout changes that arrive any other way (a sibling reorder that
+     * re-slots the element, a resize, a sibling's `AnimatePresence`
+     * enter/exit, an `AnimatePresence mode="wait"` child swap inside a gated
+     * parent) do **not** animate a gated element and do not fire
+     * `onProjectionUpdate` or `onLayoutMeasure` for it: it jumps to its new
+     * slot. (Internally the element still refreshes its cached slot with one
+     * silent DOM read on such a change — Svelte reconciles keyed lists before
+     * a child can snapshot, so that cache is the origin its next
+     * dependency-driven FLIP starts from. Unrelated renders cost nothing.)
+     *
+     * In a keyed `{#each}` list, that means the dependency must change for
+     * every row that moves. Bind it to the row's index (or sort position) — not
+     * to a field of the row's data, which only changes for the row that
+     * triggered the re-sort and lets the rows it displaces jump.
+     *
      * Enabling `drag` opts the element out of `layoutDependency` gating
      * entirely — a `layout` element with `drag` set re-measures like an ungated
      * one whether or not a drag is in progress, matching upstream
      * `MeasureLayout` (which keys off the `drag` prop, not active-gesture
-     * state). The gate only suppresses render-driven re-measurement; real
-     * layout changes detected by the observer system — element resize,
-     * structural/child mutations, and `AnimatePresence` enter/exit — are still
-     * measured so the element keeps animating genuine moves.
+     * state).
      *
      * @example
      * ```svelte
      * <!-- Re-measures only when `order` changes, not on every tick -->
      * <motion.div layout layoutDependency={order} />
+     *
+     * <!-- Keyed list: gate on the index so every moved row animates -->
+     * {#each rows as row, i (row.id)}
+     *   <motion.li layout="position" layoutDependency={i}>{row.label}</motion.li>
+     * {/each}
      * ```
      */
     layoutDependency?: unknown

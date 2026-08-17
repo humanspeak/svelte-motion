@@ -253,7 +253,8 @@ Single-element FLIP layout animation:
 
 - `layout`: translate + scale.
 - `layout="position"`: translate only.
-- Shared layout (`layoutId`) is not implemented yet.
+- `layoutDependency`: only re-measure when a value changes. In a keyed list, gate on the row's index so every row that moves animates — a per-row data field only changes for the row that triggered the re-sort, and the rows it displaces jump (upstream parity).
+- Shared layout: `layoutId` animates matching elements between positions, `LayoutGroup` scopes ids, and `layoutScroll` marks scroll containers. Full docs: <https://motion.svelte.page/docs/layout-animations>.
 
 ## Utilities
 

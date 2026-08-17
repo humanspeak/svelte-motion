@@ -23,6 +23,30 @@ type LayoutOption = boolean | string | undefined
 type AnimationType = 'position' | 'x' | 'y' | 'size' | 'both' | 'preserve-aspect'
 type RectLike = { left: number; top: number; width: number; height: number }
 
+/**
+ * Development-only measurement counters.
+ *
+ * `onProjectionUpdate` / `onLayoutMeasure` counts prove *callback* parity, not
+ * *measurement-cost* parity: a `layoutDependency`-gated element that is
+ * re-slotted by a sibling still refreshes its cached slot with a silent DOM
+ * read. These counters make that hidden cost observable so a demo or test can
+ * assert the cadence (one read per observed change, none per unrelated
+ * render). Reset them yourself between samples.
+ *
+ * @example
+ * ```ts
+ * layoutMeasureStats.reads = 0
+ * // ...trigger a keyed reorder...
+ * console.log(layoutMeasureStats.reads)
+ * ```
+ */
+export const layoutMeasureStats = {
+    /** Page-rect reads that notified `onMeasure` listeners (`measurePageRect`). */
+    reads: 0,
+    /** Silent cache refreshes for gated elements (`refreshLayout({ silent: true })`). */
+    silentReads: 0
+}
+
 export interface MotionDomProjectionOptions {
     /** Parent adapter used to connect this node into the upstream projection tree. */
     parent?: MotionDomProjectionAdapter | null
@@ -334,6 +358,54 @@ export class MotionDomProjectionAdapter {
     }
 
     /**
+     * Seed the current layout AND return its page-space rect in a single DOM
+     * read.
+     *
+     * `measurePageRect()` followed by `seedLayout()` reads the box twice (the
+     * second via upstream `updateLayout()`). Callers that need both — the
+     * observer bridge's cache refresh — use this instead: it strips motion
+     * transforms like `measurePageRect`, runs upstream `updateLayout()` once
+     * (which is what installs `projection.layout`), and derives the rect from
+     * that measurement.
+     *
+     * @param options.silent Skip the `onMeasure` listener fan-out. A
+     * `layoutDependency`-gated element re-slotted by a sibling refreshes its
+     * cache silently: upstream never runs `updateLayout()` for a node it
+     * didn't snapshot, so `onLayoutMeasure` must not fire.
+     * @returns The freshly seeded page-space rect, or `null` before mount.
+     *
+     * @example
+     * ```ts
+     * // One read: projection layout seeded, cache rect returned.
+     * const rect = adapter.refreshLayout({ silent: true })
+     * ```
+     */
+    refreshLayout(options?: { silent?: boolean }): RectLike | null {
+        if (!this.element) return null
+        this.updatePathScroll('measure')
+        // Physically strip in-flight FLIP/motion transforms for the read —
+        // `updateLayout()` measures with `measure(false)`, which trusts the DOM.
+        const restore = this.stripToBaseTransforms()
+        try {
+            this.projection.isLayoutDirty = true
+            this.projection.updateLayout()
+        } finally {
+            restore()
+        }
+        this.lastLayout = cloneMeasurements(this.projection.layout)
+        const box = this.projection.layout?.layoutBox
+        if (!box) return null
+        const rect = rectFromBox(box)
+        if (options?.silent) {
+            layoutMeasureStats.silentReads += 1
+        } else {
+            layoutMeasureStats.reads += 1
+            for (const listener of this.measureListeners) listener(rect)
+        }
+        return rect
+    }
+
+    /**
      * Measure this element's layout rect in scroll-invariant PAGE space via
      * the upstream projection node.
      *
@@ -354,6 +426,10 @@ export class MotionDomProjectionAdapter {
      * this read belongs to: `'snapshot'` before the DOM patch, `'measure'`
      * after. Mirrors upstream `updateScroll(phase)`; the observer bridge's
      * callbacks mark the phase boundaries.
+     * @param options.silent Skip the `onMeasure` listener fan-out. Used for
+     * cache-only refreshes that upstream would never surface as a measurement
+     * — a `layoutDependency`-gated node re-slotted by a sibling never runs
+     * `updateLayout()`, so its `onLayoutMeasure` must not fire either.
      * @returns The page-space rect, or `null` before mount / without a window.
      *
      * @example
@@ -361,9 +437,11 @@ export class MotionDomProjectionAdapter {
      * const before = adapter.measurePageRect('snapshot')
      * // ...DOM patch...
      * const after = adapter.measurePageRect('measure')
+     * // Cache refresh only, no listener notification:
+     * const quiet = adapter.measurePageRect('measure', { silent: true })
      * ```
      */
-    measurePageRect(phase: Phase = 'measure'): RectLike | null {
+    measurePageRect(phase: Phase = 'measure', options?: { silent?: boolean }): RectLike | null {
         if (!this.element) return null
         this.updatePathScroll(phase)
 
@@ -383,7 +461,12 @@ export class MotionDomProjectionAdapter {
         // Notify after the inline transforms are restored so listeners
         // (e.g. Reorder.Item slot registration via `onLayoutMeasure`) see a
         // consistent DOM.
-        for (const listener of this.measureListeners) listener(rect)
+        if (options?.silent) {
+            layoutMeasureStats.silentReads += 1
+        } else {
+            layoutMeasureStats.reads += 1
+            for (const listener of this.measureListeners) listener(rect)
+        }
         return rect
     }
 
