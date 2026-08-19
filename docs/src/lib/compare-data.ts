@@ -58,6 +58,11 @@ export const competitors: Competitor[] = [
             { name: 'FLIP layout / layout="position"', us: true, them: true },
             { name: 'Shared layout via layoutId', us: true, them: true },
             { name: 'Spring physics', us: true, them: true },
+            {
+                name: 'Curved motion paths (transition.path / arc())',
+                us: true,
+                them: true
+            },
             { name: 'Scroll-linked motion values', us: true, them: true },
             { name: 'useAnimate imperative scoped animations', us: true, them: true },
             { name: 'MotionConfig provider', us: true, them: true },
@@ -138,6 +143,11 @@ export const competitors: Competitor[] = [
             { name: 'Variants with propagation', us: true, them: false },
             { name: 'Spring physics', us: true, them: true },
             {
+                name: 'Curved motion paths (transition.path / arc())',
+                us: true,
+                them: true
+            },
+            {
                 name: 'Scroll-linked motion values',
                 us: 'useScroll + useTransform',
                 them: 'scroll()'
@@ -196,6 +206,11 @@ export const competitors: Competitor[] = [
                 name: 'Spring physics',
                 us: 'type: "spring"',
                 them: 'No native spring ease — Physics2D / CustomBounce approximations'
+            },
+            {
+                name: 'Curved motion paths',
+                us: 'arc() on transition.path',
+                them: 'MotionPathPlugin (any SVG path)'
             },
             { name: 'Timelines with scrub / labels / nesting', us: false, them: 'Best-in-class' },
             { name: 'Declarative motion.<tag> components', us: '~170 tags', them: false },

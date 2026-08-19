@@ -48,6 +48,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Animated Tabs',
         description: 'Interactive animated tabs animation example using Svelte Motion.'
     },
+    arc: {
+        title: 'arc()',
+        description:
+            'Curved motion paths with transition.path — keyframes, rotation, and shared layout.'
+    },
     'ai-gradient-card': {
         title: 'AI Gradient Card',
         description:

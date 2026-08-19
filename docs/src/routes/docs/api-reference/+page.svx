@@ -139,6 +139,14 @@ import {
 
 Useful when you need to drive an animation programmatically — e.g. `animate(element, { x: 100 })` — outside the `motion.<tag>` component flow.
 
+### Motion paths
+
+```ts
+import { arc } from '@humanspeak/svelte-motion'
+```
+
+`arc()` is re-exported from Motion and creates curved `transition.path` animations. See the [`arc()` guide](/docs/arc) for keyframes, layout animations, springs, and tangent-following rotation.
+
 ### Easing functions
 
 ```ts
