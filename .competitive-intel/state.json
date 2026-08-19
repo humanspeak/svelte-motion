@@ -17,7 +17,7 @@
             "validated_against_version": "13.1.0"
         },
         "gsap": {
-            "note": "STALE: Club GSAP paid-plugin claims at compare-data.ts L228/L236/L254 \u2014 all GSAP plugins free since Webflow May 2025. Flagged 2026-08-19, awaiting human rewrite.",
+            "note": "Licensing claims rewritten 2026-08-19: all plugins free since 3.13 (May 2025); distinction is MIT/OSS vs free-but-proprietary GreenSock Standard License.",
             "validated_against_version": "3.15.0"
         },
         "motion": {

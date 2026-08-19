@@ -27,7 +27,7 @@ const shared = {
         'SSR-safe by default — initial state renders server-side, hydrates without flicker',
         'Tree-shakeable Motion<Tag> named exports for bundle-size-critical apps',
         'TypeScript-first with full type safety across motion props, drag, variants, and hooks',
-        'MIT licensed — no commercial tier, no paid plugin gates'
+        'MIT licensed — open source, fork it or vendor it, no commercial tier'
     ],
     consUs: [
         'Requires Svelte 5 + runes (no Svelte 4 / legacy stores support)',
@@ -192,7 +192,11 @@ export const competitors: Competitor[] = [
         approach: 'gsap.to() / gsap.timeline() / plugins',
         features: [
             { name: 'Tween any CSS property', us: true, them: true },
-            { name: 'Spring physics', us: 'type: "spring"', them: 'Manual / RoughEase' },
+            {
+                name: 'Spring physics',
+                us: 'type: "spring"',
+                them: 'No native spring ease — Physics2D / CustomBounce approximations'
+            },
             { name: 'Timelines with scrub / labels / nesting', us: false, them: 'Best-in-class' },
             { name: 'Declarative motion.<tag> components', us: '~170 tags', them: false },
             { name: 'AnimatePresence exit animations', us: true, them: false },
@@ -205,7 +209,7 @@ export const competitors: Competitor[] = [
             {
                 name: 'Drag with constraints / momentum / elastic',
                 us: 'Built in (drag prop)',
-                them: 'Draggable plugin'
+                them: 'Draggable + InertiaPlugin'
             },
             {
                 name: 'FLIP layout animation',
@@ -222,10 +226,14 @@ export const competitors: Competitor[] = [
             {
                 name: 'MorphSVG path morphing',
                 us: 'motion.path + flubber',
-                them: 'MorphSVGPlugin (paid)'
+                them: 'MorphSVGPlugin (free since 3.13)'
             },
             { name: 'Reactive motion values', us: true, them: false },
-            { name: 'License', us: 'MIT', them: 'Standard free + Club GSAP (paid plugins)' },
+            {
+                name: 'License',
+                us: 'MIT (open source)',
+                them: 'Free for commercial use, but proprietary (GreenSock Standard License)'
+            },
             { name: 'Framework integration', us: 'Native Svelte 5', them: 'Framework-agnostic' }
         ],
         prosUs: [
@@ -233,11 +241,11 @@ export const competitors: Competitor[] = [
             'Declarative props for hover / tap / focus / in-view — no listener plumbing',
             'AnimatePresence handles exit animations without manual unmount delay',
             'FLIP layout and shared layoutId animate component-level box changes automatically',
-            'No paid plugin tier — every feature ships in the MIT-licensed core'
+            'Truly open source (MIT) — GSAP is free to use but Webflow-owned and not OSS'
         ],
         prosThem: [
             'Timeline orchestration is genuinely best-in-class — scrubbing, labels, nesting, reverse',
-            'Deep plugin ecosystem: ScrollTrigger, Flip, MorphSVG, Draggable, SplitText, Observer',
+            'Deep plugin ecosystem — ScrollTrigger, Flip, MorphSVG, Draggable, SplitText, Observer — and every plugin is free since 3.13 (May 2025)',
             'Decade-plus of production hardening across thousands of sites',
             'Ad-tech and creative-coding industry standard',
             'Detailed control over every easing curve and motion path'
@@ -251,7 +259,7 @@ export const competitors: Competitor[] = [
             'No declarative gesture props (whileHover / whileTap / whileFocus / whileInView)',
             'No AnimatePresence equivalent — manual unmount delay required',
             'No shared-layout (layoutId) animation pattern',
-            'Some marquee plugins (MorphSVG, SplitText, Physics2D) are paid (Club GSAP)',
+            'Free but not open source — Webflow owns the IP; the Standard License bars reverse engineering and use in competing no-code animation builders',
             'Larger bundle once you add ScrollTrigger / Flip / Draggable'
         ],
         verdict:
