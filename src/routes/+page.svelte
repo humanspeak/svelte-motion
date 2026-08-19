@@ -667,6 +667,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/scrolled') + searchParams}
+                    >
+                        layoutId — scrolled-page handoff (plain {'{#if}'} + AnimatePresence)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout/scroll') + searchParams}
                     >
                         layoutScroll — single container

@@ -2,7 +2,7 @@
     import { arc, motion } from '@humanspeak/svelte-motion'
 
     let right = $state(false)
-    const path = arc({ strength: 0.7 })
+    const path = arc({ strength: 0.5 })
     const transition = { layout: { duration: 0.8, ease: 'easeInOut' as const, path } }
 </script>
 
@@ -87,7 +87,7 @@
 
     .stage {
         display: grid;
-        height: 180px;
+        height: 200px;
         grid-template-columns: 1fr 1fr;
         gap: 120px;
         border: 1px solid var(--brut-ink, #0a0a0a);
