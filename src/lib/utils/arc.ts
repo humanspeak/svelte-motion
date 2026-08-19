@@ -24,25 +24,22 @@
 import { DEV } from 'esm-env'
 import { arc as upstreamArc, type ArcOptions, type MotionPath } from 'motion-dom'
 
+const AXES = ['x', 'y'] as const
+
+/** Absent values fall back to the current reading upstream; otherwise the bezier needs a finite number. */
+const isFiniteOrAbsent = (value: unknown): boolean =>
+    value == null || (typeof value === 'number' && Number.isFinite(value))
+
 /** Keyframe shapes upstream `arc()` can interpolate without producing `NaN`. */
 const isNumericKeyframe = (value: unknown): boolean => {
-    if (value === undefined) return true
-    if (typeof value === 'number') return Number.isFinite(value)
     if (Array.isArray(value)) {
-        // Upstream reads `[0]` (wildcard `null` falls back to the current
-        // value) and the last entry; anything else must be a finite number.
-        return value.every(
-            (entry, index) =>
-                (index === 0 && entry === null) ||
-                (typeof entry === 'number' && Number.isFinite(entry))
-        )
+        // Upstream reads only `[0]` (wildcard `null`/absent falls back to the
+        // current value) and the last entry; middle keyframes are ignored.
+        const last: unknown = value.at(-1)
+        return isFiniteOrAbsent(value[0]) && typeof last === 'number' && Number.isFinite(last)
     }
-    return false
+    return isFiniteOrAbsent(value)
 }
-
-/** Whether a MotionValue's current reading is safe to feed the bezier. */
-const isNumericCurrent = (value: unknown): boolean =>
-    value === undefined || value === null || (typeof value === 'number' && Number.isFinite(value))
 
 /**
  * Create a curved path for `transition.path`.
@@ -76,17 +73,17 @@ export const arc = (options: ArcOptions = {}): MotionPath => {
     let warned = false
 
     return {
-        interpolateProjection: (delta) => path.interpolateProjection(delta),
+        ...path,
         animateVisualElement(visualElement, target, transition, delay, animations) {
             if (!('x' in target || 'y' in target)) return
 
-            const endpointsNumeric = (['x', 'y'] as const).every((key) => {
+            const endpointsNumeric = AXES.every((key) => {
                 const raw = (target as Record<string, unknown>)[key]
                 // No default: `getValue(key, default)` would create the value.
                 // Mirror upstream's read order (MotionValue, then latestValues).
                 const current: unknown =
                     visualElement.getValue(key)?.get() ?? visualElement.latestValues[key]
-                return isNumericKeyframe(raw) && isNumericCurrent(current)
+                return isNumericKeyframe(raw) && isFiniteOrAbsent(current)
             })
 
             if (!endpointsNumeric) {
@@ -107,5 +104,3 @@ export const arc = (options: ArcOptions = {}): MotionPath => {
         }
     }
 }
-
-export type { ArcOptions } from 'motion-dom'

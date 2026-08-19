@@ -21,11 +21,7 @@
         The stages sit below a tall spacer; Playwright scrolls them into view before toggling.
     </p>
 
-    <div
-        style="height: 1400px"
-        class="border border-dashed border-slate-700"
-        data-testid="spacer"
-    ></div>
+    <div style="height: 1400px" class="border border-dashed border-slate-700"></div>
 
     <button
         class="w-fit rounded bg-blue-600 px-3 py-2 text-white"

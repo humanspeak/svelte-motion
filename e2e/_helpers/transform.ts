@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 
 /**
  * Read the rendered `matrix(...)` transform from an element and return the
@@ -176,7 +176,15 @@ export const beginHorizontalDrag = async (page: Page, card: Locator) => {
 }
 
 /** One per-frame transform sample from `sampleTransformSeries`. */
-export type TransformSample = { selector: string; tx: number; ty: number; atMs: number }
+export type TransformSample = {
+    selector: string
+    tx: number
+    ty: number
+    /** Matrix rotation/skew terms — non-zero while a rotation is applied. */
+    b: number
+    c: number
+    atMs: number
+}
 
 /**
  * Sample the computed `matrix(...)` translate of one or more selectors every
@@ -194,45 +202,82 @@ export const sampleTransformSeries = (
 ): Promise<TransformSample[]> =>
     page.evaluate(
         ({ selectors, ms }) =>
-            new Promise<Array<{ selector: string; tx: number; ty: number; atMs: number }>>(
-                (resolve) => {
-                    const samples: Array<{
-                        selector: string
-                        tx: number
-                        ty: number
-                        atMs: number
-                    }> = []
-                    const start = performance.now()
-                    const read = () => {
-                        for (const selector of selectors) {
-                            const el = document.querySelector<HTMLElement>(selector)
-                            if (!el) continue
-                            const transform = getComputedStyle(el).transform
-                            const match = transform.match(/matrix\(([^)]+)\)/)
-                            let tx = 0
-                            let ty = 0
-                            if (match) {
-                                const parts = match[1]
-                                    .split(',')
-                                    .map((part) => Number.parseFloat(part.trim()))
-                                tx = parts[4] ?? 0
-                                ty = parts[5] ?? 0
-                            }
-                            samples.push({
-                                selector,
-                                tx,
-                                ty,
-                                atMs: Math.round(performance.now() - start)
-                            })
+            new Promise<
+                Array<{
+                    selector: string
+                    tx: number
+                    ty: number
+                    b: number
+                    c: number
+                    atMs: number
+                }>
+            >((resolve) => {
+                const samples: Array<{
+                    selector: string
+                    tx: number
+                    ty: number
+                    b: number
+                    c: number
+                    atMs: number
+                }> = []
+                const start = performance.now()
+                const read = () => {
+                    for (const selector of selectors) {
+                        const el = document.querySelector<HTMLElement>(selector)
+                        if (!el) continue
+                        const transform = getComputedStyle(el).transform
+                        const match = transform.match(/matrix\(([^)]+)\)/)
+                        let tx = 0
+                        let ty = 0
+                        let b = 0
+                        let c = 0
+                        if (match) {
+                            const parts = match[1]
+                                .split(',')
+                                .map((part) => Number.parseFloat(part.trim()))
+                            b = parts[1] ?? 0
+                            c = parts[2] ?? 0
+                            tx = parts[4] ?? 0
+                            ty = parts[5] ?? 0
                         }
-                        if (performance.now() - start < ms) requestAnimationFrame(read)
-                        else resolve(samples)
+                        samples.push({
+                            selector,
+                            tx,
+                            ty,
+                            b,
+                            c,
+                            atMs: Math.round(performance.now() - start)
+                        })
                     }
-                    requestAnimationFrame(read)
+                    if (performance.now() - start < ms) requestAnimationFrame(read)
+                    else resolve(samples)
                 }
-            ),
+                requestAnimationFrame(read)
+            }),
         { selectors, ms }
     )
+
+/**
+ * Poll a selector's computed translate until BOTH axes hold the target at
+ * once (single `readTransform` per poll — the two-poll-per-axis form doubles
+ * the round trips and can pass with tx and ty settling at different times).
+ */
+export const waitForSettledTransform = async (
+    page: Page,
+    selector: string,
+    target: { tx: number; ty: number },
+    tolerance = 0.6
+) => {
+    await expect
+        .poll(
+            async () => {
+                const t = await readTransform(page, selector)
+                return Math.max(Math.abs(t.tx - target.tx), Math.abs(t.ty - target.ty))
+            },
+            { timeout: 2500 }
+        )
+        .toBeLessThan(tolerance)
+}
 
 /** One per-frame rect sample from `sampleRectLeftSeries`. */
 export type RectLeftSample = { atMs: number; lefts: Record<string, number | null> }

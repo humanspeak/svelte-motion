@@ -6,6 +6,16 @@
     let direction = $state<'cw' | 'ccw' | undefined>(undefined)
     let rotate = $state(false)
 
+    const controls: Array<{ testid: string; label: string; apply: () => void }> = [
+        { testid: 'strength-1', label: 'Strength 1', apply: () => (strength = 1) },
+        { testid: 'strength-0', label: 'Strength 0', apply: () => (strength = 0) },
+        { testid: 'dir-auto', label: 'Auto', apply: () => (direction = undefined) },
+        { testid: 'dir-cw', label: 'CW', apply: () => (direction = 'cw') },
+        { testid: 'dir-ccw', label: 'CCW', apply: () => (direction = 'ccw') },
+        { testid: 'rotate-on', label: 'Rotate on', apply: () => (rotate = true) },
+        { testid: 'rotate-off', label: 'Rotate off', apply: () => (rotate = false) }
+    ]
+
     // arc() keeps auto-direction continuity state, so recreate it only when
     // an option changes instead of evaluating a fresh path on every render.
     const transition = $derived({
@@ -30,55 +40,15 @@
         >
             Toggle
         </button>
-        <button
-            class="rounded bg-slate-700 px-3 py-2 text-white"
-            data-testid="strength-1"
-            onclick={() => (strength = 1)}
-        >
-            Strength 1
-        </button>
-        <button
-            class="rounded bg-slate-700 px-3 py-2 text-white"
-            data-testid="strength-0"
-            onclick={() => (strength = 0)}
-        >
-            Strength 0
-        </button>
-        <button
-            class="rounded bg-slate-700 px-3 py-2 text-white"
-            data-testid="dir-auto"
-            onclick={() => (direction = undefined)}
-        >
-            Auto
-        </button>
-        <button
-            class="rounded bg-slate-700 px-3 py-2 text-white"
-            data-testid="dir-cw"
-            onclick={() => (direction = 'cw')}
-        >
-            CW
-        </button>
-        <button
-            class="rounded bg-slate-700 px-3 py-2 text-white"
-            data-testid="dir-ccw"
-            onclick={() => (direction = 'ccw')}
-        >
-            CCW
-        </button>
-        <button
-            class="rounded bg-slate-700 px-3 py-2 text-white"
-            data-testid="rotate-on"
-            onclick={() => (rotate = true)}
-        >
-            Rotate on
-        </button>
-        <button
-            class="rounded bg-slate-700 px-3 py-2 text-white"
-            data-testid="rotate-off"
-            onclick={() => (rotate = false)}
-        >
-            Rotate off
-        </button>
+        {#each controls as control (control.testid)}
+            <button
+                class="rounded bg-slate-700 px-3 py-2 text-white"
+                data-testid={control.testid}
+                onclick={control.apply}
+            >
+                {control.label}
+            </button>
+        {/each}
     </div>
 
     <p class="font-mono text-sm" data-testid="readout">

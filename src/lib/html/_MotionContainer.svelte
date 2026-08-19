@@ -729,15 +729,14 @@
     $effect(() => {
         if (!(element && layoutIdProp && layoutIdRegistry)) return
 
-        // Capture rect on every frame while mounted. Re-express in PAGE space
-        // (window scroll folded in) plus the nearest layoutScroll ancestors'
-        // coordinate space, so the FLIP-from rect stored at unmount stays
-        // correct even if the window or a scroll container moved between the
-        // snapshot and the next element's mount. The consumer
-        // (`commitObservedLayoutChange`) seeds it as a projection snapshot
-        // against a layout measured by upstream `measurePageBox()` — page
-        // space — so a viewport-relative rect here made every cross-parent
-        // handoff on a scrolled page start `window.scrollY` px off.
+        // Capture rect on every frame while mounted, in PAGE space: the
+        // consumer (`commitObservedLayoutChange`) seeds it as a projection
+        // snapshot against a layout measured by upstream `measurePageBox()`,
+        // so a viewport-relative rect makes a scrolled page's handoff start
+        // `window.scrollY` px off. Deliberately NOT `pageRectOf()`: its
+        // phase-cached scroll only refreshes during projection updates, so a
+        // continuous rAF capture would read stale offsets after a scroll —
+        // live window/container reads are the correct form for this loop.
         let rafId: number
         const captureRect = () => {
             if (element) {
