@@ -13,7 +13,7 @@ Planned against commit `526f503` on branch `feat/arc`.
 
 | Plan | Title                                                                          | Priority | Effort | Depends on | Status |
 | ---- | ------------------------------------------------------------------------------ | -------- | ------ | ---------- | ------ |
-| 001  | Ship `arc()` curved motion paths (`transition.path`) with docs, demos, tests   | P1       | M      | —          | TODO   |
+| 001  | Ship `arc()` curved motion paths (`transition.path`) with docs, demos, tests   | P1       | M      | —          | DONE — guard PASS at `7498c80` (2026-08-19); PR held for operator sign-off |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
