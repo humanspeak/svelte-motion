@@ -75,9 +75,9 @@ export {
 // Re-export utility functions
 export { clamp, distance, distance2D, interpolate, mix, pipe, progress, wrap } from 'motion'
 
-// Curved motion paths for `transition.path` (upstream Motion 13 `arc()`).
-// Lives in `motion-dom`, not `motion`, so it is re-exported from there.
-export { arc } from 'motion-dom'
+// Curved motion paths for `transition.path` (upstream Motion 13 `arc()`),
+// wrapped with a numeric-endpoint guard — see `$lib/utils/arc`.
+export { arc } from '$lib/utils/arc'
 export type {
     ArcOptions,
     MotionPath as MotionPathDefinition, // `MotionPath` is already our motion.path component

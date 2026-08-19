@@ -1,5 +1,6 @@
+import { arc } from '$lib/utils/arc'
 import { render } from '@testing-library/svelte'
-import { arc, visualElementStore } from 'motion-dom'
+import { arc as upstreamArc, visualElementStore } from 'motion-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MotionContainer from './_MotionContainer.svelte'
 
@@ -131,5 +132,55 @@ describe('_MotionContainer transition.path (arc)', () => {
         expect(last.x).toBe(200)
         expect(last.y).toBe(0)
         expect(last.transform).toBe('translateX(200px) rotate(45deg)')
+    })
+
+    it('falls back to a straight line (no NaN) when x/y endpoints carry units', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        const { container } = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                initial: { x: '0px', y: 0 },
+                animate: { x: '100px' },
+                transition: { duration: 0.6, ease: 'linear', path: arc({ strength: 1 }) }
+            }
+        })
+        await sleep(60)
+        const el = container.firstElementChild as HTMLElement
+        const samples = await sample(el, 8, 100)
+
+        // Never NaN, never a y bulge, actually moves mid-flight, and arrives.
+        // (Assert on latestValues: the browser refuses an invalid
+        // `translateX(NaNpx)` write, so the transform string alone is vacuous.)
+        expect(samples.some((entry) => Number.isNaN(entry.x))).toBe(false)
+        expect(samples.some((entry) => Math.abs(Number(entry.y)) > 1)).toBe(false)
+        expect(
+            samples.some((entry) => {
+                const px = parseFloat(String(entry.x))
+                return Number.isFinite(px) && px > 5 && px < 95
+            })
+        ).toBe(true)
+        expect(samples.at(-1)!.transform).toBe('translateX(100px)')
+        expect(warn).toHaveBeenCalledTimes(1)
+        expect(String(warn.mock.calls[0][0])).toMatch(/arc\(\) requires numeric x\/y/)
+        warn.mockRestore()
+    })
+
+    it('documents the upstream hazard: raw motion-dom arc() emits NaN for px endpoints', async () => {
+        // Pins WHY the wrapper exists. If this starts passing without NaN,
+        // upstream fixed it and the guard in $lib/utils/arc can be retired.
+        const { container } = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                initial: { x: '0px', y: 0 },
+                animate: { x: '100px' },
+                transition: { duration: 0.6, ease: 'linear', path: upstreamArc({ strength: 1 }) }
+            }
+        })
+        await sleep(60)
+        const el = container.firstElementChild as HTMLElement
+        const samples = await sample(el, 5, 100)
+        // NaN reaches latestValues; the invalid transform write is refused by
+        // the browser, so the element freezes, then jumps on completion.
+        expect(samples.some((entry) => Number.isNaN(entry.x))).toBe(true)
     })
 })

@@ -110,6 +110,22 @@ const path = arc({ rotate: true })
 const subtlePath = arc({ rotate: 0.35 })
 ```
 
+## Numeric x/y only
+
+`arc()` bends **numeric** `x`/`y` values (pixels). Unit-bearing endpoints — `'100px'`, `'50%'`, `'var(--x)'` — are valid everywhere else in the API, but upstream Motion's arc does its bezier math on raw numbers, so they would produce `NaN` mid-flight. Svelte Motion guards that case: when either endpoint is non-numeric the path steps aside, `x`/`y` animate along the default straight line, and a one-time `console.warn` explains why in development builds.
+
+```svelte
+<!-- curves -->
+<motion.div animate={{ x: 200 }} transition={{ path }} />
+
+<!-- straight line + dev warning: '50%' is not a number -->
+<motion.div animate={{ x: '50%' }} transition={{ path }} />
+```
+
+Layout animations (`transition.layout.path`) are unaffected — projection always works in pixel deltas.
+
+> **Post-1.x follow-up**: the numeric guard mirrors an upstream limitation, not a design choice. Once Motion decides how `arc()` should resolve unit-bearing endpoints, this wrapper either adopts their resolution or is removed — revisit after the 1.x line.
+
 ## Reuse the instance
 
 Create one `arc()` instance for all animations on the same component. The path keeps continuity state so automatic direction stays on a stable screen-space side across reversals.
