@@ -3,6 +3,7 @@ import {
     animate,
     AnimatePresence,
     anticipate,
+    arc,
     backIn,
     backInOut,
     backOut,
@@ -134,6 +135,13 @@ describe('public API: index.ts', () => {
         expect(typeof distance).toBe('function')
         expect(typeof distance2D).toBe('function')
         expect(typeof progress).toBe('function')
+    })
+
+    it('re-exports arc() path factory from motion-dom', () => {
+        expect(typeof arc).toBe('function')
+        const path = arc({ strength: 1 })
+        expect(typeof path.animateVisualElement).toBe('function')
+        expect(typeof path.interpolateProjection).toBe('function')
     })
 
     it('transform creates a range mapper', () => {

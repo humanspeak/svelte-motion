@@ -1,0 +1,144 @@
+---
+title: 'arc()'
+description: 'Curved motion paths for x/y animations — keyframes, layout, and animate().'
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte'
+  import Default from '$lib/examples/arc/demos/Default.svelte'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'arc() | Docs | Svelte Motion'
+      seo.description = 'Curve x/y keyframes, layout transitions, shared elements, and imperative animations with transition.path and arc().'
+      seo.ogTitle = 'arc()'
+      seo.ogTagline = 'Curved paths for every kind of motion'
+      seo.ogFeatures = ['arc', 'Curved Paths', 'Layout Animations', 'Motion Parity']
+      seo.ogSlug = 'docs-arc'
+  }
+</script>
+
+# arc()
+
+`arc()` creates a quadratic curved path for simultaneous `x` and `y` motion. Pass the returned path to `transition.path`; the same API works with keyframes, layout animations, shared `layoutId` transitions, and imperative animation.
+
+```svelte
+<script lang="ts">
+  import { arc, motion } from '@humanspeak/svelte-motion'
+
+  const path = arc()
+</script>
+
+<motion.div
+  animate={{ x: 200, y: 0 }}
+  transition={{ duration: 1, path }}
+/>
+```
+
+<Example isSmall exampleUrl="/examples/arc">
+  <Default />
+</Example>
+
+## Options
+
+| Option | Default | Description |
+|---|---:|---|
+| `strength` | `0.5` | Controls the bend. `1` peaks at a height equal to the distance between the two points; `0` has no bend. |
+| `peak` | `0.5` | Sets where along the bend the arc reaches maximum height. `0.5` is symmetric; lower values move the peak toward the start. |
+| `direction` | auto | Lock the bend to `"cw"` or `"ccw"` relative to the direction of travel. Auto keeps the bulge on a stable screen-space side. |
+| `rotate` | `false` | `true` follows the full path tangent. A number from `0` to `1` scales the tangent rotation. |
+
+```ts
+const path = arc({
+  strength: 0.8,
+  peak: 0.35,
+  direction: 'cw',
+  rotate: true
+})
+```
+
+## Layout animations
+
+Put the path inside the `layout` transition for FLIP and shared `layoutId` animations:
+
+```svelte
+<motion.div
+  layout
+  transition={{
+    layout: { duration: 0.6, path: arc({ strength: 0.6 }) }
+  }}
+/>
+```
+
+The same transition shape works on both ends of a shared `layoutId` change. Motion skips the arc for layout shifts under 20px, where a curved detour would be visually noisy.
+
+## Springs
+
+The path changes geometry, not timing, so it composes with spring transitions:
+
+```svelte
+<motion.div
+  animate={{ x: 200, y: 100 }}
+  transition={{
+    type: 'spring',
+    bounce: 0.5,
+    path: arc({ strength: 1 })
+  }}
+/>
+```
+
+## Imperative animation
+
+Use the same path with `animate()` or with `useAnimate()`:
+
+```ts
+import { animate, arc } from '@humanspeak/svelte-motion'
+
+animate(element, { x: 200, y: 100 }, {
+  duration: 1,
+  path: arc()
+})
+```
+
+## Rotation
+
+`rotate: true` turns the element along the path tangent; a number between `0` and `1` applies a scaled amount. Path rotation is additive to the element's own `rotate`, so a concurrent rotation animation is preserved rather than overwritten.
+
+```ts
+const path = arc({ rotate: true })
+const subtlePath = arc({ rotate: 0.35 })
+```
+
+## Numeric x/y only
+
+`arc()` bends **numeric** `x`/`y` values (pixels). Unit-bearing endpoints — `'100px'`, `'50%'`, `'var(--x)'` — are valid everywhere else in the API, but upstream Motion's arc does its bezier math on raw numbers, so they would produce `NaN` mid-flight. Svelte Motion guards that case: when either endpoint is non-numeric the path steps aside, `x`/`y` animate along the default straight line, and a one-time `console.warn` explains why in development builds.
+
+```svelte
+<!-- curves -->
+<motion.div animate={{ x: 200 }} transition={{ path }} />
+
+<!-- straight line + dev warning: '50%' is not a number -->
+<motion.div animate={{ x: '50%' }} transition={{ path }} />
+```
+
+Layout animations (`transition.layout.path`) are unaffected — projection always works in pixel deltas.
+
+> **Post-1.x follow-up**: the numeric guard mirrors an upstream limitation, not a design choice. Once Motion decides how `arc()` should resolve unit-bearing endpoints, this wrapper either adopts their resolution or is removed — revisit after the 1.x line.
+
+## Reuse the instance
+
+Create one `arc()` instance for all animations on the same component. The path keeps continuity state so automatic direction stays on a stable screen-space side across reversals.
+
+```svelte
+<script lang="ts">
+  import { arc, motion } from '@humanspeak/svelte-motion'
+
+  const path = arc()
+</script>
+
+<!-- Reuse `path`; don't call arc() inline in the template. -->
+<motion.div animate={{ x }} transition={{ path }} />
+```
+
+In Svelte, an inline `transition={{ path: arc() }}` can be re-evaluated whenever a reactive dependency in that expression changes, discarding the continuity state.

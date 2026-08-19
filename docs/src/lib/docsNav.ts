@@ -23,6 +23,7 @@ import {
     Signal,
     SlidersHorizontal,
     Sparkles,
+    Spline,
     Timer,
     Wand,
     Zap
@@ -57,6 +58,7 @@ export const docsSections: NavSection[] = [
         icon: Layers,
         items: [
             { title: 'Layout Animations', href: '/docs/layout-animations', icon: Move },
+            { title: 'arc()', href: '/docs/arc', icon: Spline },
             { title: 'layoutDependency', href: '/docs/layout-dependency', icon: Gauge },
             { title: 'SVG Animation', href: '/docs/svg-animation', icon: Wand },
             { title: 'transformTemplate', href: '/docs/transform-template', icon: Code },

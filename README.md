@@ -58,6 +58,7 @@ Goal: Framer Motion API parity for Svelte where common React examples can be tra
 Motion components are generated from canonical HTML/SVG tag lists and exported from `src/lib/html/`.
 
 - `motion.div`, `motion.button`, `motion.svg`, `motion.path`, etc.
+- `arc()` curved motion paths via `transition.path` (keyframes, layout, `animate()`)
 - Most standard tags are included.
 - Excluded by generation: `script`, `style`, `link`, `meta`, `title`, `head`, `html`, `body`.
 

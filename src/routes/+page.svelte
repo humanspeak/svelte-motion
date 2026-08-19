@@ -104,6 +104,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/arc/keyframes') + searchParams}
+                    >
+                        arc() — transition.path keyframes
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/transform-template/stop') + searchParams}
                     >
                         transformTemplate — controls.stop() freeze (#402)
@@ -646,6 +654,22 @@
                         href={resolve('/tests/layout-id') + searchParams}
                     >
                         layoutId (shared layout)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/arc/layout') + searchParams}
+                    >
+                        arc() — layout / layoutId path
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/scrolled') + searchParams}
+                    >
+                        layoutId — scrolled-page handoff (plain {'{#if}'} + AnimatePresence)
                     </a>
                 </li>
                 <li>

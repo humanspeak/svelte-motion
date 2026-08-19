@@ -1,0 +1,94 @@
+{
+    "_non_goals_comment": "svelte-motion has no hard non-goals declared; its README 'Known gaps vs Framer Motion' (whileInView viewport options, MotionConfig reducedMotion/features/transformPagePoint) are parity TODOs, surfaced via the upstream watch — not non-goals.",
+
+    "_slack_channel_comment": "#claude-reports (human-speak). Delivery via shared webhook in ~/.config/competitive-intel/common.env.",
+    "category": "Svelte 5 animation library — Framer Motion API port",
+
+    "compare_data_paths": ["docs/src/lib/compare-data.ts"],
+    "competitors": [
+        {
+            "npm": "motion-sv",
+            "repo": "hanielu/motion-svelte",
+            "note": "strongest active rival: runes-native Framer Motion API for Svelte 5"
+        },
+        {
+            "npm": "svelte-motion",
+            "repo": "micha-lmxt/svelte-motion",
+            "note": "namesake incumbent; highest downloads/stars in niche but stale since 2024 (Svelte 3/4-era port). Key migration/SEO target"
+        },
+        { "npm": "gsap", "repo": "greensock/GSAP" }
+    ],
+
+    "github_handle": "jaysin586",
+    "non_goals": [],
+    "page_validation": {
+        "download_tolerance": 0.3,
+        "_comment": "compare-data.ts drives the /compare 'vs' pages (framer-motion, motion/Motion One, gsap). framer-motion + motion are fetched via 'upstream', gsap via 'competitors', so all compare-page packages have metadata for validation."
+    },
+
+    "project": "@humanspeak/svelte-motion",
+    "repo_triage": {
+        "enabled": true,
+        "_comment": "Open PRs/issues not opened by jaysin586, plus threads awaiting reply."
+    },
+
+    "self_features": [
+        "Declarative motion.<tag> components (broad element coverage)",
+        "AnimatePresence exit animations",
+        "Gestures: whileHover, whileTap, whileFocus, whileInView",
+        "Drag with constraints / momentum / elastic",
+        "Variants with orchestration",
+        "FLIP layout animations + shared-layout transitions",
+        "Spring physics",
+        "Scroll-linked motion values",
+        "Motion values + use-* hooks (useSpring, useScroll, useTransform, useInView, usePresence)",
+        "MotionConfig (transition defaults)",
+        "SSR-friendly for SvelteKit",
+        "TypeScript-first"
+    ],
+
+    "self_npm": "@humanspeak/svelte-motion",
+    "self_repo": "humanspeak/svelte-motion",
+
+    "slack_channel": "C0BP5BF1UTX",
+    "upstream": [
+        {
+            "npm": "motion",
+            "repo": "motiondivision/motion",
+            "note": "runtime dependency (motion + motion-dom) AND the repo that publishes framer-motion; watch releases for new APIs/features to port and parity to verify"
+        },
+        {
+            "npm": "framer-motion",
+            "repo": "",
+            "note": "the React API this library mirrors; track its version as the API-parity anchor"
+        }
+    ],
+
+    "watchlist": [
+        {
+            "npm": "@animotion/motion",
+            "repo": "animotionjs/motion",
+            "note": "runes-native, Joy of Code; imperative tween/to/await model (adjacent, could expand toward our niche)"
+        },
+        {
+            "npm": "motion-svelte",
+            "repo": "epavanello/motion-svelte",
+            "note": "same niche, runes-native, but dormant at v0.0.1 — watch for revival"
+        },
+        {
+            "npm": "@neodrag/svelte",
+            "repo": "PuruVJ/neodrag",
+            "note": "dominant Svelte drag action (2.4k★); overlaps our drag feature"
+        },
+        {
+            "npm": "svelte-gestures",
+            "repo": "Rezi/svelte-gestures",
+            "note": "gesture recognizers (pan/pinch/press/swipe); overlaps our gesture surface"
+        },
+        {
+            "npm": "svelte-inview",
+            "repo": "svelte-inview/svelte-inview",
+            "note": "IntersectionObserver action; the de-facto whileInView alternative devs pair with svelte/transition"
+        }
+    ]
+}

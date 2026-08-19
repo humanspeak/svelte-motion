@@ -84,6 +84,8 @@ The most common use case is a tab indicator that slides between tabs:
 3. When the new element mounts, it reads the stored rect and performs a FLIP animation from the old position to its own natural position.
 4. The animation uses the element's `transition` prop, or falls back to the previous element's transition.
 
+Layout animations can travel along a curve instead of a straight FLIP interpolation. See [`arc()`](/docs/arc) for `transition.layout.path` and shared `layoutId` examples.
+
 ### Full interactive example
 
 <Example isSmall exampleUrl="/examples/shared-layout-animation">
