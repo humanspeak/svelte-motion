@@ -14,6 +14,24 @@
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
 
+> **Revision 2026-08-19 (guard, after executor round 1)**:
+> 1. motion-dom's `MotionPath` **type** collides with this package's existing
+>    `MotionPath` **component** export (`src/lib/index.ts` →
+>    `export { default as MotionPath } from '$lib/html/Path.svelte'`). Export the
+>    type under the alias **`MotionPathDefinition`** instead:
+>    `export type { ArcOptions, MotionPath as MotionPathDefinition, PathInterpolator, PathState, Point2D } from 'motion-dom'`.
+>    Do NOT add a separate `import type … as …` + `export type X = …` pair.
+> 2. `docs/src/lib/demo-loaders.ts`, `docs/src/lib/demo-manifest.json`,
+>    `docs/src/lib/sitemap-manifest.json` are **gitignored** (`docs/.gitignore:36-40`)
+>    and regenerated on every docs dev/build. They will never appear in
+>    `git status`; the "commit the regenerated files" instruction in Step 5 and
+>    the related `git status` verify line are void. The `grep` checks on their
+>    local contents still apply.
+> 3. `pnpm` via corepack fails in the Codex sandbox (`@pnpm/exe` identity check);
+>    `./node_modules/.bin/vitest` / `./node_modules/.bin/svelte-check` are the
+>    equivalent direct invocations. The guard runs the real `pnpm` gates locally.
+> Re-stamped: planned-at now `1ba2838` (plan commit); drift check unchanged.
+
 ## Status
 
 - **Priority**: P1
@@ -21,7 +39,7 @@
 - **Risk**: LOW
 - **Depends on**: none
 - **Category**: direction (upstream parity feature)
-- **Planned at**: commit `526f503`, 2026-08-19
+- **Planned at**: commit `526f503`, 2026-08-19 (revised 2026-08-19 at `1ba2838`)
 
 ## Why this matters
 
@@ -240,7 +258,7 @@ is the maintainer's live dev/sign-off server — **never kill it**. Run
 - `docs/src/lib/examples/arc/demos/Default.svelte`, `Layout.svelte`, `Rotate.svelte` (create)
 - `docs/src/lib/docsNav.ts`, `docs/src/lib/examplesIndex.ts`, `docs/src/lib/compare-data.ts`
 - `docs/src/routes/docs/api-reference/+page.svx` (one bullet), `docs/src/routes/docs/layout-animations/+page.svx` (one cross-link paragraph)
-- Generated docs files touched by the build/sync: `docs/src/lib/demo-loaders.ts`, `docs/src/lib/demo-manifest.json`, `docs/src/lib/sitemap-manifest.json`, `docs/src/routes/examples/+page.ts`
+- Generated docs files touched by the build/sync (gitignored, regenerate locally only): `docs/src/lib/demo-loaders.ts`, `docs/src/lib/demo-manifest.json`, `docs/src/lib/sitemap-manifest.json`; plus `docs/src/routes/examples/+page.ts` if the catalog sync rewrites it
 - `README.md` (feature bullet), `.changeset/<new>.md` (create)
 - `.agents/.plans/arc-motion-path/README.md` (status row)
 
@@ -270,7 +288,13 @@ In `src/lib/index.ts`, directly after the "Re-export utility functions" block
 // Curved motion paths for `transition.path` (upstream Motion 13 `arc()`).
 // Lives in `motion-dom`, not `motion`, so it is re-exported from there.
 export { arc } from 'motion-dom'
-export type { ArcOptions, MotionPath, PathInterpolator, PathState, Point2D } from 'motion-dom'
+export type {
+    ArcOptions,
+    MotionPath as MotionPathDefinition, // `MotionPath` is already our motion.path component
+    PathInterpolator,
+    PathState,
+    Point2D
+} from 'motion-dom'
 ```
 
 In `src/lib/index.spec.ts`, inside `describe('public API: index.ts')`, add
@@ -530,15 +554,15 @@ test('layoutId shared transition follows the arc', …)
 11. `docs/src/routes/docs/layout-animations/+page.svx` — after the paragraph
     at line ~85 ("The animation uses the element's `transition` prop…"), add
     one paragraph: layout animations can travel a curve — see [`arc()`](/docs/arc).
-12. Rebuild the library so docs see the export, regenerate the generated docs
-    files, and sync the catalog:
+12. Rebuild the library so docs see the export, regenerate the (gitignored) docs
+    loader/manifest files locally, and sync the catalog:
     `pnpm build && rm -rf docs/node_modules/.vite && (cd docs && pnpm examples-catalog:sync && pnpm build)`.
 
 **Verify**: `cd docs && pnpm check` → no errors mentioning `arc` (the 6
 pre-existing `optimized-appear` errors may remain — if the regenerated
 `demo-loaders.ts` now also includes the `optimized-appear/demos/*` entries,
 those errors disappear; either outcome is fine).
-**Verify**: `git status --short docs/src/lib/demo-loaders.ts docs/src/lib/demo-manifest.json docs/src/lib/sitemap-manifest.json docs/src/routes/examples/+page.ts` → all four show as modified and contain `arc`.
+**Verify**: `grep -c "arc/demos" docs/src/lib/demo-loaders.ts` ≥ 3 and `grep -c "/docs/arc\|/examples/arc" docs/src/lib/sitemap-manifest.json` ≥ 2 (these files are gitignored and regenerated on build — they will not show in `git status`).
 **Verify** (visual): `cd docs && pnpm dev` (any free port), open `/docs/arc`
 and `/examples/arc` — all three demos curve; no console errors.
 
