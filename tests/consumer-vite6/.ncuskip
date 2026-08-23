@@ -1,3 +1,5 @@
-# This fixture specifically verifies Vite 6 compatibility; do not upgrade Vite.
+# This fixture specifically verifies Vite 6 compatibility; do not upgrade Vite
+# or its Svelte plugin to a major that requires Vite 8.
 vite
+@sveltejs/vite-plugin-svelte
 typescript
