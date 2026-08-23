@@ -2,6 +2,7 @@
     "_non_goals_comment": "svelte-motion has no hard non-goals declared; its README 'Known gaps vs Framer Motion' (whileInView viewport options, MotionConfig reducedMotion/features/transformPagePoint) are parity TODOs, surfaced via the upstream watch — not non-goals.",
 
     "_slack_channel_comment": "#claude-reports (human-speak). Delivery via shared webhook in ~/.config/competitive-intel/common.env.",
+    "ahrefs_project_id": 8934908,
     "category": "Svelte 5 animation library — Framer Motion API port",
 
     "compare_data_paths": ["docs/src/lib/compare-data.ts"],
