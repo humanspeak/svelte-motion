@@ -14,5 +14,5 @@
 <CompareIndexV2
     {competitors}
     {ours}
-    introHtml="Honest, side-by-side comparisons of <b>@humanspeak/svelte-motion</b> against every major animation library you'd consider — including <b>Framer Motion</b> (React), <b>Motion One</b> / <code>motion.dev</code>, and <b>GSAP</b>. Feature matrices, pros / cons, verdicts. No spin. Coming from the dormant <code>svelte-motion</code> package? Read the <a href='/migrate-from-svelte-motion'>migration guide</a>."
+    introHtml="Honest, side-by-side comparisons of <b>@humanspeak/svelte-motion</b> against every major animation library you'd consider — including <b>Framer Motion</b> (React), <b>Motion One</b> / <code>motion.dev</code>, and <b>GSAP</b>. Feature matrices, pros / cons, verdicts. No spin. Coming from the dormant <code>svelte-motion</code> package? Read the <a href='/blog/migrating-from-svelte-motion'>migration guide</a>."
 />

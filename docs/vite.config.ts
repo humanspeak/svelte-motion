@@ -41,8 +41,9 @@ export default defineConfig({
         // dev server's `buildStart` hook. Replaces the sitemap half of the
         // legacy `generate-sitemap-manifest.mjs` script; the trimmed script
         // (`sync-examples-catalog.mjs`) now owns only the
-        // `examples/+page.ts` metadata sync. `blogDir: false` disables
-        // docs-kit's default blog-folder scan — we don't have a blog.
+        // `examples/+page.ts` metadata sync. Blog posts live directly under
+        // `src/routes/blog`, so route discovery finds them; `blogDir: false`
+        // only disables the separate `src/content/blog` content-folder scan.
         sitemapManifestPlugin({
             blogDir: false,
             extraPages: competitors.map((competitor) => ({
@@ -118,6 +119,12 @@ export default defineConfig({
                 'Spring physics, gestures, layout animations, exit animations, and scroll effects with a familiar declarative API.',
             defaultFeatures: docsConfig.defaultFeatures,
             extraPages: [
+                {
+                    ogSlug: 'blog-migrating-from-svelte-motion',
+                    ogTitle: 'Migrating from svelte-motion',
+                    ogTagline: 'A practical Svelte 5 migration to @humanspeak/svelte-motion.',
+                    ogFeatures: ['Svelte 5', 'Migration Guide', 'Motion API', 'SSR-safe']
+                },
                 {
                     ogSlug: 'compare',
                     ogTitle: `${docsConfig.name} vs Alternatives`,

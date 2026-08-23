@@ -4,6 +4,7 @@
     import favicon from '$lib/assets/logo.svg'
     import ExamplePager from '$lib/components/general/ExamplePager.svelte'
     import { docsConfig } from '$lib/docs-config'
+    import { headerNav } from '$lib/docsNav'
     import rootPkg from '../../../../package.json'
     import '@fontsource-variable/inter/index.css'
     import '@fontsource-variable/jetbrains-mono/index.css'
@@ -27,16 +28,7 @@
     layout shipped — preserved so existing per-example transition
     overrides keep behaving the same way.
 -->
-<ExampleLayoutV2
-    config={docsConfig}
-    {favicon}
-    version={PKG_VERSION}
-    nav={[
-        { label: 'docs', href: '/docs' },
-        { label: 'examples', href: '/examples' },
-        { label: 'compare', href: '/compare' }
-    ]}
->
+<ExampleLayoutV2 config={docsConfig} {favicon} version={PKG_VERSION} nav={headerNav}>
     <div class="flex flex-1 flex-col" use:enhanceCodeBlocks>
         <MotionConfig transition={{ duration: 0.6 }}>
             {@render children?.()}
