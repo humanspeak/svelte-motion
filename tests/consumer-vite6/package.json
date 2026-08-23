@@ -8,7 +8,8 @@
     "dependencies": {
         "@humanspeak/svelte-motion": "workspace:*",
         "@sveltejs/vite-plugin-svelte": "5.1.1",
-        "svelte": "5.56.8",
+        "svelte": "5.56.10",
         "vite": "6.4.3"
-    }
+    },
+    "packageManager": "pnpm@11.22.0"
 }

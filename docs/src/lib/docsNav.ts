@@ -1,4 +1,4 @@
-import type { NavSection } from '@humanspeak/docs-kit'
+import type { Breadcrumb, NavSection } from '@humanspeak/docs-kit'
 import {
     Accessibility,
     Activity,
@@ -28,6 +28,26 @@ import {
     Wand,
     Zap
 } from '@lucide/svelte'
+
+/** Header links shared by the docs, examples, comparisons, blog, and landing pages. */
+export const headerNav: { label: string; href: string }[] = [
+    { label: 'docs', href: '/docs' },
+    { label: 'examples', href: '/examples' },
+    { label: 'compare', href: '/compare' },
+    { label: 'blog', href: '/blog' }
+]
+
+const blogPostTitles: Record<string, string> = {
+    'migrating-from-svelte-motion': 'Migrating from svelte-motion'
+}
+
+/** Resolve blog routes into readable breadcrumb labels. */
+export const buildBlogBreadcrumbs = (pathname: string): Breadcrumb[] => {
+    if (pathname === '/blog' || pathname === '/blog/') return [{ title: 'Blog' }]
+
+    const slug = pathname.replace('/blog/', '').replace(/\/$/, '')
+    return [{ title: 'Blog', href: '/blog' }, { title: blogPostTitles[slug] ?? slug }]
+}
 
 export const docsSections: NavSection[] = [
     {

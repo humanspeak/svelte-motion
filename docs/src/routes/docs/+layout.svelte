@@ -16,7 +16,7 @@
     } from '@humanspeak/docs-kit'
     import { docsConfig } from '$lib/docs-config'
     import favicon from '$lib/assets/logo.svg'
-    import { docsSections, motionLoveAndRespect } from '$lib/docsNav'
+    import { docsSections, headerNav, motionLoveAndRespect } from '$lib/docsNav'
     import sitemapManifest from '$lib/sitemap-manifest.json'
     import rootPkg from '../../../../package.json'
     import '@fontsource-variable/inter/index.css'
@@ -154,16 +154,7 @@
 </svelte:head>
 
 <div class="flex min-h-screen flex-col justify-between bg-background">
-    <HeaderV2
-        config={docsConfig}
-        {favicon}
-        version={PKG_VERSION}
-        nav={[
-            { label: 'docs', href: '/docs' },
-            { label: 'examples', href: '/examples' },
-            { label: 'compare', href: '/compare' }
-        ]}
-    />
+    <HeaderV2 config={docsConfig} {favicon} version={PKG_VERSION} nav={headerNav} />
 
     <DocSlugStrip slug={docSlug} />
 

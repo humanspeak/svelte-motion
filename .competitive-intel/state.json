@@ -9,38 +9,42 @@
             "closed_on": "2026-08-19",
             "evidence": "reducedMotion prop at src/lib/components/MotionConfig.svelte:14",
             "gap": "MotionConfig reducedMotion"
+        },
+        {
+            "closed_on": "2026-08-23",
+            "evidence": "v0.9.3 (2026-08-19) feat: arc() curved motion paths via transition.path, PR #472; src/lib/utils/arc.ts",
+            "gap": "arc() curved motion paths"
         }
     ],
     "compare_validation": {
+        "_open_nits": [
+            "compare-data.ts:47 github link uses old org github.com/framer/motion (301 -> motiondivision/motion)"
+        ],
         "framer-motion": {
-            "note": "React-only framing accurate",
-            "validated_against_version": "13.1.0"
+            "note": "React-only framing accurate; 13.1.1 patch (SSR window guard, React 19 strict-mode AnimatePresence) flips no them: claim",
+            "validated_against_version": "13.1.1"
         },
         "gsap": {
             "note": "Licensing claims rewritten 2026-08-19: all plugins free since 3.13 (May 2025); distinction is MIT/OSS vs free-but-proprietary GreenSock Standard License.",
             "validated_against_version": "3.15.0"
         },
         "motion": {
-            "note": "framework-agnostic framing accurate",
-            "validated_against_version": "13.1.0"
+            "note": "framework-agnostic framing accurate at 13.1.1",
+            "validated_against_version": "13.1.1"
         }
     },
-    "last_run": "2026-08-19",
+    "last_run": "2026-08-23",
     "notes": {
-        "downloads": "All packages fell ~25-30% WoW on 2026-08-19 (npm reporting-window artifact). Self fell 28823->7032 (-76%), out of line with the field \u2014 recheck next run."
+        "competitive": "motion-sv weekly downloads (9260) edged above self (8910) for the first time in tracked data.",
+        "downloads": "2026-08-19's field-wide -25-30% drop reverted this run (motion-sv +20%, svelte-motion +49%, gsap +21%). Self 7032->8910 (+27%), a normal-sized rebound -- so the 28823 reading of 2026-08-12 looks like the outlier, not 7032. Treat 7-9k as the real self baseline.",
+        "upstream": "motion/framer-motion 13.1.1 fix 'guard animation window access in non-browser runtimes' -- SSR parity check outstanding for us."
     },
     "open_gaps": [
         {
-            "gap": "arc() curved motion paths",
-            "held_by": "motion (upstream 13.x); shipped by motion-sv 0.1.13",
-            "why": "only capability a direct Svelte rival visibly has that we don't; demo-able in comparisons",
-            "worth_doing": "yes \u2014 port"
-        },
-        {
             "gap": "MotionConfig skipAnimations (global animation kill switch)",
             "held_by": "motion-sv 0.1.13",
-            "why": "skipAnimations already plumbed internally at src/lib/utils/visualElementCore.ts:431 but not exposed as a MotionConfig prop",
-            "worth_doing": "yes \u2014 cheap, wiring exists"
+            "why": "skipAnimations already plumbed internally at src/lib/utils/visualElementCore.ts:431 (threaded at :480/:496) but not exposed as a MotionConfig prop",
+            "worth_doing": "yes -- cheap, wiring exists"
         },
         {
             "gap": "MotionConfig features / transformPagePoint",
@@ -50,6 +54,48 @@
         }
     ],
     "project": "@humanspeak/svelte-motion",
+    "rank_tracker": {
+        "project_id": 8934908,
+        "rows": [
+            {
+                "kd": 7,
+                "keyword": "framer motion svelte",
+                "position": 10,
+                "position_diff": -13,
+                "position_prev": 23,
+                "url": "https://motion.svelte.page/",
+                "volume": 20
+            },
+            {
+                "kd": 18,
+                "keyword": "svelte motion",
+                "position": 10,
+                "position_diff": -2,
+                "position_prev": 12,
+                "url": "https://motion.svelte.page/",
+                "volume": 20
+            },
+            {
+                "kd": 11,
+                "keyword": "svelte animation",
+                "position": 23,
+                "position_diff": 1,
+                "position_prev": 22,
+                "url": "https://motion.svelte.page/",
+                "volume": 20
+            }
+        ],
+        "summary": {
+            "avg_position": 14.3,
+            "declined": 1,
+            "improved": 2,
+            "ranked": 3,
+            "top10": 2,
+            "top100": 3,
+            "top3": 0,
+            "tracked": 3
+        }
+    },
     "run_type": "delta",
     "snapshot": {
         "competitors": [
@@ -68,14 +114,14 @@
                 "recent_releases": [
                     {
                         "date": "2026-07-07",
-                        "notes": "This release rebases motion-sv on the **motion-vue v2 architecture (motion-v 2.3)**, catching it up with upstream. Mostly an internal rewrite, but two things matter for you:\n\n### Build fix\n\nIf you were on a recent Vite (or anything pulling `motion-dom` \u2265 12.41), your build probably died with `\"activeAnimations\" is not exported by motion-dom`. No need for [#16](https://github.com/hanielu/motion-svelte/issues/16).\n\n### New\n\n- **`arc()` path animations** \u2014 curved motion paths ([docs](https://motion.dev/docs/arc)).\n- **`MotionConfig skipAnimations`** \u2014 kill all animations globally (reduced-motion,",
+                        "notes": "This release rebases motion-sv on the **motion-vue v2 architecture (motion-v 2.3)**, catching it up with upstream. Mostly an internal rewrite, but two things matter for you:\n\n### Build fix\n\nIf you were on a recent Vite (or anything pulling `motion-dom` ≥ 12.41), your build probably died with `\"activeAnimations\" is not exported by motion-dom`. No need for [#16](https://github.com/hanielu/motion-svelte/issues/16).\n\n### New\n\n- **`arc()` path animations** — curved motion paths ([docs](https://motion.dev/docs/arc)).\n- **`MotionConfig skipAnimations`** — kill all animations globally (reduced-motion,",
                         "notes_truncated": true,
                         "url": "https://github.com/hanielu/motion-svelte/releases/tag/motion-sv%400.1.13",
                         "version": "motion-sv@0.1.13"
                     },
                     {
                         "date": "2026-04-06",
-                        "notes": "### Improvements\n\n- **Narrowed `useSpring` type signature** \u2014 Source parameter changed from `T | MotionValue<T>` (generic) to `MotionValue<string> | MotionValue<number> | number`, which more accurately reflects the supported input types.\n\n### Breaking Changes\n\n- `useSpring` no longer accepts `string` as a standalone source value (only `number` or a `MotionValue`). If you were passing a raw string, wrap it in a `motionValue()` first.",
+                        "notes": "### Improvements\n\n- **Narrowed `useSpring` type signature** — Source parameter changed from `T | MotionValue<T>` (generic) to `MotionValue<string> | MotionValue<number> | number`, which more accurately reflects the supported input types.\n\n### Breaking Changes\n\n- `useSpring` no longer accepts `string` as a standalone source value (only `number` or a `MotionValue`). If you were passing a raw string, wrap it in a `motionValue()` first.",
                         "notes_truncated": false,
                         "url": "https://github.com/hanielu/motion-svelte/releases/tag/motion-sv%400.1.12",
                         "version": "motion-sv@0.1.12"
@@ -89,7 +135,7 @@
                     },
                     {
                         "date": "2026-02-02",
-                        "notes": "# Patch Changes\n\n1. Add `use-in-view` and `use-in-page-view`\n2. ## \ud83d\udc1b Bug Fix: AnimatePresence `mode=\"wait\"` now works correctly in SvelteKit\n    \n    ### Fixed\n    - **AnimatePresence `mode=\"wait\"` not working on first toggle in SvelteKit** - Elements would appear immediately instead of waiting for the exit animation to complete. This was caused by SvelteKit's bundling optimization skipping the intro transition call, making the first outro call incorrectly identified as an intro.\n    \n    ### Changes\n    - Added element exit state tracking via `onoutrostart` event to correctly distinguish betw",
+                        "notes": "# Patch Changes\n\n1. Add `use-in-view` and `use-in-page-view`\n2. ## 🐛 Bug Fix: AnimatePresence `mode=\"wait\"` now works correctly in SvelteKit\n    \n    ### Fixed\n    - **AnimatePresence `mode=\"wait\"` not working on first toggle in SvelteKit** - Elements would appear immediately instead of waiting for the exit animation to complete. This was caused by SvelteKit's bundling optimization skipping the intro transition call, making the first outro call incorrectly identified as an intro.\n    \n    ### Changes\n    - Added element exit state tracking via `onoutrostart` event to correctly distinguish betw",
                         "notes_truncated": true,
                         "url": "https://github.com/hanielu/motion-svelte/releases/tag/motion-sv%400.1.10",
                         "version": "motion-sv@0.1.10"
@@ -103,9 +149,9 @@
                     }
                 ],
                 "repo": "hanielu/motion-svelte",
-                "stars": 159,
+                "stars": 160,
                 "svelte_peer": "^5.0.0",
-                "weekly_downloads": 7740
+                "weekly_downloads": 9260
             },
             {
                 "archived": false,
@@ -123,7 +169,7 @@
                 "repo": "micha-lmxt/svelte-motion",
                 "stars": 661,
                 "svelte_peer": ">=3.35.0 || ^4.0.0 || ^5.0.0 || ^5.0.0-next.0",
-                "weekly_downloads": 13143
+                "weekly_downloads": 19605
             },
             {
                 "archived": false,
@@ -137,26 +183,33 @@
                 "pushed_at": "2026-04-13",
                 "recent_releases": [],
                 "repo": "greensock/GSAP",
-                "stars": 27821,
+                "stars": 27937,
                 "svelte_peer": null,
-                "weekly_downloads": 3821322
+                "weekly_downloads": 4637059
             }
         ],
-        "fetched_at": "2026-08-19T07:45:17Z",
+        "fetched_at": "2026-08-23T07:45:16Z",
         "project": "@humanspeak/svelte-motion",
         "self": {
             "archived": false,
             "error": null,
             "first_publish": "2025-02-21",
-            "last_publish": "2026-08-17",
-            "last_release": "2026-08-17",
-            "latest_version": "0.9.2",
+            "last_publish": "2026-08-19",
+            "last_release": "2026-08-19",
+            "latest_version": "0.9.3",
             "npm": "@humanspeak/svelte-motion",
             "peer_deps": {
                 "svelte": "^5.0.0"
             },
-            "pushed_at": "2026-08-17",
+            "pushed_at": "2026-08-19",
             "recent_releases": [
+                {
+                    "date": "2026-08-19",
+                    "notes": "Changes in this Release\nfeat: arc() curved motion paths via transition.path\n\nFor more details, see the [Pull Request](https://github.com/humanspeak/svelte-motion/pull/472)",
+                    "notes_truncated": false,
+                    "url": "https://github.com/humanspeak/svelte-motion/releases/tag/v0.9.3",
+                    "version": "v0.9.3"
+                },
                 {
                     "date": "2026-08-17",
                     "notes": "Changes in this Release\nfix(layout): match upstream layoutDependency gate semantics\n\nFor more details, see the [Pull Request](https://github.com/humanspeak/svelte-motion/pull/471)",
@@ -194,7 +247,7 @@
                 },
                 {
                     "date": "2026-07-23",
-                    "notes": "Changes in this Release\nfeat(gesture): upstream parity \u2014 velocity continuity, first-start idle, wildcard keyframes\n\nFor more details, see the [Pull Request](https://github.com/humanspeak/svelte-motion/pull/453)",
+                    "notes": "Changes in this Release\nfeat(gesture): upstream parity — velocity continuity, first-start idle, wildcard keyframes\n\nFor more details, see the [Pull Request](https://github.com/humanspeak/svelte-motion/pull/453)",
                     "notes_truncated": false,
                     "url": "https://github.com/humanspeak/svelte-motion/releases/tag/v0.8.0",
                     "version": "v0.8.0"
@@ -208,7 +261,7 @@
                 },
                 {
                     "date": "2026-07-21",
-                    "notes": "Changes in this Release\nfix(animate-presence): exit in place \u2014 placeholder slot anchoring, clone position, key={0}\n\nFor more details, see the [Pull Request](https://github.com/humanspeak/svelte-motion/pull/448)",
+                    "notes": "Changes in this Release\nfix(animate-presence): exit in place — placeholder slot anchoring, clone position, key={0}\n\nFor more details, see the [Pull Request](https://github.com/humanspeak/svelte-motion/pull/448)",
                     "notes_truncated": false,
                     "url": "https://github.com/humanspeak/svelte-motion/releases/tag/v0.7.20",
                     "version": "v0.7.20"
@@ -254,47 +307,40 @@
                     "notes_truncated": false,
                     "url": "https://github.com/humanspeak/svelte-motion/releases/tag/v0.7.13",
                     "version": "v0.7.13"
-                },
-                {
-                    "date": "2026-07-03",
-                    "notes": "Changes in this Release\nfeat(values): vanilla motion-value layer with unified rune sources\n\nFor more details, see the [Pull Request](https://github.com/humanspeak/svelte-motion/pull/432)",
-                    "notes_truncated": false,
-                    "url": "https://github.com/humanspeak/svelte-motion/releases/tag/v0.7.12",
-                    "version": "v0.7.12"
                 }
             ],
             "repo": "humanspeak/svelte-motion",
-            "stars": 88,
+            "stars": 90,
             "svelte_peer": "^5.0.0",
-            "weekly_downloads": 7032
+            "weekly_downloads": 8910
         },
         "upstream": [
             {
                 "archived": false,
                 "error": null,
                 "first_publish": "2013-12-26",
-                "last_publish": "2026-08-10",
+                "last_publish": "2026-08-20",
                 "last_release": null,
-                "latest_version": "13.1.0",
+                "latest_version": "13.1.1",
                 "npm": "motion",
                 "peer_deps": {
                     "react": "^18.0.0 || ^19.0.0",
                     "react-dom": "^18.0.0 || ^19.0.0"
                 },
-                "pushed_at": "2026-08-19",
+                "pushed_at": "2026-08-20",
                 "recent_releases": [],
                 "repo": "motiondivision/motion",
-                "stars": 33276,
+                "stars": 33321,
                 "svelte_peer": null,
-                "weekly_downloads": 12575051
+                "weekly_downloads": 18855889
             },
             {
                 "archived": null,
                 "error": null,
                 "first_publish": "2019-01-14",
-                "last_publish": "2026-08-10",
+                "last_publish": "2026-08-20",
                 "last_release": null,
-                "latest_version": "13.1.0",
+                "latest_version": "13.1.1",
                 "npm": "framer-motion",
                 "peer_deps": {
                     "react": "^18.0.0 || ^19.0.0",
@@ -305,7 +351,7 @@
                 "repo": null,
                 "stars": null,
                 "svelte_peer": null,
-                "weekly_downloads": 37531096
+                "weekly_downloads": 43973918
             }
         ],
         "watchlist": [
@@ -325,7 +371,7 @@
                 "repo": "animotionjs/motion",
                 "stars": 58,
                 "svelte_peer": "^5.0.0",
-                "weekly_downloads": 227
+                "weekly_downloads": 710
             },
             {
                 "archived": false,
@@ -344,7 +390,7 @@
                 "repo": "epavanello/motion-svelte",
                 "stars": 25,
                 "svelte_peer": "^5.0.0",
-                "weekly_downloads": 0
+                "weekly_downloads": 25
             },
             {
                 "archived": false,
@@ -360,9 +406,9 @@
                 "pushed_at": "2026-08-10",
                 "recent_releases": [],
                 "repo": "PuruVJ/neodrag",
-                "stars": 2447,
+                "stars": 2450,
                 "svelte_peer": "^3.0.0 || ^4.0.0 || ^5.0.0",
-                "weekly_downloads": 7465
+                "weekly_downloads": 12231
             },
             {
                 "archived": false,
@@ -376,9 +422,9 @@
                 "pushed_at": "2025-09-21",
                 "recent_releases": [],
                 "repo": "Rezi/svelte-gestures",
-                "stars": 184,
+                "stars": 183,
                 "svelte_peer": null,
-                "weekly_downloads": 24260
+                "weekly_downloads": 27520
             },
             {
                 "archived": false,
@@ -396,19 +442,19 @@
                 "repo": "svelte-inview/svelte-inview",
                 "stars": 777,
                 "svelte_peer": "^3.0.0 || ^4.0.0 || ^5.0.0 || ^5.0.0-next",
-                "weekly_downloads": 12825
+                "weekly_downloads": 15089
             }
         ]
     },
     "upstream_status": {
         "framer-motion": {
             "api_parity_anchor": true,
-            "latest": "13.1.0"
+            "latest": "13.1.1"
         },
         "motion": {
             "consumed": "^13.1.0",
-            "latest": "13.1.0",
-            "note": "on latest"
+            "latest": "13.1.1",
+            "note": "13.1.1 resolves within consumed range; no bump needed"
         }
     }
 }

@@ -8,6 +8,7 @@
     } from '@humanspeak/svelte-motion'
     import { HeaderV2, FooterV2, getBreadcrumbContext, getSeoContext } from '@humanspeak/docs-kit'
     import { docsConfig } from '$lib/docs-config'
+    import { headerNav } from '$lib/docsNav'
     import favicon from '$lib/assets/logo.svg'
     import githubStats from '$lib/github-stats.json'
     import '@fontsource-variable/inter/index.css'
@@ -378,16 +379,7 @@
 </svelte:head>
 
 <div id="top" class="brut-wrap flex min-h-svh flex-col">
-    <HeaderV2
-        config={docsConfig}
-        {favicon}
-        version={PKG_VERSION}
-        nav={[
-            { label: 'docs', href: '/docs' },
-            { label: 'examples', href: '/examples' },
-            { label: 'compare', href: '/compare' }
-        ]}
-    />
+    <HeaderV2 config={docsConfig} {favicon} version={PKG_VERSION} nav={headerNav} />
 
     <main class="brut">
         <!-- ── Coordinate strip ───────────────────────────────────────── -->
