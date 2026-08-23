@@ -1,3 +1,16 @@
+---
+title: Migrating from svelte-motion to Svelte Motion
+date: '2026-08-23T12:00:00-04:00'
+description: Move from the dormant svelte-motion package to @humanspeak/svelte-motion for Svelte 5 runes, AnimatePresence, gestures, drag, layout animations, and SSR-safe SvelteKit support.
+tags:
+    - svelte-motion
+    - migration
+    - svelte-5
+    - animation
+author: Jason Kummerl
+readingTime: 7
+---
+
 <script lang="ts">
     import { docsConfig } from '$lib/docs-config'
     import { BlogPostV2, type BlogPostMeta } from '@humanspeak/docs-kit/blog'
@@ -14,107 +27,111 @@
     }
 </script>
 
---- title: Migrating from svelte-motion to Svelte Motion date: '2026-08-23T12:00:00-04:00'
-description: Move from the dormant svelte-motion package to @humanspeak/svelte-motion for Svelte 5
-runes, AnimatePresence, gestures, drag, layout animations, and SSR-safe SvelteKit support. tags: -
-svelte-motion - migration - svelte-5 - animation author: Jason Kummerl readingTime: 7 ---
-
 <BlogPostV2 {post} config={docsConfig}>
-    The unscoped `svelte-motion` package has not released since February 2024. It still has users,
-    name recognition, and a familiar component model, but it predates Svelte 5's runes-first
-    ecosystem. `@humanspeak/svelte-motion` is an actively maintained alternative built specifically
-    for Svelte 5. It tracks the modern Motion API and includes `AnimatePresence`, gestures, drag,
-    FLIP layout animation, shared-layout transitions, springs, scroll-linked values, and SSR-safe
-    SvelteKit rendering. This is a source migration rather than a package alias. The concepts
-    transfer cleanly, but imports and component names need to change. ## Replace the package Remove
-    the old dependency and install the scoped package: ```bash pnpm remove svelte-motion pnpm add
-    @humanspeak/svelte-motion ``` Then replace generic `Motion` imports with either the familiar
-    proxy API or tree-shakeable named components: ```svelte
-    <script lang="ts">
-        // Before
-        // import { Motion } from 'svelte-motion'
 
-        // After: familiar proxy syntax
-        import { motion } from '@humanspeak/svelte-motion'
+The unscoped `svelte-motion` package has not released since February 2024. It still has users, name recognition, and a familiar component model, but it predates Svelte 5's runes-first ecosystem.
 
-        // Or import a tree-shakeable named component:
-        // import { MotionDiv } from '@humanspeak/svelte-motion'
-    </script>
+`@humanspeak/svelte-motion` is an actively maintained alternative built specifically for Svelte 5. It tracks the modern Motion API and includes `AnimatePresence`, gestures, drag, FLIP layout animation, shared-layout transitions, springs, scroll-linked values, and SSR-safe SvelteKit rendering.
 
-    <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 320, damping: 24 }}
-    >
-        Migrated
-    </motion.div>
-    ``` Use `motion.div`, `motion.button`, and the other element proxies when API familiarity matters
-    most. Use `MotionDiv`, `MotionButton`, and the named exports when you want the smallest tree-shaken
-    surface. ## Map the animation concepts Most of the animation intent transfers directly: | `svelte-motion`
-    concept | `@humanspeak/svelte-motion` equivalent | |---|---| | `Motion` | `motion.div` or `MotionDiv`
-    | | `initial`, `animate`, `transition` | The same prop names and semantics | | `exit` | `exit` inside
-    `AnimatePresence` | | Variants | Variants with parent-to-child propagation | | Spring and tween transitions
-    | Spring and tween transitions | | Drag | Drag with constraints, momentum, elastic, and axis locking
-    | | Layout animation | `layout` and shared `layoutId` transitions | The largest practical difference
-    is that the new package exposes the modern Framer Motion-style surface across Svelte 5 components,
-    gestures, hooks, and layout behavior. The [API reference](/docs/api-reference) lists the complete
-    public surface. ## Migrate conditional exit animations Elements cannot animate after Svelte removes
-    them from the DOM unless something owns their presence lifecycle. Wrap conditional content in `AnimatePresence`:
-    ```svelte
-    <script lang="ts">
-        import { AnimatePresence, motion } from '@humanspeak/svelte-motion'
+This is a source migration rather than a package alias. The concepts transfer cleanly, but imports and component names need to change.
 
-        let open = $state(true)
-    </script>
+## Replace the package
 
-    <button onclick={() => (open = !open)}>Toggle</button>
+Remove the old dependency and install the scoped package:
 
-    <AnimatePresence>
-        {#if open}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-            >
-                Content
-            </motion.div>
-        {/if}
-    </AnimatePresence>
-    ``` Use `mode="wait"` when the next element must wait for the previous one to exit. Use `mode="popLayout"`
-    when exiting items should leave document flow immediately. The [live AnimatePresence example](/examples/animate-presence)
-    shows the modes in action. ## Replace manual gesture state If the old component used event handlers
-    to coordinate hover, press, focus, or viewport state, move that intent into gesture props: ```svelte
-    <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.96 }}
-        whileFocus={{ boxShadow: '0 0 0 3px #a78bfa' }}
-        transition={{ type: 'spring', stiffness: 400, damping: 22 }}
-    >
-        Continue
-    </motion.button>
-    ``` This keeps application state focused on application behavior while Motion owns transient animation
-    state. Try the [hover and tap example](/examples/hover-and-tap) and [focus example](/examples/while-focus).
-    ## Use layout animation instead of measuring boxes Add `layout` when an element should animate between
-    its old and new position or size: ```svelte
-    {#each items as item (item.id)}
-        <motion.li layout>{item.label}</motion.li>
-    {/each}
-    ``` Use a matching `layoutId` on elements in different UI states to create a shared-element transition.
-    The library measures the boxes and applies a FLIP transform automatically. See [reordering](/examples/reordering)
-    and [shared layout animation](/examples/shared-layout-animation) for live versions. ## Move state
-    to Svelte 5 runes Keep application state in `$state`, compute animation targets with `$derived`, and
-    use Motion values for data that updates continuously outside ordinary component state. - `useMotionValue`
-    stores an animatable value without forcing component rerenders. - `useSpring` follows another value
-    with spring physics. - `useTransform` maps an input range into another value. - `useScroll` supplies
-    page or element scroll progress. The [motion values guide](/docs/motion-values) explains when to use
-    runes and when a Motion value is the better tool. The [scroll progress example](/examples/scroll-progress)
-    combines these APIs in a small, production-shaped example. ## Verify the migration Before removing
-    the old package from your lockfile: 1. Search the project for every import from `svelte-motion`. 2.
-    Verify conditional elements finish their exit animations before removal. 3. Test drag constraints
-    and layout transitions at responsive breakpoints. 4. Load animated routes directly in SvelteKit to
-    exercise SSR and hydration. 5. Test keyboard focus and the operating system's reduced-motion preference.
-    6. Check any variants that rely on parent-to-child propagation. The package requires Svelte 5 and
-    does not provide a Svelte 4 compatibility layer. That sharper baseline is what makes the runes-native
-    API, SSR behavior, and current Motion parity possible. Start with the [getting-started guide](/docs),
-    then browse the [live examples](/examples) for the specific animation patterns used by your application.
+```bash
+pnpm remove svelte-motion
+pnpm add @humanspeak/svelte-motion
+```
+
+Then replace generic `Motion` imports with either the familiar proxy API or tree-shakeable named components:
+
+```svelte
+<script lang="ts">
+    import { motion } from '@humanspeak/svelte-motion'
+</script>
+
+<motion.div
+    initial={{ opacity: 0, y: 12 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ type: 'spring', stiffness: 320, damping: 24 }}
+>
+    Migrated
+</motion.div>
+```
+
+Use `motion.div`, `motion.button`, and the other element proxies when API familiarity matters most. Use `MotionDiv`, `MotionButton`, and the named exports when you want the smallest tree-shaken surface.
+
+## Map the animation concepts
+
+Most animation intent transfers directly:
+
+| `svelte-motion` concept | `@humanspeak/svelte-motion` equivalent |
+|---|---|
+| `Motion` | `motion.div` or `MotionDiv` |
+| `initial`, `animate`, `transition` | The same prop names and semantics |
+| `exit` | `exit` inside `AnimatePresence` |
+| Variants | Variants with parent-to-child propagation |
+| Drag | Drag with constraints, momentum, elastic, and axis locking |
+| Layout animation | `layout` and shared `layoutId` transitions |
+
+The [API reference](/docs/api-reference) lists the complete modern Framer Motion-style surface.
+
+## Migrate conditional exit animations
+
+Elements cannot animate after Svelte removes them unless something owns their presence lifecycle. Wrap conditional content in `AnimatePresence`:
+
+```svelte
+<script lang="ts">
+    import { AnimatePresence, motion } from '@humanspeak/svelte-motion'
+    let open = $state(true)
+</script>
+
+<AnimatePresence>
+    {#if open}
+        <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+        >Content</motion.div>
+    {/if}
+</AnimatePresence>
+```
+
+Use `mode="wait"` for sequential replacement and `mode="popLayout"` when exiting items should immediately leave document flow. The [live AnimatePresence example](/examples/animate-presence) shows the modes in action.
+
+## Replace manual gesture state
+
+Move transient hover, press, focus, and viewport animation into `whileHover`, `whileTap`, `whileFocus`, and `whileInView`. Try the [hover and tap example](/examples/hover-and-tap) and [focus example](/examples/while-focus).
+
+## Use layout animation instead of measuring boxes
+
+Add `layout` when an element should animate between its old and new position or size. Use a matching `layoutId` across UI states to create a shared-element transition. See [reordering](/examples/reordering) and [shared layout animation](/examples/shared-layout-animation).
+
+## Move state to Svelte 5 runes
+
+Keep application state in `$state`, compute targets with `$derived`, and use Motion values for continuously updating animation data:
+
+- `useMotionValue` stores an animatable value without forcing component rerenders.
+- `useSpring` follows another value with spring physics.
+- `useTransform` maps an input range into another value.
+- `useScroll` supplies page or element scroll progress.
+
+The [motion values guide](/docs/motion-values) explains when to use runes and when a Motion value is the better tool.
+
+## Verify the migration
+
+Before removing the old package from your lockfile:
+
+1. Search for every import from `svelte-motion`.
+2. Verify conditional elements finish their exit animations.
+3. Test drag constraints and layout transitions at responsive breakpoints.
+4. Load animated routes directly in SvelteKit to exercise SSR and hydration.
+5. Test keyboard focus and the operating system's reduced-motion preference.
+6. Check variants that rely on parent-to-child propagation.
+
+The package requires Svelte 5 and does not provide a Svelte 4 compatibility layer. That sharper baseline enables its runes-native API, SSR behavior, and current Motion parity.
+
+Start with the [getting-started guide](/docs), then browse the [live examples](/examples) for the patterns used by your application.
+
 </BlogPostV2>

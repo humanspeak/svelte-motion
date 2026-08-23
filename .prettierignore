@@ -11,5 +11,9 @@ test-results/
 /docs/dist/
 /docs/coverage/
 
+# mdsvex posts mix frontmatter, Markdown, and Svelte components. Prettier's
+# Svelte parser collapses the Markdown body when it is nested in BlogPostV2.
+/docs/src/routes/blog/**/*.svx
+
 # Generated i18n/paraglide artifacts in docs
 /docs/src/lib/paraglide/
