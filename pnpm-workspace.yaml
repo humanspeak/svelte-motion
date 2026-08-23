@@ -6,8 +6,8 @@ allowBuilds:
     # pnpm 11 can identify this GitHub dependency by either its source URL or
     # its resolved codeload tarball while updating. Keep both exact identities
     # pinned to the same commit so the prepare script is allowed in either phase.
-    '@humanspeak/docs-kit@git+https://github.com/humanspeak/docs-kit.git#cb293900ffe271d0df0e2d50f44ccd0bd9ec56e8': true
-    '@humanspeak/docs-kit@https://codeload.github.com/humanspeak/docs-kit/tar.gz/cb293900ffe271d0df0e2d50f44ccd0bd9ec56e8': true
+    '@humanspeak/docs-kit@git+https://github.com/humanspeak/docs-kit.git#728b1f534ebcf10674a04839cbd987d7e000be16': true
+    '@humanspeak/docs-kit@https://codeload.github.com/humanspeak/docs-kit/tar.gz/728b1f534ebcf10674a04839cbd987d7e000be16': true
     core-js: true
     esbuild: true
     sharp: true
