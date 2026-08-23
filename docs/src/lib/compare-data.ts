@@ -44,7 +44,7 @@ export const competitors: Competitor[] = [
         description:
             'Framer Motion is the canonical declarative animation library for React. @humanspeak/svelte-motion is the Svelte 5 counterpart — same prop names, same component model (motion.<tag>, AnimatePresence, variants), same gestures, same FLIP layout animation, same spring physics. Different framework underneath.',
         website: 'https://www.framer.com/motion',
-        github: 'https://github.com/framer/motion',
+        github: 'https://github.com/motiondivision/motion',
         npm: 'framer-motion',
         type: 'React Animation Library',
         approach: 'Declarative components (React-only)',
