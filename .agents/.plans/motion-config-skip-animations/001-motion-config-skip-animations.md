@@ -7,10 +7,20 @@
 > `.agents/.plans/motion-config-skip-animations/README.md` — unless a reviewer
 > dispatched you and told you they maintain the index.
 >
+> **Revision 2026-08-28** — re-baselined only. The plan was authored at
+> `dd838b1` on branch `chore/docs-kit-2026.8.5`; that commit landed on `main`
+> as the squashed `5a9991f`, and the plan now lives on
+> `chore/plan-motion-config-skip-animations` (tip `130f74c`). Trees are
+> identical and `git diff dd838b1..130f74c` over the in-scope paths is empty —
+> **no "Current state" excerpt changed**. The drift-check SHA, the `Planned at`
+> stamp, and the matching STOP condition were re-pointed at `130f74c` so the
+> baseline survives deletion of the now-redundant `chore/docs-kit-2026.8.5`
+> branch. No step, scope, or criterion was altered.
+>
 > **Drift check (run first)**:
 >
 > ```bash
-> git diff --stat dd838b1..HEAD -- \
+> git diff --stat 130f74c..HEAD -- \
 >   src/lib/types.ts \
 >   src/lib/components/MotionConfig.svelte \
 >   src/lib/html/_MotionContainer.svelte \
@@ -30,7 +40,7 @@
 - **Risk**: MED
 - **Depends on**: none
 - **Category**: direction (feature parity)
-- **Planned at**: commit `dd838b1`, 2026-08-28
+- **Planned at**: commit `130f74c`, 2026-08-28 (re-baselined — see revision note)
 
 ## Why this matters
 
@@ -938,7 +948,7 @@ Stop and report back (do not improvise) if:
 - The Step 1 test PASSES before any source change — the reproduction is wrong
   and the feature may already exist.
 - The code at any location in "Current state" does not match the quoted
-  excerpt (the codebase drifted since commit `dd838b1`).
+  excerpt (the codebase drifted since commit `130f74c`).
 - `visualElement.shouldSkipAnimations = …` (Step 4c) is a TypeScript error
   because the field is readonly in the installed `motion-dom` — the plan
   verified it as public and writable at
