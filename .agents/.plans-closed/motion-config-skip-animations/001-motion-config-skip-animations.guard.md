@@ -143,3 +143,69 @@ Converged in **1 round** of a 3-round budget.
   before publish.
 - **`owned-child` e2e flake** — unrelated to this work; deserves its own issue.
 - **No PR opened** — awaiting the operator's live sign-off.
+
+---
+
+## Addendum 2026-08-28 — pnpm environment issue resolved
+
+The `npx -y pnpm@11.22.0` workarounds and `--no-verify` commits recorded above
+were caused by pnpm 11.22.0 being unable to self-switch on macOS
+(`Cannot verify the identity of the @pnpm/exe.darwin-x64 native binary`).
+
+Root-caused and fixed after this batch closed by bumping `packageManager` to
+`pnpm@11.24.0` in both `package.json` and `docs/package.json` (commit
+`6583bf7`). **Those workarounds are no longer needed.** Verified with bare
+`pnpm` after the bump:
+
+- `pnpm check` → 1336 files, 0 errors, 39 warnings (unchanged)
+- `pnpm test:only` → 851 tests pass
+- `pnpm build` → exit 0, publint "All good!"
+- `pnpm test:e2e` → now starts its own webServer natively; the new spec passes
+  4/4 through the normal path
+- husky pre-commit → passes without `--no-verify`
+
+`pnpm-lock.yaml` was not modified; `pnpm install --frozen-lockfile` passes.
+
+### Post-bump full-suite verification (2026-08-28)
+
+Re-ran every gate through the normal commands after the pnpm bump:
+
+| Gate | Result |
+| --- | --- |
+| `pnpm check` (root) | 1336 files, **0 errors**, 39 warnings, exit 0 |
+| `pnpm test:only` | **851 tests pass** |
+| `pnpm build` | exit 0, publint "All good!" |
+| `trunk fmt` / `trunk check --fix` | no issues / no new issues |
+| `pnpm install --frozen-lockfile` | passes, lockfile unchanged |
+| `pnpm test:e2e` (**full suite**, 105 spec files) | **426 passed, 1 failed, 2 skipped** of 429 |
+
+#### Known-unrelated failures
+
+1. **`docs` package `pnpm check` — 5 errors, exit 1.** In
+   `docs/src/lib/examples/keyframes/demos/Wildcard.svelte:36` (1) and
+   `docs/src/lib/examples/transform-template/demos/Default.svelte:14,19` (4,
+   `$state` used before declaration). `git log 5a9991f..HEAD` over both files
+   is **empty** — untouched by this branch; last modified by PR #453 and #450.
+   No CI workflow runs the docs `check` script, which is why it drifted
+   unnoticed. Needs its own issue.
+
+2. **`e2e/animate-presence/scroll-stress.spec.ts:335` — "anchors the exit clone
+   to the original rect when hidden from a scrolled container".** Failed once
+   in the 429-test full run; passes 12/12 in isolation and passed in two
+   earlier 167-test `animate-presence + utilities` sweeps.
+
+   Proven inert with respect to this change: that page uses **no
+   `MotionConfig`**, so the `skipAnimations` derived is `false`, and the Step 6
+   ternary then passes `mergedTransition` through unchanged — byte-identical to
+   pre-change. The VisualElement receives `false` rather than `undefined`, and
+   `mount()` applies `?? false` either way. The only residual delta is one
+   idempotent `$effect` writing a non-reactive field.
+
+   Classified as a pre-existing flake surfaced under full-suite load
+   (12.7-minute run, timing-sensitive scroll/rect anchoring assertions).
+
+3. **`e2e/animate-presence/owned-child.spec.ts:11`** — flaked once earlier in a
+   167-test sweep, passed in isolation and in every later run. Same category.
+
+Both e2e flakes are in `animate-presence` and both involve timing-sensitive
+clone/rect assertions. Worth one issue covering the pair.
