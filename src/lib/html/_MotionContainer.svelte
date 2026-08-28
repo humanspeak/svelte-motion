@@ -271,6 +271,12 @@
     // $derived makes `reducedMotion` re-evaluate whenever the OS preference
     // or `<MotionConfig reducedMotion>` policy changes.
     const reducedMotion = $derived(reducedMotionState.current)
+    // `<MotionConfig skipAnimations>`: descendant animations jump to their
+    // final value. motion-dom honors it via `VisualElement.shouldSkipAnimations`,
+    // which `animateMotionValue` checks before creating any animation — so this
+    // one flag covers animate/initial/variants/exit/whileX and the imperative
+    // controls path.
+    const skipAnimations = $derived(motionConfig?.skipAnimations ?? false)
 
     // Get presence context to check if we're inside AnimatePresence
     const context = getAnimatePresenceContext()
@@ -780,7 +786,15 @@
                 presenceKey,
                 element,
                 filteredExit,
-                mergedTransition,
+                // The clone-based exit animates a DETACHED copy with no
+                // VisualElement, so `shouldSkipAnimations` cannot reach it.
+                // motion-dom's `animateTarget` copies `transition.skipAnimations`
+                // onto every per-value transition, so threading it here is what
+                // makes exits instant under `<MotionConfig skipAnimations>`.
+                // Deliberately NOT folded into the shared `mergedTransition`
+                // derived: that value also feeds the projection adapter, and
+                // upstream does not skip layout/FLIP animations.
+                skipAnimations ? { ...mergedTransition, skipAnimations: true } : mergedTransition,
                 resolvePresenceExit
             )
         }
@@ -1070,6 +1084,7 @@
                           animate: effectiveAnimate
                       },
                       reducedMotionConfig: motionConfig?.reducedMotion ?? 'never',
+                      skipAnimations,
                       isSVG: isSVGTag(String(tag))
                   })
               )
@@ -1197,7 +1212,12 @@
         effectiveInitialProp !== false &&
             isNotEmpty(initialKeyframes) &&
             isNotEmpty(animateKeyframes) &&
-            !optimizedAppearSuppressedByTransformTemplate
+            !optimizedAppearSuppressedByTransformTemplate &&
+            // The appear bootstrap drives WAAPI directly (`startWaapiAnimation`),
+            // bypassing the VisualElement — so `shouldSkipAnimations` cannot
+            // reach it. Suppress the handoff entirely and let the (instant)
+            // main-thread enter animation write the final values.
+            !skipAnimations
             ? `svelte-motion-${componentHydrationId}`
             : undefined
     )
@@ -2108,6 +2128,19 @@
             if (visualElement.current === mounted) visualElement.unmount()
             visualElementStore.delete(mounted)
         }
+    })
+
+    // `VisualElement.mount()` latches `shouldSkipAnimations` from the PRIVATE
+    // constructor option (`this.shouldSkipAnimations = this.skipAnimationsConfig ?? false`),
+    // so a `<MotionConfig skipAnimations>` toggled after mount would never
+    // reach an already-mounted node. Unlike React, this library's config is
+    // reactive (MotionConfig exposes property getters), so re-assert the
+    // public field here. Declared AFTER the mount effect on purpose: `mount()`
+    // must have latched before this overwrites it, and depending on `element`
+    // means a remount re-applies the current value.
+    $effect(() => {
+        if (!visualElement || !element) return
+        visualElement.shouldSkipAnimations = skipAnimations
     })
 
     // Keep the node's props in sync, then let the animationState diff them.

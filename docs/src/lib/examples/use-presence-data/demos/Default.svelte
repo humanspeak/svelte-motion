@@ -31,7 +31,8 @@
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
 <div class="dk-demo-shell">
-    <MotionConfig>
+    <!-- Configs inherit for upstream parity, so a bare config no longer resets; an empty transition explicitly restores motion's defaults. -->
+    <MotionConfig transition={{}}>
         <div class="strip">
             <div class="strip-head">
                 <span class="micro">// use-presence-data</span>

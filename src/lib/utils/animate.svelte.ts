@@ -1,3 +1,5 @@
+import { getMotionConfig } from '$lib/components/motionConfig.context.js'
+import type { MotionConfigProps } from '$lib/types.js'
 import { createScopedAnimate } from 'motion'
 import type {
     AnimationPlaybackControlsWithThen,
@@ -40,6 +42,10 @@ export type AnimationScope<T extends Element = HTMLElement> = ((node: T) => () =
  * still `undefined`, and motion throws when asked to query selectors against
  * a missing root. Trigger animations from user events or `$effect` after
  * mount.
+ *
+ * Inside a `<MotionConfig skipAnimations>` subtree, animations started through
+ * the returned `animate` complete instantly. The current config value is read
+ * per call, so toggling it after mount affects subsequent animations.
  *
  * @template T The parent element type. Defaults to `HTMLElement`.
  * @returns A `[scope, animate]` tuple.
@@ -86,9 +92,48 @@ export const useAnimate = <T extends Element = HTMLElement>(): [
     scope.current = undefined
     scope.animations = []
 
-    const animate = createScopedAnimate({
-        scope: scope as MotionAnimationScope<T>
-    }) as SvelteMotionAnimate
+    // Capture the config OBJECT at init: `getContext` must run during
+    // component initialisation, but MotionConfig exposes property getters, so
+    // reading `.skipAnimations` later yields the CURRENT value. That is what
+    // keeps this reactive without a re-render — upstream gets the same effect
+    // from `useMemo(..., [skipAnimations])`
+    // (framer-motion animation/hooks/use-animate.ts:20-23).
+    //
+    // Guarded: `getContext` throws outside Svelte component initialisation,
+    // and `useAnimate()` is documented and tested as callable from plain
+    // module scope (see `animate.spec.ts`). Absent config = no override.
+    let motionConfig: MotionConfigProps | undefined
+    try {
+        motionConfig = getMotionConfig()
+    } catch {
+        motionConfig = undefined
+    }
+
+    // Memoised on the resolved value so repeated calls under an unchanged
+    // config reuse one scoped animate. Every instance is handed the SAME
+    // `scope` object, so `scope.animations` tracking stays correct across
+    // rebuilds.
+    let cachedScoped: SvelteMotionAnimate | undefined
+    let cachedSkip: boolean | undefined
+    let hasCached = false
+
+    const resolveScopedAnimate = (): SvelteMotionAnimate => {
+        const skipAnimations = motionConfig?.skipAnimations
+        if (!hasCached || cachedSkip !== skipAnimations) {
+            hasCached = true
+            cachedSkip = skipAnimations
+            cachedScoped = createScopedAnimate({
+                scope: scope as MotionAnimationScope<T>,
+                ...(skipAnimations === undefined ? {} : { skipAnimations })
+            }) as SvelteMotionAnimate
+        }
+        return cachedScoped!
+    }
+
+    const animate = ((...args: unknown[]) =>
+        (resolveScopedAnimate() as unknown as (...a: unknown[]) => unknown)(
+            ...args
+        )) as SvelteMotionAnimate
 
     return [scope, animate]
 }

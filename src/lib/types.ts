@@ -809,6 +809,24 @@ export type MotionConfigProps = {
      * Defaults to `'never'`. See {@link ReducedMotionConfig}.
      */
     reducedMotion?: ReducedMotionConfig
+    /**
+     * Skip animations entirely for descendant motion elements.
+     *
+     * When `true`, every animation in the subtree jumps straight to its final
+     * value instead of tweening — `animate`, `initial`, variants, `exit`, the
+     * `whileX` gestures, `useAnimationControls()` and `useAnimate()`. Intended
+     * for E2E tests and visual-regression screenshots, where a deterministic
+     * settled frame matters more than the transition.
+     *
+     * Unlike {@link ReducedMotionConfig}, which only strips transform keys,
+     * this disables the tween for every animated property.
+     *
+     * Defaults to `false`. Layout/FLIP projection animations and drag momentum
+     * are unaffected, matching Framer Motion.
+     *
+     * @see https://motion.dev/docs/react-motion-config
+     */
+    skipAnimations?: boolean
 }
 
 /**

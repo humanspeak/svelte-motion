@@ -184,7 +184,8 @@
         </div>
 
         <MotionConfig transition={{ duration: 0.6 }}>
-            <MotionConfig>
+            <!-- Configs inherit for upstream parity, so a bare config no longer resets; an empty transition explicitly restores motion's defaults. -->
+            <MotionConfig transition={{}}>
                 <div class="canonical-row" data-testid="presence-data-isolated-container">
                     <motion.button
                         initial={false}

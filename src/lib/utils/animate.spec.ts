@@ -1,7 +1,24 @@
-import { describe, expect, it, vi } from 'vitest'
+import { sleep } from '$lib/utils/testing'
+import { fireEvent, render } from '@testing-library/svelte'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import UseAnimateSkipHarness from '../components/__tests__/UseAnimateSkipHarness.svelte'
 import { useAnimate } from './animate.svelte.js'
 
 describe('utils/animate - useAnimate', () => {
+    beforeEach(() => {
+        vi.useRealTimers()
+        ;(globalThis as never as { requestAnimationFrame: unknown }).requestAnimationFrame = (
+            callback: FrameRequestCallback
+        ) => setTimeout(() => callback(performance.now()), 16) as unknown as number
+        ;(globalThis as never as { cancelAnimationFrame: unknown }).cancelAnimationFrame = (
+            id: number
+        ) => clearTimeout(id)
+    })
+
+    it('does not throw when called outside a Svelte component', () => {
+        expect(() => useAnimate()).not.toThrow()
+    })
+
     it('returns a [scope, animate] tuple', () => {
         const [scope, animate] = useAnimate()
         expect(typeof scope).toBe('function')
@@ -111,5 +128,20 @@ describe('utils/animate - useAnimate', () => {
 
         scope(second)
         expect(scope.current).toBe(second)
+    })
+
+    it('reads the current MotionConfig skipAnimations value for each call', async () => {
+        const { getByTestId, rerender } = render(UseAnimateSkipHarness, {
+            props: { skip: false }
+        })
+        const target = getByTestId('use-animate-target')
+
+        await rerender({ skip: true })
+        expect(getByTestId('use-animate-target')).toBe(target)
+
+        await fireEvent.click(getByTestId('run-use-animate'))
+        await sleep(100)
+
+        expect(Number.parseFloat(getComputedStyle(target).opacity)).toBe(1)
     })
 })

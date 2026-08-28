@@ -1,6 +1,6 @@
 ---
 title: MotionConfig
-description: Component that supplies default transition and reduced-motion behavior to every descendant motion component.
+description: Component that supplies default transitions, reduced-motion behavior, and skipAnimations to every descendant motion component.
 ---
 
 <script>
@@ -9,17 +9,17 @@ description: Component that supplies default transition and reduced-motion behav
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'MotionConfig | Docs | Svelte Motion'
-      seo.description = 'Provide default transition timing and the reducedMotion policy to descendant motion components from one ancestor. Nest configs to scope overrides.'
+      seo.description = 'Provide default transition timing, reducedMotion policy, and skipAnimations to descendant motion components from one ancestor. Nest configs to scope overrides.'
       seo.ogTitle = 'MotionConfig'
-      seo.ogTagline = 'Default transitions and reduced-motion policy for a subtree'
-      seo.ogFeatures = ['Default Transitions', 'Reduced Motion', 'Subtree Scoped', 'Nestable']
+      seo.ogTagline = 'Default transitions, reduced-motion policy, and animation skipping for a subtree'
+      seo.ogFeatures = ['Default Transitions', 'Reduced Motion', 'Skip Animations', 'Subtree Scoped', 'Nestable']
       seo.ogSlug = 'docs-motion-config'
   }
 </script>
 
 # MotionConfig
 
-`<MotionConfig>` is a context provider that supplies default `transition` timing and the `reducedMotion` policy to every descendant `motion.<tag>` component. Use it at the root of a route, an interactive subtree, or a single section to avoid repeating the same transition props on every child.
+`<MotionConfig>` is a context provider that supplies default `transition` timing, the `reducedMotion` policy, and `skipAnimations` to every descendant `motion.<tag>` component. Use it at the root of a route, an interactive subtree, or a single section to avoid repeating the same transition props on every child.
 
 ```svelte
 <script lang="ts">
@@ -103,16 +103,48 @@ Explicit `transition` on a `motion.<tag>` always wins:
 
 **`'user'` is the right default for production sites** — it respects the OS accessibility preference without forcing motion off for users who haven't opted in. Use `'always'` for previews / docs surfaces where you want motion disabled regardless of user setting.
 
+## `skipAnimations`
+
+Set `skipAnimations` to make every animation in the subtree jump directly to its final value instead of tweening. Unlike `reducedMotion="always"`, which strips only transform keys while opacity, color, and other properties continue to animate, `skipAnimations` disables the tween for every animated property.
+
+```svelte
+<MotionConfig skipAnimations>
+    <motion.div
+        initial={{ x: -100, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+    />
+    <motion.div whileHover={{ scale: 1.1, backgroundColor: '#7c3aed' }} />
+</MotionConfig>
+```
+
+This is intended for E2E tests and visual-regression screenshots, where a deterministic settled frame matters more than observing a transition. It covers `animate`, `initial`, variants, `exit`, the `whileX` gestures, `useAnimationControls()`, and `useAnimate()`. Layout/FLIP projection animations and drag momentum are unaffected, matching Framer Motion.
+
+The prop is reactive: toggling it updates already-mounted motion elements, so animation retargets use the current setting without requiring the subtree to remount.
+
 ## Nesting
 
 Configs nest. The nearest ancestor wins per prop — and props from outer configs that aren't overridden still apply.
 
 ```svelte
-<MotionConfig transition={{ duration: 0.4 }} reducedMotion="user">
+<MotionConfig transition={{ duration: 0.4 }} reducedMotion="user" skipAnimations>
     <Outer />
     <MotionConfig transition={{ duration: 0.2 }}>
-        <!-- inherits reducedMotion="user" from outer, overrides duration -->
+        <!-- inherits reducedMotion="user" and skipAnimations, overrides duration -->
         <Inner />
+    </MotionConfig>
+</MotionConfig>
+```
+
+### Resetting inherited defaults
+
+Because configs inherit from their nearest ancestor, a bare `<MotionConfig>` does not reset anything. To drop an inherited default, pass an explicit empty object such as `transition={{}}`.
+
+```svelte
+<MotionConfig transition={{ duration: 0.6 }}>
+    <SlowSection />
+    <MotionConfig transition={{}}>
+        <!-- Returns to motion's transition defaults. -->
+        <DefaultSection />
     </MotionConfig>
 </MotionConfig>
 ```
@@ -136,6 +168,29 @@ For per-component decisions that go beyond stripping transforms (e.g. swapping a
 ```
 
 [`useReducedMotion`](/docs/use-reduced-motion) reads only the OS preference (no `MotionConfig` ancestor required). [`useReducedMotionConfig`](/docs/use-reduced-motion-config) reads the resolved policy from the nearest `MotionConfig` combined with the OS preference.
+
+## Differences from Framer Motion
+
+### API coverage
+
+| Prop | Upstream | Svelte Motion | Notes |
+| --- | --- | --- | --- |
+| `transition` | `@public` | Supported | Sets the default transition for the subtree. |
+| `reducedMotion` | `@public` | Supported | Accepts `'user'`, `'always'`, or `'never'`. |
+| `skipAnimations` | `@public` | Supported | See the [behavioral differences](#behavioral-differences) below. |
+| `nonce` | `@public` | Not supported | Applies a CSP `nonce` to inline styles and is relevant only under a strict Content Security Policy. |
+| `isValidProp` | `@public` | Not supported | Decides whether a prop is forwarded to the DOM; upstream uses it when wrapping motion components in a styling library. |
+| `transformPagePoint` | Internal, exported only for usage in Framer | Not supported intentionally | A Framer-specific internal with no meaning outside Framer's editor. |
+| `isStatic` | Internal; determines whether this is a static context, such as the Framer canvas | Not supported intentionally | A Framer-specific internal with no meaning outside Framer's editor. |
+
+The two unimplemented `@public` props, `nonce` and `isValidProp`, are real gaps; `transformPagePoint` and `isStatic` are Framer-canvas internals with no meaning outside Framer's own editor.
+
+### Behavioral differences
+
+- **Nesting matches upstream.** A config inherits from its nearest ancestor and overrides per prop, the same as upstream's `config = { ...parentConfig, ...config }`. A child `transition` replaces the parent's wholesale unless it sets `inherit: true`, which shallow-merges with the parent with child keys winning, matching upstream's `resolveTransition`. A bare `<MotionConfig>` inherits everything; use `transition={{}}` to reset.
+- **`skipAnimations` is more reactive than upstream.** In React, the value is latched when an element mounts and never re-read, so toggling it at runtime has no effect on already-mounted elements. Here it is reactive: flipping it applies to already-mounted elements, and the next animation they run uses the current setting without a remount. `useAnimate()` reads the current value on every call for the same reason.
+- **In-flight animations are not interrupted (same as upstream).** Flipping `skipAnimations` changes what animations started after the flip do; an animation already running finishes its tween. For a deterministic screenshot, set it before the animation starts rather than mid-flight.
+- **`skipAnimations` does not affect layout/FLIP projection animations or drag momentum (same as upstream).** Those do not route through the value-level animation path the switch controls.
 
 ## See also
 
