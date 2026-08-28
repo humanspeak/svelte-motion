@@ -135,6 +135,20 @@ Configs nest. The nearest ancestor wins per prop — and props from outer config
 </MotionConfig>
 ```
 
+### Resetting inherited defaults
+
+Because configs inherit from their nearest ancestor, a bare `<MotionConfig>` does not reset anything. To drop an inherited default, pass an explicit empty object such as `transition={{}}`.
+
+```svelte
+<MotionConfig transition={{ duration: 0.6 }}>
+    <SlowSection />
+    <MotionConfig transition={{}}>
+        <!-- Returns to motion's transition defaults. -->
+        <DefaultSection />
+    </MotionConfig>
+</MotionConfig>
+```
+
 ## Programmatic reads
 
 For per-component decisions that go beyond stripping transforms (e.g. swapping a parallax effect for a static background), read the resolved policy via [`useReducedMotionConfig`](/docs/use-reduced-motion-config):
