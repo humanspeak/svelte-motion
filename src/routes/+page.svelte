@@ -797,6 +797,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion-config-skip-animations') + searchParams}
+                    >
+                        MotionConfig.skipAnimations
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/reactive-style') + searchParams}
                     >
                         styleString (Reactive Styles)

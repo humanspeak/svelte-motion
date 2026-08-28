@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { useAnimate } from './animate.svelte.js'
 
 describe('utils/animate - useAnimate', () => {
+    it('does not throw when called outside a Svelte component', () => {
+        expect(() => useAnimate()).not.toThrow()
+    })
+
     it('returns a [scope, animate] tuple', () => {
         const [scope, animate] = useAnimate()
         expect(typeof scope).toBe('function')

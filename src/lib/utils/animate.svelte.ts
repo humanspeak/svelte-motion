@@ -1,3 +1,4 @@
+import { getMotionConfig } from '$lib/components/motionConfig.context.js'
 import { createScopedAnimate } from 'motion'
 import type {
     AnimationPlaybackControlsWithThen,
@@ -40,6 +41,9 @@ export type AnimationScope<T extends Element = HTMLElement> = ((node: T) => () =
  * still `undefined`, and motion throws when asked to query selectors against
  * a missing root. Trigger animations from user events or `$effect` after
  * mount.
+ *
+ * Inside a `<MotionConfig skipAnimations>` subtree, animations started through
+ * the returned `animate` complete instantly.
  *
  * @template T The parent element type. Defaults to `HTMLElement`.
  * @returns A `[scope, animate]` tuple.
@@ -86,8 +90,23 @@ export const useAnimate = <T extends Element = HTMLElement>(): [
     scope.current = undefined
     scope.animations = []
 
+    // Upstream reads `MotionConfigContext.skipAnimations` here
+    // (framer-motion animation/hooks/use-animate.ts:18-22) so a scoped
+    // `animate()` inside `<MotionConfig skipAnimations>` completes instantly.
+    //
+    // Guarded: `getContext` throws outside Svelte component initialisation,
+    // and `useAnimate()` is documented and tested as callable from plain
+    // module scope (see `animate.spec.ts`). Absent config = no override.
+    let skipAnimations: boolean | undefined
+    try {
+        skipAnimations = getMotionConfig()?.skipAnimations
+    } catch {
+        skipAnimations = undefined
+    }
+
     const animate = createScopedAnimate({
-        scope: scope as MotionAnimationScope<T>
+        scope: scope as MotionAnimationScope<T>,
+        ...(skipAnimations === undefined ? {} : { skipAnimations })
     }) as SvelteMotionAnimate
 
     return [scope, animate]

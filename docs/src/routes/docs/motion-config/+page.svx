@@ -1,6 +1,6 @@
 ---
 title: MotionConfig
-description: Component that supplies default transition and reduced-motion behavior to every descendant motion component.
+description: Component that supplies default transitions, reduced-motion behavior, and skipAnimations to every descendant motion component.
 ---
 
 <script>
@@ -9,17 +9,17 @@ description: Component that supplies default transition and reduced-motion behav
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'MotionConfig | Docs | Svelte Motion'
-      seo.description = 'Provide default transition timing and the reducedMotion policy to descendant motion components from one ancestor. Nest configs to scope overrides.'
+      seo.description = 'Provide default transition timing, reducedMotion policy, and skipAnimations to descendant motion components from one ancestor. Nest configs to scope overrides.'
       seo.ogTitle = 'MotionConfig'
-      seo.ogTagline = 'Default transitions and reduced-motion policy for a subtree'
-      seo.ogFeatures = ['Default Transitions', 'Reduced Motion', 'Subtree Scoped', 'Nestable']
+      seo.ogTagline = 'Default transitions, reduced-motion policy, and animation skipping for a subtree'
+      seo.ogFeatures = ['Default Transitions', 'Reduced Motion', 'Skip Animations', 'Subtree Scoped', 'Nestable']
       seo.ogSlug = 'docs-motion-config'
   }
 </script>
 
 # MotionConfig
 
-`<MotionConfig>` is a context provider that supplies default `transition` timing and the `reducedMotion` policy to every descendant `motion.<tag>` component. Use it at the root of a route, an interactive subtree, or a single section to avoid repeating the same transition props on every child.
+`<MotionConfig>` is a context provider that supplies default `transition` timing, the `reducedMotion` policy, and `skipAnimations` to every descendant `motion.<tag>` component. Use it at the root of a route, an interactive subtree, or a single section to avoid repeating the same transition props on every child.
 
 ```svelte
 <script lang="ts">
@@ -103,15 +103,33 @@ Explicit `transition` on a `motion.<tag>` always wins:
 
 **`'user'` is the right default for production sites** — it respects the OS accessibility preference without forcing motion off for users who haven't opted in. Use `'always'` for previews / docs surfaces where you want motion disabled regardless of user setting.
 
+## `skipAnimations`
+
+Set `skipAnimations` to make every animation in the subtree jump directly to its final value instead of tweening. Unlike `reducedMotion="always"`, which strips only transform keys while opacity, color, and other properties continue to animate, `skipAnimations` disables the tween for every animated property.
+
+```svelte
+<MotionConfig skipAnimations>
+    <motion.div
+        initial={{ x: -100, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+    />
+    <motion.div whileHover={{ scale: 1.1, backgroundColor: '#7c3aed' }} />
+</MotionConfig>
+```
+
+This is intended for E2E tests and visual-regression screenshots, where a deterministic settled frame matters more than observing a transition. It covers `animate`, `initial`, variants, `exit`, the `whileX` gestures, `useAnimationControls()`, and `useAnimate()`. Layout/FLIP projection animations and drag momentum are unaffected, matching Framer Motion.
+
+The prop is reactive: toggling it updates already-mounted motion elements, so animation retargets use the current setting without requiring the subtree to remount.
+
 ## Nesting
 
 Configs nest. The nearest ancestor wins per prop — and props from outer configs that aren't overridden still apply.
 
 ```svelte
-<MotionConfig transition={{ duration: 0.4 }} reducedMotion="user">
+<MotionConfig transition={{ duration: 0.4 }} reducedMotion="user" skipAnimations>
     <Outer />
     <MotionConfig transition={{ duration: 0.2 }}>
-        <!-- inherits reducedMotion="user" from outer, overrides duration -->
+        <!-- inherits reducedMotion="user" and skipAnimations, overrides duration -->
         <Inner />
     </MotionConfig>
 </MotionConfig>
