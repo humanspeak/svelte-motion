@@ -204,6 +204,11 @@ Re-ran every gate through the normal commands after the pnpm bump:
    Classified as a pre-existing flake surfaced under full-suite load
    (12.7-minute run, timing-sensitive scroll/rect anchoring assertions).
 
+   **Confirmed by a second full-suite run: 427 passed, 2 skipped, 0 failed
+   (429 total, 12.8 min).** The test passed on the re-run, so the failure is
+   non-deterministic rather than a regression. Combined with the inertness
+   proof above, this is settled.
+
 3. **`e2e/animate-presence/owned-child.spec.ts:11`** — flaked once earlier in a
    167-test sweep, passed in isolation and in every later run. Same category.
 
