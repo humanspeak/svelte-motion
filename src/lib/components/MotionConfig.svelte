@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { Snippet } from 'svelte'
-    import type { MotionConfigProps } from '$lib/types'
+    import { resolveTransition } from 'motion-dom'
+    import type { MotionConfigProps, MotionTransition } from '$lib/types'
     import { createMotionConfig, getMotionConfig } from '$lib/components/motionConfig.context'
 
     /**
@@ -40,7 +41,16 @@
     // on every read rather than frozen at init.
     const motionConfig: MotionConfigProps = {
         get transition() {
-            return transition ?? parentConfig?.transition
+            // Upstream: `config.transition = resolveTransition(config.transition,
+            // parentConfig.transition)` (framer-motion
+            // components/MotionConfig/index.tsx:36-39). `resolveTransition`
+            // shallow-merges ONLY when the child sets `inherit: true`; otherwise
+            // the child's object replaces the parent's wholesale. The `??` then
+            // covers the bare-config case, where there is no own transition at all.
+            return (
+                (resolveTransition(transition, parentConfig?.transition) as MotionTransition) ??
+                parentConfig?.transition
+            )
         },
         get reducedMotion() {
             return reducedMotion ?? parentConfig?.reducedMotion

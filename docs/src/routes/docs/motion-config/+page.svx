@@ -169,6 +169,29 @@ For per-component decisions that go beyond stripping transforms (e.g. swapping a
 
 [`useReducedMotion`](/docs/use-reduced-motion) reads only the OS preference (no `MotionConfig` ancestor required). [`useReducedMotionConfig`](/docs/use-reduced-motion-config) reads the resolved policy from the nearest `MotionConfig` combined with the OS preference.
 
+## Differences from Framer Motion
+
+### API coverage
+
+| Prop | Upstream | Svelte Motion | Notes |
+| --- | --- | --- | --- |
+| `transition` | `@public` | Supported | Sets the default transition for the subtree. |
+| `reducedMotion` | `@public` | Supported | Accepts `'user'`, `'always'`, or `'never'`. |
+| `skipAnimations` | `@public` | Supported | See the [behavioral differences](#behavioral-differences) below. |
+| `nonce` | `@public` | Not supported | Applies a CSP `nonce` to inline styles and is relevant only under a strict Content Security Policy. |
+| `isValidProp` | `@public` | Not supported | Decides whether a prop is forwarded to the DOM; upstream uses it when wrapping motion components in a styling library. |
+| `transformPagePoint` | Internal, exported only for usage in Framer | Not supported intentionally | A Framer-specific internal with no meaning outside Framer's editor. |
+| `isStatic` | Internal; determines whether this is a static context, such as the Framer canvas | Not supported intentionally | A Framer-specific internal with no meaning outside Framer's editor. |
+
+The two unimplemented `@public` props, `nonce` and `isValidProp`, are real gaps; `transformPagePoint` and `isStatic` are Framer-canvas internals with no meaning outside Framer's own editor.
+
+### Behavioral differences
+
+- **Nesting matches upstream.** A config inherits from its nearest ancestor and overrides per prop, the same as upstream's `config = { ...parentConfig, ...config }`. A child `transition` replaces the parent's wholesale unless it sets `inherit: true`, which shallow-merges with the parent with child keys winning, matching upstream's `resolveTransition`. A bare `<MotionConfig>` inherits everything; use `transition={{}}` to reset.
+- **`skipAnimations` is more reactive than upstream.** In React, the value is latched when an element mounts and never re-read, so toggling it at runtime has no effect on already-mounted elements. Here it is reactive: flipping it applies to already-mounted elements, and the next animation they run uses the current setting without a remount. `useAnimate()` reads the current value on every call for the same reason.
+- **In-flight animations are not interrupted (same as upstream).** Flipping `skipAnimations` changes what animations started after the flip do; an animation already running finishes its tween. For a deterministic screenshot, set it before the animation starts rather than mid-flight.
+- **`skipAnimations` does not affect layout/FLIP projection animations or drag momentum (same as upstream).** Those do not route through the value-level animation path the switch controls.
+
 ## See also
 
 - [`useReducedMotionConfig`](/docs/use-reduced-motion-config) — Reactive read of the resolved policy

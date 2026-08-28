@@ -55,4 +55,19 @@ test.describe('MotionConfig.skipAnimations', () => {
 
         await expect(page.getByTestId('exit-box')).toHaveCount(0, { timeout: 500 })
     })
+
+    test('changed skipAnimations applies to an unkeyed mounted element', async ({ page }) => {
+        await page.goto(ROUTE)
+
+        const box = page.getByTestId('unkeyed-box')
+        await expect(box).toBeAttached()
+        await page.waitForTimeout(2200)
+        expect(await readTranslateX(box)).toBeCloseTo(0)
+
+        await page.getByTestId('toggle-skip').check()
+        await page.getByTestId('retarget-unkeyed').click()
+        await page.waitForTimeout(300)
+
+        expect(await readTranslateX(box)).toBeCloseTo(200)
+    })
 })

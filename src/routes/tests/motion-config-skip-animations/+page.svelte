@@ -3,6 +3,7 @@
 
     let skip = $state(false)
     let showExit = $state(true)
+    let unkeyedX = $state(0)
 </script>
 
 <div class="flex min-h-screen w-full flex-col items-center justify-center gap-8 p-8">
@@ -33,6 +34,24 @@
                 class="box"
             />
         {/key}
+
+        <div class="flex flex-col items-center gap-3">
+            <button
+                type="button"
+                data-testid="retarget-unkeyed"
+                class="rounded bg-gray-900 px-4 py-2 text-white"
+                onclick={() => (unkeyedX = unkeyedX === 0 ? 200 : 0)}
+            >
+                Retarget unkeyed box
+            </button>
+            <motion.div
+                data-testid="unkeyed-box"
+                initial={{ x: 0 }}
+                animate={{ x: unkeyedX }}
+                transition={{ duration: 2, ease: 'linear' }}
+                class="box"
+            />
+        </div>
 
         <div class="flex flex-col items-center gap-3">
             <button
