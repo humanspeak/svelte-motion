@@ -23,7 +23,7 @@ const LISTENING_SCALE_FLOOR = 28
  * - Locally (GPU available) we run real Chrome with GPU rasterization and
  *   hold the demo to the hardware gate: p95 < 25ms — the "is it actually
  *   smooth" verification (measured 16.7ms p95, locked 60fps).
- * - CI (blacksmith ubuntu, no GPU, bundled chromium — Chrome Stable is not
+ * - CI (ubuntu-latest, no GPU, bundled chromium — Chrome Stable is not
  *   installed there) software-rasterizes SVG filters via SwiftShader, so the
  *   same page measures ~3× slower REGARDLESS of real-world smoothness. There
  *   the budget is a regression tripwire against the measured software
