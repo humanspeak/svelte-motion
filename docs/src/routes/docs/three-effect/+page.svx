@@ -1,0 +1,92 @@
+---
+title: Three.js effect
+description: Animate Three.js objects, materials and shader uniforms with threeEffect
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte'
+  import Default from '$lib/examples/three-effect/demos/Default.svelte'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'Three.js effect | Docs | Svelte Motion'
+      seo.description = 'Animate Three.js objects, materials and shader uniforms with threeEffect.'
+      seo.ogTitle = 'Three.js effect'
+      seo.ogTagline = 'Motion physics for meshes and shader uniforms'
+      seo.ogFeatures = ['threeEffect', 'Object3D', 'Shader Uniforms', 'Motion 13.2']
+      seo.ogSlug = 'docs-three-effect'
+  }
+</script>
+
+# Three.js effect
+
+`threeEffect` connects Motion's animation engine to Three.js objects, materials, and uniforms. Register it once, then use the same `animate()` API you use for DOM elements and plain objects.
+
+```ts
+import { animate } from '@humanspeak/svelte-motion'
+import { threeEffect } from '@humanspeak/svelte-motion/three'
+
+animate.addEffect(threeEffect)
+animate(mesh, { x: 1.5, rotateY: 360 }, { type: 'spring' })
+```
+
+<Example isSmall exampleUrl="/examples/three-effect">
+  <Default />
+</Example>
+
+## Supported subjects and values
+
+The adapter claims the following Three.js-shaped subjects without importing `three` itself:
+
+| Subject | Animated values |
+|---|---|
+| `Object3D` (meshes, cameras, lights) | `x`, `y`, `z`, `rotateX`, `rotateY`, `rotateZ`, `scaleX`, `scaleY`, `scaleZ`, and `scale` |
+| Materials | Direct properties and colour keys such as `color`, `emissive`, and `specular` |
+| Uniforms objects | Any `{ key: { value } }` entry, including vector components such as `offsetX` |
+| TSL uniform nodes | Uniform-node values assigned to slots such as `material.colorNode` |
+
+Rotation shorthands — `rotateX`, `rotateY`, and `rotateZ` — are in **degrees**. They are converted to radians on write, like DOM `rotate`, so a full turn is `360`, not `Math.PI * 2`.
+
+## Shader uniforms
+
+Bind a MotionValue directly to a uniforms object when you want to control it independently from the mesh:
+
+```ts
+import { animate, motionValue } from '@humanspeak/svelte-motion'
+import { threeEffect } from '@humanspeak/svelte-motion/three'
+
+const progress = motionValue(0)
+const uniforms = { progress: { value: 0 } }
+const unbind = threeEffect(uniforms, { progress })
+
+animate(progress, 1, { duration: 1 })
+
+// When the integration is no longer active:
+unbind()
+progress.destroy()
+```
+
+## Frame timing
+
+`threeEffect` writes values in `frame.preRender`. Schedule the Three.js render loop with `frame.render` so every object transform and uniform update lands before the frame is drawn.
+
+```ts
+import { cancelFrame, frame } from '@humanspeak/svelte-motion'
+
+const render = () => renderer.render(scene, camera)
+frame.render(render, true)
+
+// On cleanup:
+cancelFrame(render)
+animate.removeEffect(threeEffect)
+```
+
+## Related
+
+- [Custom effects](/docs/custom-effects) — create and register adapters for other non-DOM subjects
+- [Three.js effect example](/examples/three-effect) — spring a mesh and ripple its shader with complete source
+
+---
+
+Based on Motion 13.2's [`motion/three`](https://motion.dev/docs/three).

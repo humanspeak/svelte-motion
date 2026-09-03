@@ -102,6 +102,7 @@ export const docsSections: NavSection[] = [
             { title: 'Overview', href: '/docs/motion-values', icon: Signal },
             { title: 'Vanilla values', href: '/docs/vanilla-values', icon: Zap },
             { title: 'Custom effects', href: '/docs/custom-effects', icon: Wand },
+            { title: 'Three.js effect', href: '/docs/three-effect', icon: Box },
             { title: 'MotionValue children', href: '/docs/motion-value-children', icon: Code },
             {
                 title: 'Object style MotionValues',

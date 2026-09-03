@@ -203,6 +203,10 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Tab Select',
         description: 'Interactive tab select animation example using Svelte Motion.'
     },
+    'three-effect': {
+        title: 'Three.js Effect',
+        description: 'Spring a mesh and ripple a shader uniform with animate() and threeEffect.'
+    },
     'toggle-switch': {
         title: 'Toggle Switch',
         description: 'Interactive toggle switch animation example using Svelte Motion.'

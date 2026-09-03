@@ -9,10 +9,11 @@ export type { ThreeEffectValues, ThreeUniform, ThreeUniforms } from 'motion/thre
  *
  * Claims `Object3D`s, materials and uniforms objects (`{ key: { value } }`).
  * Register it once with `animate.addEffect(threeEffect)` so `animate(mesh,
- * { x: 2, rotateY: Math.PI })` works, or bind values manually with
+ * { x: 2, rotateY: 180 })` works, or bind values manually with
  * `threeEffect(mesh, { x, rotateY })`. Writes land in `frame.preRender`,
  * ahead of render loops scheduled with `frame.render`. `three` itself is the
  * consumer's dependency — this module never imports it.
+ * Rotation shorthands are in degrees, like DOM `rotate`.
  *
  * @example
  * ```ts
@@ -20,7 +21,7 @@ export type { ThreeEffectValues, ThreeUniform, ThreeUniforms } from 'motion/thre
  * import { threeEffect } from '@humanspeak/svelte-motion/three'
  *
  * animate.addEffect(threeEffect)
- * animate(mesh, { rotateY: Math.PI * 2 }, { duration: 2 })
+ * animate(mesh, { rotateY: 360 }, { duration: 2 })
  * ```
  */
 export const threeEffect = threeEffectCore as typeof threeEffectCore &

@@ -306,6 +306,14 @@
                         Custom effects (createEffect + animate.addEffect on a canvas dial)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/effects/three') + searchParams}
+                    >
+                        Three.js effect (animate(mesh) + shader uniform via threeEffect)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

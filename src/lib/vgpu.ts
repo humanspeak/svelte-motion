@@ -13,6 +13,7 @@ export type { VGPUEffectValues } from 'motion/vgpu'
  * target these subjects directly, or bind values manually with `vgpuEffect`.
  * Writes land in `frame.preRender`, ahead of render loops scheduled with
  * `frame.render`. `vgpu` itself is the consumer's dependency and is pre-1.0.
+ * Rotation shorthands are in degrees, like DOM `rotate`.
  *
  * @example
  * ```ts
@@ -20,7 +21,7 @@ export type { VGPUEffectValues } from 'motion/vgpu'
  * import { vgpuEffect } from '@humanspeak/svelte-motion/vgpu'
  *
  * animate.addEffect(vgpuEffect)
- * animate(cube, { rotateY: Math.PI * 2 }, { duration: 2 })
+ * animate(cube, { rotateY: 360 }, { duration: 2 })
  * ```
  */
 export const vgpuEffect = vgpuEffectCore as typeof vgpuEffectCore &
