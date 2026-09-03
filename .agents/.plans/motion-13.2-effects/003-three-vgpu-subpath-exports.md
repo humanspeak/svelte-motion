@@ -8,8 +8,14 @@
 > (`.agents/.plans/motion-13.2-effects/README.md`) — unless a reviewer
 > dispatched you and told you they maintain the index.
 >
+> **Revision 2026-09-03** (guard, after plan 001 passed at `7d09c0d`): drift
+> baseline re-stamped `47b7149` → `7d09c0d` because 001 legitimately changed
+> `src/lib/utils/effects.ts` (the `propEffect` intersection re-type this plan
+> copies) and the 13.2.0 bump changed `package.json`. Both now match the
+> "Current state" excerpts below.
+>
 > **Drift check (run first)**:
-> `git diff --stat 47b7149..HEAD -- package.json src/lib/utils/effects.ts src/lib/vite.ts`
+> `git diff --stat 7d09c0d..HEAD -- package.json src/lib/utils/effects.ts src/lib/vite.ts`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -25,7 +31,7 @@
 - **Risk**: LOW
 - **Depends on**: 001-effect-registry-public-api.md
 - **Category**: migration
-- **Planned at**: commit `47b7149`, 2026-09-03
+- **Planned at**: commit `7d09c0d`, 2026-09-03 (re-baselined; originally `47b7149`)
 
 ## Why this matters
 

@@ -14,7 +14,14 @@
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
 >
-> **Precondition**: Plan 001 is DONE (`grep -n "createEffect, MotionValueState" src/lib/index.ts`
+> **Revision 2026-09-03** (guard, after plan 001 passed at `7d09c0d`): the
+> precondition grep now reads `MotionValueState, createEffect` — trunk's
+> export sorting put the capitalised name first when 001 landed. Note also
+> that 001 made `addEffect`/`removeEffect` **generic**
+> (`addEffect<Subject extends object>(effect: AnimateEffect<Subject>)`), so
+> `animate.addEffect(dialEffect)` infers `Dial` — no cast needed.
+>
+> **Precondition**: Plan 001 is DONE (`grep -n "MotionValueState, createEffect" src/lib/index.ts`
 > returns a match and `pnpm check` is clean). Do not start otherwise.
 
 ## Status

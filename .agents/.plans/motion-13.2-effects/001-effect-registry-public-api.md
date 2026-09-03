@@ -8,8 +8,17 @@
 > (`.agents/.plans/motion-13.2-effects/README.md`) — unless a reviewer
 > dispatched you and told you they maintain the index.
 >
+> **Revision 2026-09-03** (guard, after the first Codex run stopped at Step 6):
+> (1) Step 2 no longer uses `AnimateEffect<any>` — the repo's eslint config
+> (via `trunk check`) enforces `@typescript-eslint/no-explicit-any` as an
+> error and has no disable precedent, so the members are now **generic**
+> (`addEffect<Subject extends object>(effect: AnimateEffect<Subject>): void`).
+> (2) The done-criteria grep for the barrel export is now
+> `MotionValueState, createEffect` — trunk's import/export sorting puts the
+> capitalised name first. (3) `Planned at` re-stamped to `82c6971`.
+>
 > **Drift check (run first)**:
-> `git diff --stat 47b7149..HEAD -- src/lib/utils/animateValue.ts src/lib/utils/animateValue.spec.ts src/lib/utils/effects.ts src/lib/index.ts src/lib/index.spec.ts`
+> `git diff --stat 82c6971..HEAD -- src/lib/utils/animateValue.ts src/lib/utils/animateValue.spec.ts src/lib/utils/effects.ts src/lib/index.ts src/lib/index.spec.ts`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -26,7 +35,7 @@
 - **Risk**: LOW
 - **Depends on**: none (but see Precondition)
 - **Category**: migration
-- **Planned at**: commit `47b7149`, 2026-09-03
+- **Planned at**: commit `82c6971`, 2026-09-03 (revised; originally `47b7149`)
 
 ## Why this matters
 
@@ -280,14 +289,15 @@ and add two members to the interface (after the last call signature, with JSDoc)
      * claims (e.g. `animate.addEffect(threeEffect)`). The most recently added
      * effect is tested first; DOM elements are always animated directly.
      */
-    addEffect(effect: AnimateEffect<any>): void
+    addEffect<Subject extends object>(effect: AnimateEffect<Subject>): void
     /** Unregister an effect previously passed to {@link addEffect}. */
-    removeEffect(effect: AnimateEffect<any>): void
+    removeEffect<Subject extends object>(effect: AnimateEffect<Subject>): void
 ```
 
-Keep the `eslint-disable-next-line @typescript-eslint/no-explicit-any` comment
-if the repo's eslint config flags `any` here (it mirrors upstream's signature).
-Update the interface's leading JSDoc to mention the statics. Do not wrap
+Upstream declares these as `AnimateEffect<any>`; this repo's eslint config
+rejects explicit `any` (error level, no disable precedent), so the generic
+form is used — it accepts every `AnimateEffect<T>` by inference and needs no
+lint exception. Update the interface's leading JSDoc to mention the statics. Do not wrap
 `animate` in a function — it must stay a pure cast (the existing identity test
 `expect(animate).toBe(animateCore)` enforces that).
 
@@ -393,7 +403,7 @@ Run `trunk fmt`, then the full gate.
 - [ ] `pnpm check` exits with `0 ERRORS`
 - [ ] `pnpm test:only` exits 0; `index.spec.ts` and `animateValue.spec.ts` contain the new tests and they pass
 - [ ] `grep -n "addEffect" src/lib/utils/animateValue.ts` shows the interface member
-- [ ] `grep -n "createEffect, MotionValueState" src/lib/index.ts` returns a match
+- [ ] `grep -n "MotionValueState, createEffect" src/lib/index.ts` returns a match
 - [ ] `expect(animate).toBe(animateCore)` still passes (no wrapper introduced)
 - [ ] `pnpm package` prints `All good!`
 - [ ] `.changeset/effect-registry-api.md` exists with `minor`
@@ -411,8 +421,8 @@ Stop and report back (do not improvise) if:
 - Adding `addEffect` to the interface breaks the identity test or forces a
   wrapper function around `animateCore`.
 - The Step 5 runtime test still fails after the jsdom fallback described there.
-- eslint (via `trunk check`) rejects `AnimateEffect<any>` and there is no
-  existing disable pattern in the repo to copy (`grep -rn "no-explicit-any" src/lib | head`).
+- `trunk check` reports a lint error on the new interface members that the
+  generic signature in Step 2 does not resolve.
 
 ## Maintenance notes
 
