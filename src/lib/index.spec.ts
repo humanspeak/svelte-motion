@@ -1,3 +1,4 @@
+import { createEffect as createEffectCore, MotionValueState as MotionValueStateCore } from 'motion'
 import { describe, expect, it } from 'vitest'
 import {
     animate,
@@ -12,6 +13,7 @@ import {
     circOut,
     clamp,
     createDragControls,
+    createEffect,
     cubicBezier,
     delay,
     distance,
@@ -25,10 +27,12 @@ import {
     mix,
     motion,
     MotionConfig,
+    MotionValueState,
     pipe,
     PresenceChild,
     press,
     progress,
+    propEffect,
     resize,
     scroll,
     stagger,
@@ -63,6 +67,20 @@ describe('public API: index.ts', () => {
     it('re-exports animate and hover from motion', () => {
         expect(typeof animate).toBe('function')
         expect(typeof hover).toBe('function')
+    })
+
+    it('re-exports the Motion 13.2 effect registry primitives', () => {
+        expect(createEffect).toBe(createEffectCore)
+        expect(MotionValueState).toBe(MotionValueStateCore)
+    })
+
+    it('keeps addEffect/removeEffect on the re-typed animate', () => {
+        expect(typeof animate.addEffect).toBe('function')
+        expect(typeof animate.removeEffect).toBe('function')
+    })
+
+    it('keeps .get on the re-typed propEffect', () => {
+        expect(typeof propEffect.get).toBe('function')
     })
 
     it('exports MotionConfig component', () => {

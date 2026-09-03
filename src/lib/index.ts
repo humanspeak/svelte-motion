@@ -46,6 +46,23 @@ export { animate } from '$lib/utils/animateValue'
 export { attrEffect, propEffect, styleEffect, svgEffect } from '$lib/utils/effects'
 export type { EffectValues } from '$lib/utils/effects'
 
+// Motion 13.2 effect registry: build effects for non-DOM subjects with
+// `createEffect` and register them via `animate.addEffect`. `createEffect`
+// and the effect types come from `$lib/utils/effects` — re-typed so the
+// effects they produce accept this library's augmented motion values, the
+// same widening the element effects above get.
+export { createEffect } from '$lib/utils/effects'
+export type { AnimateEffect, Effect } from '$lib/utils/effects'
+export { MotionValueState } from 'motion'
+export type {
+    AddEffectValue,
+    EffectKeyframes,
+    EffectOptions,
+    EffectRead,
+    EffectTest,
+    EffectTransition
+} from 'motion-dom'
+
 // Svelte-augmented vanilla value factories (reactive .current, store
 // .subscribe, manual lifecycle) and the rune/readable → MotionValue
 // bridge. Their `use*` hook counterparts add component auto-cleanup.

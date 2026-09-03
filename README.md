@@ -49,6 +49,8 @@ Goal: Framer Motion API parity for Svelte where common React examples can be tra
 | Reorder (Motion 13.1 auto-axis, wrapped grids, RTL, edge auto-scroll)  | Supported                                  |
 | View Transitions (`animateView`, shared-element morphs)                | Supported                                  |
 | Vanilla values (`motionValue`, `styleEffect`, `toMotionValue` bridge)  | Supported                                  |
+| Custom effects (`createEffect`, `animate.addEffect`, Motion 13.2)      | Supported                                  |
+| Three.js / vgpu adapters (`/three`, `/vgpu` subpaths)                  | Supported                                  |
 | Pan gesture API (`onPan*`, `onPanSessionStart`)                        | Supported                                  |
 | `MotionConfig` parity beyond `transition`                              | Partial                                    |
 | `reducedMotion`, `features`, `transformPagePoint`                      | Not yet supported                          |

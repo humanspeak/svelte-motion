@@ -75,6 +75,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Conic Gradient',
         description: 'Interactive conic gradient animation example using Svelte Motion.'
     },
+    'custom-effects': {
+        title: 'Custom Effects',
+        description:
+            'Animate any JavaScript object — a canvas dial driven by createEffect and animate.addEffect.'
+    },
     'drag-constraints': {
         title: 'Drag Constraints',
         description:
@@ -197,6 +202,10 @@ const EXAMPLES: Record<string, ExampleEntry> = {
     'tab-select': {
         title: 'Tab Select',
         description: 'Interactive tab select animation example using Svelte Motion.'
+    },
+    'three-effect': {
+        title: 'Three.js Effect',
+        description: 'Spring a mesh and ripple a shader uniform with animate() and threeEffect.'
     },
     'toggle-switch': {
         title: 'Toggle Switch',

@@ -47,8 +47,8 @@ describe('SEO title policy', () => {
 
         expect(
             detailPaths,
-            `Expected 60 example detail pages, found ${detailPaths.length}`
-        ).toHaveLength(60)
+            `Expected 66 example detail pages, found ${detailPaths.length}`
+        ).toHaveLength(66)
         expect(
             missingRoutes,
             `Missing literal seo.title assignments for: ${missingRoutes.join(', ') || '(none)'}`

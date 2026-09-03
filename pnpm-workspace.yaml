@@ -19,3 +19,4 @@ minimumReleaseAgeExclude:
     - framer-motion
     - motion
     - motion-dom
+    - motion-utils

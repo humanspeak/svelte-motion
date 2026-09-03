@@ -5,6 +5,7 @@ import {
     type SequenceOptions
 } from 'motion'
 import type {
+    AnimateEffect,
     AnimationOptions,
     AnimationPlaybackControlsWithThen,
     DOMKeyframesDefinition,
@@ -20,7 +21,9 @@ import type { AnyMotionValue } from './transform.svelte.js'
  * cast. Every non-value overload (sequences, element/selector targets, object
  * targets) is preserved verbatim from motion's `animate`; only the motion-value
  * overloads widen their first parameter from `MotionValue<T>` to
- * `AnyMotionValue<T>`.
+ * `AnyMotionValue<T>`. The effect-registry statics live on
+ * {@link SvelteMotionAnimateWithEffects}, which only the module-level `animate`
+ * uses — the scoped animate from `useAnimate()` has no statics at runtime.
  *
  * The value overloads deliberately precede the object-target overload so a call
  * like `animate(motionValue, [0, 1])` resolves to the value overload rather than
@@ -64,6 +67,28 @@ export interface SvelteMotionAnimate {
 }
 
 /**
+ * The module-level `animate`: every call signature above, plus Motion 13.2's
+ * effect-registry statics.
+ *
+ * These live here and NOT on {@link SvelteMotionAnimate} because the scoped
+ * animate returned by `useAnimate()` genuinely does not have them at runtime —
+ * upstream's `createScopedAnimate()` returns a bare function. Declaring them on
+ * the shared interface would let `const [, animate] = useAnimate();
+ * animate.addEffect(effect)` compile and then throw
+ * `TypeError: animate.addEffect is not a function`.
+ */
+export interface SvelteMotionAnimateWithEffects extends SvelteMotionAnimate {
+    /**
+     * Register an effect so `animate()` can drive the non-DOM subjects it
+     * claims (e.g. `animate.addEffect(threeEffect)`). The most recently added
+     * effect is tested first; DOM elements are always animated directly.
+     */
+    addEffect<Subject extends object>(effect: AnimateEffect<Subject>): void
+    /** Unregister an effect previously passed to {@link addEffect}. */
+    removeEffect<Subject extends object>(effect: AnimateEffect<Subject>): void
+}
+
+/**
  * Motion's `animate`, re-typed to accept this library's Svelte-augmented motion
  * values without a cast.
  *
@@ -88,4 +113,4 @@ export interface SvelteMotionAnimate {
  * animate(x, 100, { duration: 0.5 }) // no cast required
  * ```
  */
-export const animate = animateCore as SvelteMotionAnimate
+export const animate = animateCore as SvelteMotionAnimateWithEffects

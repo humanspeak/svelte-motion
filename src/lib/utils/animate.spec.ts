@@ -2,6 +2,7 @@ import { sleep } from '$lib/utils/testing'
 import { fireEvent, render } from '@testing-library/svelte'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import UseAnimateSkipHarness from '../components/__tests__/UseAnimateSkipHarness.svelte'
+import { animate, createEffect } from '../index.js'
 import { useAnimate } from './animate.svelte.js'
 
 describe('utils/animate - useAnimate', () => {
@@ -130,6 +131,17 @@ describe('utils/animate - useAnimate', () => {
         expect(scope.current).toBe(second)
     })
 
+    it('does not carry the effect-registry statics on the scoped animate', () => {
+        // Upstream's `createScopedAnimate()` returns a plain function with no
+        // `addEffect`/`removeEffect`, and this wrapper adds none. The TYPE must
+        // say the same, or `animate.addEffect(...)` compiles and then throws
+        // `TypeError: animate.addEffect is not a function` at runtime.
+        const [, animate] = useAnimate()
+
+        expect((animate as unknown as Record<string, unknown>).addEffect).toBeUndefined()
+        expect((animate as unknown as Record<string, unknown>).removeEffect).toBeUndefined()
+    })
+
     it('reads the current MotionConfig skipAnimations value for each call', async () => {
         const { getByTestId, rerender } = render(UseAnimateSkipHarness, {
             props: { skip: false }
@@ -145,3 +157,31 @@ describe('utils/animate - useAnimate', () => {
         expect(Number.parseFloat(getComputedStyle(target).opacity)).toBe(1)
     })
 })
+
+/**
+ * Compile-only: the scoped animate returned by `useAnimate()` must NOT expose
+ * the effect-registry statics, which live only on the module-level `animate`.
+ */
+function typeAssertions() {
+    const [, scopedAnimate] = useAnimate()
+
+    // Call signatures are shared with the module-level `animate`.
+    scopedAnimate('.box', { opacity: 0.5 }, { duration: 0.1 })
+
+    const effect = createEffect<{ claimed: true }>(() => () => {}, {
+        test: (s): s is { claimed: true } => Boolean((s as { claimed?: true })?.claimed),
+        read: () => 0
+    })
+
+    // @ts-expect-error the scoped animate has no effect registry at runtime
+    scopedAnimate.addEffect(effect)
+    // @ts-expect-error the scoped animate has no effect registry at runtime
+    scopedAnimate.removeEffect(effect)
+
+    // …while the module-level `animate` does.
+    animate.addEffect(effect)
+    animate.removeEffect(effect)
+}
+
+// Compile-time only: referenced so the checker keeps it, and lint sees a use.
+void typeAssertions
