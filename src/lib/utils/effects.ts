@@ -53,7 +53,8 @@ export const attrEffect: Effect = attrEffectCore as Effect
 
 /**
  * Bind motion values to object properties. Identical to motion's
- * `propEffect` at runtime, re-typed to accept augmented values.
+ * `propEffect` at runtime, re-typed to accept augmented values while keeping
+ * upstream's `.get(subject, key)` accessor (Motion 13.2).
  *
  * @param subject The target object.
  * @param values Map of property names to motion values.
@@ -63,7 +64,8 @@ export const attrEffect: Effect = attrEffectCore as Effect
  * propEffect(audioNode, { volume })
  * ```
  */
-export const propEffect = propEffectCore as (subject: object, values: EffectValues) => VoidFunction
+export const propEffect = propEffectCore as typeof propEffectCore &
+    ((subject: object, values: EffectValues) => VoidFunction)
 
 /**
  * Bind motion values to SVG attributes (with SVG-specific handling).

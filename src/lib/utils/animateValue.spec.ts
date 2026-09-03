@@ -1,5 +1,5 @@
-import { animate as animateCore } from 'motion'
-import { describe, expect, it, vi } from 'vitest'
+import { animate as animateCore, createEffect } from 'motion'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { animate } from './animateValue.js'
 import { motionValue } from './vanillaValues.svelte.js'
 
@@ -61,6 +61,17 @@ function typeAssertions() {
     animate(document.createElement('div'), { opacity: 0.5 }, { duration: 0.1 })
     animate([['.a', { opacity: 0.5 }, { duration: 0.001 }]], { duration: 0.01 })
 
+    // Motion 13.2: effect registry statics survive the re-type.
+    const noopEffect = createEffect<{ isSubject: true }>(() => () => {}, {
+        test: (s): s is { isSubject: true } => Boolean((s as { isSubject?: true })?.isSubject),
+        read: () => 0
+    })
+    animate.addEffect(noopEffect)
+    animate.removeEffect(noopEffect)
+    // Motion 13.2: ObjectTarget accepts keys the subject doesn't declare
+    // (effects expose shorthands like `rotateY`).
+    animate({ x: 0 }, { x: 1, rotateY: 90 })
+
     // @ts-expect-error keyframes must match the motion value's value type
     animate(numMv, 'not-a-number')
     // @ts-expect-error a boolean is not a valid animation subject
@@ -69,3 +80,55 @@ function typeAssertions() {
 
 // Compile-time only: referenced so the checker keeps it, and lint sees a use.
 void typeAssertions
+
+interface Subject {
+    isSubject: true
+    values: Record<string, number | string>
+}
+
+const createSubject = (values: Record<string, number | string> = {}): Subject => ({
+    isSubject: true,
+    values
+})
+
+const subjectEffect = createEffect<Subject>(
+    (subject, state, key, value) =>
+        state.set(
+            key,
+            value,
+            () => {
+                subject.values[key] = state.latest[key]
+            },
+            undefined,
+            false
+        ),
+    {
+        test: (subject): subject is Subject => Boolean((subject as Subject)?.isSubject),
+        read: (subject, key) => subject.values[key]
+    }
+)
+
+describe('animate.addEffect', () => {
+    afterEach(() => {
+        animate.removeEffect(subjectEffect)
+    })
+
+    it('animates a subject claimed by a registered effect', async () => {
+        const subject = createSubject({ x: 0 })
+        animate.addEffect(subjectEffect)
+
+        animate(subject, { x: 100 }, { duration: 0.1 })
+        await vi.advanceTimersByTimeAsync(200)
+
+        expect(subject.values.x).toBe(100)
+    })
+
+    it('still animates a plain object with no claiming effect', async () => {
+        const subject = { x: 0 }
+
+        animate(subject, { x: 100 }, { duration: 0.1 })
+        await vi.advanceTimersByTimeAsync(200)
+
+        expect(subject.x).toBe(100)
+    })
+})

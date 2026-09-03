@@ -5,6 +5,7 @@ import {
     type SequenceOptions
 } from 'motion'
 import type {
+    AnimateEffect,
     AnimationOptions,
     AnimationPlaybackControlsWithThen,
     DOMKeyframesDefinition,
@@ -18,9 +19,9 @@ import type { AnyMotionValue } from './transform.svelte.js'
  * The `animate` signature re-typed so this library's Svelte-augmented motion
  * values (`AnyMotionValue<T>`) are accepted as the animation subject without a
  * cast. Every non-value overload (sequences, element/selector targets, object
- * targets) is preserved verbatim from motion's `animate`; only the motion-value
- * overloads widen their first parameter from `MotionValue<T>` to
- * `AnyMotionValue<T>`.
+ * targets) and the effect-registry statics are preserved verbatim from motion's
+ * `animate`; only the motion-value overloads widen their first parameter from
+ * `MotionValue<T>` to `AnyMotionValue<T>`.
  *
  * The value overloads deliberately precede the object-target overload so a call
  * like `animate(motionValue, [0, 1])` resolves to the value overload rather than
@@ -61,6 +62,14 @@ export interface SvelteMotionAnimate {
         keyframes: ObjectTarget<O>,
         options?: AnimationOptions
     ): AnimationPlaybackControlsWithThen
+    /**
+     * Register an effect so `animate()` can drive the non-DOM subjects it
+     * claims (e.g. `animate.addEffect(threeEffect)`). The most recently added
+     * effect is tested first; DOM elements are always animated directly.
+     */
+    addEffect<Subject extends object>(effect: AnimateEffect<Subject>): void
+    /** Unregister an effect previously passed to {@link addEffect}. */
+    removeEffect<Subject extends object>(effect: AnimateEffect<Subject>): void
 }
 
 /**
