@@ -1,17 +1,60 @@
+<script module lang="ts">
+    import { animate, cancelFrame, createEffect, frame } from '@humanspeak/svelte-motion'
+
+    type Dial = { angle: number; radius: number }
+
+    const CLOSED_ANGLE = 45
+    const OPEN_ANGLE = 270
+    const CLOSED_RADIUS = 64
+    const OPEN_RADIUS = 80
+
+    /**
+     * Teaches `animate()` how to drive a plain dial object. `state.set` binds
+     * one key and schedules its write, `test` claims matching subjects, and
+     * `step` puts those writes in `frame.preRender` — ahead of the canvas
+     * draw, which is scheduled in `frame.render`.
+     */
+    const dialEffect = createEffect<Dial>(
+        (dial, state, key, value) =>
+            state.set(
+                key,
+                value,
+                () => {
+                    const target = dial as Record<string, number>
+                    target[key] = state.latest[key] as number
+                },
+                undefined,
+                false
+            ),
+        {
+            test: (subject): subject is Dial =>
+                typeof subject === 'object' &&
+                subject !== null &&
+                'angle' in subject &&
+                'radius' in subject,
+            read: (dial, key) => (dial as Record<string, number>)[key],
+            step: frame.preRender
+        }
+    )
+
+    /**
+     * Registered once at module scope, never from a component: the registry is
+     * global and dedupes by identity without reference counting, so a
+     * component that removed it on teardown would unregister it for every
+     * other consumer.
+     */
+    animate.addEffect(dialEffect)
+</script>
+
 <script lang="ts">
     import { onMount } from 'svelte'
-    import { animate, cancelFrame, frame } from '@humanspeak/svelte-motion'
-    // Side-effect import: `dialEffect.ts` owns the effect AND its
-    // `animate.addEffect` registration, which runs once at module scope. A
-    // type-only import would be erased and the effect would never register.
-    import './dialEffect'
 
-    const dial = { angle: 45, radius: 64 }
+    const dial: Dial = { angle: CLOSED_ANGLE, radius: CLOSED_RADIUS }
 
     let canvas = $state<HTMLCanvasElement | null>(null)
     let ready = $state(false)
-    let displayedAngle = $state(45)
-    let targetAngle = $state(45)
+    let displayedAngle = $state(CLOSED_ANGLE)
+    let targetAngle = $state(CLOSED_ANGLE)
 
     const draw = () => {
         if (!canvas) return
@@ -44,11 +87,20 @@
         animate(dial, { angle: targetAngle }, { duration: 0.35 })
     }
 
-    const openDial = () => {
-        targetAngle = 270
+    // Derived from the target rather than tracked separately, so dragging the
+    // slider past the threshold keeps the button label honest.
+    const isOpen = $derived(targetAngle >= OPEN_ANGLE)
+
+    const toggleDial = () => {
+        // Read `isOpen` ONCE, before mutating `targetAngle`. It is a `$derived`
+        // of `targetAngle`, so reading it again after the assignment would see
+        // the post-toggle value and invert the radius.
+        const opening = !isOpen
+
+        targetAngle = opening ? OPEN_ANGLE : CLOSED_ANGLE
         animate(
             dial,
-            { angle: targetAngle, radius: 80 },
+            { angle: targetAngle, radius: opening ? OPEN_RADIUS : CLOSED_RADIUS },
             { type: 'spring', stiffness: 120, damping: 14 }
         )
     }
@@ -87,7 +139,9 @@
                 oninput={setAngle}
                 disabled={!ready}
             />
-            <button onclick={openDial} disabled={!ready}>Spring open</button>
+            <button onclick={toggleDial} disabled={!ready}>
+                {isOpen ? 'Spring closed' : 'Spring open'}
+            </button>
         </div>
 
         <div class="strip-foot">
