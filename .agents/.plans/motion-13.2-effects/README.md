@@ -22,7 +22,7 @@ became plans, and the rejected ones are listed at the bottom.
 | ---- | -------------------------------------------------------------------------- | -------- | ------ | ---- | ---------- | ------ |
 | 001  | Expose the effect registry (`animate.addEffect`, `createEffect`) publicly  | P1       | S      | LOW  | —          | DONE — PASS at `7d09c0d` (see guard report); plan amended once (generic signature instead of `any`) |
 | 002  | Custom-effects demo route, e2e, docs page, docs example                    | P2       | M      | LOW  | 001        | DONE — PASS at `c46aee4` (see guard report); docs typecheck has 5 pre-existing errors outside scope |
-| 003  | Re-export `motion/three` and `motion/vgpu` as package subpaths             | P2       | S      | LOW  | 001        | TODO   |
+| 003  | Re-export `motion/three` and `motion/vgpu` as package subpaths             | P2       | S      | LOW  | 001        | DONE — PASS at `315c929` (see guard report) |
 | 004  | Three.js flagship example (`animate(mesh)` + shader uniform)               | P3       | M      | MED  | 002, 003   | TODO   |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
