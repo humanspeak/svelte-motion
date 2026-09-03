@@ -14,6 +14,11 @@
 > copies) and the 13.2.0 bump changed `package.json`. Both now match the
 > "Current state" excerpts below.
 >
+> **Revision 2026-09-03 (2)** (guard, after plan 002 passed at `c46aee4`):
+> the docs step is no longer conditional — `docs/src/routes/docs/custom-effects/+page.svx`
+> exists, so Step 4's "Three.js and vgpu" section is REQUIRED and that file is
+> in scope. Everything else unchanged.
+>
 > **Drift check (run first)**:
 > `git diff --stat 7d09c0d..HEAD -- package.json src/lib/utils/effects.ts src/lib/vite.ts`
 > If any in-scope file changed since this plan was written, compare the
@@ -115,9 +120,9 @@ export const propEffect = propEffectCore as typeof propEffectCore &
 - `src/lib/vgpu.spec.ts` (create)
 - `package.json` — two `exports` entries only
 - `.changeset/three-vgpu-subpaths.md` (create)
-- `docs/src/routes/docs/custom-effects/+page.svx` — ONLY if Plan 002 has
-  landed: add a short "Three.js and vgpu" section (import snippet + note that
-  `three`/`vgpu` are the consumer's own dependencies). Otherwise skip and note it.
+- `docs/src/routes/docs/custom-effects/+page.svx` — Plan 002 has landed
+  (`c46aee4`), so this is now REQUIRED: add the "Three.js and vgpu" section
+  from Step 4 before its "## Related" heading.
 
 **Out of scope**:
 
@@ -235,8 +240,9 @@ Then confirm no runtime `three` import leaked: `grep -c "from 'three'" dist/thre
 Add `@humanspeak/svelte-motion/three` and `/vgpu` subpaths re-exporting Motion 13.2's `threeEffect` and `vgpuEffect`, re-typed for this library's augmented motion values. Register with `animate.addEffect(threeEffect)` to animate Three.js meshes, materials and shader uniforms. `three` / `vgpu` remain your own dependencies; nothing is added to the root bundle.
 ```
 
-If `docs/src/routes/docs/custom-effects/+page.svx` exists (Plan 002 done), add
-before "Related":
+Plan 002 landed at `c46aee4`, so `docs/src/routes/docs/custom-effects/+page.svx`
+exists; add the following section immediately before its `## Related` heading
+(the executor cannot run the docs build or a browser — guard verifies the page):
 
 ````md
 ## Three.js and vgpu
