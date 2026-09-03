@@ -21,6 +21,22 @@
 > "Current state" notes below. (3) The "Current state" sentence claiming
 > neither manifest lists `three` is superseded by (1).
 >
+> **Revision 2026-09-03 (2)** (guard, after the first Codex run stopped at
+> Step 2 — executor was right, the plan was wrong): `threeEffect` and
+> `vgpuEffect` rotation shorthands (`rotateX/Y/Z`) are **degrees**, converted
+> to radians on write (upstream `packages/motion/src/three.ts:178-179`:
+> `value * (Math.PI / 180)`; `vgpu.ts` `degrees: true`), mirroring DOM
+> `rotate`. So a full turn is `rotateY: 360`, and `mesh.rotation.y` then reads
+> `≈ 6.283` radians. Changes: (a) Step 2 animates `rotateY: 360` (the e2e
+> readout of `mesh.rotation.y ≈ 6.28` is unchanged and now correct); (b) the
+> docs table in Step 4 must say rotation shorthands are in degrees; (c) a new
+> Step 2b corrects the three radian-based examples that plans 003 landed —
+> the `/docs/custom-effects` snippet and the JSDoc `@example` blocks in
+> `src/lib/three.ts` and `src/lib/vgpu.ts` — **comment/markdown text only, no
+> code changes**; those two `src/lib` files are added to scope for that
+> purpose alone. The condensed upstream excerpt below is illustrative and
+> predates this correction; where it disagrees, this note wins.
+>
 > **Drift check (run first)**:
 > `git diff --stat 25036f0..HEAD -- package.json docs/package.json pnpm-workspace.yaml src/routes/+page.svelte docs/src/lib/docsNav.ts docs/src/lib/examplesIndex.ts README.md`
 > On any in-scope drift, compare against "Current state" before proceeding;
@@ -148,9 +164,12 @@ Port 4198 rule: if occupied, run e2e with `PW_REUSE_SERVER=1`; never kill it.
 - `docs/src/routes/docs/custom-effects/+page.svx` (one "Related" link)
 - `README.md` (one table row)
 
+- `src/lib/three.ts`, `src/lib/vgpu.ts` — **JSDoc comment text only** (Step 2b)
+
 **Out of scope**:
 
-- `src/lib/**` — if the example needs a library change, STOP.
+- Any executable code under `src/lib/**` — if the example needs a library
+  change beyond the Step 2b comment edits, STOP.
 - `dependencies`/`peerDependencies` — `three` must never become a runtime or
   peer dependency of the package.
 - vgpu example — rejected for this batch (see README).
@@ -183,7 +202,9 @@ Create `src/routes/tests/effects/three/+page.svelte`:
   effect bindings must still run so the e2e stays deterministic without WebGL.
 - Register `animate.addEffect(threeEffect)` and bind
   `threeEffect(uniforms, { progress })` for the uniform; animate the mesh with
-  `animate(mesh, { x: 1.5, rotateY: Math.PI * 2 }, { type: 'spring', stiffness: 80, damping: 12 })`
+  `animate(mesh, { x: 1.5, rotateY: 360 }, { type: 'spring', stiffness: 80, damping: 12 })`
+  (rotation shorthands are degrees — see revision note 2; `mesh.rotation.y`
+  will settle at `2π ≈ 6.283` radians)
   (the registry path) from a `data-testid="move"` button, and
   `animate(progress, 1, { duration: 1 })` from `data-testid="ripple"`.
 - Readouts driven from a `frame.update` subscription (or `mesh.rotation.y` read
@@ -199,6 +220,23 @@ Link it from `src/routes/+page.svelte` in the "Vanilla Values" list:
 **Verify**: `pnpm check` → `0 ERRORS`; `pnpm dev`, open `/tests/effects/three`:
 "move" springs the knot right while spinning; "ripple" makes the surface wave
 and shifts purple → cyan.
+
+### Step 2b: Correct the radian-based examples landed by plan 003
+
+Text-only edits (no code changes) so shipped examples match upstream's
+degrees contract:
+
+- `docs/src/routes/docs/custom-effects/+page.svx` — in the "Three.js and vgpu"
+  snippet change `rotateY: Math.PI * 2` to `rotateY: 360`.
+- `src/lib/three.ts` — in the JSDoc: `{ x: 2, rotateY: Math.PI }` →
+  `{ x: 2, rotateY: 180 }`; `@example` `rotateY: Math.PI * 2` → `rotateY: 360`;
+  add one sentence: "Rotation shorthands are in degrees, like DOM `rotate`."
+- `src/lib/vgpu.ts` — `@example` `rotateY: Math.PI * 2` → `rotateY: 360`; same
+  sentence.
+
+**Verify**: `grep -rn "Math.PI" src/lib/three.ts src/lib/vgpu.ts docs/src/routes/docs/custom-effects/+page.svx`
+→ no matches; `pnpm exec vitest run src/lib/three.spec.ts src/lib/vgpu.spec.ts`
+→ 4 passed (identity tests prove no code changed).
 
 ### Step 3: Playwright coverage
 
@@ -231,7 +269,9 @@ Create `e2e/effects/three.spec.ts` (pattern: `e2e/effects/custom-effect.spec.ts`
   `@humanspeak/svelte-motion/three`, a table of claimed subjects (`Object3D`,
   materials, uniforms objects, TSL uniform nodes) and shorthand keys
   (`x y z rotateX rotateY rotateZ scaleX scaleY scaleZ`, plus colour keys on
-  materials), the `frame.preRender` write-timing note, and "Related" links to
+  materials) — state explicitly that `rotateX/Y/Z` are **degrees** (converted
+  to radians on write, like DOM `rotate`), so a full turn is `360`, not
+  `Math.PI * 2` — the `frame.preRender` write-timing note, and "Related" links to
   `/docs/custom-effects` and `/examples/three-effect`. Footer: based on
   Motion 13.2's `motion/three`.
 - `docsNav.ts`: after `Custom effects` add
