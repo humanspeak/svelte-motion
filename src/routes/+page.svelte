@@ -298,6 +298,14 @@
                         Vanilla motion values (styleEffect, toMotionValue, no components)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/effects/custom-effect') + searchParams}
+                    >
+                        Custom effects (createEffect + animate.addEffect on a canvas dial)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

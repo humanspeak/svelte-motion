@@ -1,0 +1,117 @@
+---
+title: Custom effects
+description: Drive any object with animate() — createEffect, animate.addEffect and MotionValueState.
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte'
+  import Default from '$lib/examples/custom-effects/demos/Default.svelte'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'Custom effects | Docs | Svelte Motion'
+      seo.description = 'Drive any object with animate() — createEffect, animate.addEffect and MotionValueState.'
+      seo.ogTitle = 'Custom effects'
+      seo.ogTagline = 'Animate anything with Motion values'
+      seo.ogFeatures = ['createEffect', 'animate.addEffect', 'Non-DOM subjects', 'Motion 13.2']
+      seo.ogSlug = 'docs-custom-effects'
+  }
+</script>
+
+# Custom effects
+
+Custom effects teach `animate()` how to drive non-DOM subjects. Claim a kind of plain JavaScript object, describe how its properties are read and written, and it gets Motion's springs, keyframes, timing, and playback controls.
+
+```ts
+import { animate } from '@humanspeak/svelte-motion'
+import { dialEffect } from './dialEffect'
+
+animate.addEffect(dialEffect)
+animate(dial, { angle: 270, radius: 80 }, { type: 'spring' })
+```
+
+<Example isSmall exampleUrl="/examples/custom-effects">
+  <Default />
+</Example>
+
+## Writing an effect
+
+`createEffect(addValue, { test, read, step })` creates an effect for one subject type. The `addValue` callback binds each property to the `MotionValueState` shared by that subject:
+
+```ts
+import { createEffect, frame } from '@humanspeak/svelte-motion'
+
+type Dial = { angle: number; radius: number }
+
+const dialEffect = createEffect<Dial>(
+  (dial, state, key, value) =>
+    state.set(
+      key,
+      value,
+      () => {
+        (dial as Record<string, number>)[key] = state.latest[key] as number
+      },
+      undefined,
+      false
+    ),
+  {
+    test: (subject): subject is Dial =>
+      typeof subject === 'object' && subject !== null && 'angle' in subject && 'radius' in subject,
+    read: (dial, key) => (dial as Record<string, number>)[key],
+    step: frame.preRender
+  }
+)
+```
+
+The full `state.set(key, value, render, computed, useDefaultValueType)` call stores the bound value, schedules `render` when it changes, optionally tracks a computed dependency, and controls Motion's default property-specific value conversion.
+
+| Option | Description |
+|---|---|
+| `test` | Claims matching subjects passed to `animate()`. |
+| `read` | Seeds the first keyframe from the subject. Return `undefined` to require explicit `[from, to]` keyframes. |
+| `step` | Selects the frameloop phase. It defaults to `frame.render`; use `frame.preRender` when your render loop runs in `frame.render`. |
+
+## Registering with animate
+
+Register the effect before animating a matching object, then remove it when its lifecycle ends:
+
+```ts
+animate.addEffect(dialEffect)
+
+const controls = animate(dial, { angle: 270 })
+
+// When the integration is no longer active:
+animate.removeEffect(dialEffect)
+```
+
+When multiple effects match, the most recently added effect wins. DOM elements are never claimed by registered custom effects, and plain objects that no effect claims fall back to Motion's object animator.
+
+## Binding values manually
+
+Effects can also bind values without going through `animate()`. Calling `effect(subject, { x })` returns an unbind function, while `effect.get(subject, 'x')` returns the bound value:
+
+```ts
+import { motionValue } from '@humanspeak/svelte-motion'
+
+const angle = motionValue(0)
+const unbind = dialEffect(dial, { angle })
+
+dialEffect.get(dial, 'angle')?.on('change', (latest) => {
+  console.log(latest)
+})
+
+unbind()
+angle.destroy()
+```
+
+`propEffect` provides the same `.get(subject, key)` lookup for manually bound object properties.
+
+## Related
+
+- [Vanilla motion values](/docs/vanilla-values) — component-free values and element effects
+- [Custom effects example](/examples/custom-effects) — a canvas dial with complete source
+
+---
+
+Based on Motion 13.2's [animate.addEffect](https://motion.dev/docs/animate) and `createEffect`.

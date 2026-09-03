@@ -75,6 +75,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Conic Gradient',
         description: 'Interactive conic gradient animation example using Svelte Motion.'
     },
+    'custom-effects': {
+        title: 'Custom Effects',
+        description:
+            'Animate any JavaScript object — a canvas dial driven by createEffect and animate.addEffect.'
+    },
     'drag-constraints': {
         title: 'Drag Constraints',
         description:

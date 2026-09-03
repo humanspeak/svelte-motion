@@ -107,6 +107,8 @@ svgEffect(path, { pathLength: progress })              // SVG attributes
 
 Each returns an unbind function. Import them from this package (not `motion`) so both raw and augmented values type-check.
 
+Need to drive something that isn't an element? See [Custom effects](/docs/custom-effects).
+
 ## Scheduler, generators, config
 
 The rest of Motion's vanilla toolkit re-exports directly:
@@ -130,6 +132,7 @@ Plus the `steps`, `mirrorEasing`, and `reverseEasing` easing helpers alongside t
 ## Related
 
 - [Vanilla Values example](/examples/vanilla-values) — this page's demo with full source
+- [Custom effects](/docs/custom-effects) — createEffect and animate.addEffect for non-DOM subjects
 - [Motion values overview](/docs/motion-values) — the hook layer and the augmented value shape
 - [useTransform](/docs/use-transform) / [useSpring](/docs/use-spring) — component-scoped counterparts
 - [Motion component](/docs) — object-form `style` accepts these values directly
