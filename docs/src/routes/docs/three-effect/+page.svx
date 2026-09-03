@@ -31,6 +31,8 @@ animate.addEffect(threeEffect)
 animate(mesh, { x: 1.5, rotateY: 360 }, { type: 'spring' })
 ```
 
+Register at module scope rather than from a component. The effect registry is global and does not reference-count, so removing `threeEffect` when one component unmounts would unregister it for every other component still animating a mesh. See [custom effects](/docs/custom-effects#registering-with-animate) for the full rule.
+
 <Example isSmall exampleUrl="/examples/three-effect">
   <Default />
 </Example>
@@ -77,9 +79,10 @@ import { cancelFrame, frame } from '@humanspeak/svelte-motion'
 const render = () => renderer.render(scene, camera)
 frame.render(render, true)
 
-// On cleanup:
+// On cleanup, stop the render loop and release any values you bound.
+// Leave the effect registered: the registry is global and shared.
 cancelFrame(render)
-animate.removeEffect(threeEffect)
+unbind()
 ```
 
 ## Related

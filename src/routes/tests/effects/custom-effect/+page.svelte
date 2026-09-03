@@ -1,12 +1,19 @@
 <script lang="ts">
     import { onMount } from 'svelte'
     import { animate, cancelFrame, frame } from '$lib'
-    import { dialEffect, type Dial } from '../dialEffect'
+    // Side-effect import: `dialEffect.ts` owns the effect AND its
+    // `animate.addEffect` registration, which runs once at module scope. A
+    // type-only import would be erased and the effect would never register.
+    import '../dialEffect'
 
-    const dial: Dial = { angle: 0, radius: 40 }
+    const dial = { angle: 0, radius: 40 }
     const plainBox = { x: 0 }
 
     let canvas = $state<HTMLCanvasElement | null>(null)
+    // Gates the controls until the component has mounted. Playwright's click
+    // auto-waits for an enabled element, so this keeps the e2e deterministic
+    // no matter how long hydration takes (slow under `vite dev`).
+    let ready = $state(false)
     let displayedAngle = $state(0)
     let displayedPlainX = $state(0)
 
@@ -50,13 +57,13 @@
     }
 
     onMount(() => {
-        animate.addEffect(dialEffect)
+        // `dialEffect` registers itself at module scope. A component must not
+        // add or remove it: the registry is global and shared, so a teardown
+        // here would unregister it for every other consumer.
         frame.render(draw, true)
+        ready = true
 
-        return () => {
-            cancelFrame(draw)
-            animate.removeEffect(dialEffect)
-        }
+        return () => cancelFrame(draw)
     })
 </script>
 
@@ -71,8 +78,8 @@
         <section class="card">
             <canvas bind:this={canvas} data-testid="dial-canvas" width="240" height="240"></canvas>
             <div class="controls">
-                <button data-testid="open" onclick={openDial}>Open</button>
-                <button data-testid="reset" onclick={resetDial}>Reset</button>
+                <button data-testid="open" onclick={openDial} disabled={!ready}>Open</button>
+                <button data-testid="reset" onclick={resetDial} disabled={!ready}>Reset</button>
             </div>
             <div class="readout">
                 angle: <output data-testid="angle">{displayedAngle}</output>°
@@ -82,7 +89,9 @@
         <section class="card">
             <h2>Plain-object fallback</h2>
             <p>An object that no registered effect claims still uses Motion's object animator.</p>
-            <button data-testid="plain-open" onclick={movePlainBox}>Animate x</button>
+            <button data-testid="plain-open" onclick={movePlainBox} disabled={!ready}>
+                Animate x
+            </button>
             <div class="readout">
                 x: <output data-testid="plain-x">{displayedPlainX}</output>
             </div>
@@ -142,6 +151,11 @@
     .controls {
         display: flex;
         gap: 8px;
+    }
+
+    button:disabled {
+        cursor: wait;
+        opacity: 0.5;
     }
 
     button {

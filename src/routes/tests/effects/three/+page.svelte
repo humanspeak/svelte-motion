@@ -1,7 +1,18 @@
-<script lang="ts">
-    import { onMount } from 'svelte'
+<script module lang="ts">
     import { animate, cancelFrame, frame, motionValue } from '$lib'
     import { threeEffect } from '$lib/three'
+
+    /**
+     * Registered once at module scope, never per component. The effect
+     * registry is process-global and does not reference-count, so removing
+     * `threeEffect` on one component's teardown would unregister it for
+     * every other component still animating a mesh.
+     */
+    animate.addEffect(threeEffect)
+</script>
+
+<script lang="ts">
+    import { onMount } from 'svelte'
 
     const progress = motionValue(0)
 
@@ -45,7 +56,6 @@
         let material: import('three').ShaderMaterial | undefined
         let unbindUniforms: (() => void) | undefined
         let render: (() => void) | undefined
-        let effectRegistered = false
 
         const setup = async () => {
             const THREE = await import('three')
@@ -84,8 +94,6 @@
             mesh = new THREE.Mesh(geometry, material)
             scene.add(mesh)
 
-            animate.addEffect(threeEffect)
-            effectRegistered = true
             unbindUniforms = threeEffect(uniforms, { progress })
             frame.update(updateReadouts, true)
 
@@ -110,7 +118,6 @@
             rippleAnimation?.stop()
             cancelFrame(updateReadouts)
             if (render) cancelFrame(render)
-            if (effectRegistered) animate.removeEffect(threeEffect)
             unbindUniforms?.()
             renderer?.dispose()
             geometry?.dispose()

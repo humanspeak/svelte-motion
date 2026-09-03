@@ -74,16 +74,17 @@ The full `state.set(key, value, render, computed, useDefaultValueType)` call sto
 
 ## Registering with animate
 
-Register the effect before animating a matching object, then remove it when its lifecycle ends:
+Register the effect once, at module scope, alongside the effect itself:
 
 ```ts
+import { animate, createEffect } from '@humanspeak/svelte-motion'
+
+export const dialEffect = createEffect<Dial>(/* … */)
+
 animate.addEffect(dialEffect)
-
-const controls = animate(dial, { angle: 270 })
-
-// When the integration is no longer active:
-animate.removeEffect(dialEffect)
 ```
+
+The registry is process-global and dedupes by effect identity instead of counting registrations, so a single `removeEffect` unregisters an effect for the whole application no matter how many places registered it. Registering from a component's lifecycle is therefore unsafe: with two components sharing one effect, the first teardown unregisters it for the second, and `animate()` then falls back to the plain-object animator silently rather than failing. Keep `addEffect` at module scope, and reach for `removeEffect` only when tearing down an integration you own outright.
 
 When multiple effects match, the most recently added effect wins. DOM elements are never claimed by registered custom effects, and plain objects that no effect claims fall back to Motion's object animator.
 

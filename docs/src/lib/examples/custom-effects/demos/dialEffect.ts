@@ -1,4 +1,4 @@
-import { createEffect, frame } from '@humanspeak/svelte-motion'
+import { animate, createEffect, frame } from '@humanspeak/svelte-motion'
 
 /** A plain JavaScript object whose angle and radius can be animated. */
 export type Dial = {
@@ -33,3 +33,15 @@ export const dialEffect = createEffect<Dial>(
         step: frame.preRender
     }
 )
+
+/**
+ * Registered once, here at module scope, never from a component.
+ *
+ * `animate.addEffect()` writes to a process-global registry that dedupes by
+ * effect identity and does not reference-count. A component that registered
+ * on mount and removed on teardown would unregister the effect for every
+ * other component still using it, after which `animate()` silently falls
+ * back to the plain-object animator. Owning the effect and its registration
+ * in one module makes that impossible.
+ */
+animate.addEffect(dialEffect)

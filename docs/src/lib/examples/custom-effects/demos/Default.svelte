@@ -1,11 +1,15 @@
 <script lang="ts">
     import { onMount } from 'svelte'
     import { animate, cancelFrame, frame } from '@humanspeak/svelte-motion'
-    import { dialEffect, type Dial } from './dialEffect'
+    // Side-effect import: `dialEffect.ts` owns the effect AND its
+    // `animate.addEffect` registration, which runs once at module scope. A
+    // type-only import would be erased and the effect would never register.
+    import './dialEffect'
 
-    const dial: Dial = { angle: 45, radius: 64 }
+    const dial = { angle: 45, radius: 64 }
 
     let canvas = $state<HTMLCanvasElement | null>(null)
+    let ready = $state(false)
     let displayedAngle = $state(45)
     let targetAngle = $state(45)
 
@@ -50,13 +54,13 @@
     }
 
     onMount(() => {
-        animate.addEffect(dialEffect)
+        // `dialEffect` registers itself at module scope. A component must not
+        // add or remove it: the registry is global and shared, so a teardown
+        // here would unregister it for every other consumer.
         frame.render(draw, true)
+        ready = true
 
-        return () => {
-            cancelFrame(draw)
-            animate.removeEffect(dialEffect)
-        }
+        return () => cancelFrame(draw)
     })
 </script>
 
@@ -81,8 +85,9 @@
                 max="360"
                 value={targetAngle}
                 oninput={setAngle}
+                disabled={!ready}
             />
-            <button onclick={openDial}>Spring open</button>
+            <button onclick={openDial} disabled={!ready}>Spring open</button>
         </div>
 
         <div class="strip-foot">
@@ -167,6 +172,11 @@
         grid-column: 1 / -1;
         width: 100%;
         accent-color: var(--brut-accent, #247768);
+    }
+
+    button:disabled {
+        cursor: wait;
+        opacity: 0.5;
     }
 
     button {
