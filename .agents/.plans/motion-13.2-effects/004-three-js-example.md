@@ -8,8 +8,21 @@
 > (`.agents/.plans/motion-13.2-effects/README.md`) — unless a reviewer
 > dispatched you and told you they maintain the index.
 >
+> **Revision 2026-09-03** (guard, after plans 001–003 passed): (1) **Step 1 has
+> already been executed by the operator's guard at commit `25036f0`** — the
+> executor sandbox cannot run `pnpm add`. `three@^0.185.1` and
+> `@types/three@^0.185.4` are now in `devDependencies` of both `package.json`
+> and `docs/package.json`, and `pnpm-lock.yaml` is updated. Run only Step 1's
+> Verify greps, then start at Step 2; do not edit those three files.
+> (2) Drift baseline re-stamped `47b7149` → `25036f0`: plan 002 legitimately
+> changed `src/routes/+page.svelte`, `docsNav.ts`, `examplesIndex.ts`,
+> `README.md` (custom-effects entries), plan 003 changed `package.json`
+> (exports), and the deps commit changed the manifests. All now match the
+> "Current state" notes below. (3) The "Current state" sentence claiming
+> neither manifest lists `three` is superseded by (1).
+>
 > **Drift check (run first)**:
-> `git diff --stat 47b7149..HEAD -- package.json docs/package.json pnpm-workspace.yaml src/routes/+page.svelte docs/src/lib/docsNav.ts docs/src/lib/examplesIndex.ts README.md`
+> `git diff --stat 25036f0..HEAD -- package.json docs/package.json pnpm-workspace.yaml src/routes/+page.svelte docs/src/lib/docsNav.ts docs/src/lib/examplesIndex.ts README.md`
 > On any in-scope drift, compare against "Current state" before proceeding;
 > on a mismatch, STOP.
 >
@@ -23,7 +36,7 @@
 - **Risk**: MED (adds `three` as a dev dependency in two packages; WebGL in headless CI)
 - **Depends on**: 002-custom-effects-demo-docs.md, 003-three-vgpu-subpath-exports.md
 - **Category**: direction
-- **Planned at**: commit `47b7149`, 2026-09-03
+- **Planned at**: commit `25036f0`, 2026-09-03 (re-baselined; originally `47b7149`)
 
 ## Why this matters
 
@@ -41,8 +54,9 @@ animates, while `x`/`rotateY`/`scale` shorthands move the mesh — no
   `isObject3D` / `isMaterial` / uniforms objects; shorthands `x y z rotateX
   rotateY rotateZ scaleX scaleY scaleZ` map to `position/rotation/scale`;
   writes run in `frame.preRender`.
-- Neither `package.json` nor `docs/package.json` lists `three` (verified
-  `grep -n '"three"' package.json docs/package.json` → no match).
+- `package.json:196` and `docs/package.json:74` list `three@^0.185.1`, with
+  `@types/three@^0.185.4` at `package.json:168` / `docs/package.json:50` —
+  added by the guard in commit `25036f0` (Step 1 done; see revision note).
 - `pnpm-workspace.yaml:16` enforces `minimumReleaseAge: 2880` (48 h). At plan
   time `three@0.185.1` (published 2026-07-01) and `@types/three@0.185.4`
   (published 2026-08-04) are both well past the cutoff.
