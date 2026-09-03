@@ -75,6 +75,14 @@
             "types": "./dist/vite.d.ts",
             "default": "./dist/vite.js"
         },
+        "./three": {
+            "types": "./dist/three.d.ts",
+            "default": "./dist/three.js"
+        },
+        "./vgpu": {
+            "types": "./dist/vgpu.d.ts",
+            "default": "./dist/vgpu.js"
+        },
         "./html/Map.svelte": {
             "svelte": "./dist/html/HtmlMap.svelte"
         },

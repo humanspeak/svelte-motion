@@ -107,6 +107,19 @@ angle.destroy()
 
 `propEffect` provides the same `.get(subject, key)` lookup for manually bound object properties.
 
+## Three.js and vgpu
+
+Motion ships adapters for Three.js and vgpu. Import them from this package's subpaths — `three`/`vgpu` stay your own dependencies:
+
+```ts
+import { animate } from '@humanspeak/svelte-motion'
+import { threeEffect } from '@humanspeak/svelte-motion/three'
+
+animate.addEffect(threeEffect)
+animate(mesh, { rotateY: Math.PI * 2, scaleX: 1.4 }, { type: 'spring' })
+animate(material.uniforms, { progress: 1 })
+```
+
 ## Related
 
 - [Vanilla motion values](/docs/vanilla-values) — component-free values and element effects
