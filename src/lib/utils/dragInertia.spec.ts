@@ -101,4 +101,32 @@ describe('drag inertia', () => {
             expect(wrapped.next(t).value).toBeCloseTo(upstream.next(t).value, 8)
         }
     })
+
+    it.each([-1, 1])(
+        'preserves outward release velocity beyond the boundary in direction %s',
+        (direction) => {
+            const release = direction * 308
+            const boundary = direction * 200
+            const generator = createDragInertiaGenerator({
+                value: release,
+                velocity: direction * 2500,
+                min: -200,
+                max: 200,
+                power: 0.8,
+                timeConstant: 750,
+                bounceStiffness: 360,
+                bounceDamping: 24,
+                restDelta: 1,
+                restSpeed: 10
+            })
+
+            expect(generator.next(0).value).toBe(release)
+            // Motion 13.2 preserves velocity at the t=0 boundary handoff.
+            // The spring first moves outward, then returns to its boundary.
+            expect(direction * generator.next(32).value).toBeGreaterThan(direction * release)
+            expect(direction * generator.next(120).value).toBeLessThan(direction * release)
+            expect(generator.next(700)).toEqual({ value: boundary, done: true })
+            expect(generator.next(1500)).toEqual({ value: boundary, done: true })
+        }
+    )
 })
