@@ -17,7 +17,12 @@ const RIGHT = 200
 const TOP = -120
 const BOTTOM = 120
 
-import { readTransform, readTranslate } from '../_helpers/transform'
+import {
+    readTransform,
+    readTranslate,
+    sampleTransformSeries,
+    waitForSettledTransform
+} from '../_helpers/transform'
 
 const disableRotate = async (page: import('@playwright/test').Page) => {
     const rotateToggle = page.locator('.knobs input[type="checkbox"]').first()
@@ -263,20 +268,16 @@ test.describe('drag/brutalist-stage', () => {
         expect(afterSecond.ty).toBeLessThanOrEqual(BOTTOM + 1)
     })
 
-    // Regression for post-release momentum past constraints: when the
-    // value is already out-of-bounds at release, upstream inertia should
-    // immediately hand off to the boundary spring instead of travelling
-    // further past the constraint.
-    test('post-release motion never moves further from origin than release position', async ({
+    // Motion 13.2 carries outward velocity into the boundary spring even
+    // when release starts outside the constraints. An initial overshoot is
+    // valid; the card must visibly spring back and settle at the left edge.
+    test('out-of-bounds release springs back and stays at the constraint boundary', async ({
         page
     }) => {
-        // Card past the left constraint at release, with leftward velocity:
-        // the boundary spring should engage from the release position and
-        // motion should be monotonically back toward the origin. No frame
-        // post-release may have |translateX| exceeding the release |tx|.
         await page.goto(STAGE_PATH)
         const card = page.getByTestId('drag-card')
         await card.waitFor({ state: 'visible' })
+        await expect(card).toHaveAttribute('data-is-loaded', 'ready')
         await disableRotate(page)
 
         const start = await card.boundingBox()
@@ -290,24 +291,25 @@ test.describe('drag/brutalist-stage', () => {
             await page.mouse.move(cx - i * 40, cy, { steps: 1 })
         }
 
-        // Sample translateX exactly at release, then over 16-120 ms after.
-        // releaseTx is the elastic-clamped overdrag position.
+        // Confirm that the rendered drag has reached the overdrag region
+        // before releasing; pointer events and rendering run on separate clocks.
+        await expect.poll(async () => (await readTranslate(page)).tx).toBeLessThan(LEFT - 50)
         const releaseT = await readTranslate(page)
-        if (!releaseT) throw new Error('no release transform')
         await page.mouse.up()
 
-        const samples: number[] = []
-        let elapsed = 0
-        for (const atMs of [16, 32, 50, 80, 120]) {
-            await page.waitForTimeout(atMs - elapsed)
-            elapsed = atMs
-            const t = await readTranslate(page)
-            if (t) samples.push(t.tx)
-        }
+        // Sample every rendered frame in-page, allowing the outward part of
+        // the spring. At least one frame must show the return in progress,
+        // catching both a frozen overdrag and an instant clamp to the edge.
+        const selector = '[data-testid="drag-card"]'
+        const samples = await sampleTransformSeries(page, [selector], 1000)
+        expect(samples.some(({ tx }) => tx > releaseT.tx + 2 && tx < LEFT - 2)).toBe(true)
 
-        const releaseAbs = Math.abs(releaseT.tx)
-        const maxAbsAfter = Math.max(...samples.map((tx) => Math.abs(tx)))
-        // Tolerance of 2 px for sub-frame jitter / sub-pixel rounding.
-        expect(maxAbsAfter).toBeLessThanOrEqual(releaseAbs + 2)
+        await waitForSettledTransform(page, selector, { tx: LEFT, ty: 0 })
+        const settledSamples = await sampleTransformSeries(page, [selector], 150)
+        expect(settledSamples.length).toBeGreaterThan(0)
+        for (const { tx, ty } of settledSamples) {
+            expect(Math.abs(tx - LEFT)).toBeLessThanOrEqual(1)
+            expect(Math.abs(ty)).toBeLessThanOrEqual(1)
+        }
     })
 })
