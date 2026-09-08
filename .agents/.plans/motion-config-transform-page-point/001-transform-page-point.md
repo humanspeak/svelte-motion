@@ -37,7 +37,7 @@ Source snapshot `13ec152` already implements the draft. Baseline excerpts below 
 - **Category:** direction / enhancement
 - **Confidence:** HIGH that the feature is missing; ranking is product judgment
 - **Planned at:** `06ae8a4`, 2026-09-08 (approved Reorder test-only amendment; original source baseline `14046a5`)
-- **Status:** IN PROGRESS — resumed dispatch; public React reference gate first; snapshot `13ec152` has unresolved browser failures
+- **Status:** BLOCKED for review — source `0da2303` matches all29 React cases and supplementary controls; approved Reorder amendment complete; proposed controls-test scope amendment and full browser gate remain.
 
 ## Why this matters
 

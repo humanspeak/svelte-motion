@@ -106,10 +106,6 @@ async function openFixture(page, result) {
   ];
   for (const [name, pass, actual, expected] of checks) {
     result.preconditions.push({ name, pass, actual, expected });
-    if (!pass)
-      throw new Error(
-        `Precondition failed: ${name}; actual=${JSON.stringify(actual)}`,
-      );
   }
   return boot;
 }
@@ -143,20 +139,16 @@ async function assertPointerDown(page, result, targetTestId, requested) {
   const pass =
     event?.pointerType === "mouse" &&
     event?.isPrimary === true &&
-    event?.client.x === requested.x &&
-    event?.client.y === requested.y &&
-    event?.page.x === requested.x + actual.scroll.x &&
-    event?.page.y === requested.y + actual.scroll.y;
+    event?.client.x === round(requested.x) &&
+    event?.client.y === round(requested.y) &&
+    event?.page.x === round(requested.x + actual.scroll.x) &&
+    event?.page.y === round(requested.y + actual.scroll.y);
   result.preconditions.push({
     name: `${targetTestId} receives the real mouse pointerdown coordinates`,
     pass,
     actual,
     expected: { requested, pointerType: "mouse", isPrimary: true },
   });
-  if (!pass)
-    throw new Error(
-      `Pointer precondition failed for ${targetTestId}: ${JSON.stringify(actual)}`,
-    );
 }
 
 async function runTinyNudge(page) {

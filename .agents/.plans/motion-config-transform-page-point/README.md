@@ -14,7 +14,7 @@ The payoff is visual: a tile stays under the cursor inside a scaled board and re
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | IN PROGRESS — resumed dispatch; public React reference gate |
+| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | BLOCKED — controls test amendment pending; runtime parity verified |
 
 Status: TODO / IN PROGRESS / DONE / BLOCKED (reason) / REJECTED (reason).
 
@@ -57,3 +57,7 @@ All 29 public React fixtures ran twice with identical gesture traces after a run
 ## Approved follow-up — 2026-09-08
 
 The user approved the narrow Reorder test amendment. The current parity correction continues first; then dispatch the five gesture tests in `src/lib/components/Reorder/reorder.component.spec.ts` for controlled Motion frame sampling, valid pointer metadata and terminal cleanup, preserving all behavioral assertions and verification gates. No Reorder runtime scope was added. Current snapshot `06ae8a4` remains NO-PASS pending fixes and guard verification.
+
+## Current guard review — 2026-09-08
+
+Source `0da2303`: approved Reorder amendment complete; 906 units, all 29 strict React cases and 15 feature browser tests pass. The supplementary controls comparison now matches React too. The next decision is the [one-file controls test amendment](proposed-controls-test-amendment.md), which has not been approved. Full browser verification remains required; no PR/push or closure. The current [guard report](001-transform-page-point.guard-report.md) supersedes the historical paused-draft assessment above.
