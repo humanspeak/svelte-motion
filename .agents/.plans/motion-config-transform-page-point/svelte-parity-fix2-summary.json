@@ -1,0 +1,179 @@
+{
+  "snapshot": "52654fc0a40f1e99e4ca3c37343bfa6b86f488a0",
+  "cases": [
+    {
+      "id": "pan-no-config-end",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "pan-config-inherit",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "pan-config-identity",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "pan-config-explicit-undefined",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "pan-uniform-scale",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "pan-nonuniform-affine",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "pan-page-scroll-at-start",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "pan-page-scroll-held",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "pan-ancestor-scroll-held",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "pan-reference-replacement",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "pan-stable-closure-scale",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "pan-corrected-threshold",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "pan-pointer-cancel",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "pan-unmount-held",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "drag-no-config-end",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "drag-uniform-scale",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "drag-nonuniform-affine",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "drag-page-scroll-at-start",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "drag-page-scroll-held",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "drag-ancestor-scroll-held",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "drag-reference-replacement",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "drag-stable-closure-scale",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "drag-numeric-bounds",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "drag-ref-bounds",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "drag-ref-resize-regrab",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "drag-controls-snap-scrolled",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "drag-real-layout-shift-held",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "drag-pointer-cancel",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    },
+    {
+      "id": "drag-unmount-held",
+      "status": "matched",
+      "mismatches": [],
+      "error": null
+    }
+  ]
+}
