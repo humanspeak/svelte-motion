@@ -1578,6 +1578,7 @@
 
     $effect(() => {
         if (!(element && isLoaded === 'ready' && hasDragFeatures)) return
+        const dragTarget = element
         const currentDragProp = untrack(() => dragProp)
         // Only attach if drag enabled
         if (!currentDragProp) return
@@ -1591,8 +1592,9 @@
         const opts = untrack(resolveDragOptions)
         const controls = opts.controls
 
-        // Attach and hold teardown so we can re-attach if props change
-        teardownDrag = attachDrag(element, opts)
+        // MotionValue.get() is Svelte-reactive. Keep attach-time measurement reads
+        // out of this lifetime effect so drag writes cannot tear down the live session.
+        teardownDrag = untrack(() => attachDrag(dragTarget, opts))
 
         // If controls passed, subscribe element
         if (controls && controls.subscribe) {
@@ -1615,7 +1617,8 @@
     // second pointerdown.
     $effect(() => {
         const nextOptions = resolveDragOptions()
-        if (nextOptions.axis) teardownDrag?.updateOptions(nextOptions)
+        // Track option inputs, but not imperative reads of the live drag state.
+        if (nextOptions.axis) untrack(() => teardownDrag?.updateOptions(nextOptions))
     })
 
     /**
