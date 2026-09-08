@@ -20,7 +20,8 @@
         MotionOnPan,
         MotionOnPanEnd,
         MotionOnPanSessionStart,
-        MotionOnPanStart
+        MotionOnPanStart,
+        MotionTransformPoint
     } from '$lib/types'
     import { isNotEmpty } from '$lib/utils/objects'
     import { sleep } from '$lib/utils/testing'
@@ -261,6 +262,11 @@
         value === null || value === undefined || (typeof value === 'string' && /^[+-]=/.test(value))
     let dataPath = $state<number>(-1)
     const motionConfig = $derived(getMotionConfig())
+    let coordinateSessionActive = $state(false)
+    let capturedTransformPagePoint = $state<MotionTransformPoint | undefined>(undefined)
+    const effectiveTransformPagePoint = $derived(
+        coordinateSessionActive ? capturedTransformPagePoint : motionConfig?.transformPagePoint
+    )
     const lazyMotion = getLazyMotionContext()
     const activeFeatures = $derived(lazyMotion?.getFeatures() ?? domMax)
     const hasGestureFeatures = $derived(!!activeFeatures.gestures)
@@ -600,6 +606,7 @@
             // template off the props, so the VE composes templated transforms
             // natively — the job `applyMotionStyleEffect` used to do.
             transformTemplate: transformTemplateProp,
+            transformPagePoint: effectiveTransformPagePoint,
             exit: exitProp,
             layoutId: scopedLayoutId
         }) as MotionNodeOptions
@@ -1521,6 +1528,16 @@
     //   after any non-zero duration settle animation.
     let teardownDrag: AttachDragCleanup | null = null
 
+    const startCoordinateSession = () => {
+        capturedTransformPagePoint = motionConfig?.transformPagePoint
+        coordinateSessionActive = true
+    }
+
+    const endCoordinateSession = () => {
+        coordinateSessionActive = false
+        capturedTransformPagePoint = undefined
+    }
+
     const resolveDragOptions = (): AttachDragOptions => {
         const currentDragProp = dragProp
         const axis: DragAxis =
@@ -1557,6 +1574,9 @@
             getBaseTransformValues: getStyleTransformValues,
             getBaseTransform: () => userBaseTransform,
             transformTemplate: transformTemplateProp,
+            transformPagePoint: effectiveTransformPagePoint,
+            onGestureSessionStart: startCoordinateSession,
+            onGestureSessionEnd: endCoordinateSession,
             propagation: !!dragPropagationProp,
             snapToOrigin: dragSnapToOriginProp,
             boundMotionValues:
@@ -1751,7 +1771,12 @@
         // the path that keeps an in-flight gesture alive across re-renders.
         teardownPan = attachPan(
             element,
-            untrack(() => buildPanHandlers())
+            untrack(() => buildPanHandlers()),
+            untrack(() => ({
+                transformPagePoint: effectiveTransformPagePoint,
+                onGestureSessionStart: startCoordinateSession,
+                onGestureSessionEnd: endCoordinateSession
+            }))
         )
 
         return () => {
@@ -1784,8 +1809,13 @@
         void onPanProp
         void onPanEndProp
         void resolvedWhilePan
+        void effectiveTransformPagePoint
         if (!teardownPan) return
-        teardownPan.update(buildPanHandlers())
+        teardownPan.update(buildPanHandlers(), {
+            transformPagePoint: effectiveTransformPagePoint,
+            onGestureSessionStart: startCoordinateSession,
+            onGestureSessionEnd: endCoordinateSession
+        })
     })
 
     /**

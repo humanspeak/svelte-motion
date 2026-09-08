@@ -1,0 +1,88 @@
+---
+title: transformPagePoint
+description: Correct drag and pan coordinates when motion elements live inside scaled CSS containers.
+---
+
+<script>
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'transformPagePoint | Docs | Svelte Motion'
+      seo.description = 'Keep drag, pan, measured constraints, and release velocity in local units when a parent applies positive CSS scale.'
+      seo.ogTitle = 'transformPagePoint'
+      seo.ogTagline = 'Correct gesture coordinates inside scaled interfaces'
+      seo.ogFeatures = ['Scaled Drag', 'Corrected Pan', 'Measured Bounds', 'Local Velocity', 'MotionConfig']
+      seo.ogSlug = 'docs-transform-page-point'
+  }
+</script>
+
+# transformPagePoint
+
+Use [`MotionConfig`](/docs/motion-config) `transformPagePoint` when a draggable or pannable motion element sits inside a parent with CSS `scale`. The callback maps browser coordinates into the local units used by your interface.
+
+```svelte
+<script lang="ts">
+    import { MotionConfig, motion, type MotionTransformPoint } from '@humanspeak/svelte-motion'
+
+    const zoom = 0.5
+    const correctPoint: MotionTransformPoint = ({ x, y }) => ({
+        x: x / zoom,
+        y: y / zoom
+    })
+</script>
+
+<div style:transform={`scale(${zoom})`} style:transform-origin="top left">
+    <MotionConfig transformPagePoint={correctPoint}>
+        <motion.div drag dragMomentum={false}>Drag me</motion.div>
+    </MotionConfig>
+</div>
+```
+
+A 100-screen-pixel pointer move at `scale(0.5)` becomes 200 local units. The browser then renders those 200 units through the parent scale, so the element travels the same 100 screen pixels as the pointer.
+
+## Coordinate contract
+
+- Pointer callbacks receive corrected page-coordinate points. `delta`, `offset`, distance thresholds, and velocity are computed from corrected samples.
+- DOM measurements map the viewport rectangle's top-left and bottom-right corners. Projection-root scroll is added after that mapping.
+- Element-ref drag constraints map both the dragged element and constraint rectangles before subtracting their edges. Numeric constraints are already local values and are not transformed.
+- Positive uniform and nonuniform scale are supported. Affine translation in the mapping cancels when differences are calculated.
+
+The callback maps two rectangle corners, so it is not arbitrary polygon recovery. Perspective, rotation-aware bounding polygons, automatic ancestor-transform detection, SVG viewBox helpers, and Motion's React-only transform helper exports are outside this API.
+
+## Session capture
+
+The callback reference is captured at pointerdown. Replacing the `MotionConfig` function during a drag or pan does not switch coordinate domains mid-session; the replacement applies to the next gesture. The mounted VisualElement and refreshed geometry keep using the captured function until release or cancellation.
+
+A stable callback may read reactive zoom state. Svelte Motion re-evaluates retained raw pan samples through that captured callback per frame, so a live positive scale change keeps pan history in a consistent current domain. For drag UIs, changing zoom between gestures remains the simplest interaction model.
+
+## Inheritance and reset
+
+Nested configs inherit `transformPagePoint` when their own prop is `undefined`. Supply an explicit identity function to opt a subtree out of an ancestor correction:
+
+```svelte
+<script lang="ts">
+    const identity = ({ x, y }: { x: number; y: number }) => ({ x, y })
+</script>
+
+<MotionConfig transformPagePoint={correctPoint}>
+    <ScaledCanvas />
+    <MotionConfig transformPagePoint={identity}>
+        <UnscaledOverlay />
+    </MotionConfig>
+</MotionConfig>
+```
+
+Setting a child prop back to `undefined` resumes inheritance without remounting descendants.
+
+## Constraints and release velocity
+
+Ref constraints are measured in the corrected coordinate space, including resize refreshes. Numeric bounds such as `{ left: -80, right: 80 }` remain exactly those local limits. Drag and pan release velocity is reported in corrected units per second, so momentum uses the same units as the displayed local movement.
+
+## See also
+
+- [Scaled board example](/examples/transform-page-point)
+- [MotionConfig reference](/docs/motion-config)
+- [Drag](/docs/drag)
+- [Pan](/docs/pan)
+- [Motion's MotionConfig reference](https://motion.dev/docs/react-motion-config#transformpagepoint)

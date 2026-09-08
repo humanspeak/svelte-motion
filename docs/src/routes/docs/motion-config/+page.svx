@@ -1,6 +1,6 @@
 ---
 title: MotionConfig
-description: Component that supplies default transitions, reduced-motion behavior, and skipAnimations to every descendant motion component.
+description: Component that supplies default transitions, reduced-motion behavior, skipAnimations, and coordinate correction to every descendant motion component.
 ---
 
 <script>
@@ -9,17 +9,17 @@ description: Component that supplies default transitions, reduced-motion behavio
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'MotionConfig | Docs | Svelte Motion'
-      seo.description = 'Provide default transition timing, reducedMotion policy, and skipAnimations to descendant motion components from one ancestor. Nest configs to scope overrides.'
+      seo.description = 'Provide transition timing, reducedMotion, skipAnimations, and transformPagePoint coordinate correction to descendant motion components.'
       seo.ogTitle = 'MotionConfig'
-      seo.ogTagline = 'Default transitions, reduced-motion policy, and animation skipping for a subtree'
-      seo.ogFeatures = ['Default Transitions', 'Reduced Motion', 'Skip Animations', 'Subtree Scoped', 'Nestable']
+      seo.ogTagline = 'Transitions, accessibility, animation skipping, and gesture coordinates for a subtree'
+      seo.ogFeatures = ['Default Transitions', 'Reduced Motion', 'Skip Animations', 'Coordinate Correction', 'Nestable']
       seo.ogSlug = 'docs-motion-config'
   }
 </script>
 
 # MotionConfig
 
-`<MotionConfig>` is a context provider that supplies default `transition` timing, the `reducedMotion` policy, and `skipAnimations` to every descendant `motion.<tag>` component. Use it at the root of a route, an interactive subtree, or a single section to avoid repeating the same transition props on every child.
+`<MotionConfig>` supplies default `transition` timing, the `reducedMotion` policy, `skipAnimations`, and `transformPagePoint` coordinate correction to descendant `motion.<tag>` components. Use it at a route root, an interactive subtree, or a single section.
 
 ```svelte
 <script lang="ts">
@@ -121,6 +121,32 @@ This is intended for E2E tests and visual-regression screenshots, where a determ
 
 The prop is reactive: toggling it updates already-mounted motion elements, so animation retargets use the current setting without requiring the subtree to remount.
 
+## `transformPagePoint`
+
+Use `transformPagePoint` to map pointer and measured rectangle coordinates into local units when a parent applies positive CSS scale.
+
+```svelte
+<script lang="ts">
+    import { MotionConfig, motion, type MotionTransformPoint } from '@humanspeak/svelte-motion'
+
+    const scale = 0.5
+    const correctPoint: MotionTransformPoint = ({ x, y }) => ({
+        x: x / scale,
+        y: y / scale
+    })
+</script>
+
+<div style:transform={`scale(${scale})`} style:transform-origin="top left">
+    <MotionConfig transformPagePoint={correctPoint}>
+        <motion.div drag dragMomentum={false} />
+    </MotionConfig>
+</div>
+```
+
+The callback corrects drag and pan points, offsets, deltas, thresholds, release velocity, ref constraints, and VisualElement measurements together. Numeric drag bounds remain authored local values. The selected callback reference is captured at pointerdown; replacing it during a live gesture applies to the next session, preventing mixed coordinate domains. A stable callback can continue reading mutable state.
+
+See the full [`transformPagePoint` coordinate contract](/docs/transform-page-point) and [scaled board example](/examples/transform-page-point).
+
 ## Nesting
 
 Configs nest. The nearest ancestor wins per prop — and props from outer configs that aren't overridden still apply.
@@ -178,12 +204,12 @@ For per-component decisions that go beyond stripping transforms (e.g. swapping a
 | `transition` | `@public` | Supported | Sets the default transition for the subtree. |
 | `reducedMotion` | `@public` | Supported | Accepts `'user'`, `'always'`, or `'never'`. |
 | `skipAnimations` | `@public` | Supported | See the [behavioral differences](#behavioral-differences) below. |
+| `transformPagePoint` | Available on MotionConfig | Supported | Corrects drag, pan, measurements, constraints, and release units inside scaled parents. |
 | `nonce` | `@public` | Not supported | Applies a CSP `nonce` to inline styles and is relevant only under a strict Content Security Policy. |
 | `isValidProp` | `@public` | Not supported | Decides whether a prop is forwarded to the DOM; upstream uses it when wrapping motion components in a styling library. |
-| `transformPagePoint` | Internal, exported only for usage in Framer | Not supported intentionally | A Framer-specific internal with no meaning outside Framer's editor. |
 | `isStatic` | Internal; determines whether this is a static context, such as the Framer canvas | Not supported intentionally | A Framer-specific internal with no meaning outside Framer's editor. |
 
-The two unimplemented `@public` props, `nonce` and `isValidProp`, are real gaps; `transformPagePoint` and `isStatic` are Framer-canvas internals with no meaning outside Framer's own editor.
+The two unimplemented `@public` props, `nonce` and `isValidProp`, remain real gaps. `isStatic` remains a Framer-canvas internal.
 
 ### Behavioral differences
 
@@ -191,11 +217,13 @@ The two unimplemented `@public` props, `nonce` and `isValidProp`, are real gaps;
 - **`skipAnimations` is more reactive than upstream.** In React, the value is latched when an element mounts and never re-read, so toggling it at runtime has no effect on already-mounted elements. Here it is reactive: flipping it applies to already-mounted elements, and the next animation they run uses the current setting without a remount. `useAnimate()` reads the current value on every call for the same reason.
 - **In-flight animations are not interrupted (same as upstream).** Flipping `skipAnimations` changes what animations started after the flip do; an animation already running finishes its tween. For a deterministic screenshot, set it before the animation starts rather than mid-flight.
 - **`skipAnimations` does not affect layout/FLIP projection animations or drag momentum (same as upstream).** Those do not route through the value-level animation path the switch controls.
+- **Coordinate callbacks are session-consistent.** Svelte Motion keeps the pointer input, ref geometry, and VisualElement measurement callback on the function selected at pointerdown. A replacement is queued for the next gesture rather than changing units under an active one.
 
 ## See also
 
 - [`useReducedMotionConfig`](/docs/use-reduced-motion-config) — Reactive read of the resolved policy
 - [`useReducedMotion`](/docs/use-reduced-motion) — OS preference only
+- [`transformPagePoint`](/docs/transform-page-point) — Coordinate correction contract and limitations
 - [WCAG 2.3.3 — Animation from Interactions](https://www.w3.org/WAI/WCAG21/Understanding/animation-from-interactions.html)
 
 ---

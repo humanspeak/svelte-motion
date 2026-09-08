@@ -35,7 +35,7 @@
  *   origin if it's too stale" tweak upstream added for hold-then-flick
  *   gestures.
  */
-import type { DragInfo } from '$lib/types'
+import type { DragInfo, MotionTransformPoint } from '$lib/types'
 import { cancelFrame, frame, frameData, isPrimaryPointer } from 'motion-dom'
 
 /**
@@ -210,6 +210,12 @@ export interface AttachPanOptions {
      * scenarios.
      */
     contextWindow?: Window | null
+    /** Coordinate mapping selected for the next pointer session. */
+    transformPagePoint?: MotionTransformPoint
+    /** Internal notification fired before a pointer session reads coordinates. */
+    onGestureSessionStart?: () => void
+    /** Internal notification fired after terminal gesture data is captured. */
+    onGestureSessionEnd?: () => void
 }
 
 /**
@@ -222,7 +228,7 @@ export interface AttachPanOptions {
  * pan would silently die.
  */
 export type AttachPanCleanup = (() => void) & {
-    update: (next: PanHandlers) => void
+    update: (next: PanHandlers, options?: AttachPanOptions) => void
 }
 
 /**
@@ -292,11 +298,9 @@ export const attachPan = (
         return Object.assign(noop, { update: () => {} })
     }
 
-    const contextWindow = options.contextWindow ?? el.ownerDocument?.defaultView ?? window
-    const distanceThreshold = options.distanceThreshold ?? 3
-
     let session: PanSession | null = null
     let rawHandlers = handlers
+    let liveOptions = options
 
     // Liveness flag the wrapped handler closures consult before invoking
     // the user callback. Flips false at teardown so any frame.update /
@@ -322,19 +326,25 @@ export const attachPan = (
         // Defensively end any prior session before overwriting the reference.
         // Without this, a second primary pointerdown that arrives before the
         // first pointerup orphans the prior session's contextWindow listeners.
+        session?.dispatchTerminal(rawHandlers)
         session?.end()
+        const contextWindow = liveOptions.contextWindow ?? el.ownerDocument?.defaultView ?? window
         session = new PanSession(event, liveHandlers, {
-            distanceThreshold,
+            distanceThreshold: liveOptions.distanceThreshold ?? 3,
             contextWindow,
-            element: el
+            element: el,
+            transformPagePoint: liveOptions.transformPagePoint,
+            onGestureSessionStart: liveOptions.onGestureSessionStart,
+            onGestureSessionEnd: liveOptions.onGestureSessionEnd
         })
     }
 
     el.addEventListener('pointerdown', onPointerDown)
 
-    const update = (next: PanHandlers): void => {
+    const update = (next: PanHandlers, nextOptions?: AttachPanOptions): void => {
         rawHandlers = next
         liveHandlers = wrapHandlers(next, aliveGuard)
+        if (nextOptions) liveOptions = nextOptions
         session?.updateHandlers(liveHandlers)
     }
 
@@ -362,13 +372,18 @@ interface PanSessionInternalOptions {
     distanceThreshold: number
     contextWindow: Window
     element: HTMLElement | null
+    transformPagePoint?: MotionTransformPoint
+    onGestureSessionStart?: () => void
+    onGestureSessionEnd?: () => void
 }
 
 class PanSession {
     private history: TimestampedPoint[] = []
+    private rawHistory: TimestampedPoint[] = []
     private startEvent: PointerEvent | null = null
     private lastMoveEvent: PointerEvent | null = null
     private lastMovePoint: Point | null = null
+    private lastRawMovePoint: Point | null = null
     private handlers: PanHandlers = {}
     private contextWindow: Window = window
     private distanceThreshold = 3
@@ -387,6 +402,9 @@ class PanSession {
     private terminalDispatched = false
     private removeScrollListeners: (() => void) | null = null
     private removeListeners: (() => void) | null = null
+    private onGestureSessionEnd: (() => void) | undefined
+    private gestureSessionStarted = false
+    private transformPagePoint: MotionTransformPoint | undefined
 
     constructor(event: PointerEvent, handlers: PanHandlers, opts: PanSessionInternalOptions) {
         // Bail on non-primary pointers. Properties keep their declared
@@ -398,8 +416,14 @@ class PanSession {
         this.contextWindow = opts.contextWindow
         this.distanceThreshold = opts.distanceThreshold
         this.element = opts.element
+        this.transformPagePoint = opts.transformPagePoint
+        this.onGestureSessionEnd = opts.onGestureSessionEnd
+        opts.onGestureSessionStart?.()
+        this.gestureSessionStarted = true
 
-        const point = extractEventPoint(event)
+        const rawPoint = extractEventPoint(event)
+        const point = this.transformPoint(rawPoint)
+        this.rawHistory = [{ ...rawPoint, timestamp: frameData.timestamp }]
         this.history = [{ ...point, timestamp: frameData.timestamp }]
 
         this.handlers.onSessionStart?.(event, getPanInfo(point, this.history))
@@ -457,16 +481,21 @@ class PanSession {
      */
     dispatchTerminal(rawHandlers: PanHandlers): void {
         if (this.terminalDispatched) return
-        if (!(this.lastMoveEvent && this.lastMovePoint)) return
-        const info = getPanInfo(this.lastMovePoint, this.history)
+        if (!(this.lastMoveEvent && this.lastRawMovePoint)) {
+            this.notifyGestureSessionEnd()
+            return
+        }
+        const info = getPanInfo(this.lastMovePoint!, this.history)
         if (this.startEvent) rawHandlers.onEnd?.(this.lastMoveEvent, info)
         rawHandlers.onSessionEnd?.(this.lastMoveEvent, info)
         this.terminalDispatched = true
+        this.notifyGestureSessionEnd()
     }
 
     private handlePointerMove = (event: PointerEvent): void => {
         this.lastMoveEvent = event
-        this.lastMovePoint = extractEventPoint(event)
+        this.lastRawMovePoint = extractEventPoint(event)
+        this.lastMovePoint = this.transformPoint(this.lastRawMovePoint)
         // Per-frame throttle so a 1000hz mouse doesn't drown handlers.
         frame.update(this.updatePoint, true)
     }
@@ -482,11 +511,15 @@ class PanSession {
             // tap gesture instead. This prevents a spurious
             // onPanSessionStart → onPanSessionEnd pair on every plain
             // click of a pan-enabled element.
+            this.notifyGestureSessionEnd()
             return
         }
 
         const finalPoint =
-            event.type === 'pointercancel' ? this.lastMovePoint : extractEventPoint(event)
+            event.type === 'pointercancel'
+                ? this.lastMovePoint
+                : this.transformPoint(extractEventPoint(event))
+        if (event.type !== 'pointercancel') this.reprojectHistory()
         const info = getPanInfo(finalPoint, this.history)
 
         if (this.startEvent) this.handlers.onEnd?.(event, info)
@@ -494,10 +527,14 @@ class PanSession {
         // Mark idempotent so a later forced teardown via
         // `dispatchTerminal` doesn't replay this pair.
         this.terminalDispatched = true
+        this.notifyGestureSessionEnd()
     }
 
     private updatePoint = (): void => {
-        if (!(this.lastMoveEvent && this.lastMovePoint)) return
+        if (!(this.lastMoveEvent && this.lastRawMovePoint)) return
+
+        this.reprojectHistory()
+        this.lastMovePoint = this.transformPoint(this.lastRawMovePoint)
 
         const info = getPanInfo(this.lastMovePoint, this.history)
         const panAlreadyStarted = this.startEvent !== null
@@ -506,6 +543,7 @@ class PanSession {
         if (!panAlreadyStarted && !pastThreshold) return
 
         this.history.push({ ...this.lastMovePoint, timestamp: frameData.timestamp })
+        this.rawHistory.push({ ...this.lastRawMovePoint, timestamp: frameData.timestamp })
 
         if (!panAlreadyStarted) {
             this.handlers.onStart?.(this.lastMoveEvent, info)
@@ -571,16 +609,34 @@ class PanSession {
         if (delta.x === 0 && delta.y === 0) return
 
         if (isWindow) {
-            if (this.lastMovePoint) {
-                this.lastMovePoint.x += delta.x
-                this.lastMovePoint.y += delta.y
+            if (this.lastRawMovePoint) {
+                this.lastRawMovePoint.x += delta.x
+                this.lastRawMovePoint.y += delta.y
             }
-        } else if (this.history.length > 0) {
-            this.history[0].x -= delta.x
-            this.history[0].y -= delta.y
+        } else if (this.rawHistory.length > 0) {
+            this.rawHistory[0].x -= delta.x
+            this.rawHistory[0].y -= delta.y
         }
 
         this.scrollPositions.set(target, current)
         frame.update(this.updatePoint, true)
+    }
+
+    private notifyGestureSessionEnd(): void {
+        if (!this.gestureSessionStarted) return
+        this.gestureSessionStarted = false
+        this.onGestureSessionEnd?.()
+    }
+
+    private transformPoint(point: Point): Point {
+        return this.transformPagePoint ? this.transformPagePoint(point) : { ...point }
+    }
+
+    /** Re-map retained raw samples through the callback captured at pointerdown. */
+    private reprojectHistory(): void {
+        this.history = this.rawHistory.map(({ x, y, timestamp }) => ({
+            ...this.transformPoint({ x, y }),
+            timestamp
+        }))
     }
 }

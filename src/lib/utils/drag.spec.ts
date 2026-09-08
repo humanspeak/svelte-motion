@@ -112,6 +112,284 @@ describe('utils/drag', () => {
         el.remove()
     })
 
+    describe('transformPagePoint', () => {
+        it('corrects bound MotionValue movement into the configured coordinate space', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const x = motionValue(0)
+            const options = {
+                axis: 'x' as const,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x },
+                transformPagePoint: ({ x, y }: { x: number; y: number }) => ({
+                    x: x * 2,
+                    y: y * 2
+                })
+            }
+            const cleanup = attachDrag(el, options)
+
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', {
+                    clientX: 10,
+                    clientY: 10,
+                    pointerId: 1,
+                    button: 0,
+                    isPrimary: true
+                })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', {
+                    clientX: 30,
+                    clientY: 10,
+                    pointerId: 1,
+                    buttons: 1,
+                    isPrimary: true
+                })
+            )
+
+            cleanup()
+            el.remove()
+            expect(x.get()).toBe(40)
+        })
+
+        it('preserves unconfigured pointer coordinates', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const x = motionValue(0)
+            const options = {
+                axis: 'x' as const,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x }
+            }
+            const cleanup = attachDrag(el, options)
+
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', {
+                    clientX: 10,
+                    clientY: 10,
+                    pointerId: 2,
+                    button: 0,
+                    isPrimary: true
+                })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', {
+                    clientX: 30,
+                    clientY: 10,
+                    pointerId: 2,
+                    buttons: 1,
+                    isPrimary: true
+                })
+            )
+
+            cleanup()
+            el.remove()
+            expect(x.get()).toBe(20)
+        })
+
+        it('reports nonuniformly corrected callback data and bound values', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const x = motionValue(0)
+            const y = motionValue(0)
+            const onMove = vi.fn()
+            const cleanup = attachDrag(el, {
+                axis: true,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x, y },
+                callbacks: { onMove },
+                transformPagePoint: (point) => ({ x: point.x * 2, y: point.y * 3 })
+            })
+
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 3 })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 30, clientY: 20, pointerId: 3 })
+            )
+
+            expect(x.get()).toBe(40)
+            expect(y.get()).toBe(30)
+            expect(onMove.mock.calls[0][1]).toMatchObject({
+                point: { x: 60, y: 60 },
+                delta: { x: 40, y: 30 },
+                offset: { x: 40, y: 30 }
+            })
+            cleanup()
+            el.remove()
+        })
+
+        it('cancels affine translation when calculating movement deltas', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const x = motionValue(0)
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x },
+                transformPagePoint: (point) => ({ x: point.x * 2 + 100, y: point.y - 75 })
+            })
+
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 4 })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 30, clientY: 10, pointerId: 4 })
+            )
+
+            cleanup()
+            el.remove()
+            expect(x.get()).toBe(40)
+        })
+
+        it('keeps numeric constraints in authored local units', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const x = motionValue(0)
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                constraints: { left: 0, right: 25 },
+                elastic: 0,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x },
+                transformPagePoint: (point) => ({ x: point.x * 2, y: point.y * 2 })
+            })
+
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 5 })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 30, clientY: 10, pointerId: 5 })
+            )
+
+            cleanup()
+            el.remove()
+            expect(x.get()).toBe(25)
+        })
+
+        it('maps both element-ref constraint rectangles before subtracting them', () => {
+            const bounds = document.createElement('div')
+            const el = document.createElement('div')
+            document.body.append(bounds, el)
+            vi.spyOn(bounds, 'getBoundingClientRect').mockReturnValue(new DOMRect(80, 80, 100, 100))
+            vi.spyOn(el, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 100, 20, 20))
+
+            const mapped = resolveConstraints(el, bounds, (point) => ({
+                x: point.x * 2,
+                y: point.y / 2
+            }))
+
+            expect(mapped).toEqual({ top: -10, left: -40, right: 120, bottom: 30 })
+            bounds.remove()
+            el.remove()
+        })
+
+        it('keeps the captured callback when options change during a drag', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const x = motionValue(0)
+            const first = (point: { x: number; y: number }) => ({
+                x: point.x * 2,
+                y: point.y * 2
+            })
+            const second = (point: { x: number; y: number }) => ({
+                x: point.x * 3,
+                y: point.y * 3
+            })
+            const baseOptions = {
+                axis: 'x' as const,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x }
+            }
+            const cleanup = attachDrag(el, { ...baseOptions, transformPagePoint: first })
+
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 6 })
+            )
+            cleanup.updateOptions({ ...baseOptions, transformPagePoint: second })
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 20, clientY: 10, pointerId: 6 })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: 20, clientY: 10, pointerId: 6 })
+            )
+            expect(x.get()).toBe(20)
+
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 7 })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 20, clientY: 10, pointerId: 7 })
+            )
+
+            cleanup()
+            el.remove()
+            expect(x.get()).toBe(50)
+        })
+
+        it('uses corrected units for deterministic release velocity', () => {
+            const clock = vi.spyOn(performance, 'now')
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const onEnd = vi.fn()
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                callbacks: { onEnd },
+                transformPagePoint: (point) => ({ x: point.x * 2, y: point.y * 2 })
+            })
+
+            clock.mockReturnValue(0)
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 8 })
+            )
+            clock.mockReturnValue(10)
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 20, clientY: 10, pointerId: 8 })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: 20, clientY: 10, pointerId: 8 })
+            )
+
+            expect(onEnd.mock.calls[0][1].velocity.x).toBe(2000)
+            cleanup()
+            el.remove()
+            clock.mockRestore()
+        })
+
+        it('corrects both the pointer and measured center for controlled snap-to-cursor', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            vi.spyOn(el, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 40, 20, 20))
+            const x = motionValue(0)
+            const controls = createDragControls()
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                controls,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x },
+                transformPagePoint: (point) => ({ x: point.x * 2, y: point.y * 2 })
+            })
+
+            controls.start(
+                new PointerEvent('pointerdown', { clientX: 130, clientY: 50, pointerId: 9 }),
+                { snapToCursor: true }
+            )
+
+            cleanup()
+            el.remove()
+            expect(x.get()).toBe(40)
+        })
+    })
+
     it('attachDrag: attaches pointerdown and animates during move', () => {
         const el = document.createElement('div')
         el.style.width = '100px'

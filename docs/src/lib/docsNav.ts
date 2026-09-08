@@ -92,7 +92,12 @@ export const docsSections: NavSection[] = [
         items: [
             { title: 'Gestures (overview)', href: '/docs/gestures', icon: Hand },
             { title: 'Drag', href: '/docs/drag', icon: Hand },
-            { title: 'Pan', href: '/docs/pan', icon: Hand }
+            { title: 'Pan', href: '/docs/pan', icon: Hand },
+            {
+                title: 'transformPagePoint',
+                href: '/docs/transform-page-point',
+                icon: MousePointer
+            }
         ]
     },
     {

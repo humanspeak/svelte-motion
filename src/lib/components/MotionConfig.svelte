@@ -16,12 +16,15 @@
      *   Defaults to `'never'`.
      * @prop skipAnimations When `true`, descendant animations jump to their
      *   final value instead of tweening. Defaults to `false`.
+     * @prop transformPagePoint Maps pointer and measurement coordinates into
+     *   the coordinate space used by descendant motion elements.
      * @prop children Slotted content receiving this configuration.
      */
     let {
         transition,
         reducedMotion,
         skipAnimations,
+        transformPagePoint,
         children
     }: MotionConfigProps & { children?: Snippet } = $props()
 
@@ -57,6 +60,9 @@
         },
         get skipAnimations() {
             return skipAnimations ?? parentConfig?.skipAnimations
+        },
+        get transformPagePoint() {
+            return transformPagePoint ?? parentConfig?.transformPagePoint
         }
     }
     createMotionConfig(motionConfig)

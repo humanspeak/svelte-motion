@@ -4,6 +4,7 @@ import type {
     DragControls,
     DragElastic,
     DragInfo,
+    MotionTransformPoint,
     MotionWhileDrag
 } from '$lib/types'
 import { pwLog } from '$lib/utils/log'
@@ -118,14 +119,35 @@ export type AttachDragOptions = {
      * is derived from it (#421).
      */
     boundMotionValues?: { x?: MotionValue<number>; y?: MotionValue<number> }
+    /** Coordinate mapping selected for the next pointer session. */
+    transformPagePoint?: MotionTransformPoint
+    /** Internal notification fired before a pointer session reads geometry. */
+    onGestureSessionStart?: () => void
+    /** Internal notification fired after terminal gesture data is captured. */
+    onGestureSessionEnd?: () => void
 }
 
 /**
  * Read an element's DOMRect with null-safety.
  */
-const getRect = (el: HTMLElement | null): Rect | null => {
+const getRect = (
+    el: HTMLElement | null,
+    transformPagePoint?: MotionTransformPoint
+): Rect | null => {
     if (!el) return null
     const r = el.getBoundingClientRect()
+    if (transformPagePoint) {
+        const topLeft = transformPagePoint({ x: r.left, y: r.top })
+        const bottomRight = transformPagePoint({ x: r.right, y: r.bottom })
+        return {
+            top: topLeft.y,
+            left: topLeft.x,
+            right: bottomRight.x,
+            bottom: bottomRight.y,
+            width: bottomRight.x - topLeft.x,
+            height: bottomRight.y - topLeft.y
+        }
+    }
     return {
         top: r.top,
         left: r.left,
@@ -266,13 +288,14 @@ const applyDragOriginConstraints = (
  */
 export const resolveConstraints = (
     el: HTMLElement | null,
-    constraints: DragConstraints | undefined
+    constraints: DragConstraints | undefined,
+    transformPagePoint?: MotionTransformPoint
 ): { top: number; left: number; right: number; bottom: number } | null => {
     if (!constraints) return null
     if (isDomElement(constraints)) {
         if (!el) return null
-        const c = getRect(constraints)
-        const e = getRect(el)
+        const c = getRect(constraints, transformPagePoint)
+        const e = getRect(el, transformPagePoint)
         if (!c || !e) return null
         // Allow element to move within container bounds
         return {
@@ -460,7 +483,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     let maxElastic = getMaxElastic(elastic)
     let momentum = opts.momentum !== false
 
-    let constraints = resolveConstraints(el, opts.constraints)
+    let constraints = resolveConstraints(el, opts.constraints, opts.transformPagePoint)
     // Anchor constraints base:
     // - Pixel object constraints are offsets from original origin (0,0)
     // - HTMLElement constraints are measured from current applied transform at drag start
@@ -480,6 +503,15 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     let velocity = { x: 0, y: 0 }
     // History for velocity smoothing (last N samples)
     let history: Array<{ x: number; y: number; t: number }> = []
+    let sessionTransformPagePoint: MotionTransformPoint | undefined
+    let gestureSessionStarted = false
+
+    const endGestureSession = () => {
+        if (!gestureSessionStarted) return
+        gestureSessionStarted = false
+        opts.onGestureSessionEnd?.()
+        sessionTransformPagePoint = undefined
+    }
 
     // Transform channels authored by `initial`/`animate`, used as the resting
     // baseline the drag offset composes onto. `whileDrag` channels are NOT here:
@@ -516,7 +548,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         elastic = resolveDragElastic(nextOptions.elastic)
         maxElastic = getMaxElastic(elastic)
         momentum = nextOptions.momentum !== false
-        constraints = resolveConstraints(el, nextOptions.constraints)
+        constraints = resolveConstraints(
+            el,
+            nextOptions.constraints,
+            dragging ? sessionTransformPagePoint : nextOptions.transformPagePoint
+        )
     }
 
     /**
@@ -592,6 +628,16 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         velocity: { ...velocity }
     })
 
+    /**
+     * Extract a pointer in the active session's coordinate domain.
+     * Configured mappings receive upstream-compatible page coordinates;
+     * omitting the mapping preserves the existing client-coordinate behavior.
+     */
+    const extractPointerPoint = (event: PointerEvent): { x: number; y: number } => {
+        if (!sessionTransformPagePoint) return { x: event.clientX, y: event.clientY }
+        return sessionTransformPagePoint({ x: event.pageX, y: event.pageY })
+    }
+
     const getConstraintBounds = (
         base: { x: number; y: number },
         currentConstraints: { top: number; left: number; right: number; bottom: number }
@@ -612,7 +658,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         const progressX = calcConstraintProgress(applied.x, oldBounds.minX, oldBounds.maxX)
         const progressY = calcConstraintProgress(applied.y, oldBounds.minY, oldBounds.maxY)
 
-        const freshConstraints = resolveConstraints(el, opts.constraints)
+        const freshConstraints = resolveConstraints(
+            el,
+            opts.constraints,
+            dragging ? sessionTransformPagePoint : opts.transformPagePoint
+        )
         if (!freshConstraints) return
 
         constraints = freshConstraints
@@ -1010,6 +1060,10 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             pwLog('[drag] another drag holds the lock → not starting', { el: EL_ID })
             return
         }
+        endGestureSession()
+        opts.onGestureSessionStart?.()
+        sessionTransformPagePoint = opts.transformPagePoint
+        gestureSessionStarted = true
         try {
             if ('setPointerCapture' in el && typeof e.pointerId === 'number')
                 el.setPointerCapture(e.pointerId)
@@ -1051,7 +1105,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         }
 
         // Recompute constraints in case bounding boxes changed since last drag
-        constraints = resolveConstraints(el, opts.constraints)
+        constraints = resolveConstraints(el, opts.constraints, sessionTransformPagePoint)
         pwLog('[drag] constraints (px)', { el: EL_ID, constraints })
         if (constraints) {
             if (opts.constraints && !isDomElement(opts.constraints)) {
@@ -1076,10 +1130,10 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         lockAxis = null
         // Start from current applied transform, not viewport rect
         origin = { x: applied.x, y: applied.y }
-        startPoint = { x: e.clientX, y: e.clientY }
+        startPoint = extractPointerPoint(e)
         lastPoint = { ...startPoint }
         velocity = { x: 0, y: 0 }
-        history = [{ x: e.clientX, y: e.clientY, t: now() }]
+        history = [{ ...startPoint, t: now() }]
 
         const applyXAxis = axis === true || axis === 'x'
         const applyYAxis = axis === true || axis === 'y'
@@ -1088,11 +1142,16 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             const base = parseMatrixTranslate(opts.getBaseTransform?.() ?? '')
             if (applyXAxis) applied.x = rendered.tx - base.tx
             if (applyYAxis) applied.y = rendered.ty - base.ty
-            const rect = el.getBoundingClientRect()
-            const centerX = rect.left + rect.width / 2
-            const centerY = rect.top + rect.height / 2
-            if (applyXAxis) origin.x = applied.x + e.clientX - centerX
-            if (applyYAxis) origin.y = applied.y + e.clientY - centerY
+            const pointer = extractPointerPoint(e)
+            const rect = getRect(el, sessionTransformPagePoint)!
+            // motion-dom measures transformed viewport corners, then adds root
+            // scroll. Mirror that page-box contract for controlled snapping.
+            const scrollX = sessionTransformPagePoint ? window.scrollX : 0
+            const scrollY = sessionTransformPagePoint ? window.scrollY : 0
+            const centerX = rect.left + rect.width / 2 + scrollX
+            const centerY = rect.top + rect.height / 2 + scrollY
+            if (applyXAxis) origin.x = applied.x + pointer.x - centerX
+            if (applyYAxis) origin.y = applied.y + pointer.y - centerY
             setXYImmediate(origin.x, origin.y)
             pwLog('[drag] snapToCursor origin', { el: EL_ID, origin })
         }
@@ -1130,8 +1189,9 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     const onPointerMove = (e: PointerEvent) => {
         if (!dragging) return
         const t = now()
-        const nx = e.clientX
-        const ny = e.clientY
+        const point = extractPointerPoint(e)
+        const nx = point.x
+        const ny = point.y
 
         // Add to history and keep last 5 samples
         history.push({ x: nx, y: ny, t })
@@ -1297,6 +1357,14 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             onPointerCancel as EventListener,
             sessionListenerOptions
         )
+
+        let terminalDispatched = false
+        const dispatchTerminal = () => {
+            if (terminalDispatched) return
+            terminalDispatched = true
+            opts.callbacks?.onEnd?.(e, computeInfo())
+            endGestureSession()
+        }
 
         // Momentum/inertia with boundary handoff: inertia until crossing, then spring to boundary.
         // Pointer-cancel forces a no-momentum settle (clamp into constraints, no fling) since the
@@ -1512,6 +1580,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
 
             if (!releases.length) {
                 finalizeRelease('complete')
+                dispatchTerminal()
                 return
             }
 
@@ -1611,6 +1680,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 postReleaseAnimationActive = false
                 maybeReleaseDragActive()
                 opts.callbacks?.onTransitionEnd?.()
+                dispatchTerminal()
                 return
             }
 
@@ -1741,7 +1811,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
 
         // Upstream fires `onDragEnd` after `startAnimation`, from a postRender
         // (`VisualElementDragControls.ts:278-281`).
-        opts.callbacks?.onEnd?.(e, computeInfo())
+        dispatchTerminal()
     }
 
     // Wire dragControls. The cancelInertia thunk reads the *current*
@@ -1768,6 +1838,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         // from `cancel()`, which its unmount path also calls).
         releaseDragLockIfHeld()
         markDragTransformActive(false)
+        endGestureSession()
         // Drop the bookkeeping of any in-flight release without stopping it: a
         // detach can be a benign re-attach (the drag effect re-running) while a
         // legitimate glide is on screen, and the fresh gesture re-derives its

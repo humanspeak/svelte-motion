@@ -800,6 +800,26 @@ export type MotionProps = {
  */
 export type ReducedMotionConfig = 'user' | 'always' | 'never'
 
+/**
+ * Maps a browser-space point into the coordinate space used by motion gestures
+ * and measurements.
+ *
+ * @param point The source point supplied by the pointer or DOM measurement path.
+ * @returns The corresponding point in the consumer's local coordinate space.
+ *
+ * @example
+ * ```ts
+ * const transformPagePoint: MotionTransformPoint = ({ x, y }) => ({
+ *   x: x / 0.5,
+ *   y: y / 0.5
+ * })
+ * ```
+ */
+export type MotionTransformPoint = (point: { x: number; y: number }) => {
+    x: number
+    y: number
+}
+
 export type MotionConfigProps = {
     /** Animation configuration */
     transition?: MotionTransition
@@ -827,6 +847,16 @@ export type MotionConfigProps = {
      * @see https://motion.dev/docs/react-motion-config
      */
     skipAnimations?: boolean
+    /**
+     * Correct pointer and measurement coordinates for transformed ancestors.
+     *
+     * The selected function is inherited by descendant motion elements and is
+     * captured when a pointer session starts, keeping gesture input and
+     * geometry in one coordinate domain until that session ends.
+     *
+     * @see https://motion.dev/docs/react-motion-config#transformpagepoint
+     */
+    transformPagePoint?: MotionTransformPoint
 }
 
 /**
