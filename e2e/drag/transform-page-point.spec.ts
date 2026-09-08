@@ -143,6 +143,155 @@ const canonicalSequence = async (page: Page, terminal: 'up' | 'cancel' = 'up') =
     await advance(page, 20)
 }
 
+const expectPointNear = (actual: Point, expected: Point, report: string) => {
+    expect(Math.abs(actual.x - expected.x), report).toBeLessThanOrEqual(2)
+    expect(Math.abs(actual.y - expected.y), report).toBeLessThanOrEqual(2)
+}
+
+const waitForTargetCenterToSettle = async (page: Page) => {
+    const samples: Point[] = []
+    let stableFrames = 0
+
+    for (let frameIndex = 0; frameIndex < 180; frameIndex++) {
+        await advance(page, 16)
+        const current = await center(page.getByTestId('target'))
+        const previous = samples.at(-1)
+        samples.push(current)
+
+        if (
+            frameIndex >= 20 &&
+            previous &&
+            Math.abs(current.x - previous.x) <= 0.05 &&
+            Math.abs(current.y - previous.y) <= 0.05
+        ) {
+            stableFrames += 1
+            if (stableFrames === 8) return samples
+        } else {
+            stableFrames = 0
+        }
+    }
+
+    throw new Error(`Target layout did not settle; samples=${JSON.stringify(samples)}`)
+}
+
+const runLayoutSnapCorrectionRegression = async (
+    page: Page,
+    caseId: string,
+    initialAxes: Point
+) => {
+    await page.setViewportSize({ width: 900, height: 700 })
+    await openCase(page, caseId)
+
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await expect
+        .poll(() => page.evaluate(() => ({ x: window.scrollX, y: window.scrollY })))
+        .toEqual({ x: 0, y: 0 })
+
+    const target = page.getByTestId('target')
+    const handle = page.getByTestId('handle')
+    const shiftButton = page.getByTestId('layout-shift-button')
+    const viewport = page.viewportSize()
+    const initialTarget = await target.boundingBox()
+    const initialHandle = await handle.boundingBox()
+    const initialShiftButton = await shiftButton.boundingBox()
+    const initialSlot = await page.getByTestId('slot').boundingBox()
+    if (!viewport || !initialTarget || !initialHandle || !initialShiftButton || !initialSlot) {
+        throw new Error('Expected the isolated layout/snap fixture to be visible')
+    }
+
+    for (const box of [initialTarget, initialHandle, initialShiftButton, initialSlot]) {
+        expect(box.x).toBeGreaterThanOrEqual(0)
+        expect(box.y).toBeGreaterThanOrEqual(0)
+        expect(box.x + box.width).toBeLessThanOrEqual(viewport.width)
+        expect(box.y + box.height).toBeLessThanOrEqual(viewport.height)
+    }
+    expect((await snapshot(page, 'layout-snap-initial')).boundValues).toEqual({
+        ...initialAxes,
+        panOffset: { x: 0, y: 0 }
+    })
+    expect(initialSlot.x).toBe(300)
+    expect(initialSlot.y).toBe(300)
+    expect(initialTarget.x - initialSlot.x).toBe(initialAxes.x)
+    expect(initialTarget.y - initialSlot.y).toBe(initialAxes.y)
+
+    const handlePoint = {
+        x: initialHandle.x + initialHandle.width / 2,
+        y: initialHandle.y + initialHandle.height / 2
+    }
+    await page.mouse.move(handlePoint.x, handlePoint.y)
+    await page.mouse.down()
+    await advance(page, 16)
+    await advance(page, 16)
+    const firstSnap = await center(target)
+
+    const dragSamples: Array<{ pointer: Point; target: Point }> = []
+    for (const delta of [
+        { x: 50, y: 20 },
+        { x: 100, y: 35 },
+        { x: 150, y: 50 }
+    ]) {
+        const pointer = { x: handlePoint.x + delta.x, y: handlePoint.y + delta.y }
+        await page.mouse.move(pointer.x, pointer.y)
+        await advance(page, 16)
+        dragSamples.push({ pointer, target: await center(target) })
+    }
+    await page.mouse.up()
+    await advance(page, 20)
+    const postDrag = await center(target)
+
+    const shiftPoint = await center(shiftButton)
+    await page.mouse.move(shiftPoint.x, shiftPoint.y)
+    await page.mouse.down()
+    await page.mouse.up()
+    await expect
+        .poll(() => page.getByTestId('slot').evaluate((element) => element.offsetLeft))
+        .toBe(360)
+    const shiftedSlot = await page.getByTestId('slot').boundingBox()
+    if (!shiftedSlot) throw new Error('Expected shifted slot to remain visible')
+    const layoutSamples = await waitForTargetCenterToSettle(page)
+    const postLayout = layoutSamples.at(-1)!
+
+    const repeatSnap = async () => {
+        const currentHandle = await center(handle)
+        await page.mouse.move(handlePoint.x, handlePoint.y)
+        await page.mouse.down()
+        await advance(page, 16)
+        await advance(page, 16)
+        const snapped = await center(target)
+        await page.mouse.up()
+        await advance(page, 20)
+        return { currentHandle, snapped }
+    }
+    const second = await repeatSnap()
+    const third = await repeatSnap()
+
+    const report = JSON.stringify({
+        handlePoint,
+        firstSnap,
+        dragSamples,
+        postDrag,
+        initialSlot,
+        shiftedSlot,
+        layoutSamples,
+        second,
+        third
+    })
+    expectPointNear(firstSnap, handlePoint, report)
+    for (const sample of dragSamples) expectPointNear(sample.target, sample.pointer, report)
+    expectPointNear(postDrag, { x: handlePoint.x + 150, y: handlePoint.y + 50 }, report)
+    expect(shiftedSlot.x - initialSlot.x, report).toBe(60)
+    expect(shiftedSlot.y - initialSlot.y, report).toBe(0)
+    expectPointNear(postLayout, { x: postDrag.x + 60, y: postDrag.y }, report)
+    expectPointNear(second.currentHandle, handlePoint, report)
+    expectPointNear(third.currentHandle, handlePoint, report)
+    expectPointNear(second.snapped, handlePoint, report)
+    expectPointNear(third.snapped, handlePoint, report)
+    expect(await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }))).toEqual({
+        x: 0,
+        y: 0
+    })
+}
+
 const scrollWindow = async (page: Page, x: number, y: number, mode: 'to' | 'by' = 'by') => {
     const expected = await page.evaluate(
         ({ x, y, mode }) => {
@@ -524,6 +673,24 @@ test.describe('MotionConfig transformPagePoint drag', () => {
         })
         await page.mouse.up()
         await advance(page, 20)
+    })
+
+    test('keeps repeated controls snaps aligned after drag and settled parent layout', async ({
+        page
+    }) => {
+        await runLayoutSnapCorrectionRegression(page, 'drag-layout-snap-correction', {
+            x: 0,
+            y: 0
+        })
+    })
+
+    test('keeps nonzero-initial controls snaps aligned after settled parent layout', async ({
+        page
+    }) => {
+        await runLayoutSnapCorrectionRegression(page, 'drag-layout-snap-correction-nonzero', {
+            x: 45,
+            y: -30
+        })
     })
 
     test('continues after unmount, resets detached values at end, and handles cancel', async ({

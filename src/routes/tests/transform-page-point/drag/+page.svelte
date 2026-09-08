@@ -14,8 +14,11 @@
 
     const controls = createDragControls()
     const caseId = $derived(page.url.searchParams.get('case') ?? 'drag-uniform-scale')
+    const usesLayoutSnapCorrection = $derived(
+        caseId === 'drag-layout-snap-correction' || caseId === 'drag-layout-snap-correction-nonzero'
+    )
     const configKind = $derived(
-        caseId === 'drag-no-config-end'
+        caseId === 'drag-no-config-end' || usesLayoutSnapCorrection
             ? 'none'
             : caseId === 'drag-nonuniform-affine'
               ? 'nonuniform'
@@ -24,8 +27,12 @@
                 : 'double'
     )
     const usesAncestor = $derived(caseId === 'drag-ancestor-scroll-held')
-    const usesControls = $derived(caseId === 'drag-controls-snap-scrolled')
-    const usesLayout = $derived(caseId === 'drag-real-layout-shift-held')
+    const usesControls = $derived(
+        caseId === 'drag-controls-snap-scrolled' || usesLayoutSnapCorrection
+    )
+    const usesLayout = $derived(
+        caseId === 'drag-real-layout-shift-held' || usesLayoutSnapCorrection
+    )
     const boundsKind = $derived(
         caseId === 'drag-numeric-bounds'
             ? 'numeric'
@@ -55,8 +62,10 @@
     // references on the corresponding fixture actions. These references still
     // enter through normal motion props; there is no fixture-only engine hook.
     let callbackCommit = $state(0)
-    const x = motionValue(0)
-    const y = motionValue(0)
+    const initialAxes = () =>
+        caseId === 'drag-layout-snap-correction-nonzero' ? { x: 45, y: -30 } : { x: 0, y: 0 }
+    const x = motionValue(initialAxes().x)
+    const y = motionValue(initialAxes().y)
 
     const round = (value: number) =>
         Number.isFinite(value) ? Math.round(value * 1_000_000) / 1_000_000 : value
@@ -324,7 +333,42 @@
         </div>
     {/snippet}
 
-    {#if usesAncestor}
+    {#if usesLayoutSnapCorrection}
+        <div data-testid="layout-snap-overlay" class="layoutSnapOverlay">
+            <button
+                bind:this={handle}
+                data-testid="handle"
+                class="layoutSnapHandle"
+                onpointerdown={(event) => controls.start(event, { snapToCursor: true })}
+                >snap</button
+            >
+            <button
+                data-testid="layout-shift-button"
+                class="layoutShiftButton"
+                onclick={() => (layoutShift = layoutShift === 0 ? 60 : 0)}>shift</button
+            >
+            <div
+                bind:this={slot}
+                data-testid="slot"
+                class="layoutSnapSlot"
+                style:margin-left={`${layoutShift}px`}
+            >
+                <motion.div
+                    bind:ref={target}
+                    data-testid="target"
+                    drag
+                    dragControls={controls}
+                    dragListener={false}
+                    dragMomentum={false}
+                    layout
+                    style={{ x, y, width: '80px', height: '80px' }}
+                    onDragStart={dragCallbacks.onStart}
+                    onDrag={dragCallbacks.onMove}
+                    onDragEnd={dragCallbacks.onEnd}>drag card</motion.div
+                >
+            </div>
+        </div>
+    {:else if usesAncestor}
         <div bind:this={shell} data-testid="shell" class="shell">
             <div class="shellContent">{@render stageContent()}</div>
         </div>
@@ -332,7 +376,7 @@
         {@render stageContent()}
     {/if}
 
-    {#if usesControls}
+    {#if usesControls && !usesLayoutSnapCorrection}
         <button
             bind:this={handle}
             data-testid="handle"
@@ -461,5 +505,37 @@
         background: #be123c;
         color: white;
         touch-action: none;
+    }
+    .layoutSnapOverlay {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+    }
+    .layoutSnapHandle,
+    .layoutShiftButton,
+    .layoutSnapSlot {
+        position: absolute;
+    }
+    .layoutSnapHandle {
+        left: 100px;
+        top: 100px;
+        touch-action: none;
+    }
+    .layoutShiftButton {
+        left: 400px;
+        top: 50px;
+    }
+    .layoutSnapSlot {
+        left: 300px;
+        top: 300px;
+    }
+    .layoutSnapSlot :global([data-testid='target']) {
+        display: grid;
+        place-items: center;
+        background: #fbbf24;
+        color: #111827;
+        font-weight: 800;
+        touch-action: none;
+        user-select: none;
     }
 </style>
