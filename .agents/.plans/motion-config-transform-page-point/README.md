@@ -14,7 +14,7 @@ The payoff is visual: a tile stays under the cursor inside a scaled board and re
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | IN PROGRESS |
+| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | BLOCKED — coordinate-contract approval; browser failures |
 
 Status: TODO / IN PROGRESS / DONE / BLOCKED (reason) / REJECTED (reason).
 
@@ -41,3 +41,7 @@ Focused parity audit: public config/API, local drag/pan paths, relevant renderin
 ## Dispatch preflight — 2026-09-08
 
 Isolated worktree: `/Users/jasonkummerl/Github/svelte-motion-transform-page-point`, branch `feat/motion-config-transform-page-point`, source baseline `14046a5` (main v1.2.0). PR #480 has merged. Scoped source comparison to `fcf6452` is empty. Codex executor writes source; guard owns installs, browser checks, plan/evidence records and commits. The original worktree and local intel change remain intact.
+
+## Guard checkpoint — 2026-09-08
+
+Implementation snapshot `13ec152` is preserved on `feat/motion-config-transform-page-point`. **NO-PASS:** upstream transformed-scroll semantics conflict with the corrected-unit requirement; [proposed amendment](proposed-amendment.md) awaits explicit operator approval. Guard reproduced 903/903 unit tests, successful formatting/lint/Svelte commit gates and app build/package validation. Targeted browser run: 9 passed, 5 failed (nonuniform drag, resize/bounds, layout-slot compensation, pan control visibility, page scrolling). Full browser and changed-docs final gates remain unrun. See [guard report](001-transform-page-point.guard-report.md), [coordinate contract](coordinate-contract.md), and the [verbatim executor report](executor-report.md). No push, PR, or batch closure.

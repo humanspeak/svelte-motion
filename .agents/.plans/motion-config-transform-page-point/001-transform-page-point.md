@@ -16,7 +16,7 @@
 - **Category:** direction / enhancement
 - **Confidence:** HIGH that the feature is missing; ranking is product judgment
 - **Planned at:** `14046a5`, 2026-09-08
-- **Status:** TODO
+- **Status:** BLOCKED — semantic amendment awaiting operator approval; snapshot `13ec152` has unresolved browser failures
 
 ## Why this matters
 
