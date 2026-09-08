@@ -117,3 +117,7 @@ ebcaccc · user-approved controls test amendment
 ## Checkpoint 13 — PLAN AMENDED (2026-09-08)
 
 Snapshot40b5c11 captures completed controls test-only executor; no runtime changes. User then reported repeated initial upward drift and explicitly requested a red test first. Acceptance of cumulative (-50,-50) is held. Dispatch only a no-creep regression, reproduce RED on0da2303, compare public React and resolve any behavioral conflict before runtime changes. T3 collaborative browser is available and the page has been visually inspected.
+
+## Checkpoint 14 — ON TRACK for red proof; overall NO-PASS (2026-09-08)
+
+Source snapshot6c6781b. First two controls tests unchanged and pass. New repeated snap no-creep regression fails atcontrols.spec.ts:244,expected<=2px,received50px. All three sessions collected before geometry assertions; real active/end checks passed. Production remains0da2303. Exact same-input three-session React probe matches all Svelte rectangles and verifies button hit targets. User-requested red-first milestone achieved; runtime fix, full browser gate and public example walkthrough remain. Upstream currentmain package13.2.0 retains the same calculation; relatedmergedPR3445 fixed first snap. No posting/push/PR. T3 controls tab remains visible.

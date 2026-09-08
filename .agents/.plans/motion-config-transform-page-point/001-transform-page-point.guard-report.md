@@ -1,8 +1,14 @@
 # Guard report — 001 transform-page-point
 
-**NO-PASS / awaiting controls test amendment.** The approved Reorder amendment is complete. Feature runtime matches all 29 strict public React Motion 13.2.0 cases, and the supplementary controls comparison now matches too. Two existing controls assertions conflict with that React behavior and are outside the approved test scope. The full browser gate remains required.
+**NO-PASS — user-requested repeated-start RED reproduced; runtime direction under review.** The two other controls tests pass. Repeated identical drags drift in both Svelte and public React Motion13.2.0. No runtime fix or upstream submission has been made.
 
-Reviewed source snapshot: `0da2303`, 2026-09-08. Worktree: `/Users/jasonkummerl/Github/svelte-motion-transform-page-point`, branch `feat/motion-config-transform-page-point`. No push, PR, merge or plan closure.
+Latest test snapshot:`6c6781b`; production snapshot:`0da2303`. Worktree:`/Users/jasonkummerl/Github/svelte-motion-transform-page-point`. Branch:`feat/motion-config-transform-page-point`.
+
+## Current red-first gate
+
+Guard independently ran the controls file:2passed,1failed in6.2s. The regression asserts each snap centers at the pointer and repeated real drags finish consistently within2px; second snap misses by50px. Positions after three identical drags:(750,427),(800,377),(850,327). Test captures all positions and preserves real lifecycle assertions. The first and tiny-nudge tests and shared helpers are byte-identical todf11fcc.
+
+See controls-red-first-guard.log and controls-repeat-red-input-probe.json. The matching public React probe uses the same three inputs, verifies each button hit, and produces exactly identical boxes. Source has not changed since the previously verified runtime below. The previous acceptance of repeated drift is superseded by the user's red-first bug report.
 
 ## Verified changes
 
@@ -29,22 +35,16 @@ Commands use pinned pnpm11.24.0 through `npm exec --yes --package=pnpm@11.24.0 -
 | Docs metadata coverage | **5/5 pass** | `/tmp/transform-page-point-round3-seo.log` |
 | Docs typecheck | Same **6 baseline errors / 13 warnings**; exact error file/location/diagnostic comparison unchanged | `/tmp/transform-page-point-round3-docs-check.log`, earlier baseline comparison in `resume-environment.md` |
 | Trunk formatting / lint | **Pass / no new issues**; one existing lint issue | `/tmp/transform-page-point-round3-trunk-fmt.log`, `/tmp/transform-page-point-round3-trunk-check.log` |
-| Full browser suite | **Pending**: 450 tests; gate retained | Existing controls tests require the proposed scope amendment before expectations can match React |
-| Diff hygiene / scope | Source snapshot clean; scope restored; final artifact hygiene checked before commit | No changes to excluded projection/dependencies/workflows/controls route/tests; original intel edit preserved |
+| Full browser suite | **Pending**: 450 tests; gate retained | Repeated-start regression now deliberately RED; full gate remains required after the chosen correction |
+| Diff hygiene / scope | Source snapshot clean; scope restored; final artifact hygiene checked before commit | No changes to excluded projection/dependencies/workflows/controls route; approved controls test edits captured separately; original intel edit preserved |
 
 The six docs baseline errors are in unchanged PostHog, keyframes/Wildcard, and transform-template/Default files. They are not feature errors and have not been relabeled as a passing docs check. Generated unrelated animated-tabs class ordering was inspected and restored.
 
-## Remaining decision
 
-See [proposed controls test amendment](proposed-controls-test-amendment.md). Permit only the two failing tests in `e2e/drag/controls.spec.ts` and their necessary helpers:
+## Remaining work
 
-1. The tiny two-pixel nudge does not start a React drag. It produces only the fractional snap alignment (-0.0078125px,0), conflicting with the existing minimum1px movement requirement. Preserve no-teleport/y checks and add real movement beyond the threshold.
-2. React's repeated snap with initial x100/y40 is not position-consistent; it shifts -50/-50 between the two recorded gestures. Assert the matched sequence and preconditions instead of the existing equality assertion. Do not adopt the former mismatching Svelte output.
+Resolve the intended bug correction against the earlier exact-React-parity instruction; the user is discussing offering the correction upstream. CONTRIBUTING welcomes bug fixes but GitHub currently shows issue/PR-creation restrictions. A local draft exists in upstream-report-draft.md; nothing has been submitted. RelatedPR3445 addresses the first snap, while this report reproduces repeated drift. No historical bisect has been performed.
 
-This is a concrete plan-scope decision, not permission to reduce verification. After approval, dispatch only the amendment, independently verify it, then run controls/gesture regressions and the full browser gate. Any full-suite failure still follows the repository's one-page-at-a-time review policy. In-app browser discovery currently returns no connected browsers; automated Playwright works, but no live in-app visual review is claimed.
+After the runtime direction is settled, route source changes through an executor and verify RED-to-GREEN, remaining parity cases, appropriate unit/build/docs gates, and the full browser suite. Full-suite failures require one-page-at-a-time T3 review with the user. The public scaled-board walkthrough remains requested for completion. T3 browser is available; the controls test page is currently open. Earlier Codex iab unavailability is not a current browser blocker.
 
-## Conduct and evidence
-
-Executor reports are preserved verbatim, including all three corrective reports and the Reorder report. Source snapshots were committed through the commit skill with hooks intact before guard review. Guard authored only plans/evidence/reports, ran checks and restored its own generated artifact churn. The feature branch has no upstream target; the original worktree's `.competitive-intel/state.json` edit remains intact. Earlier reports and failed traces remain in Git and the append-only guard log.
-
-**What flips this to PASS:** approve and implement the narrowly scoped controls test correction, then complete every remaining browser/final gate without weakening assertions or expanding runtime scope. No implementation executor remains running at this review handoff.
+No plan closure, push, PR or merge. Guard owns only evidence/plans/commits; executor owns source. Historical passing gates above apply to unchanged production0da2303, not to a completed overall feature gate.

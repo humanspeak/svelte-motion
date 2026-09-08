@@ -14,7 +14,7 @@ The payoff is visual: a tile stays under the cursor inside a scaled board and re
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | IN PROGRESS — approved controls tests; final browser verification |
+| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | IN PROGRESS — repeated-start RED confirmed; upstream bug discussion |
 
 Status: TODO / IN PROGRESS / DONE / BLOCKED (reason) / REJECTED (reason).
 
