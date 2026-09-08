@@ -23,6 +23,8 @@
 
 > Revision 2026-09-08: Complete the same authorized snap integration correction inside original drag.ts scope by isolating projection-measure axis sampling with public Svelte untrack. Later measure callbacks can execute inside projection effects even after attach/update were untracked. Keep all tests and contracts unchanged; see repeated-initial-red-first.md. Reviewed source `88a811f0`.
 
+> Revision 2026-09-08: User approved “Yes, lets touch the test” after the T3 owned-child review. Add only the first test in e2e/animate-presence/owned-child.spec.ts: replace the fixed 120 ms opacity sample with a bounded wait for opacity below 0.95. Preserve original-node identity, no-clone, eventual removal and exit-completion assertions, the initial enter settle, every other test and all gates. No AnimatePresence runtime/demo scope. Reviewed baseline `b5a30a38`; see owned-child-test-amendment.md.
+
 ## Governing revision — 2026-09-08
 
 User direction: “I dont want to reuse if its not marked for reuse, we need to match react exactly”.
@@ -46,7 +48,7 @@ Source snapshot `13ec152` already implements the draft. Baseline excerpts below 
 - **Depends on:** none; PR #480 merged; baseline includes its boundary-release tests
 - **Category:** direction / enhancement
 - **Confidence:** HIGH that the feature is missing; ranking is product judgment
-- **Planned at:** `ebcaccc`, 2026-09-08 (approved controls test-only amendment; original source baseline `14046a5`)
+- **Planned at:** `b5a30a38`, 2026-09-08 (approved first owned-child opacity test amendment; original source baseline `14046a5`)
 - **Status:** IN PROGRESS — local snap bug corrected; 908 units, 18 targeted browser tests and all29 parity cases pass. Full browser review and final closeout remain.
 
 ## Why this matters
@@ -186,6 +188,8 @@ Only the following runtime files may change:
 - `src/lib/utils/drag.ts`, `src/lib/utils/pan.ts`
 
 Only the following test/demo paths may change or be added:
+
+- `e2e/animate-presence/owned-child.spec.ts` (user-approved amendment: first test only, bounded fade-progress wait; preserve behavioral assertions and all other tests)
 
 - `src/lib/utils/drag.spec.ts`, new `src/lib/utils/pan.spec.ts`
 - new `src/lib/components/MotionConfig.transformPagePoint.spec.ts`

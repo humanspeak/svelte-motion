@@ -75,3 +75,5 @@ User authorized the one-file controls test amendment and requested the example p
 2026-09-08: Snapshot `88a811f0` passes 908 units and 18 targeted browser tests, including unchanged repeated-start RED. Strict parity has one layout snapshot mismatch; full e2e stops at first owned-child opacity timing failure after 53 passes. T3 page reviewed; user decision pending per repository workflow. See current guard report.
 
 2026-09-08: Source `2f191d3b` completes the authorized snap fix and isolates projection bookkeeping reads. Independent guard: 908/908 units, 18/18 targeted browser tests, 29/29 strict React cases, root check and package build pass. Public docs pointer movement passes all four presets. Full-suite owned-child review remains pending; unchanged focused repeat passes 3/3. No further source edits or test weakening authorized by that repeat alone.
+
+2026-09-08: User approved the first owned-child timing test amendment. Resume bounded polling edit and full-browser verification. No runtime or other test scope expansion; no approval remains pending for this first test.
