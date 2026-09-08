@@ -527,6 +527,79 @@ describe('utils/drag', () => {
             // (40, 0), the exact scaled/scrolled public parity regression.
             expect({ x: x.get(), y: y.get() }).toEqual({ x: -90, y: -50 })
         })
+
+        it('matches repeated controlled snap with authored initial axis values', async () => {
+            const el = document.createElement('div')
+            el.style.transform = 'matrix(1, 0, 0, 1, 100, 40)'
+            document.body.appendChild(el)
+            const node = registerStubNode(el, { x: 100, y: 40 }) as ReturnType<
+                typeof registerStubNode
+            > & {
+                projection?: {
+                    layout: {
+                        layoutBox: {
+                            x: { min: number; max: number }
+                            y: { min: number; max: number }
+                        }
+                    }
+                }
+            }
+            node.projection = {
+                layout: {
+                    layoutBox: {
+                        x: { min: 700, max: 780 },
+                        y: { min: 477, max: 557 }
+                    }
+                }
+            }
+            node.render.mockImplementation(() => {
+                el.style.transform = `matrix(1, 0, 0, 1, ${String(node.latestValues.x)}, ${String(node.latestValues.y)})`
+            })
+            const controls = createDragControls()
+            const cleanup = attachDrag(el, {
+                axis: true,
+                controls,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                baselineSources: { initial: { x: 100, y: 40 } }
+            })
+
+            const dragFromHandle = async (pointerId: number) => {
+                controls.start(
+                    new PointerEvent('pointerdown', {
+                        clientX: 640,
+                        clientY: 417,
+                        pointerId
+                    }),
+                    { snapToCursor: true }
+                )
+                window.dispatchEvent(
+                    new PointerEvent('pointermove', {
+                        clientX: 690,
+                        clientY: 467,
+                        pointerId
+                    })
+                )
+                await flushFrame()
+                window.dispatchEvent(
+                    new PointerEvent('pointerup', {
+                        clientX: 690,
+                        clientY: 467,
+                        pointerId
+                    })
+                )
+                await flushFrame()
+            }
+
+            await dragFromHandle(90)
+            expect(node.latestValues).toMatchObject({ x: 50, y: -10 })
+
+            await dragFromHandle(91)
+            expect(node.latestValues).toMatchObject({ x: 0, y: -60 })
+
+            cleanup()
+            el.remove()
+        })
     })
 
     it('attachDrag: attaches pointerdown and animates during move', async () => {
@@ -767,7 +840,12 @@ describe('utils/drag', () => {
             second.dispatchEvent(
                 new PointerEvent('pointerdown', { clientX: 5, clientY: 5, pointerId: 9 })
             )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 10, clientY: 5, pointerId: 9 })
+            )
+            await flushFrame()
             expect(onStart).not.toHaveBeenCalled()
+            expect(isDragActive()).toBe(true)
 
             // …and once the first session ends, the second element can drag.
             window.dispatchEvent(

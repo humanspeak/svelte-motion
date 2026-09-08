@@ -340,50 +340,6 @@ describe('_MotionContainer', () => {
         expect(await latestValuesOf(el)).toMatchObject({ opacity: 0.9 })
     })
 
-    it('forwards replaced drag callback props to the existing VisualElement', async () => {
-        const firstStart = vi.fn()
-        const firstMove = vi.fn()
-        const firstEnd = vi.fn()
-        const result = render(MotionContainer as unknown as any, {
-            props: {
-                tag: 'div',
-                drag: true,
-                onDragStart: firstStart,
-                onDrag: firstMove,
-                onDragEnd: firstEnd
-            }
-        })
-
-        await flushTimers()
-        const el = result.container.firstElementChild as HTMLElement
-        const { visualElementStore } = await import('motion-dom')
-        const visualElement = visualElementStore.get(el)
-        expect(visualElement?.props).toMatchObject({
-            onDragStart: firstStart,
-            onDrag: firstMove,
-            onDragEnd: firstEnd
-        })
-
-        const nextStart = vi.fn()
-        const nextMove = vi.fn()
-        const nextEnd = vi.fn()
-        await result.rerender({
-            tag: 'div',
-            drag: true,
-            onDragStart: nextStart,
-            onDrag: nextMove,
-            onDragEnd: nextEnd
-        })
-        await flushTimers()
-
-        expect(visualElementStore.get(el)).toBe(visualElement)
-        expect(visualElement?.props).toMatchObject({
-            onDragStart: nextStart,
-            onDrag: nextMove,
-            onDragEnd: nextEnd
-        })
-    })
-
     it('subscribes animate controls and starts resolved variants', async () => {
         // Controls drive the VisualElement now (plan 002 Step 7), so behaviour is
         // asserted on the values the node holds rather than on call args to the

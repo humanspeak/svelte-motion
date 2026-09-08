@@ -190,4 +190,94 @@ describe('MotionConfig.transformPagePoint', () => {
             })
         )
     })
+
+    it('forwards replacement drag callbacks through the same live VisualElement session', async () => {
+        const firstStart = vi.fn()
+        const firstMove = vi.fn()
+        const firstEnd = vi.fn()
+        const result = render(TransformPagePointHarness, {
+            props: {
+                dragEnabled: true,
+                onDragStart: firstStart,
+                onDrag: firstMove,
+                onDragEnd: firstEnd
+            }
+        })
+        await sleep(80)
+        const element = result.getByTestId('motion-target')
+        const visualElement = visualElementStore.get(element)!
+
+        element.dispatchEvent(
+            new PointerEvent('pointerdown', {
+                clientX: 10,
+                clientY: 10,
+                pointerId: 20,
+                pointerType: 'mouse',
+                isPrimary: true,
+                button: 0,
+                buttons: 1
+            })
+        )
+        window.dispatchEvent(
+            new PointerEvent('pointermove', {
+                clientX: 20,
+                clientY: 10,
+                pointerId: 20,
+                pointerType: 'mouse',
+                isPrimary: true,
+                buttons: 1
+            })
+        )
+        await sleep(20)
+        expect(firstStart).toHaveBeenCalledTimes(1)
+        expect(firstMove).toHaveBeenCalled()
+        const firstMoveCount = firstMove.mock.calls.length
+
+        const nextStart = vi.fn()
+        const nextMove = vi.fn()
+        const nextEnd = vi.fn()
+        await result.rerender({
+            dragEnabled: true,
+            onDragStart: nextStart,
+            onDrag: nextMove,
+            onDragEnd: nextEnd
+        })
+        await sleep(20)
+
+        expect(result.getByTestId('motion-target')).toBe(element)
+        expect(visualElementStore.get(element)).toBe(visualElement)
+        expect(visualElement.getProps()).toMatchObject({
+            onDragStart: nextStart,
+            onDrag: nextMove,
+            onDragEnd: nextEnd
+        })
+
+        window.dispatchEvent(
+            new PointerEvent('pointermove', {
+                clientX: 30,
+                clientY: 10,
+                pointerId: 20,
+                pointerType: 'mouse',
+                isPrimary: true,
+                buttons: 1
+            })
+        )
+        await sleep(20)
+        window.dispatchEvent(
+            new PointerEvent('pointerup', {
+                clientX: 30,
+                clientY: 10,
+                pointerId: 20,
+                pointerType: 'mouse',
+                isPrimary: true
+            })
+        )
+        await sleep(20)
+
+        expect(firstMove).toHaveBeenCalledTimes(firstMoveCount)
+        expect(firstEnd).not.toHaveBeenCalled()
+        expect(nextStart).not.toHaveBeenCalled()
+        expect(nextMove).toHaveBeenCalled()
+        expect(nextEnd).toHaveBeenCalledTimes(1)
+    })
 })

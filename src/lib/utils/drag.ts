@@ -26,10 +26,7 @@ import { pwLog } from '$lib/utils/log'
  */
 import { isDomElement } from '$lib/utils/dom'
 import { createDragInertiaOptions, startAxisRelease } from '$lib/utils/dragInertia'
-import {
-    applyConstraints as applyFloatConstraints,
-    parseMatrixTranslate
-} from '$lib/utils/dragMath'
+import { applyConstraints as applyFloatConstraints } from '$lib/utils/dragMath'
 import { deriveBoundaryPhysics } from '$lib/utils/dragParams'
 import { attachPan, type AttachPanCleanup } from '$lib/utils/pan'
 import {
@@ -997,11 +994,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         const applyXAxis = axis === true || axis === 'x'
         const applyYAxis = axis === true || axis === 'y'
         if (pendingSnapToCursor) {
-            const rendered = parseMatrixTranslate(getComputedStyle(el).transform)
-            const base = parseMatrixTranslate(opts.getBaseTransform?.() ?? '')
-            if (applyXAxis) applied.x = rendered.tx - base.tx
-            if (applyYAxis) applied.y = rendered.ty - base.ty
-
             const projectionNode = getNode() as unknown as {
                 projection?: {
                     layout?: {
@@ -1020,6 +1012,13 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             const centerY = layoutBox
                 ? (layoutBox.y.min + layoutBox.y.max) / 2
                 : (rect?.top ?? 0) + (rect?.height ?? 0) / 2
+            // `applied` was already derived above from the current axis value
+            // minus its authored baseline. Upstream adds the raw-point/layout
+            // delta to the current TOTAL axis value; adding that same delta to
+            // our relative value is equivalent. Re-seeding from the rendered
+            // matrix here would add the authored baseline a second time on
+            // every controlled start (for example initial x/y values).
+            //
             // Upstream intentionally crosses these domains at this boundary:
             // snap receives extractEventInfo(event).point (the raw PAGE point),
             // while the projection layout box has already consumed

@@ -2,13 +2,16 @@
     import MotionConfig from '$lib/components/MotionConfig.svelte'
     import { getMotionConfig } from '$lib/components/motionConfig.context.js'
     import MotionContainer from '$lib/html/_MotionContainer.svelte'
-    import type { MotionTransformPoint } from '$lib/types.js'
+    import type { DragInfo, MotionTransformPoint } from '$lib/types.js'
 
     // eslint-disable-next-line svelte/no-unused-props -- this harness must test omitted versus explicitly undefined props
     let props: {
         parentTransformPagePoint?: MotionTransformPoint
         childTransformPagePoint?: MotionTransformPoint
         dragEnabled?: boolean
+        onDragStart?: (event: PointerEvent, info: DragInfo) => void
+        onDrag?: (event: PointerEvent, info: DragInfo) => void
+        onDragEnd?: (event: PointerEvent, info: DragInfo) => void
     } = $props()
 
     const hasChildTransformPagePoint = $derived(
@@ -25,6 +28,9 @@
         data-testid="motion-target"
         drag={props.dragEnabled ? 'x' : false}
         dragMomentum={false}
+        onDragStart={props.onDragStart}
+        onDrag={props.onDrag}
+        onDragEnd={props.onDragEnd}
     />
 {/snippet}
 
