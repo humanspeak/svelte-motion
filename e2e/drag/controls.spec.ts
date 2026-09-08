@@ -141,7 +141,9 @@ test.describe('drag/controls', () => {
         await expect(el).not.toHaveAttribute('data-svelte-motion-drag-active', 'true')
     })
 
-    test('snapToCursor is consistent with initial coordinates', async ({ page }) => {
+    test('snapToCursor does not creep across repeated drags with initial coordinates', async ({
+        page
+    }) => {
         await page.setViewportSize({ width: 1280, height: 720 })
         await page.goto('/tests/drag/controls?@isPlaywright=true')
         const el = page.getByTestId('drag-controls-initial')
@@ -169,46 +171,116 @@ test.describe('drag/controls', () => {
         expect(initialTranslation).toEqual({ x: 100, y: 40 })
         await installControlObservers(handle, el)
 
-        const dragToHandle = async (expectedBefore: { x: number; y: number }) => {
+        const pointerStart = { x: 640, y: 417 }
+        const pointerEnd = { x: 790, y: 467 }
+        const sessions: Array<{
+            before: NonNullable<Awaited<ReturnType<Locator['boundingBox']>>>
+            handle: NonNullable<Awaited<ReturnType<Locator['boundingBox']>>>
+            pointerDown: PointerDownSnapshot
+            snapped: NonNullable<Awaited<ReturnType<Locator['boundingBox']>>>
+            active: NonNullable<Awaited<ReturnType<Locator['boundingBox']>>>
+            end: NonNullable<Awaited<ReturnType<Locator['boundingBox']>>>
+        }> = []
+
+        const dragToHandle = async () => {
             const before = await el.boundingBox()
             const h = await handle.boundingBox()
             if (!before) throw new Error('no before')
             if (!h) throw new Error('no h')
-            expect(before.x).toBeCloseTo(expectedBefore.x, 0)
-            expect(before.y).toBeCloseTo(expectedBefore.y, 0)
-            expect(h).toEqual(bootHandle)
             const start = { x: h.x + h.width / 2, y: h.y + h.height / 2 }
-            expect(start).toEqual({ x: 640, y: 417 })
             await page.mouse.move(start.x, start.y)
             await page.mouse.down()
-            expect(await readPointerDown(handle)).toEqual({
-                clientX: 640,
-                clientY: 417,
+            const pointerDown = await readPointerDown(handle)
+            const snapped = await el.boundingBox()
+            if (!snapped) throw new Error('no snapped')
+            await page.mouse.move(pointerEnd.x, pointerEnd.y, { steps: 5 })
+            await page.waitForTimeout(50)
+            await expect(el).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+            const active = await el.boundingBox()
+            if (!active) throw new Error('no active')
+            await page.mouse.up()
+            await page.waitForTimeout(100)
+            await expect(el).not.toHaveAttribute('data-svelte-motion-drag-active', 'true')
+            const end = await el.boundingBox()
+            if (!end) throw new Error('no end')
+            sessions.push({ before, handle: h, pointerDown, snapped, active, end })
+        }
+
+        await dragToHandle()
+        await dragToHandle()
+        await dragToHandle()
+
+        const positions = sessions.map(({ before, snapped, active, end }) => ({
+            before: { x: before.x, y: before.y },
+            snapped: { x: snapped.x, y: snapped.y },
+            active: { x: active.x, y: active.y },
+            end: { x: end.x, y: end.y }
+        }))
+        const positionReport = `actual repeated drag positions: ${JSON.stringify(positions)}`
+
+        expect(sessions[0].before).toEqual(boot)
+        for (const [index, session] of sessions.entries()) {
+            expect(session.handle).toEqual(bootHandle)
+            expect(session.pointerDown).toEqual({
+                clientX: pointerStart.x,
+                clientY: pointerStart.y,
                 pointerType: 'mouse',
                 isPrimary: true,
                 button: 0,
                 buttons: 1
             })
-            await page.mouse.move(690, 467, { steps: 5 })
-            await page.waitForTimeout(50)
-            await expect(el).toHaveAttribute('data-svelte-motion-drag-active', 'true')
-            const active = await el.boundingBox()
-            await page.mouse.up()
-            await page.waitForTimeout(100)
-            await expect(el).not.toHaveAttribute('data-svelte-motion-drag-active', 'true')
-            if (!active) throw new Error('no active')
-            return active
+            expect({
+                x: session.handle.x + session.handle.width / 2,
+                y: session.handle.y + session.handle.height / 2
+            }).toEqual({
+                x: session.pointerDown.clientX,
+                y: session.pointerDown.clientY
+            })
+            expect(
+                Math.abs(
+                    session.snapped.x + session.snapped.width / 2 - session.pointerDown.clientX
+                ),
+                positionReport
+            ).toBeLessThanOrEqual(2)
+            expect(
+                Math.abs(
+                    session.snapped.y + session.snapped.height / 2 - session.pointerDown.clientY
+                ),
+                positionReport
+            ).toBeLessThanOrEqual(2)
+            expect(
+                Math.abs(session.end.x + session.end.width / 2 - pointerEnd.x),
+                positionReport
+            ).toBeLessThanOrEqual(2)
+            expect(
+                Math.abs(session.end.y + session.end.height / 2 - pointerEnd.y),
+                positionReport
+            ).toBeLessThanOrEqual(2)
+            expect(Math.abs(session.active.x - session.end.x), positionReport).toBeLessThanOrEqual(
+                2
+            )
+            expect(Math.abs(session.active.y - session.end.y), positionReport).toBeLessThanOrEqual(
+                2
+            )
+            if (index > 0) {
+                expect(
+                    Math.abs(session.before.x - sessions[index - 1].end.x),
+                    positionReport
+                ).toBeLessThanOrEqual(2)
+                expect(
+                    Math.abs(session.before.y - sessions[index - 1].end.y),
+                    positionReport
+                ).toBeLessThanOrEqual(2)
+                expect(
+                    Math.abs(session.end.x - sessions[0].end.x),
+                    positionReport
+                ).toBeLessThanOrEqual(2)
+                expect(
+                    Math.abs(session.end.y - sessions[0].end.y),
+                    positionReport
+                ).toBeLessThanOrEqual(2)
+            }
         }
-
-        const first = await dragToHandle({ x: 700, y: 477 })
-        const second = await dragToHandle({ x: 650, y: 427 })
-
-        expect(first.x).toBeCloseTo(650, 0)
-        expect(first.y).toBeCloseTo(427, 0)
-        expect(second.x).toBeCloseTo(600, 0)
-        expect(second.y).toBeCloseTo(377, 0)
-        expect(second.x - first.x).toBeCloseTo(-50, 0)
-        expect(second.y - first.y).toBeCloseTo(-50, 0)
-        expect(await el.getAttribute('data-playwright-drag-start-count')).toBe('2')
+        expect(await el.getAttribute('data-playwright-drag-start-count')).toBe('3')
     })
 })
