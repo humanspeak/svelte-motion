@@ -1,6 +1,6 @@
 # Proposed coordinate-contract amendment — 2026-09-08
 
-**SUPERSEDED / NOT APPROVED.** The user selected exact React behavior and reuse only through APIs intended for reuse. The custom correction proposed below is historical and must not be implemented as an approved contract. See the [governing plan revision](001-transform-page-point.md#governing-revision--2026-09-08-paused-for-review).
+**SUPERSEDED / NOT APPROVED.** The user selected exact React behavior and reuse only through APIs intended for reuse. The custom correction proposed below is historical and must not be implemented as an approved contract. See the [governing plan revision](001-transform-page-point.md#governing-revision--2026-09-08).
 
 Evidence correction: the direct `PanSession` probe passed `element`, enabling scroll tracking that React's ordinary `PanGesture` wrapper does not enable. It does not prove a React `onPan` defect. Snap remains a source-level concern until matched public React/Svelte fixtures establish observable behavior. Implementation remains paused for review.
 

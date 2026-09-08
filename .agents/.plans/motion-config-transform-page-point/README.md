@@ -14,7 +14,7 @@ The payoff is visual: a tile stays under the cursor inside a scaled board and re
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | PAUSED FOR REVIEW — exact React parity; reference contract pending |
+| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | IN PROGRESS — resumed dispatch; public React reference gate |
 
 Status: TODO / IN PROGRESS / DONE / BLOCKED (reason) / REJECTED (reason).
 
@@ -44,4 +44,8 @@ Isolated worktree: `/Users/jasonkummerl/Github/svelte-motion-transform-page-poin
 
 ## Guard checkpoint — 2026-09-08
 
-Implementation snapshot `13ec152` is preserved on `feat/motion-config-transform-page-point`. **NO-PASS / PAUSED FOR REVIEW:** the user selected exact observable React behavior and public APIs intended for reuse. The [custom correction proposal](proposed-amendment.md) is superseded, unapproved. The direct upstream class probe enabled scroll tracking omitted by React’s ordinary pan wrapper, so it does not establish a React pan bug. See the [governing revision](001-transform-page-point.md#governing-revision--2026-09-08-paused-for-review); matched reference fixtures and reconciled execution steps are pending. Guard reproduced 903/903 unit tests, successful formatting/lint/Svelte commit gates and app build/package validation. Targeted browser run: 9 passed, 5 failed (nonuniform drag, resize/bounds, layout-slot compensation, pan control visibility, page scrolling). Full browser and changed-docs final gates remain unrun. See [guard report](001-transform-page-point.guard-report.md), [coordinate contract](coordinate-contract.md), and the [verbatim executor report](executor-report.md). No push, PR, or batch closure.
+Implementation snapshot `13ec152` is preserved on `feat/motion-config-transform-page-point`. **NO-PASS / PAUSED FOR REVIEW:** the user selected exact observable React behavior and public APIs intended for reuse. The [custom correction proposal](proposed-amendment.md) is superseded, unapproved. The direct upstream class probe enabled scroll tracking omitted by React’s ordinary pan wrapper, so it does not establish a React pan bug. See the [governing revision](001-transform-page-point.md#governing-revision--2026-09-08); matched reference fixtures and reconciled execution steps are pending. Guard reproduced 903/903 unit tests, successful formatting/lint/Svelte commit gates and app build/package validation. Targeted browser run: 9 passed, 5 failed (nonuniform drag, resize/bounds, layout-slot compensation, pan control visibility, page scrolling). Full browser and changed-docs final gates remain unrun. See [guard report](001-transform-page-point.guard-report.md), [coordinate contract](coordinate-contract.md), and the [verbatim executor report](executor-report.md). No push, PR, or batch closure.
+
+## Dispatch resumed — 2026-09-08
+
+User authorized “Go ahead and $dispatch”. The pause is lifted. Plan revision at `5248e45` supplies resumed Steps A–E: prepare public React fixtures, guard verifies reference evidence, executor corrects Svelte behavior, then complete all original gates. Previous NO-PASS evidence remains; no implementation is endorsed by this status change.

@@ -1,26 +1,28 @@
 # Plan 001: Add MotionConfig coordinate correction for drag and pan
 
-> Follow the steps in order, including the failing regression and coordinate-characterization gate. Do not implement a pointer-only shortcut. Stop on the conditions below instead of expanding scope. Update this batch's README status when finished.
+> Follow the resumed steps in order. First prepare the public React reference fixtures for guard verification; then implement from the recorded parity evidence. Stop on the conditions below instead of expanding scope. Update this batch's README status when finished.
+>
+> Revision 2026-09-08: The user said “Go ahead and $dispatch”, lifting the review pause. Resume from reviewed source snapshot `13ec152`, current plan tip `5248e45`; scoped drift from that tip is empty. React parity and public intended-for-reuse APIs govern. Dispatch reference preparation first, guard runs it, then dispatch implementation. The original red proof remains valid; no dependency or shipped runtime scope expansion.
 >
 > Revision 2026-09-08: Execute in the isolated `feat/motion-config-transform-page-point` worktree at main `14046a5` (v1.2.0, includes merged PR #480). Compared the complete scoped source diff against `fcf6452`: no runtime/docs anchor drift. Operator prepares dependencies and runs browser verification because the Codex companion sandbox cannot install, launch browsers, write `.agents/**`, or commit. Executor returns coordinate-contract evidence in its report for guard to record; it never edits this plan. All red-first and characterization gates remain mandatory.
 >
-> **Drift check:** `git diff --stat 14046a5..HEAD -- src/lib/types.ts src/lib/index.ts src/lib/components/MotionConfig.svelte src/lib/components/motionConfig.context.ts src/lib/html/_MotionContainer.svelte src/lib/utils/drag.ts src/lib/utils/pan.ts src/lib/utils/motionDomProjection.ts docs/src/routes/docs/motion-config docs/src/lib/docsNav.ts docs/src/lib/examplesIndex.ts`
+> **Drift check:** `git diff --stat 5248e45..HEAD -- src/lib/types.ts src/lib/index.ts src/lib/components/MotionConfig.svelte src/lib/components/motionConfig.context.ts src/lib/html/_MotionContainer.svelte src/lib/utils/drag.ts src/lib/utils/pan.ts src/lib/utils/motionDomProjection.ts docs/src/routes/docs/motion-config docs/src/lib/docsNav.ts docs/src/lib/examplesIndex.ts`
 > Also compare existing test/docs exemplars below before editing them. New paths in Scope must not already contain an independent implementation. A changed file is a prompt to compare, not permission to overwrite it.
 
-## Governing revision — 2026-09-08, paused for review
+## Governing revision — 2026-09-08
 
 User direction: “I dont want to reuse if its not marked for reuse, we need to match react exactly”.
 
-This revision supersedes conflicting behavior requirements below and the unapproved [proposed amendment](proposed-amendment.md). **Implementation remains paused for review.** Recording this direction does not authorize restarting dispatch.
+This revision supersedes conflicting behavior requirements below and the unapproved [proposed amendment](proposed-amendment.md). The user subsequently authorized dispatch. Resume through the reference gate below; do not implement unverified semantic choices.
 
 - Match observable behavior through the public React Motion 13.2.0 components for the scoped pan/drag cases. Do not substitute mathematically preferred scroll, snap, history, velocity, or callback-capture behavior, even when upstream behavior appears surprising.
 - Reuse only APIs intended for public reuse. `PanSession` is marked `@internal` and is not a public package export. Do not deep-import it, patch package exports, extract private classes from feature bundles, or treat this direction as permission to vendor its implementation. Internal source is a behavioral reference; Svelte adapters must use supported public primitives and reproduce React behavior.
 - Correct the reference evidence: React `PanGesture` constructs its session with `transformPagePoint` and `contextWindow`, without `element`. Our `attachPan` passes `element`, which enables optional scroll tracking. The guard's direct class probe also passed `element`; it does not establish ordinary React `onPan` behavior. Characterize React drag separately through its actual adapter.
-- Before implementation resumes, prepare and review a pinned React reference fixture using public components, with matching Svelte inputs, DOM geometry, scroll positions, event timing, and config. Keep any reference environment isolated from shipped Svelte dependencies. Record callback sequences, point/delta/offset/velocity, rendered positions, snap, cancellation, config replacement and stable-closure changes. Assert actual scroll and layout preconditions. Private-class probes may supplement this evidence, never replace it.
+- Before runtime edits, prepare a pinned React reference fixture for guard to run and review using public components, with matching Svelte inputs, DOM geometry, scroll positions, event timing, and config. Keep any reference environment isolated from shipped Svelte dependencies. Record callback sequences, point/delta/offset/velocity, rendered positions, snap, cancellation, config replacement and stable-closure changes. Assert actual scroll and layout preconditions. Private-class probes may supplement this evidence, never replace it.
 - Earlier instructions to preserve every existing no-config convention or impose a particular raw-history/scroll policy are not authority to diverge from React. Identify existing mismatches and their compatibility impact explicitly before changing them. The earlier element-wide callback snapshot policy also requires comparison with React's actual adapter lifetimes.
 - Keep the current file scope and every verification gate. Do not weaken assertions to accommodate the draft. Revise behavior expectations only from matched React evidence, retaining the previous expectations and rationale in the guard record. Any required scope expansion needs review.
 
-Source snapshot `13ec152` already implements the draft. The excerpts and numbered steps below describe the original `14046a5` baseline and are retained for review; they are **not a ready-to-dispatch revised execution sequence**. Preserve completed red-first evidence instead of requiring the fixed regression to fail again. Resume preparation must reconcile those steps and done criteria with the reference results before execution. Five targeted browser failures and remaining verification gates are unresolved.
+Source snapshot `13ec152` already implements the draft. Baseline excerpts below describe `14046a5` and are historical recon, not a missing-feature STOP trigger. The resumed Steps and Done criteria are current authority. Preserve completed red-first evidence. Five targeted browser failures and remaining verification gates are unresolved.
 
 ## Status
 
@@ -30,8 +32,8 @@ Source snapshot `13ec152` already implements the draft. The excerpts and numbere
 - **Depends on:** none; PR #480 merged; baseline includes its boundary-release tests
 - **Category:** direction / enhancement
 - **Confidence:** HIGH that the feature is missing; ranking is product judgment
-- **Planned at:** `af75ef6`, 2026-09-08 (policy revision; original source baseline `14046a5`)
-- **Status:** PAUSED FOR REVIEW — React parity selected; reference contract and revised execution steps pending; snapshot `13ec152` has unresolved browser failures
+- **Planned at:** `5248e45`, 2026-09-08 (dispatch resume; original source baseline `14046a5`)
+- **Status:** IN PROGRESS — resumed dispatch; public React reference gate first; snapshot `13ec152` has unresolved browser failures
 
 ## Why this matters
 
@@ -79,7 +81,7 @@ lastPoint = { ...startPoint }
 history = [{ x: e.clientX, y: e.clientY, t: now() }]
 ```
 
-`onPointerMove` at line 1133 also reads `clientX/clientY`. `computeInfo` uses this history, and release inertia uses its velocity. Transforming only the DOM output or callbacks would leave release physics wrong. Preserve the current no-config behavior, including callback semantics; do not fix the separate cumulative-delta convention in this feature.
+`onPointerMove` at line 1133 also reads `clientX/clientY`. `computeInfo` uses this history, and release inertia uses its velocity. Transforming only the DOM output or callbacks would leave release physics wrong. Characterize this existing no-config behavior against React; change an in-scope mismatch only with recorded reference evidence, including the cumulative-delta convention.
 
 `resolveConstraints` at line 267 accepts an element or numeric limits. Element constraints use raw DOMRect differences:
 
@@ -153,9 +155,9 @@ Current public docs describe the hook, although the source context still labels 
 ```
 
 - Add Google-style documented `MotionTransformPoint = (point: { x: number; y: number }) => { x: number; y: number }` and optional `MotionConfigProps.transformPagePoint`.
-- Missing prop inherits; an explicit identity function overrides an ancestor. An undefined child override resumes inheritance. No new implicit global default or changed no-config coordinate behavior.
+- Missing prop inherits; an explicit identity function overrides an ancestor. An undefined child override resumes inheritance. No new implicit global default. No-config behavior is subject to the same React parity reference.
 - Uniform and nonuniform positive CSS parent scales are required. Plain affine translation in the mapping must cancel correctly when calculating deltas. Corrected callbacks and release velocity use corrected units.
-- Snapshot the selected callback at pointerdown, matching upstream PanSession; replacing the config function must not tear down the gesture and affects the next gesture. Geometry used by that live gesture must remain in its captured domain. A callback reading mutable state is a distinct case from replacing its reference; document the outcome of Step 2 before promising live zoom support.
+- Snapshot the selected callback at pointerdown, matching upstream PanSession; replacing the config function must not tear down the gesture and affects the next gesture. Verify geometry callback lifetime through the actual React adapter before choosing an element-wide capture policy. A callback reading mutable state is a distinct case from replacing its reference; document the outcome of Step 2 before promising live zoom support.
 - Element-ref constraints, numeric constraints, controlled start/snap-to-cursor, cancel, axis lock, re-grab, ref resize, and layout compensation must continue working in the supported domain.
 - No automatic detection of ancestor CSS transforms, `correctParentTransform`, `transformViewBoxPoint`, perspective/rotation box recovery, or new SVG drag API in this plan. A two-corner AABB mapping is not an arbitrary polygon transform.
 - Do not advertise complete scroll/live-zoom parity if Step 2 reveals unresolved upstream behavior. Stop with evidence rather than quietly narrowing these cases after implementation.
@@ -195,7 +197,9 @@ Documentation/discovery/release-note scope:
 - new `.changeset/motion-config-transform-page-point.md` (minor)
 - this plan, batch README, and `coordinate-contract.md` under this batch
 
-**Out of scope:** package versions/lockfiles, dependencies, workflow changes, projection implementation, animation engines, generated HTML components, Reorder algorithms, AnimatePresence, other MotionConfig options, helper exports mentioned above, `.competitive-intel/state.json`, archived plans. There is a pre-existing uncommitted intel-state change; preserve it. Do not ship edits in PR #480. If production projection changes are necessary, stop and revise the plan rather than expanding the whitelist yourself.
+**Isolated reference fixture scope:** executor may create test-only fixture and runner files under `/tmp/svelte-motion-react-parity-1320/`; guard owns dependency installation there. Use public `motion/react`, React and ReactDOM APIs. No source edits to other repositories, private imports, dependency patches, or references from shipped code to this temporary environment. Return fixture source, exact commands and evidence in the report for guard to preserve in planning artifacts. This is the isolated reference environment already required by the governing revision, not an application dependency change.
+
+**Out of scope:** package versions/lockfiles, application dependencies, workflow changes, projection implementation, animation engines, generated HTML components, Reorder algorithms, AnimatePresence, other MotionConfig options, helper exports mentioned above, `.competitive-intel/state.json`, archived plans. There is a pre-existing uncommitted intel-state change; preserve it. Do not ship edits in PR #480. If production projection changes are necessary, stop and revise the plan rather than expanding the whitelist yourself.
 
 ## Commands you will need
 
@@ -227,116 +231,65 @@ Create an isolated feature branch/worktree from the current base when execution 
 
 ## Steps
 
-### Step 1: Write a failing coordinate regression before API work
+### Step A: Prepare matched public React fixtures, without runtime changes
 
-In `src/lib/utils/drag.spec.ts`, follow its existing bound MotionValue test: create a DOM element, bind x to a MotionValue, attach an x drag, dispatch pointerdown at x=10 and move to x=30, then clean up. Use options in a separately inferred variable with `axis: 'x' as const`, the ordinary required fields, and a `transformPagePoint` callback multiplying x/y by 2. This structural variable is assignable before the optional field exists; do not use an unknown-property compile failure as the reproduction. Set momentum false. Correct bound x is 40, current bound x is 20.
+Read the current snapshot, guard report and corrected coordinate evidence. Preserve the original regression proof (expected 40, received 20; no-config control passed), measurement probes and five browser failures. Do not repeat the already-fixed red proof as a gate.
 
-Add a second case in the same describe with no callback that still expects 20. Use real primary pointer fields and the cleanup pattern already in the file; do not mock the coordinate transformation itself.
+Create a small isolated React 13.2.0 browser fixture and runner in the reference scope. Import public `motion/react` and React APIs only. Record exact installed versions. Exercise ordinary `motion.div` pan and drag separately, using a matched DOM structure and controlled event/frame timing. Expose raw callback records and rendered geometry for guard assertions; do not assert desired Svelte behavior as the React answer. A public Motion frame timestamp API, if intended for reuse, or browser clock control can support deterministic velocity observations. Avoid elapsed-wall-time velocity expectations.
 
-**Verify:** `pnpm exec vitest run src/lib/utils/drag.spec.ts -t 'transformPagePoint'` must fail specifically on expected 40/received 20, while the identity characterization passes. If it passes already or fails on setup/types, repair the reproduction or stop. Record exact failure in `coordinate-contract.md`. Do not commit a knowingly red intermediate state for release.
+Include no-config/identity, positive uniform and nonuniform transforms, affine translation, page scroll at start, actual page and overflow-ancestor scroll while held, callback-reference replacement, stable callback closure changes, thresholds, callback sequence/payloads, cancellation and teardown. Drag fixtures also need numeric/ref bounds, resize/re-grab, controls-start/snap with verified nonzero scroll, and real layout displacement while held. Use representative fixed geometry and event coordinates, and export them so the Svelte comparison uses identical inputs. Explicitly assert scroll, frame readiness and layout preconditions before interpreting results.
 
-### Step 2: Characterize upstream measurement primitives; defer integration cases
+Return a reference-preparation report and stop at this checkpoint. Guard installs isolated dependencies, runs the fixture, records results and reviews the matching conditions. This handoff is automatic within dispatch, not a new user permission gate. No production changes before the reference gate passes.
 
-Create `coordinate-contract.md` in this batch. Pin upstream evidence to the installed version or a verified matching upstream revision. Record raw input domains, corrected result domains, when the callback is captured, and every conversion point. **This step does not run a corrected Svelte drag before that implementation exists.** It probes the installed measurement primitives and reads the upstream input contract; the browser integration matrix runs in Step 6.
+### Step B: Reconcile the Svelte implementation against recorded React behavior
 
-Add a describe named `transformPagePoint coordinate characterization` in `src/lib/utils/motionDomProjection.spec.ts`. Use the installed `motion-dom` exports `measureViewportBox` and `measurePageBox`, a real DOM element with a stubbed `getBoundingClientRect`, and a minimal root scroll object matching the measurement function's argument. No React reference app, dependency install, external worktree write, or modification of the upstream checkout is required. If these exports are not callable in the installed version, stop rather than inventing a browser adapter.
+Guard passes the verified reference output into a fresh executor invocation. In existing whitelisted runtime and tests, correct observed mismatches. Use public supported primitives; do not import, export-patch, extract or vendor private PanSession. Reading source is permitted for understanding behavior.
 
-Use a DOMRect `(left=100, top=200, width=80, height=40)` and callback `({x,y}) => ({x:x/0.5,y:y/2})`. Verify viewport box x=[200,360], y=[100,120]. With root scroll offset x=10/y=30, verify page box x=[210,370], y=[130,150], proving scroll is added after mapping. A spy callback must receive the original viewport corners (100,200) and (180,240), not page-adjusted corners. Also check identity and affine-translation mappings. Exercise the adapter's existing no-transform scroll-invariance tests unchanged.
+Cover start/move/end/cancel, threshold, delta/offset/velocity, event timing, history retention, callback replacement and handler hot swapping. Match React's actual pan wrapper scroll configuration; do not infer drag behavior from pan. Remove custom history remapping or scroll correction where it diverges from the public reference. The element-wide captured callback policy and drag cumulative-delta convention must be evaluated against the reference, not preserved by assumption. Existing no-config mismatches within scope must be recorded and tested as compatibility changes; stop if resolving them requires out-of-scope files or algorithms.
 
-Read the verified upstream PanSession and drag-controls sources to record pointer extraction, snap-to-cursor and session callback capture, with the exact version/SHA and excerpts. The contract must distinguish callback replacement from a stable callback reading mutable state. Clearly label source-derived expectations separately from executed primitive-test observations.
+Wire inherited MotionConfig transformPagePoint through VisualElement and the existing gesture attach/update lifecycle. Preserve the single transform writer and upstream projection ownership. Correct pointer/constraints/snap/inertia behavior only as supported by the reference. Numeric bounds remain authored local values. Never double-correct projection deltas. Do not promise pointer pinning or a mathematically cleaner snap when the corresponding public React case behaves differently; record the actual result and its limit.
 
-The following integration cases are **pending**, not claimed green in this step: scaled drag, scrolled-start drag/ref constraints/snap-to-cursor, layout compensation, ref resize, active page/ancestor scroll, live scale through a captured closure, and callback replacement between sessions. Define their inputs and expectations here; Steps 4–6 implement and execute them. Do not create an untyped proxy implementation of the future feature merely to make these tests pass early.
+Add focused numerical tests for all changed functions, including deterministic pan velocity, and preserve the original red proof. For each remaining defect, show a failing parity assertion before fixing it when supported by the executor environment; guard runs browser red cases. Do not weaken existing assertions merely to pass the draft. A behavior expectation may change only with recorded matching React evidence and an explicit account of the previous expectation.
 
-**Verify:** `pnpm exec vitest run src/lib/utils/motionDomProjection.spec.ts -t 'transformPagePoint coordinate characterization'` passes the numerical assertions above. `pnpm exec vitest run src/lib/utils/drag.spec.ts -t 'transformPagePoint'` still fails only on the Step 1 expected 40/received 20 assertion. The report exists and identifies all pending integration checks. If the measured contract disagrees with the installed implementation, STOP and correct this plan before production changes.
+### Step C: Finish demos and browser integration
 
-### Step 3: Add the inherited API and container wiring
+Keep the two feature demo routes and index links. Diagnose the five reported failures using actual geometry/scroll/frame preconditions before runtime changes: nonuniform y error 164.73625946044922 px, resize boundary error 7.57611083984375 px, layout shift 30 px, pan-inherit control outside viewport, and page-scroll offset expected 80/received 60. The last expected value is provisional under the React reference. The current layout fixture uses CSS translate; test real layout displacement. The snap test must prove nonzero scroll survives any scrollIntoView call and check both axes.
 
-Add documented types/prop; mirror MotionConfig's existing getter pattern and add explicit type exports in `index.ts`. New component tests cover parent inheritance, child override, identity override, clearing override, and config updates without remount. Check the callback in the mounted VisualElement via `visualElementStore`, following the skipAnimations harness.
+Run matching React and Svelte scenarios for the Step A matrix. Compare callback sequences and numerical payloads and rendered geometry. Existing physical movement and constraint checks retain the 2-screen-pixel bound for cases in which the React fixture demonstrates it. Do not increase tolerance to conceal a mismatch. Reference-equivalent edge behavior must be documented and asserted explicitly.
 
-Add the optional transform fields to `AttachDragOptions`, `AttachPanOptions` and `PanSessionInternalOptions` in this step, before passing them from typed container calls. Runtime consumption is Steps 4–5. Add a getter/options update channel for pan so the latest config is read when a new session starts, without recreating the attachment.
+Run both targeted browser files, then all regression/full browser gates. For a full e2e failure, follow repository policy: open the related page in the in-app browser, explain intended/asserted/visible behavior, and obtain the user's behavior-versus-test decision before modifying it or advancing to the next failure. Targeted feature failures can be diagnosed and routed through the executor without that full-suite decision gate.
 
-Use an **element-scoped effective callback** in `_MotionContainer.svelte`: an active-session boolean plus the captured callback (the boolean distinguishes a captured undefined/identity behavior from no active session). At session start, capture the current inherited config before constraints or pointer history are measured. For the duration of the pointer session, `buildMotionNodeProps`, drag/pan inputs and any refreshed constraints use this effective callback. A config reference replacement is queued by keeping the raw inherited getter live; it becomes effective after the session ends and is selected by the next pointerdown. Do not overwrite the active snapshot through `updateOptions`.
+### Step D: Finish documentation and release metadata
 
-Provide internal start/end notifications on the attach options to maintain that coordinator, and invoke them on natural terminal events, cancellation, forced teardown, and interrupted/restarted sessions. They are internal plumbing, not new public Motion component callbacks. Start must run before first geometry reads; end must run after terminal payload computation and release physics capture. Handler hot-swapping must not change these lifecycle semantics. Existing drag-versus-pan exclusivity means one pointer session owns the element. Test that changing the config function mid-drag preserves the old effective function in the VisualElement and existing session, then updates both for the next gesture. This explicit Svelte policy prevents the input/measurement mismatch that forwarding the newest config directly would create. Document it as a session-consistency policy, not a claim of identical React rerender timing.
+Review existing feature docs, MotionConfig reference, reusable example, route metadata, index links and minor changeset against observed React semantics. Document actual callback input domains, capture/lifetime behavior, velocity, identity reset, numeric versus ref bounds and tested limitations. Remove claims that we fix an upstream inconsistency or provide custom raw-scroll/history behavior. Public examples use supported public imports and existing docs component/style conventions.
 
-Forward the effective callback into `buildMotionNodeProps`, `resolveDragOptions`, and pan attachment through the existing attach-versus-update split. No detach/re-attach on callback identity changes, and no callback values in DOM spread attributes. A captured function reading changing data remains callable per event/frame; do not confuse that with changing the captured function reference.
+Run catalog sync and generated mirrors; keep only feature-related changes. Verify actual SEO route count and the root README's scoped parity claims. No version bump or application dependency change. Preserve the known unrelated docs typecheck baseline and report it separately.
 
-**Verify:** `pnpm exec vitest run src/lib/components/MotionConfig.transformPagePoint.spec.ts -t "config API"` and `pnpm check` pass. Group inheritance/export/idle-VisualElement tests under `config API`; active-session integration cases are added and made green in Steps 4–6 when the lifecycle notifications actually run. The Step 1 movement assertion still fails until Step 4. Public TypeScript consumers can import the new types without an internal path.
+### Step E: Guard final verification
 
-### Step 4: Correct drag inputs, measurements, and release units together
-
-Consume the optional `AttachDragOptions` field added in Step 3 and implement the agreed callback input path. Seed and update pointer/history positions in corrected units once, then let existing offset, direction-lock, constraints, callbacks, bound values, and inertia consume them. Capture the transform for the active session; `updateOptions` must not silently replace that domain mid-drag. Preserve current behavior when the optional callback is absent.
-
-Extend `resolveConstraints` with an optional transform argument and transform both measured rectangles consistently before their differences are taken. Update all four call sites, including resize and re-grab paths. Keep numeric constraints unchanged. Correct pointer and measured center in `snapToCursor` consistently with Step 2. Forward the callback through the VisualElement so its own measurements are corrected; do not correct projection deltas again in `adjustOrigin`.
-
-Tests must check bound x/y values, transformed callback point/offset/velocity, nonuniform scaling, translated mapping, numeric limits, ref limits, ref resize, controlled start and snap-to-cursor. Reuse real MotionValues and clock control from the existing tests; exact release velocity belongs in deterministic unit tests, not elapsed-time browser assertions. Retain the existing drag callback delta convention.
-
-**Verify:** `pnpm exec vitest run src/lib/utils/drag.spec.ts src/lib/utils/motionDomProjection.spec.ts` passes, including Step 1 and the projection characterization. A changed inertia trajectory from unit correction is expected; no changes to the generator or boundary-release tests are allowed.
-
-### Step 5: Correct pan lifecycle and scroll bookkeeping
-
-Add `src/lib/utils/pan.spec.ts`. Follow real-frame setup and cleanup from `gestures.spec.ts` / `MotionConfig.skipAnimations.spec.ts`; flush Motion frame callbacks before asserting.
-
-Apply the session transform to start/move/up inputs once; cancel and teardown reuse the last valid corrected point. Compute distance threshold, delta, offset and velocity in the corrected domain. Preserve raw pointer positions separately where per-frame re-transformation or scroll bookkeeping needs them. Never mutate a corrected point by adding an uncorrected scroll delta. Implement and verify the scroll behavior derived from the upstream source in Step 2; preserve terminal-event idempotence and handler hot swapping. An unresolved source/observed mismatch is a STOP condition, not permission to omit a case.
-
-Test all callback payload fields, positive/nonuniform/translated mappings, start threshold, ordinary end, pointercancel, teardown once, ignored secondary pointers, handler replacement, callback-reference replacement between gestures, and scroll cases from the contract. Include no-config baseline cases.
-
-**Verify:** `pnpm exec vitest run src/lib/utils/pan.spec.ts src/lib/components/MotionConfig.transformPagePoint.spec.ts` and `pnpm exec playwright test e2e/motion/pan-authored-transforms.spec.ts --reporter=line` pass; no listener leaks or duplicate terminal callbacks.
-
-### Step 6: Build two demo pages and observable browser tests
-
-Create `/tests/transform-page-point/drag` and `/tests/transform-page-point/pan`, link both from the test index, and add an e2e file for each. Both pages expose ready state, local x/y, callback payloads, and stable test IDs. Use object-style APIs, Svelte 5 runes, and `touch-action: none`; no production-only instrumentation.
-
-Drag page: scaled board with presets 50%, 100%, 200%, and nonuniform scale; selectable numeric/ref bounds, momentum, and a controls-start handle. Keep changes to zoom outside a gesture unless Step 2 proved the live case. Have a layout-slot control reachable while the test holds a pointer, and a ref-resize control. Test physical card-center displacement against pointer displacement while unconstrained (within 2 px after frame/poll readiness), authored local movement, visual containment at both edges, second drag, snap-to-cursor, and scrolled-start cases. With `dragElastic=0`, box edges may differ by at most 2 screen px. Release tests poll eventual settling rather than demanding monotonic return.
-
-Pan page: a pan-only surface renders corrected offset into a follower and shows point/delta/velocity. Include nested config override/reset and a separate identity case. Tests verify local movement, inherited versus overridden mappings, reactivity between gestures, cancel/end cleanup, and the contract's scroll cases. Execute every integration case marked pending in Step 2, recording numerical outcomes; specifically test nonzero page scroll before snap-to-cursor, page and ancestor scrolling during a held pan, and a stable callback reading changing scale. If those cases require a projection implementation change or upstream semantic divergence, STOP with evidence and request a separate bounded decision rather than declaring parity. Do not coattach pan and drag; the container intentionally gives drag precedence.
-
-**Verify:** the targeted browser command in the command table passes, followed by `pnpm exec playwright test --reporter=line` for the existing drag/reorder/layout/pan regressions and full suite. Use the in-app Browser skill for visual review when available and leave the chosen page open if the operator requests it. If a full e2e run fails, follow repository policy: inspect one page, explain expected/asserted/visible behavior, and obtain the operator's behavior-versus-test decision before modifying it or advancing to the next failure.
-
-### Step 7: Publish docs and the reusable demo locally
-
-Add the public feature doc route, extend the MotionConfig reference, and add the example route and reusable `Default.svelte`. The demo is a compact zoomed-board interaction with a draggable tile, visible zoom presets, and measured bounds; user-facing copy describes dragging/zoom, not internal coordinate pipelines. Use `docs/src/lib/examples/drag-constraints/demos/Default.svelte` as the style exemplar (existing `--brut-*` tokens), and its example route's `ExampleV2`, `CodeReferenceV2`, `demoCodeSample`, and SEO/breadcrumb pattern. Keep the code sample self-contained.
-
-Document the callback's actual domains and function-capture semantics from `coordinate-contract.md`, identity reset, corrected velocity units, numeric versus ref bounds, and tested limitations. Link to the upstream config reference without claiming automatic transform helpers are exported here.
-
-Add docs navigation and example metadata. Run the existing catalog sync (`pnpm --filter docs examples-catalog:sync`), inspect generated changes, and retain only feature-related metadata. The SEO policy currently asserts 66 detail pages; derive the actual new total (normally 67), do not blindly increment a stale constant. Docs Vite plugins generate Markdown mirrors from source; do not hand-edit generated mirrors instead of the source pages. In README, update only directly related parity/config claims, including acknowledging the already-shipped reducedMotion/skipAnimations support. Leave unrelated stale counts/gaps to another task.
-
-Add a minor changeset describing the optional API; no version bump. The nightly intel process owns its state file, so do not edit it.
-
-**Verify:** root package build, docs check/build and metadata tests pass or demonstrate a pre-existing blocker with unchanged baseline evidence. Confirm the new doc and example routes and generated mirrors exist, and all displayed imports resolve from the public package.
-
-### Step 8: Run final gates and review scope
-
-Run root check, full unit suite, full Playwright suite, package build/validation, docs gates, then Trunk formatting/lint and diff hygiene. Formatting that changes relevant source requires rerunning affected gates. Preserve pre-existing unrelated working changes. Record exact commands/results and any blocked checks in `coordinate-contract.md` and the batch index; do not mark DONE with unresolved required behavior.
-
-**Verify:** every Done criterion below holds and the final diff contains only Scope paths.
+Guard snapshots the executor changes through the commit skill, reads the entire contribution diff and checks scope. Reproduce root check, focused/full unit tests, targeted/full browser tests, package validation, docs check/build/metadata, Trunk formatting/lint and diff hygiene using the existing command table. Record exact commands and outcomes in the coordinate contract and guard report. Do not mark DONE with missing parity evidence or unresolved required verification.
 
 ## Test plan / done criteria
 
-The feature extends existing drag/pan behavior, so red-first is required. No failing reproduction was executed during this planning audit; Step 1 specifies the expected failure and must prove it before implementation.
-
-- [ ] Step 1 demonstrated expected 40/received 20 before implementation, then passed.
-- [ ] `coordinate-contract.md` contains pinned upstream references and numerical outcomes for the measurement probes and all initially pending integration cases; no unresolved supported-case mismatch.
-- [ ] Public callback and MotionConfig types compile, context inheritance/identity reset work, and the VisualElement receives the callback.
-- [ ] Drag history, callbacks, ref measurements, snap-to-cursor and inertia share corrected units; numeric bounds remain unchanged.
-- [ ] Pan start/move/end/cancel, threshold, velocity and agreed scroll cases pass; callback updates never detach an active session.
-- [ ] Both new demo routes have passing e2e files and links from the test index.
-- [ ] Root check, full unit tests, full e2e, package validation, docs gates, `trunk fmt`, `trunk check`, and `git diff --check` meet the command-table expectations. Baseline blockers are reported, not relabeled as success.
-- [ ] New public docs, example page, reusable demo, metadata, mirrors and minor changeset exist.
-- [ ] Existing no-config drag/pan/reorder/layout tests remain green without loosened assertions.
-- [ ] Review `git diff --name-only` and `git diff --cached --name-only` against Scope; preserve the unrelated intel edit and exclude it from any commit.
-- [ ] Batch README status updated accurately; no push/PR without separate authorization.
+- [ ] Historical red-first proof is preserved and its regression/control remain green.
+- [ ] Pinned public React fixtures and matching Svelte scenarios establish numerical outcomes for the complete reference matrix; no private package reuse or unresolved in-scope behavior mismatch.
+- [ ] Public callback/config types compile; inheritance, identity reset and VisualElement propagation match the reference.
+- [ ] Drag point/delta/offset/velocity, measurements, numeric/ref bounds, snap, resize/re-grab and layout behavior match the reference, including no-config cases.
+- [ ] Pan callback sequence, threshold, point/delta/offset/velocity, history, scroll, handler/config changes, end/cancel and teardown match the reference, including deterministic velocity evidence and no-config cases.
+- [ ] Both new demo routes have passing e2e files and links from the test index; actual scroll/layout readiness is asserted.
+- [ ] Root check, full units, full e2e, package validation, docs gates, Trunk formatting/lint and diff hygiene meet the command-table expectations; demonstrated baseline blockers are reported separately.
+- [ ] Feature docs, reusable demo, metadata, mirrors and minor changeset accurately describe verified behavior.
+- [ ] Existing regressions pass without weakened assertions; any intentional in-scope compatibility correction has matched React evidence.
+- [ ] Full diff is in scope and excludes the unrelated intel edit; guard artifacts preserve evidence and reports.
+- [ ] Batch README status is accurate; no push or PR without authorization.
 
 ## STOP conditions
 
-- The missing API has already landed, or current source disagrees materially with these excerpts.
-- The red test cannot reproduce the coordinate mismatch as a runtime assertion.
-- The coordinate characterization requires a projection rewrite, undocumented scroll normalization, or a silent change to no-config semantics.
-- A callback-reference update changes geometry under an existing session in a different coordinate domain; do not ship mixed units.
-- Ref resize, controlled snapping, or slot compensation needs an out-of-scope runtime change.
-- SVG/rotated/perspective support or automatic helpers become necessary to satisfy the agreed scale-only examples; report the dependency rather than adding them.
-- A required verification fails twice after a reasonable targeted fix, or the full-e2e review workflow needs the operator's decision.
-- Baseline docs/build failures prevent verifying changed docs; report exact unchanged-file evidence and request a separate repair plan.
+- Independent unreviewed work conflicts with the snapshot or in-scope files materially drift after this resume revision.
+- Public React reference cannot be run or its preconditions are not established; report the environment issue for guard, without inventing runtime semantics.
+- Matching React requires private package reuse, production projection changes, another out-of-scope file/algorithm, or automatic SVG/rotation/perspective support.
+- Required verification fails repeatedly after the bounded fix-dispatch budget, or the full-e2e review workflow needs the user's decision.
+- Baseline docs/build problems prevent verifying changed docs; report exact unchanged-file evidence and the necessary separate repair.
 
 ## Maintenance notes
 

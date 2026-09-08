@@ -28,3 +28,12 @@ af75ef6 · user policy correction; source snapshot remains 13ec152
 - Corrected earlier evidence interpretation: React PanGesture omits element when creating PanSession; Svelte attachPan and the isolated guard probe pass it. Optional scroll tracking in that probe is not evidence of ordinary React onPan behavior. Prior numerical observations remain historical evidence for the explicitly configured class only.
 - Require matched public React/Svelte fixtures before reconciling prior history, capture, scroll, snap and no-config expectations. Existing file scope and verification gates remain. Original red proof is retained; draft source is not mistaken for unexpected baseline drift.
 - User's earlier “Keep paused for review” remains effective. No runtime/test/dependency edits, executor restart, new verification run, push, PR or closure. The five browser failures and remaining gates are unchanged; NO-PASS.
+
+## Checkpoint 4 — 2026-09-08 — PLAN AMENDED, DISPATCH RESUMED
+
+5248e45 · explicit user dispatch authorization; clean source tree
+
+- User lifted the review pause with “Go ahead and $dispatch”. Rebased drift check to current reviewed tip; scoped source drift is empty.
+- Replaced contradictory historical execution steps with a reference-first resumed sequence. Public React observable behavior and intended-for-reuse APIs remain mandatory. Original red proof and verification gates retained.
+- Isolated reference fixture scope implements the already-approved reference-environment requirement without changing shipped dependencies. Executor prepares fixture code; guard installs/runs and records evidence before a second implementation dispatch.
+- Current source snapshot remains NO-PASS. No runtime edits by guard; no push or PR.
