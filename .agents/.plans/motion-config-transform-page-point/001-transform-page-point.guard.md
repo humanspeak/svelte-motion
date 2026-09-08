@@ -113,3 +113,7 @@ ebcaccc · user-approved controls test amendment
 
 - User said “Go ahead” to the concrete controls proposal and requested the example page after completion. Approved only the two controls tests and necessary helpers in e2e/drag/controls.spec.ts. Re-stamped the reviewed baseline and updated status; no runtime or verification scope change.
 - Dispatch the bounded test update, verify controls and full browser gate, then open the scaled-board example and explain expected behavior. No second approval request for the same amendment.
+
+## Checkpoint 13 — PLAN AMENDED (2026-09-08)
+
+Snapshot40b5c11 captures completed controls test-only executor; no runtime changes. User then reported repeated initial upward drift and explicitly requested a red test first. Acceptance of cumulative (-50,-50) is held. Dispatch only a no-creep regression, reproduce RED on0da2303, compare public React and resolve any behavioral conflict before runtime changes. T3 collaborative browser is available and the page has been visually inspected.

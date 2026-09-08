@@ -15,6 +15,8 @@
 
 > Revision 2026-09-08: User explicitly approved proposed-reorder-test-amendment.md. Add only src/lib/components/Reorder/reorder.component.spec.ts for the five gesture tests: valid primary pointer metadata, controlled Motion frame advancement and terminal cleanup, retaining all behavioral assertions and gates. No production Reorder scope expansion. Planned baseline is reviewed snapshot 06ae8a4; in-flight fix-round source changes remain executor work to be reviewed, not independent drift.
 
+> Revision 2026-09-08: User reports repeated Start Initial Drag upward drift and requests a red test first. Follow repeated-initial-red-first.md before accepting the controls amendment or changing runtime. Baseline40b5c11. Preserve React parity pending direct comparison.
+
 ## Governing revision — 2026-09-08
 
 User direction: “I dont want to reuse if its not marked for reuse, we need to match react exactly”.

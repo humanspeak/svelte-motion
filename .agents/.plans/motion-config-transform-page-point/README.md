@@ -65,3 +65,5 @@ Source `0da2303`: approved Reorder amendment complete; 906 units, all 29 strict 
 ## Controls amendment approved — 2026-09-08
 
 User authorized the one-file controls test amendment and requested the example page be opened with a walkthrough when finished. Resume test-only execution from reviewed ebcaccc, followed by remaining browser gates. Runtime and prior passing checks remain reviewed; no permission is pending for this amendment.
+
+2026-09-08: User requests red-first investigation of repeated Start Initial Drag upward drift. Controls acceptance is held; see repeated-initial-red-first.md.
