@@ -1,5 +1,7 @@
 # Plan 001: Add MotionConfig coordinate correction for drag and pan
 
+> Revision 2026-09-08: User authorized the review P2 correction and requested the remaining failing page. Follow `layout-snap-correction.md` from reviewed `872a3f41`: RED first for layout plus repeated snap, then fix the mismatched measurement cache. All existing contracts and gates remain. The axis-handoff full-suite checkpoint stays open; no edits to that test are authorized here.
+
 > Follow the resumed steps in order. First prepare the public React reference fixtures for guard verification; then implement from the recorded parity evidence. Stop on the conditions below instead of expanding scope. Update this batch's README status when finished.
 >
 > Revision 2026-09-08: Reference gate verified at `6625550`; all 29 cases repeated with identical semantic traces. Explicit undefined clears the inherited transform in React, correcting the original assumption. Step A is complete; Steps B–D use reference-contract.md and reference-results.json.
