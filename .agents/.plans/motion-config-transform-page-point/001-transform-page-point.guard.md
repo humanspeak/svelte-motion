@@ -67,3 +67,21 @@ Public React fixture snapshot precedes this evidence record; feature source rema
 - User explicitly selected “Approve the narrow test amendment”. Updated Plan001 whitelist and Planned-at baseline, proposal status and README.
 - Added only five gesture tests in src/lib/components/Reorder/reorder.component.spec.ts for valid primary pointer metadata, deterministic Motion frame sampling and terminal cleanup. All numerical/axis/keyed-layout/reorder assertions and verification gates remain. No production Reorder or projection scope.
 - Action: finish current in-scope parity fix checkpoint, commit this amendment separately, then dispatch the bounded Reorder test follow-up. No second permission gate is pending.
+
+## Checkpoint 8 — 2026-09-08 09:49 — DRIFTING
+
+410e0dc · parity fix round1 source snapshot; approved test amendment committed separately in13f289e
+
+- Guard snapshot through commit skill, hooks passed. Read complete7-file correction: publicframe subscribers, rawsnappoint, constraintbase refresh, containercommitflush/siblingobserver, boundedtestreadiness and twoaxissnapregression. No productionprojection/deps/Reorder edits. Executorreport preserved verbatim.
+- Guard freshbuild targetedbrowser15/15 PASS (44.0s), packagepublintpasses with pinnedpnpm. Strict29casecomparison:27exactmatches,2remainingmismatches. Stableclosuredrag misses commit-time1088 sample and intermediate(894,710); ref-resize-regrab absolute point.x180 vs60. Exactdifferences preserved in svelte-parity-fix1-mismatches.json.
+- Guard fixtureaudit: data-fixture-commit is artificial and insufficient. The next correction should model actual publiccallbackreferencechanges fromReactparentrenders, not dummyattributes/directfixtureenginecalls. Expectedtraces and equalitygate remain unchanged.
+- Existinggesturebrowser suite75tests on known410e0dc preview:72passed,1skipped,2controls failures (2pxnudgethreshold, repeatedsnapwithinitialcoordinates). Cleanbaseline had no controlsfailures; earlier snap-to-origintimingfailure passedthisrun. Controlsfile/demo remain outsidewhitelist. Need publicReactcontrolsreferencebefore deciding compatibilityvsruntimeissue.
+- Action: approvedReorder test-only executor running. Prepared subsequentparityfixround2 for remainingmatrixcases, removingdummycommitsignal, supplementarypublicReactcontrolsfixture, and explicitno-configcompatibilityrelease notes. No sourceedits byguard. Fullbrowsergatepending; noPASS/PR/push.
+
+## Checkpoint 9 — 2026-09-08 10:01 — ON TRACK (Reorder amendment only)
+
+2fa94a3 · user-approved Reorder test correction
+
+- Snapshotted the one-file executor change through the commit skill; all hooks passed. Reviewed the complete diff: original coordinates, axis changes, callback counts/order and keyed compensation assertions remain. Added primary mouse metadata, fake-timer advancement and failure-safe cancellation/draining only. The test environment's RAF mock uses a zero-delay timer, explaining the bounded one-millisecond sampling helper.
+- Guard independently ran the full unit suite: all 82 files / 904 tests passed, including all 14 Reorder component tests. Log: /tmp/transform-page-point-reorder-guard-full-units.log. Executor report preserved verbatim.
+- Action: approved test amendment is complete. Continue parity fix round2 for the two strict reference mismatches, explicit matched handler updates, supplementary public React controls evidence and compatibility release notes. The feature remains NO-PASS until remaining browser parity/regression gates pass.

@@ -1,0 +1,194 @@
+[
+  {
+    "id": "drag-stable-closure-scale",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.2.at",
+        "actual": 1104,
+        "expected": 1088
+      },
+      {
+        "path": "callbacks.3.at",
+        "actual": 1144,
+        "expected": 1104
+      },
+      {
+        "path": "callbacks.3.info.point.x",
+        "actual": 1748,
+        "expected": 1708
+      },
+      {
+        "path": "callbacks.3.info.point.y",
+        "actual": 1400,
+        "expected": 1380
+      },
+      {
+        "path": "callbacks.3.info.delta.x",
+        "actual": 40,
+        "expected": 0
+      },
+      {
+        "path": "callbacks.3.info.delta.y",
+        "actual": 20,
+        "expected": 0
+      },
+      {
+        "path": "callbacks.3.info.offset.x",
+        "actual": 934,
+        "expected": 894
+      },
+      {
+        "path": "callbacks.3.info.offset.y",
+        "actual": 730,
+        "expected": 710
+      },
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 12416.666667,
+        "expected": 15964.285714
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 9861.111111,
+        "expected": 12678.571429
+      },
+      {
+        "path": "callbacks.3.boundValues.x",
+        "actual": 934,
+        "expected": 894
+      },
+      {
+        "path": "callbacks.3.boundValues.y",
+        "actual": 730,
+        "expected": 710
+      },
+      {
+        "path": "callbacks.4.at",
+        "actual": 1164,
+        "expected": 1144
+      },
+      {
+        "path": "callbacks.4.type",
+        "actual": "onDragEnd",
+        "expected": "onDrag"
+      },
+      {
+        "path": "callbacks.4.eventType",
+        "actual": "pointerup",
+        "expected": "pointermove"
+      },
+      {
+        "path": "callbacks.4.info.delta.x",
+        "actual": 0,
+        "expected": 40
+      },
+      {
+        "path": "callbacks.4.info.delta.y",
+        "actual": 0,
+        "expected": 20
+      },
+      {
+        "path": "callbacks.4.info.velocity.x",
+        "actual": 8339.285714,
+        "expected": 12416.666667
+      },
+      {
+        "path": "callbacks.4.info.velocity.y",
+        "actual": 6517.857143,
+        "expected": 9861.111111
+      },
+      {
+        "path": "callbacks.5",
+        "expected": {
+          "at": 1164,
+          "type": "onDragEnd",
+          "eventType": "pointerup",
+          "info": {
+            "point": {
+              "x": 1748,
+              "y": 1400
+            },
+            "delta": {
+              "x": 0,
+              "y": 0
+            },
+            "offset": {
+              "x": 934,
+              "y": 730
+            },
+            "velocity": {
+              "x": 8339.285714,
+              "y": 6517.857143
+            }
+          },
+          "boundValues": {
+            "x": 934,
+            "y": 730
+          }
+        }
+      },
+      {
+        "path": "stable-scale-commit.rects.target.x",
+        "actual": 353.5,
+        "expected": 567
+      },
+      {
+        "path": "stable-scale-commit.rects.target.y",
+        "actual": 292.5,
+        "expected": 465
+      },
+      {
+        "path": "stable-scale-commit.rects.target.top",
+        "actual": 292.5,
+        "expected": 465
+      },
+      {
+        "path": "stable-scale-commit.rects.target.right",
+        "actual": 373.5,
+        "expected": 587
+      },
+      {
+        "path": "stable-scale-commit.rects.target.bottom",
+        "actual": 312.5,
+        "expected": 485
+      },
+      {
+        "path": "stable-scale-commit.rects.target.left",
+        "actual": 353.5,
+        "expected": 567
+      },
+      {
+        "path": "stable-scale-commit.boundValues.x",
+        "actual": 40,
+        "expected": 894
+      },
+      {
+        "path": "stable-scale-commit.boundValues.y",
+        "actual": 20,
+        "expected": 710
+      }
+    ]
+  },
+  {
+    "id": "drag-ref-resize-regrab",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.3.info.point.x",
+        "actual": 180,
+        "expected": 60
+      },
+      {
+        "path": "callbacks.4.info.point.x",
+        "actual": 180,
+        "expected": 60
+      },
+      {
+        "path": "callbacks.5.info.point.x",
+        "actual": 180,
+        "expected": 60
+      }
+    ]
+  }
+]
