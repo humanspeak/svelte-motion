@@ -121,3 +121,7 @@ Snapshot40b5c11 captures completed controls test-only executor; no runtime chang
 ## Checkpoint 14 — ON TRACK for red proof; overall NO-PASS (2026-09-08)
 
 Source snapshot6c6781b. First two controls tests unchanged and pass. New repeated snap no-creep regression fails atcontrols.spec.ts:244,expected<=2px,received50px. All three sessions collected before geometry assertions; real active/end checks passed. Production remains0da2303. Exact same-input three-session React probe matches all Svelte rectangles and verifies button hit targets. User-requested red-first milestone achieved; runtime fix, full browser gate and public example walkthrough remain. Upstream currentmain package13.2.0 retains the same calculation; relatedmergedPR3445 fixed first snap. No posting/push/PR. T3 controls tab remains visible.
+
+## Checkpoint15 — PLAN AMENDED (2026-09-08)
+
+User says “Ok, lets fix it for us first”, authorizing correction of the shared repeated-start bug as a narrow React13.2.0 parity exception. Upstream issue3805 is posted. Baselinebf50874; productionunchanged0da2303; RED6c6781b. Executor corrects existingdrag adapter and adds meaningfulunitcoverage; controlsregressionbyte-identical, no projection/dependency/demo workaround. All other contracts and gates remain.

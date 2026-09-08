@@ -17,6 +17,8 @@
 
 > Revision 2026-09-08: User reports repeated Start Initial Drag upward drift and requests a red test first. Follow repeated-initial-red-first.md before accepting the controls amendment or changing runtime. Baseline40b5c11. Preserve React parity pending direct comparison.
 
+> Revision 2026-09-08: User explicitly requests fixing repeated snap drift in Svelte first. Follow the approved correction section of repeated-initial-red-first.md from bf50874. This is a narrow exception to React13.2.0 bug parity; keep the red controls test unchanged and preserve all other contracts and gates. Upstream issue3805 is posted.
+
 ## Governing revision — 2026-09-08
 
 User direction: “I dont want to reuse if its not marked for reuse, we need to match react exactly”.

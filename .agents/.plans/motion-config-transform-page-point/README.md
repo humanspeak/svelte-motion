@@ -14,7 +14,7 @@ The payoff is visual: a tile stays under the cursor inside a scaled board and re
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | IN PROGRESS — repeated-start RED confirmed; upstream bug discussion |
+| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | IN PROGRESS — Svelte snap correction approved; RED recorded |
 
 Status: TODO / IN PROGRESS / DONE / BLOCKED (reason) / REJECTED (reason).
 
@@ -67,3 +67,5 @@ Source `0da2303`: approved Reorder amendment complete; 906 units, all 29 strict 
 User authorized the one-file controls test amendment and requested the example page be opened with a walkthrough when finished. Resume test-only execution from reviewed ebcaccc, followed by remaining browser gates. Runtime and prior passing checks remain reviewed; no permission is pending for this amendment.
 
 2026-09-08: User requests red-first investigation of repeated Start Initial Drag upward drift. Controls acceptance is held; see repeated-initial-red-first.md.
+
+2026-09-08: User explicitly authorized fixing Svelte first. Upstream issue3805 posted. Dispatch narrow snap correction from bf50874; no further approval needed for this fix.
