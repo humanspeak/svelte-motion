@@ -69,3 +69,5 @@ User authorized the one-file controls test amendment and requested the example p
 2026-09-08: User requests red-first investigation of repeated Start Initial Drag upward drift. Controls acceptance is held; see repeated-initial-red-first.md.
 
 2026-09-08: User explicitly authorized fixing Svelte first. Upstream issue3805 posted. Dispatch narrow snap correction from bf50874; no further approval needed for this fix.
+
+2026-09-08: Snapshot501ea9c3 fixescontrolsRED but exposes reactive gesture reattachment. Narrow original-scope container integration correction dispatched; no assertion changes.

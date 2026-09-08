@@ -125,3 +125,12 @@ Source snapshot6c6781b. First two controls tests unchanged and pass. New repeate
 ## Checkpoint15 — PLAN AMENDED (2026-09-08)
 
 User says “Ok, lets fix it for us first”, authorizing correction of the shared repeated-start bug as a narrow React13.2.0 parity exception. Upstream issue3805 is posted. Baselinebf50874; productionunchanged0da2303; RED6c6781b. Executor corrects existingdrag adapter and adds meaningfulunitcoverage; controlsregressionbyte-identical, no projection/dependency/demo workaround. All other contracts and gates remain.
+
+## Checkpoint16 — 2026-09-08 13:46 — DRIFTING
+
+501ea9c3 · first snap correction verification
+
+- UnchangedcontrolsRED isGREEN:3/3. Featurebrowser14/15; fulltarget18=17pass1fail.
+- Fullunits906pass2fail(total908); focusedReorder12pass2fail. Pre-fix111c1031 passesReorder14/14 in isolatedbaseline.
+- Strictmatrix28match1mismatch:real-layout-shift-held,3mismatches. Newaxis.get reads in attach/update effect subscribe lifecycle to reactivecurrent; attachDragcall is not untracked. This causes staleactivecleanup/lostliveaxis-layoutcompensation.
+- Build/package/publint/sourcehookPASS. No testweakening. Action: route narrowuntrackintegrationfix through executor in original _MotionContainer.svelte whitelist; preserve allassertions.

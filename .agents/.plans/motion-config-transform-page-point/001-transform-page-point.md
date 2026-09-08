@@ -19,6 +19,8 @@
 
 > Revision 2026-09-08: User explicitly requests fixing repeated snap drift in Svelte first. Follow the approved correction section of repeated-initial-red-first.md from bf50874. This is a narrow exception to React13.2.0 bug parity; keep the red controls test unchanged and preserve all other contracts and gates. Upstream issue3805 is posted.
 
+> Revision 2026-09-08: Necessary integration correction within original _MotionContainer.svelte scope: run imperative drag attach/update work untracked so new measurement snapshots do not subscribe the gesture lifecycle to axis positions. Keep option reads reactive and all tests unchanged. See repeated-initial-red-first.md; reviewed501ea9c3.
+
 ## Governing revision — 2026-09-08
 
 User direction: “I dont want to reuse if its not marked for reuse, we need to match react exactly”.
