@@ -14,13 +14,13 @@ The payoff is visual: a tile stays under the cursor inside a scaled board and re
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | BLOCKED — coordinate-contract approval; browser failures |
+| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | PAUSED FOR REVIEW — exact React parity; reference contract pending |
 
 Status: TODO / IN PROGRESS / DONE / BLOCKED (reason) / REJECTED (reason).
 
 ## Dependencies and decisions
 
-- First prove the current runtime mismatch, then characterize installed upstream measurement primitives and source contracts before implementation. Step 2 requires no nonexistent Svelte API or external reference app. The complete scroll/layout/gesture integration matrix runs after implementation and can block completion if its contract is inconsistent.
+- The current governing revision requires matched public React 13.2.0 reference fixtures before resuming implementation. Earlier primitive/class probes are supporting evidence only. Reuse is limited to APIs intended for public reuse; private imports and export patches are excluded. Preserve completed red-first evidence and all verification gates.
 - Runtime scope is optional config + existing gesture/container paths. Projection implementation, automatic matrix/SVG helpers, and other config fields are excluded.
 - A single implementation plan covers API, focused unit/e2e coverage, two test pages, public docs, reusable example, and final verification. Do not split this into a prop-only PR that leaves bounds/velocity in the wrong units.
 - Pinned pnpm 11.24.0 works through `npm exec --yes --package=pnpm@11.24.0 -- ...`; the global 11.25.0 has a local identity-verification failure. No version bump is planned.
@@ -44,4 +44,4 @@ Isolated worktree: `/Users/jasonkummerl/Github/svelte-motion-transform-page-poin
 
 ## Guard checkpoint — 2026-09-08
 
-Implementation snapshot `13ec152` is preserved on `feat/motion-config-transform-page-point`. **NO-PASS:** upstream transformed-scroll semantics conflict with the corrected-unit requirement; [proposed amendment](proposed-amendment.md) awaits explicit operator approval. Guard reproduced 903/903 unit tests, successful formatting/lint/Svelte commit gates and app build/package validation. Targeted browser run: 9 passed, 5 failed (nonuniform drag, resize/bounds, layout-slot compensation, pan control visibility, page scrolling). Full browser and changed-docs final gates remain unrun. See [guard report](001-transform-page-point.guard-report.md), [coordinate contract](coordinate-contract.md), and the [verbatim executor report](executor-report.md). No push, PR, or batch closure.
+Implementation snapshot `13ec152` is preserved on `feat/motion-config-transform-page-point`. **NO-PASS / PAUSED FOR REVIEW:** the user selected exact observable React behavior and public APIs intended for reuse. The [custom correction proposal](proposed-amendment.md) is superseded, unapproved. The direct upstream class probe enabled scroll tracking omitted by React’s ordinary pan wrapper, so it does not establish a React pan bug. See the [governing revision](001-transform-page-point.md#governing-revision--2026-09-08-paused-for-review); matched reference fixtures and reconciled execution steps are pending. Guard reproduced 903/903 unit tests, successful formatting/lint/Svelte commit gates and app build/package validation. Targeted browser run: 9 passed, 5 failed (nonuniform drag, resize/bounds, layout-slot compensation, pan control visibility, page scrolling). Full browser and changed-docs final gates remain unrun. See [guard report](001-transform-page-point.guard-report.md), [coordinate contract](coordinate-contract.md), and the [verbatim executor report](executor-report.md). No push, PR, or batch closure.

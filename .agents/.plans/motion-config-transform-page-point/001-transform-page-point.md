@@ -7,6 +7,21 @@
 > **Drift check:** `git diff --stat 14046a5..HEAD -- src/lib/types.ts src/lib/index.ts src/lib/components/MotionConfig.svelte src/lib/components/motionConfig.context.ts src/lib/html/_MotionContainer.svelte src/lib/utils/drag.ts src/lib/utils/pan.ts src/lib/utils/motionDomProjection.ts docs/src/routes/docs/motion-config docs/src/lib/docsNav.ts docs/src/lib/examplesIndex.ts`
 > Also compare existing test/docs exemplars below before editing them. New paths in Scope must not already contain an independent implementation. A changed file is a prompt to compare, not permission to overwrite it.
 
+## Governing revision — 2026-09-08, paused for review
+
+User direction: “I dont want to reuse if its not marked for reuse, we need to match react exactly”.
+
+This revision supersedes conflicting behavior requirements below and the unapproved [proposed amendment](proposed-amendment.md). **Implementation remains paused for review.** Recording this direction does not authorize restarting dispatch.
+
+- Match observable behavior through the public React Motion 13.2.0 components for the scoped pan/drag cases. Do not substitute mathematically preferred scroll, snap, history, velocity, or callback-capture behavior, even when upstream behavior appears surprising.
+- Reuse only APIs intended for public reuse. `PanSession` is marked `@internal` and is not a public package export. Do not deep-import it, patch package exports, extract private classes from feature bundles, or treat this direction as permission to vendor its implementation. Internal source is a behavioral reference; Svelte adapters must use supported public primitives and reproduce React behavior.
+- Correct the reference evidence: React `PanGesture` constructs its session with `transformPagePoint` and `contextWindow`, without `element`. Our `attachPan` passes `element`, which enables optional scroll tracking. The guard's direct class probe also passed `element`; it does not establish ordinary React `onPan` behavior. Characterize React drag separately through its actual adapter.
+- Before implementation resumes, prepare and review a pinned React reference fixture using public components, with matching Svelte inputs, DOM geometry, scroll positions, event timing, and config. Keep any reference environment isolated from shipped Svelte dependencies. Record callback sequences, point/delta/offset/velocity, rendered positions, snap, cancellation, config replacement and stable-closure changes. Assert actual scroll and layout preconditions. Private-class probes may supplement this evidence, never replace it.
+- Earlier instructions to preserve every existing no-config convention or impose a particular raw-history/scroll policy are not authority to diverge from React. Identify existing mismatches and their compatibility impact explicitly before changing them. The earlier element-wide callback snapshot policy also requires comparison with React's actual adapter lifetimes.
+- Keep the current file scope and every verification gate. Do not weaken assertions to accommodate the draft. Revise behavior expectations only from matched React evidence, retaining the previous expectations and rationale in the guard record. Any required scope expansion needs review.
+
+Source snapshot `13ec152` already implements the draft. The excerpts and numbered steps below describe the original `14046a5` baseline and are retained for review; they are **not a ready-to-dispatch revised execution sequence**. Preserve completed red-first evidence instead of requiring the fixed regression to fail again. Resume preparation must reconcile those steps and done criteria with the reference results before execution. Five targeted browser failures and remaining verification gates are unresolved.
+
 ## Status
 
 - **Priority:** P1 within the remaining parity roadmap; not a release blocker
@@ -15,8 +30,8 @@
 - **Depends on:** none; PR #480 merged; baseline includes its boundary-release tests
 - **Category:** direction / enhancement
 - **Confidence:** HIGH that the feature is missing; ranking is product judgment
-- **Planned at:** `14046a5`, 2026-09-08
-- **Status:** BLOCKED — semantic amendment awaiting operator approval; snapshot `13ec152` has unresolved browser failures
+- **Planned at:** `af75ef6`, 2026-09-08 (policy revision; original source baseline `14046a5`)
+- **Status:** PAUSED FOR REVIEW — React parity selected; reference contract and revised execution steps pending; snapshot `13ec152` has unresolved browser failures
 
 ## Why this matters
 

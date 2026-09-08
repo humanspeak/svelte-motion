@@ -19,3 +19,12 @@
 - Guard full units: 82 files / 903 tests passed. Targeted Playwright: 9 passed / 5 failed; app build and publint succeeded during server startup. Full browser suite and changed-docs final checks were not run after STOP.
 - Existing docs baseline: five type errors in unchanged keyframes/transform-template examples; baseline production build and metadata tests pass. In-app browser discovery returned no connected browser; inspected the first failure screenshot only.
 - Action: preserve snapshot; publish NO-PASS report and proposed amendment for operator decision. Keep batch active/BLOCKED. No PR or push.
+
+## Checkpoint 3 — 2026-09-08 — PLAN AMENDED, PAUSED FOR REVIEW
+
+af75ef6 · user policy correction; source snapshot remains 13ec152
+
+- User: “I dont want to reuse if its not marked for reuse, we need to match react exactly”. Recorded exact observable React 13.2.0 parity and public intended-for-reuse APIs as governing requirements. Superseded the unapproved custom scroll/snap correction proposal. No private imports, export patches, feature-internal extraction, or implied vendoring authorization.
+- Corrected earlier evidence interpretation: React PanGesture omits element when creating PanSession; Svelte attachPan and the isolated guard probe pass it. Optional scroll tracking in that probe is not evidence of ordinary React onPan behavior. Prior numerical observations remain historical evidence for the explicitly configured class only.
+- Require matched public React/Svelte fixtures before reconciling prior history, capture, scroll, snap and no-config expectations. Existing file scope and verification gates remain. Original red proof is retained; draft source is not mistaken for unexpected baseline drift.
+- User's earlier “Keep paused for review” remains effective. No runtime/test/dependency edits, executor restart, new verification run, push, PR or closure. The five browser failures and remaining gates are unchanged; NO-PASS.

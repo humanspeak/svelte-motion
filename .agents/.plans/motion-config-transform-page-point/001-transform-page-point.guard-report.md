@@ -1,10 +1,24 @@
 # Guard report — 001 transform-page-point
 
-**Recommendation: NO-PASS** — coordinate-contract approval is outstanding and five targeted browser tests fail.
+**Recommendation: NO-PASS / PAUSED FOR REVIEW** — React parity reference and revised execution steps are pending; five targeted browser tests fail.
 
 **Reviewed at** `13ec152` · 2026-09-08 05:32 · **Plan planned at** `14046a5`
 
 Implementation is preserved in the isolated feature worktree. No push, PR, merge, or plan closure occurred.
+
+## Subsequent review correction — 2026-09-08
+
+The user selected **exact observable React Motion 13.2.0 parity**, with reuse limited to APIs intended for public reuse. The custom scroll/snap amendment is superseded and unapproved. Implementation remains paused for review; source snapshot `13ec152` is unchanged.
+
+React's installed `gestures/pan/index.mjs` passes `transformPagePoint` and `contextWindow` to `PanSession`, but omits `element`. Scroll tracking is conditional on that option. Svelte `attachPan` and the guard's isolated class probe pass `element`. The numerical probe results below remain valid for that class configuration, but cannot establish ordinary React `onPan` behavior or justify calling the custom correction a React bug fix. React drag requires its own adapter-level comparison.
+
+`PanSession` is marked `@internal` and is not publicly exported by these packages. No private imports, patched exports, internal feature extraction, or assumed permission to vendor it. Public React components in pinned, matched reference fixtures must establish the expected behavior before revising implementation or assertions. Earlier raw-scroll, history-remapping, element-wide capture, and no-config preservation requirements are provisional where they conflict with that reference. See the [governing plan revision](001-transform-page-point.md#governing-revision--2026-09-08-paused-for-review).
+
+Historical results below are preserved. Guard's final snapshot run supersedes earlier “not run” entries: 903 units passed; targeted browser tests had 9 passes and 5 failures. Those failures remain undiagnosed, and full browser/changed-docs final gates remain outstanding. React parity has not been verified.
+
+## Historical checkpoint assessment at `13ec152`
+
+The following assessment uses the original criteria. The governing revision above supersedes its recommendation to approve a custom upstream correction.
 
 ## Done criteria
 
@@ -50,6 +64,6 @@ The draft carries the feature end-to-end and demonstrates corrected units in uni
 
 ## To reach PASS
 
-Approve or revise [the proposed coordinate-contract amendment](proposed-amendment.md), then resume through a separate executor. Preserve the original red proof; add a valid scrolled-axis regression before snap correction. Diagnose/fix the five browser failures with actual scroll/layout readiness preconditions, add deterministic pan-velocity evidence, finish the integration matrix and docs checks, then run all remaining original gates. If projection runtime changes become necessary, stop for a separate scope decision.
+Keep implementation paused for review. Prepare the matched public React reference contract and reconcile the execution steps with the governing revision; the previous custom-correction proposal is superseded. When the user resumes execution, use a separate executor. Preserve the original red proof; add a valid scrolled-axis regression before snap correction. Diagnose/fix the five browser failures with actual scroll/layout readiness preconditions, add deterministic pan-velocity evidence, finish the integration matrix and docs checks, then run all remaining original gates. If projection runtime changes become necessary, stop for a separate scope decision.
 
 Logs: `/tmp/transform-page-point-guard-unit.log`, `/tmp/transform-page-point-guard-browser.log`; failure screenshots/error contexts remain in this worktree's ignored `test-results/`. Full executor report and coordinate evidence are co-located with this report.
