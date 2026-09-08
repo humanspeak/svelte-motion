@@ -49,3 +49,7 @@ Implementation snapshot `13ec152` is preserved on `feat/motion-config-transform-
 ## Dispatch resumed — 2026-09-08
 
 User authorized “Go ahead and $dispatch”. The pause is lifted. Plan revision at `5248e45` supplies resumed Steps A–E: prepare public React fixtures, guard verifies reference evidence, executor corrects Svelte behavior, then complete all original gates. Previous NO-PASS evidence remains; no implementation is endorsed by this status change.
+
+## Reference gate complete — 2026-09-08
+
+All 29 public React fixtures ran twice with identical gesture traces after a runner event-delivery fix. See [verified contract](reference-contract.md) and [results](reference-results.json). Steps B–D now proceed from this evidence; feature source is still the prior NO-PASS snapshot.

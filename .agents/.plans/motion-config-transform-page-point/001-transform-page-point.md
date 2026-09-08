@@ -2,11 +2,13 @@
 
 > Follow the resumed steps in order. First prepare the public React reference fixtures for guard verification; then implement from the recorded parity evidence. Stop on the conditions below instead of expanding scope. Update this batch's README status when finished.
 >
+> Revision 2026-09-08: Reference gate verified at `6625550`; all 29 cases repeated with identical semantic traces. Explicit undefined clears the inherited transform in React, correcting the original assumption. Step A is complete; Steps B–D use reference-contract.md and reference-results.json.
+>
 > Revision 2026-09-08: The user said “Go ahead and $dispatch”, lifting the review pause. Resume from reviewed source snapshot `13ec152`, current plan tip `5248e45`; scoped drift from that tip is empty. React parity and public intended-for-reuse APIs govern. Dispatch reference preparation first, guard runs it, then dispatch implementation. The original red proof remains valid; no dependency or shipped runtime scope expansion.
 >
 > Revision 2026-09-08: Execute in the isolated `feat/motion-config-transform-page-point` worktree at main `14046a5` (v1.2.0, includes merged PR #480). Compared the complete scoped source diff against `fcf6452`: no runtime/docs anchor drift. Operator prepares dependencies and runs browser verification because the Codex companion sandbox cannot install, launch browsers, write `.agents/**`, or commit. Executor returns coordinate-contract evidence in its report for guard to record; it never edits this plan. All red-first and characterization gates remain mandatory.
 >
-> **Drift check:** `git diff --stat 5248e45..HEAD -- src/lib/types.ts src/lib/index.ts src/lib/components/MotionConfig.svelte src/lib/components/motionConfig.context.ts src/lib/html/_MotionContainer.svelte src/lib/utils/drag.ts src/lib/utils/pan.ts src/lib/utils/motionDomProjection.ts docs/src/routes/docs/motion-config docs/src/lib/docsNav.ts docs/src/lib/examplesIndex.ts`
+> **Drift check:** `git diff --stat 6625550..HEAD -- src/lib/types.ts src/lib/index.ts src/lib/components/MotionConfig.svelte src/lib/components/motionConfig.context.ts src/lib/html/_MotionContainer.svelte src/lib/utils/drag.ts src/lib/utils/pan.ts src/lib/utils/motionDomProjection.ts docs/src/routes/docs/motion-config docs/src/lib/docsNav.ts docs/src/lib/examplesIndex.ts`
 > Also compare existing test/docs exemplars below before editing them. New paths in Scope must not already contain an independent implementation. A changed file is a prompt to compare, not permission to overwrite it.
 
 ## Governing revision — 2026-09-08
@@ -32,7 +34,7 @@ Source snapshot `13ec152` already implements the draft. Baseline excerpts below 
 - **Depends on:** none; PR #480 merged; baseline includes its boundary-release tests
 - **Category:** direction / enhancement
 - **Confidence:** HIGH that the feature is missing; ranking is product judgment
-- **Planned at:** `5248e45`, 2026-09-08 (dispatch resume; original source baseline `14046a5`)
+- **Planned at:** `6625550`, 2026-09-08 (reference gate; original source baseline `14046a5`)
 - **Status:** IN PROGRESS — resumed dispatch; public React reference gate first; snapshot `13ec152` has unresolved browser failures
 
 ## Why this matters
@@ -155,7 +157,7 @@ Current public docs describe the hook, although the source context still labels 
 ```
 
 - Add Google-style documented `MotionTransformPoint = (point: { x: number; y: number }) => { x: number; y: number }` and optional `MotionConfigProps.transformPagePoint`.
-- Missing prop inherits; an explicit identity function overrides an ancestor. An undefined child override resumes inheritance. No new implicit global default. No-config behavior is subject to the same React parity reference.
+- An omitted prop inherits; an explicit identity function overrides an ancestor. An explicitly supplied undefined child override clears inheritance, as verified through the public React fixture. No new implicit global default. No-config behavior is subject to the same React parity reference.
 - Uniform and nonuniform positive CSS parent scales are required. Plain affine translation in the mapping must cancel correctly when calculating deltas. Corrected callbacks and release velocity use corrected units.
 - Snapshot the selected callback at pointerdown, matching upstream PanSession; replacing the config function must not tear down the gesture and affects the next gesture. Verify geometry callback lifetime through the actual React adapter before choosing an element-wide capture policy. A callback reading mutable state is a distinct case from replacing its reference; document the outcome of Step 2 before promising live zoom support.
 - Element-ref constraints, numeric constraints, controlled start/snap-to-cursor, cancel, axis lock, re-grab, ref resize, and layout compensation must continue working in the supported domain.
@@ -228,6 +230,10 @@ Recent baseline evidence from this session: 7 brutalist-stage e2e tests and 6 in
 ## Git workflow
 
 Create an isolated feature branch/worktree from the current base when execution starts, such as `feat/motion-config-transform-page-point`. Leave the PR #480 branch and unrelated local intel edit intact. Use conventional commits, e.g. `feat(gestures): support MotionConfig coordinate transforms`. Commit coherent units after verification. Do not push or open a PR unless separately instructed.
+
+## Reference gate result
+
+Guard verified all 29 public React fixtures twice with identical gesture traces; see [reference contract](reference-contract.md) and [numerical results](reference-results.json). Step A is complete. Dispatch Steps B–D from this evidence, then guard runs Step E. No user approval is pending.
 
 ## Steps
 

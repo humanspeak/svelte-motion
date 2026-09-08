@@ -37,3 +37,13 @@ af75ef6 · user policy correction; source snapshot remains 13ec152
 - Replaced contradictory historical execution steps with a reference-first resumed sequence. Public React observable behavior and intended-for-reuse APIs remain mandatory. Original red proof and verification gates retained.
 - Isolated reference fixture scope implements the already-approved reference-environment requirement without changing shipped dependencies. Executor prepares fixture code; guard installs/runs and records evidence before a second implementation dispatch.
 - Current source snapshot remains NO-PASS. No runtime edits by guard; no push or PR.
+
+## Checkpoint 5 — 2026-09-08 — ON TRACK (reference gate only)
+
+Public React fixture snapshot precedes this evidence record; feature source remains 13ec152.
+
+- Separate executor prepared 29 public React fixture cases; full report preserved verbatim. Guard reviewed all source/imports/runner and reproduced browser results.
+- A repeat exposed scroll-event delivery racing controlled frames. One bounded executor correction added target-specific scroll-event readiness; both subsequent complete runs exited 0 and produced identical ordered callback time/type/payload/bound-value traces. No expected gesture values were weakened.
+- Reference contract records verified no-config/config, frame history, scroll, live closure, snap, unmount and layout behavior. Explicit undefined clears inheritance; corrected earlier plan wording to the observed React result under the user-selected parity policy.
+- Docs build and metadata passed; docs typecheck has the same six errors/13 warnings on feature and clean baseline. Environment evidence preserved separately.
+- Action: Step A complete; dispatch Svelte parity implementation against the reference. No production/source edits by guard. Feature remains unverified/NO-PASS until Steps B–E finish.
