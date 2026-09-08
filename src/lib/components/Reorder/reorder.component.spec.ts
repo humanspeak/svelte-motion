@@ -13,6 +13,37 @@ class FakeResizeObserver {
     disconnect() {}
 }
 
+const activePointers = new Map<number, { clientX: number; clientY: number }>()
+
+/** Advance the controlled Motion frame used to sample drag pointer events. */
+const flushFrame = async (ms = 1) => {
+    await vi.advanceTimersByTimeAsync(ms)
+}
+
+const dispatchMousePointer = (
+    target: EventTarget,
+    type: 'pointerdown' | 'pointermove' | 'pointercancel',
+    { clientX, clientY, pointerId }: { clientX: number; clientY: number; pointerId: number }
+) => {
+    target.dispatchEvent(
+        new PointerEvent(type, {
+            clientX,
+            clientY,
+            pointerId,
+            pointerType: 'mouse',
+            isPrimary: true,
+            button: type === 'pointermove' ? -1 : 0,
+            buttons: type === 'pointerdown' || type === 'pointermove' ? 1 : 0
+        })
+    )
+
+    if (type === 'pointercancel') {
+        activePointers.delete(pointerId)
+    } else {
+        activePointers.set(pointerId, { clientX, clientY })
+    }
+}
+
 beforeAll(() => {
     vi.stubGlobal('ResizeObserver', FakeResizeObserver)
 })
@@ -21,8 +52,16 @@ afterAll(() => {
     vi.unstubAllGlobals()
 })
 
-afterEach(() => {
-    vi.restoreAllMocks()
+afterEach(async () => {
+    try {
+        for (const [pointerId, point] of [...activePointers]) {
+            dispatchMousePointer(window, 'pointercancel', { ...point, pointerId })
+        }
+        await flushFrame()
+    } finally {
+        activePointers.clear()
+        vi.restoreAllMocks()
+    }
 })
 
 describe('Reorder.Group / Reorder.Item', () => {
@@ -61,20 +100,24 @@ describe('Reorder.Group / Reorder.Item', () => {
         // The group and items mounted while the safe detected axis was `y`.
         // These post-mount horizontal measurements must rewire the existing
         // item's drag gesture before this diagonal pointer move.
-        item.dispatchEvent(
-            new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 1 })
-        )
-        window.dispatchEvent(
-            new PointerEvent('pointermove', { clientX: 40, clientY: 30, pointerId: 1 })
-        )
+        dispatchMousePointer(item, 'pointerdown', { clientX: 10, clientY: 10, pointerId: 1 })
+        dispatchMousePointer(window, 'pointermove', {
+            clientX: 40,
+            clientY: 30,
+            pointerId: 1
+        })
+        await flushFrame()
 
         const visualElement = visualElementStore.get(item)
         expect(visualElement?.getValue('x')?.get()).toBe(30)
         expect(visualElement?.getValue('y')?.get()).toBe(0)
 
-        window.dispatchEvent(
-            new PointerEvent('pointercancel', { clientX: 40, clientY: 30, pointerId: 1 })
-        )
+        dispatchMousePointer(window, 'pointercancel', {
+            clientX: 40,
+            clientY: 30,
+            pointerId: 1
+        })
+        await flushFrame()
     })
 
     it('keeps the active pointer session alive when the group axis changes', async () => {
@@ -84,12 +127,17 @@ describe('Reorder.Group / Reorder.Item', () => {
         const item = await screen.findByTestId('item-0')
         await vi.advanceTimersByTimeAsync(1000)
 
-        item.dispatchEvent(
-            new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 22 })
-        )
-        window.dispatchEvent(
-            new PointerEvent('pointermove', { clientX: 40, clientY: 30, pointerId: 22 })
-        )
+        dispatchMousePointer(item, 'pointerdown', {
+            clientX: 10,
+            clientY: 10,
+            pointerId: 22
+        })
+        dispatchMousePointer(window, 'pointermove', {
+            clientX: 40,
+            clientY: 30,
+            pointerId: 22
+        })
+        await flushFrame()
 
         const visualElement = visualElementStore.get(item)
         expect(visualElement?.getValue('x')?.get()).toBe(30)
@@ -98,16 +146,22 @@ describe('Reorder.Group / Reorder.Item', () => {
         await result.rerender({ axis: 'xy', values: [0, 1, 2] })
         await vi.advanceTimersByTimeAsync(0)
 
-        window.dispatchEvent(
-            new PointerEvent('pointermove', { clientX: 60, clientY: 60, pointerId: 22 })
-        )
+        dispatchMousePointer(window, 'pointermove', {
+            clientX: 60,
+            clientY: 60,
+            pointerId: 22
+        })
+        await flushFrame()
         expect(item.dataset.svelteMotionDragActive).toBe('true')
         expect(visualElement?.getValue('x')?.get()).toBe(50)
         expect(visualElement?.getValue('y')?.get()).toBe(50)
 
-        window.dispatchEvent(
-            new PointerEvent('pointercancel', { clientX: 60, clientY: 60, pointerId: 22 })
-        )
+        dispatchMousePointer(window, 'pointercancel', {
+            clientX: 60,
+            clientY: 60,
+            pointerId: 22
+        })
+        await flushFrame()
     })
 
     it('continues proposing swaps when a controlled consumer rejects one', async () => {
@@ -126,24 +180,34 @@ describe('Reorder.Group / Reorder.Item', () => {
         const item = await screen.findByTestId('item-0')
         await vi.advanceTimersByTimeAsync(1000)
 
-        item.dispatchEvent(
-            new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 23 })
-        )
-        window.dispatchEvent(
-            new PointerEvent('pointermove', { clientX: 70, clientY: 10, pointerId: 23 })
-        )
+        dispatchMousePointer(item, 'pointerdown', {
+            clientX: 10,
+            clientY: 10,
+            pointerId: 23
+        })
+        dispatchMousePointer(window, 'pointermove', {
+            clientX: 70,
+            clientY: 10,
+            pointerId: 23
+        })
+        await flushFrame()
         expect(onReorder).toHaveBeenCalledOnce()
         expect(onReorder).toHaveBeenLastCalledWith([1, 0, 2])
 
-        await vi.advanceTimersByTimeAsync(20)
-        window.dispatchEvent(
-            new PointerEvent('pointermove', { clientX: 71, clientY: 10, pointerId: 23 })
-        )
+        dispatchMousePointer(window, 'pointermove', {
+            clientX: 71,
+            clientY: 10,
+            pointerId: 23
+        })
+        await flushFrame(16)
         expect(onReorder).toHaveBeenCalledTimes(2)
 
-        window.dispatchEvent(
-            new PointerEvent('pointercancel', { clientX: 71, clientY: 10, pointerId: 23 })
-        )
+        dispatchMousePointer(window, 'pointercancel', {
+            clientX: 71,
+            clientY: 10,
+            pointerId: 23
+        })
+        await flushFrame()
     })
 
     it('accepts axis="xy" and enables two-axis dragging', async () => {
@@ -151,20 +215,24 @@ describe('Reorder.Group / Reorder.Item', () => {
         const item = await screen.findByTestId('item-0')
         await vi.advanceTimersByTimeAsync(1000)
 
-        item.dispatchEvent(
-            new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 2 })
-        )
-        window.dispatchEvent(
-            new PointerEvent('pointermove', { clientX: 40, clientY: 30, pointerId: 2 })
-        )
+        dispatchMousePointer(item, 'pointerdown', { clientX: 10, clientY: 10, pointerId: 2 })
+        dispatchMousePointer(window, 'pointermove', {
+            clientX: 40,
+            clientY: 30,
+            pointerId: 2
+        })
+        await flushFrame()
 
         const visualElement = visualElementStore.get(item)
         expect(visualElement?.getValue('x')?.get()).toBe(30)
         expect(visualElement?.getValue('y')?.get()).toBe(20)
 
-        window.dispatchEvent(
-            new PointerEvent('pointercancel', { clientX: 40, clientY: 30, pointerId: 2 })
-        )
+        dispatchMousePointer(window, 'pointercancel', {
+            clientX: 40,
+            clientY: 30,
+            pointerId: 2
+        })
+        await flushFrame()
     })
 
     it('rebases an active drag when a keyed reorder moves its layout slot', async () => {
@@ -193,12 +261,17 @@ describe('Reorder.Group / Reorder.Item', () => {
         const item = await screen.findByTestId('item-0')
         await vi.advanceTimersByTimeAsync(1000)
 
-        item.dispatchEvent(
-            new PointerEvent('pointerdown', { clientX: 500, clientY: 10, pointerId: 3 })
-        )
-        window.dispatchEvent(
-            new PointerEvent('pointermove', { clientX: 430, clientY: 10, pointerId: 3 })
-        )
+        dispatchMousePointer(item, 'pointerdown', {
+            clientX: 500,
+            clientY: 10,
+            pointerId: 3
+        })
+        dispatchMousePointer(window, 'pointermove', {
+            clientX: 430,
+            clientY: 10,
+            pointerId: 3
+        })
+        await flushFrame()
 
         const visualElement = visualElementStore.get(item)
         expect(item.dataset.svelteMotionDragActive).toBe('true')
@@ -223,31 +296,43 @@ describe('Reorder.Group / Reorder.Item', () => {
         // projection adds previous - next (+100) to both the live value and
         // gesture origin, keeping a stationary pointer pinned at +30.
         expect(visualElement?.getValue('x')?.get()).toBe(30)
-        window.dispatchEvent(
-            new PointerEvent('pointermove', { clientX: 430, clientY: 10, pointerId: 3 })
-        )
+        dispatchMousePointer(window, 'pointermove', {
+            clientX: 430,
+            clientY: 10,
+            pointerId: 3
+        })
+        await flushFrame()
         expect(visualElement?.getValue('x')?.get()).toBe(30)
 
         // Continue the same gesture toward item 2. From the compensated slot,
         // its ordinary midpoint threshold is x=-50: stop just before it, then
         // cross by 2px. A second Group-level compensation would add the 100px
         // slot delta again and incorrectly require another full slot of travel.
-        window.dispatchEvent(
-            new PointerEvent('pointermove', { clientX: 351, clientY: 10, pointerId: 3 })
-        )
+        dispatchMousePointer(window, 'pointermove', {
+            clientX: 351,
+            clientY: 10,
+            pointerId: 3
+        })
+        await flushFrame()
         expect(visualElement?.getValue('x')?.get()).toBe(-49)
         expect(onReorder).not.toHaveBeenCalled()
 
-        window.dispatchEvent(
-            new PointerEvent('pointermove', { clientX: 349, clientY: 10, pointerId: 3 })
-        )
+        dispatchMousePointer(window, 'pointermove', {
+            clientX: 349,
+            clientY: 10,
+            pointerId: 3
+        })
+        await flushFrame()
         expect(visualElement?.getValue('x')?.get()).toBe(-51)
         expect(onReorder).toHaveBeenCalledOnce()
         expect(onReorder).toHaveBeenCalledWith([1, 2, 0])
 
-        window.dispatchEvent(
-            new PointerEvent('pointercancel', { clientX: 430, clientY: 10, pointerId: 3 })
-        )
+        dispatchMousePointer(window, 'pointercancel', {
+            clientX: 430,
+            clientY: 10,
+            pointerId: 3
+        })
+        await flushFrame()
     })
 
     it('projects each newly displaced sibling across sequential keyed reorders', async () => {
