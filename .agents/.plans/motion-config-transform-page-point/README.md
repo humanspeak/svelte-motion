@@ -53,3 +53,7 @@ User authorized “Go ahead and $dispatch”. The pause is lifted. Plan revision
 ## Reference gate complete — 2026-09-08
 
 All 29 public React fixtures ran twice with identical gesture traces after a runner event-delivery fix. See [verified contract](reference-contract.md) and [results](reference-results.json). Steps B–D now proceed from this evidence; feature source is still the prior NO-PASS snapshot.
+
+## Approved follow-up — 2026-09-08
+
+The user approved the narrow Reorder test amendment. The current parity correction continues first; then dispatch the five gesture tests in `src/lib/components/Reorder/reorder.component.spec.ts` for controlled Motion frame sampling, valid pointer metadata and terminal cleanup, preserving all behavioral assertions and verification gates. No Reorder runtime scope was added. Current snapshot `06ae8a4` remains NO-PASS pending fixes and guard verification.

@@ -47,3 +47,23 @@ Public React fixture snapshot precedes this evidence record; feature source rema
 - Reference contract records verified no-config/config, frame history, scroll, live closure, snap, unmount and layout behavior. Explicit undefined clears inheritance; corrected earlier plan wording to the observed React result under the user-selected parity policy.
 - Docs build and metadata passed; docs typecheck has the same six errors/13 warnings on feature and clean baseline. Environment evidence preserved separately.
 - Action: Step A complete; dispatch Svelte parity implementation against the reference. No production/source edits by guard. Feature remains unverified/NO-PASS until Steps B–E finish.
+
+## Checkpoint 6 — 2026-09-08 09:20 — DRIFTING
+
+06ae8a4 · resumed implementation snapshot and initial guard verification
+
+- Executor implemented Steps B–D and returned a candid partial report; preserved verbatim in parity-implementation-executor-report.md. Source snapshot committed through commit skill with all hooks passing; no excluded runtime/dependency/projection changes.
+- Guard root check: 0 errors/39 existing warnings. Full units: 899 passed/5 failed (904); failures in excluded Reorder component tests assert immediately after pointermove. Clean 14046a5 baseline: all 14 Reorder component tests pass. Proposed one-file test amendment awaits user decision; production Reorder remains excluded.
+- Fresh-build targeted Playwright: 9 passed/6 failed. Three velocity differences (71.428571 vs100 etc.), two malformed DOMMatrix test calls, and snap bound(716,-202) vs(-49,-436). App build, package validation, Trunk check and formatting pass. Docs production build and 5 metadata tests pass; docs check retains exactly the demonstrated six baseline errors/13 warnings. Unrelated generated animated-tabs class-order churn restored to HEAD.
+- Initial full Svelte comparison failed all29 at ready polling: frozen RAF prevented waitForFunction's default polling. Independent timer-polling probe confirmed hydration ready without advancing a frame. A separate executor fixed only the temporary runner, with bounded native scroll readiness and partial trace preservation; report/source preserved.
+- Corrected driver completed all29: 1 matched,28 mismatched. Most differences are stale initial Motion frame timestamp because React fixture keeps a public frame subscriber active; further config-commit callback, resize and layout compensation differences recorded in svelte-parity-initial-mismatches.json. No tolerance/expected-value weakening.
+- Snap diagnosis: public React onSessionStart uses raw extractEventInfo(event).point; Svelte draft used transformed info.point. Difference exactly equals raw page point(765,234).
+- Action: dispatched in-scope source fix round1 with exact traces, fixture clock diagnosis, malformed test calls, raw snap boundary, and remaining resize/layout/config-commit differences. No guard source authorship. Full browser gate remains pending targeted parity; no PR/push.
+
+## Checkpoint 7 — 2026-09-08 09:25 — PLAN AMENDED
+
+06ae8a4 · user-approved Reorder test-only scope amendment
+
+- User explicitly selected “Approve the narrow test amendment”. Updated Plan001 whitelist and Planned-at baseline, proposal status and README.
+- Added only five gesture tests in src/lib/components/Reorder/reorder.component.spec.ts for valid primary pointer metadata, deterministic Motion frame sampling and terminal cleanup. All numerical/axis/keyed-layout/reorder assertions and verification gates remain. No production Reorder or projection scope.
+- Action: finish current in-scope parity fix checkpoint, commit this amendment separately, then dispatch the bounded Reorder test follow-up. No second permission gate is pending.

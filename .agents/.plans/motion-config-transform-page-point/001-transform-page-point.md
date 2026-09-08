@@ -8,8 +8,10 @@
 >
 > Revision 2026-09-08: Execute in the isolated `feat/motion-config-transform-page-point` worktree at main `14046a5` (v1.2.0, includes merged PR #480). Compared the complete scoped source diff against `fcf6452`: no runtime/docs anchor drift. Operator prepares dependencies and runs browser verification because the Codex companion sandbox cannot install, launch browsers, write `.agents/**`, or commit. Executor returns coordinate-contract evidence in its report for guard to record; it never edits this plan. All red-first and characterization gates remain mandatory.
 >
-> **Drift check:** `git diff --stat 6625550..HEAD -- src/lib/types.ts src/lib/index.ts src/lib/components/MotionConfig.svelte src/lib/components/motionConfig.context.ts src/lib/html/_MotionContainer.svelte src/lib/utils/drag.ts src/lib/utils/pan.ts src/lib/utils/motionDomProjection.ts docs/src/routes/docs/motion-config docs/src/lib/docsNav.ts docs/src/lib/examplesIndex.ts`
+> **Drift check:** `git diff --stat 06ae8a4..HEAD -- src/lib/types.ts src/lib/index.ts src/lib/components/MotionConfig.svelte src/lib/components/motionConfig.context.ts src/lib/html/_MotionContainer.svelte src/lib/utils/drag.ts src/lib/utils/pan.ts src/lib/utils/motionDomProjection.ts docs/src/routes/docs/motion-config docs/src/lib/docsNav.ts docs/src/lib/examplesIndex.ts`
 > Also compare existing test/docs exemplars below before editing them. New paths in Scope must not already contain an independent implementation. A changed file is a prompt to compare, not permission to overwrite it.
+
+> Revision 2026-09-08: User explicitly approved proposed-reorder-test-amendment.md. Add only src/lib/components/Reorder/reorder.component.spec.ts for the five gesture tests: valid primary pointer metadata, controlled Motion frame advancement and terminal cleanup, retaining all behavioral assertions and gates. No production Reorder scope expansion. Planned baseline is reviewed snapshot 06ae8a4; in-flight fix-round source changes remain executor work to be reviewed, not independent drift.
 
 ## Governing revision — 2026-09-08
 
@@ -34,7 +36,7 @@ Source snapshot `13ec152` already implements the draft. Baseline excerpts below 
 - **Depends on:** none; PR #480 merged; baseline includes its boundary-release tests
 - **Category:** direction / enhancement
 - **Confidence:** HIGH that the feature is missing; ranking is product judgment
-- **Planned at:** `6625550`, 2026-09-08 (reference gate; original source baseline `14046a5`)
+- **Planned at:** `06ae8a4`, 2026-09-08 (approved Reorder test-only amendment; original source baseline `14046a5`)
 - **Status:** IN PROGRESS — resumed dispatch; public React reference gate first; snapshot `13ec152` has unresolved browser failures
 
 ## Why this matters
@@ -180,6 +182,7 @@ Only the following test/demo paths may change or be added:
 - new `src/lib/components/__tests__/TransformPagePointHarness.svelte`
 - `src/lib/utils/motionDomProjection.spec.ts` (characterization assertions only)
 - `src/lib/index.spec.ts` (public type assertions)
+- `src/lib/components/Reorder/reorder.component.spec.ts` (user-approved amendment: five gesture tests only; valid primary pointer metadata, deterministic Motion frame advancement and terminal cleanup; preserve numerical/axis/keyed-layout/reorder assertions)
 - new `src/routes/tests/transform-page-point/drag/+page.svelte`
 - new `src/routes/tests/transform-page-point/pan/+page.svelte`
 - new `e2e/drag/transform-page-point.spec.ts`
@@ -270,6 +273,10 @@ Run both targeted browser files, then all regression/full browser gates. For a f
 Review existing feature docs, MotionConfig reference, reusable example, route metadata, index links and minor changeset against observed React semantics. Document actual callback input domains, capture/lifetime behavior, velocity, identity reset, numeric versus ref bounds and tested limitations. Remove claims that we fix an upstream inconsistency or provide custom raw-scroll/history behavior. Public examples use supported public imports and existing docs component/style conventions.
 
 Run catalog sync and generated mirrors; keep only feature-related changes. Verify actual SEO route count and the root README's scoped parity claims. No version bump or application dependency change. Preserve the known unrelated docs typecheck baseline and report it separately.
+
+### Approved Reorder test follow-up
+
+After the current parity fix checkpoint, dispatch the five Reorder gesture tests in the newly approved test file. Replace immediate post-pointer assertions with deterministic Motion frame sampling and valid primary pointer metadata; preserve all behavioral assertions and terminal cleanup. Reproduce all 14 component tests and the full unit suite. Stop on any required Reorder runtime or further scope change. See proposed-reorder-test-amendment.md for the approved bounds.
 
 ### Step E: Guard final verification
 
