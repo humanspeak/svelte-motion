@@ -18,12 +18,16 @@ test.describe('AnimatePresence owned child', () => {
         await page.waitForTimeout(900)
         await page.getByTestId('owned-toggle').click()
         await expect(child).toHaveCount(1)
-        await page.waitForTimeout(120)
+
+        await expect
+            .poll(
+                async () =>
+                    child.evaluate((node) => Number.parseFloat(getComputedStyle(node).opacity)),
+                { timeout: 500, intervals: [16, 32, 50] }
+            )
+            .toBeLessThan(0.95)
 
         expect(await child.evaluate((node, before) => node === before, original)).toBe(true)
-        expect(
-            await child.evaluate((node) => Number.parseFloat(getComputedStyle(node).opacity))
-        ).toBeLessThan(0.95)
         await expect(page.locator('[data-clone="true"]')).toHaveCount(0)
 
         await expect(child).toHaveCount(0)
