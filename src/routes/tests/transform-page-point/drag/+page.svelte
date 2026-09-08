@@ -509,7 +509,7 @@
     .layoutSnapOverlay {
         position: fixed;
         inset: 0;
-        z-index: 10;
+        z-index: 30;
     }
     .layoutSnapHandle,
     .layoutShiftButton,

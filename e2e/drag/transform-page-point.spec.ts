@@ -218,6 +218,22 @@ const runLayoutSnapCorrectionRegression = async (
         x: initialHandle.x + initialHandle.width / 2,
         y: initialHandle.y + initialHandle.height / 2
     }
+    const shiftPoint = {
+        x: initialShiftButton.x + initialShiftButton.width / 2,
+        y: initialShiftButton.y + initialShiftButton.height / 2
+    }
+    expect(
+        await handle.evaluate(
+            (element, point) => document.elementFromPoint(point.x, point.y) === element,
+            handlePoint
+        )
+    ).toBe(true)
+    expect(
+        await shiftButton.evaluate(
+            (element, point) => document.elementFromPoint(point.x, point.y) === element,
+            shiftPoint
+        )
+    ).toBe(true)
     await page.mouse.move(handlePoint.x, handlePoint.y)
     await page.mouse.down()
     await advance(page, 16)
@@ -239,7 +255,6 @@ const runLayoutSnapCorrectionRegression = async (
     await advance(page, 20)
     const postDrag = await center(target)
 
-    const shiftPoint = await center(shiftButton)
     await page.mouse.move(shiftPoint.x, shiftPoint.y)
     await page.mouse.down()
     await page.mouse.up()
