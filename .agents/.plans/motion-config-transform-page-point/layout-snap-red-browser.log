@@ -1,0 +1,70 @@
+
+Running 2 tests using 1 worker
+
+(node:26555) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/2] [chromium] › e2e/drag/transform-page-point.spec.ts:693:5 › MotionConfig transformPagePoint drag › keeps repeated controls snaps aligned after drag and settled parent layout
+  1) [chromium] › e2e/drag/transform-page-point.spec.ts:693:5 › MotionConfig transformPagePoint drag › keeps repeated controls snaps aligned after drag and settled parent layout 
+
+    Error: {"handlePoint":{"x":117.53125,"y":112},"firstSnap":{"x":117.53125,"y":112},"dragSamples":[{"pointer":{"x":167.53125,"y":132},"target":{"x":167.53125,"y":132}},{"pointer":{"x":217.53125,"y":147},"target":{"x":217.53125,"y":147}},{"pointer":{"x":267.53125,"y":162},"target":{"x":267.53125,"y":162}}],"postDrag":{"x":267.53125,"y":162},"initialSlot":{"x":300,"y":300,"width":80,"height":80},"shiftedSlot":{"x":360,"y":300,"width":80,"height":80},"layoutSamples":[{"x":272.7900085449219,"y":162},{"x":277.7944641113281,"y":162},{"x":282.5750045776367,"y":162},{"x":287.15673828125,"y":162},{"x":291.5682373046875,"y":162},{"x":295.7962646484375,"y":162},{"x":299.83636474609375,"y":162},{"x":303.66680908203125,"y":162},{"x":307.3225402832031,"y":162},{"x":310.7181701660156,"y":162},{"x":313.8975830078125,"y":162},{"x":316.7871398925781,"y":162},{"x":319.4549560546875,"y":162},{"x":321.79180908203125,"y":162},{"x":323.789306640625,"y":162},{"x":325.4222412109375,"y":162},{"x":326.630615234375,"y":162},{"x":327.3564453125,"y":162},{"x":327.53125,"y":162},{"x":327.53125,"y":162},{"x":327.53125,"y":162},{"x":327.53125,"y":162},{"x":327.53125,"y":162},{"x":327.53125,"y":162},{"x":327.53125,"y":162},{"x":327.53125,"y":162},{"x":327.53125,"y":162},{"x":327.53125,"y":162}],"second":{"currentHandle":{"x":117.53125,"y":112},"snapped":{"x":45.0625,"y":-66}},"third":{"currentHandle":{"x":117.53125,"y":112},"snapped":{"x":45.0625,"y":-66}}}
+
+    expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 2
+    Received:    72.46875
+
+      145 |
+      146 | const expectPointNear = (actual: Point, expected: Point, report: string) => {
+    > 147 |     expect(Math.abs(actual.x - expected.x), report).toBeLessThanOrEqual(2)
+          |                                                     ^
+      148 |     expect(Math.abs(actual.y - expected.y), report).toBeLessThanOrEqual(2)
+      149 | }
+      150 |
+        at expectPointNear (/Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/drag/transform-page-point.spec.ts:147:53)
+        at runLayoutSnapCorrectionRegression (/Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/drag/transform-page-point.spec.ts:302:5)
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/drag/transform-page-point.spec.ts:696:9
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/layout-snap-red-results/drag-transform-page-point--a08a8-g-and-settled-parent-layout-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/layout-snap-red-results/drag-transform-page-point--a08a8-g-and-settled-parent-layout-chromium/error-context.md
+
+
+(node:27154) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[2/2] [chromium] › e2e/drag/transform-page-point.spec.ts:702:5 › MotionConfig transformPagePoint drag › keeps nonzero-initial controls snaps aligned after settled parent layout
+  2) [chromium] › e2e/drag/transform-page-point.spec.ts:702:5 › MotionConfig transformPagePoint drag › keeps nonzero-initial controls snaps aligned after settled parent layout 
+
+    Error: {"handlePoint":{"x":117.53125,"y":112},"firstSnap":{"x":162.53125,"y":82},"dragSamples":[{"pointer":{"x":167.53125,"y":132},"target":{"x":212.53125,"y":102}},{"pointer":{"x":217.53125,"y":147},"target":{"x":262.53125,"y":117}},{"pointer":{"x":267.53125,"y":162},"target":{"x":312.53125,"y":132}}],"postDrag":{"x":312.53125,"y":132},"initialSlot":{"x":300,"y":300,"width":80,"height":80},"shiftedSlot":{"x":360,"y":300,"width":80,"height":80},"layoutSamples":[{"x":317.7901916503906,"y":132},{"x":322.7944641113281,"y":132},{"x":327.57501220703125,"y":132},{"x":332.15673828125,"y":132},{"x":336.5682373046875,"y":132},{"x":340.7962646484375,"y":132},{"x":344.83636474609375,"y":132},{"x":348.66680908203125,"y":132},{"x":352.3225402832031,"y":132},{"x":355.7181701660156,"y":132},{"x":358.8975524902344,"y":132},{"x":361.7871398925781,"y":132},{"x":364.4549560546875,"y":132},{"x":366.79180908203125,"y":132},{"x":368.78932189941406,"y":132},{"x":370.4222412109375,"y":132},{"x":371.630615234375,"y":132},{"x":372.3564453125,"y":132},{"x":372.53125,"y":132},{"x":372.53125,"y":132},{"x":372.53125,"y":132},{"x":372.53125,"y":132},{"x":372.53125,"y":132},{"x":372.53125,"y":132},{"x":372.53125,"y":132},{"x":372.53125,"y":132},{"x":372.53125,"y":132},{"x":372.53125,"y":132}],"second":{"currentHandle":{"x":117.53125,"y":112},"snapped":{"x":90.0625,"y":-96}},"third":{"currentHandle":{"x":117.53125,"y":112},"snapped":{"x":90.0625,"y":-96}}}
+
+    expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 2
+    Received:    45
+
+      145 |
+      146 | const expectPointNear = (actual: Point, expected: Point, report: string) => {
+    > 147 |     expect(Math.abs(actual.x - expected.x), report).toBeLessThanOrEqual(2)
+          |                                                     ^
+      148 |     expect(Math.abs(actual.y - expected.y), report).toBeLessThanOrEqual(2)
+      149 | }
+      150 |
+        at expectPointNear (/Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/drag/transform-page-point.spec.ts:147:53)
+        at runLayoutSnapCorrectionRegression (/Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/drag/transform-page-point.spec.ts:294:5)
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/drag/transform-page-point.spec.ts:705:9
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/layout-snap-red-results/drag-transform-page-point--da14f-after-settled-parent-layout-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/layout-snap-red-results/drag-transform-page-point--da14f-after-settled-parent-layout-chromium/error-context.md
+
+
+  2 failed
+    [chromium] › e2e/drag/transform-page-point.spec.ts:693:5 › MotionConfig transformPagePoint drag › keeps repeated controls snaps aligned after drag and settled parent layout 
+    [chromium] › e2e/drag/transform-page-point.spec.ts:702:5 › MotionConfig transformPagePoint drag › keeps nonzero-initial controls snaps aligned after settled parent layout 

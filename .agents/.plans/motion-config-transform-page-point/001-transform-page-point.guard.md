@@ -142,3 +142,10 @@ Snapshot `88a811f0` fixes the reactive drag lifetime regression: 908 units and 1
 ## Checkpoint 18 — 2026-09-08 14:22 — ON TRACK; full-suite review pending
 
 Source `2f191d3b`: unchanged controls RED now GREEN; 908 units, 18 targeted browser tests and all29 strict public React cases pass. Isolated layout-commit mismatch also passes. Root check0errors39existingwarnings, app/package/publint, docs build252images/Cloudflare, docsmetadata5, Trunkfmt/check and diffhygiene pass; docscheck6errors13warnings exactly matches established baseline. Public docs real-pointer displacement passes all four presets. First full-e2e failure remains paused for user decision under CLAUDE.md:44-51; unchanged samecase repeats3/3PASS and T3 fades correctly. NO-PASS for overall feature closure solely because fullbrowser gate is unresolved. No additional assertion/source changes, PR or push.
+
+
+## Checkpoint 19 — 2026-09-08 — ON TRACK for P2; overall NO-PASS
+
+User authorized review P2 correction and clearer test-page instructions. Plan amended at ecd9d9c9, RED tests at4239a6db/30cfe973, runtime66aff2cc. Guard rejected the first obstructed fixture run, established intended RED with real hit/layout preconditions, then traced and verified empty/none normalization. Final911 units,20 browser tests,29 strictcases, package and root/Trunk checks pass. Public initial-prop probes and live-pointer diagnostics pass. Axis-handoff remains the unresolved full-suite checkpoint despite another isolated pass; preserve79pass/1fail/370unrun. No assertion weakening, projection/dependency scope expansion or publication. See current guard report.
+
+Final CSS-only control stacking follow-up: fresh app/package build passes, all20 gesture browser tests pass again (17.1s), and explicit real-pointer Snap1/2/3 readouts each report0px while the handle remains hittable. Zero/nonzero public initial-prop consumers each pass three actual starts with hit preconditions. Runtime unchanged from66aff2cc; prior911 units/29 strictcases/root checks remain valid.

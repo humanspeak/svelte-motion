@@ -758,6 +758,7 @@
     }
     .layoutSnapHandle,
     .layoutShiftButton {
+        z-index: 1;
         outline: 2px solid #0f172a;
         box-shadow: 0 3px 0 #0f172a;
         color: #0f172a;

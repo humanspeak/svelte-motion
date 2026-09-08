@@ -1,0 +1,10 @@
+
+Running 2 tests using 1 worker
+
+(node:46672) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/2] [chromium] › e2e/drag/transform-page-point.spec.ts:693:5 › MotionConfig transformPagePoint drag › keeps repeated controls snaps aligned after drag and settled parent layout
+[2/2] [chromium] › e2e/drag/transform-page-point.spec.ts:702:5 › MotionConfig transformPagePoint drag › keeps nonzero-initial controls snaps aligned after settled parent layout
+  2 passed (10.8s)

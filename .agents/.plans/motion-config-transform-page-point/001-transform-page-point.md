@@ -50,7 +50,7 @@ Source snapshot `13ec152` already implements the draft. Baseline excerpts below 
 - **Depends on:** none; PR #480 merged; baseline includes its boundary-release tests
 - **Category:** direction / enhancement
 - **Confidence:** HIGH that the feature is missing; ranking is product judgment
-- **Planned at:** `b5a30a38`, 2026-09-08 (approved first owned-child opacity test amendment; original source baseline `14046a5`)
+- **Planned at:** `66aff2cc`, 2026-09-08 (authorized layout/snap P2 correction; original source baseline `14046a5`)
 - **Status:** IN PROGRESS — local snap bug corrected; 908 units, 18 targeted browser tests and all29 parity cases pass. Full browser review and final closeout remain.
 
 ## Why this matters

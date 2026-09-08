@@ -16,7 +16,7 @@ The payoff is visual: a tile stays under the cursor inside a scaled board and re
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | IN PROGRESS — snap fixed; 29 parity cases pass; full-suite review pending |
+| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | IN PROGRESS — layout/snap P2 fixed; 911 units, 20 browser tests, 29 parity cases pass; axis-handoff review pending |
 
 Status: TODO / IN PROGRESS / DONE / BLOCKED (reason) / REJECTED (reason).
 
@@ -79,3 +79,5 @@ User authorized the one-file controls test amendment and requested the example p
 2026-09-08: Source `2f191d3b` completes the authorized snap fix and isolates projection bookkeeping reads. Independent guard: 908/908 units, 18/18 targeted browser tests, 29/29 strict React cases, root check and package build pass. Public docs pointer movement passes all four presets. Full-suite owned-child review remains pending; unchanged focused repeat passes 3/3. No further source edits or test weakening authorized by that repeat alone.
 
 2026-09-08: User approved the first owned-child timing test amendment. Resume bounded polling edit and full-browser verification. No runtime or other test scope expansion; no approval remains pending for this first test.
+
+2026-09-08: User-authorized layout/snap review P2 corrected in66aff2cc, with RED-first browser coverage and clearer demo instructions/live distance readout. Full units911/911, targetedbrowser20/20, strictReact29/29 pass. The unchanged axis-handoff case passes in isolation but its full-suite failure remains under review; no full-suite acceptance or batch closure.

@@ -1,0 +1,27 @@
+{
+  "before": {
+    "x": 892,
+    "y": 514.40625,
+    "viewport": {
+      "right": 1065,
+      "bottom": 636.40625
+    },
+    "scroll": {
+      "left": 0,
+      "top": 0
+    },
+    "boardRight": 1282
+  },
+  "held": {
+    "x": 1150,
+    "y": 514.40625,
+    "text": "MOVE local units",
+    "scroll": {
+      "left": 0,
+      "top": 0
+    }
+  },
+  "scrollUnchanged": true,
+  "pointerOutsideViewport": true,
+  "pointerMatched": true
+}
