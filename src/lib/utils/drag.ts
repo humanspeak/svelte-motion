@@ -479,6 +479,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         if (!dragging && isDomElement(nextOptions.constraints)) {
             constraintsBase = { ...applied }
         }
+        observeProjectionMeasurements()
         panCleanup?.update(dragSessionHandlers, dragSessionOptions())
     }
 
@@ -759,6 +760,106 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     const authoredAxisChannel = (axisKey: 'x' | 'y'): AnyResolvedKeyframe | undefined =>
         (opts.getBaseTransformValues?.() ?? {})[axisKey] ?? restingTransformValues[axisKey]
 
+    type SnapProjectionLayout = {
+        layoutBox: {
+            x: { min: number; max: number }
+            y: { min: number; max: number }
+        }
+    }
+
+    type SnapProjection = {
+        layout?: SnapProjectionLayout
+        addEventListener?: (name: 'measure', listener: () => void) => (() => void) | undefined
+    }
+
+    type SnapVisualElement = {
+        values: Map<string, MotionValue<AnyResolvedKeyframe>>
+        latestValues: Record<string, AnyResolvedKeyframe | undefined>
+        projection?: SnapProjection
+    }
+
+    /** Parse a transform channel without changing its coordinate domain. */
+    const readNumericAxisValue = (value: AnyResolvedKeyframe | undefined): number | null => {
+        if (value === undefined) return 0
+        const numeric = typeof value === 'number' ? value : Number.parseFloat(value)
+        return Number.isNaN(numeric) ? null : numeric
+    }
+
+    /** Read the total value currently owned by an axis MotionValue. */
+    const readCurrentAxisValue = (axisKey: 'x' | 'y'): number | null => {
+        const bound = axisKey === 'x' ? boundX : boundY
+        if (bound) return readNumericAxisValue(bound.get())
+
+        const node = getNode() as unknown as SnapVisualElement | null
+        const value = node?.values.get(axisKey)?.get() ?? node?.latestValues[axisKey]
+        return readNumericAxisValue(value ?? authoredAxisChannel(axisKey))
+    }
+
+    // A projection layout box is a cached measurement. Keep the axis values
+    // from the same measurement boundary so snapToCursor can distinguish a
+    // real layout position from a transform that changed after that read.
+    // This deliberately does not force a fresh measurement at pointerdown:
+    // the cached layout/raw-page-point pairing is part of the established
+    // transformPagePoint + scroll contract.
+    let measuredProjection: SnapProjection | null = null
+    let measuredProjectionLayout: SnapProjectionLayout | undefined
+    let measuredAxisValues = { x: null as number | null, y: null as number | null }
+    let stopProjectionMeasureListener: (() => void) | null = null
+
+    const captureProjectionAxisValues = (projection: SnapProjection) => {
+        if (!projection.layout) return
+        measuredProjectionLayout = projection.layout
+        measuredAxisValues = {
+            x: readCurrentAxisValue('x'),
+            y: readCurrentAxisValue('y')
+        }
+    }
+
+    /** Observe the projection measurement owned by the shared VisualElement. */
+    const observeProjectionMeasurements = (): SnapProjection | null => {
+        const projection = (getNode() as unknown as SnapVisualElement | null)?.projection
+
+        if (!projection) return null
+        if (projection !== measuredProjection) {
+            stopProjectionMeasureListener?.()
+            measuredProjection = projection
+            captureProjectionAxisValues(projection)
+            stopProjectionMeasureListener =
+                projection.addEventListener?.('measure', () => {
+                    captureProjectionAxisValues(projection)
+                }) ?? null
+        } else if (projection.layout !== measuredProjectionLayout) {
+            // Real projection nodes emit `measure` after replacing `layout`.
+            // This fallback also keeps minimal/custom VisualElements coherent.
+            captureProjectionAxisValues(projection)
+        }
+        return projection
+    }
+
+    /**
+     * Resolve a cached projection center at the current axis position.
+     *
+     * The projection measurement and axis MotionValue share the corrected
+     * local coordinate space. Therefore only the axis delta since measurement
+     * is added; affine translation cancels, and no raw DOM pixels are mixed
+     * into scaled coordinates.
+     */
+    const resolveCurrentProjectionCenter = (
+        axisKey: 'x' | 'y',
+        layout: SnapProjectionLayout,
+        currentAxisValue: number | null
+    ): number => {
+        const measuredAxisValue = measuredAxisValues[axisKey]
+        const measuredAxis = layout.layoutBox[axisKey]
+        const measuredCenter = (measuredAxis.min + measuredAxis.max) / 2
+
+        return measuredProjectionLayout === layout &&
+            measuredAxisValue !== null &&
+            currentAxisValue !== null
+            ? measuredCenter + currentAxisValue - measuredAxisValue
+            : measuredCenter
+    }
+
     /**
      * Fallback release values, for axes with no MotionValue to drive: no
      * VisualElement at all (standalone `attachDrag`, unit tests), or an authored
@@ -978,6 +1079,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         // samples the interrupted animation and leaves the value — and its
         // velocity — at the sampled position, WAAPI-accelerated channels included
         // (`NativeAnimationExtended.updateMotionValue`).
+        const currentAxisValues = { x: null as number | null, y: null as number | null }
         for (const axisKey of ['x', 'y'] as const) {
             if (!(axisKey === 'x' ? dragX : dragY)) continue
             const release = resolveAxisRelease(axisKey)
@@ -987,37 +1089,28 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             // it, and `applied` is what seeds `origin` and `constraintsBase`
             // below. `value = applied + base`, so invert that.
             const frozen = release.value.get()
-            const numeric = typeof frozen === 'number' ? frozen : Number.parseFloat(frozen)
-            if (!Number.isNaN(numeric)) applied[axisKey] = numeric - release.base
+            const numeric = readNumericAxisValue(frozen)
+            currentAxisValues[axisKey] = numeric
+            if (numeric !== null) applied[axisKey] = numeric - release.base
         }
 
         const applyXAxis = axis === true || axis === 'x'
         const applyYAxis = axis === true || axis === 'y'
         if (pendingSnapToCursor) {
-            const projectionNode = getNode() as unknown as {
-                projection?: {
-                    layout?: {
-                        layoutBox?: {
-                            x: { min: number; max: number }
-                            y: { min: number; max: number }
-                        }
-                    }
-                }
-            } | null
-            const layoutBox = projectionNode?.projection?.layout?.layoutBox
-            const rect = layoutBox ? null : getRect(el, opts.transformPagePoint)
-            const centerX = layoutBox
-                ? (layoutBox.x.min + layoutBox.x.max) / 2
+            const projection = observeProjectionMeasurements()
+            const projectionLayout = projection?.layout
+            const rect = projectionLayout ? null : getRect(el, opts.transformPagePoint)
+            const centerX = projectionLayout
+                ? resolveCurrentProjectionCenter('x', projectionLayout, currentAxisValues.x)
                 : (rect?.left ?? 0) + (rect?.width ?? 0) / 2
-            const centerY = layoutBox
-                ? (layoutBox.y.min + layoutBox.y.max) / 2
+            const centerY = projectionLayout
+                ? resolveCurrentProjectionCenter('y', projectionLayout, currentAxisValues.y)
                 : (rect?.top ?? 0) + (rect?.height ?? 0) / 2
             // `applied` was already derived above from the current axis value
-            // minus its authored baseline. Upstream adds the raw-point/layout
-            // delta to the current TOTAL axis value; adding that same delta to
-            // our relative value is equivalent. Re-seeding from the rendered
-            // matrix here would add the authored baseline a second time on
-            // every controlled start (for example initial x/y values).
+            // minus its authored baseline. The projection center is advanced by
+            // exactly the axis delta since its measurement, so adding the
+            // raw-point/current-center delta produces the same snap on every
+            // identical start. Initial coordinates are still counted once.
             //
             // Upstream intentionally crosses these domains at this boundary:
             // snap receives extractEventInfo(event).point (the raw PAGE point),
@@ -1158,6 +1251,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         scheduleHandlers: false
     })
 
+    observeProjectionMeasurements()
     panCleanup = attachPan(el, dragSessionHandlers, dragSessionOptions())
 
     const onPointerDown = (e: PointerEvent) => {
@@ -1714,6 +1808,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         // legitimate glide is on screen, and the fresh gesture re-derives its
         // offset from the axis values at drag start anyway.
         detachRelease?.()
+        stopProjectionMeasureListener?.()
+        stopProjectionMeasureListener = null
         stopConstraintResizeObserver?.()
         el.removeEventListener('pointerdown', onPointerDown)
     }

@@ -528,7 +528,7 @@ describe('utils/drag', () => {
             expect({ x: x.get(), y: y.get() }).toEqual({ x: -90, y: -50 })
         })
 
-        it('matches repeated controlled snap with authored initial axis values', async () => {
+        it('does not accumulate repeated controlled snaps with authored initial axis values', async () => {
             const el = document.createElement('div')
             el.style.transform = 'matrix(1, 0, 0, 1, 100, 40)'
             document.body.appendChild(el)
@@ -563,6 +563,7 @@ describe('utils/drag', () => {
                 mergedTransition: { duration: 0 },
                 baselineSources: { initial: { x: 100, y: 40 } }
             })
+            const snapped: Array<{ x: unknown; y: unknown }> = []
 
             const dragFromHandle = async (pointerId: number) => {
                 controls.start(
@@ -573,6 +574,7 @@ describe('utils/drag', () => {
                     }),
                     { snapToCursor: true }
                 )
+                snapped.push({ x: node.latestValues.x, y: node.latestValues.y })
                 window.dispatchEvent(
                     new PointerEvent('pointermove', {
                         clientX: 690,
@@ -595,9 +597,150 @@ describe('utils/drag', () => {
             expect(node.latestValues).toMatchObject({ x: 50, y: -10 })
 
             await dragFromHandle(91)
-            expect(node.latestValues).toMatchObject({ x: 0, y: -60 })
+            expect(node.latestValues).toMatchObject({ x: 50, y: -10 })
+
+            await dragFromHandle(92)
+            expect(node.latestValues).toMatchObject({ x: 50, y: -10 })
+            expect(snapped).toEqual([
+                { x: 0, y: -60 },
+                { x: 0, y: -60 },
+                { x: 0, y: -60 }
+            ])
 
             cleanup()
+            el.remove()
+        })
+
+        it('does not accumulate repeated controlled snaps from zero axis values', async () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const node = registerStubNode(el) as ReturnType<typeof registerStubNode> & {
+                projection?: {
+                    layout: {
+                        layoutBox: {
+                            x: { min: number; max: number }
+                            y: { min: number; max: number }
+                        }
+                    }
+                }
+            }
+            node.projection = {
+                layout: {
+                    layoutBox: {
+                        x: { min: 460, max: 540 },
+                        y: { min: 260, max: 340 }
+                    }
+                }
+            }
+            const controls = createDragControls()
+            const cleanup = attachDrag(el, {
+                axis: true,
+                controls,
+                momentum: false,
+                mergedTransition: { duration: 0 }
+            })
+            const snapped: Array<{ x: unknown; y: unknown }> = []
+
+            const dragFromHandle = async (pointerId: number) => {
+                controls.start(
+                    new PointerEvent('pointerdown', {
+                        clientX: 400,
+                        clientY: 250,
+                        pointerId
+                    }),
+                    { snapToCursor: true }
+                )
+                snapped.push({ x: node.latestValues.x, y: node.latestValues.y })
+                window.dispatchEvent(
+                    new PointerEvent('pointermove', {
+                        clientX: 430,
+                        clientY: 270,
+                        pointerId
+                    })
+                )
+                await flushFrame()
+                window.dispatchEvent(
+                    new PointerEvent('pointerup', {
+                        clientX: 430,
+                        clientY: 270,
+                        pointerId
+                    })
+                )
+                await flushFrame()
+            }
+
+            await dragFromHandle(93)
+            expect(node.latestValues).toMatchObject({ x: -70, y: -30 })
+
+            await dragFromHandle(94)
+            expect(node.latestValues).toMatchObject({ x: -70, y: -30 })
+            expect(snapped).toEqual([
+                { x: -100, y: -50 },
+                { x: -100, y: -50 }
+            ])
+
+            cleanup()
+            el.remove()
+        })
+
+        it('pairs a refreshed projection measurement with its then-current axis value', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const node = registerStubNode(el)
+            const measureListeners = new Set<() => void>()
+            const stopMeasureListener = vi.fn()
+            const projection = {
+                layout: {
+                    layoutBox: {
+                        x: { min: 80, max: 120 },
+                        y: { min: 30, max: 70 }
+                    }
+                },
+                addEventListener: (name: string, listener: () => void) => {
+                    expect(name).toBe('measure')
+                    measureListeners.add(listener)
+                    return () => {
+                        measureListeners.delete(listener)
+                        stopMeasureListener()
+                    }
+                }
+            }
+            ;(node as typeof node & { projection: typeof projection }).projection = projection
+            const controls = createDragControls()
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                controls,
+                momentum: false,
+                mergedTransition: { duration: 0 }
+            })
+
+            // A new layout measurement includes x=40. A later writer advances
+            // the shared axis to 70 without refreshing the layout box.
+            node.getValue('x').set(40)
+            projection.layout = {
+                layoutBox: {
+                    x: { min: 120, max: 160 },
+                    y: { min: 30, max: 70 }
+                }
+            }
+            for (const listener of measureListeners) listener()
+            node.getValue('x').set(70)
+
+            controls.start(
+                new PointerEvent('pointerdown', {
+                    clientX: 100,
+                    clientY: 50,
+                    pointerId: 95
+                }),
+                { snapToCursor: true }
+            )
+
+            // Cached center 140 represented x=40. At x=70 the live center is
+            // 170, so pointer 100 snaps the axis to 0 (70 + 100 - 170).
+            expect(node.latestValues.x).toBe(0)
+
+            cleanup()
+            expect(stopMeasureListener).toHaveBeenCalledOnce()
             el.remove()
         })
     })
