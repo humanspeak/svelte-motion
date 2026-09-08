@@ -1,0 +1,19 @@
+
+Running 3 tests using 1 worker
+
+(node:70425) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/3] [chromium] › e2e/animate-presence/owned-child.spec.ts:11:5 › AnimatePresence owned child › retains and exits the original node without creating a clone
+(node:70445) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[2/3] [chromium] › e2e/animate-presence/owned-child.spec.ts:11:5 › AnimatePresence owned child › retains and exits the original node without creating a clone
+(node:70453) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[3/3] [chromium] › e2e/animate-presence/owned-child.spec.ts:11:5 › AnimatePresence owned child › retains and exits the original node without creating a clone
+  3 passed (14.5s)

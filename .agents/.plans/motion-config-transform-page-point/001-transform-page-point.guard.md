@@ -138,3 +138,7 @@ User says “Ok, lets fix it for us first”, authorizing correction of the shar
 ## Checkpoint 17 — 2026-09-08 14:05 — ON TRACK, incomplete verification
 
 Snapshot `88a811f0` fixes the reactive drag lifetime regression: 908 units and 18 targeted browser tests pass; controls RED remains unchanged. Strict matrix 28/29, one intermediate rendered rectangle mismatch, read-only diagnosis underway. Full e2e stopped after 53 passes on owned-child opacity timing (0.98175 vs <0.95 at 120 ms); T3 real-click review fades correctly and completes. User decision required by repository full-failure workflow before changing that test/page or continuing full verification. No source scope expansion, test weakening, PR, push or closure. See current guard report and snap-integration evidence.
+
+## Checkpoint 18 — 2026-09-08 14:22 — ON TRACK; full-suite review pending
+
+Source `2f191d3b`: unchanged controls RED now GREEN; 908 units, 18 targeted browser tests and all29 strict public React cases pass. Isolated layout-commit mismatch also passes. Root check0errors39existingwarnings, app/package/publint, docs build252images/Cloudflare, docsmetadata5, Trunkfmt/check and diffhygiene pass; docscheck6errors13warnings exactly matches established baseline. Public docs real-pointer displacement passes all four presets. First full-e2e failure remains paused for user decision under CLAUDE.md:44-51; unchanged samecase repeats3/3PASS and T3 fades correctly. NO-PASS for overall feature closure solely because fullbrowser gate is unresolved. No additional assertion/source changes, PR or push.

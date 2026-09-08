@@ -14,7 +14,7 @@ The payoff is visual: a tile stays under the cursor inside a scaled board and re
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | IN PROGRESS — Svelte snap correction approved; RED recorded |
+| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | IN PROGRESS — snap fixed; 29 parity cases pass; full-suite review pending |
 
 Status: TODO / IN PROGRESS / DONE / BLOCKED (reason) / REJECTED (reason).
 
@@ -73,3 +73,5 @@ User authorized the one-file controls test amendment and requested the example p
 2026-09-08: Snapshot501ea9c3 fixescontrolsRED but exposes reactive gesture reattachment. Narrow original-scope container integration correction dispatched; no assertion changes.
 
 2026-09-08: Snapshot `88a811f0` passes 908 units and 18 targeted browser tests, including unchanged repeated-start RED. Strict parity has one layout snapshot mismatch; full e2e stops at first owned-child opacity timing failure after 53 passes. T3 page reviewed; user decision pending per repository workflow. See current guard report.
+
+2026-09-08: Source `2f191d3b` completes the authorized snap fix and isolates projection bookkeeping reads. Independent guard: 908/908 units, 18/18 targeted browser tests, 29/29 strict React cases, root check and package build pass. Public docs pointer movement passes all four presets. Full-suite owned-child review remains pending; unchanged focused repeat passes 3/3. No further source edits or test weakening authorized by that repeat alone.

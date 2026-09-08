@@ -47,7 +47,7 @@ Source snapshot `13ec152` already implements the draft. Baseline excerpts below 
 - **Category:** direction / enhancement
 - **Confidence:** HIGH that the feature is missing; ranking is product judgment
 - **Planned at:** `ebcaccc`, 2026-09-08 (approved controls test-only amendment; original source baseline `14046a5`)
-- **Status:** IN PROGRESS — controls test amendment approved; runtime verification complete; browser regression/full gate and requested example walkthrough remain.
+- **Status:** IN PROGRESS — local snap bug corrected; 908 units, 18 targeted browser tests and all29 parity cases pass. Full browser review and final closeout remain.
 
 ## Why this matters
 
