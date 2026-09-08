@@ -20,8 +20,7 @@
         MotionOnPan,
         MotionOnPanEnd,
         MotionOnPanSessionStart,
-        MotionOnPanStart,
-        MotionTransformPoint
+        MotionOnPanStart
     } from '$lib/types'
     import { isNotEmpty } from '$lib/utils/objects'
     import { sleep } from '$lib/utils/testing'
@@ -262,11 +261,7 @@
         value === null || value === undefined || (typeof value === 'string' && /^[+-]=/.test(value))
     let dataPath = $state<number>(-1)
     const motionConfig = $derived(getMotionConfig())
-    let coordinateSessionActive = $state(false)
-    let capturedTransformPagePoint = $state<MotionTransformPoint | undefined>(undefined)
-    const effectiveTransformPagePoint = $derived(
-        coordinateSessionActive ? capturedTransformPagePoint : motionConfig?.transformPagePoint
-    )
+    const effectiveTransformPagePoint = $derived(motionConfig?.transformPagePoint)
     const lazyMotion = getLazyMotionContext()
     const activeFeatures = $derived(lazyMotion?.getFeatures() ?? domMax)
     const hasGestureFeatures = $derived(!!activeFeatures.gestures)
@@ -1528,16 +1523,6 @@
     //   after any non-zero duration settle animation.
     let teardownDrag: AttachDragCleanup | null = null
 
-    const startCoordinateSession = () => {
-        capturedTransformPagePoint = motionConfig?.transformPagePoint
-        coordinateSessionActive = true
-    }
-
-    const endCoordinateSession = () => {
-        coordinateSessionActive = false
-        capturedTransformPagePoint = undefined
-    }
-
     const resolveDragOptions = (): AttachDragOptions => {
         const currentDragProp = dragProp
         const axis: DragAxis =
@@ -1575,8 +1560,6 @@
             getBaseTransform: () => userBaseTransform,
             transformTemplate: transformTemplateProp,
             transformPagePoint: effectiveTransformPagePoint,
-            onGestureSessionStart: startCoordinateSession,
-            onGestureSessionEnd: endCoordinateSession,
             propagation: !!dragPropagationProp,
             snapToOrigin: dragSnapToOriginProp,
             boundMotionValues:
@@ -1671,6 +1654,16 @@
      */
     let whilePanRestore: Record<string, unknown> | null = null
 
+    /** Restore the local whilePan extension without emitting a public pan lifecycle event. */
+    const restoreWhilePan = () => {
+        if (whilePanRestore && visualElement) {
+            animateTarget(visualElement, whilePanRestore as TargetAndTransition, {
+                transitionOverride: mergedTransition as Transition | undefined
+            })
+        }
+        whilePanRestore = null
+    }
+
     /**
      * Boolean presence-check for "is any pan surface active?". Derived
      * so the attach effect below tracks the *boolean value*, not the
@@ -1728,12 +1721,7 @@
         },
         onMove: onPanProp,
         onEnd: (event, info) => {
-            if (whilePanRestore && visualElement) {
-                animateTarget(visualElement, whilePanRestore as TargetAndTransition, {
-                    transitionOverride: mergedTransition as Transition | undefined
-                })
-            }
-            whilePanRestore = null
+            restoreWhilePan()
             onPanEndProp?.(event, info)
         }
     })
@@ -1773,23 +1761,14 @@
             element,
             untrack(() => buildPanHandlers()),
             untrack(() => ({
-                transformPagePoint: effectiveTransformPagePoint,
-                onGestureSessionStart: startCoordinateSession,
-                onGestureSessionEnd: endCoordinateSession
+                transformPagePoint: effectiveTransformPagePoint
             }))
         )
 
         return () => {
-            // Synchronous revert of whilePan + lifecycle dispatch lives in
-            // attachPan.teardown() — the cleanup chain there calls
-            // session.dispatchTerminal(rawHandlers) BEFORE flipping isAlive,
-            // so onPanEnd fires (which runs the revert above) before the
-            // listeners go. dispatchTerminal is idempotent (PanSession's
-            // terminalDispatched flag) so a host that tears down after a
-            // natural release won't replay the lifecycle pair.
             teardownPan?.()
             teardownPan = null
-            whilePanRestore = null
+            restoreWhilePan()
         }
     })
 
@@ -1812,9 +1791,7 @@
         void effectiveTransformPagePoint
         if (!teardownPan) return
         teardownPan.update(buildPanHandlers(), {
-            transformPagePoint: effectiveTransformPagePoint,
-            onGestureSessionStart: startCoordinateSession,
-            onGestureSessionEnd: endCoordinateSession
+            transformPagePoint: effectiveTransformPagePoint
         })
     })
 

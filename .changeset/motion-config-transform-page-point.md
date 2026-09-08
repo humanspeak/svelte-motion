@@ -2,6 +2,6 @@
 '@humanspeak/svelte-motion': minor
 ---
 
-Add `MotionConfig.transformPagePoint` and the public `MotionTransformPoint` / `MotionConfigProps` types. Drag, pan, VisualElement measurements, element-ref constraints, snap-to-cursor, callback payloads, and release velocity now share corrected local units inside uniformly or nonuniformly scaled parents.
+Add `MotionConfig.transformPagePoint` and the public `MotionTransformPoint` / `MotionConfigProps` types. Drag, pan, VisualElement measurements, element-ref constraints, controls, callback payloads, and release velocity now follow Motion's corrected-coordinate behavior inside uniformly or nonuniformly scaled parents.
 
-Nested configs inherit the callback, while an explicit identity function resets a subtree. The callback reference is captured at pointerdown so replacing config during a live gesture cannot mix coordinate domains; the replacement applies to the next session.
+Nested configs inherit an omitted callback, while explicit `undefined` clears it and an identity function opts a subtree out. Pointer input captures the callback reference at pointerdown; live measurements remain current, and retained gesture history is not remapped when a stable callback's closed-over state changes.

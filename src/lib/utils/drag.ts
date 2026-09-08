@@ -31,6 +31,7 @@ import {
     parseMatrixTranslate
 } from '$lib/utils/dragMath'
 import { deriveBoundaryPhysics } from '$lib/utils/dragParams'
+import { attachPan, type AttachPanCleanup } from '$lib/utils/pan'
 import {
     buildGestureTransform,
     collectGestureTransformValues as collectTransformValues,
@@ -38,6 +39,7 @@ import {
 } from '$lib/utils/transformComposer'
 import { type AnimationOptions } from 'motion'
 import {
+    frame,
     motionValue,
     setDragLock,
     visualElementStore,
@@ -121,10 +123,6 @@ export type AttachDragOptions = {
     boundMotionValues?: { x?: MotionValue<number>; y?: MotionValue<number> }
     /** Coordinate mapping selected for the next pointer session. */
     transformPagePoint?: MotionTransformPoint
-    /** Internal notification fired before a pointer session reads geometry. */
-    onGestureSessionStart?: () => void
-    /** Internal notification fired after terminal gesture data is captured. */
-    onGestureSessionEnd?: () => void
 }
 
 /**
@@ -322,65 +320,6 @@ export const applyElastic = (value: number, min: number, max: number, elastic: n
     return value
 }
 
-/** Prefer high-resolution time in browser; fall back for SSR/tests. */
-const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
-
-/** Sample windows for release-velocity inference (matches motion-dom values). */
-const MAX_VELOCITY_DELTA_MS = 30
-const MIN_VELOCITY_INTERVAL_MS = 5
-
-/**
- * Compute the release velocity for momentum from a pointer-history window.
- *
- * Mirrors motion-dom: walks back from the newest sample, including only
- * samples within `MAX_VELOCITY_DELTA_MS` (30 ms) of newest, then divides
- * the displacement by the elapsed time. Returns 0 if the newest sample is
- * stale, the window has fewer than two samples, or the oldest-newest span
- * is shorter than `MIN_VELOCITY_INTERVAL_MS` (5 ms — sub-frame).
- *
- * @param history Recent pointer samples ordered oldest → newest. Each
- *   sample is `{ x, y, t }` where `t` is `performance.now()` ms.
- * @param nowMs Current `performance.now()` ms — used to discard a stale
- *   newest sample (finger lifted after a pause).
- * @returns Inferred release velocity in pixels per second on each axis.
- * @example
- *   const v = computeReleaseVelocity(
- *       [{ x: 0, y: 0, t: 1000 }, { x: 20, y: 0, t: 1020 }],
- *       1020
- *   )
- *   // v ≈ { x: 1000, y: 0 } — 20 px over 20 ms → 1000 px/s
- */
-const computeReleaseVelocity = (
-    history: ReadonlyArray<{ x: number; y: number; t: number }>,
-    nowMs: number
-): { x: number; y: number } => {
-    if (history.length < 2) return { x: 0, y: 0 }
-
-    for (let newestIdx = history.length - 1; newestIdx > 0; newestIdx--) {
-        const newest = history[newestIdx]
-        if (nowMs - newest.t > MAX_VELOCITY_DELTA_MS) return { x: 0, y: 0 }
-
-        let oldestIdx = newestIdx
-        for (let i = newestIdx - 1; i >= 0; i--) {
-            if (newest.t - history[i].t > MAX_VELOCITY_DELTA_MS) break
-            oldestIdx = i
-        }
-
-        if (oldestIdx === newestIdx) continue
-
-        const oldest = history[oldestIdx]
-        const dtMs = newest.t - oldest.t
-        if (dtMs < MIN_VELOCITY_INTERVAL_MS) continue
-
-        return {
-            x: ((newest.x - oldest.x) / dtMs) * 1000,
-            y: ((newest.y - oldest.y) / dtMs) * 1000
-        }
-    }
-
-    return { x: 0, y: 0 }
-}
-
 /**
  * Cleanup handle returned by {@link attachDrag}. Invoke it to detach the
  * gesture's pointer/resize listeners. It does NOT cancel an in-flight
@@ -435,14 +374,6 @@ export type AttachDragCleanup = (() => void) & {
  * cleanup()
  * ```
  */
-/**
- * Options for the window-level gesture-session listeners. Capture phase
- * guarantees the gesture ends even when a descendant stops propagation
- * of `pointerup`/`pointercancel`; passive because the handlers never
- * call `preventDefault`. Mirrors upstream PanSession (motion#3731).
- */
-const sessionListenerOptions: AddEventListenerOptions = { passive: true, capture: true }
-
 const addPixelOffset = (
     value: AnyResolvedKeyframe | undefined,
     offset: number
@@ -494,24 +425,12 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     let lockAxis: 'x' | 'y' | null = null
     const lockThreshold = 4 // px to decide first-axis
 
-    let startPoint = { x: 0, y: 0 }
-    let lastPoint = { x: 0, y: 0 }
     // Accumulated transform applied to element via Motion ('x'/'y')
     const applied = { x: 0, y: 0 }
     // Origin transform at the start of current drag
     let origin = { x: 0, y: 0 }
     let velocity = { x: 0, y: 0 }
-    // History for velocity smoothing (last N samples)
-    let history: Array<{ x: number; y: number; t: number }> = []
-    let sessionTransformPagePoint: MotionTransformPoint | undefined
-    let gestureSessionStarted = false
-
-    const endGestureSession = () => {
-        if (!gestureSessionStarted) return
-        gestureSessionStarted = false
-        opts.onGestureSessionEnd?.()
-        sessionTransformPagePoint = undefined
-    }
+    let panCleanup: AttachPanCleanup | null = null
 
     // Transform channels authored by `initial`/`animate`, used as the resting
     // baseline the drag offset composes onto. `whileDrag` channels are NOT here:
@@ -551,8 +470,9 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         constraints = resolveConstraints(
             el,
             nextOptions.constraints,
-            dragging ? sessionTransformPagePoint : nextOptions.transformPagePoint
+            nextOptions.transformPagePoint
         )
+        panCleanup?.update(dragSessionHandlers, dragSessionOptions())
     }
 
     /**
@@ -618,26 +538,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         releaseDragLock = null
     }
 
-    const computeInfo = (): DragInfo => ({
-        point: { ...lastPoint },
-        delta: { x: lastPoint.x - startPoint.x, y: lastPoint.y - startPoint.y },
-        offset: {
-            x: origin.x + (lastPoint.x - startPoint.x),
-            y: origin.y + (lastPoint.y - startPoint.y)
-        },
-        velocity: { ...velocity }
-    })
-
-    /**
-     * Extract a pointer in the active session's coordinate domain.
-     * Configured mappings receive upstream-compatible page coordinates;
-     * omitting the mapping preserves the existing client-coordinate behavior.
-     */
-    const extractPointerPoint = (event: PointerEvent): { x: number; y: number } => {
-        if (!sessionTransformPagePoint) return { x: event.clientX, y: event.clientY }
-        return sessionTransformPagePoint({ x: event.pageX, y: event.pageY })
-    }
-
     const getConstraintBounds = (
         base: { x: number; y: number },
         currentConstraints: { top: number; left: number; right: number; bottom: number }
@@ -658,11 +558,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         const progressX = calcConstraintProgress(applied.x, oldBounds.minX, oldBounds.maxX)
         const progressY = calcConstraintProgress(applied.y, oldBounds.minY, oldBounds.maxY)
 
-        const freshConstraints = resolveConstraints(
-            el,
-            opts.constraints,
-            dragging ? sessionTransformPagePoint : opts.transformPagePoint
-        )
+        const freshConstraints = resolveConstraints(el, opts.constraints, opts.transformPagePoint)
         if (!freshConstraints) return
 
         constraints = freshConstraints
@@ -971,8 +867,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
      * mid-gesture, keeping the dragged element pinned under the cursor
      * while its underlying layout slot moves.
      *
-     * Direct port of framer-motion's projection `didUpdate` handler in
-     * `VisualElementDragControls.ts:742-758`:
+     * Mirrors the public effect of Motion's projection `didUpdate` handling:
      *
      * ```ts
      * this.originPoint[axis] += delta[axis].translate
@@ -1038,32 +933,17 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         void node.animationState.setActive('whileDrag', isActive)
     }
 
-    const onPointerDown = (e: PointerEvent) => {
-        if (!listenerEnabled) return
-        beginDrag(e)
-    }
+    let pendingSnapToCursor = false
+    let sessionPrepared = false
 
-    /**
-     * Begin a drag sequence. Optionally rebase the origin under the cursor (`snapToCursor`).
-     * We capture the pointer to receive move/up/cancel regardless of hover state.
-     */
-    const beginDrag = (e: PointerEvent, snapToCursor = false) => {
+    /** Prepare axis ownership when the pointer session begins. */
+    const prepareDragSession = (e: PointerEvent, info: DragInfo) => {
         pwLog('[drag] begin', {
             el: EL_ID,
             pointer: { id: e.pointerId, x: e.clientX, y: e.clientY },
-            snapToCursor
+            snapToCursor: pendingSnapToCursor
         })
-        // Take the global lock FIRST: an aborted start must not capture the
-        // pointer, cancel in-flight inertia, or touch any gesture state
-        // (upstream returns from `onStart` before recording the origin).
-        if (!acquireDragLock()) {
-            pwLog('[drag] another drag holds the lock → not starting', { el: EL_ID })
-            return
-        }
-        endGestureSession()
-        opts.onGestureSessionStart?.()
-        sessionTransformPagePoint = opts.transformPagePoint
-        gestureSessionStarted = true
+        sessionPrepared = true
         try {
             if ('setPointerCapture' in el && typeof e.pointerId === 'number')
                 el.setPointerCapture(e.pointerId)
@@ -1104,8 +984,51 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             if (!Number.isNaN(numeric)) applied[axisKey] = numeric - release.base
         }
 
-        // Recompute constraints in case bounding boxes changed since last drag
-        constraints = resolveConstraints(el, opts.constraints, sessionTransformPagePoint)
+        const applyXAxis = axis === true || axis === 'x'
+        const applyYAxis = axis === true || axis === 'y'
+        if (pendingSnapToCursor) {
+            const rendered = parseMatrixTranslate(getComputedStyle(el).transform)
+            const base = parseMatrixTranslate(opts.getBaseTransform?.() ?? '')
+            if (applyXAxis) applied.x = rendered.tx - base.tx
+            if (applyYAxis) applied.y = rendered.ty - base.ty
+
+            const projectionNode = getNode() as unknown as {
+                projection?: {
+                    layout?: {
+                        layoutBox?: {
+                            x: { min: number; max: number }
+                            y: { min: number; max: number }
+                        }
+                    }
+                }
+            } | null
+            const layoutBox = projectionNode?.projection?.layout?.layoutBox
+            const rect = layoutBox ? null : getRect(el, opts.transformPagePoint)
+            const centerX = layoutBox
+                ? (layoutBox.x.min + layoutBox.x.max) / 2
+                : (rect?.left ?? 0) + (rect?.width ?? 0) / 2
+            const centerY = layoutBox
+                ? (layoutBox.y.min + layoutBox.y.max) / 2
+                : (rect?.top ?? 0) + (rect?.height ?? 0) / 2
+            if (applyXAxis) applied.x += info.point.x - centerX
+            if (applyYAxis) applied.y += info.point.y - centerY
+            setXYImmediate(applied.x, applied.y)
+            pwLog('[drag] snapToCursor', { el: EL_ID, applied: { ...applied } })
+        }
+        pendingSnapToCursor = false
+    }
+
+    /** Enter the public drag lifecycle after the corrected threshold is crossed. */
+    const startDrag = (e: PointerEvent, info: DragInfo) => {
+        if (!sessionPrepared || !acquireDragLock()) {
+            pwLog('[drag] another drag holds the lock → not starting', { el: EL_ID })
+            return
+        }
+
+        // Recompute constraints in case bounding boxes changed since pointerdown.
+        // Geometry reads the current VisualElement/config callback, whereas
+        // `info` continues using the input callback captured by the session.
+        constraints = resolveConstraints(el, opts.constraints, opts.transformPagePoint)
         pwLog('[drag] constraints (px)', { el: EL_ID, constraints })
         if (constraints) {
             if (opts.constraints && !isDomElement(opts.constraints)) {
@@ -1128,92 +1051,19 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         el.dispatchEvent(new CustomEvent('svelte-motion:drag-start'))
         markDragTransformActive(true)
         lockAxis = null
-        // Start from current applied transform, not viewport rect
         origin = { x: applied.x, y: applied.y }
-        startPoint = extractPointerPoint(e)
-        lastPoint = { ...startPoint }
-        velocity = { x: 0, y: 0 }
-        history = [{ ...startPoint, t: now() }]
-
-        const applyXAxis = axis === true || axis === 'x'
-        const applyYAxis = axis === true || axis === 'y'
-        if (snapToCursor) {
-            const rendered = parseMatrixTranslate(getComputedStyle(el).transform)
-            const base = parseMatrixTranslate(opts.getBaseTransform?.() ?? '')
-            if (applyXAxis) applied.x = rendered.tx - base.tx
-            if (applyYAxis) applied.y = rendered.ty - base.ty
-            const pointer = extractPointerPoint(e)
-            const rect = getRect(el, sessionTransformPagePoint)!
-            // motion-dom measures transformed viewport corners, then adds root
-            // scroll. Mirror that page-box contract for controlled snapping.
-            const scrollX = sessionTransformPagePoint ? window.scrollX : 0
-            const scrollY = sessionTransformPagePoint ? window.scrollY : 0
-            const centerX = rect.left + rect.width / 2 + scrollX
-            const centerY = rect.top + rect.height / 2 + scrollY
-            if (applyXAxis) origin.x = applied.x + pointer.x - centerX
-            if (applyYAxis) origin.y = applied.y + pointer.y - centerY
-            setXYImmediate(origin.x, origin.y)
-            pwLog('[drag] snapToCursor origin', { el: EL_ID, origin })
-        }
-
         setWhileDragActive(true)
-        opts.callbacks?.onStart?.(e, computeInfo())
-
-        // Listen on element (to receive captured events) and window as fallback.
-        // Window listeners run in the CAPTURE phase so a descendant calling
-        // stopPropagation() (e.g. in its own pointerup handler) can't prevent
-        // the gesture from ending. Mirrors upstream PanSession (motion#3731).
-        el.addEventListener('pointermove', onPointerMove as EventListener)
-        el.addEventListener('pointerup', onPointerUp as EventListener)
-        el.addEventListener('pointercancel', onPointerCancel as EventListener)
-        window.addEventListener(
-            'pointermove',
-            onPointerMove as EventListener,
-            sessionListenerOptions
-        )
-        window.addEventListener('pointerup', onPointerUp as EventListener, sessionListenerOptions)
-        window.addEventListener(
-            'pointercancel',
-            onPointerCancel as EventListener,
-            sessionListenerOptions
-        )
+        frame.update(() => opts.callbacks?.onStart?.(e, info), false, true)
     }
 
-    /**
-     * Update drag on pointer move:
-     * - Track a small history for velocity smoothing
-     * - Compute dx/dy from initial pointerdown
-     * - Apply direction lock and constraints with elastic
-     * - Write absolute x/y
-     */
-    const onPointerMove = (e: PointerEvent) => {
+    /** Apply the session-relative offset and forward the previous-frame delta. */
+    const moveDrag = (e: PointerEvent, info: DragInfo) => {
         if (!dragging) return
-        const t = now()
-        const point = extractPointerPoint(e)
-        const nx = point.x
-        const ny = point.y
-
-        // Add to history and keep last 5 samples
-        history.push({ x: nx, y: ny, t })
-        if (history.length > 5) history.shift()
-
-        // Calculate velocity from oldest to newest sample for smoothing
-        if (history.length >= 2) {
-            const oldest = history[0]
-            const newest = history[history.length - 1]
-            const dt = Math.max(1, newest.t - oldest.t)
-            const vx = ((newest.x - oldest.x) / dt) * 1000 // px/s
-            const vy = ((newest.y - oldest.y) / dt) * 1000
-            velocity = { x: vx, y: vy }
-        }
-
-        lastPoint = { x: nx, y: ny }
-
-        const dx = nx - startPoint.x
-        const dy = ny - startPoint.y
+        velocity = { ...info.velocity }
+        const { x: dx, y: dy } = info.offset
         pwLog('[drag] move', {
             el: EL_ID,
-            pointer: { x: nx, y: ny },
+            pointer: info.point,
             deltas: { dx, dy },
             origin,
             applied,
@@ -1267,38 +1117,44 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         // path schedules the write and can leave the element visibly chasing
         // the pointer on dense/rotated drag surfaces.
         setXYImmediate(x, y)
-        opts.callbacks?.onMove?.(e, computeInfo())
+        frame.update(() => opts.callbacks?.onMove?.(e, info), false, true)
     }
 
-    const onPointerUp = (e: PointerEvent) => {
-        pwLog('[drag] pointerup', {
-            el: EL_ID,
-            pointer: { id: e.pointerId, x: e.clientX, y: e.clientY },
-            dragging
-        })
-        if (!dragging) return
-        finishDrag(e)
+    // Assigned after the handler table so its closures can share one declaration.
+    // eslint-disable-next-line prefer-const
+    let finishDrag: (e: PointerEvent, cancelled: boolean, info: DragInfo) => void
+
+    const dragSessionHandlers = {
+        onSessionStart: prepareDragSession,
+        onStart: startDrag,
+        onMove: moveDrag,
+        onSessionEnd: (e: PointerEvent, info: DragInfo) => {
+            if (dragging) finishDrag(e, e.type === 'pointercancel', info)
+            sessionPrepared = false
+        }
     }
-    const onPointerCancel = (e: PointerEvent) => {
-        pwLog('[drag] pointercancel', {
-            el: EL_ID,
-            pointer: { id: e.pointerId, x: e.clientX, y: e.clientY },
-            dragging
-        })
-        if (!dragging) return
-        // Pointer was preempted (gesture-nav, palm rejection, scroll
-        // takeover). User did not release intentionally — skip the
-        // inertia/momentum path and force a no-momentum settle so the
-        // card clamps back into constraints without flinging.
-        finishDrag(e, true)
+
+    const dragSessionOptions = () => ({
+        transformPagePoint: opts.transformPagePoint,
+        trackScrollFrom: el,
+        continueSessionAfterDetach: true,
+        pointerDownListener: false,
+        scheduleHandlers: false
+    })
+
+    panCleanup = attachPan(el, dragSessionHandlers, dragSessionOptions())
+
+    const onPointerDown = (e: PointerEvent) => {
+        if (listenerEnabled) panCleanup?.start(e)
     }
+    el.addEventListener('pointerdown', onPointerDown)
 
     /**
      * Finish a drag:
      * - If momentum is enabled, decay towards a clamped target with exponential easing
      * - Otherwise, animate back to a clamped position (or origin), then sync `applied`
      */
-    const finishDrag = (e: PointerEvent, cancelled = false) => {
+    finishDrag = (e: PointerEvent, cancelled: boolean, info: DragInfo) => {
         dragging = false
         postReleaseAnimationActive = false
         // The SESSION ends here — at pointer-up/cancel, before any momentum
@@ -1321,12 +1177,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         // It also never ran at all on the early-return paths below.
         setWhileDragActive(false)
 
-        velocity = computeReleaseVelocity(history, now())
+        velocity = { ...info.velocity }
 
         pwLog('[drag] finish', {
             el: EL_ID,
-            lastPoint,
-            startPoint,
+            info,
             origin,
             applied,
             momentum,
@@ -1339,31 +1194,21 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             // ignore
         }
 
-        el.removeEventListener('pointermove', onPointerMove as EventListener)
-        el.removeEventListener('pointerup', onPointerUp as EventListener)
-        el.removeEventListener('pointercancel', onPointerCancel as EventListener)
-        window.removeEventListener(
-            'pointermove',
-            onPointerMove as EventListener,
-            sessionListenerOptions
-        )
-        window.removeEventListener(
-            'pointerup',
-            onPointerUp as EventListener,
-            sessionListenerOptions
-        )
-        window.removeEventListener(
-            'pointercancel',
-            onPointerCancel as EventListener,
-            sessionListenerOptions
-        )
-
         let terminalDispatched = false
         const dispatchTerminal = () => {
             if (terminalDispatched) return
             terminalDispatched = true
-            opts.callbacks?.onEnd?.(e, computeInfo())
-            endGestureSession()
+            frame.postRender(() => {
+                // In the pinned React 19 public fixture, an active drag keeps
+                // receiving window events after its node is removed, but its
+                // detached axis MotionValues are reset before onDragEnd.
+                if (!el.isConnected) {
+                    applied.x = 0
+                    applied.y = 0
+                    setXYImmediate(0, 0)
+                }
+                opts.callbacks?.onEnd?.(e, info)
+            })
         }
 
         // Momentum/inertia with boundary handoff: inertia until crossing, then spring to boundary.
@@ -1375,9 +1220,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 velocityY: velocity.y,
                 appliedX: applied.x,
                 appliedY: applied.y,
-                historyLength: history.length,
-                historyFirst: history[0],
-                historyLast: history[history.length - 1]
+                info
             })
             // Boundary min/max anchor to `constraintsBase` (the absolute
             // pixel-constraint origin) so the inertia handoff snaps to the
@@ -1598,10 +1441,14 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             // separate DOM animation state.
             const applyX = (axis === true || axis === 'x') && lockAxis !== 'y'
             const applyY = (axis === true || axis === 'y') && lockAxis !== 'x'
-            const dx = lastPoint.x - startPoint.x
-            const dy = lastPoint.y - startPoint.y
-            let x = origin.x + (applyX ? dx : 0)
-            let y = origin.y + (applyY ? dy : 0)
+            // Pointer-up can carry fresh page coordinates after document scroll
+            // even though no move frame rendered them. Release from the current
+            // axis values, while the public terminal callback still receives
+            // the terminal PanInfo above.
+            const dx = applied.x - origin.x
+            const dy = applied.y - origin.y
+            let x = applied.x
+            let y = applied.y
             let minX = -Infinity
             let maxX = Infinity
             let minY = -Infinity
@@ -1825,20 +1672,27 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                 cancelInertia?: () => void
             ) => void
         }
-        internal._bind?.(el, beginDrag, () => stopInertia?.())
+        internal._bind?.(
+            el,
+            (event, snap = false) => {
+                pendingSnapToCursor = snap
+                panCleanup?.start(event)
+            },
+            () => stopInertia?.()
+        )
         pwLog('[drag] controls bound', { el: EL_ID })
     }
 
-    el.addEventListener('pointerdown', onPointerDown)
     pwLog('[drag] pointerdown listener attached', { el: EL_ID })
 
     const teardown = () => {
         pwLog('[drag] detach', { el: EL_ID })
-        // Unmount mid-drag must not leak the global lock (upstream releases it
-        // from `cancel()`, which its unmount path also calls).
-        releaseDragLockIfHeld()
-        markDragTransformActive(false)
-        endGestureSession()
+        // The pinned React 19 adapter leaves an active drag session alive when
+        // its source node unmounts. `attachPan` therefore removes only the
+        // pointerdown listener here and lets the window session reach its real
+        // terminal event, where `finishDrag` releases the lock and callbacks.
+        panCleanup?.()
+        panCleanup = null
         // Drop the bookkeeping of any in-flight release without stopping it: a
         // detach can be a benign re-attach (the drag effect re-running) while a
         // legitimate glide is on screen, and the fresh gesture re-derives its
@@ -1846,24 +1700,6 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         detachRelease?.()
         stopConstraintResizeObserver?.()
         el.removeEventListener('pointerdown', onPointerDown)
-        el.removeEventListener('pointermove', onPointerMove as EventListener)
-        el.removeEventListener('pointerup', onPointerUp as EventListener)
-        el.removeEventListener('pointercancel', onPointerCancel as EventListener)
-        window.removeEventListener(
-            'pointermove',
-            onPointerMove as EventListener,
-            sessionListenerOptions
-        )
-        window.removeEventListener(
-            'pointerup',
-            onPointerUp as EventListener,
-            sessionListenerOptions
-        )
-        window.removeEventListener(
-            'pointercancel',
-            onPointerCancel as EventListener,
-            sessionListenerOptions
-        )
     }
 
     return Object.assign(teardown, { adjustOrigin, updateOptions })

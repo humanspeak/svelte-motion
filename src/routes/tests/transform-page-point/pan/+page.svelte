@@ -1,180 +1,378 @@
 <script lang="ts">
+    import { page } from '$app/state'
     import { MotionConfig, motion, type DragInfo, type MotionTransformPoint } from '$lib'
     import { onMount } from 'svelte'
 
-    let scale = $state(0.5)
-    let mode = $state<'inherit' | 'override' | 'identity'>('inherit')
-    let point = $state({ x: 0, y: 0 })
-    let delta = $state({ x: 0, y: 0 })
-    let offset = $state({ x: 0, y: 0 })
-    let velocity = $state({ x: 0, y: 0 })
-    let starts = $state(0)
-    let ends = $state(0)
-    let cancelled = $state(false)
-    let ready = $state(false)
+    const caseId = $derived(page.url.searchParams.get('case') ?? 'pan-config-inherit')
+    const configKind = $derived(
+        caseId === 'pan-no-config-end'
+            ? 'none'
+            : caseId === 'pan-config-inherit'
+              ? 'inherit'
+              : caseId === 'pan-config-identity'
+                ? 'identity'
+                : caseId === 'pan-config-explicit-undefined'
+                  ? 'undefined'
+                  : caseId === 'pan-nonuniform-affine'
+                    ? 'nonuniform'
+                    : caseId === 'pan-stable-closure-scale'
+                      ? 'stable'
+                      : 'double'
+    )
+    const usesAncestor = $derived(caseId === 'pan-ancestor-scroll-held')
 
-    const inherited: MotionTransformPoint = ({ x, y }) => ({ x: x / scale, y: y / scale })
-    const override: MotionTransformPoint = ({ x, y }) => ({ x: x / 0.25, y: y / 0.25 })
-    const identity: MotionTransformPoint = (value) => value
-    const childTransform = $derived(
-        mode === 'override' ? override : mode === 'identity' ? identity : undefined
+    let mounted = $state(true)
+    let ready = $state(false)
+    type MappingKind = 'none' | 'double' | 'triple' | 'nonuniform-affine'
+    let mappingKind = $state<MappingKind>('double')
+    let stableScale = 2
+    let visualScale = $state({ x: 0.5, y: 0.5 })
+    let panOffset = $state({ x: 0, y: 0 })
+    let callbackInfo = $state<DragInfo | null>(null)
+    let ends = $state(0)
+    let stage: HTMLElement | null = $state(null)
+    let shell: HTMLElement | null = $state(null)
+    let target: HTMLElement | null = $state(null)
+    let follower: HTMLElement | null = $state(null)
+
+    const round = (value: number) =>
+        Number.isFinite(value) ? Math.round(value * 1_000_000) / 1_000_000 : value
+    const point = (value: { x: number; y: number }) => ({ x: round(value.x), y: round(value.y) })
+    const rect = (element: HTMLElement | null) => {
+        if (!element) return null
+        const value = element.getBoundingClientRect()
+        return {
+            x: round(value.x),
+            y: round(value.y),
+            top: round(value.top),
+            right: round(value.right),
+            bottom: round(value.bottom),
+            left: round(value.left),
+            width: round(value.width),
+            height: round(value.height)
+        }
+    }
+    const eventRecord = (event: PointerEvent) => ({
+        type: event.type,
+        pointerId: event.pointerId,
+        pointerType: event.pointerType,
+        isPrimary: event.isPrimary,
+        button: event.button,
+        buttons: event.buttons,
+        client: { x: round(event.clientX), y: round(event.clientY) },
+        page: { x: round(event.pageX), y: round(event.pageY) }
+    })
+    const infoRecord = (info: DragInfo) => ({
+        point: point(info.point),
+        delta: point(info.delta),
+        offset: point(info.offset),
+        velocity: point(info.velocity)
+    })
+
+    const parity: {
+        library: string
+        case: string
+        ready: boolean
+        trace: Array<Record<string, unknown>>
+        snapshots: Array<Record<string, unknown>>
+        actions: Record<string, (...args: never[]) => unknown>
+    } = {
+        library: 'Svelte Motion public fixture',
+        case: '',
+        ready: false,
+        trace: [],
+        snapshots: [],
+        actions: {}
+    }
+    const trace = (type: string, data: Record<string, unknown> = {}) => {
+        parity.trace.push({
+            sequence: parity.trace.length,
+            at: round(performance.now()),
+            type,
+            ...data
+        })
+    }
+    const traced =
+        (identityName: string, transform: MotionTransformPoint): MotionTransformPoint =>
+        (input) => {
+            const output = transform(input)
+            trace('transformPagePoint', {
+                identity: identityName,
+                input: point(input),
+                output: point(output),
+                stableScale
+            })
+            return output
+        }
+
+    const double = traced('double', ({ x, y }) => ({ x: x * 2, y: y * 2 }))
+    const triple = traced('triple', ({ x, y }) => ({ x: x * 3, y: y * 3 }))
+    const nonuniform = traced('nonuniform-affine', ({ x, y }) => ({
+        x: x * 2 + 37,
+        y: y * 0.5 - 23
+    }))
+    const stable = traced('stable-closure', ({ x, y }) => ({
+        x: x * stableScale,
+        y: y * stableScale
+    }))
+    const identity: MotionTransformPoint = traced('identity', ({ x, y }) => ({ x, y }))
+    const activeTransform = $derived(
+        configKind === 'stable'
+            ? stable
+            : mappingKind === 'triple'
+              ? triple
+              : configKind === 'nonuniform'
+                ? nonuniform
+                : double
     )
 
-    const record = (event: PointerEvent, info: DragInfo) => {
-        point = info.point
-        delta = info.delta
-        offset = info.offset
-        velocity = info.velocity
-        cancelled = event.type === 'pointercancel'
+    const captureSnapshot = (label: string) => {
+        const snapshot = {
+            sequence: parity.snapshots.length,
+            at: round(performance.now()),
+            label,
+            mappingKind,
+            stableScale,
+            visualScale: { ...visualScale },
+            mounted,
+            scroll: { x: round(window.scrollX), y: round(window.scrollY) },
+            shellScroll: shell ? { x: shell.scrollLeft, y: shell.scrollTop } : null,
+            rects: {
+                shell: rect(shell),
+                stage: rect(stage),
+                board: null,
+                slot: null,
+                target: rect(target),
+                handle: null,
+                follower: rect(follower)
+            },
+            boundValues: { x: 0, y: 0, panOffset: point(panOffset) }
+        }
+        parity.snapshots.push(snapshot)
+        return snapshot
+    }
+
+    const record = (name: string, event: PointerEvent, info: DragInfo) => {
+        trace(name, {
+            event: eventRecord(event),
+            info: infoRecord(info),
+            callbackRenderState: { mappingKind, stableScale },
+            rendered: { target: rect(target), follower: rect(follower) },
+            boundValues: { x: 0, y: 0 }
+        })
+        if (name === 'onPanStart' || name === 'onPan' || name === 'onPanEnd') {
+            panOffset = point(info.offset)
+            callbackInfo = info
+        }
+        if (name === 'onPanEnd') ends += 1
     }
 
     onMount(() => {
+        const root = globalThis as typeof globalThis & { __PARITY__?: typeof parity }
+        root.__PARITY__ = parity
+        parity.case = caseId
+        mappingKind =
+            configKind === 'none'
+                ? 'none'
+                : configKind === 'nonuniform'
+                  ? 'nonuniform-affine'
+                  : 'double'
+        visualScale =
+            configKind === 'none'
+                ? { x: 1, y: 1 }
+                : configKind === 'nonuniform'
+                  ? { x: 0.5, y: 2 }
+                  : { x: 0.5, y: 0.5 }
+        parity.actions = {
+            captureSnapshot: captureSnapshot as (...args: never[]) => unknown,
+            setMapping: ((value: MappingKind) => {
+                mappingKind = value
+            }) as (...args: never[]) => unknown,
+            setStableScale: ((value: number) => {
+                stableScale = value
+                visualScale = { x: 1 / value, y: 1 / value }
+            }) as (...args: never[]) => unknown,
+            resizeBoard: (() => {}) as (...args: never[]) => unknown,
+            shiftLayout: (() => {}) as (...args: never[]) => unknown,
+            unmount: (() => {
+                mounted = false
+            }) as (...args: never[]) => unknown
+        }
+        parity.ready = true
         ready = true
     })
 </script>
 
-<svelte:head><title>transformPagePoint pan test</title></svelte:head>
-
-<main data-testid="pan-page" data-ready={ready}>
-    <h1>transformPagePoint · pan</h1>
-    <div class="controls">
-        <button data-testid="pan-inherit" onclick={() => (mode = 'inherit')}>inherit</button>
-        <button data-testid="pan-override" onclick={() => (mode = 'override')}>override 25%</button>
-        <button data-testid="pan-identity" onclick={() => (mode = 'identity')}
-            >identity reset</button
+{#snippet panTarget()}
+    {#if mounted}
+        <motion.div
+            bind:ref={target}
+            data-testid="target"
+            class="panTarget"
+            onPanSessionStart={(event, info) => record('onPanSessionStart', event, info)}
+            onPanStart={(event, info) => record('onPanStart', event, info)}
+            onPan={(event, info) => record('onPan', event, info)}
+            onPanEnd={(event, info) => record('onPanEnd', event, info)}
         >
-        <button data-testid="pan-scale-50" onclick={() => (scale = 0.5)}>50%</button>
-        <button data-testid="pan-scale-100" onclick={() => (scale = 1)}>100%</button>
-        <button data-testid="pan-live-scale" onclick={() => (scale = scale === 0.5 ? 0.25 : 0.5)}
-            >live scale</button
-        >
-        <button data-testid="pan-page-scroll" onclick={() => window.scrollBy(0, 80)}
-            >page scroll</button
-        >
-    </div>
+            <div
+                bind:this={follower}
+                data-testid="follower"
+                class="follower"
+                style:transform={`translate(${panOffset.x}px, ${panOffset.y}px)`}
+            ></div>
+            pan surface
+        </motion.div>
+    {/if}
+{/snippet}
 
-    <div class="scroll-shell" data-testid="pan-scroll-shell">
-        <div class="scaled" style:transform={`scale(${scale})`} data-testid="scaled-pan-board">
-            <MotionConfig transformPagePoint={inherited}>
-                <MotionConfig transformPagePoint={childTransform}>
-                    <motion.div
-                        class="surface"
-                        data-testid="pan-surface"
-                        onPanSessionStart={() => {
-                            starts += 1
-                        }}
-                        onPanStart={record}
-                        onPan={record}
-                        onPanEnd={(event, info) => {
-                            record(event, info)
-                            ends += 1
-                        }}
-                    >
-                        <span
-                            class="follower"
-                            data-testid="pan-follower"
-                            style:transform={`translate(${offset.x}px, ${offset.y}px)`}
-                        ></span>
-                        pan here
-                    </motion.div>
-                </MotionConfig>
-            </MotionConfig>
-        </div>
-        <div class="spacer"></div>
-    </div>
-
-    <MotionConfig transformPagePoint={inherited}>
-        <MotionConfig transformPagePoint={identity}>
-            <motion.div class="identity-surface" data-testid="identity-pan" onPan={record}>
-                explicit identity
-            </motion.div>
+{#snippet configuredTarget()}
+    {#if configKind === 'none'}
+        {@render panTarget()}
+    {:else if configKind === 'inherit'}
+        <MotionConfig transformPagePoint={double}>
+            <MotionConfig>{@render panTarget()}</MotionConfig>
         </MotionConfig>
-    </MotionConfig>
+    {:else if configKind === 'identity'}
+        <MotionConfig transformPagePoint={double}>
+            <MotionConfig transformPagePoint={identity}>{@render panTarget()}</MotionConfig>
+        </MotionConfig>
+    {:else if configKind === 'undefined'}
+        <MotionConfig transformPagePoint={double}>
+            <MotionConfig transformPagePoint={undefined}>{@render panTarget()}</MotionConfig>
+        </MotionConfig>
+    {:else}
+        <MotionConfig transformPagePoint={activeTransform}>{@render panTarget()}</MotionConfig>
+    {/if}
+{/snippet}
 
-    <output
-        data-testid="pan-output"
-        data-mode={mode}
-        data-scale={scale}
-        data-point-x={point.x}
-        data-point-y={point.y}
-        data-delta-x={delta.x}
-        data-delta-y={delta.y}
-        data-offset-x={offset.x}
-        data-offset-y={offset.y}
-        data-velocity-x={velocity.x}
-        data-velocity-y={velocity.y}
-        data-starts={starts}
-        data-ends={ends}
-        data-cancelled={cancelled}
-    >
-        offset {offset.x.toFixed(2)}, {offset.y.toFixed(2)}
-    </output>
+<svelte:head><title>transformPagePoint pan reference</title></svelte:head>
+
+<main data-testid="fixture" data-case={caseId} data-ready={ready}>
+    <div class="caseLabel">{caseId}</div>
+    {#if usesAncestor}
+        <div bind:this={shell} data-testid="shell" class="shell">
+            <div class="shellContent">
+                <div bind:this={stage} data-testid="stage" class="stage stageInShell">
+                    <div class="panPlacement">{@render configuredTarget()}</div>
+                </div>
+            </div>
+        </div>
+    {:else}
+        <div
+            bind:this={stage}
+            data-testid="stage"
+            class="stage"
+            style:transform={configKind === 'none'
+                ? 'none'
+                : configKind === 'nonuniform'
+                  ? 'translate(40px, -30px) scale(0.5, 2)'
+                  : `scale(${visualScale.x}, ${visualScale.y})`}
+        >
+            <div class="panPlacement">{@render configuredTarget()}</div>
+        </div>
+    {/if}
+
+    <aside class="controls">
+        <button onclick={() => (mappingKind = mappingKind === 'double' ? 'triple' : 'double')}
+            >replace mapping</button
+        >
+        <button onclick={() => parity.actions.setStableScale?.(4 as never)}>stable scale ×4</button>
+        <button onclick={() => (mounted = !mounted)}>toggle target</button>
+        <output
+            data-testid="pan-output"
+            data-offset-x={callbackInfo?.offset.x ?? 0}
+            data-offset-y={callbackInfo?.offset.y ?? 0}
+            data-delta-x={callbackInfo?.delta.x ?? 0}
+            data-delta-y={callbackInfo?.delta.y ?? 0}
+            data-velocity-x={callbackInfo?.velocity.x ?? 0}
+            data-velocity-y={callbackInfo?.velocity.y ?? 0}
+            data-ends={ends}>offset {panOffset.x}, {panOffset.y}</output
+        >
+    </aside>
 </main>
 
 <style>
-    main {
-        min-width: 1600px;
-        min-height: 1400px;
-        padding: 24px;
-        font-family: system-ui;
+    :global(html),
+    :global(body) {
+        margin: 0;
+        min-width: 2600px;
+        min-height: 2200px;
+    }
+    :global(body) {
+        overflow: scroll;
+    }
+    .caseLabel,
+    .controls {
+        position: fixed;
+        z-index: 20;
+        top: 8px;
+        left: 8px;
+        padding: 5px 8px;
+        background: rgb(2 6 23 / 85%);
+        color: white;
     }
     .controls {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 16px;
+        top: 42px;
+        display: grid;
+        gap: 4px;
     }
-    button {
-        padding: 7px 10px;
-    }
-    .scroll-shell {
-        width: 620px;
-        height: 360px;
-        overflow: auto;
-        border: 2px solid #475569;
-        padding: 36px;
-    }
-    .scaled {
-        width: 480px;
+    .stage {
+        position: absolute;
+        left: 300px;
+        top: 260px;
+        width: max-content;
         transform-origin: top left;
     }
-    :global(.surface),
-    :global(.identity-surface) {
+    .stageInShell {
+        left: 280px;
+        top: 220px;
+        transform: scale(0.5);
+    }
+    .panPlacement {
         position: relative;
-        width: 420px;
-        height: 220px;
+        width: 440px;
+        height: 280px;
+    }
+    :global(.panTarget) {
+        position: absolute;
+        left: 60px;
+        top: 50px;
+        width: 320px;
+        height: 180px;
         display: grid;
         place-items: center;
         overflow: hidden;
-        touch-action: none;
-        user-select: none;
+        box-sizing: border-box;
+        border: 4px solid #60a5fa;
         background: #172554;
         color: white;
-        border: 4px solid #60a5fa;
+        touch-action: none;
+        user-select: none;
     }
     .follower {
         position: absolute;
-        left: 180px;
-        top: 80px;
-        width: 56px;
-        height: 56px;
+        left: 132px;
+        top: 62px;
+        width: 48px;
+        height: 48px;
         border-radius: 50%;
         background: #fb7185;
         pointer-events: none;
     }
-    .spacer {
-        width: 1000px;
-        height: 700px;
+    .shell {
+        position: absolute;
+        left: 80px;
+        top: 90px;
+        width: 560px;
+        height: 380px;
+        overflow: scroll;
+        box-sizing: border-box;
+        border: 3px solid #94a3b8;
+        background: #111827;
     }
-    :global(.identity-surface) {
-        margin-top: 40px;
-        width: 320px;
-        height: 140px;
-        background: #3f3f46;
-    }
-    output {
-        display: block;
-        margin-top: 20px;
-        font-variant-numeric: tabular-nums;
+    .shellContent {
+        position: relative;
+        width: 1300px;
+        height: 1000px;
     }
 </style>

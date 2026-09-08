@@ -16,7 +16,7 @@ describe('MotionConfig.transformPagePoint', () => {
     })
 
     describe('config API', () => {
-        it('inherits the parent callback when the child prop is undefined', async () => {
+        it('inherits the parent callback when the child prop is omitted', async () => {
             const parentTransformPagePoint = ({ x, y }: { x: number; y: number }) => ({
                 x: x * 2,
                 y: y * 3
@@ -60,29 +60,28 @@ describe('MotionConfig.transformPagePoint', () => {
             ).toBe(identity)
         })
 
-        it('clears a child override back to inheritance without remounting', async () => {
+        it('clears inherited mapping with an explicitly undefined child prop', async () => {
             const parentTransformPagePoint = ({ x, y }: { x: number; y: number }) => ({
                 x: x * 2,
                 y: y * 2
             })
-            const childTransformPagePoint = ({ x, y }: { x: number; y: number }) => ({
-                x: x + 5,
-                y: y + 5
-            })
             const { getByTestId, rerender } = render(TransformPagePointHarness, {
-                props: { parentTransformPagePoint, childTransformPagePoint }
+                props: { parentTransformPagePoint }
             })
             await sleep(40)
-            const element = getByTestId('motion-target')
 
             await rerender({ parentTransformPagePoint, childTransformPagePoint: undefined })
             await sleep(40)
 
-            expect(getByTestId('motion-target')).toBe(element)
+            expect(getByTestId('config-probe').getAttribute('data-point')).toBe('none')
             expect(
-                (visualElementStore.get(element)?.getProps() as Record<string, unknown>)
-                    .transformPagePoint
-            ).toBe(parentTransformPagePoint)
+                (
+                    visualElementStore.get(getByTestId('motion-target'))?.getProps() as Record<
+                        string,
+                        unknown
+                    >
+                ).transformPagePoint
+            ).toBeUndefined()
         })
 
         it('applies a new config callback to the mounted VisualElement', async () => {
@@ -105,7 +104,7 @@ describe('MotionConfig.transformPagePoint', () => {
         })
     })
 
-    it('keeps an active drag and VisualElement on the captured callback until release', async () => {
+    it('captures gesture input but updates the mounted VisualElement callback live', async () => {
         const first = ({ x, y }: { x: number; y: number }) => ({ x: x * 2, y: y * 2 })
         const second = ({ x, y }: { x: number; y: number }) => ({ x: x * 3, y: y * 3 })
         const { getByTestId, rerender } = render(TransformPagePointHarness, {
@@ -116,18 +115,42 @@ describe('MotionConfig.transformPagePoint', () => {
         const visualElement = visualElementStore.get(element)!
 
         element.dispatchEvent(
-            new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 10 })
+            new PointerEvent('pointerdown', {
+                clientX: 10,
+                clientY: 10,
+                pointerId: 10,
+                pointerType: 'mouse',
+                isPrimary: true,
+                button: 0,
+                buttons: 1
+            })
         )
         await rerender({ parentTransformPagePoint: second, dragEnabled: true })
         await sleep(20)
-        expect((visualElement.getProps() as Record<string, unknown>).transformPagePoint).toBe(first)
+        expect((visualElement.getProps() as Record<string, unknown>).transformPagePoint).toBe(
+            second
+        )
 
         window.dispatchEvent(
-            new PointerEvent('pointermove', { clientX: 20, clientY: 10, pointerId: 10 })
+            new PointerEvent('pointermove', {
+                clientX: 20,
+                clientY: 10,
+                pointerId: 10,
+                pointerType: 'mouse',
+                isPrimary: true,
+                buttons: 1
+            })
         )
+        await sleep(20)
         expect(visualElement.latestValues.x).toBe(20)
         window.dispatchEvent(
-            new PointerEvent('pointerup', { clientX: 20, clientY: 10, pointerId: 10 })
+            new PointerEvent('pointerup', {
+                clientX: 20,
+                clientY: 10,
+                pointerId: 10,
+                pointerType: 'mouse',
+                isPrimary: true
+            })
         )
         await sleep(20)
         expect((visualElement.getProps() as Record<string, unknown>).transformPagePoint).toBe(
@@ -135,14 +158,36 @@ describe('MotionConfig.transformPagePoint', () => {
         )
 
         element.dispatchEvent(
-            new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 11 })
+            new PointerEvent('pointerdown', {
+                clientX: 10,
+                clientY: 10,
+                pointerId: 11,
+                pointerType: 'mouse',
+                isPrimary: true,
+                button: 0,
+                buttons: 1
+            })
         )
         window.dispatchEvent(
-            new PointerEvent('pointermove', { clientX: 20, clientY: 10, pointerId: 11 })
+            new PointerEvent('pointermove', {
+                clientX: 20,
+                clientY: 10,
+                pointerId: 11,
+                pointerType: 'mouse',
+                isPrimary: true,
+                buttons: 1
+            })
         )
+        await sleep(20)
         expect(visualElement.latestValues.x).toBe(50)
         window.dispatchEvent(
-            new PointerEvent('pointerup', { clientX: 20, clientY: 10, pointerId: 11 })
+            new PointerEvent('pointerup', {
+                clientX: 20,
+                clientY: 10,
+                pointerId: 11,
+                pointerType: 'mouse',
+                isPrimary: true
+            })
         )
     })
 })

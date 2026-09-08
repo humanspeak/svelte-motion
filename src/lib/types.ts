@@ -820,6 +820,10 @@ export type MotionTransformPoint = (point: { x: number; y: number }) => {
     y: number
 }
 
+/**
+ * Configuration inherited by motion components below a {@link MotionConfig}
+ * provider.
+ */
 export type MotionConfigProps = {
     /** Animation configuration */
     transition?: MotionTransition
@@ -850,9 +854,10 @@ export type MotionConfigProps = {
     /**
      * Correct pointer and measurement coordinates for transformed ancestors.
      *
-     * The selected function is inherited by descendant motion elements and is
-     * captured when a pointer session starts, keeping gesture input and
-     * geometry in one coordinate domain until that session ends.
+     * Descendants inherit an omitted value; explicitly passing `undefined`
+     * clears an inherited mapping. A pointer session captures the selected
+     * callback for its input samples, while mounted element measurements read
+     * the current resolved config.
      *
      * @see https://motion.dev/docs/react-motion-config#transformpagepoint
      */

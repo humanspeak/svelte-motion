@@ -1,4 +1,4 @@
-import { frame } from 'motion-dom'
+import { frame, frameData } from 'motion-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { attachPan, type AttachPanCleanup, type PanHandlers } from './pan.js'
 
@@ -40,6 +40,7 @@ describe('attachPan transformPagePoint', () => {
         for (const cleanup of cleanups) cleanup()
         element.remove()
         vi.restoreAllMocks()
+        vi.useRealTimers()
     })
 
     const attach = (handlers: PanHandlers, options = {}) => {
@@ -154,15 +155,10 @@ describe('attachPan transformPagePoint', () => {
         })
     })
 
-    it('dispatches teardown terminals and session notifications exactly once', async () => {
+    it('does not synthesize public terminal callbacks on teardown', async () => {
         const onEnd = vi.fn()
         const onSessionEnd = vi.fn()
-        const onGestureSessionStart = vi.fn()
-        const onGestureSessionEnd = vi.fn()
-        const cleanup = attach(
-            { onEnd, onSessionEnd },
-            { onGestureSessionStart, onGestureSessionEnd }
-        )
+        const cleanup = attach({ onEnd, onSessionEnd })
 
         element.dispatchEvent(pointer('pointerdown', 10, 10))
         window.dispatchEvent(pointer('pointermove', 20, 10))
@@ -170,10 +166,8 @@ describe('attachPan transformPagePoint', () => {
         cleanup()
         cleanup()
 
-        expect(onEnd).toHaveBeenCalledTimes(1)
-        expect(onSessionEnd).toHaveBeenCalledTimes(1)
-        expect(onGestureSessionStart).toHaveBeenCalledTimes(1)
-        expect(onGestureSessionEnd).toHaveBeenCalledTimes(1)
+        expect(onEnd).not.toHaveBeenCalled()
+        expect(onSessionEnd).not.toHaveBeenCalled()
     })
 
     it('ignores secondary pointers', async () => {
@@ -209,7 +203,7 @@ describe('attachPan transformPagePoint', () => {
         expect(secondMove.mock.calls[1][1].offset.x).toBe(30)
     })
 
-    it('transforms page and ancestor scroll deltas into the captured domain', async () => {
+    it('ordinary pan does not track page or ancestor scroll', async () => {
         const ancestor = document.createElement('div')
         ancestor.style.overflowX = 'auto'
         ancestor.style.overflowY = 'auto'
@@ -237,16 +231,16 @@ describe('attachPan transformPagePoint', () => {
         pageScrollX = 5
         window.dispatchEvent(new Event('scroll'))
         await flushFrame()
-        expect(onMove.mock.calls.at(-1)![1].offset.x).toBe(30)
+        expect(onMove.mock.calls.at(-1)![1].offset.x).toBe(20)
 
         ancestor.scrollLeft = 5
         ancestor.dispatchEvent(new Event('scroll', { bubbles: true }))
         await flushFrame()
-        expect(onMove.mock.calls.at(-1)![1].offset.x).toBe(40)
+        expect(onMove.mock.calls.at(-1)![1].offset.x).toBe(20)
         ancestor.remove()
     })
 
-    it('re-evaluates a captured closure against mutable scale without mixing retained samples', async () => {
+    it('re-evaluates a captured closure while retaining old mapped history', async () => {
         let scale = 2
         const onMove = vi.fn()
         const transformPagePoint = ({ x, y }: { x: number; y: number }) => ({
@@ -264,6 +258,49 @@ describe('attachPan transformPagePoint', () => {
         window.dispatchEvent(pointer('pointermove', 20, 10, 6))
         await flushFrame()
         expect(onMove.mock.calls.at(-1)![1].point.x).toBe(80)
-        expect(onMove.mock.calls.at(-1)![1].offset.x).toBe(40)
+        expect(onMove.mock.calls.at(-1)![1].offset.x).toBe(60)
+    })
+
+    it('matches the recorded corrected-frame velocity sequence deterministically', async () => {
+        vi.useFakeTimers()
+        const clock = vi.spyOn(performance, 'now').mockReturnValue(1000)
+        frameData.timestamp = 1000
+        const onMove = vi.fn()
+        const onEnd = vi.fn()
+        attach(
+            { onMove, onEnd },
+            {
+                scheduleHandlers: false,
+                transformPagePoint: ({ x, y }: { x: number; y: number }) => ({
+                    x: x * 2,
+                    y: y * 2
+                })
+            }
+        )
+
+        element.dispatchEvent(pointer('pointerdown', 10, 10, 7))
+        clock.mockReturnValue(1016)
+        await vi.runOnlyPendingTimersAsync()
+        window.dispatchEvent(pointer('pointermove', 12, 11, 7))
+        clock.mockReturnValue(1040)
+        await vi.runOnlyPendingTimersAsync()
+        window.dispatchEvent(pointer('pointermove', 40, 30, 7))
+        clock.mockReturnValue(1080)
+        await vi.runOnlyPendingTimersAsync()
+        window.dispatchEvent(pointer('pointerup', 40, 30, 7))
+        clock.mockReturnValue(1100)
+        await vi.runOnlyPendingTimersAsync()
+
+        const moveInfos = onMove.mock.calls.map((call) => call[1])
+        expect(moveInfos[0]).toMatchObject({
+            delta: { x: 4, y: 2 },
+            offset: { x: 4, y: 2 },
+            velocity: { x: 0, y: 0 }
+        })
+        expect(onEnd.mock.calls[0][1]).toMatchObject({
+            delta: { x: 0, y: 0 },
+            offset: { x: 60, y: 40 },
+            velocity: { x: 750, y: 500 }
+        })
     })
 })

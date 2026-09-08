@@ -143,7 +143,7 @@ Use `transformPagePoint` to map pointer and measured rectangle coordinates into 
 </div>
 ```
 
-The callback corrects drag and pan points, offsets, deltas, thresholds, release velocity, ref constraints, and VisualElement measurements together. Numeric drag bounds remain authored local values. The selected callback reference is captured at pointerdown; replacing it during a live gesture applies to the next session, preventing mixed coordinate domains. A stable callback can continue reading mutable state.
+The callback corrects drag and pan points, offsets, deltas, thresholds, release velocity, ref constraints, and VisualElement measurements. Numeric drag bounds remain authored local values. Gesture input captures the selected callback reference at pointerdown, so replacement affects the next session, while mounted element measurements and refreshed drag geometry read the current config. A stable callback can read mutable state, but retained history is not remapped and can produce large jumps if that state changes while held.
 
 See the full [`transformPagePoint` coordinate contract](/docs/transform-page-point) and [scaled board example](/examples/transform-page-point).
 
@@ -174,6 +174,8 @@ Because configs inherit from their nearest ancestor, a bare `<MotionConfig>` doe
     </MotionConfig>
 </MotionConfig>
 ```
+
+`transformPagePoint` has an additional reset form: omitting it inherits, while explicitly passing `transformPagePoint={undefined}` clears the inherited callback. An explicit identity function also opts a subtree out while making that intent visible.
 
 ## Programmatic reads
 
@@ -217,7 +219,7 @@ The two unimplemented `@public` props, `nonce` and `isValidProp`, remain real ga
 - **`skipAnimations` is more reactive than upstream.** In React, the value is latched when an element mounts and never re-read, so toggling it at runtime has no effect on already-mounted elements. Here it is reactive: flipping it applies to already-mounted elements, and the next animation they run uses the current setting without a remount. `useAnimate()` reads the current value on every call for the same reason.
 - **In-flight animations are not interrupted (same as upstream).** Flipping `skipAnimations` changes what animations started after the flip do; an animation already running finishes its tween. For a deterministic screenshot, set it before the animation starts rather than mid-flight.
 - **`skipAnimations` does not affect layout/FLIP projection animations or drag momentum (same as upstream).** Those do not route through the value-level animation path the switch controls.
-- **Coordinate callbacks are session-consistent.** Svelte Motion keeps the pointer input, ref geometry, and VisualElement measurement callback on the function selected at pointerdown. A replacement is queued for the next gesture rather than changing units under an active one.
+- **Coordinate input is session-captured.** Pointer samples keep the callback selected at pointerdown; replacing the callback affects the next gesture. VisualElement/config measurements remain live, and a stable callback reads its latest closed-over values without remapping old gesture history, matching the verified Motion behavior.
 
 ## See also
 

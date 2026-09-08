@@ -20,13 +20,8 @@
      *   the coordinate space used by descendant motion elements.
      * @prop children Slotted content receiving this configuration.
      */
-    let {
-        transition,
-        reducedMotion,
-        skipAnimations,
-        transformPagePoint,
-        children
-    }: MotionConfigProps & { children?: Snippet } = $props()
+    // eslint-disable-next-line svelte/no-unused-props -- object presence distinguishes omission from explicit undefined
+    let props: MotionConfigProps & { children?: Snippet } = $props()
 
     // Read the ancestor config BEFORE `createMotionConfig` shadows the context
     // key for this subtree. Upstream merges the parent context into its own
@@ -51,21 +46,25 @@
             // the child's object replaces the parent's wholesale. The `??` then
             // covers the bare-config case, where there is no own transition at all.
             return (
-                (resolveTransition(transition, parentConfig?.transition) as MotionTransition) ??
-                parentConfig?.transition
+                (resolveTransition(
+                    props.transition,
+                    parentConfig?.transition
+                ) as MotionTransition) ?? parentConfig?.transition
             )
         },
         get reducedMotion() {
-            return reducedMotion ?? parentConfig?.reducedMotion
+            return props.reducedMotion ?? parentConfig?.reducedMotion
         },
         get skipAnimations() {
-            return skipAnimations ?? parentConfig?.skipAnimations
+            return props.skipAnimations ?? parentConfig?.skipAnimations
         },
         get transformPagePoint() {
-            return transformPagePoint ?? parentConfig?.transformPagePoint
+            return Object.prototype.hasOwnProperty.call(props, 'transformPagePoint')
+                ? props.transformPagePoint
+                : parentConfig?.transformPagePoint
         }
     }
     createMotionConfig(motionConfig)
 </script>
 
-{@render children?.()}
+{@render props.children?.()}

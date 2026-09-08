@@ -80,7 +80,7 @@ Use motion components the same way you use regular elements, with animation prop
 
 ### `MotionConfig`
 
-`MotionConfig` supports default `transition` values, `reducedMotion`, `skipAnimations`, and `transformPagePoint` coordinate correction for descendants.
+`MotionConfig` supports default `transition` values, `reducedMotion`, `skipAnimations`, and Motion-compatible `transformPagePoint` coordinate correction for descendant drag and pan gestures. See the [coordinate contract](https://motion.svelte.page/docs/transform-page-point) for session, scroll, constraints, and controls behavior.
 
 ```svelte
 <script lang="ts">

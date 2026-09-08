@@ -1,9 +1,8 @@
 /**
  * Pan gesture session.
  *
- * Direct port of framer-motion's `PanSession`
- * (`packages/framer-motion/src/gestures/pan/PanSession.ts`) and `PanGesture`
- * (`packages/framer-motion/src/gestures/pan/index.ts`). Pan is the
+ * Local pan bookkeeping with public behavior aligned to Motion's `PanSession`
+ * and `PanGesture`. Pan is the
  * primitive that powers swipe-to-dismiss drawers, swipe-to-delete rows,
  * carousels, and any gesture that tracks pointer offset/velocity without
  * the constraint/momentum/snap-to-origin baggage of `drag`.
@@ -13,8 +12,8 @@
  * - `pointermove`, `pointerup`, `pointercancel` subscribe on the
  *   `contextWindow` (defaults to `window`), NOT the source element. This
  *   keeps the gesture alive even when the pointer leaves the element's
- *   bounds during a fast swipe — the original element is only used for
- *   the initial `pointerdown` and for scroll-compensation tracking.
+ *   bounds during a fast swipe — the original element is used for the
+ *   initial `pointerdown`. Drag opts into ancestor-scroll tracking separately.
  *
  * - `distanceThreshold` (default `3`px) gates the `onStart` callback so
  *   a steady press without movement doesn't fire a pan. `onSessionStart`
@@ -26,7 +25,7 @@
  *   step lanes (see `wrapUpdate` / `wrapPostRender` above):
  *   `onSessionStart` / `onStart` / `onMove` land on `update`,
  *   `onEnd` / `onSessionEnd` on `postRender`. Matches upstream's
- *   `asyncHandler` + `frame.postRender` split byte-for-byte.
+ *   public `asyncHandler` + `frame.postRender` scheduling behavior.
  *
  * - `getPanInfo` returns `{ point, delta, offset, velocity }` — identical
  *   shape to motion-dom's `DragInfo` / framer-motion's `PanInfo`.
@@ -212,10 +211,14 @@ export interface AttachPanOptions {
     contextWindow?: Window | null
     /** Coordinate mapping selected for the next pointer session. */
     transformPagePoint?: MotionTransformPoint
-    /** Internal notification fired before a pointer session reads coordinates. */
-    onGestureSessionStart?: () => void
-    /** Internal notification fired after terminal gesture data is captured. */
-    onGestureSessionEnd?: () => void
+    /** @internal Element whose scrollable ancestors should be tracked. Drag-only. */
+    trackScrollFrom?: HTMLElement
+    /** @internal Keep a live session running after its source element detaches. */
+    continueSessionAfterDetach?: boolean
+    /** @internal Disable the source element listener for imperative sessions. */
+    pointerDownListener?: boolean
+    /** @internal Drag already runs inside the session frame and schedules public callbacks itself. */
+    scheduleHandlers?: boolean
 }
 
 /**
@@ -229,6 +232,8 @@ export interface AttachPanOptions {
  */
 export type AttachPanCleanup = (() => void) & {
     update: (next: PanHandlers, options?: AttachPanOptions) => void
+    /** @internal Start a session from an imperative control. */
+    start: (event: PointerEvent) => void
 }
 
 /**
@@ -244,13 +249,9 @@ export type AttachPanCleanup = (() => void) & {
  * `$effect` consumer never fires on the server anyway, but defending the
  * boundary lets the module load cleanly in node-only test runners.
  *
- * Lifecycle guarantee: when the returned cleanup runs mid-gesture, the
- * session synthesizes `onEnd` + `onSessionEnd` against the raw handlers
- * BEFORE removing listeners (see `PanSession.dispatchTerminal`). Hosts
- * (e.g. `_MotionContainer`'s pan `$effect`) can put their `whilePan`
- * revert logic inside the user-supplied `onEnd` and rely on it firing
- * exactly once per gesture — whether the user released or the host
- * forced teardown.
+ * Cleanup removes listeners and queued public callbacks without synthesizing
+ * a terminal gesture event. Hosts must restore internal gesture state from
+ * their own teardown path.
  *
  * @param el Target element to bind `pointerdown` on. Move/up/cancel
  *   events are listened for on the element's owning window so a fast
@@ -265,8 +266,9 @@ export type AttachPanCleanup = (() => void) & {
  *   gates the start callback; `contextWindow` overrides the owning
  *   window (use for shadow-root / iframe scenarios).
  * @returns A cleanup function with an attached `.update(next)` method.
- *   Calling the cleanup ends the session + removes the pointerdown
- *   listener. Calling `.update(next)` swaps handlers in place on the
+ *   Calling cleanup ends the session and removes the pointerdown listener,
+ *   unless the internal drag continuation option is active. Calling
+ *   `.update(next)` swaps handlers in place on the
  *   live session without rebuilding it — the canonical Svelte pattern
  *   for inline arrow handlers that change identity each render.
  *
@@ -295,11 +297,10 @@ export const attachPan = (
 ): AttachPanCleanup => {
     if (typeof window === 'undefined') {
         const noop = () => {}
-        return Object.assign(noop, { update: () => {} })
+        return Object.assign(noop, { update: () => {}, start: () => {} })
     }
 
     let session: PanSession | null = null
-    let rawHandlers = handlers
     let liveOptions = options
 
     // Liveness flag the wrapped handler closures consult before invoking
@@ -318,54 +319,48 @@ export const attachPan = (
     // wrapUpdate / wrapPostRender helpers at the top of this file for the
     // rationale. PanSession itself stays scheduler-unaware (and synchronous,
     // for testability) — the scheduling lives at the `attachPan` boundary.
-    let liveHandlers = wrapHandlers(handlers, aliveGuard)
+    let liveHandlers =
+        options.scheduleHandlers === false ? handlers : wrapHandlers(handlers, aliveGuard)
 
-    const onPointerDown = (event: PointerEvent) => {
+    let detached = false
+    const start = (event: PointerEvent) => {
+        if (detached) return
         // Match upstream: ignore non-primary pointers (multi-touch, right-click).
         if (!isPrimaryPointer(event)) return
         // Defensively end any prior session before overwriting the reference.
         // Without this, a second primary pointerdown that arrives before the
         // first pointerup orphans the prior session's contextWindow listeners.
-        session?.dispatchTerminal(rawHandlers)
         session?.end()
         const contextWindow = liveOptions.contextWindow ?? el.ownerDocument?.defaultView ?? window
         session = new PanSession(event, liveHandlers, {
             distanceThreshold: liveOptions.distanceThreshold ?? 3,
             contextWindow,
-            element: el,
-            transformPagePoint: liveOptions.transformPagePoint,
-            onGestureSessionStart: liveOptions.onGestureSessionStart,
-            onGestureSessionEnd: liveOptions.onGestureSessionEnd
+            element: liveOptions.trackScrollFrom ?? null,
+            transformPagePoint: liveOptions.transformPagePoint
         })
     }
 
-    el.addEventListener('pointerdown', onPointerDown)
+    if (options.pointerDownListener !== false) el.addEventListener('pointerdown', start)
 
     const update = (next: PanHandlers, nextOptions?: AttachPanOptions): void => {
-        rawHandlers = next
-        liveHandlers = wrapHandlers(next, aliveGuard)
         if (nextOptions) liveOptions = nextOptions
+        liveHandlers =
+            liveOptions.scheduleHandlers === false ? next : wrapHandlers(next, aliveGuard)
         session?.updateHandlers(liveHandlers)
     }
 
     const teardown = (): void => {
-        // Synthesize the gesture's terminal lifecycle BEFORE flipping
-        // `isAlive`, so a host that tears us down mid-pan (effect re-run,
-        // component unmount) still sees a balanced onPanEnd / onPanSessionEnd
-        // pair. Dispatched against the *raw* (unwrapped) handlers so the
-        // delivery is synchronous — the wrapped lane would otherwise queue
-        // the callbacks onto frame.postRender just for them to be cancelled
-        // by the `isAlive = false` line immediately below.
-        if (session) {
-            session.dispatchTerminal(rawHandlers)
-            session.end()
-            session = null
+        detached = true
+        el.removeEventListener('pointerdown', start)
+        if (session && liveOptions.continueSessionAfterDetach) {
+            return
         }
         isAlive = false
-        el.removeEventListener('pointerdown', onPointerDown)
+        session?.end()
+        session = null
     }
 
-    return Object.assign(teardown, { update })
+    return Object.assign(teardown, { update, start })
 }
 
 interface PanSessionInternalOptions {
@@ -373,13 +368,10 @@ interface PanSessionInternalOptions {
     contextWindow: Window
     element: HTMLElement | null
     transformPagePoint?: MotionTransformPoint
-    onGestureSessionStart?: () => void
-    onGestureSessionEnd?: () => void
 }
 
 class PanSession {
     private history: TimestampedPoint[] = []
-    private rawHistory: TimestampedPoint[] = []
     private startEvent: PointerEvent | null = null
     private lastMoveEvent: PointerEvent | null = null
     private lastMovePoint: Point | null = null
@@ -389,21 +381,10 @@ class PanSession {
     private distanceThreshold = 3
     private element: HTMLElement | null = null
     private scrollPositions = new Map<Element | Window, Point>()
-    /**
-     * Idempotency flag — set the first time the gesture's terminal
-     * lifecycle pair (`onEnd` + `onSessionEnd`) fires. Both
-     * `handlePointerUp` (the natural release path) and
-     * `dispatchTerminal` (the forced-teardown path called by
-     * `attachPan.teardown`) check this and bail if already dispatched.
-     * Without it, a normal pointerup followed by a host-side teardown
-     * (e.g. `$effect` cleanup, component unmount) would replay
-     * `onEnd`/`onSessionEnd` against handlers that already saw them.
-     */
+    /** Prevent a terminal browser event from dispatching more than once. */
     private terminalDispatched = false
     private removeScrollListeners: (() => void) | null = null
     private removeListeners: (() => void) | null = null
-    private onGestureSessionEnd: (() => void) | undefined
-    private gestureSessionStarted = false
     private transformPagePoint: MotionTransformPoint | undefined
 
     constructor(event: PointerEvent, handlers: PanHandlers, opts: PanSessionInternalOptions) {
@@ -417,13 +398,8 @@ class PanSession {
         this.distanceThreshold = opts.distanceThreshold
         this.element = opts.element
         this.transformPagePoint = opts.transformPagePoint
-        this.onGestureSessionEnd = opts.onGestureSessionEnd
-        opts.onGestureSessionStart?.()
-        this.gestureSessionStarted = true
-
         const rawPoint = extractEventPoint(event)
         const point = this.transformPoint(rawPoint)
-        this.rawHistory = [{ ...rawPoint, timestamp: frameData.timestamp }]
         this.history = [{ ...point, timestamp: frameData.timestamp }]
 
         this.handlers.onSessionStart?.(event, getPanInfo(point, this.history))
@@ -461,37 +437,6 @@ class PanSession {
         cancelFrame(this.updatePoint)
     }
 
-    /**
-     * Synthesize the gesture's terminal lifecycle pair (`onEnd` then
-     * `onSessionEnd`) against the supplied *raw* (unwrapped) handlers,
-     * using the last observed event + point as the synthetic terminal
-     * sample. Called by `attachPan.teardown` when a host kills the
-     * session mid-gesture — without this, an `$effect` re-run that
-     * tears down the attachment silently strands the consumer's state
-     * machine in an "in-progress" state (whilePan keyframes never
-     * revert, threshold-based commit decisions never run).
-     *
-     * Bypasses the frame-loop wrappers deliberately: the wrapped
-     * handlers would queue to `frame.postRender` only for the
-     * about-to-flip `isAlive` flag in attachPan to cancel them. Raw
-     * dispatch keeps the lifecycle synchronous with teardown.
-     *
-     * No-op when no pointermove ever fired — matches the
-     * `handlePointerUp` no-movement contract upstream uses.
-     */
-    dispatchTerminal(rawHandlers: PanHandlers): void {
-        if (this.terminalDispatched) return
-        if (!(this.lastMoveEvent && this.lastRawMovePoint)) {
-            this.notifyGestureSessionEnd()
-            return
-        }
-        const info = getPanInfo(this.lastMovePoint!, this.history)
-        if (this.startEvent) rawHandlers.onEnd?.(this.lastMoveEvent, info)
-        rawHandlers.onSessionEnd?.(this.lastMoveEvent, info)
-        this.terminalDispatched = true
-        this.notifyGestureSessionEnd()
-    }
-
     private handlePointerMove = (event: PointerEvent): void => {
         this.lastMoveEvent = event
         this.lastRawMovePoint = extractEventPoint(event)
@@ -511,7 +456,6 @@ class PanSession {
             // tap gesture instead. This prevents a spurious
             // onPanSessionStart → onPanSessionEnd pair on every plain
             // click of a pan-enabled element.
-            this.notifyGestureSessionEnd()
             return
         }
 
@@ -519,21 +463,16 @@ class PanSession {
             event.type === 'pointercancel'
                 ? this.lastMovePoint
                 : this.transformPoint(extractEventPoint(event))
-        if (event.type !== 'pointercancel') this.reprojectHistory()
         const info = getPanInfo(finalPoint, this.history)
 
         if (this.startEvent) this.handlers.onEnd?.(event, info)
         this.handlers.onSessionEnd?.(event, info)
-        // Mark idempotent so a later forced teardown via
-        // `dispatchTerminal` doesn't replay this pair.
         this.terminalDispatched = true
-        this.notifyGestureSessionEnd()
     }
 
     private updatePoint = (): void => {
         if (!(this.lastMoveEvent && this.lastRawMovePoint)) return
 
-        this.reprojectHistory()
         this.lastMovePoint = this.transformPoint(this.lastRawMovePoint)
 
         const info = getPanInfo(this.lastMovePoint, this.history)
@@ -543,7 +482,6 @@ class PanSession {
         if (!panAlreadyStarted && !pastThreshold) return
 
         this.history.push({ ...this.lastMovePoint, timestamp: frameData.timestamp })
-        this.rawHistory.push({ ...this.lastRawMovePoint, timestamp: frameData.timestamp })
 
         if (!panAlreadyStarted) {
             this.handlers.onStart?.(this.lastMoveEvent, info)
@@ -553,11 +491,9 @@ class PanSession {
     }
 
     /**
-     * Track scrollable ancestors so we can compensate for scroll deltas
-     * during the gesture — mirrors upstream's `startScrollTracking`.
-     * For element scrolls: adjust `history[0]` so offset stays sane
-     * (pageX/pageY unaffected by element scroll). For window scrolls:
-     * adjust `lastMovePoint` (pageX/pageY shift with window scroll).
+     * Track scroll for drag sessions. Element scroll shifts the retained
+     * gesture origin by raw scroll units. Window scroll schedules a sample;
+     * browser-derived page coordinates supply the terminal page-scroll delta.
      */
     private startScrollTracking(element: HTMLElement): void {
         let current: HTMLElement | null = element.parentElement
@@ -609,34 +545,20 @@ class PanSession {
         if (delta.x === 0 && delta.y === 0) return
 
         if (isWindow) {
-            if (this.lastRawMovePoint) {
-                this.lastRawMovePoint.x += delta.x
-                this.lastRawMovePoint.y += delta.y
+            if (this.lastMovePoint) {
+                this.lastMovePoint.x += delta.x
+                this.lastMovePoint.y += delta.y
             }
-        } else if (this.rawHistory.length > 0) {
-            this.rawHistory[0].x -= delta.x
-            this.rawHistory[0].y -= delta.y
+        } else if (this.history.length > 0) {
+            this.history[0].x -= delta.x
+            this.history[0].y -= delta.y
         }
 
         this.scrollPositions.set(target, current)
         frame.update(this.updatePoint, true)
     }
 
-    private notifyGestureSessionEnd(): void {
-        if (!this.gestureSessionStarted) return
-        this.gestureSessionStarted = false
-        this.onGestureSessionEnd?.()
-    }
-
     private transformPoint(point: Point): Point {
         return this.transformPagePoint ? this.transformPagePoint(point) : { ...point }
-    }
-
-    /** Re-map retained raw samples through the callback captured at pointerdown. */
-    private reprojectHistory(): void {
-        this.history = this.rawHistory.map(({ x, y, timestamp }) => ({
-            ...this.transformPoint({ x, y }),
-            timestamp
-        }))
     }
 }

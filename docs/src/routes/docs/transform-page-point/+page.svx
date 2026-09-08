@@ -9,7 +9,7 @@ description: Correct drag and pan coordinates when motion elements live inside s
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'transformPagePoint | Docs | Svelte Motion'
-      seo.description = 'Keep drag, pan, measured constraints, and release velocity in local units when a parent applies positive CSS scale.'
+      seo.description = 'Correct drag and pan coordinates when a parent applies positive CSS scale, with Motion-compatible session, scroll, and constraint behavior.'
       seo.ogTitle = 'transformPagePoint'
       seo.ogTagline = 'Correct gesture coordinates inside scaled interfaces'
       seo.ogFeatures = ['Scaled Drag', 'Corrected Pan', 'Measured Bounds', 'Local Velocity', 'MotionConfig']
@@ -43,7 +43,7 @@ A 100-screen-pixel pointer move at `scale(0.5)` becomes 200 local units. The bro
 
 ## Coordinate contract
 
-- Pointer callbacks receive corrected page-coordinate points. `delta`, `offset`, distance thresholds, and velocity are computed from corrected samples.
+- Pointer callbacks receive corrected page-coordinate points. `delta` is previous-frame-relative, `offset` is gesture-relative, and distance thresholds and velocity are computed from the retained corrected samples.
 - DOM measurements map the viewport rectangle's top-left and bottom-right corners. Projection-root scroll is added after that mapping.
 - Element-ref drag constraints map both the dragged element and constraint rectangles before subtracting their edges. Numeric constraints are already local values and are not transformed.
 - Positive uniform and nonuniform scale are supported. Affine translation in the mapping cancels when differences are calculated.
@@ -52,13 +52,13 @@ The callback maps two rectangle corners, so it is not arbitrary polygon recovery
 
 ## Session capture
 
-The callback reference is captured at pointerdown. Replacing the `MotionConfig` function during a drag or pan does not switch coordinate domains mid-session; the replacement applies to the next gesture. The mounted VisualElement and refreshed geometry keep using the captured function until release or cancellation.
+The gesture input callback reference is captured at pointerdown. Replacing the `MotionConfig` function during a drag or pan applies to the next gesture's pointer samples. Mounted VisualElement measurements and refreshed drag geometry remain live and can read the current config; they are not frozen with the input callback.
 
-A stable callback may read reactive zoom state. Svelte Motion re-evaluates retained raw pan samples through that captured callback per frame, so a live positive scale change keeps pan history in a consistent current domain. For drag UIs, changing zoom between gestures remains the simplest interaction model.
+A stable callback may read reactive zoom state, but only the latest raw pointer point is transformed again. Earlier samples keep their already-mapped values. Changing the closed-over scale while held can therefore create the same large offset and velocity jumps as Motion: in the verified scale-2-to-4 fixture, pan jumps from `(40, 20)` to `(900, 700)` and drag to `(894, 710)`. Keep the mapping fixed for the duration of a gesture unless this retained-history behavior is intentional.
 
 ## Inheritance and reset
 
-Nested configs inherit `transformPagePoint` when their own prop is `undefined`. Supply an explicit identity function to opt a subtree out of an ancestor correction:
+Nested configs inherit `transformPagePoint` when the child omits the prop. Supply an explicit identity function to opt a subtree out of an ancestor correction:
 
 ```svelte
 <script lang="ts">
@@ -73,11 +73,21 @@ Nested configs inherit `transformPagePoint` when their own prop is `undefined`. 
 </MotionConfig>
 ```
 
-Setting a child prop back to `undefined` resumes inheritance without remounting descendants.
+Explicitly passing `transformPagePoint={undefined}` clears an inherited mapping for that subtree. This prop distinguishes omission from an explicit `undefined`, matching Motion's public config behavior.
 
 ## Constraints and release velocity
 
-Ref constraints are measured in the corrected coordinate space, including resize refreshes. Numeric bounds such as `{ left: -80, right: 80 }` remain exactly those local limits. Drag and pan release velocity is reported in corrected units per second, so momentum uses the same units as the displayed local movement.
+Ref constraints are measured in the corrected coordinate space, including resize refreshes. Numeric bounds such as `{ left: -80, right: 80 }` remain exactly those local limits. A second drag's callback `offset` starts from zero even though the bound `x`/`y` values retain the previous translation.
+
+Velocity uses the corrected retained frame history. The verified scale-2 sequence reports move velocities `(0, 0)` then `(100, 50)`, followed by terminal velocity `(750, 500)` at the recorded frame times.
+
+## Scroll, layout, and controls
+
+Ordinary pan does not subscribe to ancestor or window scroll as gesture movement. Drag does track scrollable ancestors: a raw ancestor scroll delta is added to drag offset without running that delta through `transformPagePoint`.
+
+Browser page coordinates can still change at pointerup after document scrolling. In the verified held-scroll fixture, the last move offset and rendered drag translation stay `(60, 40)`, while the terminal callback reports `(150, 180)`. Treat terminal payload and displayed translation as distinct in this case.
+
+Layout projection stays the transform owner. A real 60-local-pixel layout displacement while held compensates bound `x` from `60` to `0`, and the next pointer move produces `(20, 40)`. Imperative `snapToCursor` also follows Motion's projection layout calculation. With page scroll `(120, 160)` in the matched fixture it snaps to bound `(-49, -436)`, then moves to `(1, -406)`; it does not physically center the rendered box under the cursor.
 
 ## See also
 

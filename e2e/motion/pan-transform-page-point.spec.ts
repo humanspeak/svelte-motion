@@ -1,6 +1,55 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 
-const URL = '/tests/transform-page-point/pan?@isPlaywright=true'
+type Point = { x: number; y: number }
+type GestureEntry = {
+    type: string
+    info: { point: Point; delta: Point; offset: Point; velocity: Point }
+    boundValues: Point
+}
+
+const installClock = async (page: Page) => {
+    await page.addInitScript(() => {
+        let now = 1000
+        let nextId = 1
+        const callbacks = new Map<number, FrameRequestCallback>()
+        Object.defineProperty(performance, 'now', { configurable: true, value: () => now })
+        window.requestAnimationFrame = (callback) => {
+            const id = nextId++
+            callbacks.set(id, callback)
+            return id
+        }
+        window.cancelAnimationFrame = (id) => callbacks.delete(id)
+        ;(
+            window as unknown as { __PARITY_CLOCK__: { advance(ms: number): void } }
+        ).__PARITY_CLOCK__ = {
+            advance(ms) {
+                now += ms
+                const queued = [...callbacks.values()]
+                callbacks.clear()
+                for (const callback of queued) callback(now)
+            }
+        }
+    })
+}
+
+const advance = async (page: Page, ms: number) => {
+    await page.evaluate((delta) => {
+        ;(
+            window as unknown as { __PARITY_CLOCK__: { advance(ms: number): void } }
+        ).__PARITY_CLOCK__.advance(delta)
+    }, ms)
+    await page.evaluate(async () => {
+        await Promise.resolve()
+        await new Promise((resolve) => queueMicrotask(resolve))
+    })
+}
+
+const openCase = async (page: Page, caseId: string) => {
+    await page.goto(`/tests/transform-page-point/pan?case=${caseId}&@isPlaywright=true`)
+    await expect(page.getByTestId('fixture')).toHaveAttribute('data-ready', 'true')
+    await advance(page, 16)
+    await advance(page, 16)
+}
 
 const center = async (locator: Locator) => {
     const box = await locator.boundingBox()
@@ -8,110 +57,233 @@ const center = async (locator: Locator) => {
     return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 
-const panBy = async (page: Page, surface: Locator, dx: number, dy: number, release = true) => {
-    const start = await center(surface)
-    await page.mouse.move(start.x, start.y)
-    await page.mouse.down()
-    await page.mouse.move(start.x + dx, start.y + dy, { steps: 3 })
-    if (release) await page.mouse.up()
-    return start
+const gestures = (page: Page) =>
+    page.evaluate(() => {
+        const parity = (window as unknown as { __PARITY__: { trace: GestureEntry[] } }).__PARITY__
+        return parity.trace.filter((entry) => entry.type.startsWith('onPan'))
+    })
+
+const action = async (page: Page, name: string, value?: unknown) => {
+    await page.evaluate(
+        ({ actionName, actionValue }) => {
+            const actions = (
+                window as unknown as {
+                    __PARITY__: { actions: Record<string, (value?: unknown) => unknown> }
+                }
+            ).__PARITY__.actions
+            return actions[actionName](actionValue)
+        },
+        { actionName: name, actionValue: value }
+    )
 }
 
-const offsetX = async (page: Page) =>
-    Number(await page.getByTestId('pan-output').getAttribute('data-offset-x'))
+const canonicalSequence = async (page: Page, terminal: 'up' | 'cancel' = 'up') => {
+    const start = await center(page.getByTestId('target'))
+    await page.mouse.move(start.x, start.y)
+    await page.mouse.down()
+    await advance(page, 16)
+    await page.mouse.move(start.x + 2, start.y + 1)
+    await advance(page, 24)
+    await page.mouse.move(start.x + 30, start.y + 20)
+    await advance(page, 40)
+    if (terminal === 'cancel') {
+        await page.evaluate(
+            ({ x, y }) => {
+                window.dispatchEvent(
+                    new PointerEvent('pointercancel', {
+                        bubbles: true,
+                        pointerId: 1,
+                        pointerType: 'mouse',
+                        isPrimary: true,
+                        clientX: x,
+                        clientY: y,
+                        button: 0,
+                        buttons: 0
+                    })
+                )
+            },
+            { x: start.x + 30, y: start.y + 20 }
+        )
+        await page.mouse.up()
+    } else {
+        await page.mouse.up()
+    }
+    await advance(page, 20)
+}
+
+const scrollWindowBy = async (page: Page, x: number, y: number) => {
+    await page.evaluate(
+        ({ x, y }) =>
+            new Promise<void>((resolve) => {
+                window.addEventListener('scroll', () => resolve(), { once: true })
+                window.scrollBy(x, y)
+            }),
+        { x, y }
+    )
+}
+
+const scrollShellBy = async (page: Page, x: number, y: number) => {
+    await page.getByTestId('shell').evaluate(
+        (element, delta) =>
+            new Promise<void>((resolve) => {
+                element.addEventListener('scroll', () => resolve(), { once: true })
+                element.scrollBy(delta.x, delta.y)
+            }),
+        { x, y }
+    )
+}
 
 test.describe('MotionConfig transformPagePoint pan', () => {
-    test.beforeEach(async ({ page }) => {
-        await page.goto(URL)
-        await expect(page.getByTestId('pan-page')).toHaveAttribute('data-ready', 'true')
-    })
+    test.beforeEach(async ({ page }) => installClock(page))
 
-    test('reports inherited corrected movement and moves its follower locally', async ({
-        page
-    }) => {
-        await panBy(page, page.getByTestId('pan-surface'), 40, 20)
-        await expect.poll(() => offsetX(page)).toBeCloseTo(80, 0)
-        await expect(page.getByTestId('pan-output')).toHaveAttribute('data-ends', '1')
-    })
+    test('matches inherited scale-2 frame history and terminal velocity', async ({ page }) => {
+        await openCase(page, 'pan-config-inherit')
+        const followerBefore = await center(page.getByTestId('follower'))
+        await canonicalSequence(page)
+        const followerAfter = await center(page.getByTestId('follower'))
+        const trace = await gestures(page)
 
-    test('supports child override, inherited reset, and explicit identity between gestures', async ({
-        page
-    }) => {
-        const surface = page.getByTestId('pan-surface')
-        await page.getByTestId('pan-override').click()
-        await panBy(page, surface, 20, 0)
-        await expect.poll(() => offsetX(page)).toBeCloseTo(80, 0)
-
-        await page.getByTestId('pan-inherit').click()
-        await panBy(page, surface, 20, 0)
-        await expect.poll(() => offsetX(page)).toBeCloseTo(40, 0)
-
-        await panBy(page, page.getByTestId('identity-pan'), 20, 0)
-        await expect.poll(() => offsetX(page)).toBeCloseTo(20, 0)
-    })
-
-    test('queues callback-reference replacement until the next pointer session', async ({
-        page
-    }) => {
-        const surface = page.getByTestId('pan-surface')
-        const start = await panBy(page, surface, 20, 0, false)
-        await expect.poll(() => offsetX(page)).toBeCloseTo(40, 0)
-        await page
-            .getByTestId('pan-override')
-            .evaluate((button: HTMLButtonElement) => button.click())
-        await page.mouse.move(start.x + 30, start.y)
-        await expect.poll(() => offsetX(page)).toBeCloseTo(60, 0)
-        await page.mouse.up()
-
-        await panBy(page, surface, 20, 0)
-        await expect.poll(() => offsetX(page)).toBeCloseTo(80, 0)
-    })
-
-    test('re-evaluates a stable callback closure when scale changes live', async ({ page }) => {
-        const surface = page.getByTestId('pan-surface')
-        const start = await panBy(page, surface, 20, 0, false)
-        await expect.poll(() => offsetX(page)).toBeCloseTo(40, 0)
-        await page
-            .getByTestId('pan-live-scale')
-            .evaluate((button: HTMLButtonElement) => button.click())
-        await page.mouse.move(start.x + 20, start.y + 1)
-        await expect.poll(() => offsetX(page)).toBeCloseTo(80, 0)
-        await page.mouse.up()
-    })
-
-    test('transforms ancestor and page scroll while the pointer is held', async ({ page }) => {
-        const surface = page.getByTestId('pan-surface')
-        await panBy(page, surface, 20, 0, false)
-        await expect.poll(() => offsetX(page)).toBeCloseTo(40, 0)
-
-        await page.getByTestId('pan-scroll-shell').evaluate((element) => {
-            element.scrollLeft += 10
+        expect(trace.map(({ type }) => type)).toEqual([
+            'onPanSessionStart',
+            'onPanStart',
+            'onPan',
+            'onPan',
+            'onPanEnd'
+        ])
+        expect(trace[1].info).toMatchObject({
+            delta: { x: 4, y: 2 },
+            offset: { x: 4, y: 2 },
+            velocity: { x: 0, y: 0 }
         })
-        await expect.poll(() => offsetX(page)).toBeCloseTo(60, 0)
-
-        await page.evaluate(() => window.scrollBy(10, 0))
-        await expect.poll(() => offsetX(page)).toBeCloseTo(80, 0)
-        await page.mouse.up()
+        expect(trace[3].info).toMatchObject({
+            delta: { x: 56, y: 38 },
+            offset: { x: 60, y: 40 },
+            velocity: { x: 100, y: 50 }
+        })
+        expect(trace[4].info).toMatchObject({
+            delta: { x: 0, y: 0 },
+            offset: { x: 60, y: 40 },
+            velocity: { x: 750, y: 500 }
+        })
+        expect(Math.abs(followerAfter.x - followerBefore.x - 30)).toBeLessThanOrEqual(2)
+        expect(Math.abs(followerAfter.y - followerBefore.y - 20)).toBeLessThanOrEqual(2)
     })
 
-    test('cancels once with the last valid corrected point', async ({ page }) => {
-        const surface = page.getByTestId('pan-surface')
-        await panBy(page, surface, 20, 0, false)
-        await page.evaluate(() => {
-            window.dispatchEvent(
-                new PointerEvent('pointercancel', {
-                    clientX: 999,
-                    clientY: 999,
-                    pointerId: 1,
-                    pointerType: 'mouse',
-                    isPrimary: true
-                })
+    test('distinguishes omitted inheritance from explicit undefined and identity', async ({
+        page
+    }) => {
+        for (const [caseId, expected] of [
+            ['pan-config-inherit', { x: 60, y: 40 }],
+            ['pan-config-identity', { x: 30, y: 20 }],
+            ['pan-config-explicit-undefined', { x: 30, y: 20 }]
+        ] as const) {
+            await openCase(page, caseId)
+            await canonicalSequence(page)
+            expect((await gestures(page)).at(-1)?.info.offset).toEqual(expected)
+        }
+    })
+
+    test('keeps pan unchanged by held page and ancestor scroll', async ({ page }) => {
+        for (const scenario of ['page', 'ancestor'] as const) {
+            await openCase(page, `pan-${scenario}-scroll-held`)
+            if (scenario === 'ancestor') await scrollShellBy(page, 90, 70)
+            const start = await center(page.getByTestId('target'))
+            await page.mouse.move(start.x, start.y)
+            await page.mouse.down()
+            await advance(page, 16)
+            await page.mouse.move(start.x + 30, start.y + 20)
+            await advance(page, 40)
+            if (scenario === 'page') await scrollWindowBy(page, 45, 70)
+            else await scrollShellBy(page, 45, 55)
+            await advance(page, 30)
+
+            expect((await gestures(page)).at(-1)?.info.offset).toEqual({ x: 60, y: 40 })
+            await page.mouse.up()
+            await advance(page, 20)
+            expect((await gestures(page)).at(-1)?.info.offset).toEqual(
+                scenario === 'page' ? { x: 150, y: 180 } : { x: 60, y: 40 }
             )
+        }
+    })
+
+    test('captures replacement identity but retains mapped history for a stable closure', async ({
+        page
+    }) => {
+        await openCase(page, 'pan-reference-replacement')
+        let start = await center(page.getByTestId('target'))
+        await page.mouse.move(start.x, start.y)
+        await page.mouse.down()
+        await advance(page, 16)
+        await page.mouse.move(start.x + 20, start.y + 10)
+        await advance(page, 40)
+        await action(page, 'setMapping', 'triple')
+        await advance(page, 16)
+        await page.mouse.move(start.x + 35, start.y + 20)
+        await advance(page, 40)
+        await page.mouse.up()
+        await advance(page, 20)
+        start = await center(page.getByTestId('target'))
+        await page.mouse.move(start.x, start.y)
+        await page.mouse.down()
+        await advance(page, 16)
+        await page.mouse.move(start.x + 10, start.y + 5)
+        await advance(page, 40)
+        await page.mouse.up()
+        await advance(page, 20)
+        const replacement = await gestures(page)
+        expect(replacement[replacement.length - 2].info.offset).toEqual({ x: 30, y: 15 })
+
+        await openCase(page, 'pan-stable-closure-scale')
+        start = await center(page.getByTestId('target'))
+        await page.mouse.move(start.x, start.y)
+        await page.mouse.down()
+        await advance(page, 16)
+        await page.mouse.move(start.x + 20, start.y + 10)
+        await advance(page, 40)
+        await action(page, 'setStableScale', 4)
+        await page.waitForFunction(
+            () =>
+                Math.abs(
+                    new DOMMatrix(
+                        getComputedStyle(document.querySelector('[data-testid="stage"]')!)
+                    ).a - 0.25
+                ) < 0.0001
+        )
+        await advance(page, 16)
+        await page.mouse.move(start.x + 30, start.y + 15)
+        await advance(page, 40)
+        await page.mouse.up()
+        await advance(page, 20)
+        const stable = await gestures(page)
+        expect(stable.at(-2)?.info.offset).toEqual({ x: 940, y: 720 })
+        expect(stable.at(-1)?.info.offset).toEqual({ x: 940, y: 720 })
+    })
+
+    test('uses the last point on cancel and emits no public end after unmount', async ({
+        page
+    }) => {
+        await openCase(page, 'pan-pointer-cancel')
+        await canonicalSequence(page, 'cancel')
+        expect((await gestures(page)).at(-1)).toMatchObject({
+            type: 'onPanEnd',
+            info: { offset: { x: 60, y: 40 } }
         })
 
-        await expect(page.getByTestId('pan-output')).toHaveAttribute('data-cancelled', 'true')
-        await expect(page.getByTestId('pan-output')).toHaveAttribute('data-ends', '1')
+        await openCase(page, 'pan-unmount-held')
+        const start = await center(page.getByTestId('target'))
+        await page.mouse.move(start.x, start.y)
+        await page.mouse.down()
+        await advance(page, 16)
+        await page.mouse.move(start.x + 30, start.y + 20)
+        await advance(page, 40)
+        await action(page, 'unmount')
+        await expect(page.getByTestId('target')).toHaveCount(0)
+        await advance(page, 20)
+        await page.mouse.move(start.x + 40, start.y + 30)
+        await advance(page, 30)
         await page.mouse.up()
+        await advance(page, 20)
+        expect((await gestures(page)).some(({ type }) => type === 'onPanEnd')).toBe(false)
     })
 
     test('is linked from the root test index', async ({ page }) => {
