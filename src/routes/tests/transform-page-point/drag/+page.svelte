@@ -56,6 +56,15 @@
     let target: HTMLElement | null = $state(null)
     let handle: HTMLElement | null = $state(null)
     let callbackInfo = $state<DragInfo | null>(null)
+    type SnapDiagnostic = {
+        attempt: number
+        status: 'checking' | 'pass' | 'fail'
+        horizontalDistance: number | null
+        verticalDistance: number | null
+    }
+    let snapDiagnostics = $state<SnapDiagnostic[]>([])
+    const latestSnapDiagnostic = $derived(snapDiagnostics.at(-1) ?? null)
+    const pendingLayoutSnapCleanups: Array<() => void> = []
     // React's public reference fixture creates fresh onDrag* closures whenever
     // one of these parent action states causes a render. Svelte event-handler
     // closures are compiler-stable, so explicitly replace the public callback
@@ -216,6 +225,86 @@
         }
     })
 
+    const startLayoutSnap = (event: PointerEvent) => {
+        controls.start(event, { snapToCursor: true })
+
+        const attempt = snapDiagnostics.length + 1
+        const pointerId = event.pointerId
+        const cursor = { x: event.clientX, y: event.clientY }
+        let firstFrame: number | null = null
+        let secondFrame: number | null = null
+        let listening = true
+
+        const trackPointer = (pointerEvent: PointerEvent) => {
+            if (pointerEvent.pointerId !== pointerId) return
+            cursor.x = pointerEvent.clientX
+            cursor.y = pointerEvent.clientY
+        }
+        const stopTrackingPointer = (pointerEvent: PointerEvent) => {
+            if (pointerEvent.pointerId !== pointerId) return
+            trackPointer(pointerEvent)
+            removePointerListeners()
+        }
+        const removePointerListeners = () => {
+            if (!listening) return
+            listening = false
+            window.removeEventListener('pointermove', trackPointer, true)
+            window.removeEventListener('pointerup', stopTrackingPointer, true)
+            window.removeEventListener('pointercancel', stopTrackingPointer, true)
+        }
+        const cleanup = () => {
+            removePointerListeners()
+            if (firstFrame !== null) cancelAnimationFrame(firstFrame)
+            if (secondFrame !== null) cancelAnimationFrame(secondFrame)
+            const cleanupIndex = pendingLayoutSnapCleanups.indexOf(cleanup)
+            if (cleanupIndex !== -1) pendingLayoutSnapCleanups.splice(cleanupIndex, 1)
+        }
+
+        window.addEventListener('pointermove', trackPointer, true)
+        window.addEventListener('pointerup', stopTrackingPointer, true)
+        window.addEventListener('pointercancel', stopTrackingPointer, true)
+        pendingLayoutSnapCleanups.push(cleanup)
+        snapDiagnostics = [
+            ...snapDiagnostics,
+            {
+                attempt,
+                status: 'checking',
+                horizontalDistance: null,
+                verticalDistance: null
+            }
+        ]
+
+        firstFrame = requestAnimationFrame(() => {
+            firstFrame = null
+            secondFrame = requestAnimationFrame(() => {
+                secondFrame = null
+                const targetRect = target?.getBoundingClientRect()
+                if (!targetRect) {
+                    cleanup()
+                    return
+                }
+
+                const horizontalDistance = Math.abs(
+                    targetRect.left + targetRect.width / 2 - cursor.x
+                )
+                const verticalDistance = Math.abs(targetRect.top + targetRect.height / 2 - cursor.y)
+                const status = horizontalDistance <= 2 && verticalDistance <= 2 ? 'pass' : 'fail'
+
+                snapDiagnostics = snapDiagnostics.map((diagnostic) =>
+                    diagnostic.attempt === attempt
+                        ? {
+                              ...diagnostic,
+                              status,
+                              horizontalDistance,
+                              verticalDistance
+                          }
+                        : diagnostic
+                )
+                cleanup()
+            })
+        })
+    }
+
     onMount(() => {
         const root = globalThis as typeof globalThis & { __PARITY__?: typeof parity }
         root.__PARITY__ = parity
@@ -268,7 +357,10 @@
         frame.update(recordMotionFrame, true)
         parity.ready = true
         ready = true
-        return () => cancelFrame(recordMotionFrame)
+        return () => {
+            cancelFrame(recordMotionFrame)
+            for (const cleanup of [...pendingLayoutSnapCleanups]) cleanup()
+        }
     })
 </script>
 
@@ -301,10 +393,18 @@
     {/if}
 {/snippet}
 
-<svelte:head><title>transformPagePoint drag reference</title></svelte:head>
+<svelte:head>
+    <title
+        >{usesLayoutSnapCorrection
+            ? 'Layout-shift snap check'
+            : 'transformPagePoint drag reference'}</title
+    >
+</svelte:head>
 
 <main data-testid="fixture" data-case={caseId} data-ready={ready}>
-    <div class="caseLabel">{caseId}</div>
+    {#if !usesLayoutSnapCorrection}
+        <div class="caseLabel">{caseId}</div>
+    {/if}
     {#snippet stageContent()}
         <div
             bind:this={stage}
@@ -335,12 +435,80 @@
 
     {#if usesLayoutSnapCorrection}
         <div data-testid="layout-snap-overlay" class="layoutSnapOverlay">
+            <section
+                data-testid="layout-snap-instructions"
+                class="layoutSnapInstructions"
+                aria-labelledby="layout-snap-title"
+            >
+                <p class="layoutSnapEyebrow">Interactive regression check</p>
+                <h1 id="layout-snap-title">Does Snap stay aligned after a layout shift?</h1>
+                <p class="layoutSnapVariant">
+                    <strong>Starting position:</strong>
+                    {caseId === 'drag-layout-snap-correction-nonzero'
+                        ? 'Non-zero offset (x 45px, y −30px)'
+                        : 'Zero offset (x 0px, y 0px)'}
+                </p>
+
+                <ol>
+                    <li>
+                        Press and hold <strong>Snap</strong>. The yellow tile’s center should land
+                        under your cursor.
+                    </li>
+                    <li>Still holding, drag right and down, then release.</li>
+                    <li>
+                        Click <strong>Shift</strong>. The tile’s parent intentionally moves 60px
+                        right.
+                    </li>
+                    <li>
+                        Press and hold <strong>Snap</strong> again. The tile’s center must return under
+                        your cursor.
+                    </li>
+                </ol>
+
+                <div class="layoutSnapOutcome">
+                    <p>
+                        <strong>Expected:</strong> Shift moves the tile 60px right; every Snap centers
+                        it under the cursor.
+                    </p>
+                    <p>
+                        <strong>Failure:</strong> Snap itself makes the tile jump away from the cursor.
+                    </p>
+                </div>
+
+                <output
+                    data-testid="layout-snap-readout"
+                    class:pass={latestSnapDiagnostic?.status === 'pass'}
+                    class:fail={latestSnapDiagnostic?.status === 'fail'}
+                    data-status={latestSnapDiagnostic?.status ?? 'idle'}
+                    data-horizontal-distance={latestSnapDiagnostic?.horizontalDistance ?? ''}
+                    data-vertical-distance={latestSnapDiagnostic?.verticalDistance ?? ''}
+                    aria-live="polite"
+                >
+                    {#if !latestSnapDiagnostic}
+                        <strong>Snap check:</strong> waiting for your first Snap.
+                    {:else if latestSnapDiagnostic.status === 'checking'}
+                        <strong>Snap {latestSnapDiagnostic.attempt}:</strong> Checking after the tile
+                        renders…
+                    {:else}
+                        <strong
+                            >Snap {latestSnapDiagnostic.attempt}: {latestSnapDiagnostic.status ===
+                            'pass'
+                                ? 'PASS'
+                                : 'FAIL'}</strong
+                        >
+                        <span>
+                            Cursor-to-center distance: horizontal
+                            {latestSnapDiagnostic.horizontalDistance?.toFixed(1)}px, vertical
+                            {latestSnapDiagnostic.verticalDistance?.toFixed(1)}px.
+                        </span>
+                    {/if}
+                </output>
+            </section>
             <button
                 bind:this={handle}
                 data-testid="handle"
                 class="layoutSnapHandle"
-                onpointerdown={(event) => controls.start(event, { snapToCursor: true })}
-                >snap</button
+                onpointerdown={startLayoutSnap}>snap</button
             >
             <button
                 data-testid="layout-shift-button"
@@ -386,25 +554,29 @@
         >
     {/if}
 
-    <aside class="controls">
-        <button onclick={() => (mappingKind = mappingKind === 'double' ? 'triple' : 'double')}
-            >replace mapping</button
-        >
-        <button onclick={() => (boardWidth = boardWidth === 500 ? 620 : 500)}>resize board</button>
-        <button onclick={() => (layoutShift = layoutShift === 0 ? 60 : 0)}>shift layout</button>
-        <output
-            data-testid="drag-output"
-            data-local-x={callbackInfo?.offset.x ?? 0}
-            data-local-y={callbackInfo?.offset.y ?? 0}
-            data-delta-x={callbackInfo?.delta.x ?? 0}
-            data-delta-y={callbackInfo?.delta.y ?? 0}
-            data-velocity-x={callbackInfo?.velocity.x ?? 0}
-            data-velocity-y={callbackInfo?.velocity.y ?? 0}
-            data-bound-x={x.get()}
-            data-bound-y={y.get()}
-            >offset {callbackInfo?.offset.x ?? 0}, {callbackInfo?.offset.y ?? 0}</output
-        >
-    </aside>
+    {#if !usesLayoutSnapCorrection}
+        <aside class="controls">
+            <button onclick={() => (mappingKind = mappingKind === 'double' ? 'triple' : 'double')}
+                >replace mapping</button
+            >
+            <button onclick={() => (boardWidth = boardWidth === 500 ? 620 : 500)}
+                >resize board</button
+            >
+            <button onclick={() => (layoutShift = layoutShift === 0 ? 60 : 0)}>shift layout</button>
+            <output
+                data-testid="drag-output"
+                data-local-x={callbackInfo?.offset.x ?? 0}
+                data-local-y={callbackInfo?.offset.y ?? 0}
+                data-delta-x={callbackInfo?.delta.x ?? 0}
+                data-delta-y={callbackInfo?.delta.y ?? 0}
+                data-velocity-x={callbackInfo?.velocity.x ?? 0}
+                data-velocity-y={callbackInfo?.velocity.y ?? 0}
+                data-bound-x={x.get()}
+                data-bound-y={y.get()}
+                >offset {callbackInfo?.offset.x ?? 0}, {callbackInfo?.offset.y ?? 0}</output
+            >
+        </aside>
+    {/if}
 </main>
 
 <style>
@@ -511,19 +683,100 @@
         inset: 0;
         z-index: 30;
     }
+    .layoutSnapInstructions {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 280px;
+        padding: 16px;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        background: rgb(248 250 252 / 96%);
+        box-shadow: 0 8px 24px rgb(15 23 42 / 12%);
+        color: #0f172a;
+        font:
+            14px/1.4 system-ui,
+            sans-serif;
+        pointer-events: none;
+    }
+    .layoutSnapInstructions h1 {
+        margin: 2px 0 8px;
+        font-size: 19px;
+        line-height: 1.2;
+    }
+    .layoutSnapInstructions p {
+        margin: 0;
+    }
+    .layoutSnapEyebrow {
+        color: #475569;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+    .layoutSnapVariant {
+        padding-bottom: 10px;
+        color: #334155;
+        font-size: 12px;
+    }
+    .layoutSnapInstructions ol {
+        margin: 0;
+        padding-left: 20px;
+    }
+    .layoutSnapInstructions li + li {
+        margin-top: 5px;
+    }
+    .layoutSnapOutcome {
+        display: grid;
+        gap: 5px;
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid #cbd5e1;
+        font-size: 12px;
+    }
+    .layoutSnapInstructions output {
+        display: grid;
+        gap: 2px;
+        margin-top: 12px;
+        padding: 9px 10px;
+        border-radius: 8px;
+        background: #e2e8f0;
+        font-size: 12px;
+    }
+    .layoutSnapInstructions output.pass {
+        background: #dcfce7;
+        color: #14532d;
+    }
+    .layoutSnapInstructions output.fail {
+        background: #fee2e2;
+        color: #7f1d1d;
+    }
     .layoutSnapHandle,
     .layoutShiftButton,
     .layoutSnapSlot {
         position: absolute;
     }
+    .layoutSnapHandle,
+    .layoutShiftButton {
+        outline: 2px solid #0f172a;
+        box-shadow: 0 3px 0 #0f172a;
+        color: #0f172a;
+        cursor: pointer;
+    }
     .layoutSnapHandle {
         left: 100px;
         top: 100px;
+        background: #fbbf24;
+        cursor: grab;
         touch-action: none;
+    }
+    .layoutSnapHandle:active {
+        cursor: grabbing;
     }
     .layoutShiftButton {
         left: 400px;
         top: 50px;
+        background: #7dd3fc;
     }
     .layoutSnapSlot {
         left: 300px;

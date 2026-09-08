@@ -711,12 +711,14 @@ describe('utils/drag', () => {
                 axis: 'x',
                 controls,
                 momentum: false,
-                mergedTransition: { duration: 0 }
+                mergedTransition: { duration: 0 },
+                getBaseTransform: () => ''
             })
 
             // A new layout measurement includes x=40. A later writer advances
             // the shared axis to 70 without refreshing the layout box.
             node.getValue('x').set(40)
+            el.style.transform = 'translateX(40px)'
             projection.layout = {
                 layoutBox: {
                     x: { min: 120, max: 160 },
@@ -725,6 +727,7 @@ describe('utils/drag', () => {
             }
             for (const listener of measureListeners) listener()
             node.getValue('x').set(70)
+            el.style.transform = 'translateX(70px)'
 
             controls.start(
                 new PointerEvent('pointerdown', {
@@ -743,6 +746,86 @@ describe('utils/drag', () => {
             expect(stopMeasureListener).toHaveBeenCalledOnce()
             el.remove()
         })
+
+        it.each([
+            {
+                name: 'a translated and rotated authored base',
+                authoredBase: 'translateX(12px) rotate(5deg)',
+                physicalTransform: 'translateX(12px) rotate(5deg)'
+            },
+            {
+                name: 'an empty authored base and empty physical transform',
+                authoredBase: '',
+                physicalTransform: ''
+            },
+            {
+                name: 'an empty authored base and physical none',
+                authoredBase: '',
+                physicalTransform: 'none'
+            }
+        ])(
+            'pairs a base-only projection measurement with zero represented motion axes for $name',
+            ({ authoredBase, physicalTransform }) => {
+                const el = document.createElement('div')
+                el.style.transform = `translateX(45px) translateY(-30px)${authoredBase ? ` ${authoredBase}` : ''}`
+                document.body.appendChild(el)
+                const node = registerStubNode(el, { x: 45, y: -30 })
+                const measureListeners = new Set<() => void>()
+                const projection = {
+                    layout: {
+                        layoutBox: {
+                            x: { min: 230, max: 270 },
+                            y: { min: 130, max: 170 }
+                        }
+                    },
+                    addEventListener: (_name: string, listener: () => void) => {
+                        measureListeners.add(listener)
+                        return () => measureListeners.delete(listener)
+                    }
+                }
+                ;(node as typeof node & { projection: typeof projection }).projection = projection
+                const controls = createDragControls()
+                const cleanup = attachDrag(el, {
+                    axis: true,
+                    controls,
+                    momentum: false,
+                    mergedTransition: { duration: 0 },
+                    baselineSources: { initial: { x: 45, y: -30 } },
+                    getBaseTransform: () => authoredBase
+                })
+
+                // refreshLayout() strips the live motion axes to the authored raw
+                // transform before updateLayout(). Its measure event is synchronous
+                // within that strip, while the MotionValues remain nonzero.
+                const liveTransform = el.style.transform
+                el.style.transform = physicalTransform
+                projection.layout = {
+                    layoutBox: {
+                        x: { min: 280, max: 320 },
+                        y: { min: 180, max: 220 }
+                    }
+                }
+                for (const listener of measureListeners) listener()
+                el.style.transform = liveTransform
+
+                controls.start(
+                    new PointerEvent('pointerdown', {
+                        clientX: 300,
+                        clientY: 200,
+                        pointerId: 96
+                    }),
+                    { snapToCursor: true }
+                )
+
+                // The measured center already includes authoredBase but neither
+                // motion axis. At the current x=45/y=-30, snapping that live center
+                // back to the measured center therefore returns both axes to zero.
+                expect(node.latestValues).toMatchObject({ x: 0, y: 0 })
+
+                cleanup()
+                el.remove()
+            }
+        )
     })
 
     it('attachDrag: attaches pointerdown and animates during move', async () => {

@@ -812,10 +812,26 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         if (!layout) return
         // Projection bookkeeping can run inside component effects; these reads
         // must not subscribe the caller to the axis MotionValues.
-        const axisValues = untrackSvelte(() => ({
-            x: readCurrentAxisValue('x'),
-            y: readCurrentAxisValue('y')
-        }))
+        const axisValues = untrackSvelte(() => {
+            // The projection adapter physically strips motion transforms to the
+            // authored raw transform while updateLayout() measures. Its
+            // `measure` event fires before that inline transform is restored,
+            // so the still-current MotionValues are not represented by this
+            // particular layout box. Cache zero motion-axis contribution for
+            // that read. The authored raw transform remains part of the box;
+            // it must not be parsed or mistaken for x/y MotionValues.
+            const baseTransform = opts.getBaseTransform?.()
+            const measuredAtBaseTransform =
+                baseTransform !== undefined &&
+                (el.style.transform || 'none') === (baseTransform || 'none')
+
+            return measuredAtBaseTransform
+                ? { x: 0, y: 0 }
+                : {
+                      x: readCurrentAxisValue('x'),
+                      y: readCurrentAxisValue('y')
+                  }
+        })
         measuredProjectionLayout = layout
         measuredAxisValues = axisValues
     }
