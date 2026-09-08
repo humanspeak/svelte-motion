@@ -106,3 +106,10 @@ Public React fixture snapshot precedes this evidence record; feature source rema
 - The approved five-test Reorder amendment is complete. A new, unapproved proposal permits only two conflicting controls expectations and necessary helpers in e2e/drag/controls.spec.ts, using public React evidence while retaining meaningful movement/axis checks and every verification gate. Runtime correction and reviewable proposal are complete; no further source executor is running.
 - Stop for this genuine scope decision. The full450-test browser gate remains pending and is not waived or claimed green. A full-suite failure would still require the repository's one-page-at-a-time in-app review; browser discovery currently returns [], while automated Playwright works. No live visual review is claimed.
 - Updated the current guard report and README to NO-PASS / awaiting controls amendment. No push, PR, merge, plan retirement or change to the original worktree's intel edit.
+
+## Checkpoint 12 — 2026-09-08 — PLAN AMENDED
+
+ebcaccc · user-approved controls test amendment
+
+- User said “Go ahead” to the concrete controls proposal and requested the example page after completion. Approved only the two controls tests and necessary helpers in e2e/drag/controls.spec.ts. Re-stamped the reviewed baseline and updated status; no runtime or verification scope change.
+- Dispatch the bounded test update, verify controls and full browser gate, then open the scaled-board example and explain expected behavior. No second approval request for the same amendment.

@@ -14,7 +14,7 @@ The payoff is visual: a tile stays under the cursor inside a scaled board and re
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | BLOCKED — controls test amendment pending; runtime parity verified |
+| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | IN PROGRESS — approved controls tests; final browser verification |
 
 Status: TODO / IN PROGRESS / DONE / BLOCKED (reason) / REJECTED (reason).
 
@@ -61,3 +61,7 @@ The user approved the narrow Reorder test amendment. The current parity correcti
 ## Current guard review — 2026-09-08
 
 Source `0da2303`: approved Reorder amendment complete; 906 units, all 29 strict React cases and 15 feature browser tests pass. The supplementary controls comparison now matches React too. The next decision is the [one-file controls test amendment](proposed-controls-test-amendment.md), which has not been approved. Full browser verification remains required; no PR/push or closure. The current [guard report](001-transform-page-point.guard-report.md) supersedes the historical paused-draft assessment above.
+
+## Controls amendment approved — 2026-09-08
+
+User authorized the one-file controls test amendment and requested the example page be opened with a walkthrough when finished. Resume test-only execution from reviewed ebcaccc, followed by remaining browser gates. Runtime and prior passing checks remain reviewed; no permission is pending for this amendment.

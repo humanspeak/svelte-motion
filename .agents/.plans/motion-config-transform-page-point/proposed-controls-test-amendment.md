@@ -1,6 +1,6 @@
-# Proposed controls test amendment — pending review
+# Controls test amendment — APPROVED 2026-09-08
 
-This proposal is not approved. The earlier approval applies only to the five Reorder gesture tests.
+The user approved this amendment with “Go ahead” and requested the example page be opened after verification. The earlier Reorder amendment remains complete.
 
 ## Why the current controls assertions conflict with React
 
@@ -22,4 +22,4 @@ No production projection, Reorder runtime, dependency, lockfile, workflow, contr
 
 ## Approval boundary
 
-Plan001's governing revision says to keep the current file scope and obtain review for required scope expansion. Its Scope section does not include `e2e/drag/controls.spec.ts`. This proposal makes that one-file expansion and the evidence-based expectation changes reviewable; it does not silently approve them. The repository's separate full-e2e failure review workflow still applies if a full run fails.
+Plan001's governing revision says to keep the current file scope and obtain review for required scope expansion. Its Scope section does not include `e2e/drag/controls.spec.ts`. The explicit user approval authorizes this one-file expansion and the evidence-based expectation changes. The repository's separate full-e2e failure review workflow still applies if a full run fails.

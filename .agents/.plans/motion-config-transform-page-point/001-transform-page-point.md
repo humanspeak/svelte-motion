@@ -8,7 +8,9 @@
 >
 > Revision 2026-09-08: Execute in the isolated `feat/motion-config-transform-page-point` worktree at main `14046a5` (v1.2.0, includes merged PR #480). Compared the complete scoped source diff against `fcf6452`: no runtime/docs anchor drift. Operator prepares dependencies and runs browser verification because the Codex companion sandbox cannot install, launch browsers, write `.agents/**`, or commit. Executor returns coordinate-contract evidence in its report for guard to record; it never edits this plan. All red-first and characterization gates remain mandatory.
 >
-> **Drift check:** `git diff --stat 06ae8a4..HEAD -- src/lib/types.ts src/lib/index.ts src/lib/components/MotionConfig.svelte src/lib/components/motionConfig.context.ts src/lib/html/_MotionContainer.svelte src/lib/utils/drag.ts src/lib/utils/pan.ts src/lib/utils/motionDomProjection.ts docs/src/routes/docs/motion-config docs/src/lib/docsNav.ts docs/src/lib/examplesIndex.ts`
+> Revision 2026-09-08: User approved the controls-test amendment with “Go ahead”. Add only the two affected tests and necessary helpers in e2e/drag/controls.spec.ts; preserve the first movement test, controls demo, all runtime scope boundaries and verification gates. Reviewed baseline is ebcaccc. Guard already verified runtime0da2303 against all29 cases, supplementary controls, full906 units and15 feature e2e. After the test-only dispatch, complete browser verification and open the public scaled-board example.
+>
+> **Drift check:** `git diff --stat ebcaccc..HEAD -- src/lib/types.ts src/lib/index.ts src/lib/components/MotionConfig.svelte src/lib/components/motionConfig.context.ts src/lib/html/_MotionContainer.svelte src/lib/utils/drag.ts src/lib/utils/pan.ts src/lib/utils/motionDomProjection.ts docs/src/routes/docs/motion-config docs/src/lib/docsNav.ts docs/src/lib/examplesIndex.ts`
 > Also compare existing test/docs exemplars below before editing them. New paths in Scope must not already contain an independent implementation. A changed file is a prompt to compare, not permission to overwrite it.
 
 > Revision 2026-09-08: User explicitly approved proposed-reorder-test-amendment.md. Add only src/lib/components/Reorder/reorder.component.spec.ts for the five gesture tests: valid primary pointer metadata, controlled Motion frame advancement and terminal cleanup, retaining all behavioral assertions and gates. No production Reorder scope expansion. Planned baseline is reviewed snapshot 06ae8a4; in-flight fix-round source changes remain executor work to be reviewed, not independent drift.
@@ -36,8 +38,8 @@ Source snapshot `13ec152` already implements the draft. Baseline excerpts below 
 - **Depends on:** none; PR #480 merged; baseline includes its boundary-release tests
 - **Category:** direction / enhancement
 - **Confidence:** HIGH that the feature is missing; ranking is product judgment
-- **Planned at:** `06ae8a4`, 2026-09-08 (approved Reorder test-only amendment; original source baseline `14046a5`)
-- **Status:** BLOCKED for review — source `0da2303` matches all29 React cases and supplementary controls; approved Reorder amendment complete; proposed controls-test scope amendment and full browser gate remain.
+- **Planned at:** `ebcaccc`, 2026-09-08 (approved controls test-only amendment; original source baseline `14046a5`)
+- **Status:** IN PROGRESS — controls test amendment approved; runtime verification complete; browser regression/full gate and requested example walkthrough remain.
 
 ## Why this matters
 
@@ -185,6 +187,7 @@ Only the following test/demo paths may change or be added:
 - `src/lib/components/Reorder/reorder.component.spec.ts` (user-approved amendment: five gesture tests only; valid primary pointer metadata, deterministic Motion frame advancement and terminal cleanup; preserve numerical/axis/keyed-layout/reorder assertions)
 - new `src/routes/tests/transform-page-point/drag/+page.svelte`
 - new `src/routes/tests/transform-page-point/pan/+page.svelte`
+- `e2e/drag/controls.spec.ts` (approved amendment: two affected controls tests and necessary helpers only; preserve the first imperative-start test and demo route)
 - new `e2e/drag/transform-page-point.spec.ts`
 - new `e2e/motion/pan-transform-page-point.spec.ts`
 - `src/routes/+page.svelte`
