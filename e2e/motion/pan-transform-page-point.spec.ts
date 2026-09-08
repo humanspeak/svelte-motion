@@ -49,6 +49,21 @@ const openCase = async (page: Page, caseId: string) => {
     await expect(page.getByTestId('fixture')).toHaveAttribute('data-ready', 'true')
     await advance(page, 16)
     await advance(page, 16)
+    const frameProbe = await page.evaluate(() =>
+        (
+            window as unknown as {
+                __PARITY__: {
+                    trace: Array<{
+                        type: string
+                        timestamp?: number
+                        performanceNow?: number
+                    }>
+                }
+            }
+        ).__PARITY__.trace.find((entry) => entry.type === 'motionFrameProbe')
+    )
+    expect(frameProbe?.timestamp).toBe(frameProbe?.performanceNow)
+    expect([1016, 1032]).toContain(frameProbe?.timestamp)
 }
 
 const center = async (locator: Locator) => {
@@ -112,25 +127,65 @@ const canonicalSequence = async (page: Page, terminal: 'up' | 'cancel' = 'up') =
 }
 
 const scrollWindowBy = async (page: Page, x: number, y: number) => {
-    await page.evaluate(
-        ({ x, y }) =>
-            new Promise<void>((resolve) => {
-                window.addEventListener('scroll', () => resolve(), { once: true })
-                window.scrollBy(x, y)
-            }),
+    const expected = await page.evaluate(
+        ({ x, y }) => {
+            const expected = { x: window.scrollX + x, y: window.scrollY + y }
+            const state = { delivered: false }
+            ;(window as unknown as { __TPP_WINDOW_SCROLL__?: typeof state }).__TPP_WINDOW_SCROLL__ =
+                state
+            const recordScroll = () => {
+                if (window.scrollX === expected.x && window.scrollY === expected.y) {
+                    state.delivered = true
+                    window.removeEventListener('scroll', recordScroll)
+                }
+            }
+            window.addEventListener('scroll', recordScroll)
+            window.scrollBy(x, y)
+            return expected
+        },
         { x, y }
     )
+    await page.waitForFunction(
+        ({ x, y }) => {
+            const state = (window as unknown as { __TPP_WINDOW_SCROLL__?: { delivered: boolean } })
+                .__TPP_WINDOW_SCROLL__
+            return state?.delivered && window.scrollX === x && window.scrollY === y
+        },
+        expected,
+        { polling: 10, timeout: 2000 }
+    )
+    expect(await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }))).toEqual(expected)
 }
 
 const scrollShellBy = async (page: Page, x: number, y: number) => {
-    await page.getByTestId('shell').evaluate(
-        (element, delta) =>
-            new Promise<void>((resolve) => {
-                element.addEventListener('scroll', () => resolve(), { once: true })
-                element.scrollBy(delta.x, delta.y)
-            }),
+    const shell = page.getByTestId('shell')
+    const expected = await shell.evaluate(
+        (element, delta) => {
+            const expected = { x: element.scrollLeft + delta.x, y: element.scrollTop + delta.y }
+            element.dataset.scrollDelivered = 'false'
+            const recordScroll = () => {
+                if (element.scrollLeft === expected.x && element.scrollTop === expected.y) {
+                    element.dataset.scrollDelivered = 'true'
+                    element.removeEventListener('scroll', recordScroll)
+                }
+            }
+            element.addEventListener('scroll', recordScroll)
+            element.scrollBy(delta.x, delta.y)
+            return expected
+        },
         { x, y }
     )
+    await expect
+        .poll(
+            () =>
+                shell.evaluate((element) => ({
+                    delivered: element.dataset.scrollDelivered,
+                    x: element.scrollLeft,
+                    y: element.scrollTop
+                })),
+            { timeout: 2000, intervals: [10] }
+        )
+        .toEqual({ delivered: 'true', ...expected })
 }
 
 test.describe('MotionConfig transformPagePoint pan', () => {
@@ -245,9 +300,11 @@ test.describe('MotionConfig transformPagePoint pan', () => {
             () =>
                 Math.abs(
                     new DOMMatrix(
-                        getComputedStyle(document.querySelector('[data-testid="stage"]')!)
+                        getComputedStyle(document.querySelector('[data-testid="stage"]')!).transform
                     ).a - 0.25
-                ) < 0.0001
+                ) < 0.0001,
+            null,
+            { polling: 10, timeout: 2000 }
         )
         await advance(page, 16)
         await page.mouse.move(start.x + 30, start.y + 15)

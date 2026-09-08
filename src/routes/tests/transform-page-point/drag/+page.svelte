@@ -2,7 +2,9 @@
     import { page } from '$app/state'
     import {
         MotionConfig,
+        cancelFrame,
         createDragControls,
+        frame,
         motion,
         motionValue,
         type DragInfo,
@@ -47,6 +49,9 @@
     let target: HTMLElement | null = $state(null)
     let handle: HTMLElement | null = $state(null)
     let callbackInfo = $state<DragInfo | null>(null)
+    const fixtureCommit = $derived(
+        `${mappingKind}:${stableScale}:${visualScale.x}:${visualScale.y}:${boardWidth}:${layoutShift}`
+    )
     const x = motionValue(0)
     const y = motionValue(0)
 
@@ -226,8 +231,20 @@
                 mounted = false
             }) as (...args: never[]) => unknown
         }
+        let frameProbeRecorded = false
+        const recordMotionFrame = (frameData: { delta: number; timestamp: number }) => {
+            if (frameProbeRecorded) return
+            frameProbeRecorded = true
+            trace('motionFrameProbe', {
+                delta: round(frameData.delta),
+                timestamp: round(frameData.timestamp),
+                performanceNow: round(performance.now())
+            })
+        }
+        frame.update(recordMotionFrame, true)
         parity.ready = true
         ready = true
+        return () => cancelFrame(recordMotionFrame)
     })
 </script>
 
@@ -236,6 +253,7 @@
         <motion.div
             bind:ref={target}
             data-testid="target"
+            data-fixture-commit={fixtureCommit}
             class="dragTarget"
             drag
             dragListener={!usesControls}

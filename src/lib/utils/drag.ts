@@ -472,6 +472,16 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             nextOptions.constraints,
             nextOptions.transformPagePoint
         )
+        // A React render commit refreshes ref constraints through the
+        // projection measure listener before resize scaling runs. Our
+        // constraints are stored relative to the element's current box, so
+        // pair that fresh measurement with the current applied origin. Leaving
+        // the prior base attached to the new relative distances makes the
+        // resize observer treat an unchanged position as out of bounds and
+        // push it to the new edge.
+        if (!dragging && isDomElement(nextOptions.constraints)) {
+            constraintsBase = { ...applied }
+        }
         panCleanup?.update(dragSessionHandlers, dragSessionOptions())
     }
 
@@ -937,7 +947,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     let sessionPrepared = false
 
     /** Prepare axis ownership when the pointer session begins. */
-    const prepareDragSession = (e: PointerEvent, info: DragInfo) => {
+    const prepareDragSession = (e: PointerEvent) => {
         pwLog('[drag] begin', {
             el: EL_ID,
             pointer: { id: e.pointerId, x: e.clientX, y: e.clientY },
@@ -1010,8 +1020,15 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             const centerY = layoutBox
                 ? (layoutBox.y.min + layoutBox.y.max) / 2
                 : (rect?.top ?? 0) + (rect?.height ?? 0) / 2
-            if (applyXAxis) applied.x += info.point.x - centerX
-            if (applyYAxis) applied.y += info.point.y - centerY
+            // Upstream intentionally crosses these domains at this boundary:
+            // snap receives extractEventInfo(event).point (the raw PAGE point),
+            // while the projection layout box has already consumed
+            // transformPagePoint. Do not reuse the session-mapped `info.point`
+            // here or a scaled/scrolled control starts one transformed pointer
+            // away from React's public result.
+            const rawPagePoint = { x: e.pageX, y: e.pageY }
+            if (applyXAxis) applied.x += rawPagePoint.x - centerX
+            if (applyYAxis) applied.y += rawPagePoint.y - centerY
             setXYImmediate(applied.x, applied.y)
             pwLog('[drag] snapToCursor', { el: EL_ID, applied: { ...applied } })
         }

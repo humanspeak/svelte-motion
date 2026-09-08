@@ -1,6 +1,13 @@
 <script lang="ts">
     import { page } from '$app/state'
-    import { MotionConfig, motion, type DragInfo, type MotionTransformPoint } from '$lib'
+    import {
+        MotionConfig,
+        cancelFrame,
+        frame,
+        motion,
+        type DragInfo,
+        type MotionTransformPoint
+    } from '$lib'
     import { onMount } from 'svelte'
 
     const caseId = $derived(page.url.searchParams.get('case') ?? 'pan-config-inherit')
@@ -198,8 +205,20 @@
                 mounted = false
             }) as (...args: never[]) => unknown
         }
+        let frameProbeRecorded = false
+        const recordMotionFrame = (frameData: { delta: number; timestamp: number }) => {
+            if (frameProbeRecorded) return
+            frameProbeRecorded = true
+            trace('motionFrameProbe', {
+                delta: round(frameData.delta),
+                timestamp: round(frameData.timestamp),
+                performanceNow: round(performance.now())
+            })
+        }
+        frame.update(recordMotionFrame, true)
         parity.ready = true
         ready = true
+        return () => cancelFrame(recordMotionFrame)
     })
 </script>
 

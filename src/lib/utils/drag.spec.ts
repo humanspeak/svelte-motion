@@ -479,18 +479,38 @@ describe('utils/drag', () => {
             clock.mockRestore()
         })
 
-        it('corrects both the pointer and measured center for controlled snap-to-cursor', async () => {
+        it('uses the raw page point against the transformed projection center for controlled snap', async () => {
             const el = document.createElement('div')
             document.body.appendChild(el)
-            vi.spyOn(el, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 40, 20, 20))
+            const node = registerStubNode(el) as ReturnType<typeof registerStubNode> & {
+                projection?: {
+                    layout: {
+                        layoutBox: {
+                            x: { min: number; max: number }
+                            y: { min: number; max: number }
+                        }
+                    }
+                }
+            }
+            node.projection = {
+                layout: {
+                    // The VisualElement projection has already consumed the
+                    // scale-2 transformPagePoint mapping.
+                    layoutBox: {
+                        x: { min: 200, max: 240 },
+                        y: { min: 80, max: 120 }
+                    }
+                }
+            }
             const x = motionValue(0)
+            const y = motionValue(0)
             const controls = createDragControls()
             const cleanup = attachDrag(el, {
-                axis: 'x',
+                axis: true,
                 controls,
                 momentum: false,
                 mergedTransition: { duration: 0 },
-                boundMotionValues: { x },
+                boundMotionValues: { x, y },
                 transformPagePoint: (point) => ({ x: point.x * 2, y: point.y * 2 })
             })
 
@@ -502,7 +522,10 @@ describe('utils/drag', () => {
 
             cleanup()
             el.remove()
-            expect(x.get()).toBe(40)
+            // Raw page point (130, 50) minus transformed layout center
+            // (220, 100). Reusing mapped info.point would incorrectly yield
+            // (40, 0), the exact scaled/scrolled public parity regression.
+            expect({ x: x.get(), y: y.get() }).toEqual({ x: -90, y: -50 })
         })
     })
 

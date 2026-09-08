@@ -2167,6 +2167,15 @@
         // compares it with `prevPresenceContext` to detect exit and re-entry.
         const nextPresenceContext = buildPresenceContext()
         untrack(() => {
+            const activeDragCommit =
+                element?.dataset.svelteMotionDragActive === 'true' && teardownDrag
+            if (activeDragCommit) {
+                // React's MeasureLayout commit calls projection.didUpdate(),
+                // which synchronously flushes Motion's update lane. An active
+                // PanSession therefore samples its retained pointer at the
+                // render-commit timestamp (including config/closure changes).
+                motionDomProjection?.projection.willUpdate()
+            }
             visualElement.update(next, nextPresenceContext)
             // Upstream runs feature updates after every VisualElement update.
             // Without this, a motion.* child held by PresenceChild receives the
@@ -2185,6 +2194,12 @@
             // (use-visual-element.ts:148); the frameloop variant can sit unflushed
             // when nothing else is animating, which left `renderState` stale.
             visualElement.scheduleRenderMicrotask()
+            // Drag controls read current props on every React commit. Refresh
+            // our long-lived adapter here too, even when the gesture-specific
+            // values themselves kept the same identity (for example a ref
+            // constraint whose parent changed size).
+            if (teardownDrag) teardownDrag.updateOptions(resolveDragOptions())
+            if (activeDragCommit) motionDomProjection?.projection.root?.didUpdate()
             // Only once the mount/enter effect has run the first pass — it owns
             // the enter ordering and the wait-mode gate.
             //
@@ -2661,10 +2676,36 @@
         element!.addEventListener(sizeCorrectionEndEvent, handleSizeCorrectionEnd)
 
         const disconnectObservers = observeLayoutChanges(element!, () => scheduleProjectionCommit())
+        // A sibling can re-slot a dragged layout element without changing the
+        // dragged node, its parent, or either element's size. React observes
+        // this through the parent's render commit. Svelte's fine-grained DOM
+        // update otherwise leaves no signal for this component, so watch the
+        // containing layout row while the drag is active and route real rect
+        // changes through the existing single-writer compensation path.
+        const siblingLayoutParent = element!.parentElement?.parentElement
+        const siblingLayoutObserver =
+            dragProp && siblingLayoutParent && typeof MutationObserver !== 'undefined'
+                ? new MutationObserver((mutations) => {
+                      if (element?.dataset.svelteMotionDragActive !== 'true') return
+                      const hasExternalMutation = mutations.some((mutation) => {
+                          const target = mutation.target
+                          return target instanceof Element && !element?.contains(target)
+                      })
+                      if (hasExternalMutation) scheduleProjectionCommit()
+                  })
+                : null
+        if (siblingLayoutObserver && siblingLayoutParent) {
+            siblingLayoutObserver.observe(siblingLayoutParent, {
+                attributes: true,
+                attributeFilter: ['class', 'style'],
+                subtree: true
+            })
+        }
         element!.addEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
 
         return () => {
             disconnectObservers()
+            siblingLayoutObserver?.disconnect()
             element?.removeEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
             element?.removeEventListener(sizeCorrectionSeedEvent, handleSizeCorrectionSeed)
             element?.removeEventListener(sizeCorrectionEndEvent, handleSizeCorrectionEnd)
