@@ -45,6 +45,7 @@ import {
     type TransformTemplate,
     type VisualElement
 } from 'motion-dom'
+import { untrack as untrackSvelte } from 'svelte'
 
 /**
  * Drag-specific alias for the shared gesture transform writer.
@@ -807,12 +808,16 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     let stopProjectionMeasureListener: (() => void) | null = null
 
     const captureProjectionAxisValues = (projection: SnapProjection) => {
-        if (!projection.layout) return
-        measuredProjectionLayout = projection.layout
-        measuredAxisValues = {
+        const layout = projection.layout
+        if (!layout) return
+        // Projection bookkeeping can run inside component effects; these reads
+        // must not subscribe the caller to the axis MotionValues.
+        const axisValues = untrackSvelte(() => ({
             x: readCurrentAxisValue('x'),
             y: readCurrentAxisValue('y')
-        }
+        }))
+        measuredProjectionLayout = layout
+        measuredAxisValues = axisValues
     }
 
     /** Observe the projection measurement owned by the shared VisualElement. */
