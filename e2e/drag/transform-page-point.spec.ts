@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
 
 type Point = { x: number; y: number }
 type GestureEntry = {
+    at: number
     type: string
     info: { point: Point; delta: Point; offset: Point; velocity: Point }
     boundValues: Point
@@ -359,7 +360,47 @@ test.describe('MotionConfig transformPagePoint drag', () => {
             null,
             { polling: 10, timeout: 2000 }
         )
+        const stableScaleCommit = await snapshot(page, 'stable-scale-commit')
+        expect(stableScaleCommit).toMatchObject({
+            rects: {
+                target: {
+                    x: 567,
+                    y: 465,
+                    top: 465,
+                    right: 587,
+                    bottom: 485,
+                    left: 567,
+                    width: 20,
+                    height: 20
+                }
+            },
+            boundValues: { x: 894, y: 710 }
+        })
+        let stableTrace = await gestures(page)
+        expect(stableTrace[2]).toMatchObject({
+            at: 1088,
+            type: 'onDrag',
+            info: {
+                point: { x: 1708, y: 1380 },
+                delta: { x: 854, y: 690 },
+                offset: { x: 894, y: 710 },
+                velocity: { x: 714.285714, y: 357.142857 }
+            },
+            boundValues: { x: 894, y: 710 }
+        })
         await advance(page, 16)
+        stableTrace = await gestures(page)
+        expect(stableTrace[3]).toMatchObject({
+            at: 1104,
+            type: 'onDrag',
+            info: {
+                point: { x: 1708, y: 1380 },
+                delta: { x: 0, y: 0 },
+                offset: { x: 894, y: 710 },
+                velocity: { x: 15964.285714, y: 12678.571429 }
+            },
+            boundValues: { x: 894, y: 710 }
+        })
         await page.mouse.move(start.x + 30, start.y + 15)
         await advance(page, 40)
         await page.mouse.up()
@@ -413,7 +454,25 @@ test.describe('MotionConfig transformPagePoint drag', () => {
             .poll(() => page.getByTestId('board').evaluate((element) => element.offsetWidth))
             .toBe(620)
         await advance(page, 32)
+        const preRegrab = await snapshot(page, 'pre-regrab')
+        expect(preRegrab).toMatchObject({
+            rects: {
+                target: {
+                    x: 510,
+                    y: 315,
+                    top: 315,
+                    right: 550,
+                    bottom: 355,
+                    left: 510,
+                    width: 40,
+                    height: 40
+                }
+            },
+            layout: { boardOffsetWidth: 620 },
+            boundValues: { x: 246, y: 0 }
+        })
         start = await center(page.getByTestId('target'))
+        expect(start).toEqual({ x: 530, y: 335 })
         await page.mouse.move(start.x, start.y)
         await page.mouse.down()
         await advance(page, 16)
@@ -421,6 +480,8 @@ test.describe('MotionConfig transformPagePoint drag', () => {
         await advance(page, 40)
         await page.mouse.up()
         await advance(page, 20)
+        const resizeTrace = await gestures(page)
+        expect(resizeTrace.slice(-3).map(({ info }) => info.point.x)).toEqual([60, 60, 60])
         expect((await snapshot(page, 'resized')).boundValues).toMatchObject({ x: -174, y: 0 })
     })
 

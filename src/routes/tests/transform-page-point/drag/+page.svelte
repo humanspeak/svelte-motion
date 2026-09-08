@@ -49,9 +49,12 @@
     let target: HTMLElement | null = $state(null)
     let handle: HTMLElement | null = $state(null)
     let callbackInfo = $state<DragInfo | null>(null)
-    const fixtureCommit = $derived(
-        `${mappingKind}:${stableScale}:${visualScale.x}:${visualScale.y}:${boardWidth}:${layoutShift}`
-    )
+    // React's public reference fixture creates fresh onDrag* closures whenever
+    // one of these parent action states causes a render. Svelte event-handler
+    // closures are compiler-stable, so explicitly replace the public callback
+    // references on the corresponding fixture actions. These references still
+    // enter through normal motion props; there is no fixture-only engine hook.
+    let callbackCommit = $state(0)
     const x = motionValue(0)
     const y = motionValue(0)
 
@@ -195,6 +198,14 @@
             boundValues: { x: round(x.get()), y: round(y.get()) }
         })
     }
+    const dragCallbacks = $derived.by(() => {
+        void callbackCommit
+        return {
+            onStart: (event: PointerEvent, info: DragInfo) => record('onDragStart', event, info),
+            onMove: (event: PointerEvent, info: DragInfo) => record('onDrag', event, info),
+            onEnd: (event: PointerEvent, info: DragInfo) => record('onDragEnd', event, info)
+        }
+    })
 
     onMount(() => {
         const root = globalThis as typeof globalThis & { __PARITY__?: typeof parity }
@@ -216,16 +227,20 @@
             captureSnapshot: captureSnapshot as (...args: never[]) => unknown,
             setMapping: ((value: MappingKind) => {
                 mappingKind = value
+                callbackCommit += 1
             }) as (...args: never[]) => unknown,
             setStableScale: ((value: number) => {
                 stableScale = value
                 visualScale = { x: 1 / value, y: 1 / value }
+                callbackCommit += 1
             }) as (...args: never[]) => unknown,
             resizeBoard: ((width: number) => {
                 boardWidth = width
+                callbackCommit += 1
             }) as (...args: never[]) => unknown,
             shiftLayout: ((px: number) => {
                 layoutShift = px
+                callbackCommit += 1
             }) as (...args: never[]) => unknown,
             unmount: (() => {
                 mounted = false
@@ -253,7 +268,6 @@
         <motion.div
             bind:ref={target}
             data-testid="target"
-            data-fixture-commit={fixtureCommit}
             class="dragTarget"
             drag
             dragListener={!usesControls}
@@ -263,9 +277,9 @@
             dragMomentum={false}
             layout={usesLayout}
             style={{ x, y }}
-            onDragStart={(event, info) => record('onDragStart', event, info)}
-            onDrag={(event, info) => record('onDrag', event, info)}
-            onDragEnd={(event, info) => record('onDragEnd', event, info)}>drag card</motion.div
+            onDragStart={dragCallbacks.onStart}
+            onDrag={dragCallbacks.onMove}
+            onDragEnd={dragCallbacks.onEnd}>drag card</motion.div
         >
     {/if}
 {/snippet}

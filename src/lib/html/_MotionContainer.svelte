@@ -597,6 +597,15 @@
             whileFocus: filterReducedMotionDefinition(whileFocusProp),
             whileInView: filterReducedMotionDefinition(whileInViewProp),
             whileDrag: filterReducedMotionDefinition(whileDragProp),
+            // Gesture callbacks are public VisualElement props upstream. Carry
+            // them here even though the Svelte drag adapter invokes them: a
+            // callback-reference replacement is still a real props commit and
+            // must flow through the same active-drag projection/updateOptions
+            // lifecycle below. This also keeps the adapter's callbacks hot-
+            // swappable without tearing down the live pointer session.
+            onDragStart: onDragStartProp,
+            onDrag: onDragProp,
+            onDragEnd: onDragEndProp,
             // `buildHTMLStyles(state, latestValues, transformTemplate)` reads the
             // template off the props, so the VE composes templated transforms
             // natively — the job `applyMotionStyleEffect` used to do.
