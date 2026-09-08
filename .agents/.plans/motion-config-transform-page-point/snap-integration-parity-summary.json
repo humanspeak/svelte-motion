@@ -1,0 +1,288 @@
+[
+  {
+    "id": "pan-no-config-end",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "pan-config-inherit",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "pan-config-identity",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "pan-config-explicit-undefined",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "pan-uniform-scale",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "pan-nonuniform-affine",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "pan-page-scroll-at-start",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "pan-page-scroll-held",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "pan-ancestor-scroll-held",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "pan-reference-replacement",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "pan-stable-closure-scale",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "pan-corrected-threshold",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "pan-pointer-cancel",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "pan-unmount-held",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "drag-no-config-end",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "drag-uniform-scale",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "drag-nonuniform-affine",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "drag-page-scroll-at-start",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "drag-page-scroll-held",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "drag-ancestor-scroll-held",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "drag-reference-replacement",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "drag-stable-closure-scale",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "drag-numeric-bounds",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "drag-ref-bounds",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "drag-ref-resize-regrab",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "drag-controls-snap-scrolled",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "drag-real-layout-shift-held",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "kind": "snapshot",
+        "label": "layout-commit",
+        "expected": {
+          "label": "layout-commit",
+          "mappingKind": "double",
+          "stableScale": 2,
+          "visualScale": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "mounted": true,
+          "scroll": {
+            "x": 0,
+            "y": 0
+          },
+          "shellScroll": null,
+          "rects": {
+            "shell": null,
+            "stage": {
+              "x": 300,
+              "y": 260,
+              "top": 260,
+              "right": 550,
+              "bottom": 410,
+              "left": 300,
+              "width": 250,
+              "height": 150
+            },
+            "board": {
+              "x": 300,
+              "y": 260,
+              "top": 260,
+              "right": 550,
+              "bottom": 410,
+              "left": 300,
+              "width": 250,
+              "height": 150
+            },
+            "slot": {
+              "x": 417,
+              "y": 315,
+              "top": 315,
+              "right": 457,
+              "bottom": 355,
+              "left": 417,
+              "width": 40,
+              "height": 40
+            },
+            "target": {
+              "x": 417,
+              "y": 330,
+              "top": 330,
+              "right": 457,
+              "bottom": 370,
+              "left": 417,
+              "width": 40,
+              "height": 40
+            },
+            "handle": null,
+            "follower": null
+          },
+          "boundValues": {
+            "x": 0,
+            "y": 30,
+            "panOffset": {
+              "x": 0,
+              "y": 0
+            }
+          }
+        },
+        "actual": {
+          "label": "layout-commit",
+          "mappingKind": "double",
+          "stableScale": 2,
+          "visualScale": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "mounted": true,
+          "scroll": {
+            "x": 0,
+            "y": 0
+          },
+          "shellScroll": null,
+          "rects": {
+            "shell": null,
+            "stage": {
+              "x": 300,
+              "y": 260,
+              "top": 260,
+              "right": 550,
+              "bottom": 410,
+              "left": 300,
+              "width": 250,
+              "height": 150
+            },
+            "board": {
+              "x": 300,
+              "y": 260,
+              "top": 260,
+              "right": 550,
+              "bottom": 410,
+              "left": 300,
+              "width": 250,
+              "height": 150
+            },
+            "slot": {
+              "x": 417,
+              "y": 315,
+              "top": 315,
+              "right": 457,
+              "bottom": 355,
+              "left": 417,
+              "width": 40,
+              "height": 40
+            },
+            "target": {
+              "x": 417,
+              "y": 315,
+              "top": 315,
+              "right": 457,
+              "bottom": 355,
+              "left": 417,
+              "width": 40,
+              "height": 40
+            },
+            "handle": null,
+            "follower": null
+          },
+          "boundValues": {
+            "x": 0,
+            "y": 30,
+            "panOffset": {
+              "x": 0,
+              "y": 0
+            }
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "drag-pointer-cancel",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "drag-unmount-held",
+    "status": "matched",
+    "mismatches": []
+  }
+]

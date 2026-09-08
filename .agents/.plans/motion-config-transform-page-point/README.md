@@ -71,3 +71,5 @@ User authorized the one-file controls test amendment and requested the example p
 2026-09-08: User explicitly authorized fixing Svelte first. Upstream issue3805 posted. Dispatch narrow snap correction from bf50874; no further approval needed for this fix.
 
 2026-09-08: Snapshot501ea9c3 fixescontrolsRED but exposes reactive gesture reattachment. Narrow original-scope container integration correction dispatched; no assertion changes.
+
+2026-09-08: Snapshot `88a811f0` passes 908 units and 18 targeted browser tests, including unchanged repeated-start RED. Strict parity has one layout snapshot mismatch; full e2e stops at first owned-child opacity timing failure after 53 passes. T3 page reviewed; user decision pending per repository workflow. See current guard report.

@@ -1,0 +1,46 @@
+1:45:11 PM [vite-plugin-svelte] invalid plugin option `hot` in inline config
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+[tsconfig-paths] An error occurred while parsing "/private/tmp/svelte-motion-snap-baseline/docs/tsconfig.json". See below for details. To disable this message, set the `ignoreConfigErrors` option to true.
+
+ RUN  v4.1.11 /private/tmp/svelte-motion-snap-baseline
+
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:314:8 This reference only captures the initial value of `layoutScrollProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:668:42 This reference only captures the initial value of `keyProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:690:24 This reference only captures the initial value of `keyProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:690:49 This reference only captures the initial value of `keyProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:694:25 This reference only captures the initial value of `keyProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:921:15 This reference only captures the initial value of `declarativeAnimateProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:922:14 This reference only captures the initial value of `declarativeAnimateProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:923:15 This reference only captures the initial value of `variantsProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:949:10 This reference only captures the initial value of `initialProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:950:12 This reference only captures the initial value of `initialProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:951:34 This reference only captures the initial value of `variantsProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:958:8 This reference only captures the initial value of `initialProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:959:8 This reference only captures the initial value of `animateProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:962:8 This reference only captures the initial value of `initialProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:1009:31 This reference only captures the initial value of `customProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+1:45:16 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:1009:58 This reference only captures the initial value of `customProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+ ✓ src/lib/components/Reorder/reorder.component.spec.ts (14 tests) 2115ms
+     ✓ rebases an active drag when a keyed reorder moves its layout slot  1165ms
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  13:45:12
+   Duration  6.77s (transform 2.07s, setup 340ms, import 2.55s, tests 2.11s, environment 1.38s)
+

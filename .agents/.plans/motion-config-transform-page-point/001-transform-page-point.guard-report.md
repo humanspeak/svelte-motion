@@ -1,50 +1,42 @@
-# Guard report — 001 transform-page-point
+# Guard report — MotionConfig coordinate transforms and repeated snap fix
 
-**NO-PASS — user-requested repeated-start RED reproduced; runtime direction under review.** The two other controls tests pass. Repeated identical drags drift in both Svelte and public React Motion13.2.0. No runtime fix or upstream submission has been made.
+**NO-PASS: the repeated-start regression is fixed; one strict parity checkpoint and full browser review remain.**
 
-Latest test snapshot:`6c6781b`; production snapshot:`0da2303`. Worktree:`/Users/jasonkummerl/Github/svelte-motion-transform-page-point`. Branch:`feat/motion-config-transform-page-point`.
+Reviewed source: `88a811f0` on `feat/motion-config-transform-page-point` in `/Users/jasonkummerl/Github/svelte-motion-transform-page-point`.
 
-## Current red-first gate
+## What changed
 
-Guard independently ran the controls file:2passed,1failed in6.2s. The regression asserts each snap centers at the pointer and repeated real drags finish consistently within2px; second snap misses by50px. Positions after three identical drags:(750,427),(800,377),(850,327). Test captures all positions and preserves real lifecycle assertions. The first and tiny-nudge tests and shared helpers are byte-identical todf11fcc.
+The user authorized fixing Svelte first, as a narrow exception to the repeated snap bug reproduced in React Motion 13.2.0. `501ea9c3` pairs cached projection measurements with their axis values and corrects the center using subsequent axis movement. `88a811f0` keeps imperative drag attachment and option updates outside Svelte reactive tracking, preserving active sessions. No dependency or projection implementation changes.
 
-See controls-red-first-guard.log and controls-repeat-red-input-probe.json. The matching public React probe uses the same three inputs, verifies each button hit, and produces exactly identical boxes. Source has not changed since the previously verified runtime below. The previous acceptance of repeated drift is superseded by the user's red-first bug report.
+The controls regression was committed RED at `6c6781b` before these runtime changes. It remains byte-identical and now passes all three repeated real-pointer sessions. Earlier acceptance of cumulative drift is superseded. Upstream issue: https://github.com/motiondivision/motion/issues/3805. No upstream PR or feature PR/push.
 
-## Verified changes
+## Independently reproduced verification
 
-- Inherited `MotionConfig.transformPagePoint`, public types, gesture input capture, live measurement config, corrected callbacks/velocity, constraints, snap, scroll and layout behavior follow the pinned public React reference.
-- Ordinary pan and drag use the existing local pan implementation with their distinct upstream scroll/lifetime behavior. No private imports, vendoring, patched exports, new dependencies or production projection changes.
-- Parent callback replacements reach the normal VisualElement commit path. Matched Svelte fixtures explicitly replace public callback references when the corresponding React parent render does; the artificial fixture attribute was removed.
-- Controlled snap no longer counts authored initial coordinates twice. Svelte and React start at the same (700,477) box and produce active (650,427), then (600,377), for the same repeated inputs.
-- The five approved Reorder gesture tests retain their original numerical, axis, keyed-layout and callback assertions while using valid pointer metadata and controlled Motion frame sampling. All 14 Reorder tests pass in the full suite.
-- The round2 out-of-scope component-test addition was removed. That file exactly matches its original version; coverage now resides in the approved config test/harness and verifies handler replacement during the same active session. The lock-contention regression now samples a move beyond the threshold before asserting the second drag is blocked.
-
-## Guard verification
-
-Commands use pinned pnpm11.24.0 through `npm exec --yes --package=pnpm@11.24.0 -- pnpm`.
-
-| Gate | Result | Evidence |
+| Gate | Current result | Evidence |
 | --- | --- | --- |
-| Strict public React/Svelte matrix | **29/29 exact matches**, zero mismatches | `svelte-parity-fix3-summary.json`; full raw result `/tmp/svelte-motion-react-parity-1320/svelte-parity-fix3-guard.json` |
-| Supplementary controls reference | **Matches**, with geometry and raw pointer preconditions verified | `react-controls-reference-fixed.json`, `react-controls-tiny-raw-guard.json`, `svelte-controls-fix3-guard.json` |
-| Full unit suite, `pnpm test:only` | **906/906 pass**, 82 files | `/tmp/transform-page-point-round3-full-units.log` |
-| New feature browser files | **15/15 pass** on a fresh build | `/tmp/transform-page-point-round3-targeted.log` |
-| Root check | **0 errors / 39 existing warnings**, independently reproduced; source commit hook also passes | `/tmp/transform-page-point-round3-root-check.log`, `/tmp/transform-page-point-round3-snapshot-commit.log` |
-| App build, package, publint | **Pass** during fresh browser-server startup | `/tmp/transform-page-point-round3-targeted.log` |
-| Docs production build | **Pass**, including 252 generated social images and Cloudflare adapter output | `/tmp/transform-page-point-round3-docs-build.log` |
-| Docs metadata coverage | **5/5 pass** | `/tmp/transform-page-point-round3-seo.log` |
-| Docs typecheck | Same **6 baseline errors / 13 warnings**; exact error file/location/diagnostic comparison unchanged | `/tmp/transform-page-point-round3-docs-check.log`, earlier baseline comparison in `resume-environment.md` |
-| Trunk formatting / lint | **Pass / no new issues**; one existing lint issue | `/tmp/transform-page-point-round3-trunk-fmt.log`, `/tmp/transform-page-point-round3-trunk-check.log` |
-| Full browser suite | **Pending**: 450 tests; gate retained | Repeated-start regression now deliberately RED; full gate remains required after the chosen correction |
-| Diff hygiene / scope | Source snapshot clean; scope restored; final artifact hygiene checked before commit | No changes to excluded projection/dependencies/workflows/controls route; approved controls test edits captured separately; original intel edit preserved |
+| Full units | 908/908 pass, 82 files; includes Reorder 14/14 | `snap-integration-full-units.log` |
+| Controls and feature browser tests | 18/18 pass on fresh build; protected RED test unchanged | `snap-integration-targeted-browser.log` |
+| Public React strict matrix | 28/29 match; one intermediate rendered rectangle mismatch | `snap-integration-parity-summary.json`; raw `/tmp/svelte-motion-react-parity-1320/svelte-snap-fix2-guard.json` |
+| App build, package, publint | Pass | `/tmp/snap-fix2-build.log` |
+| Root check | Source commit hooks pass; executor reports 0 errors, 39 existing warnings | `/tmp/snap-fix2-source-commit.log`; `snap-integration-executor-report.md` |
+| Docs metadata | 5/5 pass | `/tmp/snap-fix2-docs-seo.log` |
+| Docs check | 6 baseline errors, 13 warnings; exact error locations and diagnostics unchanged from prior guard run | `/tmp/snap-fix2-docs-check.log` |
+| Trunk check | No new issues; one existing issue | `/tmp/snap-fix2-trunk-check.log` |
+| Full browser suite | 53 pass, 1 fail, 396 not run; stopped at first failure | `snap-integration-full-browser.log` |
+| Final docs build and formatting | Pending after remaining runtime decision/correction | Earlier builds are historical, not final verification of this snapshot |
 
-The six docs baseline errors are in unchanged PostHog, keyframes/Wildcard, and transform-template/Default files. They are not feature errors and have not been relabeled as a passing docs check. Generated unrelated animated-tabs class ordering was inspected and restored.
+## Strict parity finding
 
+`drag-real-layout-shift-held` now has correct axis values `{x:0,y:30}` at `layout-commit`, but the immediate rendered target y is 315 rather than React's 330. The following sampled callbacks render correctly. The isolated case reproduces the same single mismatch. A read-only executor diagnosis is underway. No assertions or reference fixtures have been weakened. Other 28 cases match, including scrolled snap and callback/velocity semantics.
+
+## First full-browser failure: review required
+
+`e2e/animate-presence/owned-child.spec.ts:26` expects opacity below 0.95 at a fixed 120 ms after toggling removal; observed 0.98175. The identity assertion before it passed. The route and test are unchanged from base `14046a5`; that alone does not prove this failure is pre-existing.
+
+Opened the page visibly in T3 tab_8 at http://127.0.0.1:4198/tests/animate-presence/owned-child?@isPlaywright=true. The page demonstrates retaining and fading the original live node, preserving state, then unmounting without a clone. A real T3 click plus requestAnimationFrame observations showed opacity 0.859 at 115 ms and 0.838625 at 131 ms, same original node and zero clones; by 1115 ms it was removed and exits completed was 1. This supports investigating the test's fixed timing, not a proven diagnosis or authority to change the assertion.
+
+The repository AGENTS.md failed-e2e workflow requires the user's behavior-versus-test decision before altering this failure or moving to the next failing page. No full-suite retry, assertion edit or AnimatePresence source change has occurred. The page remains open for review.
 
 ## Remaining work
 
-Resolve the intended bug correction against the earlier exact-React-parity instruction; the user is discussing offering the correction upstream. CONTRIBUTING welcomes bug fixes but GitHub currently shows issue/PR-creation restrictions. A local draft exists in upstream-report-draft.md; nothing has been submitted. RelatedPR3445 addresses the first snap, while this report reproduces repeated drift. No historical bisect has been performed.
-
-After the runtime direction is settled, route source changes through an executor and verify RED-to-GREEN, remaining parity cases, appropriate unit/build/docs gates, and the full browser suite. Full-suite failures require one-page-at-a-time T3 review with the user. The public scaled-board walkthrough remains requested for completion. T3 browser is available; the controls test page is currently open. Earlier Codex iab unavailability is not a current browser blocker.
-
-No plan closure, push, PR or merge. Guard owns only evidence/plans/commits; executor owns source. Historical passing gates above apply to unchanged production0da2303, not to a completed overall feature gate.
+Resolve the strict layout snapshot diagnosis within approved scope, obtain the user's decision on the first full-suite failure, then complete required browser/docs/formatting gates and final review. Keep the batch IN PROGRESS. The public scaled-board example is available in T3 tab_6 and docs server port 5188, but the requested finished walkthrough remains pending. Do not close the plan or claim full parity/full e2e success yet.

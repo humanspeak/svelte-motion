@@ -21,6 +21,8 @@
 
 > Revision 2026-09-08: Necessary integration correction within original _MotionContainer.svelte scope: run imperative drag attach/update work untracked so new measurement snapshots do not subscribe the gesture lifecycle to axis positions. Keep option reads reactive and all tests unchanged. See repeated-initial-red-first.md; reviewed501ea9c3.
 
+> Revision 2026-09-08: Complete the same authorized snap integration correction inside original drag.ts scope by isolating projection-measure axis sampling with public Svelte untrack. Later measure callbacks can execute inside projection effects even after attach/update were untracked. Keep all tests and contracts unchanged; see repeated-initial-red-first.md. Reviewed source `88a811f0`.
+
 ## Governing revision — 2026-09-08
 
 User direction: “I dont want to reuse if its not marked for reuse, we need to match react exactly”.

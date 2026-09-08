@@ -134,3 +134,7 @@ User says “Ok, lets fix it for us first”, authorizing correction of the shar
 - Fullunits906pass2fail(total908); focusedReorder12pass2fail. Pre-fix111c1031 passesReorder14/14 in isolatedbaseline.
 - Strictmatrix28match1mismatch:real-layout-shift-held,3mismatches. Newaxis.get reads in attach/update effect subscribe lifecycle to reactivecurrent; attachDragcall is not untracked. This causes staleactivecleanup/lostliveaxis-layoutcompensation.
 - Build/package/publint/sourcehookPASS. No testweakening. Action: route narrowuntrackintegrationfix through executor in original _MotionContainer.svelte whitelist; preserve allassertions.
+
+## Checkpoint 17 — 2026-09-08 14:05 — ON TRACK, incomplete verification
+
+Snapshot `88a811f0` fixes the reactive drag lifetime regression: 908 units and 18 targeted browser tests pass; controls RED remains unchanged. Strict matrix 28/29, one intermediate rendered rectangle mismatch, read-only diagnosis underway. Full e2e stopped after 53 passes on owned-child opacity timing (0.98175 vs <0.95 at 120 ms); T3 real-click review fades correctly and completes. User decision required by repository full-failure workflow before changing that test/page or continuing full verification. No source scope expansion, test weakening, PR, push or closure. See current guard report and snap-integration evidence.
