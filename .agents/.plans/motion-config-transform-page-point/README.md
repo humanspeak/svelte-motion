@@ -85,3 +85,5 @@ User authorized the one-file controls test amendment and requested the example p
 2026-09-08: User approved the first owned-child timing test amendment. Resume bounded polling edit and full-browser verification. No runtime or other test scope expansion; no approval remains pending for this first test.
 
 2026-09-08: User-authorized layout/snap review P2 corrected in66aff2cc, with RED-first browser coverage and clearer demo instructions/live distance readout. Full units911/911, targetedbrowser20/20, strictReact29/29 pass. The unchanged axis-handoff case passes in isolation but its full-suite failure remains under review; no full-suite acceptance or batch closure.
+
+2026-09-09: PLAN AMENDED with user authorization to fix PR481 CI regressions from8ea80dbd. See [CI corrections](ci-corrections.md). Full browser verification moves to hosted runners per user machine constraint; assertions and gates remain.

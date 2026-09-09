@@ -1,0 +1,21 @@
+# Approved CI corrections — 2026-09-09
+
+User authorization: “Ok please move forward... this is a bit frustrating as it felt like a non major change”. Baseline 8ea80dbd. PR481 runner34387214998: 445 passed, four failed, one flaky, two skipped. Unit/build/lint passed.
+
+## Scope and sequence
+
+1. RED first: add focused component coverage in src/lib/components/Reorder/reorder.component.spec.ts proving document scrolling does not activate from a page-space point when the real client pointer is away from an edge. Cover both axes if practical. Existing harness may gain narrowly necessary MotionConfig/onDrag props in src/lib/components/Reorder/__tests__/ReorderHarness.svelte. Keep real drag callbacks and autoScroll behavior; assert meaningful absence of scrolling, not implementation syntax. Guard runs this before runtime edits.
+2. Fix src/lib/components/Reorder/Item.svelte: autoScrollIfNeeded requires client coordinates; select event.clientX/clientY rather than info.point. Preserve public transformed/page callback info and all reorder behavior. No autoScroll engine changes.
+3. e2e/drag/controls.spec.ts repeated-initial-snap fixture: replace exact font-dependent button x/width with invariant center/hit/viewport geometry. Preserve tile initial geometry, three sessions, pointer metadata, exact movement and <=2px drift assertions.
+4. e2e/drag/axis-handoff.spec.ts foreign-retarget case: diagnose second-drag zero using runner trace. Add valid hit preconditions and bounded frame-aware sampling while held, preserving original -70..-50 movement bounds and all retarget/callback assertions. Do not conceal a runtime defect behind a timeout. If zero persists with correct hit and processed frames, report mechanism before expanding runtime scope.
+
+## Evidence
+
+Reorder scrollable.spec.ts:122 expected alpha,gamma,beta,delta, received alpha,gamma,delta,beta twice. Retry trace shows scrollTop750 jumping to1376 after call30. Item passes info.point to autoScroll, whose geometry is explicitly client-space. New pan extracts pageX/pageY. The mid-scroll test also fails pitch tolerance with 2.904388427734375 >1.5.
+Controls.spec.ts:161 expects macOS button x581.609375/width116.78125; Linux returns x582.640625/width114.71875. Both centers640,417. Failure is before dragging.
+Axis-handoff.spec.ts:199 second drag expected <-50, got0. Retarget-to420 and callback assertions pass. Six pointer steps take24ms, read starts immediately after. Timing is provisional; inspect hit/frames. Retry screenshot includes selected text, so do not assume frame sampling is the only cause.
+Artifacts: /tmp/pr481-runner-artifacts-shard1 and shard2. Logs: /tmp/pr481-runner-shard1.log and shard2.log.
+
+## Gates
+
+Preserve all existing verification gates and prior red/parity evidence. Run new red test, then focused Reorder units with bounded workers, normal commit formatting/lint/Svelte checks. Push corrected PR for full unit/browser/build CI; no full local browser suite. One focused browser investigation is permitted if necessary. Existing Reorder browser assertions remain unchanged. Do not alter flaky snap-to-origin test, dependencies, pnpm, public gesture semantics, projection engine, unrelated demos or pending grid proposal. No minor PR label. Do not merge.

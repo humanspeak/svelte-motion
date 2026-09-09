@@ -1,5 +1,7 @@
 # Plan 001: Add MotionConfig coordinate correction for drag and pan
 
+> Revision 2026-09-09: User authorized proceeding with the diagnosed PR #481 CI corrections. Follow ci-corrections.md from reviewed 8ea80dbd. This narrowly permits Reorder.Item client-coordinate adaptation plus focused regression coverage, portable controls-test geometry and frame-aware axis-handoff verification. Existing behavioral assertions and verification gates remain. Use hosted CI for the full browser suite because the operator machine is overloaded. This supersedes earlier prohibitions only for these corrections.
+
 > Revision 2026-09-08: User authorized the review P2 correction and requested the remaining failing page. Follow `layout-snap-correction.md` from reviewed `872a3f41`: RED first for layout plus repeated snap, then fix the mismatched measurement cache. All existing contracts and gates remain. The axis-handoff full-suite checkpoint stays open; no edits to that test are authorized here.
 
 > Follow the resumed steps in order. First prepare the public React reference fixtures for guard verification; then implement from the recorded parity evidence. Stop on the conditions below instead of expanding scope. Update this batch's README status when finished.
@@ -50,7 +52,7 @@ Source snapshot `13ec152` already implements the draft. Baseline excerpts below 
 - **Depends on:** none; PR #480 merged; baseline includes its boundary-release tests
 - **Category:** direction / enhancement
 - **Confidence:** HIGH that the feature is missing; ranking is product judgment
-- **Planned at:** `66aff2cc`, 2026-09-08 (authorized layout/snap P2 correction; original source baseline `14046a5`)
+- **Planned at:** `8ea80dbd`, 2026-09-09 (authorized CI corrections; original source baseline `14046a5`)
 - **Status:** IN PROGRESS — local snap bug corrected; 908 units, 18 targeted browser tests and all29 parity cases pass. Full browser review and final closeout remain.
 
 ## Why this matters

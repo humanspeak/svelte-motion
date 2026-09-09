@@ -159,3 +159,5 @@ Snapshot54ab016e, clean and unchanged source. User passes the axis-handoff visua
 ## Checkpoint 21 — 2026-09-09 — ON TRACK for test execution; full-suite NO-PASS
 
 User requests browser tests and explicitly removes minor PR label. Source unchanged54ab016e, testedHEADc01551b2. Complete452-test collection:439pass,10fail,1flaky,2skip in20.7minutes. Earlier exact last-card and foreign-retarget regressions pass in this run; different grid/axis cases fail. Featuredrag11/pan6 pass. High early host load recorded, without attributing every failure to the environment. First failure (clone-fidelity opacityNaN near exit completion) loaded in T3; no next-page review or source/test edits. Full run and evidence in full-browser-sep9.md/log. No push, PR, new label, waived gate, or scope expansion.
+
+2026-09-09: PLAN AMENDED with user authorization to fix PR481 CI regressions from8ea80dbd. See [CI corrections](ci-corrections.md). Full browser verification moves to hosted runners per user machine constraint; assertions and gates remain.
