@@ -1,0 +1,66 @@
+
+Running 452 tests using 1 worker
+
+(node:39646) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/452] [chromium] › e2e/animate-presence/clone-fidelity.spec.ts:6:5 › AnimatePresence clone fidelity › PresenceChild runs a motion child exit on the real node
+[2/452] [chromium] › e2e/animate-presence/clone-fidelity.spec.ts:23:5 › AnimatePresence clone fidelity › marks an interactive exit clone inert and aria-hidden
+[3/452] [chromium] › e2e/animate-presence/clone-fidelity.spec.ts:33:5 › AnimatePresence clone fidelity › does not create a blank clone for a canvas subtree
+[4/452] [chromium] › e2e/animate-presence/clone-fidelity.spec.ts:44:5 › AnimatePresence clone fidelity › keeps the fidelity harness linked from the root test index
+[5/452] [chromium] › e2e/animate-presence/custom.spec.ts:489:5 › AnimatePresence custom › uses AnimatePresence custom for directional exit variants
+[6/452] [chromium] › e2e/animate-presence/custom.spec.ts:502:5 › AnimatePresence custom › keeps the demo linked from the root test index
+[7/452] [chromium] › e2e/animate-presence/custom.spec.ts:510:5 › AnimatePresence custom › allows scrolling through all custom presence harness sections
+[8/452] [chromium] › e2e/animate-presence/custom.spec.ts:520:5 › AnimatePresence custom › usePresenceData popLayout square keeps at most two visible layers during transition
+[9/452] [chromium] › e2e/animate-presence/custom.spec.ts:534:5 › AnimatePresence custom › usePresenceData popLayout square uses previous direction on first previous click
+[10/452] [chromium] › e2e/animate-presence/custom.spec.ts:548:5 › AnimatePresence custom › usePresenceData popLayout square stays in its stage after scroll and click
+[11/452] [chromium] › e2e/animate-presence/custom.spec.ts:574:5 › AnimatePresence custom › usePresenceData popLayout square holds incoming slide during interrupted delayed enter
+[12/452] [chromium] › e2e/animate-presence/custom.spec.ts:590:5 › AnimatePresence custom › usePresenceData demo can isolate itself from parent MotionConfig defaults
+[13/452] [chromium] › e2e/animate-presence/custom.spec.ts:609:5 › AnimatePresence custom › usePresenceData popLayout square stays in a nested scroll viewport after scroll and click
+[14/452] [chromium] › e2e/animate-presence/enter-handoff-label-pop.spec.ts:84:1 › does not pop the entering copied label on the pop-layout enter handoff
+[15/452] [chromium] › e2e/animate-presence/grid-exit.spec.ts:92:5 › AnimatePresence grid exit › middle card exit: survivors hold, then the right card slides into the gap
+[16/452] [chromium] › e2e/animate-presence/grid-exit.spec.ts:109:5 › AnimatePresence grid exit › first card exit: both survivors hold, then slide left together
+[17/452] [chromium] › e2e/animate-presence/grid-exit.spec.ts:124:5 › AnimatePresence grid exit › sequential removals: the exit clone fades in the current slot, not the registration slot
+[18/452] [chromium] › e2e/animate-presence/grid-exit.spec.ts:152:5 › AnimatePresence grid exit › last card exit: survivors never move
+  1) [chromium] › e2e/animate-presence/grid-exit.spec.ts:152:5 › AnimatePresence grid exit › last card exit: survivors never move 
+
+    Error: a must hold its slot while the exit runs (t=185ms)
+
+    expect(received).toBeLessThan(expected)
+
+    Expected: < 2
+    Received:   2.890625
+
+      71 |             Math.abs((frame.lefts[key] ?? Number.NaN) - at),
+      72 |             `${key} must hold its slot while the exit runs (t=${frame.atMs}ms)`
+    > 73 |         ).toBeLessThan(2)
+         |           ^
+      74 |     }
+      75 | }
+      76 |
+        at expectHeld (/Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/animate-presence/grid-exit.spec.ts:73:11)
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/animate-presence/grid-exit.spec.ts:159:9
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/animate-presence-grid-exit-b8b25-d-exit-survivors-never-move-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/animate-presence-grid-exit-b8b25-d-exit-survivors-never-move-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/animate-presence-grid-exit-b8b25-d-exit-survivors-never-move-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/animate-presence-grid-exit-b8b25-d-exit-survivors-never-move-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+Testing stopped early after 1 maximum allowed failures.
+
+  1 failed
+    [chromium] › e2e/animate-presence/grid-exit.spec.ts:152:5 › AnimatePresence grid exit › last card exit: survivors never move 
+  434 did not run
+  17 passed (30.5s)
+  1 error was not a part of any test, see above for details

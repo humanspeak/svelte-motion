@@ -30,7 +30,11 @@ The dedicated test page now explains Snap → drag → Shift → Snap, labels st
 
 Docs source/API/dependencies remain unchanged in this P2 correction. Prior docs build, metadata and baseline diagnostic comparisons remain valid: production build and 5 SEO tests passed; docs check has 6 demonstrated baseline errors and 13 warnings. No new docs blockers were inferred.
 
-## Remaining full-browser checkpoint
+## Current full-browser checkpoint — 2026-09-09
+
+Source54ab016e remains unchanged. User passed the axis-handoff visual review. Resumed full suite with retained failure traces stopped earlier:17passed,1failed (grid-exit last-card removal),434unrun; axis-handoff not reached. Existing assertion observed Card A shift2.890625px while the clone faded. Trace establishes settled entrance before the click and an oversized112.155px placeholder during the shift. Three unchanged focused repeats pass; T3 real-click sampling reports0px with a110.203px placeholder. This is an unresolved sizing lead, not a completed diagnosis. Review page and proposed bounded correction are in `proposed-grid-exit-correction.md`; no source/test changes or scope amendment made. Full-suite and focused logs are retained alongside this report.
+
+## Previous full-browser checkpoint
 
 The approved owned-child test now uses bounded fade-progress polling and its seven tests passed. The subsequent full suite at `872a3f41` stopped at axis-handoff after 79 passes: expected x420, received x0, 370 tests not run. Three unchanged isolated repeats passed during review; another unchanged run passed on fixed runtime `66aff2cc`. This does not establish the cause or clear the full-suite gate.
 
