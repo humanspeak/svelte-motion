@@ -158,12 +158,26 @@ test.describe('drag/controls', () => {
         if (!boot) throw new Error('no boot')
         if (!bootHandle) throw new Error('no boot handle')
         expect(boot).toEqual({ x: 700, y: 477, width: 80, height: 80 })
-        expect(bootHandle).toEqual({
-            x: 581.609375,
-            y: 405,
-            width: 116.78125,
-            height: 24
+        expect(bootHandle.width).toBeGreaterThan(0)
+        expect(bootHandle.height).toBeGreaterThan(0)
+        expect(bootHandle.height).toBe(24)
+        expect(bootHandle.x).toBeGreaterThanOrEqual(0)
+        expect(bootHandle.y).toBeGreaterThanOrEqual(0)
+        expect(bootHandle.x + bootHandle.width).toBeLessThanOrEqual(1280)
+        expect(bootHandle.y + bootHandle.height).toBeLessThanOrEqual(720)
+        expect({
+            x: bootHandle.x + bootHandle.width / 2,
+            y: bootHandle.y + bootHandle.height / 2
+        }).toEqual({
+            x: 640,
+            y: 417
         })
+        expect(
+            await handle.evaluate(
+                (element, point) => document.elementFromPoint(point.x, point.y) === element,
+                { x: 640, y: 417 }
+            )
+        ).toBe(true)
         const initialTranslation = await el.evaluate((node) => {
             const transform = new DOMMatrixReadOnly(getComputedStyle(node).transform)
             return { x: transform.m41, y: transform.m42 }

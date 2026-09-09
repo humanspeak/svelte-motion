@@ -181,15 +181,41 @@ test.describe('drag/axis-handoff', () => {
         const afterBox = await card.boundingBox()
         if (!afterBox) throw new Error('no bbox after retarget')
         const beforeSecondDrag = await readTranslate(page, 'foreign-retarget-card')
-        await page.mouse.move(afterBox.x + afterBox.width / 2, afterBox.y + afterBox.height / 2)
+        const secondDragPoint = {
+            x: afterBox.x + afterBox.width / 2,
+            y: afterBox.y + afterBox.height / 2
+        }
+        expect(
+            await card.evaluate(
+                (element, point) => document.elementFromPoint(point.x, point.y) === element,
+                secondDragPoint
+            )
+        ).toBe(true)
+        await page.mouse.move(secondDragPoint.x, secondDragPoint.y)
         await page.mouse.down()
-        await page.mouse.move(
-            afterBox.x + afterBox.width / 2 - 60,
-            afterBox.y + afterBox.height / 2,
-            { steps: 6 }
-        )
-        const dragged = await readTranslate(page, 'foreign-retarget-card')
-        await page.mouse.up()
+        let dragged = beforeSecondDrag
+        try {
+            await page.mouse.move(secondDragPoint.x - 60, secondDragPoint.y, { steps: 6 })
+            await expect(card).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+            await expect
+                .poll(
+                    async () => {
+                        await page.evaluate(
+                            () =>
+                                new Promise<void>((resolve) => {
+                                    requestAnimationFrame(() => resolve())
+                                })
+                        )
+                        dragged = await readTranslate(page, 'foreign-retarget-card')
+                        const heldMovement = dragged.x - beforeSecondDrag.x
+                        return heldMovement > -70 && heldMovement < -50
+                    },
+                    { timeout: 1000, intervals: [0, 16, 32, 64] }
+                )
+                .toBe(true)
+        } finally {
+            await page.mouse.up()
+        }
 
         const moved = dragged.x - beforeSecondDrag.x
         expect(
