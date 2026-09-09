@@ -176,7 +176,7 @@
         height: 260px;
     }
 
-    .card {
+    .lane :global(.card) {
         width: 118px;
         height: 84px;
         border-radius: 12px;
@@ -189,15 +189,15 @@
         user-select: none;
     }
 
-    .card-a {
+    .lane :global(.card-a) {
         background: linear-gradient(140deg, #7dd3fc, #38bdf8);
     }
 
-    .card-b {
+    .lane :global(.card-b) {
         background: linear-gradient(140deg, #fca5a5, #f87171);
     }
 
-    .card-c {
+    .lane :global(.card-c) {
         background: linear-gradient(140deg, #86efac, #34d399);
     }
 </style>
