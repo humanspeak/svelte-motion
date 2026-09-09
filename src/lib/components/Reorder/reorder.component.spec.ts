@@ -23,19 +23,38 @@ const flushFrame = async (ms = 1) => {
 const dispatchMousePointer = (
     target: EventTarget,
     type: 'pointerdown' | 'pointermove' | 'pointercancel',
-    { clientX, clientY, pointerId }: { clientX: number; clientY: number; pointerId: number }
+    {
+        clientX,
+        clientY,
+        pageX = clientX,
+        pageY = clientY,
+        pointerId
+    }: {
+        clientX: number
+        clientY: number
+        pageX?: number
+        pageY?: number
+        pointerId: number
+    }
 ) => {
-    target.dispatchEvent(
-        new PointerEvent(type, {
-            clientX,
-            clientY,
-            pointerId,
-            pointerType: 'mouse',
-            isPrimary: true,
-            button: type === 'pointermove' ? -1 : 0,
-            buttons: type === 'pointerdown' || type === 'pointermove' ? 1 : 0
-        })
-    )
+    const event = new PointerEvent(type, {
+        clientX,
+        clientY,
+        pointerId,
+        pointerType: 'mouse',
+        isPrimary: true,
+        button: type === 'pointermove' ? -1 : 0,
+        buttons: type === 'pointerdown' || type === 'pointermove' ? 1 : 0
+    })
+
+    // jsdom aliases pageX/pageY to clientX/clientY because it doesn't model
+    // document scrolling. Define the browser coordinates on the real event so
+    // component regressions can exercise a scrolled-page gesture faithfully.
+    Object.defineProperties(event, {
+        pageX: { configurable: true, value: pageX },
+        pageY: { configurable: true, value: pageY }
+    })
+    target.dispatchEvent(event)
 
     if (type === 'pointercancel') {
         activePointers.delete(pointerId)
@@ -234,6 +253,73 @@ describe('Reorder.Group / Reorder.Item', () => {
         })
         await flushFrame()
     })
+
+    it.each(['x', 'y'] as const)(
+        'does not auto-scroll document axes from page-space drag points away from viewport edges (%s)',
+        async (axis) => {
+            const scrollPosition = { x: 1200, y: 900 }
+            const initialScrollPosition = { ...scrollPosition }
+            const pageOffset = { ...scrollPosition }
+            const viewportCenter = {
+                x: Math.round(window.innerWidth / 2),
+                y: Math.round(window.innerHeight / 2)
+            }
+
+            vi.spyOn(window, 'scrollX', 'get').mockImplementation(() => scrollPosition.x)
+            vi.spyOn(window, 'scrollY', 'get').mockImplementation(() => scrollPosition.y)
+            vi.spyOn(document.body, 'scrollWidth', 'get').mockReturnValue(window.innerWidth + 5000)
+            vi.spyOn(document.body, 'scrollHeight', 'get').mockReturnValue(
+                window.innerHeight + 5000
+            )
+            vi.spyOn(document.body, 'getBoundingClientRect').mockReturnValue(
+                new DOMRect(0, 0, window.innerWidth, window.innerHeight)
+            )
+            vi.spyOn(window, 'scrollBy').mockImplementation(((options: ScrollToOptions) => {
+                scrollPosition.x += options.left ?? 0
+                scrollPosition.y += options.top ?? 0
+            }) as typeof window.scrollBy)
+
+            const onDrag = vi.fn()
+            render(ReorderHarness, { props: { axis, onDrag } })
+            const item = await screen.findByTestId('item-0')
+            await vi.advanceTimersByTimeAsync(1000)
+
+            const pointerId = axis === 'x' ? 24 : 25
+            const pointFor = (axisPosition: number) => {
+                const clientX = axis === 'x' ? axisPosition : viewportCenter.x
+                const clientY = axis === 'y' ? axisPosition : viewportCenter.y
+                return {
+                    clientX,
+                    clientY,
+                    pageX: clientX + pageOffset.x,
+                    pageY: clientY + pageOffset.y,
+                    pointerId
+                }
+            }
+            const axisCenter = viewportCenter[axis]
+
+            dispatchMousePointer(item, 'pointerdown', pointFor(axisCenter - 20))
+            dispatchMousePointer(window, 'pointermove', pointFor(axisCenter - 10))
+            await flushFrame()
+            const finalPoint = pointFor(axisCenter)
+            dispatchMousePointer(window, 'pointermove', finalPoint)
+            await flushFrame(16)
+
+            expect(onDrag).toHaveBeenLastCalledWith(
+                expect.objectContaining({
+                    clientX: finalPoint.clientX,
+                    clientY: finalPoint.clientY
+                }),
+                expect.objectContaining({
+                    point: { x: finalPoint.pageX, y: finalPoint.pageY }
+                })
+            )
+            expect({ x: window.scrollX, y: window.scrollY }).toEqual(initialScrollPosition)
+
+            dispatchMousePointer(window, 'pointercancel', finalPoint)
+            await flushFrame()
+        }
+    )
 
     it('rebases an active drag when a keyed reorder moves its layout slot', async () => {
         const onReorder = vi.fn()

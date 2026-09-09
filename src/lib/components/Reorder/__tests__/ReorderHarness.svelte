@@ -1,5 +1,6 @@
 <script lang="ts">
     import { Reorder } from '$lib/reorder'
+    import type { DragInfo } from '$lib/types'
     import type { ReorderElementTag } from '../types'
 
     let {
@@ -9,6 +10,7 @@
         itemAs = 'li',
         itemSizeAnimation = false,
         groupStyle,
+        onDrag,
         onReorder = () => {}
     }: {
         values?: number[]
@@ -17,6 +19,7 @@
         itemAs?: ReorderElementTag
         itemSizeAnimation?: boolean
         groupStyle?: string
+        onDrag?: (event: PointerEvent, info: DragInfo) => void
         onReorder?: (next: number[]) => void
     } = $props()
 </script>
@@ -28,6 +31,7 @@
             value={item}
             data-testid={`item-${item}`}
             data-layout-size-animation={itemSizeAnimation ? '' : undefined}
+            {onDrag}
         >
             {item}
         </Reorder.Item>

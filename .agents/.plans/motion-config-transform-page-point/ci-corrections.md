@@ -19,3 +19,11 @@ Artifacts: /tmp/pr481-runner-artifacts-shard1 and shard2. Logs: /tmp/pr481-runne
 ## Gates
 
 Preserve all existing verification gates and prior red/parity evidence. Run new red test, then focused Reorder units with bounded workers, normal commit formatting/lint/Svelte checks. Push corrected PR for full unit/browser/build CI; no full local browser suite. One focused browser investigation is permitted if necessary. Existing Reorder browser assertions remain unchanged. Do not alter flaky snap-to-origin test, dependencies, pnpm, public gesture semantics, projection engine, unrelated demos or pending grid proposal. No minor PR label. Do not merge.
+
+## Additional guard diagnosis
+
+The separate full hosted run34387232431 independently produced the same four failures,445 passed,one flaky,two skipped. Existing-source targeted browser probe at4198 confirmed a real pointer hit on foreign-retarget-card and x420 to360 for a60px held move, remaining360 after200ms. A second probe with deliberately selected label text also reached360. Thus text selection alone is not established as the failure mechanism; bounded frame sampling and explicit hit preconditions should be verified on CI without relaxing movement. Reorder is the only internal component consumer passing info.point to viewport geometry (rg audit). T3 reviewed page-scroll, controls and axis-handoff before edits.
+
+## RED proof
+
+Guard ran pinned pnpm exec vitest run --maxWorkers=1 src/lib/components/Reorder/reorder.component.spec.ts -t "does not auto-scroll document axes from page-space drag points away from viewport edges". Both cases failed at the intended scroll-state assertion: x1200 became6499.84; y900 became7194.92. Public page-point callback assertions passed. Duration9.84s; fourteen unrelated tests filtered. Log /tmp/pr481-reorder-red.log. Executor suggested --project client, but this repository has no client project; guard used the actual configuration.
