@@ -154,3 +154,8 @@ Final CSS-only control stacking follow-up: fresh app/package build passes, all20
 ## Checkpoint 20 — 2026-09-09 — ON TRACK; new full-suite review checkpoint
 
 Snapshot54ab016e, clean and unchanged source. User passes the axis-handoff visual review and asks how to resolve the remaining test gate. Full suite with retained failure trace:17pass,1grid-exit failure,434unrun; handoff not reached. Existing last-card test measured A drift2.890625px, exceeding unchanged2px bound. Trace shows settled entrance before removal, oversized placeholder during exit, then return. Three unchanged isolated repeats PASS and T3 measured0px; cause not yet established. No source edits, tolerance changes, skipped cases, push, or PR. Proposal `proposed-grid-exit-correction.md` awaits the repository-required behavior-versus-test decision; preserve axis-handoff automated checkpoint as unresolved.
+
+
+## Checkpoint 21 — 2026-09-09 — ON TRACK for test execution; full-suite NO-PASS
+
+User requests browser tests and explicitly removes minor PR label. Source unchanged54ab016e, testedHEADc01551b2. Complete452-test collection:439pass,10fail,1flaky,2skip in20.7minutes. Earlier exact last-card and foreign-retarget regressions pass in this run; different grid/axis cases fail. Featuredrag11/pan6 pass. High early host load recorded, without attributing every failure to the environment. First failure (clone-fidelity opacityNaN near exit completion) loaded in T3; no next-page review or source/test edits. Full run and evidence in full-browser-sep9.md/log. No push, PR, new label, waived gate, or scope expansion.

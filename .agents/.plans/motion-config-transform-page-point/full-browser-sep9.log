@@ -1,0 +1,918 @@
+
+Running 452 tests using 1 worker
+
+(node:99373) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/452] [chromium] › e2e/animate-presence/clone-fidelity.spec.ts:6:5 › AnimatePresence clone fidelity › PresenceChild runs a motion child exit on the real node
+  1) [chromium] › e2e/animate-presence/clone-fidelity.spec.ts:6:5 › AnimatePresence clone fidelity › PresenceChild runs a motion child exit on the real node
+
+    Error: expect(received).toBeLessThan(expected)
+
+    Expected: < 0.95
+    Received:   NaN
+
+      16 |             Number.parseFloat(getComputedStyle(node).opacity)
+      17 |         )
+    > 18 |         expect(opacity).toBeLessThan(0.95)
+         |                         ^
+      19 |         await expect(child).toHaveCount(0)
+      20 |         await expect(page.getByTestId('presence-child-exit-count')).toHaveText('1')
+      21 |     })
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/animate-presence/clone-fidelity.spec.ts:18:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-clone-fid-ecb48-child-exit-on-the-real-node-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-clone-fid-ecb48-child-exit-on-the-real-node-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-clone-fid-ecb48-child-exit-on-the-real-node-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-clone-fid-ecb48-child-exit-on-the-real-node-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:194) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[2/452] [chromium] › e2e/animate-presence/clone-fidelity.spec.ts:23:5 › AnimatePresence clone fidelity › marks an interactive exit clone inert and aria-hidden
+[3/452] [chromium] › e2e/animate-presence/clone-fidelity.spec.ts:33:5 › AnimatePresence clone fidelity › does not create a blank clone for a canvas subtree
+[4/452] [chromium] › e2e/animate-presence/clone-fidelity.spec.ts:44:5 › AnimatePresence clone fidelity › keeps the fidelity harness linked from the root test index
+[5/452] [chromium] › e2e/animate-presence/custom.spec.ts:489:5 › AnimatePresence custom › uses AnimatePresence custom for directional exit variants
+[6/452] [chromium] › e2e/animate-presence/custom.spec.ts:502:5 › AnimatePresence custom › keeps the demo linked from the root test index
+[7/452] [chromium] › e2e/animate-presence/custom.spec.ts:510:5 › AnimatePresence custom › allows scrolling through all custom presence harness sections
+[8/452] [chromium] › e2e/animate-presence/custom.spec.ts:520:5 › AnimatePresence custom › usePresenceData popLayout square keeps at most two visible layers during transition
+[9/452] [chromium] › e2e/animate-presence/custom.spec.ts:534:5 › AnimatePresence custom › usePresenceData popLayout square uses previous direction on first previous click
+[10/452] [chromium] › e2e/animate-presence/custom.spec.ts:548:5 › AnimatePresence custom › usePresenceData popLayout square stays in its stage after scroll and click
+[11/452] [chromium] › e2e/animate-presence/custom.spec.ts:574:5 › AnimatePresence custom › usePresenceData popLayout square holds incoming slide during interrupted delayed enter
+[12/452] [chromium] › e2e/animate-presence/custom.spec.ts:590:5 › AnimatePresence custom › usePresenceData demo can isolate itself from parent MotionConfig defaults
+[13/452] [chromium] › e2e/animate-presence/custom.spec.ts:609:5 › AnimatePresence custom › usePresenceData popLayout square stays in a nested scroll viewport after scroll and click
+[14/452] [chromium] › e2e/animate-presence/enter-handoff-label-pop.spec.ts:84:1 › does not pop the entering copied label on the pop-layout enter handoff
+[15/452] [chromium] › e2e/animate-presence/grid-exit.spec.ts:92:5 › AnimatePresence grid exit › middle card exit: survivors hold, then the right card slides into the gap
+  2) [chromium] › e2e/animate-presence/grid-exit.spec.ts:92:5 › AnimatePresence grid exit › middle card exit: survivors hold, then the right card slides into the gap
+
+    Error: a must hold its slot while the exit runs (t=332ms)
+
+    expect(received).toBeLessThan(expected)
+
+    Expected: < 2
+    Received:   3.234375
+
+      71 |             Math.abs((frame.lefts[key] ?? Number.NaN) - at),
+      72 |             `${key} must hold its slot while the exit runs (t=${frame.atMs}ms)`
+    > 73 |         ).toBeLessThan(2)
+         |           ^
+      74 |     }
+      75 | }
+      76 |
+        at expectHeld (/Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/animate-presence/grid-exit.spec.ts:73:11)
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/animate-presence/grid-exit.spec.ts:103:9
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-grid-exit-9ee5b-ht-card-slides-into-the-gap-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-grid-exit-9ee5b-ht-card-slides-into-the-gap-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-grid-exit-9ee5b-ht-card-slides-into-the-gap-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-grid-exit-9ee5b-ht-card-slides-into-the-gap-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:2115) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[16/452] [chromium] › e2e/animate-presence/grid-exit.spec.ts:109:5 › AnimatePresence grid exit › first card exit: both survivors hold, then slide left together
+[17/452] [chromium] › e2e/animate-presence/grid-exit.spec.ts:124:5 › AnimatePresence grid exit › sequential removals: the exit clone fades in the current slot, not the registration slot
+[18/452] [chromium] › e2e/animate-presence/grid-exit.spec.ts:152:5 › AnimatePresence grid exit › last card exit: survivors never move
+[19/452] [chromium] › e2e/animate-presence/key-change.spec.ts:25:5 › AnimatePresence key-change transitions › enters animate state after key change
+[20/452] [chromium] › e2e/animate-presence/key-change.spec.ts:43:5 › AnimatePresence key-change transitions › full cycle through all states
+[21/452] [chromium] › e2e/animate-presence/key-change.spec.ts:62:5 › AnimatePresence key-change transitions › exit animation runs before enter
+[22/452] [chromium] › e2e/animate-presence/key-change.spec.ts:97:5 › AnimatePresence key-change transitions › rapid state changes do not leave elements stuck
+[23/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:301:5 › AnimatePresence layout button dogfood › keeps docs-kit copy feedback inside the fixed button shell
+[24/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:424:5 › AnimatePresence layout button dogfood › runs the interactive rolling copy control
+[25/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:460:5 › AnimatePresence layout button dogfood › keeps rolling copy labels out of scaled ancestors during the swap
+[26/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:555:5 › AnimatePresence layout button dogfood › renders status icons as SVG instead of font glyphs
+[27/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:585:5 › AnimatePresence layout button dogfood › keeps interactive paint metrics on whole pixels
+[28/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:670:5 › AnimatePresence layout button dogfood › keeps copy label typography stable during layout/presence swap
+[29/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:739:5 › AnimatePresence layout button dogfood › keeps the readable label fully opaque during the swap
+[30/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:804:5 › AnimatePresence layout button dogfood › keeps copy label contained during slow layout animation
+[31/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:898:5 › AnimatePresence layout button dogfood › keeps the readable active label visually centered during the swap
+[32/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:982:5 › AnimatePresence layout button dogfood › animates the copied label out on reset for every presence mode
+[33/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:1067:5 › AnimatePresence layout button dogfood › moves the readable active label without one-frame jumps
+[34/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:1176:5 › AnimatePresence layout button dogfood › keeps sync shell anchored while both states are present
+[35/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:1261:5 › AnimatePresence layout button dogfood › keeps sync shell anchored during reset
+[36/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:1359:5 › AnimatePresence layout button dogfood › keeps sync return icon and text centered as one unit
+[37/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:1442:5 › AnimatePresence layout button dogfood › does not leave the sync copy icon overlapping the copied label
+[38/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:1519:5 › AnimatePresence layout button dogfood › restores button size after the page scrolls during layout animation
+[39/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:1577:5 › AnimatePresence layout button dogfood › wait mode settles copied size when release happens fully offscreen
+[40/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:1641:5 › AnimatePresence layout button dogfood › animates button width instead of snapping to the final size
+[41/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:1695:5 › AnimatePresence layout button dogfood › animates sync button width when the copied label enters
+[42/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:1753:5 › AnimatePresence layout button dogfood › keeps wait-mode readable text at natural scale during size animation
+[43/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:1855:5 › AnimatePresence layout button dogfood › keeps wait-mode copied label at natural scale without width reversal
+[44/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:1982:5 › AnimatePresence layout button dogfood › coordinates layout participation by presence mode
+[45/452] [chromium] › e2e/animate-presence/layout-button.spec.ts:2038:5 › wait-mode swap with the page scrolled (#437) › entering wait label never carries a scroll-magnitude translate
+[46/452] [chromium] › e2e/animate-presence/modes.spec.ts:46:5 › AnimatePresence modes › sync preserves exiting layout while popLayout reflows immediately
+[47/452] [chromium] › e2e/animate-presence/modes.spec.ts:74:5 › AnimatePresence modes › sync does not move layout siblings under a visible exiting child on repeated toggles
+[48/452] [chromium] › e2e/animate-presence/modes.spec.ts:114:5 › AnimatePresence modes › sync animates layout siblings when an entering child pushes them over
+  3) [chromium] › e2e/animate-presence/modes.spec.ts:114:5 › AnimatePresence modes › sync animates layout siblings when an entering child pushes them over
+
+    Error: expect(received).toBeGreaterThan(expected)
+
+    Expected: > 357.18011474609375
+    Received:   357
+
+    Call Log:
+    - Timeout 2000ms exceeded while waiting on the predicate
+
+      132 |         await expect
+      133 |             .poll(async () => await readX(syncRight), framePoll)
+    > 134 |             .toBeGreaterThan(collapsedRightBox!.x + 8)
+          |              ^
+      135 |         const enteringMovingRightBox = await syncRight.boundingBox()
+      136 |
+      137 |         expect(collapsedRightBox).not.toBeNull()
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/animate-presence/modes.spec.ts:134:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-modes-Ani-3a3e6-ring-child-pushes-them-over-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-modes-Ani-3a3e6-ring-child-pushes-them-over-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-modes-Ani-3a3e6-ring-child-pushes-them-over-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-modes-Ani-3a3e6-ring-child-pushes-them-over-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:6978) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[49/452] [chromium] › e2e/animate-presence/nested-keys.spec.ts:4:5 › AnimatePresence Nested Keys › direct child with key should animate in/out correctly
+[50/452] [chromium] › e2e/animate-presence/nested-keys.spec.ts:22:5 › AnimatePresence Nested Keys › nested motion elements without keys should work correctly
+[51/452] [chromium] › e2e/animate-presence/nested-keys.spec.ts:40:5 › AnimatePresence Nested Keys › conditional nested element should unmount immediately like upstream
+[52/452] [chromium] › e2e/animate-presence/nested-keys.spec.ts:60:5 › AnimatePresence Nested Keys › nested elements should exit with parent when parent exits
+[53/452] [chromium] › e2e/animate-presence/nested-keys.spec.ts:81:5 › AnimatePresence Nested Keys › nested elements should re-enter with parent when parent enters
+[54/452] [chromium] › e2e/animate-presence/owned-child.spec.ts:11:5 › AnimatePresence owned child › retains and exits the original node without creating a clone
+[55/452] [chromium] › e2e/animate-presence/owned-child.spec.ts:37:5 › AnimatePresence owned child › completes when removed during the initial enter animation
+[56/452] [chromium] › e2e/animate-presence/owned-child.spec.ts:50:5 › AnimatePresence owned child › preserves live canvas pixels and focus while exiting
+[57/452] [chromium] › e2e/animate-presence/owned-child.spec.ts:88:5 › AnimatePresence owned child › makes legacy focus loss visible when the original is removed
+[58/452] [chromium] › e2e/animate-presence/owned-child.spec.ts:107:5 › AnimatePresence owned child › cancels an exit on re-entry without replacing the node
+[59/452] [chromium] › e2e/animate-presence/owned-child.spec.ts:123:5 › AnimatePresence owned child › shows the clone and real-node mechanisms side by side
+[60/452] [chromium] › e2e/animate-presence/owned-child.spec.ts:138:5 › AnimatePresence owned child › keeps the owned-child harness linked from the root test index
+[61/452] [chromium] › e2e/animate-presence/scroll-stress.spec.ts:95:5 › AnimatePresence scroll stress › keeps exit clone anchored after normal document scrolling
+[62/452] [chromium] › e2e/animate-presence/scroll-stress.spec.ts:116:5 › AnimatePresence scroll stress › keeps re-entering box centered after scroll hide show interruption
+[63/452] [chromium] › e2e/animate-presence/scroll-stress.spec.ts:167:5 › AnimatePresence scroll stress › keeps clone centered after scrolling with the page control then hiding
+[64/452] [chromium] › e2e/animate-presence/scroll-stress.spec.ts:227:5 › AnimatePresence scroll stress › keeps a scrolled exit clone centered on its placeholder
+[65/452] [chromium] › e2e/animate-presence/scroll-stress.spec.ts:282:5 › AnimatePresence scroll stress › honors an early hide click after the page is scrolled
+[66/452] [chromium] › e2e/animate-presence/scroll-stress.spec.ts:302:5 › AnimatePresence scroll stress › keeps diagnostics in sync when hiding during a scrolled enter animation
+[67/452] [chromium] › e2e/animate-presence/scroll-stress.spec.ts:335:5 › AnimatePresence scroll stress › anchors the exit clone to the original rect when hidden from a scrolled container
+  4) [chromium] › e2e/animate-presence/scroll-stress.spec.ts:335:5 › AnimatePresence scroll stress › anchors the exit clone to the original rect when hidden from a scrolled container
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 844
+    Received:    845.2890625
+
+      30 | const expectRectNear = (actual: RectSnapshot, expected: RectSnapshot, tolerance = 8) => {
+      31 |     expect(actual.left).toBeGreaterThanOrEqual(expected.left - tolerance)
+    > 32 |     expect(actual.left).toBeLessThanOrEqual(expected.left + tolerance)
+         |                         ^
+      33 |     expect(actual.top).toBeGreaterThanOrEqual(expected.top - tolerance)
+      34 |     expect(actual.top).toBeLessThanOrEqual(expected.top + tolerance)
+      35 |     expect(actual.width).toBeGreaterThanOrEqual(expected.width - tolerance)
+        at expectRectNear (/Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/animate-presence/scroll-stress.spec.ts:32:25)
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/animate-presence/scroll-stress.spec.ts:361:9
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-scroll-st-222d9-n-from-a-scrolled-container-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-scroll-st-222d9-n-from-a-scrolled-container-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-scroll-st-222d9-n-from-a-scrolled-container-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../tmp/browser-pr-readiness-sep9-complete-results/animate-presence-scroll-st-222d9-n-from-a-scrolled-container-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:8501) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[68/452] [chromium] › e2e/animate-presence/scroll-stress.spec.ts:366:5 › AnimatePresence scroll stress › keeps the exit clone aligned while Hide + scroll moves the container
+[69/452] [chromium] › e2e/animate-presence/scroll-stress.spec.ts:401:5 › AnimatePresence scroll stress › does not leave a live box after hiding from a manually scrolled spring demo
+[70/452] [chromium] › e2e/animate-presence/scroll-stress.spec.ts:426:5 › AnimatePresence scroll stress › keeps hidden state from reviving the live box after rapid scroll and hide
+[71/452] [chromium] › e2e/animate-presence/scroll-stress.spec.ts:458:5 › AnimatePresence scroll stress › keeps the box from overlapping counters after manual scroll and re-enter
+[72/452] [chromium] › e2e/animate-presence/scroll-stress.spec.ts:486:5 › AnimatePresence scroll stress › keeps the exiting clone from overlapping counters while scrolled
+[73/452] [chromium] › e2e/animate-presence/wait-reset-label-pop.spec.ts:22:1 › does not pop the readable copied label during the wait settle window
+[74/452] [chromium] › e2e/armed-buttons/archive.spec.ts:4:5 › Armed buttons - archive confirm › arms, confirms, and records archived state
+[75/452] [chromium] › e2e/armed-buttons/archive.spec.ts:27:5 › Armed buttons - archive confirm › auto-disarms an abandoned archive action
+[76/452] [chromium] › e2e/armed-buttons/delete-wait.spec.ts:4:5 › Armed buttons - delete wait › arms, waits, then confirms deletion
+[77/452] [chromium] › e2e/armed-buttons/delete-wait.spec.ts:27:5 › Armed buttons - delete wait › auto-disarms an abandoned delete action after it becomes ready
+[78/452] [chromium] › e2e/drag/axis-handoff.spec.ts:20:5 › drag/axis-handoff › the pointer wins over a foreign x animation already in flight
+[79/452] [chromium] › e2e/drag/axis-handoff.spec.ts:66:5 › drag/axis-handoff › whileDrag on the dragged axis does not cancel the release glide
+  5) [chromium] › e2e/drag/axis-handoff.spec.ts:66:5 › drag/axis-handoff › whileDrag on the dragged axis does not cancel the release glide
+
+    Error: y did not glide onward — trace: 120, 209, 206, 185, 171, 158, 149, 144, 140, 137, 135, 134, 132, 132
+
+    expect(received).toBeGreaterThan(expected)
+
+    Expected: > 208.709
+    Received:   205.953
+
+       97 |             samples[0].y
+       98 |         )
+    >  99 |         expect(samples[2].y, `y did not glide onward — trace: ${trace}`).toBeGreaterThan(
+          |                                                                          ^
+      100 |             samples[1].y
+      101 |         )
+      102 |         const settledY = samples[samples.length - 1].y
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/drag/axis-handoff.spec.ts:99:74
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/drag-axis-handoff-drag-axi-042e4-ot-cancel-the-release-glide-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/browser-pr-readiness-sep9-complete-results/drag-axis-handoff-drag-axi-042e4-ot-cancel-the-release-glide-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/drag-axis-handoff-drag-axi-042e4-ot-cancel-the-release-glide-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../tmp/browser-pr-readiness-sep9-complete-results/drag-axis-handoff-drag-axi-042e4-ot-cancel-the-release-glide-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:10868) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[80/452] [chromium] › e2e/drag/axis-handoff.spec.ts:122:5 › drag/axis-handoff › a foreign retarget mid-glide takes over cleanly and the dead release cleans up
+[81/452] [chromium] › e2e/drag/axis-handoff.spec.ts:202:5 › drag/axis-handoff › is linked from the root test index
+[82/452] [chromium] › e2e/drag/axis-x.spec.ts:4:5 › drag/axis-x › guide is behind box per z-index
+[83/452] [chromium] › e2e/drag/axis-x.spec.ts:12:5 › drag/axis-x › moves on x but not y
+[84/452] [chromium] › e2e/drag/axis-x.spec.ts:31:5 › drag/axis-x › second drag respects x-only
+[85/452] [chromium] › e2e/drag/axis-y.spec.ts:4:5 › drag/axis-y › guide is behind box per z-index
+[86/452] [chromium] › e2e/drag/axis-y.spec.ts:12:5 › drag/axis-y › moves on y but not x
+[87/452] [chromium] › e2e/drag/basic.spec.ts:4:5 › drag/basic › moves when dragged
+[88/452] [chromium] › e2e/drag/basic.spec.ts:22:5 › drag/basic › has momentum after release
+[89/452] [chromium] › e2e/drag/basic.spec.ts:51:5 › drag/basic › second drag starts from transformed position
+[90/452] [chromium] › e2e/drag/brutalist-stage.spec.ts:33:5 › drag/brutalist-stage › rotated card follows the pointer during active drag
+[91/452] [chromium] › e2e/drag/brutalist-stage.spec.ts:72:5 › drag/brutalist-stage › hard rotated release preserves translate while whileDrag scale restores
+[92/452] [chromium] › e2e/drag/brutalist-stage.spec.ts:105:5 › drag/brutalist-stage › moving the mouse after release does not let hover reset drag translate
+[93/452] [chromium] › e2e/drag/brutalist-stage.spec.ts:152:5 › drag/brutalist-stage › settles within constraint bounds after hard left + down drag
+[94/452] [chromium] › e2e/drag/brutalist-stage.spec.ts:185:5 › drag/brutalist-stage › settles within constraint bounds after hard right + up drag
+[95/452] [chromium] › e2e/drag/brutalist-stage.spec.ts:213:5 › drag/brutalist-stage › second drag from past-boundary still settles within absolute constraints
+[96/452] [chromium] › e2e/drag/brutalist-stage.spec.ts:274:5 › drag/brutalist-stage › out-of-bounds release springs back and stays at the constraint boundary
+[97/452] [chromium] › e2e/drag/constraints-ref.spec.ts:4:5 › drag/constraints-ref › allows elastic overdrag while held and settles inside container ref
+[98/452] [chromium] › e2e/drag/controls-cancel-inertia.spec.ts:10:5 › drag/controls cancel inertia › stop() freezes the card mid-release spring-back
+[99/452] [chromium] › e2e/drag/controls.spec.ts:54:5 › drag/controls › imperative start moves x only with dragControls
+[100/452] [chromium] › e2e/drag/controls.spec.ts:81:5 › drag/controls › tiny right nudge does NOT teleport on x-only dragControls
+[101/452] [chromium] › e2e/drag/controls.spec.ts:144:5 › drag/controls › snapToCursor does not creep across repeated drags with initial coordinates
+[102/452] [chromium] › e2e/drag/elastic.spec.ts:77:5 › drag/elastic › elastic=0.5 springs back over multiple frames after overdrag release
+[103/452] [chromium] › e2e/drag/elastic.spec.ts:83:5 › drag/elastic › elastic=1 springs back over multiple frames after overdrag release
+[104/452] [chromium] › e2e/drag/elastic.spec.ts:87:5 › drag/elastic › elastic=0 multiple drags never exceed +30 bound
+[105/452] [chromium] › e2e/drag/elastic.spec.ts:118:5 › drag/elastic › elastic=0 clamps exactly to ±30
+[106/452] [chromium] › e2e/drag/elastic.spec.ts:139:5 › drag/elastic › object elastic applies per-edge overdrag
+[107/452] [chromium] › e2e/drag/elastic.spec.ts:171:5 › drag/elastic › elastic=0 (no overdrag) settles without visible bounce
+[108/452] [chromium] › e2e/drag/elastic.spec.ts:195:5 › drag/elastic › second drag respects click point after elastic settle and clamps within bounds
+[109/452] [chromium] › e2e/drag/elastic.spec.ts:249:5 › drag/elastic › second drag clamps from new origin
+[110/452] [chromium] › e2e/drag/element-ref-resize.spec.ts:46:5 › drag/element-ref-resize › container shrink mid-inertia keeps card inside new bounds
+[111/452] [chromium] › e2e/drag/element-ref-resize.spec.ts:76:5 › drag/element-ref-resize › container grow mid-inertia remaps card into expanded bounds
+[112/452] [chromium] › e2e/drag/element-ref-resize.spec.ts:107:5 › drag/element-ref-resize › slow review mode animates constraint resize for visual inspection
+[113/452] [chromium] › e2e/drag/hover-during-glide.spec.ts:31:5 › drag/hover-during-glide › hover engages mid-glide and the glide keeps travelling
+[114/452] [chromium] › e2e/drag/hover-during-glide.spec.ts:115:5 › drag/hover-during-glide › is linked from the root test index
+[115/452] [chromium] › e2e/drag/lock-direction.spec.ts:4:5 › drag/lock-direction › random jitter after axis pull still settles at center
+[116/452] [chromium] › e2e/drag/mobile-drawer.spec.ts:49:5 › drag/mobile-drawer › dragging the handle past the threshold closes the drawer
+[117/452] [chromium] › e2e/drag/mobile-drawer.spec.ts:60:5 › drag/mobile-drawer › a short drag snaps back and keeps the drawer open
+[118/452] [chromium] › e2e/drag/mobile-drawer.spec.ts:74:5 › drag/mobile-drawer › the bound y MotionValue is elastic-damped, not double-applied
+[119/452] [chromium] › e2e/drag/mobile-drawer.spec.ts:89:5 › drag/mobile-drawer › clicking the backdrop closes the drawer
+[120/452] [chromium] › e2e/drag/momentum.spec.ts:4:5 › drag/momentum › continues moving after release
+[121/452] [chromium] › e2e/drag/motion-dev-constraints.spec.ts:13:9 › drag/motion-dev-constraints › keeps the card within constraints after right edge overdrag
+[122/452] [chromium] › e2e/drag/motion-dev-constraints.spec.ts:13:9 › drag/motion-dev-constraints › keeps the card within constraints after left edge overdrag
+[123/452] [chromium] › e2e/drag/motion-dev-constraints.spec.ts:13:9 › drag/motion-dev-constraints › keeps the card within constraints after top edge overdrag
+[124/452] [chromium] › e2e/drag/motion-dev-constraints.spec.ts:13:9 › drag/motion-dev-constraints › keeps the card within constraints after bottom edge overdrag
+[125/452] [chromium] › e2e/drag/motion-dev-constraints.spec.ts:13:9 › drag/motion-dev-constraints › keeps the card within constraints after bottom-right corner overdrag
+[126/452] [chromium] › e2e/drag/pointer-cancel.spec.ts:14:5 › drag/pointer-cancel › pointercancel mid-drag clamps without fling
+[127/452] [chromium] › e2e/drag/settle-cancel.spec.ts:21:5 › drag/settle-cancel › snapToOrigin animation freezes when user re-grabs without moving
+[128/452] [chromium] › e2e/drag/settle-cancel.spec.ts:71:5 › drag/settle-cancel › no-momentum settle animation freezes when user re-grabs without moving
+[129/452] [chromium] › e2e/drag/settle-cancel.spec.ts:127:5 › drag/settle-cancel › slow no-momentum settle follows rightward movement after re-grab
+[130/452] [chromium] › e2e/drag/settle-cancel.spec.ts:175:5 › drag/settle-cancel › release cancellation preserves authored base transform on re-grab
+[131/452] [chromium] › e2e/drag/settle-cancel.spec.ts:242:5 › drag/settle-cancel › an authored transform STRING is replaced once drag animates channels
+[132/452] [chromium] › e2e/drag/single-frame.spec.ts:20:10 › drag/single-frame › one tiny pointermove + release produces no momentum fling
+[133/452] [chromium] › e2e/drag/snap-to-origin.spec.ts:25:5 › drag/snap-to-origin › release animates back to origin instead of snapping instantly
+[134/452] [chromium] › e2e/drag/snap-to-origin.spec.ts:53:5 › drag/snap-to-origin › axis-specific snap-to-origin only returns the requested axis
+[135/452] [chromium] › e2e/drag/snap-to-origin.spec.ts:71:5 › drag/snap-to-origin › axis-specific snap constrains the other active axis without momentum
+[136/452] [chromium] › e2e/drag/snap-to-origin.spec.ts:91:5 › drag/snap-to-origin › releases back to origin after drag
+[137/452] [chromium] › e2e/drag/snap-to-origin.spec.ts:121:5 › drag/snap-to-origin › second drag starts from correct position with no jump
+[138/452] [chromium] › e2e/drag/stale-velocity.spec.ts:11:5 › drag/stale-velocity › pause-then-release produces near-zero momentum
+[139/452] [chromium] › e2e/drag/subpixel-constraints.spec.ts:4:5 › drag/subpixel constraints › elastic=0 clamps to 30.5 exactly (±0.25) and float positions appear with elastic
+[140/452] [chromium] › e2e/drag/transform-page-point.spec.ts:384:5 › MotionConfig transformPagePoint drag › matches scale-2 movement, velocity, bound values, and physical travel
+[141/452] [chromium] › e2e/drag/transform-page-point.spec.ts:419:5 › MotionConfig transformPagePoint drag › matches nonuniform affine coordinates without losing physical pointer tracking
+[142/452] [chromium] › e2e/drag/transform-page-point.spec.ts:440:5 › MotionConfig transformPagePoint drag › separates page-scroll terminal payload from rendered translation
+[143/452] [chromium] › e2e/drag/transform-page-point.spec.ts:460:5 › MotionConfig transformPagePoint drag › adds raw ancestor scroll to drag offset
+[144/452] [chromium] › e2e/drag/transform-page-point.spec.ts:480:5 › MotionConfig transformPagePoint drag › keeps second-session offset gesture-relative and retains stable-closure history
+[145/452] [chromium] › e2e/drag/transform-page-point.spec.ts:578:5 › MotionConfig transformPagePoint drag › matches numeric, ref, and resized ref bounds
+[146/452] [chromium] › e2e/drag/transform-page-point.spec.ts:652:5 › MotionConfig transformPagePoint drag › matches scrolled controls snap and real layout displacement
+[147/452] [chromium] › e2e/drag/transform-page-point.spec.ts:693:5 › MotionConfig transformPagePoint drag › keeps repeated controls snaps aligned after drag and settled parent layout
+[148/452] [chromium] › e2e/drag/transform-page-point.spec.ts:702:5 › MotionConfig transformPagePoint drag › keeps nonzero-initial controls snaps aligned after settled parent layout
+[149/452] [chromium] › e2e/drag/transform-page-point.spec.ts:711:5 › MotionConfig transformPagePoint drag › continues after unmount, resets detached values at end, and handles cancel
+[150/452] [chromium] › e2e/drag/transform-page-point.spec.ts:743:5 › MotionConfig transformPagePoint drag › is linked from the root test index
+[151/452] [chromium] › e2e/drag/while-drag-restore.spec.ts:23:5 › drag/whileDrag restore › re-grab mid-restore still settles scale to 1.0
+[152/452] [chromium] › e2e/drag/while-drag-transforms.spec.ts:12:5 › drag/whileDrag transform composition › keeps whileDrag rotation composed across live drag frames
+[153/452] [chromium] › e2e/drag/while-drag-transforms.spec.ts:30:5 › drag/whileDrag transform composition › keeps an x-only drag pinned on y when its layout slot moves
+[154/452] [chromium] › e2e/drag/while-drag-transforms.spec.ts:54:5 › drag/whileDrag transform composition › keeps a whileDrag override composed with an authored style channel
+[155/452] [chromium] › e2e/drag/while-drag-transforms.spec.ts:92:5 › drag/whileDrag transform composition › drags under the full gesture stack over authored transform channels
+[156/452] [chromium] › e2e/drag/while-drag-transforms.spec.ts:144:5 › drag/whileDrag transform composition › release restores the authored rotate smoothly, without a settle-then-snap
+  6) [chromium] › e2e/drag/while-drag-transforms.spec.ts:144:5 › drag/whileDrag transform composition › release restores the authored rotate smoothly, without a settle-then-snap
+
+    Error: max single-frame rotation jump: 6.04deg — samples: 2.9, -3.2, -4.8, -7.5, -7.9, -8.2, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0, -8.0
+
+    expect(received).toBeLessThan(expected)
+
+    Expected: < 4
+    Received:   6.042415956739308
+
+      160 |                 .map((d) => d.toFixed(1))
+      161 |                 .join(', ')}`
+    > 162 |         ).toBeLessThan(4)
+          |           ^
+      163 |
+      164 |         // And it must settle on the style-authored angle, not neutral.
+      165 |         const settled = samples.at(-1)!
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/drag/while-drag-transforms.spec.ts:162:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/drag-while-drag-transforms-9baaf--without-a-settle-then-snap-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/browser-pr-readiness-sep9-complete-results/drag-while-drag-transforms-9baaf--without-a-settle-then-snap-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/drag-while-drag-transforms-9baaf--without-a-settle-then-snap-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../tmp/browser-pr-readiness-sep9-complete-results/drag-while-drag-transforms-9baaf--without-a-settle-then-snap-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:17290) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[157/452] [chromium] › e2e/drag/while-drag-transforms.spec.ts:172:5 › drag/whileDrag transform composition › keeps rotateX composed with perspective across live drag frames
+[158/452] [chromium] › e2e/drag/while-drag-transforms.spec.ts:199:5 › drag/whileDrag transform composition › is linked from the root test index
+[159/452] [chromium] › e2e/drag/while-drag-write-coalescing.spec.ts:19:5 › drag/whileDrag write coalescing › composes at most one transform write per frame while channel springs animate
+[160/452] [chromium] › e2e/effects/custom-effect.spec.ts:9:5 › effects/custom-effect › animate() drives an effect-claimed object
+[161/452] [chromium] › e2e/effects/custom-effect.spec.ts:20:5 › effects/custom-effect › reset animates back
+[162/452] [chromium] › e2e/effects/custom-effect.spec.ts:30:5 › effects/custom-effect › objects no effect claims still animate
+[163/452] [chromium] › e2e/effects/three.spec.ts:9:5 › effects/three › animate(mesh) through the registry rotates the mesh
+[164/452] [chromium] › e2e/effects/three.spec.ts:19:5 › effects/three › uniform progress animates to 1
+[165/452] [chromium] › e2e/layout/arc-layout.spec.ts:20:5 › layout FLIP follows the arc (ty deviates on a horizontal move)
+[166/452] [chromium] › e2e/layout/arc-layout.spec.ts:20:5 › layoutId shared transition follows the arc
+[167/452] [chromium] › e2e/layout/group.spec.ts:25:5 › layout/group › sibling LayoutGroups do not bridge a shared layoutId across the page
+[168/452] [chromium] › e2e/layout/group.spec.ts:97:5 › layout/group › regression page renders both strips and all six tabs
+[169/452] [chromium] › e2e/layout/layout-dependency.spec.ts:42:5 › layoutDependency (#314) › gated box does not re-measure on unrelated renders; ungated box does
+[170/452] [chromium] › e2e/layout/layout-dependency.spec.ts:62:5 › layoutDependency (#314) › gated box re-measures exactly once when layoutDependency changes
+[171/452] [chromium] › e2e/layout/layout-dependency.spec.ts:89:5 › layoutDependency escape hatches › drag forces measurement on renders; non-drag box stays gated
+[172/452] [chromium] › e2e/layout/layout-dependency.spec.ts:106:5 › layoutDependency escape hatches › gated box stays gated when an AnimatePresence sibling toggles (upstream parity)
+[173/452] [chromium] › e2e/layout/layout-dependency.spec.ts:180:5 › layoutDependency in a keyed list (#470) › per-row field gate: only the bumped row animates; displaced rows jump
+[174/452] [chromium] › e2e/layout/layout-dependency.spec.ts:220:5 › layoutDependency in a keyed list (#470) › measurement cadence: renders cost gated rows no DOM reads; a reorder costs one silent read per displaced row
+[175/452] [chromium] › e2e/layout/layout-dependency.spec.ts:259:5 › layoutDependency in a keyed list (#470) › index gate: every row whose slot changed animates
+[176/452] [chromium] › e2e/layout/layout-dependency.spec.ts:278:5 › layoutDependency own-presence and wait-mode parent (upstream parity) › own presence flip measures a gated element; renders do not
+[177/452] [chromium] › e2e/layout/layout-dependency.spec.ts:293:5 › layoutDependency own-presence and wait-mode parent (upstream parity) › gated wait-mode parent jumps on child swap; ungated parent animates size
+[178/452] [chromium] › e2e/layout/nested-scroll.spec.ts:14:5 › layout/nested-scroll › outer scroll mid-animation is cancelled by the FLIP delta
+[179/452] [chromium] › e2e/layout/nested-scroll.spec.ts:65:5 › layout/nested-scroll › regression page renders both containers + box
+[180/452] [chromium] › e2e/layout/scroll.spec.ts:15:5 › layout/scroll › layoutScroll container keeps animations anchored across scroll
+[181/452] [chromium] › e2e/layout/scroll.spec.ts:86:5 › layout/scroll › regression page renders both panels with their boxes
+[182/452] [chromium] › e2e/layout-id/basic.spec.ts:4:5 › layoutId shared layout animation › underline is visible under active tab on initial render
+[183/452] [chromium] › e2e/layout-id/basic.spec.ts:16:5 › layoutId shared layout animation › underline moves when switching tabs
+[184/452] [chromium] › e2e/layout-id/basic.spec.ts:52:5 › layoutId shared layout animation › underline animates through an in-flight FLIP transform
+[185/452] [chromium] › e2e/layout-id/basic.spec.ts:70:5 › layoutId shared layout animation › full cycle through all tabs
+[186/452] [chromium] › e2e/layout-id/basic.spec.ts:95:5 › layoutId shared layout animation › rapid switching does not leak elements
+[187/452] [chromium] › e2e/layout-id/scrolled.spec.ts:39:5 › layoutId handoff on a scrolled page › plain {#if} swap does not fly in from the scroll offset
+[188/452] [chromium] › e2e/layout-id/scrolled.spec.ts:46:5 › layoutId handoff on a scrolled page › AnimatePresence swap (control) stays horizontal
+[189/452] [chromium] › e2e/lazy-motion/basic.spec.ts:4:5 › LazyMotion › renders m namespace components with domAnimation
+[190/452] [chromium] › e2e/lazy-motion/basic.spec.ts:12:5 › LazyMotion › gates gesture affordances by feature bundle
+[191/452] [chromium] › e2e/lazy-motion/basic.spec.ts:22:5 › LazyMotion › loads async feature bundles for m namespace components
+[192/452] [chromium] › e2e/motion/animate-transform-persist.spec.ts:19:5 › motion/animate-transform-persist (#377) › scaleX target persists at rest (does not revert to none)
+[193/452] [chromium] › e2e/motion/animate-transform-persist.spec.ts:37:5 › motion/animate-transform-persist (#377) › animates through an intermediate frame (no snap to target)
+[194/452] [chromium] › e2e/motion/animate-transform-persist.spec.ts:75:5 › motion/animate-transform-persist (#377) › does NOT snap to the target at the start of the animation
+[195/452] [chromium] › e2e/motion/animate-transform-persist.spec.ts:111:5 › motion/animate-transform-persist (#377) › keyframe-array target rests at the LAST element, not the first
+[196/452] [chromium] › e2e/motion/animation-frame.test.ts:4:5 › useAnimationFrame › should animate cube with requestAnimationFrame
+[197/452] [chromium] › e2e/motion/animation-frame.test.ts:48:5 › useAnimationFrame › should have consistent animation over time
+[198/452] [chromium] › e2e/motion/animation-frame.test.ts:75:5 › useAnimationFrame › should display documentation text
+[199/452] [chromium] › e2e/motion/arc-keyframes.spec.ts:30:5 › arc() keyframe paths › arc bulges off the straight line and settles exactly
+[200/452] [chromium] › e2e/motion/arc-keyframes.spec.ts:41:5 › arc() keyframe paths › direction cw and ccw bulge to opposite sides
+[201/452] [chromium] › e2e/motion/arc-keyframes.spec.ts:60:5 › arc() keyframe paths › rotate:true rotates mid-flight, rotate:false does not
+[202/452] [chromium] › e2e/motion/aspect-ratio.test.ts:4:5 › motion/aspect-ratio › box resizes by width and respects aspect-ratio
+[203/452] [chromium] › e2e/motion/declarative-wildcards.spec.ts:21:5 › declarative wildcard/relative settle › animate x:null holds the initial value through settle
+[204/452] [chromium] › e2e/motion/declarative-wildcards.spec.ts:32:5 › declarative wildcard/relative settle › animate x:'+=50' lands at initial+50 and stays there through settle
+[205/452] [chromium] › e2e/motion/enter-animation.test.ts:4:5 › Enter Animation › should animate from invisible to visible
+[206/452] [chromium] › e2e/motion/exit-animation.spec.ts:12:5 › AnimatePresence exit animation › animates out when toggled off with preserved shape
+  7) [chromium] › e2e/motion/exit-animation.spec.ts:12:5 › AnimatePresence exit animation › animates out when toggled off with preserved shape
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 3
+    Received:    4.9197998046875
+
+      117 |
+      118 |         expect(cloneData).toBeTruthy()
+    > 119 |         expect(Math.abs(cloneData!.rect.width - boxRect.width)).toBeLessThanOrEqual(3)
+          |                                                                 ^
+      120 |         expect(Math.abs(cloneData!.rect.height - boxRect.height)).toBeLessThanOrEqual(3)
+      121 |         expect(cloneData!.styles.borderRadius).toBe(boxStyles.borderRadius)
+      122 |         expect(cloneData!.styles.clipPath).toBe(boxStyles.clipPath)
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/motion/exit-animation.spec.ts:119:65
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/motion-exit-animation-Anim-2a32a-ed-off-with-preserved-shape-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/browser-pr-readiness-sep9-complete-results/motion-exit-animation-Anim-2a32a-ed-off-with-preserved-shape-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/motion-exit-animation-Anim-2a32a-ed-off-with-preserved-shape-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../tmp/browser-pr-readiness-sep9-complete-results/motion-exit-animation-Anim-2a32a-ed-off-with-preserved-shape-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:20180) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[207/452] [chromium] › e2e/motion/fancy-like-button.size.spec.ts:4:5 › Fancy Like Button - size stability › does not shrink after press animation completes
+[chromium] › e2e/motion/fancy-like-button.size.spec.ts:4:5 › Fancy Like Button - size stability › does not shrink after press animation completes
+[like] before size { w: 25.199951171875, h: 25.20001220703125 }
+
+[like] after size { w: 25.199951171875, h: 25.20001220703125 }
+
+[208/452] [chromium] › e2e/motion/fancy-like-button.size.spec.ts:56:5 › Fancy Like Button - size stability › rapid taps do not exceed baseline transform
+[209/452] [chromium] › e2e/motion/fancy-like-button.size.spec.ts:116:5 › Fancy Like Button - size stability › rapid taps during reset do not escalate transform
+[210/452] [chromium] › e2e/motion/hover-and-tap.test.ts:4:5 › Hover + Tap › hover scales up, tap scales down, then returns to hover scale on release
+[211/452] [chromium] › e2e/motion/hover-and-tap.test.ts:70:5 › Hover + Tap › presses from the current hover scale without snapping
+[212/452] [chromium] › e2e/motion/hover-and-tap.test.ts:130:5 › Hover + Tap › returns to rest smoothly when the pointer leaves mid-release-spring
+[213/452] [chromium] › e2e/motion/hover-authored-opacity.spec.ts:16:5 › motion/whileHover over style-authored opacity › hover-leave restores the style-authored opacity, not the neutral default
+[214/452] [chromium] › e2e/motion/hover-authored-transforms.spec.ts:12:5 › motion/whileHover over authored transforms › hover-enter animates the authored rotate to the whileHover value
+[215/452] [chromium] › e2e/motion/hover-authored-transforms.spec.ts:26:5 › motion/whileHover over authored transforms › hover-leave restores the authored rotate smoothly, without a settle-then-snap
+[216/452] [chromium] › e2e/motion/hover-authored-transforms.spec.ts:59:5 › motion/whileHover over authored transforms › is linked from the root test index
+[217/452] [chromium] › e2e/motion/hover-default-spring.spec.ts:45:5 › Hover composed channels use upstream default transitions › scale hover overshoots its target (critically-damped spring default)
+[218/452] [chromium] › e2e/motion/hover-default-spring.spec.ts:64:5 › Hover composed channels use upstream default transitions › scale keyframe array plays its 1.8 waypoint in full
+[219/452] [chromium] › e2e/motion/hover-opacity.test.ts:4:5 › Hover opacity animation › smoothly animates opacity on hover and hover exit
+[220/452] [chromium] › e2e/motion/hover-opacity.test.ts:59:5 › Hover opacity animation › maintains smooth transitions with multiple rapid hovers
+[221/452] [chromium] › e2e/motion/hover-opacity.test.ts:92:5 › Hover opacity animation › should smoothly continue animation when re-hovering during exit animation
+[222/452] [chromium] › e2e/motion/hover-tap-disjoint-keys-throttled.spec.ts:17:5 › Hover/tap disjoint-key release under CPU throttle › restores the non-owned opacity key to rest on a slow runner
+[223/452] [chromium] › e2e/motion/hover-tap-disjoint-keys.spec.ts:27:5 › Hover/tap disjoint-key ownership › hover applied while a tap is active animates the non-owned opacity key
+[224/452] [chromium] › e2e/motion/hover-tap-disjoint-keys.spec.ts:53:5 › Hover/tap disjoint-key ownership › hover exiting while a tap is active restores the non-owned opacity key on release
+[225/452] [chromium] › e2e/motion/hover-tap-multichannel-handoff.spec.ts:28:5 › Hover→tap multichannel handoff › mid-hover press does not snap y on frame one
+[226/452] [chromium] › e2e/motion/hover-transform-channels.spec.ts:24:5 › Hover with multiple transform channels › hover applies scale and y together, and both restore on exit
+[227/452] [chromium] › e2e/motion/hover-velocity-continuity.spec.ts:41:5 › Hover→tap velocity continuity › mid-hover press carries velocity: scale climbs before reversing
+[228/452] [chromium] › e2e/motion/hover-velocity-continuity.spec.ts:216:5 › Hover→tap velocity continuity › tap cancel (release outside) never snaps to the frozen hover value
+[229/452] [chromium] › e2e/motion/html-content.test.ts:4:5 › HTML Content › should animate number from 0 to 100
+[230/452] [chromium] › e2e/motion/initial-false.test.ts:8:5 › initial={false} › All three elements should be visible
+[231/452] [chromium] › e2e/motion/initial-false.test.ts:14:5 › initial={false} › Elements should be fully opaque immediately
+[232/452] [chromium] › e2e/motion/initial-false.test.ts:21:5 › initial={false} › Page should render exactly 3 elements
+[233/452] [chromium] › e2e/motion/keyframes-scale.test.ts:4:5 › Keyframes Scale › should grow (scale 2x) and return to normal size
+[234/452] [chromium] › e2e/motion/keyframes.test.ts:4:5 › Keyframes Animation › should morph square -> circle -> square
+[235/452] [chromium] › e2e/motion/layout-align-toggle.spec.ts:6:5 › motion/layout FLIP on parent align toggle › the ball slides between slots instead of snapping
+[236/452] [chromium] › e2e/motion/layout-class-toggle.spec.ts:24:5 › motion/layout FLIP on own class toggle › records exactly one changed-projection event for one class toggle
+[237/452] [chromium] › e2e/motion/layout-class-toggle.spec.ts:50:5 › motion/layout FLIP on own class toggle › the ball slides monotonically into the shifted slot without a restart jump
+[238/452] [chromium] › e2e/motion/layout-class-toggle.spec.ts:84:5 › motion/layout FLIP on own class toggle › an imperative classList change still FLIPs (no over-suppression)
+[239/452] [chromium] › e2e/motion/layout-grandparent-toggle.spec.ts:8:5 › motion/layout FLIP on grandparent align toggle › the ball slides between slots instead of snapping
+[240/452] [chromium] › e2e/motion/optimized-appear.spec.ts:4:5 › optimized appear animations › starts SSR appear animations before hydration handoff
+[241/452] [chromium] › e2e/motion/optimized-appear.spec.ts:71:5 › optimized appear animations › starts a WAAPI appear for non-transform CSS properties like filter
+[242/452] [chromium] › e2e/motion/optimized-appear.spec.ts:103:5 › optimized appear animations › filter appear animates through intermediate blurs and settles clean
+[243/452] [chromium] › e2e/motion/pan-authored-transforms.spec.ts:17:5 › motion/whilePan over authored transforms › pan-start animates the authored rotate to the whilePan value
+[244/452] [chromium] › e2e/motion/pan-authored-transforms.spec.ts:35:5 › motion/whilePan over authored transforms › pan-end restores the authored rotate smoothly, without a settle-then-snap
+[245/452] [chromium] › e2e/motion/pan-authored-transforms.spec.ts:74:5 › motion/whilePan over authored transforms › restores whilePan keys the element never authored
+[246/452] [chromium] › e2e/motion/pan-authored-transforms.spec.ts:107:5 › motion/whilePan over authored transforms › is linked from the root test index
+[247/452] [chromium] › e2e/motion/pan-transform-page-point.spec.ts:194:5 › MotionConfig transformPagePoint pan › matches inherited scale-2 frame history and terminal velocity
+[248/452] [chromium] › e2e/motion/pan-transform-page-point.spec.ts:227:5 › MotionConfig transformPagePoint pan › distinguishes omitted inheritance from explicit undefined and identity
+[249/452] [chromium] › e2e/motion/pan-transform-page-point.spec.ts:241:5 › MotionConfig transformPagePoint pan › keeps pan unchanged by held page and ancestor scroll
+[250/452] [chromium] › e2e/motion/pan-transform-page-point.spec.ts:264:5 › MotionConfig transformPagePoint pan › captures replacement identity but retains mapped history for a stable closure
+[251/452] [chromium] › e2e/motion/pan-transform-page-point.spec.ts:319:5 › MotionConfig transformPagePoint pan › uses the last point on cancel and emits no public end after unmount
+[252/452] [chromium] › e2e/motion/pan-transform-page-point.spec.ts:346:5 › MotionConfig transformPagePoint pan › is linked from the root test index
+[253/452] [chromium] › e2e/motion/rapid-tap.test.ts:44:5 › Rapid tap (spring runaway guard) › rapid press/release stays bounded and settles back to rest
+[254/452] [chromium] › e2e/motion/reentry-animation.spec.ts:4:5 › AnimatePresence re-entry animation › animates in when toggled back on after exit (initial={false})
+[255/452] [chromium] › e2e/motion/reentry-animation.spec.ts:112:5 › AnimatePresence re-entry animation › re-entry animation starts from initial keyframes
+[256/452] [chromium] › e2e/motion/reentry-animation.spec.ts:199:5 › AnimatePresence re-entry animation › multiple re-entries all animate correctly
+[257/452] [chromium] › e2e/motion/reentry-animation.spec.ts:282:5 › AnimatePresence re-entry animation › second exit clone uses the settled re-entry dimensions
+[258/452] [chromium] › e2e/motion/reentry-animation.spec.ts:325:5 › AnimatePresence re-entry animation › rapid toggle leaves only one element after animations complete
+[259/452] [chromium] › e2e/motion/svg-path-length.test.ts:4:5 › SVG pathLength Animation › animates pathLength 0→1 with normalized dash attributes and no flash
+  8) [chromium] › e2e/motion/svg-path-length.test.ts:4:5 › SVG pathLength Animation › animates pathLength 0→1 with normalized dash attributes and no flash
+
+    Error: initial first dash value should be small (~0)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      16 |             const initVals = initialAttrDash.split(/[\s,]+/).map((v) => parseFloat(v))
+      17 |             // Be tolerant to renderer rounding; allow up to 0.15
+    > 18 |             expect(initVals[0] < 0.15, 'initial first dash value should be small (~0)').toBe(true)
+         |                                                                                         ^
+      19 |         }
+      20 |
+      21 |         // Small delay to allow animation to start
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/motion/svg-path-length.test.ts:18:89
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/motion-svg-path-length-SVG-e3648-ash-attributes-and-no-flash-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/browser-pr-readiness-sep9-complete-results/motion-svg-path-length-SVG-e3648-ash-attributes-and-no-flash-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/motion-svg-path-length-SVG-e3648-ash-attributes-and-no-flash-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../tmp/browser-pr-readiness-sep9-complete-results/motion-svg-path-length-SVG-e3648-ash-attributes-and-no-flash-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[260/452] [chromium] › e2e/motion/svg-path-length.test.ts:149:10 › SVG pathLength Animation › should support pathOffset animation
+(node:26545) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[261/452] [chromium] › e2e/motion/tap-authored-transforms.spec.ts:12:5 › motion/whileTap over authored transforms › press and release keep a translate-centered element centered
+[262/452] [chromium] › e2e/motion/while-focus.test.ts:4:5 › whileFocus › animates on focus and restores on blur
+[263/452] [chromium] › e2e/motion/while-focus.test.ts:47:5 › whileFocus › works with input elements
+[264/452] [chromium] › e2e/motion/while-focus.test.ts:78:5 › whileFocus › works with tabindex on divs
+[265/452] [chromium] › e2e/motion/while-focus.test.ts:98:5 › whileFocus › multiple elements can have independent focus animations
+[266/452] [chromium] › e2e/motion/while-in-view.test.ts:8:5 › whileInView › element already in viewport animates on initial render
+[267/452] [chromium] › e2e/motion/while-in-view.test.ts:29:5 › whileInView › element below fold does not animate until scrolled into view
+[268/452] [chromium] › e2e/motion/while-in-view.test.ts:55:5 › whileInView › element below fold animates when scrolled into view
+[269/452] [chromium] › e2e/motion/while-in-view.test.ts:83:5 › whileInView › element below fold also scales when scrolled into view
+[270/452] [chromium] › e2e/motion/while-string-variants.spec.ts:28:5 › motion/while-string-variants › whileHover with a single variant key scales the element
+[271/452] [chromium] › e2e/motion/while-string-variants.spec.ts:47:5 › motion/while-string-variants › whileHover with an array merges variants left-to-right (later wins on color)
+[272/452] [chromium] › e2e/projection/nested-ancestor.spec.ts:43:5 › projection/nested-ancestor › preserves a static ancestor transform in the layout box (offset 0)
+[273/452] [chromium] › e2e/projection/nested-ancestor.spec.ts:70:5 › projection/nested-ancestor › strips a post-mount (motion) ancestor transform, keeping the user base
+[274/452] [chromium] › e2e/projection/nested-ancestor.spec.ts:98:5 › projection/nested-ancestor › renders the wrapper, inner, controls, and readouts
+[275/452] [chromium] › e2e/projection/nested-ancestor.spec.ts:108:5 › projection/nested-ancestor › controls are discoverable by role and keyboard-operable
+[276/452] [chromium] › e2e/projection/scroll-during-layout.spec.ts:78:5 › projection/scroll-during-layout › case 1: swap with no scroll animates the layout change
+[277/452] [chromium] › e2e/projection/scroll-during-layout.spec.ts:86:5 › projection/scroll-during-layout › case 2: swap after a viewport scroll still animates
+[278/452] [chromium] › e2e/projection/scroll-during-layout.spec.ts:100:5 › projection/scroll-during-layout › case 3: swap while offscreen settles correctly with no spurious replay
+[279/452] [chromium] › e2e/projection/scroll-during-layout.spec.ts:151:5 › projection/scroll-during-layout › page renders the toolbar, stage, and per-box readouts
+[280/452] [chromium] › e2e/projection/sibling-swap.spec.ts:23:5 › projection/sibling-swap › each box emits a didUpdate with the opposite-signed row delta
+[281/452] [chromium] › e2e/projection/sibling-swap.spec.ts:72:5 › projection/sibling-swap › renders both boxes, the swap control, and per-box readouts
+[282/452] [chromium] › e2e/projection/sibling-swap.spec.ts:81:5 › projection/sibling-swap › swap control is discoverable by role and keyboard-operable
+[283/452] [chromium] › e2e/random/animated-border-gradient.test.ts:4:5 › Animated Border Gradient › rotates conic-gradient background over time
+[284/452] [chromium] › e2e/reorder/axis-auto.spec.ts:29:5 › reorder/axis-auto › detects a horizontal row and locks out perpendicular drift
+[285/452] [chromium] › e2e/reorder/axis-auto.spec.ts:37:5 › reorder/axis-auto › detects a vertical stack and locks out perpendicular drift
+[286/452] [chromium] › e2e/reorder/axis-x.spec.ts:12:5 › reorder/axis-x › drags a tile right one slot to reorder
+[287/452] [chromium] › e2e/reorder/axis-x.spec.ts:39:5 › reorder/axis-x › drags a tile left one slot to reorder
+[288/452] [chromium] › e2e/reorder/basic.spec.ts:29:5 › reorder/basic › renders the initial order
+[289/452] [chromium] › e2e/reorder/basic.spec.ts:33:5 › reorder/basic › drags an item down one slot to reorder
+[290/452] [chromium] › e2e/reorder/basic.spec.ts:40:5 › reorder/basic › drags an item up one slot to reorder
+[291/452] [chromium] › e2e/reorder/basic.spec.ts:45:5 › reorder/basic › crosses multiple positions in one gesture
+[292/452] [chromium] › e2e/reorder/basic.spec.ts:50:5 › reorder/basic › settles into the new slot after release
+[293/452] [chromium] › e2e/reorder/basic.spec.ts:84:5 › reorder/basic › locks dragging to the group axis
+[294/452] [chromium] › e2e/reorder/custom-drag.spec.ts:10:5 › reorder/custom-drag › `drag` on the item unlocks both axes and still reorders
+[295/452] [chromium] › e2e/reorder/grid.spec.ts:10:5 › reorder/grid › moves across a row boundary and FLIPs displaced siblings
+[296/452] [chromium] › e2e/reorder/rtl.spec.ts:10:5 › reorder/rtl › maps leftward visual travel to the next logical value
+[297/452] [chromium] › e2e/reorder/rtl.spec.ts:67:5 › reorder/rtl › FLIP-animates each newly displaced sibling across one continuous drag
+[298/452] [chromium] › e2e/reorder/scrollable.spec.ts:26:5 › reorder/scrollable › reorders correctly when the container is pre-scrolled
+[299/452] [chromium] › e2e/reorder/scrollable.spec.ts:59:5 › reorder/scrollable › auto-scrolls the container when dragging near its bottom edge
+[300/452] [chromium] › e2e/reorder/scrollable.spec.ts:91:5 › reorder/scrollable › does not auto-scroll when dragging away from the edge zone
+[301/452] [chromium] › e2e/reorder/scrollable.spec.ts:122:5 › reorder/page-scroll › reorders exactly one slot with a non-zero window scroll
+  9) [chromium] › e2e/reorder/scrollable.spec.ts:122:5 › reorder/page-scroll › reorders exactly one slot with a non-zero window scroll
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "alpha,gamma,beta,delta"
+    Received: "alpha,gamma,delta,beta"
+
+      140 |         await page.waitForTimeout(800)
+      141 |
+    > 142 |         expect(await order(page)).toBe('alpha,gamma,beta,delta')
+          |                                   ^
+      143 |         // The gesture must not move the window…
+      144 |         expect(await page.evaluate(() => window.scrollY)).toBe(750)
+      145 |         // …and beta settles exactly into gamma's old slot.
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/reorder/scrollable.spec.ts:142:35
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/reorder-scrollable-reorder-b42a1-th-a-non-zero-window-scroll-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/browser-pr-readiness-sep9-complete-results/reorder-scrollable-reorder-b42a1-th-a-non-zero-window-scroll-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/reorder-scrollable-reorder-b42a1-th-a-non-zero-window-scroll-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../tmp/browser-pr-readiness-sep9-complete-results/reorder-scrollable-reorder-b42a1-th-a-non-zero-window-scroll-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:30557) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[302/452] [chromium] › e2e/reorder/scrollable.spec.ts:152:5 › reorder/page-scroll › keeps positions consistent when the window scrolls mid-drag
+  10) [chromium] › e2e/reorder/scrollable.spec.ts:152:5 › reorder/page-scroll › keeps positions consistent when the window scrolls mid-drag
+
+    Error: expect(received).toBeLessThan(expected)
+
+    Expected: < 1.5
+    Received:   1.6046295166015625
+
+      13 |     }
+      14 |     for (let i = 1; i < ys.length; i++) {
+    > 15 |         expect(Math.abs(ys[i] - ys[i - 1] - pitch)).toBeLessThan(1.5)
+         |                                                     ^
+      16 |     }
+      17 | }
+      18 |
+        at expectConsistentPitch (/Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/reorder/scrollable.spec.ts:15:53)
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/reorder/scrollable.spec.ts:179:9
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/reorder-scrollable-reorder-90c38-the-window-scrolls-mid-drag-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/browser-pr-readiness-sep9-complete-results/reorder-scrollable-reorder-90c38-the-window-scrolls-mid-drag-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/reorder-scrollable-reorder-90c38-the-window-scrolls-mid-drag-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../tmp/browser-pr-readiness-sep9-complete-results/reorder-scrollable-reorder-90c38-the-window-scrolls-mid-drag-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+(node:30716) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[303/452] [chromium] › e2e/reorder/siblings-flip.spec.ts:10:5 › reorder/siblings-flip › displaced sibling animates to its new slot during a live drag
+[304/452] [chromium] › e2e/reorder/siblings-flip.spec.ts:45:5 › reorder/siblings-flip › dragged item paints above the sibling it displaces when dragged upward
+[305/452] [chromium] › e2e/reorder/siblings-flip.spec.ts:81:5 › reorder/siblings-flip › dragged item stays pinned under the cursor through a swap
+[306/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:56:5 › SVG MotionValue attributes › commits exact final CSS styles after accelerated SVG animation
+[307/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:118:5 › SVG MotionValue attributes › an interrupted accelerated SVG animation cannot commit a stale destination
+[308/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:139:5 › SVG MotionValue attributes › claims and updates MotionValues for arbitrary SVG prop names
+[309/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:156:5 › SVG MotionValue attributes › never stringifies a MotionValue into the DOM
+[310/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:164:5 › SVG MotionValue attributes › renders a numeric cx on first paint
+[311/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:177:5 › SVG MotionValue attributes › updates cx through the SVGVisualElement when the MotionValue changes
+[312/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:195:5 › SVG MotionValue attributes › drives a progress ring via stroke-dashoffset
+[313/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:211:5 › SVG MotionValue attributes › binds a kebab-case stroke-width prop, the spelling Svelte authors write
+[314/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:232:5 › SVG MotionValue attributes › renders attrX/attrY as the x/y attributes, not CSS transforms
+[315/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:248:5 › SVG MotionValue attributes › updates the x attribute when the attrX MotionValue changes
+[316/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:281:5 › SVG MotionValue attributes › renders camelCase SVG tags with their case-sensitive spec spelling
+[317/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:300:5 › SVG MotionValue attributes › renders attrScale as the scale attribute on feDisplacementMap
+[318/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:313:5 › SVG MotionValue attributes › updates the feDisplacementMap scale attribute when attrScale changes
+[319/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:333:5 › SVG MotionValue attributes › writes attrScale to the rect but leaves the rect visually unchanged
+[320/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:371:5 › SVG MotionValue attributes › updates x2 on the attribute channel for a non-attr-prefixed key
+[321/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:392:5 › SVG MotionValue attributes › leaves a plain numeric cx static on the channel the live element reads
+[322/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:420:5 › SVG MotionValue attributes › does not re-render the attribute spread when a bound value changes
+[323/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:489:5 › SVG MotionValue attributes › an unrelated re-render does not clobber attribute-routed values
+[324/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:514:5 › SVG MotionValue attributes › binds a MotionValue to a filter primitive attribute
+[325/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:537:5 › SVG MotionValue attributes › server-renders a filter primitive attribute without stringifying it
+[326/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:560:5 › SVG MotionValue attributes › reattaches cleanly after unmount and remount
+[327/452] [chromium] › e2e/svg/motion-value-attributes.spec.ts:579:5 › SVG MotionValue attributes › server-rendered markup carries the resolved attribute values
+[328/452] [chromium] › e2e/svg/namespace.spec.ts:6:5 › SVG Namespace › motion.svg elements should have correct SVG namespace
+[329/452] [chromium] › e2e/svg/namespace.spec.ts:22:5 › SVG Namespace › motion.path should have correct SVG namespace
+[330/452] [chromium] › e2e/svg/namespace.spec.ts:35:5 › SVG Namespace › motion.circle should have correct SVG namespace
+[331/452] [chromium] › e2e/svg/namespace.spec.ts:48:5 › SVG Namespace › motion.line should have correct SVG namespace
+[332/452] [chromium] › e2e/svg/namespace.spec.ts:61:5 › SVG Namespace › SVG elements should maintain correct namespace after AnimatePresence unmount/remount
+[333/452] [chromium] › e2e/svg/namespace.spec.ts:100:5 › SVG Namespace › SVG elements should NOT be HTMLUnknownElement
+[334/452] [chromium] › e2e/svg/nested-svg.spec.ts:16:5 › nested motion.svg root-tag parity › a bound x animates the root svg via CSS transform
+[335/452] [chromium] › e2e/svg/nested-svg.spec.ts:39:5 › nested motion.svg root-tag parity › a bound attrX on the root svg tag is a documented no-op (#456)
+[336/452] [chromium] › e2e/utilities/ai-gradient-card.spec.ts:21:5 › AI Gradient Card (animated conic-gradient template) › renders a well-formed conic-gradient from a motion template
+[337/452] [chromium] › e2e/utilities/ai-gradient-card.spec.ts:29:5 › AI Gradient Card (animated conic-gradient template) › the from angle keeps advancing across loop cycles
+[338/452] [chromium] › e2e/utilities/ai-gradient-card.spec.ts:53:5 › AI Gradient Card (animated conic-gradient template) › pausing and jumping sets an exact from angle
+[339/452] [chromium] › e2e/utilities/animation-controls.spec.ts:23:5 › useAnimationControls › starts coordinated subscribers and completes the sequence
+[340/452] [chromium] › e2e/utilities/animation-controls.spec.ts:38:5 › useAnimationControls › does not flash back to rest between chained controls animations
+[341/452] [chromium] › e2e/utilities/animation-controls.spec.ts:94:5 › useAnimationControls › set jumps subscribers to their final variant state
+[342/452] [chromium] › e2e/utilities/animation-controls.spec.ts:102:5 › useAnimationControls › reset returns subscribers to idle after a run
+[343/452] [chromium] › e2e/utilities/animation-controls.spec.ts:112:5 › useAnimationControls › initial variant remains stable before controls run
+[344/452] [chromium] › e2e/utilities/animation-controls.spec.ts:136:5 › useAnimationControls › stop freezes active subscribers mid-sequence
+[345/452] [chromium] › e2e/utilities/animation-controls.spec.ts:156:1 › holds a non-neutral variant transform after the sequence settles
+[346/452] [chromium] › e2e/utilities/animation-controls.spec.ts:200:5 › stop() freezes the mid-flight value across a reactive flush › holds mid-flight scaleX after a completed start, then a reactive poke
+[347/452] [chromium] › e2e/utilities/animation-controls.spec.ts:234:5 › stop() freezes the mid-flight value across a reactive flush › holds mid-flight translateX when the FIRST-ever start is interrupted
+[348/452] [chromium] › e2e/utilities/animation-controls.spec.ts:262:5 › stop() freezes the mid-flight value across a reactive flush › idle stop (nothing in flight) leaves the resting variant untouched
+[349/452] [chromium] › e2e/utilities/animation-controls.spec.ts:292:5 › first-ever start animates FROM the non-neutral idle (no from-wipe) › first-ever start-slow visibly travels from idle scaleX 0.16 toward 1
+[350/452] [chromium] › e2e/utilities/animation-controls.spec.ts:362:5 › detaching controls clears their settle state (last-writer-wins parity) › re-attaching idle controls after a declarative swap does not resurrect the stale target
+[351/452] [chromium] › e2e/utilities/animation-controls.spec.ts:403:5 › detaching controls clears their settle state (last-writer-wins parity) › a completed start holds its settle value across an unrelated re-render (no over-eager clear)
+[352/452] [chromium] › e2e/utilities/conic-gradient.spec.ts:21:5 › useTransform compute form (conic gradient) › background starts centered at 50% 50%
+[353/452] [chromium] › e2e/utilities/conic-gradient.spec.ts:31:5 › useTransform compute form (conic gradient) › moving the gradientX/Y motion values updates the pivot
+[354/452] [chromium] › e2e/utilities/conic-gradient.spec.ts:46:5 › useTransform compute form (conic gradient) › pivot changes between two distinct pointer positions over the swatch
+[355/452] [chromium] › e2e/utilities/cycle.spec.ts:4:5 › useCycle › starts at the first item and advances on cycle()
+[356/452] [chromium] › e2e/utilities/cycle.spec.ts:22:5 › useCycle › wraps back to the first item after the last
+[357/452] [chromium] › e2e/utilities/cycle.spec.ts:33:5 › useCycle › cycle(i) jumps to a specific index
+[358/452] [chromium] › e2e/utilities/cycle.spec.ts:48:5 › useCycle › numeric cycle reflects current value and advances relative to last jump
+[359/452] [chromium] › e2e/utilities/in-view.spec.ts:4:5 › useInView › top box reports in-view on load; bottom + once boxes start out-of-view
+[360/452] [chromium] › e2e/utilities/in-view.spec.ts:14:5 › useInView › bottom box toggles to true when scrolled into view and back to false on exit
+[361/452] [chromium] › e2e/utilities/in-view.spec.ts:27:5 › useInView › once box latches to true on first entry and stays true after exit
+[362/452] [chromium] › e2e/utilities/motion-config-reduced-motion.spec.ts:22:5 › MotionConfig.reducedMotion › policy='always' strips transforms but still fades in opacity
+[363/452] [chromium] › e2e/utilities/motion-config-reduced-motion.spec.ts:37:5 › MotionConfig.reducedMotion › policy='never' lets transforms animate
+[364/452] [chromium] › e2e/utilities/motion-config-reduced-motion.spec.ts:49:5 › MotionConfig.reducedMotion › policy='user' honors OS prefers-reduced-motion
+[365/452] [chromium] › e2e/utilities/motion-config-skip-animations.spec.ts:15:5 › MotionConfig.skipAnimations › skipAnimations on jumps the box to its final state
+[366/452] [chromium] › e2e/utilities/motion-config-skip-animations.spec.ts:28:5 › MotionConfig.skipAnimations › skipAnimations off leaves the box mid-flight
+[367/452] [chromium] › e2e/utilities/motion-config-skip-animations.spec.ts:38:5 › MotionConfig.skipAnimations › skipAnimations is scoped to the MotionConfig subtree
+[368/452] [chromium] › e2e/utilities/motion-config-skip-animations.spec.ts:49:5 › MotionConfig.skipAnimations › skipAnimations makes presence exits instant
+[369/452] [chromium] › e2e/utilities/motion-config-skip-animations.spec.ts:59:5 › MotionConfig.skipAnimations › changed skipAnimations applies to an unkeyed mounted element
+[370/452] [chromium] › e2e/utilities/motion-value-children.spec.ts:6:5 › MotionValue children › server-renders the initial motion value child text
+[371/452] [chromium] › e2e/utilities/motion-value-children.spec.ts:16:5 › MotionValue children › renders the initial motion value child text and updates on change
+[372/452] [chromium] › e2e/utilities/motion-value-children.spec.ts:38:5 › MotionValue children › is linked from the root test index
+[373/452] [chromium] › e2e/utilities/object-style-motion-values.spec.ts:20:5 › object style MotionValues › server-renders initial object-form style values
+[374/452] [chromium] › e2e/utilities/object-style-motion-values.spec.ts:30:5 › object style MotionValues › updates object-form MotionValue styles without styleString
+[375/452] [chromium] › e2e/utilities/object-style-motion-values.spec.ts:75:5 › object style MotionValues › is linked from the root test index
+[376/452] [chromium] › e2e/utilities/reactive-style.spec.ts:4:5 › Reactive Style (styleString) › demo box should be visible with initial styles
+[377/452] [chromium] › e2e/utilities/reactive-style.spec.ts:17:5 › Reactive Style (styleString) › scale slider should update box scale reactively
+[378/452] [chromium] › e2e/utilities/reactive-style.spec.ts:37:5 › Reactive Style (styleString) › opacity slider should update box opacity reactively
+[379/452] [chromium] › e2e/utilities/reactive-style.spec.ts:56:5 › Reactive Style (styleString) › hue slider should update box background color reactively
+[380/452] [chromium] › e2e/utilities/reactive-style.spec.ts:72:5 › Reactive Style (styleString) › rotation slider should update box rotation when auto mode is off
+[381/452] [chromium] › e2e/utilities/reactive-style.spec.ts:93:5 › Reactive Style (styleString) › auto rotate toggle should enable time-based rotation
+[382/452] [chromium] › e2e/utilities/reactive-style.spec.ts:115:5 › Reactive Style (styleString) › styleString should correctly handle unit conversion
+[383/452] [chromium] › e2e/utilities/reduced-motion.spec.ts:8:5 › useReducedMotion (no OS preference) › reflects no-preference and animates by default
+[384/452] [chromium] › e2e/utilities/reduced-motion.spec.ts:21:5 › useReducedMotion (no OS preference) › in-page force toggle disables animation without changing OS preference
+[385/452] [chromium] › e2e/utilities/reduced-motion.spec.ts:52:5 › useReducedMotion (OS prefers reduce) › detects prefers-reduced-motion and stops animation
+[386/452] [chromium] › e2e/utilities/reduced-motion.spec.ts:64:5 › useReducedMotion (OS prefers reduce) › store updates when the media query changes at runtime
+[387/452] [chromium] › e2e/utilities/transform-template-optimized-appear.spec.ts:9:5 › transformTemplate — optimized appear suppression page › suppresses the SSR appear bootstrap only for the templated transform
+[388/452] [chromium] › e2e/utilities/transform-template-optimized-appear.spec.ts:32:5 › transformTemplate — optimized appear suppression page › settles every box on its templated/expected transform
+[389/452] [chromium] › e2e/utilities/transform-template-optimized-appear.spec.ts:53:5 › transformTemplate — optimized appear suppression page › counts exactly one optimized-appear transform animation on full load
+[390/452] [chromium] › e2e/utilities/transform-template-optimized-appear.spec.ts:64:5 › transformTemplate — optimized appear suppression page › is linked from the root test index
+[391/452] [chromium] › e2e/utilities/transform-template-stop.spec.ts:12:5 › transformTemplate — controls.stop() freeze page › freezes the templated transform instantly on Stop
+[392/452] [chromium] › e2e/utilities/transform-template-stop.spec.ts:50:5 › transformTemplate — controls.stop() freeze page › Reset returns the orb to the origin
+[393/452] [chromium] › e2e/utilities/transform-template-stop.spec.ts:66:5 › transformTemplate — controls.stop() freeze page › is linked from the root test index
+[394/452] [chromium] › e2e/utilities/transform-template.spec.ts:42:5 › transformTemplate › applies transformTemplate on initial render
+[395/452] [chromium] › e2e/utilities/transform-template.spec.ts:50:5 › transformTemplate › applies updated transformTemplate
+[396/452] [chromium] › e2e/utilities/transform-template.spec.ts:64:5 › transformTemplate › renders transform with transformTemplate
+[397/452] [chromium] › e2e/utilities/transform-template.spec.ts:72:5 › transformTemplate › renders transformTemplate without any transform
+[398/452] [chromium] › e2e/utilities/transform-template.spec.ts:80:5 › transformTemplate › removes transformTemplate if prop is removed and transform is changed
+[399/452] [chromium] › e2e/utilities/transform-template.spec.ts:96:5 › transformTemplate › removes transformTemplate if prop is removed and transform is not changed
+[400/452] [chromium] › e2e/utilities/transform-template.spec.ts:112:5 › transformTemplate › removes transformTemplate if prop is removed
+[401/452] [chromium] › e2e/utilities/transform-template.spec.ts:124:5 › transformTemplate › applies transformTemplate to animated resting styles
+[402/452] [chromium] › e2e/utilities/transform-template.spec.ts:138:5 › transformTemplate › applies transformTemplate throughout transform animation frames
+[403/452] [chromium] › e2e/utilities/transform-template.spec.ts:167:5 › transformTemplate › starts repeated transformTemplate animations from the current transform
+[404/452] [chromium] › e2e/utilities/transform-template.spec.ts:212:5 › transformTemplate › applies transformTemplate throughout animation controls frames
+[405/452] [chromium] › e2e/utilities/transform-template.spec.ts:254:5 › transformTemplate › controls.stop() freezes an in-flight templated transform animation
+[406/452] [chromium] › e2e/utilities/transform-template.spec.ts:297:5 › transformTemplate › suppresses optimized appear for templated transform animations
+[407/452] [chromium] › e2e/utilities/transform-template.spec.ts:318:5 › transformTemplate › settles a templated optimized-appear element on the templated transform
+[408/452] [chromium] › e2e/utilities/transform-template.spec.ts:333:5 › transformTemplate › preserves style transforms during templated target animations
+[409/452] [chromium] › e2e/utilities/transform-template.spec.ts:385:5 › transformTemplate › supports keyboard activation and accessible names for transform toggles
+[410/452] [chromium] › e2e/utilities/transform-template.spec.ts:412:5 › transformTemplate › applies transformPerspective through transformTemplate
+[411/452] [chromium] › e2e/utilities/transform-template.spec.ts:425:5 › transformTemplate › is linked from the root test index
+[412/452] [chromium] › e2e/utilities/use-animate.spec.ts:9:5 › useAnimate › idle on load; list items render
+[413/452] [chromium] › e2e/utilities/use-animate.spec.ts:17:5 › useAnimate › clicking Animate runs the sequence and flips status to done
+[414/452] [chromium] › e2e/utilities/use-animate.spec.ts:30:5 › useAnimate › the second sequence segment animates the target button (sibling of the list)
+[415/452] [chromium] › e2e/utilities/use-animate.spec.ts:56:5 › useAnimate › clicking Reset returns status to idle
+[416/452] [chromium] › e2e/utilities/use-presence-data.spec.ts:42:5 › usePresenceData › returns undefined outside AnimatePresence and tracks custom data inside it
+[417/452] [chromium] › e2e/utilities/use-presence-data.spec.ts:56:5 › usePresenceData › moves the exiting child from the latest custom direction on first previous click
+[418/452] [chromium] › e2e/utilities/use-presence-data.spec.ts:67:5 › usePresenceData › moves the exiting child from the latest custom direction on next click
+[419/452] [chromium] › e2e/utilities/use-presence-data.spec.ts:78:5 › usePresenceData › is linked from the root test index
+[420/452] [chromium] › e2e/utilities/use-presence.spec.ts:4:5 › usePresence › basic toggle: card stays mounted during exit transition then unmounts
+[421/452] [chromium] › e2e/utilities/use-presence.spec.ts:29:5 › usePresence › clicking Show after Hide brings the card back
+[422/452] [chromium] › e2e/utilities/use-presence.spec.ts:40:5 › usePresence › swap: wait mode holds each incoming PresenceChild until safeToRemove fires
+[423/452] [chromium] › e2e/utilities/wildcard-keyframes.spec.ts:28:5 › wildcard / relative keyframes resolve against the live value › wildcard [0, null] fills forward to [0, 0] and lands at 0 (upstream fillWildcards)
+[424/452] [chromium] › e2e/utilities/wildcard-keyframes.spec.ts:53:5 › wildcard / relative keyframes resolve against the live value › relative "+=50" resolves against the live x (0 → 50)
+[425/452] [chromium] › e2e/utilities/wildcard-keyframes.spec.ts:68:5 › wildcard / relative keyframes resolve against the live value › leading wildcard [null, 100] starts FROM the live x (64) and lands at 100
+[426/452] [chromium] › e2e/utilities/will-change.spec.ts:16:5 › useWillChange (#327) › flips will-change to "transform" when a transform prop animates
+[427/452] [chromium] › e2e/utilities/will-change.spec.ts:36:5 › useWillChange (#327) › flips will-change for an accelerated backgroundColor animation
+[428/452] [chromium] › e2e/utilities/will-change.spec.ts:54:5 › useWillChange (#327) › flips will-change via imperative animation controls
+[429/452] [chromium] › e2e/utilities/will-change.spec.ts:67:5 › useWillChange (#327) › leaves will-change at "auto" for a nonaccelerated borderRadius animation
+[430/452] [chromium] › e2e/utilities/will-change.spec.ts:86:5 › useWillChange (#327) › triggers the transform flip via keyboard activation
+[431/452] [chromium] › e2e/vanilla-values/basic.spec.ts:10:5 › vanilla-values/basic › a $state slider drives plain elements through the vanilla layer
+[432/452] [chromium] › e2e/vanilla-values/basic.spec.ts:32:5 › vanilla-values/basic › springValue follows the mapped value and settles at its target
+[433/452] [chromium] › e2e/vanilla-values/basic.spec.ts:57:5 › vanilla-values/basic › reactive .current readouts track the values in the template
+[434/452] [chromium] › e2e/vanilla-values/basic.spec.ts:63:5 › vanilla-values/basic › vanilla motionValue works from an event handler
+[435/452] [chromium] › e2e/variants/inherited-initial.spec.ts:28:5 › variants/inherited-initial › children paint at the inherited closed pose, then animate open and back
+[436/452] [chromium] › e2e/variants/notifications-stack.test.ts:4:5 › Notifications Stack - Variants › should start in closed state with notifications properly stacked on initial load
+[437/452] [chromium] › e2e/variants/notifications-stack.test.ts:54:5 › Notifications Stack - Variants › should expand when clicked and show all notifications
+[438/452] [chromium] › e2e/variants/notifications-stack.test.ts:86:5 › Notifications Stack - Variants › should collapse when collapse button is clicked
+[439/452] [chromium] › e2e/variants/notifications-stack.test.ts:115:5 › Notifications Stack - Variants › should properly inherit variants from parent to children
+[440/452] [chromium] › e2e/variants/notifications-stack.test.ts:144:5 › Notifications Stack - Variants › should apply stagger delays correctly
+[441/452] [chromium] › e2e/variants/notifications-stack.test.ts:169:5 › Notifications Stack - Variants › should animate smoothly on first click (not jump instantly)
+[442/452] [chromium] › e2e/variants/stagger-interrupt.test.ts:4:5 › variants/stagger-interrupt › stop interrupts delayed stagger without late upward pops
+[443/452] [chromium] › e2e/view/basic.spec.ts:16:5 › view/basic › runs the update through a real View Transition
+[444/452] [chromium] › e2e/view/basic.spec.ts:39:5 › view/basic › queues rapid toggles and settles on the final state
+[445/452] [chromium] › e2e/view/filter-gallery.spec.ts:10:5 › view/filter-gallery › filters with enter/exit view animations and settles on the right set
+[446/452] [chromium] › e2e/view/shared-element.spec.ts:10:5 › view/shared-element › morphs a thumbnail into the detail hero and back
+[447/452] [chromium] › e2e/view/shared-element.spec.ts:25:5 › view/shared-element › temporary view-transition-names are cleaned up after the morph
+(node:41487) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[448/452] [chromium] › e2e/motion/ai-glow-border.spec.ts:68:5 › motion/ai-glow-border › frame budget: p95 < 25ms, no long frames after warmup
+(node:42448) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[449/452] (retries) [chromium] › e2e/motion/ai-glow-border.spec.ts:68:5 › motion/ai-glow-border › frame budget: p95 < 25ms, no long frames after warmup (retry #1)
+(node:42621) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[450/452] (retries) [chromium] › e2e/motion/ai-glow-border.spec.ts:68:5 › motion/ai-glow-border › frame budget: p95 < 25ms, no long frames after warmup (retry #2)
+  11) [chromium] › e2e/motion/ai-glow-border.spec.ts:68:5 › motion/ai-glow-border › frame budget: p95 < 25ms, no long frames after warmup
+
+    Error: sampled a real 2s window
+
+    expect(received).toBeGreaterThan(expected)
+
+    Expected: > 30
+    Received:   4
+
+       96 |         })
+       97 |
+    >  98 |         expect(frames, 'sampled a real 2s window').toBeGreaterThan(30)
+          |                                                    ^
+       99 |         expect(p95, `p95 frame delta ${p95.toFixed(1)}ms`).toBeLessThan(P95_BUDGET_MS)
+      100 |         expect(worst, `worst frame delta ${worst.toFixed(1)}ms`).toBeLessThan(100)
+      101 |     })
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/motion/ai-glow-border.spec.ts:98:52
+
+    Error Context: ../../../../tmp/browser-pr-readiness-sep9-complete-results/motion-ai-glow-border-moti-c15fd-no-long-frames-after-warmup-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/motion-ai-glow-border-moti-c15fd-no-long-frames-after-warmup-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../tmp/browser-pr-readiness-sep9-complete-results/motion-ai-glow-border-moti-c15fd-no-long-frames-after-warmup-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: sampled a real 2s window
+
+    expect(received).toBeGreaterThan(expected)
+
+    Expected: > 30
+    Received:   4
+
+       96 |         })
+       97 |
+    >  98 |         expect(frames, 'sampled a real 2s window').toBeGreaterThan(30)
+          |                                                    ^
+       99 |         expect(p95, `p95 frame delta ${p95.toFixed(1)}ms`).toBeLessThan(P95_BUDGET_MS)
+      100 |         expect(worst, `worst frame delta ${worst.toFixed(1)}ms`).toBeLessThan(100)
+      101 |     })
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/motion/ai-glow-border.spec.ts:98:52
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/motion-ai-glow-border-moti-c15fd-no-long-frames-after-warmup-chromium-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../tmp/browser-pr-readiness-sep9-complete-results/motion-ai-glow-border-moti-c15fd-no-long-frames-after-warmup-chromium-retry1/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../tmp/browser-pr-readiness-sep9-complete-results/motion-ai-glow-border-moti-c15fd-no-long-frames-after-warmup-chromium-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../tmp/browser-pr-readiness-sep9-complete-results/motion-ai-glow-border-moti-c15fd-no-long-frames-after-warmup-chromium-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[451/452] [chromium] › e2e/motion/ai-glow-border.spec.ts:103:5 › motion/ai-glow-border › filter channels are MotionValue-driven, never [object Object]
+[452/452] [chromium] › e2e/motion/ai-glow-border.spec.ts:141:5 › motion/ai-glow-border › listening toggle boosts displacement and flips state
+[453/452] [chromium] › e2e/motion/ai-glow-border.spec.ts:172:5 › motion/ai-glow-border › reduced motion renders a static glow
+[454/452] [chromium] › e2e/motion/ai-glow-border.spec.ts:196:5 › motion/ai-glow-border › thickness slider scales the rings in proportion
+  10 failed
+    [chromium] › e2e/animate-presence/clone-fidelity.spec.ts:6:5 › AnimatePresence clone fidelity › PresenceChild runs a motion child exit on the real node
+    [chromium] › e2e/animate-presence/grid-exit.spec.ts:92:5 › AnimatePresence grid exit › middle card exit: survivors hold, then the right card slides into the gap
+    [chromium] › e2e/animate-presence/modes.spec.ts:114:5 › AnimatePresence modes › sync animates layout siblings when an entering child pushes them over
+    [chromium] › e2e/animate-presence/scroll-stress.spec.ts:335:5 › AnimatePresence scroll stress › anchors the exit clone to the original rect when hidden from a scrolled container
+    [chromium] › e2e/drag/axis-handoff.spec.ts:66:5 › drag/axis-handoff › whileDrag on the dragged axis does not cancel the release glide
+    [chromium] › e2e/drag/while-drag-transforms.spec.ts:144:5 › drag/whileDrag transform composition › release restores the authored rotate smoothly, without a settle-then-snap
+    [chromium] › e2e/motion/exit-animation.spec.ts:12:5 › AnimatePresence exit animation › animates out when toggled off with preserved shape
+    [chromium] › e2e/motion/svg-path-length.test.ts:4:5 › SVG pathLength Animation › animates pathLength 0→1 with normalized dash attributes and no flash
+    [chromium] › e2e/reorder/scrollable.spec.ts:122:5 › reorder/page-scroll › reorders exactly one slot with a non-zero window scroll
+    [chromium] › e2e/reorder/scrollable.spec.ts:152:5 › reorder/page-scroll › keeps positions consistent when the window scrolls mid-drag
+  1 flaky
+    [chromium] › e2e/motion/ai-glow-border.spec.ts:68:5 › motion/ai-glow-border › frame budget: p95 < 25ms, no long frames after warmup
+  2 skipped
+  439 passed (20.7m)

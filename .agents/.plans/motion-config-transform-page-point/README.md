@@ -1,5 +1,7 @@
 # MotionConfig coordinate-transform parity
 
+2026-09-09 complete browser run:439passed,10failed,1flaky,2skipped (452total;20.7minutes). Exact earlier last-card and foreign-retarget cases pass; other grid/axis cases fail. See full-browser-sep9.md. User explicitly removes the minor PR label; prior label request is superseded.
+
 2026-09-09: Latest full suite at54ab016e:17pass, grid-exit last-card removal failed (2.890625px survivor shift),434unrun. T3 review page open; three unchanged focused repeats pass. Axis-handoff visual review passed but automated full-suite gate was not reached. See proposed-grid-exit-correction.md; no source changes or scope amendment approved yet.
 
 2026-09-08: Review found a layout-plus-repeated-snap measurement regression; user authorized correction. Follow `layout-snap-correction.md`, RED first. Latest full suite: 79 passed, axis-handoff failed at x=0 versus 420, 370 unrun; three unchanged focused reruns passed. Preserve this unresolved review checkpoint and open its page after fixing the P2.
@@ -18,7 +20,7 @@ The payoff is visual: a tile stays under the cursor inside a scaled board and re
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | IN PROGRESS — layout/snap P2 fixed; 911 units, 20 browser tests, 29 parity cases pass; full-suite grid-exit review pending; axis-handoff visual review passed |
+| [001](001-transform-page-point.md) | Add coordinate correction for drag and pan | P1 within parity roadmap | L | None | IN PROGRESS — layout/snap P2 fixed; 911 units, 20 browser tests, 29 parity cases pass; full suite439pass/10fail/1flaky/2skip; first clone-fidelity review pending |
 
 Status: TODO / IN PROGRESS / DONE / BLOCKED (reason) / REJECTED (reason).
 
