@@ -27,3 +27,11 @@ The separate full hosted run34387232431 independently produced the same four fai
 ## RED proof
 
 Guard ran pinned pnpm exec vitest run --maxWorkers=1 src/lib/components/Reorder/reorder.component.spec.ts -t "does not auto-scroll document axes from page-space drag points away from viewport edges". Both cases failed at the intended scroll-state assertion: x1200 became6499.84; y900 became7194.92. Public page-point callback assertions passed. Duration9.84s; fourteen unrelated tests filtered. Log /tmp/pr481-reorder-red.log. Executor suggested --project client, but this repository has no client project; guard used the actual configuration.
+
+## Follow-up: axis-handoff fixture CSS
+
+Hosted run34390333107 at74df2413:913 units pass; browser448 pass,1 fail,1 flaky,2 skipped. Both Reorder scroll regressions and controls pass. Axis handoff fails its new active-drag precondition after5seconds; exact-card hit passes. Timing-only diagnosis is disproven. Three traced local repetitions pass, so no unverified runtime fix is authorized.
+
+Read-only runtime review finds lock released, foreign release bookkeeping cleared, no expected reactive detach, completed retarget420. Concrete fixture defect: route .card/.card-a/.card-b/.card-c selectors are scoped but motion.div owns its internal DOM; compiled browser DOM lacks page scope class and CI warns these selectors unused. T3 confirms width154.125 height24 userSelect:auto touchAction:auto versus authored width118 height84 userSelect:none touchAction:none. Linux screenshots show selected text. This is a definite fixture defect; its causal relation to the remaining drag failure must be verified on CI.
+
+Continue standing user authorization to fix these runner failures with this necessary fixture correction. Add only src/routes/tests/drag/axis-handoff/+page.svelte, changing the four child card selectors to page-scoped .lane :global(.card...) so intended rules reach internal elements. Preserve declarations, all gesture props and instructions. Add preconditions in e2e/drag/axis-handoff.spec.ts proving actual intended card geometry and interaction styles, retaining ALL original movement/retarget/callback assertions and current hit/frame checks. Do not add gesture-runtime changes or change thresholds. Run focused browser tests against a freshly built preview with one worker, then existing full hosted gates.

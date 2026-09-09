@@ -1,5 +1,7 @@
 # Plan 001: Add MotionConfig coordinate correction for drag and pan
 
+> Revision 2026-09-09: Continue the user-authorized CI correction on the same axis-handoff page. Confirmed fixture CSS is unused: intended118x84 non-selectable cards render154.125x24 selectable text. Add only src/routes/tests/drag/axis-handoff/+page.svelte selector correction and e2e/drag/axis-handoff.spec.ts fixture preconditions. This is the necessary fixture repair for the approved failing-test work, not gesture-runtime expansion. See ci-corrections.md. Baseline74df2413.
+
 > Revision 2026-09-09: User authorized proceeding with the diagnosed PR #481 CI corrections. Follow ci-corrections.md from reviewed 8ea80dbd. This narrowly permits Reorder.Item client-coordinate adaptation plus focused regression coverage, portable controls-test geometry and frame-aware axis-handoff verification. Existing behavioral assertions and verification gates remain. Use hosted CI for the full browser suite because the operator machine is overloaded. This supersedes earlier prohibitions only for these corrections.
 
 > Revision 2026-09-08: User authorized the review P2 correction and requested the remaining failing page. Follow `layout-snap-correction.md` from reviewed `872a3f41`: RED first for layout plus repeated snap, then fix the mismatched measurement cache. All existing contracts and gates remain. The axis-handoff full-suite checkpoint stays open; no edits to that test are authorized here.
@@ -52,7 +54,7 @@ Source snapshot `13ec152` already implements the draft. Baseline excerpts below 
 - **Depends on:** none; PR #480 merged; baseline includes its boundary-release tests
 - **Category:** direction / enhancement
 - **Confidence:** HIGH that the feature is missing; ranking is product judgment
-- **Planned at:** `8ea80dbd`, 2026-09-09 (authorized CI corrections; original source baseline `14046a5`)
+- **Planned at:** `74df2413`, 2026-09-09 (axis-handoff fixture correction within authorized CI work; original source baseline `14046a5`)
 - **Status:** IN PROGRESS — local snap bug corrected; 908 units, 18 targeted browser tests and all29 parity cases pass. Full browser review and final closeout remain.
 
 ## Why this matters

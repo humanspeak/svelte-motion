@@ -163,3 +163,5 @@ User requests browser tests and explicitly removes minor PR label. Source unchan
 2026-09-09: PLAN AMENDED with user authorization to fix PR481 CI regressions from8ea80dbd. See [CI corrections](ci-corrections.md). Full browser verification moves to hosted runners per user machine constraint; assertions and gates remain.
 
 2026-09-09: ON TRACK — RED snapshot1a44f1df. Both new Reorder component regressions failed specifically on unexpected document scrolling, while raw event/public page-point assertions passed. Hook formatting, lint and Svelte checks passed. Bounded runtime/client-coordinate and drag-test correction dispatched. Linux full verification remains pending.
+
+2026-09-09: PLAN AMENDED for necessary axis-handoff fixture CSS correction within authorized CI work. At74df2413,913 units and448 browser cases pass; only axis-handoff remains persistently red. T3 proves intended card styles are absent. Add route selector correction and fixture preconditions; no runtime expansion.
