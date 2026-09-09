@@ -211,6 +211,10 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Toggle Switch',
         description: 'Interactive toggle switch animation example using Svelte Motion.'
     },
+    'transform-page-point': {
+        title: 'Scaled Drag Board',
+        description: 'A zoomable constrained board whose draggable tile stays under the pointer.'
+    },
     'use-animate': {
         title: 'useAnimate',
         description: 'Interactive useAnimate animation example using Svelte Motion.'

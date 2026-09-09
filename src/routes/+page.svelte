@@ -200,6 +200,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/transform-page-point/pan') + searchParams}
+                    >
+                        MotionConfig transformPagePoint — pan
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/rapid-tap') + searchParams}
                     >
                         Rapid Tap (spring runaway guard)
@@ -290,6 +298,14 @@
         <div>
             <h2 class="mb-3 text-xl font-medium">Vanilla Values</h2>
             <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/transform-page-point/drag') + searchParams}
+                    >
+                        MotionConfig transformPagePoint — drag
+                    </a>
+                </li>
                 <li>
                     <a
                         class="text-blue-300 hover:underline"

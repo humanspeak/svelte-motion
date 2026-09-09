@@ -27,6 +27,8 @@ import {
     mix,
     motion,
     MotionConfig,
+    type MotionConfigProps,
+    type MotionTransformPoint,
     MotionValueState,
     pipe,
     PresenceChild,
@@ -53,6 +55,12 @@ import {
 } from './index.js'
 
 describe('public API: index.ts', () => {
+    it('exports MotionConfig coordinate transform types', () => {
+        const transformPagePoint: MotionTransformPoint = ({ x, y }) => ({ x: x * 2, y: y * 2 })
+        const config: MotionConfigProps = { transformPagePoint }
+
+        expect(config.transformPagePoint?.({ x: 10, y: 20 })).toEqual({ x: 20, y: 40 })
+    })
     it('exports motion object with lowercased HTML keys', () => {
         // spot-check some common elements
         expect(motion).toBeTruthy()

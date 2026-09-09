@@ -1,11 +1,12 @@
 import {
+    frameData,
     isDragActive,
     motionValue,
     visualElementStore,
     type MotionValue,
     type VisualElement
 } from 'motion-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { applyElastic, attachDrag, buildDragTransform, resolveConstraints } from './drag.js'
 import { createDragControls } from './dragControls.js'
 
@@ -15,6 +16,24 @@ vi.mock('motion', () => {
 })
 const { animate: animateMock } = (await import('motion')) as unknown as {
     animate: ReturnType<typeof vi.fn> & { mockClear: () => void; mock: { calls: unknown[][] } }
+}
+
+/** Advance the controlled Motion frame used by drag's PanSession bookkeeping. */
+const flushFrame = async (ms = 16) => {
+    await vi.advanceTimersByTimeAsync(ms)
+}
+
+const NativePointerEvent = globalThis.PointerEvent
+class PointerEvent extends NativePointerEvent {
+    constructor(type: string, init: PointerEventInit = {}) {
+        super(type, {
+            pointerType: 'mouse',
+            isPrimary: true,
+            button: type === 'pointermove' ? -1 : 0,
+            buttons: type === 'pointerdown' || type === 'pointermove' ? 1 : 0,
+            ...init
+        })
+    }
 }
 
 /**
@@ -60,6 +79,19 @@ describe('utils/drag', () => {
         document.body.innerHTML = ''
     })
 
+    afterEach(async () => {
+        window.dispatchEvent(
+            new PointerEvent('pointerup', {
+                clientX: 0,
+                clientY: 0,
+                pointerId: 1,
+                pointerType: 'mouse',
+                isPrimary: true
+            })
+        )
+        await flushFrame()
+    })
+
     it('applyElastic clamps within bounds and eases overflow', () => {
         expect(applyElastic(50, 0, 100, 0.5)).toBe(50)
         expect(applyElastic(-10, 0, 100, 0.5)).toBeCloseTo(-5, 3)
@@ -88,7 +120,7 @@ describe('utils/drag', () => {
         expect(transform).toBe('perspective(600px) translateX(20px) rotateX(30deg)')
     })
 
-    it('leaves transform rendering to a bound MotionValue when no other channel is active', () => {
+    it('leaves transform rendering to a bound MotionValue when no other channel is active', async () => {
         const el = document.createElement('div')
         el.style.transform = 'rotate(12deg)'
         document.body.appendChild(el)
@@ -100,11 +132,27 @@ describe('utils/drag', () => {
         })
 
         el.dispatchEvent(
-            new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 1 })
+            new PointerEvent('pointerdown', {
+                clientX: 10,
+                clientY: 10,
+                pointerId: 1,
+                pointerType: 'mouse',
+                isPrimary: true,
+                button: 0,
+                buttons: 1
+            })
         )
         window.dispatchEvent(
-            new PointerEvent('pointermove', { clientX: 25, clientY: 10, pointerId: 1 })
+            new PointerEvent('pointermove', {
+                clientX: 25,
+                clientY: 10,
+                pointerId: 1,
+                pointerType: 'mouse',
+                isPrimary: true,
+                buttons: 1
+            })
         )
+        await flushFrame()
 
         expect(x.get()).toBe(15)
         expect(el.style.transform).toBe('rotate(12deg)')
@@ -112,7 +160,675 @@ describe('utils/drag', () => {
         el.remove()
     })
 
-    it('attachDrag: attaches pointerdown and animates during move', () => {
+    describe('transformPagePoint', () => {
+        it('corrects bound MotionValue movement into the configured coordinate space', async () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const x = motionValue(0)
+            const options = {
+                axis: 'x' as const,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x },
+                transformPagePoint: ({ x, y }: { x: number; y: number }) => ({
+                    x: x * 2,
+                    y: y * 2
+                })
+            }
+            const cleanup = attachDrag(el, options)
+
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', {
+                    clientX: 10,
+                    clientY: 10,
+                    pointerId: 1,
+                    button: 0,
+                    isPrimary: true
+                })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', {
+                    clientX: 30,
+                    clientY: 10,
+                    pointerId: 1,
+                    buttons: 1,
+                    isPrimary: true
+                })
+            )
+            await flushFrame()
+
+            cleanup()
+            el.remove()
+            expect(x.get()).toBe(40)
+        })
+
+        it('preserves unconfigured pointer coordinates', async () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const x = motionValue(0)
+            const options = {
+                axis: 'x' as const,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x }
+            }
+            const cleanup = attachDrag(el, options)
+
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', {
+                    clientX: 10,
+                    clientY: 10,
+                    pointerId: 2,
+                    button: 0,
+                    isPrimary: true
+                })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', {
+                    clientX: 30,
+                    clientY: 10,
+                    pointerId: 2,
+                    buttons: 1,
+                    isPrimary: true
+                })
+            )
+            await flushFrame()
+
+            cleanup()
+            el.remove()
+            expect(x.get()).toBe(20)
+        })
+
+        it('reports nonuniformly corrected callback data and bound values', async () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const x = motionValue(0)
+            const y = motionValue(0)
+            const onMove = vi.fn()
+            const cleanup = attachDrag(el, {
+                axis: true,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x, y },
+                callbacks: { onMove },
+                transformPagePoint: (point) => ({ x: point.x * 2, y: point.y * 3 })
+            })
+
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', {
+                    clientX: 10,
+                    clientY: 10,
+                    pointerId: 3,
+                    pointerType: 'mouse',
+                    button: 0,
+                    buttons: 1
+                })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', {
+                    clientX: 30,
+                    clientY: 20,
+                    pointerId: 3,
+                    pointerType: 'mouse',
+                    button: -1,
+                    buttons: 1
+                })
+            )
+            await flushFrame()
+
+            expect(x.get()).toBe(40)
+            expect(y.get()).toBe(30)
+            expect(onMove.mock.calls[0][1]).toMatchObject({
+                point: { x: 60, y: 60 },
+                delta: { x: 40, y: 30 },
+                offset: { x: 40, y: 30 }
+            })
+            cleanup()
+            el.remove()
+        })
+
+        it('cancels affine translation when calculating movement deltas', async () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const x = motionValue(0)
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x },
+                transformPagePoint: (point) => ({ x: point.x * 2 + 100, y: point.y - 75 })
+            })
+
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', {
+                    clientX: 10,
+                    clientY: 10,
+                    pointerId: 4,
+                    pointerType: 'mouse',
+                    button: 0,
+                    buttons: 1
+                })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', {
+                    clientX: 30,
+                    clientY: 10,
+                    pointerId: 4,
+                    pointerType: 'mouse',
+                    button: -1,
+                    buttons: 1
+                })
+            )
+            await flushFrame()
+
+            cleanup()
+            el.remove()
+            expect(x.get()).toBe(40)
+        })
+
+        it('keeps numeric constraints in authored local units', async () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const x = motionValue(0)
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                constraints: { left: 0, right: 25 },
+                elastic: 0,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x },
+                transformPagePoint: (point) => ({ x: point.x * 2, y: point.y * 2 })
+            })
+
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', {
+                    clientX: 10,
+                    clientY: 10,
+                    pointerId: 5,
+                    pointerType: 'mouse',
+                    button: 0,
+                    buttons: 1
+                })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', {
+                    clientX: 30,
+                    clientY: 10,
+                    pointerId: 5,
+                    pointerType: 'mouse',
+                    button: -1,
+                    buttons: 1
+                })
+            )
+            await flushFrame()
+
+            cleanup()
+            el.remove()
+            expect(x.get()).toBe(25)
+        })
+
+        it('maps both element-ref constraint rectangles before subtracting them', () => {
+            const bounds = document.createElement('div')
+            const el = document.createElement('div')
+            document.body.append(bounds, el)
+            vi.spyOn(bounds, 'getBoundingClientRect').mockReturnValue(new DOMRect(80, 80, 100, 100))
+            vi.spyOn(el, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 100, 20, 20))
+
+            const mapped = resolveConstraints(el, bounds, (point) => ({
+                x: point.x * 2,
+                y: point.y / 2
+            }))
+
+            expect(mapped).toEqual({ top: -10, left: -40, right: 120, bottom: 30 })
+            bounds.remove()
+            el.remove()
+        })
+
+        it('keeps the captured callback when options change during a drag', async () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const x = motionValue(0)
+            const first = (point: { x: number; y: number }) => ({
+                x: point.x * 2,
+                y: point.y * 2
+            })
+            const second = (point: { x: number; y: number }) => ({
+                x: point.x * 3,
+                y: point.y * 3
+            })
+            const onMove = vi.fn()
+            const baseOptions = {
+                axis: 'x' as const,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x },
+                callbacks: { onMove }
+            }
+            const cleanup = attachDrag(el, { ...baseOptions, transformPagePoint: first })
+
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 6 })
+            )
+            cleanup.updateOptions({ ...baseOptions, transformPagePoint: second })
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 20, clientY: 10, pointerId: 6 })
+            )
+            await flushFrame()
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: 20, clientY: 10, pointerId: 6 })
+            )
+            await flushFrame()
+            expect(x.get()).toBe(20)
+            expect(onMove.mock.calls.at(-1)![1].offset).toEqual({ x: 20, y: 0 })
+
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 7 })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 20, clientY: 10, pointerId: 7 })
+            )
+            await flushFrame()
+
+            cleanup()
+            el.remove()
+            expect(x.get()).toBe(50)
+            expect(onMove.mock.calls.at(-1)![1].offset).toEqual({ x: 30, y: 0 })
+        })
+
+        it('uses corrected units for deterministic release velocity', async () => {
+            const clock = vi.spyOn(performance, 'now').mockReturnValue(1000)
+            frameData.timestamp = 1000
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const onMove = vi.fn()
+            const onEnd = vi.fn()
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                callbacks: { onMove, onEnd },
+                transformPagePoint: (point) => ({ x: point.x * 2, y: point.y * 2 })
+            })
+
+            el.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: 8 })
+            )
+            clock.mockReturnValue(1016)
+            await flushFrame(16)
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 12, clientY: 11, pointerId: 8 })
+            )
+            clock.mockReturnValue(1040)
+            await flushFrame(24)
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 40, clientY: 30, pointerId: 8 })
+            )
+            clock.mockReturnValue(1080)
+            await flushFrame(40)
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: 40, clientY: 30, pointerId: 8 })
+            )
+            clock.mockReturnValue(1100)
+            await flushFrame(20)
+
+            expect(onMove.mock.calls[0][1].velocity).toEqual({ x: 0, y: 0 })
+            expect(onMove.mock.calls[1][1].velocity).toEqual({ x: 100, y: 50 })
+            expect(onEnd.mock.calls[0][1].velocity).toEqual({ x: 750, y: 500 })
+            cleanup()
+            el.remove()
+            clock.mockRestore()
+        })
+
+        it('uses the raw page point against the transformed projection center for controlled snap', async () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const node = registerStubNode(el) as ReturnType<typeof registerStubNode> & {
+                projection?: {
+                    layout: {
+                        layoutBox: {
+                            x: { min: number; max: number }
+                            y: { min: number; max: number }
+                        }
+                    }
+                }
+            }
+            node.projection = {
+                layout: {
+                    // The VisualElement projection has already consumed the
+                    // scale-2 transformPagePoint mapping.
+                    layoutBox: {
+                        x: { min: 200, max: 240 },
+                        y: { min: 80, max: 120 }
+                    }
+                }
+            }
+            const x = motionValue(0)
+            const y = motionValue(0)
+            const controls = createDragControls()
+            const cleanup = attachDrag(el, {
+                axis: true,
+                controls,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x, y },
+                transformPagePoint: (point) => ({ x: point.x * 2, y: point.y * 2 })
+            })
+
+            controls.start(
+                new PointerEvent('pointerdown', { clientX: 130, clientY: 50, pointerId: 9 }),
+                { snapToCursor: true }
+            )
+            await flushFrame()
+
+            cleanup()
+            el.remove()
+            // Raw page point (130, 50) minus transformed layout center
+            // (220, 100). Reusing mapped info.point would incorrectly yield
+            // (40, 0), the exact scaled/scrolled public parity regression.
+            expect({ x: x.get(), y: y.get() }).toEqual({ x: -90, y: -50 })
+        })
+
+        it('does not accumulate repeated controlled snaps with authored initial axis values', async () => {
+            const el = document.createElement('div')
+            el.style.transform = 'matrix(1, 0, 0, 1, 100, 40)'
+            document.body.appendChild(el)
+            const node = registerStubNode(el, { x: 100, y: 40 }) as ReturnType<
+                typeof registerStubNode
+            > & {
+                projection?: {
+                    layout: {
+                        layoutBox: {
+                            x: { min: number; max: number }
+                            y: { min: number; max: number }
+                        }
+                    }
+                }
+            }
+            node.projection = {
+                layout: {
+                    layoutBox: {
+                        x: { min: 700, max: 780 },
+                        y: { min: 477, max: 557 }
+                    }
+                }
+            }
+            node.render.mockImplementation(() => {
+                el.style.transform = `matrix(1, 0, 0, 1, ${String(node.latestValues.x)}, ${String(node.latestValues.y)})`
+            })
+            const controls = createDragControls()
+            const cleanup = attachDrag(el, {
+                axis: true,
+                controls,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                baselineSources: { initial: { x: 100, y: 40 } }
+            })
+            const snapped: Array<{ x: unknown; y: unknown }> = []
+
+            const dragFromHandle = async (pointerId: number) => {
+                controls.start(
+                    new PointerEvent('pointerdown', {
+                        clientX: 640,
+                        clientY: 417,
+                        pointerId
+                    }),
+                    { snapToCursor: true }
+                )
+                snapped.push({ x: node.latestValues.x, y: node.latestValues.y })
+                window.dispatchEvent(
+                    new PointerEvent('pointermove', {
+                        clientX: 690,
+                        clientY: 467,
+                        pointerId
+                    })
+                )
+                await flushFrame()
+                window.dispatchEvent(
+                    new PointerEvent('pointerup', {
+                        clientX: 690,
+                        clientY: 467,
+                        pointerId
+                    })
+                )
+                await flushFrame()
+            }
+
+            await dragFromHandle(90)
+            expect(node.latestValues).toMatchObject({ x: 50, y: -10 })
+
+            await dragFromHandle(91)
+            expect(node.latestValues).toMatchObject({ x: 50, y: -10 })
+
+            await dragFromHandle(92)
+            expect(node.latestValues).toMatchObject({ x: 50, y: -10 })
+            expect(snapped).toEqual([
+                { x: 0, y: -60 },
+                { x: 0, y: -60 },
+                { x: 0, y: -60 }
+            ])
+
+            cleanup()
+            el.remove()
+        })
+
+        it('does not accumulate repeated controlled snaps from zero axis values', async () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const node = registerStubNode(el) as ReturnType<typeof registerStubNode> & {
+                projection?: {
+                    layout: {
+                        layoutBox: {
+                            x: { min: number; max: number }
+                            y: { min: number; max: number }
+                        }
+                    }
+                }
+            }
+            node.projection = {
+                layout: {
+                    layoutBox: {
+                        x: { min: 460, max: 540 },
+                        y: { min: 260, max: 340 }
+                    }
+                }
+            }
+            const controls = createDragControls()
+            const cleanup = attachDrag(el, {
+                axis: true,
+                controls,
+                momentum: false,
+                mergedTransition: { duration: 0 }
+            })
+            const snapped: Array<{ x: unknown; y: unknown }> = []
+
+            const dragFromHandle = async (pointerId: number) => {
+                controls.start(
+                    new PointerEvent('pointerdown', {
+                        clientX: 400,
+                        clientY: 250,
+                        pointerId
+                    }),
+                    { snapToCursor: true }
+                )
+                snapped.push({ x: node.latestValues.x, y: node.latestValues.y })
+                window.dispatchEvent(
+                    new PointerEvent('pointermove', {
+                        clientX: 430,
+                        clientY: 270,
+                        pointerId
+                    })
+                )
+                await flushFrame()
+                window.dispatchEvent(
+                    new PointerEvent('pointerup', {
+                        clientX: 430,
+                        clientY: 270,
+                        pointerId
+                    })
+                )
+                await flushFrame()
+            }
+
+            await dragFromHandle(93)
+            expect(node.latestValues).toMatchObject({ x: -70, y: -30 })
+
+            await dragFromHandle(94)
+            expect(node.latestValues).toMatchObject({ x: -70, y: -30 })
+            expect(snapped).toEqual([
+                { x: -100, y: -50 },
+                { x: -100, y: -50 }
+            ])
+
+            cleanup()
+            el.remove()
+        })
+
+        it('pairs a refreshed projection measurement with its then-current axis value', () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            const node = registerStubNode(el)
+            const measureListeners = new Set<() => void>()
+            const stopMeasureListener = vi.fn()
+            const projection = {
+                layout: {
+                    layoutBox: {
+                        x: { min: 80, max: 120 },
+                        y: { min: 30, max: 70 }
+                    }
+                },
+                addEventListener: (name: string, listener: () => void) => {
+                    expect(name).toBe('measure')
+                    measureListeners.add(listener)
+                    return () => {
+                        measureListeners.delete(listener)
+                        stopMeasureListener()
+                    }
+                }
+            }
+            ;(node as typeof node & { projection: typeof projection }).projection = projection
+            const controls = createDragControls()
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                controls,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                getBaseTransform: () => ''
+            })
+
+            // A new layout measurement includes x=40. A later writer advances
+            // the shared axis to 70 without refreshing the layout box.
+            node.getValue('x').set(40)
+            el.style.transform = 'translateX(40px)'
+            projection.layout = {
+                layoutBox: {
+                    x: { min: 120, max: 160 },
+                    y: { min: 30, max: 70 }
+                }
+            }
+            for (const listener of measureListeners) listener()
+            node.getValue('x').set(70)
+            el.style.transform = 'translateX(70px)'
+
+            controls.start(
+                new PointerEvent('pointerdown', {
+                    clientX: 100,
+                    clientY: 50,
+                    pointerId: 95
+                }),
+                { snapToCursor: true }
+            )
+
+            // Cached center 140 represented x=40. At x=70 the live center is
+            // 170, so pointer 100 snaps the axis to 0 (70 + 100 - 170).
+            expect(node.latestValues.x).toBe(0)
+
+            cleanup()
+            expect(stopMeasureListener).toHaveBeenCalledOnce()
+            el.remove()
+        })
+
+        it.each([
+            {
+                name: 'a translated and rotated authored base',
+                authoredBase: 'translateX(12px) rotate(5deg)',
+                physicalTransform: 'translateX(12px) rotate(5deg)'
+            },
+            {
+                name: 'an empty authored base and empty physical transform',
+                authoredBase: '',
+                physicalTransform: ''
+            },
+            {
+                name: 'an empty authored base and physical none',
+                authoredBase: '',
+                physicalTransform: 'none'
+            }
+        ])(
+            'pairs a base-only projection measurement with zero represented motion axes for $name',
+            ({ authoredBase, physicalTransform }) => {
+                const el = document.createElement('div')
+                el.style.transform = `translateX(45px) translateY(-30px)${authoredBase ? ` ${authoredBase}` : ''}`
+                document.body.appendChild(el)
+                const node = registerStubNode(el, { x: 45, y: -30 })
+                const measureListeners = new Set<() => void>()
+                const projection = {
+                    layout: {
+                        layoutBox: {
+                            x: { min: 230, max: 270 },
+                            y: { min: 130, max: 170 }
+                        }
+                    },
+                    addEventListener: (_name: string, listener: () => void) => {
+                        measureListeners.add(listener)
+                        return () => measureListeners.delete(listener)
+                    }
+                }
+                ;(node as typeof node & { projection: typeof projection }).projection = projection
+                const controls = createDragControls()
+                const cleanup = attachDrag(el, {
+                    axis: true,
+                    controls,
+                    momentum: false,
+                    mergedTransition: { duration: 0 },
+                    baselineSources: { initial: { x: 45, y: -30 } },
+                    getBaseTransform: () => authoredBase
+                })
+
+                // refreshLayout() strips the live motion axes to the authored raw
+                // transform before updateLayout(). Its measure event is synchronous
+                // within that strip, while the MotionValues remain nonzero.
+                const liveTransform = el.style.transform
+                el.style.transform = physicalTransform
+                projection.layout = {
+                    layoutBox: {
+                        x: { min: 280, max: 320 },
+                        y: { min: 180, max: 220 }
+                    }
+                }
+                for (const listener of measureListeners) listener()
+                el.style.transform = liveTransform
+
+                controls.start(
+                    new PointerEvent('pointerdown', {
+                        clientX: 300,
+                        clientY: 200,
+                        pointerId: 96
+                    }),
+                    { snapToCursor: true }
+                )
+
+                // The measured center already includes authoredBase but neither
+                // motion axis. At the current x=45/y=-30, snapping that live center
+                // back to the measured center therefore returns both axes to zero.
+                expect(node.latestValues).toMatchObject({ x: 0, y: 0 })
+
+                cleanup()
+                el.remove()
+            }
+        )
+    })
+
+    it('attachDrag: attaches pointerdown and animates during move', async () => {
         const el = document.createElement('div')
         el.style.width = '100px'
         el.style.height = '100px'
@@ -125,6 +841,7 @@ describe('utils/drag', () => {
 
         const cleanup = attachDrag(el, {
             axis: true,
+            momentum: false,
             mergedTransition: { duration: 0 },
             callbacks
         })
@@ -135,9 +852,11 @@ describe('utils/drag', () => {
         window.dispatchEvent(
             new PointerEvent('pointermove', { clientX: 20, clientY: 30, pointerId: 1 })
         )
+        await flushFrame()
         window.dispatchEvent(
             new PointerEvent('pointerup', { clientX: 20, clientY: 30, pointerId: 1 })
         )
+        await flushFrame()
 
         expect(callbacks.onStart).toHaveBeenCalled()
         expect(callbacks.onMove).toHaveBeenCalled()
@@ -147,7 +866,7 @@ describe('utils/drag', () => {
         cleanup()
     })
 
-    it('writes the axis MotionValues on the VisualElement and renders synchronously', () => {
+    it('writes the axis MotionValues on the VisualElement in the sampled frame', async () => {
         const el = document.createElement('div')
         document.body.appendChild(el)
         const node = registerStubNode(el)
@@ -159,6 +878,7 @@ describe('utils/drag', () => {
         el.dispatchEvent(
             new PointerEvent('pointermove', { clientX: 40, clientY: 25, pointerId: 1 })
         )
+        await flushFrame()
 
         // The gesture owns the node's x/y channels — no composed string of its
         // own, so the VisualElement stays the single writer of `transform`.
@@ -166,7 +886,7 @@ describe('utils/drag', () => {
         expect(node.values.get('y')?.get()).toBe(15)
         expect(node.latestValues.x).toBe(30)
         expect(node.latestValues.y).toBe(15)
-        // Synchronous render per pointer batch (upstream
+        // Synchronous render inside the sampled Motion frame (upstream
         // `VisualElementDragControls.ts:216`) — a pointermove must paint in the
         // frame it arrives in.
         expect(node.render).toHaveBeenCalled()
@@ -174,11 +894,12 @@ describe('utils/drag', () => {
         expect(el.dataset.svelteMotionDragTransform).toBeUndefined()
 
         el.dispatchEvent(new PointerEvent('pointerup', { clientX: 40, clientY: 25, pointerId: 1 }))
+        await flushFrame()
         cleanup()
         el.remove()
     })
 
-    it('shifts the live MotionValue and drag origin when its layout slot moves', () => {
+    it('shifts the live MotionValue and drag origin when its layout slot moves', async () => {
         const el = document.createElement('div')
         document.body.appendChild(el)
         const node = registerStubNode(el)
@@ -190,6 +911,7 @@ describe('utils/drag', () => {
         window.dispatchEvent(
             new PointerEvent('pointermove', { clientX: 140, clientY: 10, pointerId: 1 })
         )
+        await flushFrame()
         expect(node.values.get('x')?.get()).toBe(-60)
 
         // A keyed reorder moved the element's underlying slot 100px left.
@@ -203,16 +925,18 @@ describe('utils/drag', () => {
         window.dispatchEvent(
             new PointerEvent('pointermove', { clientX: 140, clientY: 10, pointerId: 1 })
         )
+        await flushFrame()
         expect(node.values.get('x')?.get()).toBe(40)
 
         window.dispatchEvent(
             new PointerEvent('pointerup', { clientX: 140, clientY: 10, pointerId: 1 })
         )
+        await flushFrame()
         cleanup()
         el.remove()
     })
 
-    it('composes an unbound drag axis onto its authored channel value', () => {
+    it('composes an unbound drag axis onto its authored channel value', async () => {
         const el = document.createElement('div')
         document.body.appendChild(el)
         // Authored `style={{ x: 40 }}`: drag is an offset from the authored
@@ -230,6 +954,7 @@ describe('utils/drag', () => {
         el.dispatchEvent(
             new PointerEvent('pointermove', { clientX: 35, clientY: 10, pointerId: 1 })
         )
+        await flushFrame()
 
         expect(node.values.get('x')?.get()).toBe(65)
         cleanup()
@@ -240,26 +965,28 @@ describe('utils/drag', () => {
         // A leaked lock is worse than no lock: `isDragActive()` gates
         // motion-dom's own hover()/press() recognizers globally, so every route
         // out of a drag session is pinned here.
-        const drag = (el: HTMLElement, id = 1) => {
+        const drag = async (el: HTMLElement, id = 1) => {
             el.dispatchEvent(
                 new PointerEvent('pointerdown', { clientX: 5, clientY: 5, pointerId: id })
             )
             window.dispatchEvent(
                 new PointerEvent('pointermove', { clientX: 25, clientY: 5, pointerId: id })
             )
+            await flushFrame()
         }
 
-        it('holds the lock for the pointer session and releases it on pointerup', () => {
+        it('holds the lock for the pointer session and releases it on pointerup', async () => {
             const el = document.createElement('div')
             document.body.appendChild(el)
             const cleanup = attachDrag(el, { axis: 'x', mergedTransition: { duration: 0 } })
 
             expect(isDragActive()).toBe(false)
-            drag(el)
+            await drag(el)
             expect(isDragActive()).toBe(true)
             window.dispatchEvent(
                 new PointerEvent('pointerup', { clientX: 25, clientY: 5, pointerId: 1 })
             )
+            await flushFrame()
             // Released at pointer-up, NOT after the momentum glide — this is what
             // lets hover respond mid-glide (e2e/drag/hover-during-glide).
             expect(isDragActive()).toBe(false)
@@ -268,26 +995,41 @@ describe('utils/drag', () => {
             el.remove()
         })
 
-        it('releases the lock on pointercancel and on teardown mid-drag', () => {
+        it('releases on pointercancel and keeps an unmounted active session until terminal', async () => {
             const el = document.createElement('div')
             document.body.appendChild(el)
-            const cleanup = attachDrag(el, { axis: 'x', mergedTransition: { duration: 0 } })
+            const x = motionValue(0)
+            const terminalBoundValues: number[] = []
+            const cleanup = attachDrag(el, {
+                axis: 'x',
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x },
+                callbacks: { onEnd: () => terminalBoundValues.push(x.get()) }
+            })
 
-            drag(el)
+            await drag(el)
             window.dispatchEvent(
                 new PointerEvent('pointercancel', { clientX: 25, clientY: 5, pointerId: 1 })
             )
+            await flushFrame()
             expect(isDragActive()).toBe(false)
 
             // Unmount mid-drag: teardown is the only remaining exit.
-            drag(el, 2)
+            await drag(el, 2)
             expect(isDragActive()).toBe(true)
             cleanup()
-            expect(isDragActive()).toBe(false)
+            expect(isDragActive()).toBe(true)
             el.remove()
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: 25, clientY: 5, pointerId: 2 })
+            )
+            await flushFrame()
+            expect(isDragActive()).toBe(false)
+            expect(terminalBoundValues.at(-1)).toBe(0)
         })
 
-        it('does not take the lock when propagation is allowed', () => {
+        it('does not take the lock when propagation is allowed', async () => {
             const el = document.createElement('div')
             document.body.appendChild(el)
             const cleanup = attachDrag(el, {
@@ -296,18 +1038,19 @@ describe('utils/drag', () => {
                 propagation: true
             })
 
-            drag(el)
+            await drag(el)
             // `dragPropagation` opts out of the lock so nested draggables move
             // together — upstream `VisualElementDragControls.ts:121`.
             expect(isDragActive()).toBe(false)
             window.dispatchEvent(
                 new PointerEvent('pointerup', { clientX: 25, clientY: 5, pointerId: 1 })
             )
+            await flushFrame()
             cleanup()
             el.remove()
         })
 
-        it('a second element cannot start a drag while the lock is held', () => {
+        it('a second element cannot start a drag while the lock is held', async () => {
             const first = document.createElement('div')
             const second = document.createElement('div')
             document.body.append(first, second)
@@ -319,23 +1062,30 @@ describe('utils/drag', () => {
                 callbacks: { onStart }
             })
 
-            drag(first)
+            await drag(first)
             second.dispatchEvent(
                 new PointerEvent('pointerdown', { clientX: 5, clientY: 5, pointerId: 9 })
             )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 10, clientY: 5, pointerId: 9 })
+            )
+            await flushFrame()
             expect(onStart).not.toHaveBeenCalled()
+            expect(isDragActive()).toBe(true)
 
             // …and once the first session ends, the second element can drag.
             window.dispatchEvent(
                 new PointerEvent('pointerup', { clientX: 25, clientY: 5, pointerId: 1 })
             )
-            drag(second, 10)
+            await flushFrame()
+            await drag(second, 10)
             expect(onStart).toHaveBeenCalled()
             expect(isDragActive()).toBe(true)
 
             window.dispatchEvent(
                 new PointerEvent('pointerup', { clientX: 25, clientY: 5, pointerId: 10 })
             )
+            await flushFrame()
             expect(isDragActive()).toBe(false)
             stopFirst()
             stopSecond()
@@ -344,7 +1094,7 @@ describe('utils/drag', () => {
         })
     })
 
-    it('attachDrag: ends the gesture when a child stops pointerup propagation (motion#3731)', () => {
+    it('attachDrag: ends the gesture when a child stops pointerup propagation (motion#3731)', async () => {
         const el = document.createElement('div')
         const child = document.createElement('button')
         el.appendChild(child)
@@ -373,6 +1123,7 @@ describe('utils/drag', () => {
                 bubbles: true
             })
         )
+        await flushFrame()
         child.dispatchEvent(
             new PointerEvent('pointerup', {
                 clientX: 25,
@@ -381,6 +1132,7 @@ describe('utils/drag', () => {
                 bubbles: true
             })
         )
+        await flushFrame()
 
         expect(callbacks.onEnd).toHaveBeenCalled()
 
@@ -392,9 +1144,11 @@ describe('utils/drag', () => {
         window.dispatchEvent(
             new PointerEvent('pointermove', { clientX: 30, clientY: 30, pointerId: 2 })
         )
+        await flushFrame()
         window.dispatchEvent(
             new PointerEvent('pointerup', { clientX: 30, clientY: 30, pointerId: 2 })
         )
+        await flushFrame()
         expect(callbacks.onEnd).toHaveBeenCalledTimes(2)
         cleanup()
     })
@@ -411,26 +1165,29 @@ describe('utils/drag', () => {
          * `JSAnimation.stop()` calls `onStop` instead
          * (`animation/JSAnimation.mjs:44-54`).
          */
-        const fling = (el: HTMLElement, id = 1) => {
+        const fling = async (el: HTMLElement, id = 1) => {
             el.dispatchEvent(
                 new PointerEvent('pointerdown', { clientX: 10, clientY: 10, pointerId: id })
             )
             window.dispatchEvent(
                 new PointerEvent('pointermove', { clientX: 60, clientY: 10, pointerId: id })
             )
+            await flushFrame(16)
             window.dispatchEvent(
                 new PointerEvent('pointermove', { clientX: 140, clientY: 10, pointerId: id })
             )
+            await flushFrame(16)
             window.dispatchEvent(
                 new PointerEvent('pointerup', { clientX: 140, clientY: 10, pointerId: id })
             )
+            await flushFrame()
         }
 
         /** A stand-in foreign animation, registered as the value's own. */
         const takeOver = (value: MotionValue) =>
             void value.start(() => ({ stop: vi.fn() }) as never)
 
-        it('route 1 — natural completion fires onDragTransitionEnd exactly once', () => {
+        it('route 1 — natural completion fires onDragTransitionEnd exactly once', async () => {
             const el = document.createElement('div')
             document.body.appendChild(el)
             registerStubNode(el)
@@ -445,14 +1202,14 @@ describe('utils/drag', () => {
                 mergedTransition: { duration: 0 },
                 callbacks: { onTransitionEnd }
             })
-            fling(el)
+            await fling(el)
 
             expect(onTransitionEnd).toHaveBeenCalledTimes(1)
             cleanup()
             el.remove()
         })
 
-        it('route 2 — our own cancel stops the axis and skips onDragTransitionEnd', () => {
+        it('route 2 — our own cancel stops the axis and skips onDragTransitionEnd', async () => {
             const el = document.createElement('div')
             document.body.appendChild(el)
             const node = registerStubNode(el)
@@ -465,7 +1222,7 @@ describe('utils/drag', () => {
                 mergedTransition: { duration: 0 },
                 callbacks: { onTransitionEnd }
             })
-            fling(el)
+            await fling(el)
             const x = node.values.get('x') as MotionValue
             expect(x.isAnimating()).toBe(true)
 
@@ -477,7 +1234,7 @@ describe('utils/drag', () => {
             el.remove()
         })
 
-        it('route 3 — a foreign takeover cleans up without stopping the new owner', () => {
+        it('route 3 — a foreign takeover cleans up without stopping the new owner', async () => {
             const el = document.createElement('div')
             document.body.appendChild(el)
             const node = registerStubNode(el)
@@ -490,7 +1247,7 @@ describe('utils/drag', () => {
                 mergedTransition: { duration: 0 },
                 callbacks: { onTransitionEnd }
             })
-            fling(el)
+            await fling(el)
             const x = node.values.get('x') as MotionValue
 
             takeOver(x)
@@ -506,7 +1263,7 @@ describe('utils/drag', () => {
             el.remove()
         })
 
-        it('route 4 — teardown drops the bookkeeping without killing the glide', () => {
+        it('route 4 — teardown drops the bookkeeping without killing the glide', async () => {
             const el = document.createElement('div')
             document.body.appendChild(el)
             const node = registerStubNode(el)
@@ -519,7 +1276,7 @@ describe('utils/drag', () => {
                 mergedTransition: { duration: 0 },
                 callbacks: { onTransitionEnd }
             })
-            fling(el)
+            await fling(el)
             const x = node.values.get('x') as MotionValue
 
             // A detach can be a benign re-attach (the drag effect re-running), so

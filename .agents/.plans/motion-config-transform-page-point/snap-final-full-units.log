@@ -1,0 +1,168 @@
+$ vitest run
+2:12:46 PM [vite-plugin-svelte] invalid plugin option `hot` in inline config
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+
+ RUN  v4.1.11 /Users/jasonkummerl/Github/svelte-motion-transform-page-point
+
+2:12:52 PM [vite-plugin-svelte] src/lib/components/AnimatePresence.svelte:65:8 This reference only captures the initial value of `initial`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:52 PM [vite-plugin-svelte] src/lib/components/AnimatePresence.svelte:66:8 This reference only captures the initial value of `mode`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:52 PM [vite-plugin-svelte] src/lib/components/AnimatePresence.svelte:67:29 This reference only captures the initial value of `onExitComplete`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:52 PM [vite-plugin-svelte] src/lib/components/AnimatePresence.svelte:70:8 This reference only captures the initial value of `initial`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:52 PM [vite-plugin-svelte] src/lib/components/AnimatePresence.svelte:71:8 This reference only captures the initial value of `mode`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:52 PM [vite-plugin-svelte] src/lib/components/AnimatePresence.svelte:72:8 This reference only captures the initial value of `onExitComplete`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:52 PM [vite-plugin-svelte] src/lib/components/AnimatePresence.svelte:73:8 This reference only captures the initial value of `custom`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+ ✓ src/lib/utils/layout.spec.ts (43 tests) 1013ms
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:314:8 This reference only captures the initial value of `layoutScrollProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:668:42 This reference only captures the initial value of `keyProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:690:24 This reference only captures the initial value of `keyProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:690:49 This reference only captures the initial value of `keyProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:694:25 This reference only captures the initial value of `keyProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:921:15 This reference only captures the initial value of `declarativeAnimateProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:922:14 This reference only captures the initial value of `declarativeAnimateProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:923:15 This reference only captures the initial value of `variantsProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:949:10 This reference only captures the initial value of `initialProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:950:12 This reference only captures the initial value of `initialProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:951:34 This reference only captures the initial value of `variantsProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:958:8 This reference only captures the initial value of `initialProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:959:8 This reference only captures the initial value of `animateProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:962:8 This reference only captures the initial value of `initialProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:1009:31 This reference only captures the initial value of `customProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:54 PM [vite-plugin-svelte] src/lib/html/_MotionContainer.svelte:1009:58 This reference only captures the initial value of `customProp`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+ ✓ src/lib/utils/drag.spec.ts (30 tests) 998ms
+     ✓ leaves transform rendering to a bound MotionValue when no other channel is active  311ms
+2:12:55 PM [vite-plugin-svelte] src/lib/components/LayoutGroup.svelte:64:86 This reference only captures the initial value of `id`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+2:12:55 PM [vite-plugin-svelte] src/lib/components/LayoutGroup.svelte:64:92 This reference only captures the initial value of `id`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+ ✓ src/lib/components/MotionConfig.skipAnimations.spec.ts (8 tests) 960ms
+     ✓ jumps straight to the final value instead of tweening  373ms
+ ✓ src/lib/components/MotionConfig.transformPagePoint.spec.ts (6 tests) 1406ms
+     ✓ captures gesture input but updates the mounted VisualElement callback live  618ms
+ ✓ src/lib/html/_MotionContainer.arc.spec.ts (5 tests) 4361ms
+     ✓ curves x/y along the arc and composes pathRotation onto transform  1127ms
+     ✓ rotate:false keeps transform free of rotate()  888ms
+     ✓ keeps a user rotate in the transform while pathRotation is additive  885ms
+     ✓ falls back to a straight line (no NaN) when x/y endpoints carry units  880ms
+     ✓ documents the upstream hazard: raw motion-dom arc() emits NaN for px endpoints  575ms
+ ✓ src/lib/html/_MotionContainer.spec.ts (22 tests) 4427ms
+     ✓ re-runs animate when animate prop changes  354ms
+     ✓ inherits custom from a parent motion component when child has no custom prop  3067ms
+ ✓ src/lib/components/animatePresenceKey.component.spec.ts (3 tests) 602ms
+     ✓ accepts falsy-but-valid keys like 0  499ms
+ ✓ src/lib/components/LazyMotion.spec.ts (6 tests) 586ms
+     ✓ keeps animation features available with domMin  305ms
+ ✓ src/lib/utils/animate.spec.ts (12 tests) 661ms
+     ✓ stops in-flight animations and clears the list when the parent detaches  319ms
+ ✓ src/lib/utils/presence.spec.ts (46 tests) 819ms
+ ✓ src/lib/components/initial.component.spec.ts (8 tests) 1494ms
+     ✓ should render element when initial has keyframes  448ms
+ ✓ src/lib/components/Reorder/reorder.component.spec.ts (14 tests) 5513ms
+     ✓ renders a ul with li items by default  376ms
+     ✓ propagates a post-measure detected axis into the item drag constraint  545ms
+     ✓ rebases an active drag when a keyed reorder moves its layout slot  2815ms
+     ✓ projects each newly displaced sibling across sequential keyed reorders  883ms
+ ✓ src/lib/utils/hookVanillaParity.svelte.spec.ts (8 tests) 400ms
+ ✓ src/lib/utils/animateValue.spec.ts (5 tests) 328ms
+ ✓ src/lib/html/motionDomSsr.spec.ts (1 test) 461ms
+     ✓ can start an animateTarget animation without a browser window  455ms
+ ✓ src/lib/components/Reorder/autoScroll.spec.ts (8 tests) 622ms
+     ✓ does nothing without a scrollable ancestor  504ms
+ ✓ src/lib/utils/vanillaValues.svelte.spec.ts (7 tests) 449ms
+     ✓ follows a MotionValue source toward its target  368ms
+ ✓ src/lib/utils/usePresence.spec.ts (12 tests) 256ms
+ ✓ src/lib/html/_MotionContainer.ssr.spec.ts (4 tests) 278ms
+ ✓ src/lib/html/componentNames.spec.ts (5 tests) 232ms
+ ✓ src/lib/html/__tests__/refBind.svelte.spec.ts (2 tests) 276ms
+ ✓ src/lib/utils/style.spec.ts (51 tests) 138ms
+ ✓ src/lib/components/layoutGroup.context.spec.ts (13 tests) 213ms
+ ✓ src/lib/components/Reorder/itemMotionValue.component.spec.ts (1 test) 362ms
+     ✓ reuses a consumer x MotionValue and floats the item while offset  349ms
+ ✓ src/lib/components/MotionConfig.spec.ts (2 tests) 144ms
+ ✓ src/lib/utils/visualElementCore.spec.ts (40 tests) 153ms
+2:13:10 PM [vite-plugin-svelte] src/lib/components/__tests__/Provider.svelte:8:25 This reference only captures the initial value of `transition`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+ ✓ src/lib/components/motionConfig.context.spec.ts (2 tests) 143ms
+ ✓ src/lib/utils/motionDomProjection.spec.ts (16 tests) 201ms
+ ✓ src/lib/utils/willChange.svelte.spec.ts (6 tests) 62ms
+ ✓ src/lib/utils/gestures.spec.ts (15 tests) 165ms
+ ✓ src/lib/utils/dragInertia.spec.ts (6 tests) 56ms
+ ✓ src/lib/utils/transform.svelte.spec.ts (16 tests) 113ms
+ ✓ src/lib/utils/animateView.spec.ts (5 tests) 133ms
+ ✓ src/lib/utils/inView.svelte.spec.ts (13 tests) 154ms
+ ✓ src/lib/utils/motionValue.svelte.spec.ts (8 tests) 72ms
+ ✓ src/lib/utils/variants.spec.ts (59 tests) 172ms
+ ✓ src/lib/utils/time.svelte.spec.ts (8 tests) 68ms
+ ✓ src/lib/utils/animationControls.spec.ts (4 tests) 110ms
+ ✓ src/lib/components/lazyMotion.context.spec.ts (1 test) 139ms
+ ✓ src/lib/utils/svg.spec.ts (49 tests) 144ms
+ ✓ src/lib/utils/attachable.spec.ts (9 tests) 90ms
+ ✓ src/lib/utils/arc.spec.ts (13 tests) 108ms
+ ✓ src/lib/vite.spec.ts (22 tests) 168ms
+ ✓ src/lib/utils/cycle.svelte.spec.ts (23 tests) 102ms
+ ✓ src/lib/utils/pan.spec.ts (10 tests) 131ms
+ ✓ src/lib/utils/styleObject.spec.ts (21 tests) 44ms
+ ✓ src/lib/utils/objects.isEmpty.test.ts (4 tests) 31ms
+ ✓ src/lib/utils/toMotionValue.svelte.spec.ts (6 tests) 80ms
+ ✓ src/lib/utils/scroll.svelte.spec.ts (14 tests) 127ms
+ ✓ src/lib/utils/spring.svelte.spec.ts (13 tests) 117ms
+ ✓ src/lib/utils/followValue.svelte.spec.ts (13 tests) 201ms
+ ✓ src/lib/utils/augmentMotionValue.svelte.spec.ts (17 tests) 84ms
+ ✓ src/lib/utils/optimizedAppear.spec.ts (14 tests) 155ms
+ ✓ src/lib/utils/motionValueChild.spec.ts (3 tests) 37ms
+ ✓ src/lib/utils/animation.spec.ts (3 tests) 94ms
+ ✓ src/lib/utils/animationFrame.spec.ts (5 tests) 150ms
+ ✓ src/lib/utils/a11y.spec.ts (5 tests) 27ms
+ ✓ src/lib/utils/dom.spec.ts (14 tests) 43ms
+ ✓ src/lib/utils/reducedMotion.svelte.spec.ts (7 tests) 99ms
+ ✓ src/lib/utils/hover.spec.ts (5 tests) 42ms
+ ✓ src/lib/utils/reducedMotionConfig.svelte.spec.ts (12 tests) 113ms
+ ✓ src/lib/index.spec.ts (17 tests) 57ms
+ ✓ src/lib/utils/motionTemplate.svelte.spec.ts (9 tests) 68ms
+ ✓ src/lib/utils/velocity.svelte.spec.ts (7 tests) 58ms
+ ✓ src/docsExampleDemos.spec.ts (2 tests) 56ms
+ ✓ src/lib/utils/log.spec.ts (3 tests) 35ms
+ ✓ src/lib/utils/objects.isNotEmpty.test.ts (4 tests) 25ms
+ ✓ src/lib/features/index.spec.ts (3 tests) 26ms
+ ✓ src/demo.spec.ts (1 test) 29ms
+ ✓ src/lib/utils/constants.spec.ts (2 tests) 16ms
+ ✓ src/lib/components/Reorder/detectAxis.spec.ts (7 tests) 25ms
+ ✓ src/lib/utils/promise.spec.ts (4 tests) 22ms
+ ✓ src/lib/utils/transformComposer.spec.ts (7 tests) 29ms
+ ✓ src/lib/components/Reorder/checkReorder.spec.ts (14 tests) 41ms
+ ✓ src/lib/utils/initial.spec.ts (5 tests) 29ms
+ ✓ src/lib/components/Reorder/order.spec.ts (3 tests) 26ms
+ ✓ src/lib/utils/dragMath.spec.ts (6 tests) 25ms
+ ✓ src/lib/utils/effects.spec.ts (2 tests) 26ms
+ ✓ src/lib/three.spec.ts (2 tests) 17ms
+ ✓ src/lib/utils/dragParams.spec.ts (3 tests) 23ms
+ ✓ src/lib/vgpu.spec.ts (2 tests) 15ms
+ ✓ src/routes/tests/effects/effectRegistry.spec.ts (2 tests) 17ms
+
+ Test Files  82 passed (82)
+      Tests  908 passed (908)
+   Start at  14:12:46
+   Duration  51.42s (transform 44.49s, setup 50.11s, import 97.77s, tests 31.59s, environment 255.13s)
+

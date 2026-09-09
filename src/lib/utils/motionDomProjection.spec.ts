@@ -1,4 +1,4 @@
-import { visualElementStore } from 'motion-dom'
+import { measurePageBox, measureViewportBox, visualElementStore } from 'motion-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MotionDomProjectionAdapter, layoutMeasureStats } from './motionDomProjection.js'
 import { createMotionVisualElement } from './visualElementCore.js'
@@ -24,6 +24,64 @@ const setScrollAndRect = (el: HTMLElement, scrollY: number, pageTop: number, pag
         new DOMRect(pageLeft, pageTop - scrollY, 100, 50)
     )
 }
+
+describe('transformPagePoint coordinate characterization', () => {
+    const createMeasuredElement = () => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 200, 80, 40))
+        return element
+    }
+
+    it('maps original viewport corners before converting them to a box', () => {
+        const element = createMeasuredElement()
+        const transformPagePoint = vi.fn(({ x, y }: { x: number; y: number }) => ({
+            x: x / 0.5,
+            y: y / 2
+        }))
+
+        const box = measureViewportBox(element, transformPagePoint)
+
+        expect(box).toEqual({ x: { min: 200, max: 360 }, y: { min: 100, max: 120 } })
+        expect(transformPagePoint).toHaveBeenNthCalledWith(1, { x: 100, y: 200 })
+        expect(transformPagePoint).toHaveBeenNthCalledWith(2, { x: 180, y: 240 })
+        element.remove()
+    })
+
+    it('adds projection-root scroll after mapping viewport corners', () => {
+        const element = createMeasuredElement()
+        const transformPagePoint = vi.fn(({ x, y }: { x: number; y: number }) => ({
+            x: x / 0.5,
+            y: y / 2
+        }))
+        const root = { scroll: { offset: { x: 10, y: 30 } } }
+
+        const box = measurePageBox(element, root, transformPagePoint)
+
+        expect(box).toEqual({ x: { min: 210, max: 370 }, y: { min: 130, max: 150 } })
+        expect(transformPagePoint).toHaveBeenNthCalledWith(1, { x: 100, y: 200 })
+        expect(transformPagePoint).toHaveBeenNthCalledWith(2, { x: 180, y: 240 })
+        element.remove()
+    })
+
+    it('preserves the DOMRect with no mapping or an identity mapping', () => {
+        const element = createMeasuredElement()
+        const expected = { x: { min: 100, max: 180 }, y: { min: 200, max: 240 } }
+
+        expect(measureViewportBox(element)).toEqual(expected)
+        expect(measureViewportBox(element, (point) => point)).toEqual(expected)
+        element.remove()
+    })
+
+    it('applies an affine translation equally to both viewport corners', () => {
+        const element = createMeasuredElement()
+
+        const box = measureViewportBox(element, ({ x, y }) => ({ x: x + 25, y: y - 75 }))
+
+        expect(box).toEqual({ x: { min: 125, max: 205 }, y: { min: 125, max: 165 } })
+        element.remove()
+    })
+})
 
 describe('MotionDomProjectionAdapter.measurePageRect', () => {
     let element: HTMLElement

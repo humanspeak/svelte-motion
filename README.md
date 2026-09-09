@@ -37,23 +37,23 @@ npm install @humanspeak/svelte-motion
 
 Goal: Framer Motion API parity for Svelte where common React examples can be translated with minimal changes.
 
-| Capability                                                             | Status                                     |
-| ---------------------------------------------------------------------- | ------------------------------------------ |
-| `initial` / `animate` / `transition`                                   | Supported                                  |
-| `variants` (string keys + inheritance, function-form `custom`)         | Supported                                  |
-| `whileHover` / `whileTap` / `whileFocus` / `whileDrag` / `whileInView` | Supported (inline + variant keys / arrays) |
-| Drag (`drag`, constraints, momentum, controls, callbacks)              | Supported                                  |
-| `AnimatePresence` (`initial`, `mode`, `onExitComplete`)                | Supported                                  |
-| Layout (`layout`, `layout="position"`)                                 | Supported (single-element FLIP)            |
-| Shared layout (`layoutId`, `LayoutGroup`, `layoutScroll`)              | Supported                                  |
-| Reorder (Motion 13.1 auto-axis, wrapped grids, RTL, edge auto-scroll)  | Supported                                  |
-| View Transitions (`animateView`, shared-element morphs)                | Supported                                  |
-| Vanilla values (`motionValue`, `styleEffect`, `toMotionValue` bridge)  | Supported                                  |
-| Custom effects (`createEffect`, `animate.addEffect`, Motion 13.2)      | Supported                                  |
-| Three.js / vgpu adapters (`/three`, `/vgpu` subpaths)                  | Supported                                  |
-| Pan gesture API (`onPan*`, `onPanSessionStart`)                        | Supported                                  |
-| `MotionConfig` parity beyond `transition`                              | Partial                                    |
-| `reducedMotion`, `features`, `transformPagePoint`                      | Not yet supported                          |
+| Capability                                                                             | Status                                     |
+| -------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `initial` / `animate` / `transition`                                                   | Supported                                  |
+| `variants` (string keys + inheritance, function-form `custom`)                         | Supported                                  |
+| `whileHover` / `whileTap` / `whileFocus` / `whileDrag` / `whileInView`                 | Supported (inline + variant keys / arrays) |
+| Drag (`drag`, constraints, momentum, controls, callbacks)                              | Supported                                  |
+| `AnimatePresence` (`initial`, `mode`, `onExitComplete`)                                | Supported                                  |
+| Layout (`layout`, `layout="position"`)                                                 | Supported (single-element FLIP)            |
+| Shared layout (`layoutId`, `LayoutGroup`, `layoutScroll`)                              | Supported                                  |
+| Reorder (Motion 13.1 auto-axis, wrapped grids, RTL, edge auto-scroll)                  | Supported                                  |
+| View Transitions (`animateView`, shared-element morphs)                                | Supported                                  |
+| Vanilla values (`motionValue`, `styleEffect`, `toMotionValue` bridge)                  | Supported                                  |
+| Custom effects (`createEffect`, `animate.addEffect`, Motion 13.2)                      | Supported                                  |
+| Three.js / vgpu adapters (`/three`, `/vgpu` subpaths)                                  | Supported                                  |
+| Pan gesture API (`onPan*`, `onPanSessionStart`)                                        | Supported                                  |
+| `MotionConfig` (`transition`, `reducedMotion`, `skipAnimations`, `transformPagePoint`) | Supported                                  |
+| Remaining MotionConfig options (`features`, `nonce`, `isValidProp`)                    | Not yet supported                          |
 
 ## Supported elements
 
@@ -80,14 +80,18 @@ Use motion components the same way you use regular elements, with animation prop
 
 ### `MotionConfig`
 
-`MotionConfig` currently supports default `transition` values for descendants.
+`MotionConfig` supports default `transition` values, `reducedMotion`, `skipAnimations`, and Motion-compatible `transformPagePoint` coordinate correction for descendant drag and pan gestures. See the [coordinate contract](https://motion.svelte.page/docs/transform-page-point) for session, scroll, constraints, and controls behavior.
 
 ```svelte
 <script lang="ts">
     import { MotionConfig, motion } from '@humanspeak/svelte-motion'
 </script>
 
-<MotionConfig transition={{ duration: 0.4 }}>
+<MotionConfig
+    transition={{ duration: 0.4 }}
+    reducedMotion="user"
+    transformPagePoint={({ x, y }) => ({ x: x / 0.5, y: y / 0.5 })}
+>
     <motion.div animate={{ scale: 1.05 }} />
 </MotionConfig>
 ```
@@ -289,8 +293,7 @@ Validated against current source and test suite (local run):
 ## Known gaps vs Framer Motion
 
 - `whileInView` does not yet expose Framer-style viewport options.
-- `MotionConfig` currently only provides `transition` defaults.
-- `reducedMotion`, `features`, and `transformPagePoint` are not implemented as `MotionConfig` props.
+- `MotionConfig` does not yet support `features`, `nonce`, or `isValidProp`.
 
 ## External dependencies
 

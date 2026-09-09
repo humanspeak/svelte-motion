@@ -261,6 +261,7 @@
         value === null || value === undefined || (typeof value === 'string' && /^[+-]=/.test(value))
     let dataPath = $state<number>(-1)
     const motionConfig = $derived(getMotionConfig())
+    const effectiveTransformPagePoint = $derived(motionConfig?.transformPagePoint)
     const lazyMotion = getLazyMotionContext()
     const activeFeatures = $derived(lazyMotion?.getFeatures() ?? domMax)
     const hasGestureFeatures = $derived(!!activeFeatures.gestures)
@@ -596,10 +597,20 @@
             whileFocus: filterReducedMotionDefinition(whileFocusProp),
             whileInView: filterReducedMotionDefinition(whileInViewProp),
             whileDrag: filterReducedMotionDefinition(whileDragProp),
+            // Gesture callbacks are public VisualElement props upstream. Carry
+            // them here even though the Svelte drag adapter invokes them: a
+            // callback-reference replacement is still a real props commit and
+            // must flow through the same active-drag projection/updateOptions
+            // lifecycle below. This also keeps the adapter's callbacks hot-
+            // swappable without tearing down the live pointer session.
+            onDragStart: onDragStartProp,
+            onDrag: onDragProp,
+            onDragEnd: onDragEndProp,
             // `buildHTMLStyles(state, latestValues, transformTemplate)` reads the
             // template off the props, so the VE composes templated transforms
             // natively — the job `applyMotionStyleEffect` used to do.
             transformTemplate: transformTemplateProp,
+            transformPagePoint: effectiveTransformPagePoint,
             exit: exitProp,
             layoutId: scopedLayoutId
         }) as MotionNodeOptions
@@ -1557,6 +1568,7 @@
             getBaseTransformValues: getStyleTransformValues,
             getBaseTransform: () => userBaseTransform,
             transformTemplate: transformTemplateProp,
+            transformPagePoint: effectiveTransformPagePoint,
             propagation: !!dragPropagationProp,
             snapToOrigin: dragSnapToOriginProp,
             boundMotionValues:
@@ -1566,6 +1578,7 @@
 
     $effect(() => {
         if (!(element && isLoaded === 'ready' && hasDragFeatures)) return
+        const dragTarget = element
         const currentDragProp = untrack(() => dragProp)
         // Only attach if drag enabled
         if (!currentDragProp) return
@@ -1579,8 +1592,9 @@
         const opts = untrack(resolveDragOptions)
         const controls = opts.controls
 
-        // Attach and hold teardown so we can re-attach if props change
-        teardownDrag = attachDrag(element, opts)
+        // MotionValue.get() is Svelte-reactive. Keep attach-time measurement reads
+        // out of this lifetime effect so drag writes cannot tear down the live session.
+        teardownDrag = untrack(() => attachDrag(dragTarget, opts))
 
         // If controls passed, subscribe element
         if (controls && controls.subscribe) {
@@ -1603,7 +1617,8 @@
     // second pointerdown.
     $effect(() => {
         const nextOptions = resolveDragOptions()
-        if (nextOptions.axis) teardownDrag?.updateOptions(nextOptions)
+        // Track option inputs, but not imperative reads of the live drag state.
+        if (nextOptions.axis) untrack(() => teardownDrag?.updateOptions(nextOptions))
     })
 
     /**
@@ -1650,6 +1665,16 @@
      * becomes a `setActive` call and this map goes away.
      */
     let whilePanRestore: Record<string, unknown> | null = null
+
+    /** Restore the local whilePan extension without emitting a public pan lifecycle event. */
+    const restoreWhilePan = () => {
+        if (whilePanRestore && visualElement) {
+            animateTarget(visualElement, whilePanRestore as TargetAndTransition, {
+                transitionOverride: mergedTransition as Transition | undefined
+            })
+        }
+        whilePanRestore = null
+    }
 
     /**
      * Boolean presence-check for "is any pan surface active?". Derived
@@ -1708,12 +1733,7 @@
         },
         onMove: onPanProp,
         onEnd: (event, info) => {
-            if (whilePanRestore && visualElement) {
-                animateTarget(visualElement, whilePanRestore as TargetAndTransition, {
-                    transitionOverride: mergedTransition as Transition | undefined
-                })
-            }
-            whilePanRestore = null
+            restoreWhilePan()
             onPanEndProp?.(event, info)
         }
     })
@@ -1751,20 +1771,16 @@
         // the path that keeps an in-flight gesture alive across re-renders.
         teardownPan = attachPan(
             element,
-            untrack(() => buildPanHandlers())
+            untrack(() => buildPanHandlers()),
+            untrack(() => ({
+                transformPagePoint: effectiveTransformPagePoint
+            }))
         )
 
         return () => {
-            // Synchronous revert of whilePan + lifecycle dispatch lives in
-            // attachPan.teardown() — the cleanup chain there calls
-            // session.dispatchTerminal(rawHandlers) BEFORE flipping isAlive,
-            // so onPanEnd fires (which runs the revert above) before the
-            // listeners go. dispatchTerminal is idempotent (PanSession's
-            // terminalDispatched flag) so a host that tears down after a
-            // natural release won't replay the lifecycle pair.
             teardownPan?.()
             teardownPan = null
-            whilePanRestore = null
+            restoreWhilePan()
         }
     })
 
@@ -1784,8 +1800,11 @@
         void onPanProp
         void onPanEndProp
         void resolvedWhilePan
+        void effectiveTransformPagePoint
         if (!teardownPan) return
-        teardownPan.update(buildPanHandlers())
+        teardownPan.update(buildPanHandlers(), {
+            transformPagePoint: effectiveTransformPagePoint
+        })
     })
 
     /**
@@ -2160,6 +2179,15 @@
         // compares it with `prevPresenceContext` to detect exit and re-entry.
         const nextPresenceContext = buildPresenceContext()
         untrack(() => {
+            const activeDragCommit =
+                element?.dataset.svelteMotionDragActive === 'true' && teardownDrag
+            if (activeDragCommit) {
+                // React's MeasureLayout commit calls projection.didUpdate(),
+                // which synchronously flushes Motion's update lane. An active
+                // PanSession therefore samples its retained pointer at the
+                // render-commit timestamp (including config/closure changes).
+                motionDomProjection?.projection.willUpdate()
+            }
             visualElement.update(next, nextPresenceContext)
             // Upstream runs feature updates after every VisualElement update.
             // Without this, a motion.* child held by PresenceChild receives the
@@ -2178,6 +2206,12 @@
             // (use-visual-element.ts:148); the frameloop variant can sit unflushed
             // when nothing else is animating, which left `renderState` stale.
             visualElement.scheduleRenderMicrotask()
+            // Drag controls read current props on every React commit. Refresh
+            // our long-lived adapter here too, even when the gesture-specific
+            // values themselves kept the same identity (for example a ref
+            // constraint whose parent changed size).
+            if (teardownDrag) teardownDrag.updateOptions(resolveDragOptions())
+            if (activeDragCommit) motionDomProjection?.projection.root?.didUpdate()
             // Only once the mount/enter effect has run the first pass — it owns
             // the enter ordering and the wait-mode gate.
             //
@@ -2654,10 +2688,36 @@
         element!.addEventListener(sizeCorrectionEndEvent, handleSizeCorrectionEnd)
 
         const disconnectObservers = observeLayoutChanges(element!, () => scheduleProjectionCommit())
+        // A sibling can re-slot a dragged layout element without changing the
+        // dragged node, its parent, or either element's size. React observes
+        // this through the parent's render commit. Svelte's fine-grained DOM
+        // update otherwise leaves no signal for this component, so watch the
+        // containing layout row while the drag is active and route real rect
+        // changes through the existing single-writer compensation path.
+        const siblingLayoutParent = element!.parentElement?.parentElement
+        const siblingLayoutObserver =
+            dragProp && siblingLayoutParent && typeof MutationObserver !== 'undefined'
+                ? new MutationObserver((mutations) => {
+                      if (element?.dataset.svelteMotionDragActive !== 'true') return
+                      const hasExternalMutation = mutations.some((mutation) => {
+                          const target = mutation.target
+                          return target instanceof Element && !element?.contains(target)
+                      })
+                      if (hasExternalMutation) scheduleProjectionCommit()
+                  })
+                : null
+        if (siblingLayoutObserver && siblingLayoutParent) {
+            siblingLayoutObserver.observe(siblingLayoutParent, {
+                attributes: true,
+                attributeFilter: ['class', 'style'],
+                subtree: true
+            })
+        }
         element!.addEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
 
         return () => {
             disconnectObservers()
+            siblingLayoutObserver?.disconnect()
             element?.removeEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
             element?.removeEventListener(sizeCorrectionSeedEvent, handleSizeCorrectionSeed)
             element?.removeEventListener(sizeCorrectionEndEvent, handleSizeCorrectionEnd)

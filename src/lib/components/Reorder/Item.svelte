@@ -72,9 +72,11 @@
         context.updateOrder(value, offset, info.velocity)
 
         const scrollAxis = selectAutoScrollAxis(reorderAxis, info.velocity)
+        // Auto-scroll compares viewport geometry, so use the matching client coordinate.
+        const pointerPosition = scrollAxis === 'x' ? event.clientX : event.clientY
         autoScrollIfNeeded(
             context.getGroupElement(),
-            info.point[scrollAxis],
+            pointerPosition,
             scrollAxis,
             info.velocity[scrollAxis]
         )

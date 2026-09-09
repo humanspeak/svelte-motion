@@ -1,0 +1,257 @@
+export const VIEWPORT = Object.freeze({ width: 1000, height: 760 })
+
+const DEFAULT_GEOMETRY = Object.freeze({
+  stage: { left: 300, top: 260 },
+  transform: { scaleX: 1, scaleY: 1, translateX: 0, translateY: 0 },
+  board: { width: 500, height: 300 },
+  card: { width: 80, height: 80 },
+  panSurface: { left: 60, top: 50, width: 320, height: 180 },
+  shell: { left: 80, top: 90, width: 560, height: 380, contentWidth: 1300, contentHeight: 1000 },
+})
+
+const pointSequence = (terminal = "pointerUp") => [
+  { op: "snapshot", label: "initial" },
+  { op: "pointerDown", target: "target" },
+  { op: "frame", ms: 16 },
+  { op: "pointerMove", dx: 2, dy: 1 },
+  { op: "frame", ms: 24 },
+  { op: "pointerMove", dx: 28, dy: 19 },
+  { op: "frame", ms: 40 },
+  { op: terminal },
+  { op: "frame", ms: 20 },
+  { op: "snapshot", label: "terminal" },
+]
+
+const geometryForConfig = (config) =>
+  config === "none"
+    ? DEFAULT_GEOMETRY
+    : config === "nonuniform-affine"
+      ? {
+          ...DEFAULT_GEOMETRY,
+          transform: { scaleX: 0.5, scaleY: 2, translateX: 40, translateY: -30 },
+        }
+      : {
+          ...DEFAULT_GEOMETRY,
+          transform: { scaleX: 0.5, scaleY: 0.5, translateX: 0, translateY: 0 },
+        }
+
+const pan = (id, config, steps = pointSequence(), extra = {}) => ({
+  id,
+  kind: "pan",
+  config,
+  geometry: geometryForConfig(config),
+  steps,
+  ...extra,
+})
+
+const drag = (id, config, steps = pointSequence(), extra = {}) => ({
+  id,
+  kind: "drag",
+  config,
+  geometry: geometryForConfig(config),
+  steps,
+  ...extra,
+})
+
+const scrollStart = (kind) => [
+  { op: "pageScroll", x: 120, y: 160, mode: "set", precondition: "nonzero scroll before pointerdown" },
+  { op: "snapshot", label: "scrolled-start" },
+  { op: "pointerDown", target: "target" },
+  { op: "frame", ms: 16 },
+  { op: "pointerMove", dx: 30, dy: 20 },
+  { op: "frame", ms: 40 },
+  { op: "pointerUp" },
+  { op: "frame", ms: 20 },
+  { op: "snapshot", label: `${kind}-after-scrolled-start` },
+]
+
+const pageScrollHeld = [
+  { op: "snapshot", label: "initial" },
+  { op: "pointerDown", target: "target" },
+  { op: "frame", ms: 16 },
+  { op: "pointerMove", dx: 30, dy: 20 },
+  { op: "frame", ms: 40 },
+  { op: "pageScroll", x: 45, y: 70, mode: "by", precondition: "actual window scroll while pointer held" },
+  { op: "frame", ms: 30 },
+  { op: "snapshot", label: "held-after-page-scroll" },
+  { op: "pointerUp" },
+  { op: "frame", ms: 20 },
+]
+
+const ancestorScrollHeld = [
+  { op: "ancestorScroll", x: 90, y: 70, mode: "set", precondition: "nonzero overflow scroll before pointerdown" },
+  { op: "snapshot", label: "ancestor-start" },
+  { op: "pointerDown", target: "target" },
+  { op: "frame", ms: 16 },
+  { op: "pointerMove", dx: 30, dy: 20 },
+  { op: "frame", ms: 40 },
+  { op: "ancestorScroll", x: 45, y: 55, mode: "by", precondition: "actual overflow scroll while pointer held" },
+  { op: "frame", ms: 30 },
+  { op: "snapshot", label: "held-after-ancestor-scroll" },
+  { op: "pointerUp" },
+  { op: "frame", ms: 20 },
+]
+
+const replacement = [
+  { op: "pointerDown", target: "target" },
+  { op: "frame", ms: 16 },
+  { op: "pointerMove", dx: 20, dy: 10 },
+  { op: "frame", ms: 40 },
+  { op: "setMapping", value: "triple", precondition: "new callback reference committed while held" },
+  { op: "frame", ms: 16 },
+  { op: "pointerMove", dx: 15, dy: 10 },
+  { op: "frame", ms: 40 },
+  { op: "pointerUp" },
+  { op: "frame", ms: 20 },
+  { op: "pointerDown", target: "target" },
+  { op: "frame", ms: 16 },
+  { op: "pointerMove", dx: 10, dy: 5 },
+  { op: "frame", ms: 40 },
+  { op: "pointerUp" },
+  { op: "frame", ms: 20 },
+  { op: "snapshot", label: "after-second-session" },
+]
+
+const stableClosure = [
+  { op: "pointerDown", target: "target" },
+  { op: "frame", ms: 16 },
+  { op: "pointerMove", dx: 20, dy: 10 },
+  { op: "frame", ms: 40 },
+  { op: "setStableScale", value: 4, precondition: "same callback identity, changed closed-over scale" },
+  { op: "frame", ms: 16 },
+  { op: "pointerMove", dx: 10, dy: 5 },
+  { op: "frame", ms: 40 },
+  { op: "pointerUp" },
+  { op: "frame", ms: 20 },
+  { op: "snapshot", label: "after-live-closure-change" },
+]
+
+export const CASES = Object.freeze([
+  pan("pan-no-config-end", "none"),
+  pan("pan-config-inherit", "inherit-double"),
+  pan("pan-config-identity", "identity-under-double"),
+  pan("pan-config-explicit-undefined", "undefined-under-double"),
+  pan("pan-uniform-scale", "double"),
+  pan("pan-nonuniform-affine", "nonuniform-affine"),
+  pan("pan-page-scroll-at-start", "double", scrollStart("pan")),
+  pan("pan-page-scroll-held", "double", pageScrollHeld),
+  pan("pan-ancestor-scroll-held", "double", ancestorScrollHeld, { ancestor: true }),
+  pan("pan-reference-replacement", "double", replacement),
+  pan("pan-stable-closure-scale", "stable", stableClosure),
+  pan("pan-corrected-threshold", "double", [
+    { op: "pointerDown", target: "target" },
+    { op: "frame", ms: 16 },
+    { op: "pointerMove", dx: 1, dy: 0 },
+    { op: "frame", ms: 32 },
+    { op: "snapshot", label: "below-corrected-threshold" },
+    { op: "pointerMove", dx: 1, dy: 0 },
+    { op: "frame", ms: 32 },
+    { op: "snapshot", label: "past-corrected-threshold" },
+    { op: "pointerUp" },
+    { op: "frame", ms: 20 },
+  ]),
+  pan("pan-pointer-cancel", "double", pointSequence("pointerCancel")),
+  pan("pan-unmount-held", "double", [
+    { op: "pointerDown", target: "target" },
+    { op: "frame", ms: 16 },
+    { op: "pointerMove", dx: 30, dy: 20 },
+    { op: "frame", ms: 40 },
+    { op: "unmount", precondition: "motion.div removed while pointer held" },
+    { op: "frame", ms: 20 },
+    { op: "pointerMove", dx: 10, dy: 10 },
+    { op: "frame", ms: 30 },
+    { op: "pointerUp" },
+    { op: "frame", ms: 20 },
+    { op: "snapshot", label: "after-unmount" },
+  ]),
+  drag("drag-no-config-end", "none"),
+  drag("drag-uniform-scale", "double"),
+  drag("drag-nonuniform-affine", "nonuniform-affine"),
+  drag("drag-page-scroll-at-start", "double", scrollStart("drag")),
+  drag("drag-page-scroll-held", "double", pageScrollHeld),
+  drag("drag-ancestor-scroll-held", "double", ancestorScrollHeld, { ancestor: true }),
+  drag("drag-reference-replacement", "double", replacement),
+  drag("drag-stable-closure-scale", "stable", stableClosure),
+  drag("drag-numeric-bounds", "double", [
+    { op: "pointerDown", target: "target" },
+    { op: "frame", ms: 16 },
+    { op: "pointerMove", dx: 240, dy: 160 },
+    { op: "frame", ms: 40 },
+    { op: "snapshot", label: "numeric-positive" },
+    { op: "pointerMove", dx: -480, dy: -320 },
+    { op: "frame", ms: 40 },
+    { op: "snapshot", label: "numeric-negative" },
+    { op: "pointerUp" },
+    { op: "frame", ms: 20 },
+  ], { bounds: "numeric" }),
+  drag("drag-ref-bounds", "double", [
+    { op: "pointerDown", target: "target" },
+    { op: "frame", ms: 16 },
+    { op: "pointerMove", dx: 400, dy: 260 },
+    { op: "frame", ms: 40 },
+    { op: "snapshot", label: "ref-positive" },
+    { op: "pointerMove", dx: -800, dy: -520 },
+    { op: "frame", ms: 40 },
+    { op: "snapshot", label: "ref-negative" },
+    { op: "pointerUp" },
+    { op: "frame", ms: 20 },
+  ], { bounds: "ref" }),
+  drag("drag-ref-resize-regrab", "double", [
+    { op: "pointerDown", target: "target" },
+    { op: "frame", ms: 16 },
+    { op: "pointerMove", dx: 350, dy: 0 },
+    { op: "frame", ms: 40 },
+    { op: "pointerUp" },
+    { op: "frame", ms: 20 },
+    { op: "resizeBoard", width: 620, precondition: "ref bounds width changed before re-grab" },
+    { op: "frame", ms: 32 },
+    { op: "pointerDown", target: "target" },
+    { op: "frame", ms: 16 },
+    { op: "pointerMove", dx: -500, dy: 0 },
+    { op: "frame", ms: 40 },
+    { op: "pointerUp" },
+    { op: "frame", ms: 20 },
+    { op: "snapshot", label: "after-resize-regrab" },
+  ], { bounds: "ref" }),
+  drag("drag-controls-snap-scrolled", "double", [
+    { op: "pageScroll", x: 120, y: 160, mode: "set", precondition: "verified nonzero scroll before controls.start" },
+    { op: "snapshot", label: "before-controls-start" },
+    { op: "pointerDown", target: "handle" },
+    { op: "frame", ms: 20 },
+    { op: "snapshot", label: "after-snap" },
+    { op: "pointerMove", dx: 25, dy: 15 },
+    { op: "frame", ms: 40 },
+    { op: "pointerUp" },
+    { op: "frame", ms: 20 },
+  ], { controls: true }),
+  drag("drag-real-layout-shift-held", "double", [
+    { op: "snapshot", label: "before-layout-shift" },
+    { op: "pointerDown", target: "target" },
+    { op: "frame", ms: 16 },
+    { op: "pointerMove", dx: 30, dy: 15 },
+    { op: "frame", ms: 40 },
+    { op: "shiftLayout", px: 60, precondition: "slot layout offset changes without CSS transform" },
+    { op: "frame", ms: 32 },
+    { op: "snapshot", label: "held-after-layout-shift" },
+    { op: "pointerMove", dx: 10, dy: 5 },
+    { op: "frame", ms: 40 },
+    { op: "pointerUp" },
+    { op: "frame", ms: 20 },
+  ], { layout: true }),
+  drag("drag-pointer-cancel", "double", pointSequence("pointerCancel")),
+  drag("drag-unmount-held", "double", [
+    { op: "pointerDown", target: "target" },
+    { op: "frame", ms: 16 },
+    { op: "pointerMove", dx: 30, dy: 20 },
+    { op: "frame", ms: 40 },
+    { op: "unmount", precondition: "motion.div removed while pointer held" },
+    { op: "frame", ms: 20 },
+    { op: "pointerMove", dx: 10, dy: 10 },
+    { op: "frame", ms: 30 },
+    { op: "pointerUp" },
+    { op: "frame", ms: 20 },
+    { op: "snapshot", label: "after-unmount" },
+  ]),
+])
+
+export const CASE_BY_ID = new Map(CASES.map((item) => [item.id, item]))

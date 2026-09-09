@@ -1,0 +1,28 @@
+
+Running 20 tests using 1 worker
+
+(node:65557) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/20] [chromium] › e2e/drag/controls.spec.ts:54:5 › drag/controls › imperative start moves x only with dragControls
+[2/20] [chromium] › e2e/drag/controls.spec.ts:81:5 › drag/controls › tiny right nudge does NOT teleport on x-only dragControls
+[3/20] [chromium] › e2e/drag/controls.spec.ts:144:5 › drag/controls › snapToCursor does not creep across repeated drags with initial coordinates
+[4/20] [chromium] › e2e/drag/transform-page-point.spec.ts:384:5 › MotionConfig transformPagePoint drag › matches scale-2 movement, velocity, bound values, and physical travel
+[5/20] [chromium] › e2e/drag/transform-page-point.spec.ts:419:5 › MotionConfig transformPagePoint drag › matches nonuniform affine coordinates without losing physical pointer tracking
+[6/20] [chromium] › e2e/drag/transform-page-point.spec.ts:440:5 › MotionConfig transformPagePoint drag › separates page-scroll terminal payload from rendered translation
+[7/20] [chromium] › e2e/drag/transform-page-point.spec.ts:460:5 › MotionConfig transformPagePoint drag › adds raw ancestor scroll to drag offset
+[8/20] [chromium] › e2e/drag/transform-page-point.spec.ts:480:5 › MotionConfig transformPagePoint drag › keeps second-session offset gesture-relative and retains stable-closure history
+[9/20] [chromium] › e2e/drag/transform-page-point.spec.ts:578:5 › MotionConfig transformPagePoint drag › matches numeric, ref, and resized ref bounds
+[10/20] [chromium] › e2e/drag/transform-page-point.spec.ts:652:5 › MotionConfig transformPagePoint drag › matches scrolled controls snap and real layout displacement
+[11/20] [chromium] › e2e/drag/transform-page-point.spec.ts:693:5 › MotionConfig transformPagePoint drag › keeps repeated controls snaps aligned after drag and settled parent layout
+[12/20] [chromium] › e2e/drag/transform-page-point.spec.ts:702:5 › MotionConfig transformPagePoint drag › keeps nonzero-initial controls snaps aligned after settled parent layout
+[13/20] [chromium] › e2e/drag/transform-page-point.spec.ts:711:5 › MotionConfig transformPagePoint drag › continues after unmount, resets detached values at end, and handles cancel
+[14/20] [chromium] › e2e/drag/transform-page-point.spec.ts:743:5 › MotionConfig transformPagePoint drag › is linked from the root test index
+[15/20] [chromium] › e2e/motion/pan-transform-page-point.spec.ts:194:5 › MotionConfig transformPagePoint pan › matches inherited scale-2 frame history and terminal velocity
+[16/20] [chromium] › e2e/motion/pan-transform-page-point.spec.ts:227:5 › MotionConfig transformPagePoint pan › distinguishes omitted inheritance from explicit undefined and identity
+[17/20] [chromium] › e2e/motion/pan-transform-page-point.spec.ts:241:5 › MotionConfig transformPagePoint pan › keeps pan unchanged by held page and ancestor scroll
+[18/20] [chromium] › e2e/motion/pan-transform-page-point.spec.ts:264:5 › MotionConfig transformPagePoint pan › captures replacement identity but retains mapped history for a stable closure
+[19/20] [chromium] › e2e/motion/pan-transform-page-point.spec.ts:319:5 › MotionConfig transformPagePoint pan › uses the last point on cancel and emits no public end after unmount
+[20/20] [chromium] › e2e/motion/pan-transform-page-point.spec.ts:346:5 › MotionConfig transformPagePoint pan › is linked from the root test index
+  20 passed (17.1s)

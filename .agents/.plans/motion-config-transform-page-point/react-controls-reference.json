@@ -1,0 +1,1800 @@
+{
+  "schemaVersion": 1,
+  "reference": "public motion/react 13.2.0 drag controls",
+  "baseUrl": "http://127.0.0.1:4299/controls.html",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "packages": {
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "motion": "13.2.0",
+    "framer-motion": "13.2.0",
+    "motion-dom": "13.2.0"
+  },
+  "cases": [
+    {
+      "id": "tiny-right-nudge",
+      "preconditions": [
+        {
+          "name": "viewport is the Playwright Desktop Chrome default",
+          "pass": true,
+          "actual": {
+            "width": 1280,
+            "height": 720
+          },
+          "expected": {
+            "width": 1280,
+            "height": 720
+          }
+        },
+        {
+          "name": "plain target is exactly 100x100",
+          "pass": true,
+          "actual": {
+            "x": 590,
+            "y": 235,
+            "top": 235,
+            "right": 690,
+            "bottom": 335,
+            "left": 590,
+            "width": 100,
+            "height": 100
+          },
+          "expected": {
+            "width": 100,
+            "height": 100
+          }
+        },
+        {
+          "name": "initial target is exactly 80x80",
+          "pass": true,
+          "actual": {
+            "x": 700,
+            "y": 477,
+            "top": 477,
+            "right": 780,
+            "bottom": 557,
+            "left": 700,
+            "width": 80,
+            "height": 80
+          },
+          "expected": {
+            "width": 80,
+            "height": 80
+          }
+        },
+        {
+          "name": "initial public x/y is rendered before input",
+          "pass": true,
+          "actual": "matrix(1, 0, 0, 1, 100, 40)",
+          "expected": "matrix translation (100,40)"
+        },
+        {
+          "name": "handle receives the real mouse pointerdown coordinates",
+          "pass": false,
+          "actual": {
+            "entry": {
+              "sequence": 1,
+              "at": 283.5,
+              "targetTestId": "handle",
+              "event": {
+                "type": "pointerdown",
+                "pointerId": 1,
+                "pointerType": "mouse",
+                "isPrimary": true,
+                "button": 0,
+                "buttons": 1,
+                "client": {
+                  "x": 639.992188,
+                  "y": 215
+                },
+                "page": {
+                  "x": 639.992188,
+                  "y": 215
+                }
+              }
+            },
+            "requested": {
+              "x": 639.9921875,
+              "y": 215
+            },
+            "scroll": {
+              "x": 0,
+              "y": 0
+            }
+          },
+          "expected": {
+            "requested": {
+              "x": 639.9921875,
+              "y": 215
+            },
+            "pointerType": "mouse",
+            "isPrimary": true
+          }
+        }
+      ],
+      "output": null,
+      "error": {
+        "name": "Error",
+        "message": "Pointer precondition failed for handle: {\"entry\":{\"sequence\":1,\"at\":283.5,\"targetTestId\":\"handle\",\"event\":{\"type\":\"pointerdown\",\"pointerId\":1,\"pointerType\":\"mouse\",\"isPrimary\":true,\"button\":0,\"buttons\":1,\"client\":{\"x\":639.992188,\"y\":215},\"page\":{\"x\":639.992188,\"y\":215}}},\"requested\":{\"x\":639.9921875,\"y\":215},\"scroll\":{\"x\":0,\"y\":0}}",
+        "stack": "Error: Pointer precondition failed for handle: {\"entry\":{\"sequence\":1,\"at\":283.5,\"targetTestId\":\"handle\",\"event\":{\"type\":\"pointerdown\",\"pointerId\":1,\"pointerType\":\"mouse\",\"isPrimary\":true,\"button\":0,\"buttons\":1,\"client\":{\"x\":639.992188,\"y\":215},\"page\":{\"x\":639.992188,\"y\":215}}},\"requested\":{\"x\":639.9921875,\"y\":215},\"scroll\":{\"x\":0,\"y\":0}}\n    at assertPointerDown (file:///private/tmp/svelte-motion-react-parity-1320/run-controls-reference.mjs:157:11)\n    at async runTinyNudge (file:///private/tmp/svelte-motion-react-parity-1320/run-controls-reference.mjs:179:5)\n    at async file:///private/tmp/svelte-motion-react-parity-1320/run-controls-reference.mjs:272:11"
+      }
+    },
+    {
+      "id": "initial-100-40-repeated-snap",
+      "preconditions": [
+        {
+          "name": "viewport is the Playwright Desktop Chrome default",
+          "pass": true,
+          "actual": {
+            "width": 1280,
+            "height": 720
+          },
+          "expected": {
+            "width": 1280,
+            "height": 720
+          }
+        },
+        {
+          "name": "plain target is exactly 100x100",
+          "pass": true,
+          "actual": {
+            "x": 590,
+            "y": 235,
+            "top": 235,
+            "right": 690,
+            "bottom": 335,
+            "left": 590,
+            "width": 100,
+            "height": 100
+          },
+          "expected": {
+            "width": 100,
+            "height": 100
+          }
+        },
+        {
+          "name": "initial target is exactly 80x80",
+          "pass": true,
+          "actual": {
+            "x": 700,
+            "y": 477,
+            "top": 477,
+            "right": 780,
+            "bottom": 557,
+            "left": 700,
+            "width": 80,
+            "height": 80
+          },
+          "expected": {
+            "width": 80,
+            "height": 80
+          }
+        },
+        {
+          "name": "initial public x/y is rendered before input",
+          "pass": true,
+          "actual": "matrix(1, 0, 0, 1, 100, 40)",
+          "expected": "matrix translation (100,40)"
+        },
+        {
+          "name": "initial-handle receives the real mouse pointerdown coordinates",
+          "pass": true,
+          "actual": {
+            "entry": {
+              "sequence": 1,
+              "at": 164.7,
+              "targetTestId": "initial-handle",
+              "event": {
+                "type": "pointerdown",
+                "pointerId": 1,
+                "pointerType": "mouse",
+                "isPrimary": true,
+                "button": 0,
+                "buttons": 1,
+                "client": {
+                  "x": 640,
+                  "y": 417
+                },
+                "page": {
+                  "x": 640,
+                  "y": 417
+                }
+              }
+            },
+            "requested": {
+              "x": 640,
+              "y": 417
+            },
+            "scroll": {
+              "x": 0,
+              "y": 0
+            }
+          },
+          "expected": {
+            "requested": {
+              "x": 640,
+              "y": 417
+            },
+            "pointerType": "mouse",
+            "isPrimary": true
+          }
+        },
+        {
+          "name": "initial-handle receives the real mouse pointerdown coordinates",
+          "pass": true,
+          "actual": {
+            "entry": {
+              "sequence": 9,
+              "at": 440.9,
+              "targetTestId": "initial-handle",
+              "event": {
+                "type": "pointerdown",
+                "pointerId": 1,
+                "pointerType": "mouse",
+                "isPrimary": true,
+                "button": 0,
+                "buttons": 1,
+                "client": {
+                  "x": 640,
+                  "y": 417
+                },
+                "page": {
+                  "x": 640,
+                  "y": 417
+                }
+              }
+            },
+            "requested": {
+              "x": 640,
+              "y": 417
+            },
+            "scroll": {
+              "x": 0,
+              "y": 0
+            }
+          },
+          "expected": {
+            "requested": {
+              "x": 640,
+              "y": 417
+            },
+            "pointerType": "mouse",
+            "isPrimary": true
+          }
+        }
+      ],
+      "output": {
+        "boot": {
+          "sequence": 0,
+          "at": 104.7,
+          "label": "boot",
+          "viewport": {
+            "width": 1280,
+            "height": 720
+          },
+          "scroll": {
+            "x": 0,
+            "y": 0
+          },
+          "rects": {
+            "plain": {
+              "x": 590,
+              "y": 235,
+              "top": 235,
+              "right": 690,
+              "bottom": 335,
+              "left": 590,
+              "width": 100,
+              "height": 100
+            },
+            "handle": {
+              "x": 602.703125,
+              "y": 203,
+              "top": 203,
+              "right": 677.28125,
+              "bottom": 227,
+              "left": 602.703125,
+              "width": 74.578125,
+              "height": 24
+            },
+            "initial": {
+              "x": 700,
+              "y": 477,
+              "top": 477,
+              "right": 780,
+              "bottom": 557,
+              "left": 700,
+              "width": 80,
+              "height": 80
+            },
+            "initialHandle": {
+              "x": 581.609375,
+              "y": 405,
+              "top": 405,
+              "right": 698.390625,
+              "bottom": 429,
+              "left": 581.609375,
+              "width": 116.78125,
+              "height": 24
+            }
+          },
+          "transforms": {
+            "plain": "none",
+            "initial": "matrix(1, 0, 0, 1, 100, 40)"
+          }
+        },
+        "drags": [
+          {
+            "index": 0,
+            "handle": {
+              "x": 581.609375,
+              "y": 405,
+              "width": 116.78125,
+              "height": 24
+            },
+            "start": {
+              "x": 640,
+              "y": 417
+            },
+            "move": {
+              "x": 690,
+              "y": 467
+            },
+            "steps": 5,
+            "before": {
+              "x": 700,
+              "y": 477,
+              "width": 80,
+              "height": 80
+            },
+            "active": {
+              "x": 650,
+              "y": 427,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "index": 1,
+            "handle": {
+              "x": 581.609375,
+              "y": 405,
+              "width": 116.78125,
+              "height": 24
+            },
+            "start": {
+              "x": 640,
+              "y": 417
+            },
+            "move": {
+              "x": 690,
+              "y": 467
+            },
+            "steps": 5,
+            "before": {
+              "x": 650,
+              "y": 427,
+              "width": 80,
+              "height": 80
+            },
+            "active": {
+              "x": 600,
+              "y": 377,
+              "width": 80,
+              "height": 80
+            }
+          }
+        ],
+        "repeatedActiveDelta": {
+          "x": -50,
+          "y": -50
+        },
+        "trace": [
+          {
+            "sequence": 0,
+            "at": 178.9,
+            "target": "initial",
+            "type": "onDragStart",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 650,
+                "y": 427
+              },
+              "page": {
+                "x": 650,
+                "y": 427
+              }
+            },
+            "info": {
+              "point": {
+                "x": 650,
+                "y": 427
+              },
+              "delta": {
+                "x": 10,
+                "y": 10
+              },
+              "offset": {
+                "x": 10,
+                "y": 10
+              },
+              "velocity": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "rect": {
+              "x": 610,
+              "y": 387,
+              "top": 387,
+              "right": 690,
+              "bottom": 467,
+              "left": 610,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 1,
+            "at": 179,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 650,
+                "y": 427
+              },
+              "page": {
+                "x": 650,
+                "y": 427
+              }
+            },
+            "info": {
+              "point": {
+                "x": 650,
+                "y": 427
+              },
+              "delta": {
+                "x": 10,
+                "y": 10
+              },
+              "offset": {
+                "x": 10,
+                "y": 10
+              },
+              "velocity": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "rect": {
+              "x": 610,
+              "y": 387,
+              "top": 387,
+              "right": 690,
+              "bottom": 467,
+              "left": 610,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 2,
+            "at": 194.6,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 660,
+                "y": 437
+              },
+              "page": {
+                "x": 660,
+                "y": 437
+              }
+            },
+            "info": {
+              "point": {
+                "x": 660,
+                "y": 437
+              },
+              "delta": {
+                "x": 10,
+                "y": 10
+              },
+              "offset": {
+                "x": 20,
+                "y": 20
+              },
+              "velocity": {
+                "x": 85.324232,
+                "y": 85.324232
+              }
+            },
+            "rect": {
+              "x": 620,
+              "y": 397,
+              "top": 397,
+              "right": 700,
+              "bottom": 477,
+              "left": 620,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 3,
+            "at": 211.7,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 670,
+                "y": 447
+              },
+              "page": {
+                "x": 670,
+                "y": 447
+              }
+            },
+            "info": {
+              "point": {
+                "x": 670,
+                "y": 447
+              },
+              "delta": {
+                "x": 10,
+                "y": 10
+              },
+              "offset": {
+                "x": 30,
+                "y": 30
+              },
+              "velocity": {
+                "x": 149.476831,
+                "y": 149.476831
+              }
+            },
+            "rect": {
+              "x": 630,
+              "y": 407,
+              "top": 407,
+              "right": 710,
+              "bottom": 487,
+              "left": 630,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 4,
+            "at": 228,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 680,
+                "y": 457
+              },
+              "page": {
+                "x": 680,
+                "y": 457
+              }
+            },
+            "info": {
+              "point": {
+                "x": 680,
+                "y": 457
+              },
+              "delta": {
+                "x": 10,
+                "y": 10
+              },
+              "offset": {
+                "x": 40,
+                "y": 40
+              },
+              "velocity": {
+                "x": 198.938992,
+                "y": 198.938992
+              }
+            },
+            "rect": {
+              "x": 640,
+              "y": 417,
+              "top": 417,
+              "right": 720,
+              "bottom": 497,
+              "left": 640,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 5,
+            "at": 244.2,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 690,
+                "y": 467
+              },
+              "page": {
+                "x": 690,
+                "y": 467
+              }
+            },
+            "info": {
+              "point": {
+                "x": 690,
+                "y": 467
+              },
+              "delta": {
+                "x": 10,
+                "y": 10
+              },
+              "offset": {
+                "x": 50,
+                "y": 50
+              },
+              "velocity": {
+                "x": 239.091452,
+                "y": 239.091452
+              }
+            },
+            "rect": {
+              "x": 650,
+              "y": 427,
+              "top": 427,
+              "right": 730,
+              "bottom": 507,
+              "left": 650,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 6,
+            "at": 261.1,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 690,
+                "y": 467
+              },
+              "page": {
+                "x": 690,
+                "y": 467
+              }
+            },
+            "info": {
+              "point": {
+                "x": 690,
+                "y": 467
+              },
+              "delta": {
+                "x": 0,
+                "y": 0
+              },
+              "offset": {
+                "x": 50,
+                "y": 50
+              },
+              "velocity": {
+                "x": 272.479564,
+                "y": 272.479564
+              }
+            },
+            "rect": {
+              "x": 650,
+              "y": 427,
+              "top": 427,
+              "right": 730,
+              "bottom": 507,
+              "left": 650,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 7,
+            "at": 277.9,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 690,
+                "y": 467
+              },
+              "page": {
+                "x": 690,
+                "y": 467
+              }
+            },
+            "info": {
+              "point": {
+                "x": 690,
+                "y": 467
+              },
+              "delta": {
+                "x": 0,
+                "y": 0
+              },
+              "offset": {
+                "x": 50,
+                "y": 50
+              },
+              "velocity": {
+                "x": 481.347774,
+                "y": 481.347774
+              }
+            },
+            "rect": {
+              "x": 650,
+              "y": 427,
+              "top": 427,
+              "right": 730,
+              "bottom": 507,
+              "left": 650,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 8,
+            "at": 293.8,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 690,
+                "y": 467
+              },
+              "page": {
+                "x": 690,
+                "y": 467
+              }
+            },
+            "info": {
+              "point": {
+                "x": 690,
+                "y": 467
+              },
+              "delta": {
+                "x": 0,
+                "y": 0
+              },
+              "offset": {
+                "x": 50,
+                "y": 50
+              },
+              "velocity": {
+                "x": 400.801603,
+                "y": 400.801603
+              }
+            },
+            "rect": {
+              "x": 650,
+              "y": 427,
+              "top": 427,
+              "right": 730,
+              "bottom": 507,
+              "left": 650,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 9,
+            "at": 315.6,
+            "target": "initial",
+            "type": "onDragEnd",
+            "event": {
+              "type": "pointerup",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": 0,
+              "buttons": 0,
+              "client": {
+                "x": 690,
+                "y": 467
+              },
+              "page": {
+                "x": 690,
+                "y": 467
+              }
+            },
+            "info": {
+              "point": {
+                "x": 690,
+                "y": 467
+              },
+              "delta": {
+                "x": 0,
+                "y": 0
+              },
+              "offset": {
+                "x": 50,
+                "y": 50
+              },
+              "velocity": {
+                "x": 345.423143,
+                "y": 345.423143
+              }
+            },
+            "rect": {
+              "x": 650,
+              "y": 427,
+              "top": 427,
+              "right": 730,
+              "bottom": 507,
+              "left": 650,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 10,
+            "at": 461,
+            "target": "initial",
+            "type": "onDragStart",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 650,
+                "y": 427
+              },
+              "page": {
+                "x": 650,
+                "y": 427
+              }
+            },
+            "info": {
+              "point": {
+                "x": 650,
+                "y": 427
+              },
+              "delta": {
+                "x": 10,
+                "y": 10
+              },
+              "offset": {
+                "x": 10,
+                "y": 10
+              },
+              "velocity": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "rect": {
+              "x": 560,
+              "y": 337,
+              "top": 337,
+              "right": 640,
+              "bottom": 417,
+              "left": 560,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 11,
+            "at": 461.1,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 650,
+                "y": 427
+              },
+              "page": {
+                "x": 650,
+                "y": 427
+              }
+            },
+            "info": {
+              "point": {
+                "x": 650,
+                "y": 427
+              },
+              "delta": {
+                "x": 10,
+                "y": 10
+              },
+              "offset": {
+                "x": 10,
+                "y": 10
+              },
+              "velocity": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "rect": {
+              "x": 560,
+              "y": 337,
+              "top": 337,
+              "right": 640,
+              "bottom": 417,
+              "left": 560,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 12,
+            "at": 478.5,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 660,
+                "y": 437
+              },
+              "page": {
+                "x": 660,
+                "y": 437
+              }
+            },
+            "info": {
+              "point": {
+                "x": 660,
+                "y": 437
+              },
+              "delta": {
+                "x": 10,
+                "y": 10
+              },
+              "offset": {
+                "x": 20,
+                "y": 20
+              },
+              "velocity": {
+                "x": 74.682599,
+                "y": 74.682599
+              }
+            },
+            "rect": {
+              "x": 570,
+              "y": 347,
+              "top": 347,
+              "right": 650,
+              "bottom": 427,
+              "left": 570,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 13,
+            "at": 494.8,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 670,
+                "y": 447
+              },
+              "page": {
+                "x": 670,
+                "y": 447
+              }
+            },
+            "info": {
+              "point": {
+                "x": 670,
+                "y": 447
+              },
+              "delta": {
+                "x": 10,
+                "y": 10
+              },
+              "offset": {
+                "x": 30,
+                "y": 30
+              },
+              "velocity": {
+                "x": 132.100396,
+                "y": 132.100396
+              }
+            },
+            "rect": {
+              "x": 580,
+              "y": 357,
+              "top": 357,
+              "right": 660,
+              "bottom": 437,
+              "left": 580,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 14,
+            "at": 510.8,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 680,
+                "y": 457
+              },
+              "page": {
+                "x": 680,
+                "y": 457
+              }
+            },
+            "info": {
+              "point": {
+                "x": 680,
+                "y": 457
+              },
+              "delta": {
+                "x": 10,
+                "y": 10
+              },
+              "offset": {
+                "x": 40,
+                "y": 40
+              },
+              "velocity": {
+                "x": 178.784267,
+                "y": 178.784267
+              }
+            },
+            "rect": {
+              "x": 590,
+              "y": 367,
+              "top": 367,
+              "right": 670,
+              "bottom": 447,
+              "left": 590,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 15,
+            "at": 527.8,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 690,
+                "y": 467
+              },
+              "page": {
+                "x": 690,
+                "y": 467
+              }
+            },
+            "info": {
+              "point": {
+                "x": 690,
+                "y": 467
+              },
+              "delta": {
+                "x": 10,
+                "y": 10
+              },
+              "offset": {
+                "x": 50,
+                "y": 50
+              },
+              "velocity": {
+                "x": 217.627856,
+                "y": 217.627856
+              }
+            },
+            "rect": {
+              "x": 600,
+              "y": 377,
+              "top": 377,
+              "right": 680,
+              "bottom": 457,
+              "left": 600,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 16,
+            "at": 544.6,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 690,
+                "y": 467
+              },
+              "page": {
+                "x": 690,
+                "y": 467
+              }
+            },
+            "info": {
+              "point": {
+                "x": 690,
+                "y": 467
+              },
+              "delta": {
+                "x": 0,
+                "y": 0
+              },
+              "offset": {
+                "x": 50,
+                "y": 50
+              },
+              "velocity": {
+                "x": 597.907324,
+                "y": 597.907324
+              }
+            },
+            "rect": {
+              "x": 600,
+              "y": 377,
+              "top": 377,
+              "right": 680,
+              "bottom": 457,
+              "left": 600,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 17,
+            "at": 560.6,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 690,
+                "y": 467
+              },
+              "page": {
+                "x": 690,
+                "y": 467
+              }
+            },
+            "info": {
+              "point": {
+                "x": 690,
+                "y": 467
+              },
+              "delta": {
+                "x": 0,
+                "y": 0
+              },
+              "offset": {
+                "x": 50,
+                "y": 50
+              },
+              "velocity": {
+                "x": 477.897252,
+                "y": 477.897252
+              }
+            },
+            "rect": {
+              "x": 600,
+              "y": 377,
+              "top": 377,
+              "right": 680,
+              "bottom": 457,
+              "left": 600,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 18,
+            "at": 577.2,
+            "target": "initial",
+            "type": "onDrag",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 690,
+                "y": 467
+              },
+              "page": {
+                "x": 690,
+                "y": 467
+              }
+            },
+            "info": {
+              "point": {
+                "x": 690,
+                "y": 467
+              },
+              "delta": {
+                "x": 0,
+                "y": 0
+              },
+              "offset": {
+                "x": 50,
+                "y": 50
+              },
+              "velocity": {
+                "x": 401.203611,
+                "y": 401.203611
+              }
+            },
+            "rect": {
+              "x": 600,
+              "y": 377,
+              "top": 377,
+              "right": 680,
+              "bottom": 457,
+              "left": 600,
+              "width": 80,
+              "height": 80
+            }
+          },
+          {
+            "sequence": 19,
+            "at": 595.1,
+            "target": "initial",
+            "type": "onDragEnd",
+            "event": {
+              "type": "pointerup",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": 0,
+              "buttons": 0,
+              "client": {
+                "x": 690,
+                "y": 467
+              },
+              "page": {
+                "x": 690,
+                "y": 467
+              }
+            },
+            "info": {
+              "point": {
+                "x": 690,
+                "y": 467
+              },
+              "delta": {
+                "x": 0,
+                "y": 0
+              },
+              "offset": {
+                "x": 50,
+                "y": 50
+              },
+              "velocity": {
+                "x": 343.938091,
+                "y": 343.938091
+              }
+            },
+            "rect": {
+              "x": 600,
+              "y": 377,
+              "top": 377,
+              "right": 680,
+              "bottom": 457,
+              "left": 600,
+              "width": 80,
+              "height": 80
+            }
+          }
+        ],
+        "inputTrace": [
+          {
+            "sequence": 0,
+            "at": 162.5,
+            "targetTestId": "initial-handle",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 0,
+              "client": {
+                "x": 640,
+                "y": 417
+              },
+              "page": {
+                "x": 640,
+                "y": 417
+              }
+            }
+          },
+          {
+            "sequence": 1,
+            "at": 164.7,
+            "targetTestId": "initial-handle",
+            "event": {
+              "type": "pointerdown",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": 0,
+              "buttons": 1,
+              "client": {
+                "x": 640,
+                "y": 417
+              },
+              "page": {
+                "x": 640,
+                "y": 417
+              }
+            }
+          },
+          {
+            "sequence": 2,
+            "at": 177.5,
+            "targetTestId": "initial-handle",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 650,
+                "y": 427
+              },
+              "page": {
+                "x": 650,
+                "y": 427
+              }
+            }
+          },
+          {
+            "sequence": 3,
+            "at": 194.2,
+            "targetTestId": "drag-controls-initial",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 660,
+                "y": 437
+              },
+              "page": {
+                "x": 660,
+                "y": 437
+              }
+            }
+          },
+          {
+            "sequence": 4,
+            "at": 211.1,
+            "targetTestId": "drag-controls-initial",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 670,
+                "y": 447
+              },
+              "page": {
+                "x": 670,
+                "y": 447
+              }
+            }
+          },
+          {
+            "sequence": 5,
+            "at": 227.6,
+            "targetTestId": "drag-controls-initial",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 680,
+                "y": 457
+              },
+              "page": {
+                "x": 680,
+                "y": 457
+              }
+            }
+          },
+          {
+            "sequence": 6,
+            "at": 243.9,
+            "targetTestId": "drag-controls-initial",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 690,
+                "y": 467
+              },
+              "page": {
+                "x": 690,
+                "y": 467
+              }
+            }
+          },
+          {
+            "sequence": 7,
+            "at": 311.9,
+            "targetTestId": "drag-controls-initial",
+            "event": {
+              "type": "pointerup",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": 0,
+              "buttons": 0,
+              "client": {
+                "x": 690,
+                "y": 467
+              },
+              "page": {
+                "x": 690,
+                "y": 467
+              }
+            }
+          },
+          {
+            "sequence": 8,
+            "at": 438.9,
+            "targetTestId": "initial-handle",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 0,
+              "client": {
+                "x": 640,
+                "y": 417
+              },
+              "page": {
+                "x": 640,
+                "y": 417
+              }
+            }
+          },
+          {
+            "sequence": 9,
+            "at": 440.9,
+            "targetTestId": "initial-handle",
+            "event": {
+              "type": "pointerdown",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": 0,
+              "buttons": 1,
+              "client": {
+                "x": 640,
+                "y": 417
+              },
+              "page": {
+                "x": 640,
+                "y": 417
+              }
+            }
+          },
+          {
+            "sequence": 10,
+            "at": 460.6,
+            "targetTestId": "initial-handle",
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 650,
+                "y": 427
+              },
+              "page": {
+                "x": 650,
+                "y": 427
+              }
+            }
+          },
+          {
+            "sequence": 11,
+            "at": 478.1,
+            "targetTestId": null,
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 660,
+                "y": 437
+              },
+              "page": {
+                "x": 660,
+                "y": 437
+              }
+            }
+          },
+          {
+            "sequence": 12,
+            "at": 494.5,
+            "targetTestId": null,
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 670,
+                "y": 447
+              },
+              "page": {
+                "x": 670,
+                "y": 447
+              }
+            }
+          },
+          {
+            "sequence": 13,
+            "at": 510.5,
+            "targetTestId": null,
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 680,
+                "y": 457
+              },
+              "page": {
+                "x": 680,
+                "y": 457
+              }
+            }
+          },
+          {
+            "sequence": 14,
+            "at": 527.5,
+            "targetTestId": null,
+            "event": {
+              "type": "pointermove",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": -1,
+              "buttons": 1,
+              "client": {
+                "x": 690,
+                "y": 467
+              },
+              "page": {
+                "x": 690,
+                "y": 467
+              }
+            }
+          },
+          {
+            "sequence": 15,
+            "at": 593.8,
+            "targetTestId": null,
+            "event": {
+              "type": "pointerup",
+              "pointerId": 1,
+              "pointerType": "mouse",
+              "isPrimary": true,
+              "button": 0,
+              "buttons": 0,
+              "client": {
+                "x": 690,
+                "y": 467
+              },
+              "page": {
+                "x": 690,
+                "y": 467
+              }
+            }
+          }
+        ],
+        "snapshots": [
+          {
+            "sequence": 0,
+            "at": 104.7,
+            "label": "boot",
+            "viewport": {
+              "width": 1280,
+              "height": 720
+            },
+            "scroll": {
+              "x": 0,
+              "y": 0
+            },
+            "rects": {
+              "plain": {
+                "x": 590,
+                "y": 235,
+                "top": 235,
+                "right": 690,
+                "bottom": 335,
+                "left": 590,
+                "width": 100,
+                "height": 100
+              },
+              "handle": {
+                "x": 602.703125,
+                "y": 203,
+                "top": 203,
+                "right": 677.28125,
+                "bottom": 227,
+                "left": 602.703125,
+                "width": 74.578125,
+                "height": 24
+              },
+              "initial": {
+                "x": 700,
+                "y": 477,
+                "top": 477,
+                "right": 780,
+                "bottom": 557,
+                "left": 700,
+                "width": 80,
+                "height": 80
+              },
+              "initialHandle": {
+                "x": 581.609375,
+                "y": 405,
+                "top": 405,
+                "right": 698.390625,
+                "bottom": 429,
+                "left": 581.609375,
+                "width": 116.78125,
+                "height": 24
+              }
+            },
+            "transforms": {
+              "plain": "none",
+              "initial": "matrix(1, 0, 0, 1, 100, 40)"
+            }
+          }
+        ]
+      },
+      "error": null
+    }
+  ]
+}

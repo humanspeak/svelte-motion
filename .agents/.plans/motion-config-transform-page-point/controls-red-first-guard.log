@@ -1,0 +1,38 @@
+
+Running 3 tests using 1 worker
+
+(node:67438) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/3] [chromium] › e2e/drag/controls.spec.ts:54:5 › drag/controls › imperative start moves x only with dragControls
+[2/3] [chromium] › e2e/drag/controls.spec.ts:81:5 › drag/controls › tiny right nudge does NOT teleport on x-only dragControls
+[3/3] [chromium] › e2e/drag/controls.spec.ts:144:5 › drag/controls › snapToCursor does not creep across repeated drags with initial coordinates
+  1) [chromium] › e2e/drag/controls.spec.ts:144:5 › drag/controls › snapToCursor does not creep across repeated drags with initial coordinates 
+
+    Error: actual repeated drag positions: [{"before":{"x":700,"y":477},"snapped":{"x":600,"y":377},"active":{"x":750,"y":427},"end":{"x":750,"y":427}},{"before":{"x":750,"y":427},"snapped":{"x":650,"y":327},"active":{"x":800,"y":377},"end":{"x":800,"y":377}},{"before":{"x":800,"y":377},"snapped":{"x":700,"y":277},"active":{"x":850,"y":327},"end":{"x":850,"y":327}}]
+
+    expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 2
+    Received:    50
+
+      242 |                 ),
+      243 |                 positionReport
+    > 244 |             ).toBeLessThanOrEqual(2)
+          |               ^
+      245 |             expect(
+      246 |                 Math.abs(
+      247 |                     session.snapped.y + session.snapped.height / 2 - session.pointerDown.clientY
+        at /Users/jasonkummerl/Github/svelte-motion-transform-page-point/e2e/drag/controls.spec.ts:244:15
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/drag-controls-drag-control-61440-gs-with-initial-coordinates-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/drag-controls-drag-control-61440-gs-with-initial-coordinates-chromium/error-context.md
+
+
+  1 failed
+    [chromium] › e2e/drag/controls.spec.ts:144:5 › drag/controls › snapToCursor does not creep across repeated drags with initial coordinates 
+  2 passed (6.2s)

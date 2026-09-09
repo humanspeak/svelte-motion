@@ -1,0 +1,1295 @@
+[
+  {
+    "id": "pan-no-config-end",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 312.5,
+        "expected": 375
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 208.333333,
+        "expected": 250
+      }
+    ]
+  },
+  {
+    "id": "pan-config-inherit",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 71.428571,
+        "expected": 100
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 35.714286,
+        "expected": 50
+      },
+      {
+        "path": "callbacks.4.info.velocity.x",
+        "actual": 625,
+        "expected": 750
+      },
+      {
+        "path": "callbacks.4.info.velocity.y",
+        "actual": 416.666667,
+        "expected": 500
+      }
+    ]
+  },
+  {
+    "id": "pan-config-identity",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 312.5,
+        "expected": 375
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 208.333333,
+        "expected": 250
+      }
+    ]
+  },
+  {
+    "id": "pan-config-explicit-undefined",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 312.5,
+        "expected": 375
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 208.333333,
+        "expected": 250
+      }
+    ]
+  },
+  {
+    "id": "pan-uniform-scale",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 71.428571,
+        "expected": 100
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 35.714286,
+        "expected": 50
+      },
+      {
+        "path": "callbacks.4.info.velocity.x",
+        "actual": 625,
+        "expected": 750
+      },
+      {
+        "path": "callbacks.4.info.velocity.y",
+        "actual": 416.666667,
+        "expected": 500
+      }
+    ]
+  },
+  {
+    "id": "pan-nonuniform-affine",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 71.428571,
+        "expected": 100
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 8.928571,
+        "expected": 12.5
+      },
+      {
+        "path": "callbacks.4.info.velocity.x",
+        "actual": 625,
+        "expected": 750
+      },
+      {
+        "path": "callbacks.4.info.velocity.y",
+        "actual": 104.166667,
+        "expected": 125
+      }
+    ]
+  },
+  {
+    "id": "pan-page-scroll-at-start",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 833.333333,
+        "expected": 1071.428571
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 555.555556,
+        "expected": 714.285714
+      }
+    ]
+  },
+  {
+    "id": "pan-page-scroll-held",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 833.333333,
+        "expected": 1071.428571
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 555.555556,
+        "expected": 714.285714
+      },
+      {
+        "path": "callbacks.4.info.velocity.x",
+        "actual": 588.235294,
+        "expected": 697.674419
+      },
+      {
+        "path": "callbacks.4.info.velocity.y",
+        "actual": 392.156863,
+        "expected": 465.116279
+      }
+    ]
+  },
+  {
+    "id": "pan-ancestor-scroll-held",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 833.333333,
+        "expected": 1071.428571
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 555.555556,
+        "expected": 714.285714
+      },
+      {
+        "path": "callbacks.4.info.velocity.x",
+        "actual": 588.235294,
+        "expected": 697.674419
+      },
+      {
+        "path": "callbacks.4.info.velocity.y",
+        "actual": 392.156863,
+        "expected": 465.116279
+      }
+    ]
+  },
+  {
+    "id": "pan-reference-replacement",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 555.555556,
+        "expected": 714.285714
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 277.777778,
+        "expected": 357.142857
+      },
+      {
+        "path": "callbacks.4.info.velocity.x",
+        "actual": 454.545455,
+        "expected": 555.555556
+      },
+      {
+        "path": "callbacks.4.info.velocity.y",
+        "actual": 227.272727,
+        "expected": 277.777778
+      },
+      {
+        "path": "callbacks.5.info.velocity.x",
+        "actual": 546.875,
+        "expected": 625
+      },
+      {
+        "path": "callbacks.5.info.velocity.y",
+        "actual": 312.5,
+        "expected": 357.142857
+      }
+    ]
+  },
+  {
+    "id": "pan-stable-closure-scale",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 555.555556,
+        "expected": 714.285714
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 277.777778,
+        "expected": 357.142857
+      },
+      {
+        "path": "callbacks.4.info.velocity.x",
+        "actual": 10227.272727,
+        "expected": 12500
+      },
+      {
+        "path": "callbacks.4.info.velocity.y",
+        "actual": 7954.545455,
+        "expected": 9722.222222
+      },
+      {
+        "path": "callbacks.5.info.velocity.x",
+        "actual": 7343.75,
+        "expected": 8392.857143
+      },
+      {
+        "path": "callbacks.5.info.velocity.y",
+        "actual": 5625,
+        "expected": 6428.571429
+      }
+    ]
+  },
+  {
+    "id": "pan-corrected-threshold",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 41.666667,
+        "expected": 50
+      }
+    ]
+  },
+  {
+    "id": "pan-pointer-cancel",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 71.428571,
+        "expected": 100
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 35.714286,
+        "expected": 50
+      },
+      {
+        "path": "callbacks.4.info.velocity.x",
+        "actual": 625,
+        "expected": 750
+      },
+      {
+        "path": "callbacks.4.info.velocity.y",
+        "actual": 416.666667,
+        "expected": 500
+      }
+    ]
+  },
+  {
+    "id": "pan-unmount-held",
+    "status": "matched",
+    "mismatches": []
+  },
+  {
+    "id": "drag-no-config-end",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.2.info.velocity.x",
+        "actual": 312.5,
+        "expected": 375
+      },
+      {
+        "path": "callbacks.2.info.velocity.y",
+        "actual": 208.333333,
+        "expected": 250
+      }
+    ]
+  },
+  {
+    "id": "drag-uniform-scale",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.2.info.velocity.x",
+        "actual": 71.428571,
+        "expected": 100
+      },
+      {
+        "path": "callbacks.2.info.velocity.y",
+        "actual": 35.714286,
+        "expected": 50
+      },
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 625,
+        "expected": 750
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 416.666667,
+        "expected": 500
+      }
+    ]
+  },
+  {
+    "id": "drag-nonuniform-affine",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.2.info.velocity.x",
+        "actual": 71.428571,
+        "expected": 100
+      },
+      {
+        "path": "callbacks.2.info.velocity.y",
+        "actual": 8.928571,
+        "expected": 12.5
+      },
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 625,
+        "expected": 750
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 104.166667,
+        "expected": 125
+      }
+    ]
+  },
+  {
+    "id": "drag-page-scroll-at-start",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.2.info.velocity.x",
+        "actual": 833.333333,
+        "expected": 1071.428571
+      },
+      {
+        "path": "callbacks.2.info.velocity.y",
+        "actual": 555.555556,
+        "expected": 714.285714
+      }
+    ]
+  },
+  {
+    "id": "drag-page-scroll-held",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.2.info.velocity.x",
+        "actual": 833.333333,
+        "expected": 1071.428571
+      },
+      {
+        "path": "callbacks.2.info.velocity.y",
+        "actual": 555.555556,
+        "expected": 714.285714
+      },
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 588.235294,
+        "expected": 697.674419
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 392.156863,
+        "expected": 465.116279
+      }
+    ]
+  },
+  {
+    "id": "drag-ancestor-scroll-held",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.2.info.velocity.x",
+        "actual": 1458.333333,
+        "expected": 1875
+      },
+      {
+        "path": "callbacks.2.info.velocity.y",
+        "actual": 1319.444444,
+        "expected": 1696.428571
+      },
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 1029.411765,
+        "expected": 1220.930233
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 931.372549,
+        "expected": 1104.651163
+      }
+    ]
+  },
+  {
+    "id": "drag-reference-replacement",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.2.at",
+        "actual": 1104,
+        "expected": 1088
+      },
+      {
+        "path": "callbacks.2.info.velocity.x",
+        "actual": 555.555556,
+        "expected": 714.285714
+      },
+      {
+        "path": "callbacks.2.info.velocity.y",
+        "actual": 277.777778,
+        "expected": 357.142857
+      },
+      {
+        "path": "callbacks.3.at",
+        "actual": 1144,
+        "expected": 1104
+      },
+      {
+        "path": "callbacks.3.info.point.x",
+        "actual": 884,
+        "expected": 854
+      },
+      {
+        "path": "callbacks.3.info.point.y",
+        "actual": 710,
+        "expected": 690
+      },
+      {
+        "path": "callbacks.3.info.delta.x",
+        "actual": 30,
+        "expected": 0
+      },
+      {
+        "path": "callbacks.3.info.delta.y",
+        "actual": 20,
+        "expected": 0
+      },
+      {
+        "path": "callbacks.3.info.offset.x",
+        "actual": 70,
+        "expected": 40
+      },
+      {
+        "path": "callbacks.3.info.offset.y",
+        "actual": 40,
+        "expected": 20
+      },
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 454.545455,
+        "expected": 714.285714
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 227.272727,
+        "expected": 357.142857
+      },
+      {
+        "path": "callbacks.3.boundValues.x",
+        "actual": 70,
+        "expected": 40
+      },
+      {
+        "path": "callbacks.3.boundValues.y",
+        "actual": 40,
+        "expected": 20
+      },
+      {
+        "path": "callbacks.4.at",
+        "actual": 1164,
+        "expected": 1144
+      },
+      {
+        "path": "callbacks.4.type",
+        "actual": "onDragEnd",
+        "expected": "onDrag"
+      },
+      {
+        "path": "callbacks.4.eventType",
+        "actual": "pointerup",
+        "expected": "pointermove"
+      },
+      {
+        "path": "callbacks.4.info.delta.x",
+        "actual": 0,
+        "expected": 30
+      },
+      {
+        "path": "callbacks.4.info.delta.y",
+        "actual": 0,
+        "expected": 20
+      },
+      {
+        "path": "callbacks.4.info.velocity.x",
+        "actual": 546.875,
+        "expected": 555.555556
+      },
+      {
+        "path": "callbacks.4.info.velocity.y",
+        "actual": 312.5,
+        "expected": 277.777778
+      },
+      {
+        "path": "callbacks.5.at",
+        "actual": 1220,
+        "expected": 1164
+      },
+      {
+        "path": "callbacks.5.type",
+        "actual": "onDragStart",
+        "expected": "onDragEnd"
+      },
+      {
+        "path": "callbacks.5.eventType",
+        "actual": "pointermove",
+        "expected": "pointerup"
+      },
+      {
+        "path": "callbacks.5.info.point.x",
+        "actual": 1356,
+        "expected": 884
+      },
+      {
+        "path": "callbacks.5.info.point.y",
+        "actual": 1080,
+        "expected": 710
+      },
+      {
+        "path": "callbacks.5.info.delta.x",
+        "actual": 30,
+        "expected": 0
+      },
+      {
+        "path": "callbacks.5.info.delta.y",
+        "actual": 15,
+        "expected": 0
+      },
+      {
+        "path": "callbacks.5.info.offset.x",
+        "actual": 30,
+        "expected": 70
+      },
+      {
+        "path": "callbacks.5.info.offset.y",
+        "actual": 15,
+        "expected": 40
+      },
+      {
+        "path": "callbacks.5.info.velocity.x",
+        "actual": 0,
+        "expected": 625
+      },
+      {
+        "path": "callbacks.5.info.velocity.y",
+        "actual": 0,
+        "expected": 357.142857
+      },
+      {
+        "path": "callbacks.5.boundValues.x",
+        "actual": 100,
+        "expected": 70
+      },
+      {
+        "path": "callbacks.5.boundValues.y",
+        "actual": 55,
+        "expected": 40
+      },
+      {
+        "path": "callbacks.6.type",
+        "actual": "onDrag",
+        "expected": "onDragStart"
+      },
+      {
+        "path": "callbacks.7.at",
+        "actual": 1240,
+        "expected": 1220
+      },
+      {
+        "path": "callbacks.7.type",
+        "actual": "onDragEnd",
+        "expected": "onDrag"
+      },
+      {
+        "path": "callbacks.7.eventType",
+        "actual": "pointerup",
+        "expected": "pointermove"
+      },
+      {
+        "path": "callbacks.7.info.delta.x",
+        "actual": 0,
+        "expected": 30
+      },
+      {
+        "path": "callbacks.7.info.delta.y",
+        "actual": 0,
+        "expected": 15
+      },
+      {
+        "path": "callbacks.7.info.velocity.x",
+        "actual": 535.714286,
+        "expected": 0
+      },
+      {
+        "path": "callbacks.7.info.velocity.y",
+        "actual": 267.857143,
+        "expected": 0
+      },
+      {
+        "path": "callbacks.8",
+        "expected": {
+          "at": 1240,
+          "type": "onDragEnd",
+          "eventType": "pointerup",
+          "info": {
+            "point": {
+              "x": 1356,
+              "y": 1080
+            },
+            "delta": {
+              "x": 0,
+              "y": 0
+            },
+            "offset": {
+              "x": 30,
+              "y": 15
+            },
+            "velocity": {
+              "x": 535.714286,
+              "y": 267.857143
+            }
+          },
+          "boundValues": {
+            "x": 100,
+            "y": 55
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "drag-stable-closure-scale",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.2.at",
+        "actual": 1104,
+        "expected": 1088
+      },
+      {
+        "path": "callbacks.2.info.velocity.x",
+        "actual": 555.555556,
+        "expected": 714.285714
+      },
+      {
+        "path": "callbacks.2.info.velocity.y",
+        "actual": 277.777778,
+        "expected": 357.142857
+      },
+      {
+        "path": "callbacks.3.at",
+        "actual": 1144,
+        "expected": 1104
+      },
+      {
+        "path": "callbacks.3.info.point.x",
+        "actual": 1748,
+        "expected": 1708
+      },
+      {
+        "path": "callbacks.3.info.point.y",
+        "actual": 1400,
+        "expected": 1380
+      },
+      {
+        "path": "callbacks.3.info.delta.x",
+        "actual": 40,
+        "expected": 0
+      },
+      {
+        "path": "callbacks.3.info.delta.y",
+        "actual": 20,
+        "expected": 0
+      },
+      {
+        "path": "callbacks.3.info.offset.x",
+        "actual": 934,
+        "expected": 894
+      },
+      {
+        "path": "callbacks.3.info.offset.y",
+        "actual": 730,
+        "expected": 710
+      },
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 10159.090909,
+        "expected": 15964.285714
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 8068.181818,
+        "expected": 12678.571429
+      },
+      {
+        "path": "callbacks.3.boundValues.x",
+        "actual": 934,
+        "expected": 894
+      },
+      {
+        "path": "callbacks.3.boundValues.y",
+        "actual": 730,
+        "expected": 710
+      },
+      {
+        "path": "callbacks.4.at",
+        "actual": 1164,
+        "expected": 1144
+      },
+      {
+        "path": "callbacks.4.type",
+        "actual": "onDragEnd",
+        "expected": "onDrag"
+      },
+      {
+        "path": "callbacks.4.eventType",
+        "actual": "pointerup",
+        "expected": "pointermove"
+      },
+      {
+        "path": "callbacks.4.info.delta.x",
+        "actual": 0,
+        "expected": 40
+      },
+      {
+        "path": "callbacks.4.info.delta.y",
+        "actual": 0,
+        "expected": 20
+      },
+      {
+        "path": "callbacks.4.info.velocity.x",
+        "actual": 7296.875,
+        "expected": 12416.666667
+      },
+      {
+        "path": "callbacks.4.info.velocity.y",
+        "actual": 5703.125,
+        "expected": 9861.111111
+      },
+      {
+        "path": "callbacks.5",
+        "expected": {
+          "at": 1164,
+          "type": "onDragEnd",
+          "eventType": "pointerup",
+          "info": {
+            "point": {
+              "x": 1748,
+              "y": 1400
+            },
+            "delta": {
+              "x": 0,
+              "y": 0
+            },
+            "offset": {
+              "x": 934,
+              "y": 730
+            },
+            "velocity": {
+              "x": 8339.285714,
+              "y": 6517.857143
+            }
+          },
+          "boundValues": {
+            "x": 934,
+            "y": 730
+          }
+        }
+      },
+      {
+        "path": "stable-scale-commit.rects.target.x",
+        "actual": 353.5,
+        "expected": 567
+      },
+      {
+        "path": "stable-scale-commit.rects.target.y",
+        "actual": 292.5,
+        "expected": 465
+      },
+      {
+        "path": "stable-scale-commit.rects.target.top",
+        "actual": 292.5,
+        "expected": 465
+      },
+      {
+        "path": "stable-scale-commit.rects.target.right",
+        "actual": 373.5,
+        "expected": 587
+      },
+      {
+        "path": "stable-scale-commit.rects.target.bottom",
+        "actual": 312.5,
+        "expected": 485
+      },
+      {
+        "path": "stable-scale-commit.rects.target.left",
+        "actual": 353.5,
+        "expected": 567
+      },
+      {
+        "path": "stable-scale-commit.boundValues.x",
+        "actual": 40,
+        "expected": 894
+      },
+      {
+        "path": "stable-scale-commit.boundValues.y",
+        "actual": 20,
+        "expected": 710
+      }
+    ]
+  },
+  {
+    "id": "drag-numeric-bounds",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.2.info.velocity.x",
+        "actual": 6666.666667,
+        "expected": 8571.428571
+      },
+      {
+        "path": "callbacks.2.info.velocity.y",
+        "actual": 4444.444444,
+        "expected": 5714.285714
+      },
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": -4285.714286,
+        "expected": -5000
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": -2857.142857,
+        "expected": -3333.333333
+      }
+    ]
+  },
+  {
+    "id": "drag-ref-bounds",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.2.info.velocity.x",
+        "actual": 11111.111111,
+        "expected": 14285.714286
+      },
+      {
+        "path": "callbacks.2.info.velocity.y",
+        "actual": 7222.222222,
+        "expected": 9285.714286
+      },
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": -7142.857143,
+        "expected": -8333.333333
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": -4642.857143,
+        "expected": -5416.666667
+      }
+    ]
+  },
+  {
+    "id": "drag-ref-resize-regrab",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.2.info.velocity.x",
+        "actual": 9722.222222,
+        "expected": 12500
+      },
+      {
+        "path": "callbacks.3.info.point.x",
+        "actual": 180,
+        "expected": 60
+      },
+      {
+        "path": "callbacks.4.info.point.x",
+        "actual": 180,
+        "expected": 60
+      },
+      {
+        "path": "callbacks.5.info.point.x",
+        "actual": 180,
+        "expected": 60
+      },
+      {
+        "path": "callbacks.5.info.velocity.x",
+        "actual": -11363.636364,
+        "expected": -17857.142857
+      }
+    ]
+  },
+  {
+    "id": "drag-controls-snap-scrolled",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.0.boundValues.x",
+        "actual": 766,
+        "expected": 1
+      },
+      {
+        "path": "callbacks.0.boundValues.y",
+        "actual": -172,
+        "expected": -406
+      },
+      {
+        "path": "callbacks.1.boundValues.x",
+        "actual": 766,
+        "expected": 1
+      },
+      {
+        "path": "callbacks.1.boundValues.y",
+        "actual": -172,
+        "expected": -406
+      },
+      {
+        "path": "callbacks.2.info.velocity.x",
+        "actual": 657.894737,
+        "expected": 833.333333
+      },
+      {
+        "path": "callbacks.2.info.velocity.y",
+        "actual": 394.736842,
+        "expected": 500
+      },
+      {
+        "path": "callbacks.2.boundValues.x",
+        "actual": 766,
+        "expected": 1
+      },
+      {
+        "path": "callbacks.2.boundValues.y",
+        "actual": -172,
+        "expected": -406
+      },
+      {
+        "path": "after-snap.rects.target.x",
+        "actual": 625,
+        "expected": 242.5
+      },
+      {
+        "path": "after-snap.rects.target.y",
+        "actual": 54,
+        "expected": -63
+      },
+      {
+        "path": "after-snap.rects.target.top",
+        "actual": 54,
+        "expected": -63
+      },
+      {
+        "path": "after-snap.rects.target.right",
+        "actual": 665,
+        "expected": 282.5
+      },
+      {
+        "path": "after-snap.rects.target.bottom",
+        "actual": 94,
+        "expected": -23
+      },
+      {
+        "path": "after-snap.rects.target.left",
+        "actual": 625,
+        "expected": 242.5
+      },
+      {
+        "path": "after-snap.boundValues.x",
+        "actual": 716,
+        "expected": -49
+      },
+      {
+        "path": "after-snap.boundValues.y",
+        "actual": -202,
+        "expected": -436
+      }
+    ]
+  },
+  {
+    "id": "drag-real-layout-shift-held",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.2.at",
+        "actual": 1120,
+        "expected": 1088
+      },
+      {
+        "path": "callbacks.2.info.velocity.x",
+        "actual": 833.333333,
+        "expected": 1071.428571
+      },
+      {
+        "path": "callbacks.2.info.velocity.y",
+        "actual": 416.666667,
+        "expected": 535.714286
+      },
+      {
+        "path": "callbacks.2.boundValues.x",
+        "actual": 60,
+        "expected": 0
+      },
+      {
+        "path": "callbacks.3.at",
+        "actual": 1160,
+        "expected": 1120
+      },
+      {
+        "path": "callbacks.3.info.point.x",
+        "actual": 894,
+        "expected": 874
+      },
+      {
+        "path": "callbacks.3.info.point.y",
+        "actual": 710,
+        "expected": 700
+      },
+      {
+        "path": "callbacks.3.info.delta.x",
+        "actual": 20,
+        "expected": 0
+      },
+      {
+        "path": "callbacks.3.info.delta.y",
+        "actual": 10,
+        "expected": 0
+      },
+      {
+        "path": "callbacks.3.info.offset.x",
+        "actual": 80,
+        "expected": 60
+      },
+      {
+        "path": "callbacks.3.info.offset.y",
+        "actual": 40,
+        "expected": 30
+      },
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 576.923077,
+        "expected": 1071.428571
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 288.461538,
+        "expected": 535.714286
+      },
+      {
+        "path": "callbacks.3.boundValues.x",
+        "actual": 80,
+        "expected": 0
+      },
+      {
+        "path": "callbacks.3.boundValues.y",
+        "actual": 40,
+        "expected": 30
+      },
+      {
+        "path": "callbacks.4.at",
+        "actual": 1180,
+        "expected": 1160
+      },
+      {
+        "path": "callbacks.4.type",
+        "actual": "onDragEnd",
+        "expected": "onDrag"
+      },
+      {
+        "path": "callbacks.4.eventType",
+        "actual": "pointerup",
+        "expected": "pointermove"
+      },
+      {
+        "path": "callbacks.4.info.delta.x",
+        "actual": 0,
+        "expected": 20
+      },
+      {
+        "path": "callbacks.4.info.delta.y",
+        "actual": 0,
+        "expected": 10
+      },
+      {
+        "path": "callbacks.4.info.velocity.x",
+        "actual": 555.555556,
+        "expected": 681.818182
+      },
+      {
+        "path": "callbacks.4.info.velocity.y",
+        "actual": 277.777778,
+        "expected": 340.909091
+      },
+      {
+        "path": "callbacks.4.boundValues.x",
+        "actual": 80,
+        "expected": 20
+      },
+      {
+        "path": "callbacks.5",
+        "expected": {
+          "at": 1180,
+          "type": "onDragEnd",
+          "eventType": "pointerup",
+          "info": {
+            "point": {
+              "x": 894,
+              "y": 710
+            },
+            "delta": {
+              "x": 0,
+              "y": 0
+            },
+            "offset": {
+              "x": 80,
+              "y": 40
+            },
+            "velocity": {
+              "x": 625,
+              "y": 312.5
+            }
+          },
+          "boundValues": {
+            "x": 20,
+            "y": 40
+          }
+        }
+      },
+      {
+        "path": "layout-commit.rects.target.x",
+        "actual": 447,
+        "expected": 417
+      },
+      {
+        "path": "layout-commit.rects.target.right",
+        "actual": 487,
+        "expected": 457
+      },
+      {
+        "path": "layout-commit.rects.target.left",
+        "actual": 447,
+        "expected": 417
+      },
+      {
+        "path": "layout-commit.boundValues.x",
+        "actual": 60,
+        "expected": 0
+      },
+      {
+        "path": "held-after-layout-shift.rects.target.x",
+        "actual": 447,
+        "expected": 417
+      },
+      {
+        "path": "held-after-layout-shift.rects.target.right",
+        "actual": 487,
+        "expected": 457
+      },
+      {
+        "path": "held-after-layout-shift.rects.target.left",
+        "actual": 447,
+        "expected": 417
+      },
+      {
+        "path": "held-after-layout-shift.boundValues.x",
+        "actual": 60,
+        "expected": 0
+      }
+    ]
+  },
+  {
+    "id": "drag-pointer-cancel",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.2.info.velocity.x",
+        "actual": 71.428571,
+        "expected": 100
+      },
+      {
+        "path": "callbacks.2.info.velocity.y",
+        "actual": 35.714286,
+        "expected": 50
+      },
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 625,
+        "expected": 750
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 416.666667,
+        "expected": 500
+      }
+    ]
+  },
+  {
+    "id": "drag-unmount-held",
+    "status": "mismatch",
+    "mismatches": [
+      {
+        "path": "callbacks.2.info.velocity.x",
+        "actual": 833.333333,
+        "expected": 1071.428571
+      },
+      {
+        "path": "callbacks.2.info.velocity.y",
+        "actual": 555.555556,
+        "expected": 714.285714
+      },
+      {
+        "path": "callbacks.3.info.velocity.x",
+        "actual": 652.173913,
+        "expected": 789.473684
+      },
+      {
+        "path": "callbacks.3.info.velocity.y",
+        "actual": 434.782609,
+        "expected": 526.315789
+      },
+      {
+        "path": "callbacks.4.info.velocity.x",
+        "actual": 655.737705,
+        "expected": 754.716981
+      },
+      {
+        "path": "callbacks.4.info.velocity.y",
+        "actual": 491.803279,
+        "expected": 566.037736
+      }
+    ]
+  }
+]

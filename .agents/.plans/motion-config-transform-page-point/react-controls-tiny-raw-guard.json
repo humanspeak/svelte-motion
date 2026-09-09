@@ -1,0 +1,140 @@
+{
+  "before": {
+    "x": 590,
+    "y": 235,
+    "width": 100,
+    "height": 100
+  },
+  "after": {
+    "x": 589.9921875,
+    "y": 235,
+    "width": 100,
+    "height": 100
+  },
+  "start": {
+    "x": 639.9921875,
+    "y": 215
+  },
+  "delta": {
+    "x": -0.0078125,
+    "y": 0
+  },
+  "raw": [
+    {
+      "x": 639.9921875,
+      "y": 215,
+      "pageX": 639.9921875,
+      "pageY": 215,
+      "pointerType": "mouse",
+      "isPrimary": true
+    }
+  ],
+  "trace": [],
+  "input": [
+    {
+      "sequence": 0,
+      "at": 509.1,
+      "targetTestId": "handle",
+      "event": {
+        "type": "pointermove",
+        "pointerId": 1,
+        "pointerType": "mouse",
+        "isPrimary": true,
+        "button": -1,
+        "buttons": 0,
+        "client": {
+          "x": 639.992188,
+          "y": 215
+        },
+        "page": {
+          "x": 639.992188,
+          "y": 215
+        }
+      }
+    },
+    {
+      "sequence": 1,
+      "at": 514.3,
+      "targetTestId": "handle",
+      "event": {
+        "type": "pointerdown",
+        "pointerId": 1,
+        "pointerType": "mouse",
+        "isPrimary": true,
+        "button": 0,
+        "buttons": 1,
+        "client": {
+          "x": 639.992188,
+          "y": 215
+        },
+        "page": {
+          "x": 639.992188,
+          "y": 215
+        }
+      }
+    },
+    {
+      "sequence": 2,
+      "at": 570.6,
+      "targetTestId": "handle",
+      "event": {
+        "type": "pointermove",
+        "pointerId": 1,
+        "pointerType": "mouse",
+        "isPrimary": true,
+        "button": -1,
+        "buttons": 1,
+        "client": {
+          "x": 640.992188,
+          "y": 215
+        },
+        "page": {
+          "x": 640.992188,
+          "y": 215
+        }
+      }
+    },
+    {
+      "sequence": 3,
+      "at": 720.1,
+      "targetTestId": "handle",
+      "event": {
+        "type": "pointermove",
+        "pointerId": 1,
+        "pointerType": "mouse",
+        "isPrimary": true,
+        "button": -1,
+        "buttons": 1,
+        "client": {
+          "x": 641.992188,
+          "y": 215
+        },
+        "page": {
+          "x": 641.992188,
+          "y": 215
+        }
+      }
+    },
+    {
+      "sequence": 4,
+      "at": 725.3,
+      "targetTestId": "handle",
+      "event": {
+        "type": "pointerup",
+        "pointerId": 1,
+        "pointerType": "mouse",
+        "isPrimary": true,
+        "button": 0,
+        "buttons": 0,
+        "client": {
+          "x": 641.992188,
+          "y": 215
+        },
+        "page": {
+          "x": 641.992188,
+          "y": 215
+        }
+      }
+    }
+  ]
+}

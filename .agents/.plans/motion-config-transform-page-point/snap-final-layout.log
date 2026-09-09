@@ -1,0 +1,10 @@
+[1/1] drag-real-layout-shift-held: running
+[1/1] drag-real-layout-shift-held: matched
+[
+  {
+    "id": "drag-real-layout-shift-held",
+    "status": "matched",
+    "mismatchCount": 0,
+    "error": null
+  }
+]
