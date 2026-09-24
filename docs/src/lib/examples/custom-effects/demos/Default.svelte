@@ -16,16 +16,10 @@
      */
     const dialEffect = createEffect<Dial>(
         (dial, state, key, value) =>
-            state.set(
-                key,
-                value,
-                () => {
-                    const target = dial as Record<string, number>
-                    target[key] = state.latest[key] as number
-                },
-                undefined,
-                false
-            ),
+            state.set(key, value, () => {
+                const target = dial as Record<string, number>
+                target[key] = value.get() as number
+            }),
         {
             test: (subject): subject is Dial =>
                 typeof subject === 'object' &&

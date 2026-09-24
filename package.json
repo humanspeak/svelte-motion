@@ -145,8 +145,8 @@
     },
     "dependencies": {
         "acorn": "^8.18.0",
-        "motion": "^13.2.0",
-        "motion-dom": "^13.2.0"
+        "motion": "^13.4.3",
+        "motion-dom": "^13.4.2"
     },
     "devDependencies": {
         "@changesets/cli": "^3.0.1",
