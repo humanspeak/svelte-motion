@@ -190,6 +190,10 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Shared Layout Animation',
         description: 'Interactive shared layout animation example using Svelte Motion.'
     },
+    'svg-css-variables': {
+        title: 'SVG CSS Variables',
+        description: 'Draw, trim, and erase a glowing SVG path by animating CSS variables.'
+    },
     'style-string': {
         title: 'styleString',
         description: 'Interactive styleString animation example using Svelte Motion.'
@@ -230,6 +234,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
     'use-cycle': {
         title: 'useCycle',
         description: 'Interactive useCycle animation example using Svelte Motion.'
+    },
+    'use-follow-value': {
+        title: 'useFollowValue',
+        description:
+            'One source, six personalities — compare springs and tweens with pointer, keyboard, replay, and reset controls.'
     },
     'use-in-view': {
         title: 'useInView',

@@ -1,9 +1,16 @@
 <script lang="ts">
-    import { useFollowValue, useMotionValue } from '@humanspeak/svelte-motion'
+    import { untrack } from 'svelte'
+    import {
+        animate,
+        useFollowValue,
+        useMotionValue,
+        useReducedMotion
+    } from '@humanspeak/svelte-motion'
 
     // The source motion values track the pointer position. Every follower
     // below derives from these two — the personality of each trail is
     // entirely down to its transition config.
+    const reduced = useReducedMotion()
     const targetX = useMotionValue(0)
     const targetY = useMotionValue(0)
 
@@ -73,35 +80,99 @@
         }
     ]
 
-    let stage: HTMLDivElement | undefined = $state()
+    let stage: HTMLButtonElement | undefined = $state()
+    let flight: ReturnType<typeof animate>[] = []
 
-    const onPointerMove = (event: PointerEvent) => {
-        if (!stage) return
-        const rect = stage.getBoundingClientRect()
-        // Centre-relative coords — easier to work with than top-left since
-        // we render trails on a centred stage.
-        targetX.set(event.clientX - rect.left - rect.width / 2)
-        targetY.set(event.clientY - rect.top - rect.height / 2)
+    /** Stop the replay before handing control back to the user. */
+    const stopReplay = () => {
+        flight.forEach((animation) => animation.stop())
+        flight = []
     }
 
-    // On enter, snap the source to the current pointer so the trails
-    // don't have to chase a previous resting position.
-    const onPointerEnter = (event: PointerEvent) => {
+    /** Retarget all six followers, keeping the source inside the stage. */
+    const aim = (x: number, y: number, snap = false) => {
         if (!stage) return
-        const rect = stage.getBoundingClientRect()
-        const x = event.clientX - rect.left - rect.width / 2
-        const y = event.clientY - rect.top - rect.height / 2
-        // Skip animating to the entry position — each follower's source is a
-        // plain MotionValue; .set on the source still drives followers
-        // through their transition, so we use .jump on each follower
-        // instead.
-        for (const f of followers) {
-            f.x.jump(x)
-            f.y.jump(y)
-        }
+        stopReplay()
+        const limitX = Math.max(0, stage.clientWidth / 2 - 32)
+        const limitY = Math.max(0, stage.clientHeight / 2 - 32)
+        x = Math.max(-limitX, Math.min(limitX, x))
+        y = Math.max(-limitY, Math.min(limitY, y))
         targetX.set(x)
         targetY.set(y)
+        if (snap || reduced.current) {
+            followers.forEach((f) => {
+                f.x.jump(x)
+                f.y.jump(y)
+            })
+        }
     }
+
+    /** Convert the pointer position to coordinates relative to the center. */
+    const followPointer = (event: PointerEvent, snap = false) => {
+        if (!stage) return
+        const rect = stage.getBoundingClientRect()
+        aim(
+            event.clientX - rect.left - rect.width / 2,
+            event.clientY - rect.top - rect.height / 2,
+            snap
+        )
+    }
+
+    /** Restore the source and every follower immediately, even mid-animation. */
+    const reset = () => {
+        stopReplay()
+        targetX.jump(0)
+        targetY.jump(0)
+        followers.forEach(({ x, y }) => {
+            x.jump(0)
+            y.jump(0)
+        })
+    }
+
+    /** Trace one repeatable route using Motion's upstream keyframe animation. */
+    const replay = () => {
+        if (!stage) return
+        stopReplay()
+        if (reduced.current) {
+            reset()
+            return
+        }
+        const x = stage.clientWidth * 0.32
+        const y = stage.clientHeight * 0.28
+        flight = [
+            animate(targetX, [targetX.get(), x, -x, x, -x * 0.75, 0], {
+                duration: 4,
+                ease: 'easeInOut'
+            }),
+            animate(targetY, [targetY.get(), -y, y, y, -y, 0], {
+                duration: 4,
+                ease: 'easeInOut'
+            })
+        ]
+    }
+
+    /** Support arrow-key retargeting and the button's Enter/Space activation. */
+    const moveWithKeys = (event: KeyboardEvent) => {
+        const offsets: Record<string, [number, number]> = {
+            ArrowLeft: [-32, 0],
+            ArrowRight: [32, 0],
+            ArrowUp: [0, -32],
+            ArrowDown: [0, 32]
+        }
+        const offset = offsets[event.key]
+        if (offset) {
+            event.preventDefault()
+            aim(targetX.get() + offset[0], targetY.get() + offset[1])
+        } else if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            replay()
+        }
+    }
+
+    $effect(() => {
+        if (reduced.current) untrack(reset)
+    })
+    $effect(() => () => stopReplay())
 </script>
 
 <!-- dk-strip: docs-kit positioning shell — stripped from the published code. -->
@@ -112,41 +183,56 @@
             <span class="micro readout">6 followers / 1 source</span>
         </div>
 
-        <div
+        <button
+            type="button"
             class="stage"
             bind:this={stage}
-            onpointermove={onPointerMove}
-            onpointerenter={onPointerEnter}
-            role="presentation"
+            aria-label="Follower playground. Move or tap to aim, use arrow keys, or press Enter to replay."
+            onpointermove={(event) => followPointer(event)}
+            onpointerdown={(event) => followPointer(event)}
+            onpointerenter={(event) => followPointer(event, true)}
+            onkeydown={moveWithKeys}
         >
-            <p class="hint">move your cursor over this card</p>
+            <span class="hint">move · tap · arrow keys</span>
 
-            <div
+            <span
                 class="source-dot"
                 style:transform="translate({targetX.current}px, {targetY.current}px)"
                 aria-hidden="true"
-            ></div>
+            ></span>
             {#each followers as f (f.label)}
-                <div
+                <span
                     class="follower"
                     style:width="{f.size}px"
                     style:height="{f.size}px"
                     style:margin-top="{-f.size / 2}px"
                     style:margin-left="{-f.size / 2}px"
                     style:border-color={f.color}
-                    style:transform="translate({f.x.current}px, {f.y.current}px)"
+                    style:transform="translate({reduced.current ? targetX.current : f.x.current}px, {reduced.current
+                        ? targetY.current
+                        : f.y.current}px)"
                     aria-hidden="true"
-                ></div>
+                ></span>
             {/each}
 
-            <ul class="legend">
+            <span class="legend" aria-hidden="true">
                 {#each followers as f (f.label)}
-                    <li>
+                    <span class="legend-item">
                         <span class="swatch" style:background={f.color}></span>
                         {f.label}
-                    </li>
+                    </span>
                 {/each}
-            </ul>
+            </span>
+        </button>
+
+        <div class="toolbar">
+            <p>
+                {reduced.current
+                    ? 'Reduced motion: followers move directly.'
+                    : 'Change direction before they catch up.'}
+            </p>
+            <button type="button" onclick={replay}>Replay</button>
+            <button type="button" onclick={reset}>Reset</button>
         </div>
 
         <div class="strip-foot">
@@ -220,7 +306,10 @@
             auto;
         overflow: hidden;
         cursor: crosshair;
-        touch-action: none;
+        touch-action: pan-y;
+        padding: 0;
+        font: inherit;
+        text-align: left;
         user-select: none;
     }
 
@@ -232,6 +321,8 @@
         left: 50%;
         transform: translate(-50%, -50%);
         margin: 0;
+        width: 85%;
+        text-align: center;
         font-family: var(--brut-mono, monospace);
         font-size: 0.6875rem;
         text-transform: uppercase;
@@ -295,7 +386,7 @@
         color: var(--brut-ink-2, #525252);
     }
 
-    .legend li {
+    .legend-item {
         display: flex;
         align-items: center;
         gap: 6px;
@@ -306,5 +397,47 @@
         width: 8px;
         height: 8px;
         border-radius: 999px;
+    }
+    .toolbar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .toolbar p {
+        flex: 1;
+        margin: 0;
+        min-width: 170px;
+        color: var(--brut-ink-3, #9a9a9a);
+        font-size: 12px;
+    }
+
+    .toolbar button {
+        padding: 0.5rem 0.9rem;
+        border: 1px solid var(--brut-rule-2, #bbc4c0);
+        background: var(--brut-bg, #f8fcfb);
+        color: var(--brut-ink, #0a0a0a);
+        font: 11px var(--brut-mono, monospace);
+        cursor: pointer;
+    }
+
+    button:focus-visible {
+        outline: 2px solid var(--brut-accent, #247768);
+        outline-offset: 4px;
+    }
+
+    @media (max-width: 480px) {
+        .strip-head,
+        .strip-foot {
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .toolbar p {
+            flex-basis: 100%;
+        }
+        .toolbar button {
+            flex: 1;
+        }
     }
 </style>

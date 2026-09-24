@@ -243,3 +243,7 @@ Filter-primitive attributes are bindable like any other. `stdDeviation`,
 
 The same holds for `motion.lineargradient`, `motion.clippath`,
 `motion.textpath`, and the rest of the camelCase SVG elements.
+
+## CSS variable drawing
+
+Try [SVG CSS Variables](/examples/svg-css-variables) to draw, trim, and erase a glowing path. The example uses `animate()` to drive `--trim-start` and `--trim-end` directly on SVG paths, with CSS converting those values into stroke dash lengths and offsets. Replay uses Motion's sequence API; Reset restores the initial segment.

@@ -372,6 +372,10 @@ A `SpringMotionValue<T>` — a real motion-dom `MotionValue` augmented with:
 
 For gesture-driven springs, combine with event handlers. For time-based animations, see [useTime](/docs/use-time) + [useTransform](/docs/use-transform).
 
+## Live example
+
+Try [useFollowValue](/examples/use-follow-value): four spring settings and two tweens chase the same pointer target. Use the arrow keys or Replay to compare their responses, and Reset to return to the center. `useSpring` delegates to the same follower API with a spring transition.
+
 ## See also
 
 - [useVelocity](/docs/use-velocity) — track the velocity of a spring or any motion value.
