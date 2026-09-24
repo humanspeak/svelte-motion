@@ -37,6 +37,8 @@ Register at module scope rather than from a component. The effect registry is gl
   <Default />
 </Example>
 
+Click **Move** again to move back, scrub the progress slider in either direction to apply or undo the ripple, or click **Reset** to restore the initial mesh and shader state immediately.
+
 ## Supported subjects and values
 
 The adapter claims the following Three.js-shaped subjects without importing `three` itself:
