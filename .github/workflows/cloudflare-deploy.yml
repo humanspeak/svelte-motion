@@ -49,8 +49,19 @@ jobs:
             - name: Install Root Dependencies
               run: pnpm install --frozen-lockfile
 
+            - name: Check Package
+              run: pnpm check
+
             - name: Build Package
               run: pnpm run build
+
+            - name: Build Docs
+              env:
+                  NODE_OPTIONS: --max-old-space-size=4096
+              run: pnpm --dir docs build
+
+            - name: Check Docs
+              run: pnpm --dir docs check
 
             # The sitemap manifest was previously generated here by a
             # standalone script. It now emits from

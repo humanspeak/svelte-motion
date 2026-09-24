@@ -374,6 +374,32 @@ describe('_MotionContainer', () => {
         cleanup()
     })
 
+    it('holds the live x through a scale pulse with wildcard keyframes', async () => {
+        const controls = animationControls()
+        const cleanup = controls.mount()
+        const { container } = render(MotionContainer, {
+            props: { tag: 'div', animate: controls, initial: { x: 0, scale: 1 } }
+        })
+
+        await flushTimers()
+        // Drift and Nudge animate to their live values before a pulse interrupts them.
+        void controls.start({ x: 35, scale: 1.05 })
+        await flushTimers()
+        expect(await latestValuesOf(container.firstElementChild)).toMatchObject({
+            x: 35,
+            scale: 1.05
+        })
+
+        void controls.start(
+            { scale: [null, 1.15, 1], x: [null, null, null] },
+            { duration: 0.5, ease: 'easeInOut', times: [0, 0.4, 1] }
+        )
+        await flushTimers()
+
+        expect(await latestValuesOf(container.firstElementChild)).toMatchObject({ x: 35, scale: 1 })
+        cleanup()
+    })
+
     it('sets animate controls to final keyframe and transitionEnd values', async () => {
         const controls = animationControls()
         const cleanup = controls.mount()

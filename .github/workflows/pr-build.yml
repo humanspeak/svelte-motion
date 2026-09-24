@@ -50,6 +50,9 @@ jobs:
             - name: Install dependencies
               run: pnpm install --filter . --frozen-lockfile --config.engine-strict=false
 
+            - name: Check package and app
+              run: pnpm check
+
             - name: Build package and app
               run: pnpm build
 
@@ -82,3 +85,6 @@ jobs:
               env:
                   NODE_OPTIONS: --max-old-space-size=4096
               run: pnpm run build
+
+            - name: Check docs
+              run: pnpm --dir docs check

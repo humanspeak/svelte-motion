@@ -128,10 +128,10 @@
         <li>
             <Sparkles />
             <span>
-                A bare <code>x: null</code> means "hold <code>x</code> at its current value", so the
-                pulse keeps the card wherever it drifted to. Because every wildcard resolves at
-                <strong>start</strong>, the <code>x</code> position and the <code>scale</code> pulse compose
-                instead of snapping to a hardcoded from-value.
+                <code>x: [null, null, null]</code> samples the current <code>x</code> at
+                <strong>start</strong>, then holds that value across the remaining keyframes. The
+                pulse keeps the card wherever it drifted to, so the <code>x</code> position and the
+                <code>scale</code> pulse compose instead of snapping to a hardcoded from-value.
             </span>
         </li>
     </ul>
