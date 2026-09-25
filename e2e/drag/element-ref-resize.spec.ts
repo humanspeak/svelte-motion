@@ -80,6 +80,7 @@ test.describe('drag/element-ref-resize', () => {
     }) => {
         await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
         const initial = await idleOffset(page)
+        await page.getByTestId('idle-card').scrollIntoViewIfNeeded()
         const card = await page.getByTestId('idle-card').boundingBox()
         if (!card) throw new Error('missing asymmetric card')
         await page.mouse.move(card.x + 40, card.y + 40)
@@ -107,6 +108,7 @@ test.describe('drag/element-ref-resize', () => {
     const dragCardRightAndRelease = async (page: import('@playwright/test').Page) => {
         const card = page.getByTestId('drag-card')
         await card.waitFor({ state: 'visible' })
+        await card.scrollIntoViewIfNeeded()
 
         const start = await readRect(page, '[data-testid="drag-card"]')
         if (!start) throw new Error('no card rect')
@@ -200,5 +202,117 @@ test.describe('drag/element-ref-resize', () => {
 
         expect(transition?.property).toContain('width')
         expect(transition?.duration).toContain('3.2s')
+    })
+
+    test('guided resting controls report measured geometry and reset the movement delta', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        await expect(page.getByTestId('idle-metric-width')).toHaveText('400.0 px')
+        await expect(page.getByTestId('idle-metric-inset')).toHaveText('40.0 px')
+        for (const [button, width] of [
+            ['idle-shrink', 200],
+            ['idle-grow', 400]
+        ] as const) {
+            await page.getByTestId(button).click()
+            await expect(page.getByTestId('idle-metric-width')).toHaveText(`${width}.0 px`)
+            await expect(page.getByTestId('idle-metric-delta')).toHaveText('0.0 px')
+            await expect(page.getByTestId('idle-metric-overflow')).toHaveText('0.0 px')
+        }
+        await page.getByTestId('idle-card').scrollIntoViewIfNeeded()
+        const card = await page.getByTestId('idle-card').boundingBox()
+        if (!card) throw new Error('missing asymmetric card')
+        await page.mouse.move(card.x + 40, card.y + 40)
+        await page.mouse.down()
+        await page.mouse.move(card.x + 120, card.y + 40, { steps: 8 })
+        await page.mouse.up()
+        await expect
+            .poll(async () =>
+                Number.parseFloat(await page.getByTestId('idle-metric-delta').innerText())
+            )
+            .toBeGreaterThan(70)
+        await expect
+            .poll(async () => {
+                const reported = Number.parseFloat(
+                    await page.getByTestId('idle-metric-inset').innerText()
+                )
+                return Math.abs(reported - ((await idleOffset(page)) - 2))
+            })
+            .toBeLessThan(0.1)
+        await page.getByTestId('idle-reset').click()
+        await expect(page.getByTestId('idle-metric-width')).toHaveText('400.0 px')
+        await expect(page.getByTestId('idle-metric-inset')).toHaveText('40.0 px')
+        await expect(page.getByTestId('idle-metric-delta')).toHaveText('0.0 px')
+        await expect(page.getByTestId('idle-metric-bounds')).toContainText('Inside bounds')
+    })
+
+    test('momentum reset restores a centered full-size fixture and fresh metrics in slow mode', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true&slow')
+        await page.getByTestId('resize-btn').click()
+        await expect
+            .poll(async () =>
+                Number.parseFloat(await page.getByTestId('momentum-metric-width').innerText())
+            )
+            .toBeLessThan(250)
+        await page
+            .getByTestId('drag-card')
+            .evaluate((element) => (element.dataset.marker = 'before-reset'))
+        await page.getByTestId('momentum-reset').click()
+        await expect(page.getByTestId('drag-card')).not.toHaveAttribute(
+            'data-marker',
+            'before-reset'
+        )
+        await expect(page.getByTestId('resize-btn')).toHaveText('Shrink to 200')
+        const geometry = await page.getByTestId('container').evaluate((container) => {
+            const card = container.querySelector('[data-testid="drag-card"]')!
+            const bounds = container.getBoundingClientRect()
+            const rect = card.getBoundingClientRect()
+            const style = getComputedStyle(container)
+            return {
+                width:
+                    bounds.width -
+                    Number.parseFloat(style.borderLeftWidth) -
+                    Number.parseFloat(style.borderRightWidth),
+                inset: rect.left - bounds.left - Number.parseFloat(style.borderLeftWidth)
+            }
+        })
+        expect(geometry.width).toBe(396)
+        expect(geometry.inset).toBe(158)
+        await expect(page.getByTestId('momentum-metric-width')).toHaveText(
+            `${geometry.width.toFixed(1)} px`
+        )
+        await expect(page.getByTestId('momentum-metric-inset')).toHaveText(
+            `${geometry.inset.toFixed(1)} px`
+        )
+        await expect(page.getByTestId('momentum-metric-delta')).toHaveText('0.0 px')
+        await expect(page.getByTestId('momentum-metric-overflow')).toHaveText('0.0 px')
+    })
+
+    test('narrow screens keep fixed-size fixtures inside local scrolling regions', async ({
+        page
+    }) => {
+        await page.setViewportSize({ width: 375, height: 812 })
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+            375
+        )
+        await expect(page.getByTestId('idle-container')).toHaveCSS('width', '400px')
+        await expect(page.getByTestId('container')).toHaveCSS('width', '400px')
+        for (const name of ['Blue card drag area', 'Orange card drag area']) {
+            const region = page.getByRole('region', { name: new RegExp(name) })
+            expect(
+                await region.evaluate((element) => element.scrollWidth > element.clientWidth)
+            ).toBe(true)
+            await region.evaluate((element) => (element.scrollLeft = 80))
+            expect(await region.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0)
+        }
+        await expect(page.getByTestId('idle-metric-inset')).toHaveText('40.0 px')
+        await expect(page.getByTestId('momentum-metric-inset')).toHaveText('158.0 px')
+        await page.getByTestId('idle-shrink').click()
+        await expect(page.getByTestId('idle-metric-width')).toHaveText('200.0 px')
+        await page.getByTestId('idle-reset').click()
+        await expect(page.getByTestId('idle-metric-inset')).toHaveText('40.0 px')
     })
 })
