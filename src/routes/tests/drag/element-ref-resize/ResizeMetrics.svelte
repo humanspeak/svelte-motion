@@ -33,8 +33,6 @@
                     const style = getComputedStyle(container)
                     const left = bounds.left + Number.parseFloat(style.borderLeftWidth)
                     const right = bounds.right - Number.parseFloat(style.borderRightWidth)
-                    const top = bounds.top + Number.parseFloat(style.borderTopWidth)
-                    const bottom = bounds.bottom - Number.parseFloat(style.borderBottomWidth)
                     const inset = rect.left - left
                     if (card !== previousCard) {
                         previousCard = card
@@ -44,12 +42,13 @@
                         width: right - left,
                         inset,
                         delta: inset - baseline,
+                        // Drag constraints use the outer rectangle, including borders.
                         overflow: Math.max(
                             0,
-                            left - rect.left,
-                            rect.right - right,
-                            top - rect.top,
-                            rect.bottom - bottom
+                            bounds.left - rect.left,
+                            rect.right - bounds.right,
+                            bounds.top - rect.top,
+                            rect.bottom - bounds.bottom
                         )
                     }
                     if (
@@ -114,7 +113,7 @@
                     : 'Outside bounds'
                 : 'Measuring…'}
         </span>
-        <span>Live DOM readings · 0.5 px bounds tolerance</span>
+        <span>Outer border bounds · 0.5 px tolerance</span>
     </div>
 </div>
 

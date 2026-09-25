@@ -229,16 +229,24 @@ describe('utils/drag', () => {
                     width = next
                     deliverResize(b)
                 },
-                drag: async () => {
+                drag: async (dx = 80) => {
                     card.dispatchEvent(
                         new PointerEvent('pointerdown', { clientX: 80, clientY: 80, pointerId: 1 })
                     )
                     window.dispatchEvent(
-                        new PointerEvent('pointermove', { clientX: 160, clientY: 80, pointerId: 1 })
+                        new PointerEvent('pointermove', {
+                            clientX: 80 + dx,
+                            clientY: 80,
+                            pointerId: 1
+                        })
                     )
                     await flushFrame()
                     window.dispatchEvent(
-                        new PointerEvent('pointerup', { clientX: 160, clientY: 80, pointerId: 1 })
+                        new PointerEvent('pointerup', {
+                            clientX: 80 + dx,
+                            clientY: 80,
+                            pointerId: 1
+                        })
                     )
                     await flushFrame()
                 }
@@ -327,6 +335,43 @@ describe('utils/drag', () => {
             second.cleanup()
             expect(observedTargets().has(first.a)).toBe(false)
         })
+        it.each(['element to element', 'element to numeric', 'numeric to element'] as const)(
+            'anchors fresh bounds during an active %s transition',
+            async (transition) => {
+                const fixture = setup(transition === 'numeric to element')
+                await fixture.drag(40)
+                fixture.resizeB(200)
+                const move = async (x: number) => {
+                    window.dispatchEvent(
+                        new PointerEvent('pointermove', { clientX: x, clientY: 80, pointerId: 1 })
+                    )
+                    await flushFrame()
+                }
+                fixture.card.dispatchEvent(
+                    new PointerEvent('pointerdown', { clientX: 120, clientY: 80, pointerId: 1 })
+                )
+                await move(240)
+                expect(fixture.node.latestValues.x).toBe(160)
+                fixture.update(
+                    transition === 'element to numeric' ? { left: -40, right: 80 } : fixture.b
+                )
+                await move(400)
+                expect(fixture.node.latestValues.x).toBe(80)
+                expect(fixture.card.dataset.svelteMotionDragActive).toBe('true')
+                await move(-200)
+                expect(fixture.node.latestValues.x).toBe(-40)
+                // Back inside the range: the original pointer origin is retained.
+                await move(140)
+                expect(fixture.node.latestValues.x).toBe(60)
+                window.dispatchEvent(
+                    new PointerEvent('pointerup', { clientX: 140, clientY: 80, pointerId: 1 })
+                )
+                await flushFrame()
+                expect(fixture.node.latestValues.x).toBe(60)
+                expect(fixture.card.dataset.svelteMotionDragActive).toBeUndefined()
+            }
+        )
+
         it('supports attach and constraint changes without ResizeObserver', () => {
             vi.stubGlobal('ResizeObserver', undefined)
             const { b, update, cleanup } = setup()

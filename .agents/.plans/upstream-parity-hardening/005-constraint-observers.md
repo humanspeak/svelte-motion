@@ -14,7 +14,7 @@
 - Category: bug
 - Audit finding: 06
 - Planned at: commit a42d99d1, reconciled 2026-09-25 against freshly fetched origin/main c8fbd7a8
-- State: DONE — independently reviewed; user visual checkpoint pending
+- State: DONE — observer and active-drag fixes independently reviewed; user visual approval pending
 
 ## Why this matters
 
@@ -72,6 +72,7 @@ Only modify these paths (plus this plan's README status):
 - src/lib/utils/drag.ts
 - src/lib/utils/drag.spec.ts
 - src/routes/tests/drag/element-ref-resize/+page.svelte
+- src/routes/tests/drag/element-ref-resize/ResizeMetrics.svelte (review follow-up: align overflow with actual constraint edges)
 - e2e/drag/element-ref-resize.spec.ts
 - .changeset/live-drag-constraint-observer.md
 
@@ -79,7 +80,7 @@ Out of scope: replacing attachDrag, recreating PanSession on prop changes, trans
 
 ## Git workflow
 
-Use a fresh branch named fix/upstream-constraint-observers in an isolated checkout from freshly fetched origin/main. The audited baseline includes reviewed commits 31657b14, 207dd870, and 6f0085ef; before execution verify that main already contains them or integrate those reviewed changes into the isolated branch. Do not cherry-pick commits already present; do not reset, pop stashes, or overwrite the user's working tree. Apply required predecessor plans before starting. Record the actual execution base and any reconciliation in the index.
+Current maintainer direction supersedes the original per-plan isolation workflow: make all ongoing changes and commits in the primary checkout on chore/motion-upstream-refresh. Reviewed work through 005 is already consolidated there. The isolated fix/upstream-constraint-observers checkout is only a historical checkpoint or temporary verification environment; do not create another branch or copy ongoing work into it. Preserve unrelated changes and record the execution base and verification evidence below.
 
 Use a conventional commit such as "fix(drag): rebind resize observers for live constraints". Do not push, merge, publish, or open a PR as part of this plan unless separately instructed.
 
@@ -142,6 +143,16 @@ Fresh-worktree setup reconciliation: the first focused red invocation could not 
 
 ## Review outcome
 
+Review follow-up history (resolved below): the user reported broken behavior and an absent countdown. The prior red proof covered unit lifecycle tests, not a deliberate browser rollback. Recheck the replacement-only browser regression against pre005 observer code in the existing archival verification worktree, without touching the shared preview or creating branches. Add a red-first assertion for an explicit button countdown and Reset cancellation, then improve the countdown visibility in the shared page. Current T3 sampling confirms the small status line counts3→2→1 and switches toB at3s; the button remains static. This does not yet explain the user's broader behavior report. Do not claim visual approval or advance006.
+
+User clarification and reconciled runtime scope: the user is using T3, holding the card outside a shrunken B while scheduling the delayed switch. Their screenshot shows B200 selected, A400, and the card outside the left edge. The original delayed browser case changed A400→B400 and asserted continued movement only, missing containment. Extend the red-first follow-up within drag.ts, drag.spec.ts, existing page/e2e and patch changeset: pre-shrink B while A selected, hold/move a nonzero drag through the switch, verify both edges on subsequent pointer movement and containment after release without restarting the session. Cover element↔numeric transitions with a nonzero measurement base. Keep drag pointer origin separate from constraintsBase; element remeasurement must use the matching current applied base even while dragging, and numeric bounds use zero base. Preserve existing intentional out-of-bounds-origin behavior and do not invent an immediate snap before a pointer event. Re-run full units, focused drag/browser checks, root/package checks and scoped lint for the runtime correction. All retained changes belong on the shared branch.
+
+Additional red proof now captured: with pre005 drag.ts in the existing archival verification checkout, the original replacement-only browser test fails with38px right overflow (tolerance0.5px). Archive restored clean and shared preview unchanged. Countdown button assertion also fails against the current static button label. The new unequal-bounds held-drag regression is still pending; these earlier red results do not prove that new case.
+
+Confirmed user-case red: three nonzero-offset unit cases fail for active element→element, element→numeric and numeric→element changes. An isolated browser test establishes A400/B200, holds the card outside B, arms the real three-second timer and then moves across B's edges. It fails post-switch left containment with140px overflow, matching the screenshot. An initial browser attempt failed during timer-sensitive setup and another hit a stopped server; neither is counted as runtime red evidence. Timer arming now occurs through the button handler after the real pointer is held; separate tests cover normal button clicks and the visible countdown.
+
+Preview lifecycle correction: building into the primary .svelte-kit/output while port5205 was serving it caused an ENOENT stream error on a replaced CSS asset and terminated the preview. Restart the user preview only after the final production build; do not rebuild that output beneath a running preview. This server interruption is separate from the proven drag regression.
+
 Visual follow-up: the user caught a fixed primary style on Use B while A was active. All three target buttons now derive their filled state from liveTarget, retaining aria-pressed and existing behavior. T3 verified initial A, switching B/numeric, and Reset restoring only A's fill. Scoped formatting/lint and production build passed; the existing ten resize Chromium tests passed after restarting port 5205 from the shared primary checkout (reviewer session 83725). No runtime change was needed or new regression reproduced after restart. Browser refreshed at section03; user visual checkpoint remains pending.
 
 The user explicitly selected chore/motion-upstream-refresh as the shared release branch and authorized consolidating reviewed work through005 there. The isolated branch below is a historical execution checkpoint, not the ongoing release branch. Keep future reviewed work on the shared branch; do not create more per-plan branches by default.
@@ -157,3 +168,17 @@ Fresh self-package imports required normal package generation before root typech
 Guided section03 preserves both earlier sections and all eight prior browser checks. New tests prove stable card identity/size, B-only resize, numeric switching, and continued movement while pressed across a delayed target swap. T3 visual review confirmed both boundary labels, 120px drag followed by B shrink to200 yielding inset60/reset delta20/overflow0. Reviewer-owned production preview session84358 serves http://localhost:5205/tests/drag/element-ref-resize#live-targets and is visible in collaborative tab_2. Earlier5204 server remains available. User visual approval is still required before006.
 
 Integration validation in the shared checkout: pinned frozen install passed with motion/motion-dom13.4.4; package/publint exit0 (known006 Reorder diagnostics); root check0 errors/35 existing warnings; focused drag/inertia52/52. Tracked non-plan files match the tested005 tree exactly, with no manifest or lockfile drift.
+
+### Final visual metric reconciliation
+
+Independent final checks passed 934 units, root check (0 errors/35 existing warnings), and all 18 targeted Chromium cases. T3 confirmed the button's 3 → 2 → 1 countdown. Visual inspection then found a separate misleading meter: the card right edge and B outer right edge both measured 548 px, but the meter showed 2 px overflow / Outside bounds because it used the inside of the 2 px border. Actual element drag constraints use the outer bounding rectangle. Scope now includes ResizeMetrics.svelte solely to calculate overflow against that same outer rectangle, retain inner width/inset/reset measurements, and clarify the labels' definition. Extend the held-switch test to assert zero overflow and Inside bounds at legal edges; capture its red before the meter correction. No runtime tolerance relaxation or further drag behavior change. Stop the owned 5205 preview before rebuilding, then restart it against the final output.
+
+### Final follow-up review — APPROVE
+
+The initial equal-size delayed-switch test missed the user's unequal-bounds containment bug. The new browser regression first failed with 140 px left overflow, and three active transition unit cases failed before the fix. Element constraint measurements now use the matching current applied offset even while pressed; numeric constraints reset that base to zero. The pointer origin and session remain intact. Public Motion resize subscriptions remain reused, with no additional engine or dependency.
+
+Countdown button coverage first failed against its static label. The page now shows 3 → 2 → 1 and a completion message; Reset cancels both the visible countdown and pending switch. The metric regression also failed first (2.0 px instead of 0.0 px at a legal edge), then passed with overflow measured against the same outer rectangle as the drag implementation. Inner width, inset, and reset delta are unchanged.
+
+Independent reviewer gates on the shared checkout: 934/934 units in 82 files, root check 0 errors/35 existing warnings, and final 18/18 Chromium checks (34.4 seconds), including all 13 resize-page cases, four axis-handoff cases, and pointercancel. Executor additionally passed focused 55 drag/inertia units, production build/package/publint (known Reorder declaration diagnostics still deferred to 006), final metric build, and scoped Trunk. Patch integrity passed. No docs/public API changes in this follow-up. Local evidence: .temp/plan-005/active-switch-red-{units,browser}.log, countdown-red.log, outer-bounds-metric-red.log, reviewer-active-{units,check}.log, reviewer-final-browser.log.
+
+T3 confirmed the final button countdown and a card exactly at B's right edge (both 548 px) reporting 0.0 px / Inside bounds. Real held-pointer continuity and both-edge behavior are verified by Playwright; T3 programmatic pointer events are only a visual smoke check. Preview port 5205 serves the frozen final primary build (reviewer session 69632), with the guided section open in tab_2 and A selected for repeatable user review. No build should replace its assets while it is running. All changes and these plan records are committed together on chore/motion-upstream-refresh using normal hooks. User visual approval remains pending; do not start 006 yet.

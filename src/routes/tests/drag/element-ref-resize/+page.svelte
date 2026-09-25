@@ -50,6 +50,7 @@
     let liveTarget: 'A' | 'B' | 'numeric' = $state('A')
     let liveReset = $state(0)
     let countdown = $state(0)
+    let switchCompleted = $state(false)
     let switchTimer: ReturnType<typeof setInterval> | undefined
     const numericBounds = { left: -40, right: 280 }
     const liveConstraints = $derived(
@@ -60,6 +61,7 @@
         clearInterval(switchTimer)
         switchTimer = undefined
         countdown = 0
+        switchCompleted = false
     }
     const selectTarget = (target: typeof liveTarget) => {
         cancelSwitch()
@@ -81,7 +83,10 @@
         countdown = 3
         switchTimer = setInterval(() => {
             countdown -= 1
-            if (countdown === 0) selectTarget('B')
+            if (countdown === 0) {
+                selectTarget('B')
+                switchCompleted = true
+            }
         }, 1000)
     }
     onDestroy(cancelSwitch)
@@ -259,9 +264,9 @@
             </div>
             <ResizeMetrics container={containerEl} cardId="drag-card" prefix="momentum-metric" />
             <p class="metric-note">
-                Overflow is the furthest edge outside the inner boundary, on either axis. Check it
-                after settling; the live label is not a pass/fail verdict. The orange width buttons
-                include the 2 px border on each side.
+                Overflow uses the outer border edges, matching drag constraints on either axis.
+                Check it after settling; the live label is not a pass/fail verdict. The orange width
+                buttons include the 2 px border on each side.
             </p>
         </section>
         <section id="live-targets" class="test-panel purple" aria-labelledby="live-title">
@@ -283,9 +288,10 @@
                         The card should remap and stay inside B.
                     </li>
                     <li>
-                        Reset and click <strong>Switch to B in 3 seconds</strong>. Start dragging
-                        and keep the pointer held as the target changes; the same drag should
-                        continue.
+                        Reset, then <strong>Shrink B to 200</strong> while A is selected. Click
+                        <strong>Switch to B in 3 seconds</strong> and drag beyond B while staying inside
+                        A. Keep holding and move back and forth after the switch: the card should follow
+                        B’s edges on continued movement and release, without restarting your drag.
                     </li>
                 </ol>
                 <p class="expected">
@@ -330,8 +336,14 @@
                     data-testid="live-grow-b"
                     onclick={() => resizeLiveB(originalWidth)}>Grow B to 400</button
                 >
-                <button type="button" data-testid="live-delay" onclick={scheduleSwitch}
-                    >Switch to B in 3 seconds</button
+                <button
+                    class="delay-button"
+                    type="button"
+                    data-testid="live-delay"
+                    onclick={scheduleSwitch}
+                    >{countdown
+                        ? `Switching to B in ${countdown}…`
+                        : 'Switch to B in 3 seconds'}</button
                 >
             </div>
             <p class="target-status" role="status">
@@ -341,7 +353,11 @@
                         : `Element ${liveTarget}`}</strong
                 >
                 <span data-testid="live-countdown"
-                    >{countdown ? ` · Switching to B in ${countdown}… keep dragging` : ''}</span
+                    >{countdown
+                        ? ` · Switching to B in ${countdown}… keep dragging`
+                        : switchCompleted
+                          ? ' · Switched to B — keep dragging to check continuity.'
+                          : ''}</span
                 >
             </p>
             <!-- svelte-ignore a11y_no_noninteractive_tabindex (Scrollable regions need focus for keyboard scrolling.) -->
@@ -456,6 +472,10 @@
     .purple {
         --accent: #6d40a5;
         --wash: #f5f0fc;
+    }
+    .delay-button {
+        width: 210px;
+        white-space: nowrap;
     }
     .secondary-controls {
         margin-top: 10px;

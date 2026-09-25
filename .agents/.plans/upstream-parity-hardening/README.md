@@ -1,7 +1,7 @@
 # Upstream parity and verification checklist
 
 Audited 2026-09-24 against `6f0085ef` on `chore/motion-upstream-refresh`.
-All eight findings selected by the maintainer. Plans 001–005 are implemented and independently reviewed; the user visually approved 004 and its guided review page. Plan005 awaits user visual review before006. Continue one plan at a time. Generated with the improve skill on 2026-09-24.
+All eight findings selected by the maintainer. Plans 001–004 are complete; the user visually approved004 and its guided review page. Plan005 now includes the reproduced unequal-bounds active-drag fix, visible countdown, and corrected bounds metrics; independent review passed and user visual approval is pending. Continue one plan at a time;006 remains unstarted. Generated with the improve skill on2026-09-24.
 
 ## Execution order and status
 
@@ -13,7 +13,7 @@ Plan numbering follows execution order; audit finding IDs below remain unchanged
 | [002](002-ci-triggers.md) | 05 | Test-only changes trigger tests | P1 | S | — | DONE — 135e5297 on shared branch |
 | [003](003-exit-promise-guard.md) | 01 | Upstream stale-exit promise guard and adapter protection | P1 | S | 001 | DONE — 9567fcc6 on shared branch; user visually approved |
 | [004](004-drag-origin-resize.md) | 02 | Upstream resting drag-origin preservation | P1 | S | 001 | DONE — 356e4ced; guided page b10243d8 on shared branch; user visually approved |
-| [005](005-constraint-observers.md) | 06 | Resize observation follows replacement constraints | P1 | S | 004 | DONE — e83cde23 on shared branch; visual review pending |
+| [005](005-constraint-observers.md) | 06 | Resize observation follows replacement constraints | P1 | S | 004 | DONE — observer fix e83cde23 plus reviewed active-drag/countdown follow-up; user visual approval pending |
 | [006](006-reorder-declarations.md) | 03 | Emitted Reorder types and consumer inference gate | P1 | S | 001, 002 | TODO |
 | [007](007-descendant-exit-registry.md) | 07 | All owned motion descendants finish before automatic removal | P1 | M | 001, 003 | TODO |
 | [008](008-svg-firefox-coverage.md) | 08 | Actual SVG docs route tested in Chromium and Firefox | P1 | M | 001, 002; integrated release gate after all | TODO |
@@ -22,7 +22,14 @@ Status values: TODO, IN PROGRESS, DONE, BLOCKED (reason), REJECTED (reason). Kee
 
 Plan 004 [visual review follow-up](004-visual-review-follow-up.md) is DONE and user visually approved. Source commit 5291c8b5 and plan commits 13f44fee/a42d99d1 are complete. User authorized proceeding to 005. Fresh origin/main remains c8fbd7a8; cumulative reviewed baseline is a42d99d1. Plan 005 will reuse Motion's public resize subscriptions and retain the guided review layout on a separate preview.
 
-### Plan005 review result — APPROVE
+### Plan005 follow-up review — APPROVE; visual checkpoint pending
+
+- Old delayed-switch coverage used equal-size bounds and missed the user's case. New regression failed with 140 px left overflow; three active element/numeric unit transitions also failed before the runtime correction.
+- Fresh element bounds now pair with the current applied offset during a held drag, while numeric bounds use zero; pointer origin and session are preserved. Countdown visibly runs 3 → 2 → 1, with Reset cancellation covered. The meter's separate 2 px border false alarm was reproduced and corrected without widening tolerance.
+- Independent 934 units, root types (0 errors/35 existing warnings), and final 18 Chromium checks pass. Executor production/package/publint and scoped lint pass with existing Reorder diagnostics deferred to 006. T3 confirms countdown and 0 px / Inside bounds at a legal edge. Full evidence is in plan005.
+- Source, regression tests, changeset, and plan records belong together on chore/motion-upstream-refresh. Preview: http://localhost:5205/tests/drag/element-ref-resize#live-targets, primary final build, tab_2. User visual approval pending; 006 stays unstarted.
+
+### Plan005 original review result — APPROVE
 
 - Source ab210b3a uses Motion's public resize subscriptions, with local target ownership and callback invalidation. Five scoped files, no dependency/API changes. New section03 reuses the guided page and metrics component.
 - Red: five lifecycle failures and two passes after fresh generated setup. Green independently rerun:931 full units,52 drag/inertia units,15 Chromium checks; root check0 errors/35 existing warnings; package/publint pass with known006 Reorder diagnostics; normal docs build and docs check0 errors/13 existing warnings; Trunk no new issues/one existing; diff integrity pass. See005 plan for fixture/setup reconciliations and log paths.

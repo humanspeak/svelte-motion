@@ -471,16 +471,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             nextOptions.constraints,
             nextOptions.transformPagePoint
         )
-        // A React render commit refreshes ref constraints through the
-        // projection measure listener before resize scaling runs. Our
-        // constraints are stored relative to the element's current box, so
-        // pair that fresh measurement with the current applied origin. Leaving
-        // the prior base attached to the new relative distances makes the
-        // resize observer treat an unchanged position as out of bounds and
-        // push it to the new edge.
-        if (!dragging && isDomElement(nextOptions.constraints)) {
-            constraintsBase = { ...applied }
-        }
+        // Element bounds were measured from the card's current box, including
+        // while pressed. Pair them with that same applied offset; numeric
+        // bounds remain relative to zero. Keep the pointer's origin separate
+        // so refreshing options never restarts or shifts the active gesture.
+        constraintsBase = isDomElement(nextOptions.constraints) ? { ...applied } : { x: 0, y: 0 }
         syncConstraintResizeObserver()
         observeProjectionMeasurements()
         panCleanup?.update(dragSessionHandlers, dragSessionOptions())

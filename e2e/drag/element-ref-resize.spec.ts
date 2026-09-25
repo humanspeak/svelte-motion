@@ -72,6 +72,88 @@ test.describe('drag/element-ref-resize', () => {
         await expect.poll(async () => before!.x - (await card.boundingBox())!.x).toBeGreaterThan(50)
     })
 
+    test('switching to smaller B while pressed preserves both bounds and the pointer session', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        await page.getByTestId('live-reset').click()
+        await page.getByTestId('live-shrink-b').click()
+        const card = page.getByTestId('live-card')
+        await card.scrollIntoViewIfNeeded()
+        await card.evaluate((element) => {
+            element.dataset.stableCard = 'smaller-held'
+        })
+        const start = await card.boundingBox()
+        const bounds = await page.getByTestId('live-b').boundingBox()
+        if (!start || !bounds) throw new Error('missing live fixture')
+        await page.mouse.move(start.x + 40, start.y + 40)
+        await page.mouse.down()
+        await page.mouse.move(start.x + 240, start.y + 40, { steps: 12 })
+        await expect
+            .poll(async () => (await card.boundingBox())!.x + start.width - bounds.x - bounds.width)
+            .toBeGreaterThan(50)
+        // Arm the real delay after establishing the held pointer, avoiding a
+        // setup race while still exercising the page's actual timer callback.
+        await page.getByTestId('live-delay').evaluate((button) => button.click())
+        await expect(page.getByTestId('live-target')).toHaveText('Element B', { timeout: 5000 })
+        await expect(card).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+        await page.mouse.move(start.x + 260, start.y + 40, { steps: 4 })
+        const expectInside = async () => {
+            await expect
+                .poll(async () => {
+                    const rect = (await card.boundingBox())!
+                    return Math.max(
+                        bounds.x - rect.x,
+                        rect.x + rect.width - bounds.x - bounds.width
+                    )
+                })
+                .toBeLessThanOrEqual(0.5)
+        }
+        await expectInside()
+        await expect(page.getByTestId('live-metric-overflow')).toHaveText('0.0 px')
+        await expect(page.getByTestId('live-metric-bounds')).toContainText('Inside bounds')
+        await page.mouse.move(bounds.x - 100, start.y + 40, { steps: 12 })
+        await expectInside()
+        await expect(page.getByTestId('live-metric-overflow')).toHaveText('0.0 px')
+        await expect(page.getByTestId('live-metric-bounds')).toContainText('Inside bounds')
+        await expect
+            .poll(async () => Math.abs((await card.boundingBox())!.x - bounds.x))
+            .toBeLessThanOrEqual(0.5)
+        await expect(card).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+        await expect(card).toHaveAttribute('data-stable-card', 'smaller-held')
+        expect((await card.boundingBox())!.width).toBe(start.width)
+        await page.mouse.up()
+        await expectInside()
+    })
+
+    test('delay button counts down visibly before switching to B', async ({ page }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        await page.getByTestId('live-reset').click()
+        const delay = page.getByTestId('live-delay')
+        await delay.click()
+        for (const seconds of [3, 2, 1]) {
+            await expect(delay).toHaveText(`Switching to B in ${seconds}…`, { timeout: 1800 })
+            await expect(page.getByTestId('live-target')).toHaveText('Element A')
+        }
+        await expect(page.getByTestId('live-target')).toHaveText('Element B', { timeout: 1800 })
+        await expect(page.getByTestId('live-countdown')).toContainText('Switched to B')
+        await expect(delay).toHaveText('Switch to B in 3 seconds')
+    })
+
+    test('Reset cancels the visible countdown and pending target switch', async ({ page }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        await page.getByTestId('live-delay').click()
+        await expect(page.getByTestId('live-delay')).toHaveText('Switching to B in 2…', {
+            timeout: 1800
+        })
+        await page.getByTestId('live-reset').click()
+        await expect(page.getByTestId('live-delay')).toHaveText('Switch to B in 3 seconds')
+        await expect(page.getByTestId('live-countdown')).toBeEmpty()
+        await page.waitForTimeout(2500)
+        await expect(page.getByTestId('live-target')).toHaveText('Element A')
+        await expect(page.getByTestId('live-countdown')).toBeEmpty()
+    })
+
     test('delayed ref replacement preserves a pointer that is still pressed', async ({ page }) => {
         await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
         await page.getByTestId('live-reset').click()
