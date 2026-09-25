@@ -9,11 +9,11 @@ Plan numbering follows execution order; audit finding IDs below remain unchanged
 
 | Plan | Finding | Deliverable | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| [001](001-docs-verification.md) | 04 | Green docs types and enforced CI checks | P1 | S | — | DONE — 9307ece4; user visually approved |
-| [002](002-ci-triggers.md) | 05 | Test-only changes trigger tests | P1 | S | — | DONE — b0fdb49e |
-| [003](003-exit-promise-guard.md) | 01 | Upstream stale-exit promise guard and adapter protection | P1 | S | 001 | DONE — c0389a83; user visually approved |
-| [004](004-drag-origin-resize.md) | 02 | Upstream resting drag-origin preservation | P1 | S | 001 | DONE — f1393887; guided page 5291c8b5; user visually approved |
-| [005](005-constraint-observers.md) | 06 | Resize observation follows replacement constraints | P1 | S | 004 | DONE — ab210b3a; visual review pending |
+| [001](001-docs-verification.md) | 04 | Green docs types and enforced CI checks | P1 | S | — | DONE — d5245adb on shared branch; user visually approved |
+| [002](002-ci-triggers.md) | 05 | Test-only changes trigger tests | P1 | S | — | DONE — 135e5297 on shared branch |
+| [003](003-exit-promise-guard.md) | 01 | Upstream stale-exit promise guard and adapter protection | P1 | S | 001 | DONE — 9567fcc6 on shared branch; user visually approved |
+| [004](004-drag-origin-resize.md) | 02 | Upstream resting drag-origin preservation | P1 | S | 001 | DONE — 356e4ced; guided page b10243d8 on shared branch; user visually approved |
+| [005](005-constraint-observers.md) | 06 | Resize observation follows replacement constraints | P1 | S | 004 | DONE — e83cde23 on shared branch; visual review pending |
 | [006](006-reorder-declarations.md) | 03 | Emitted Reorder types and consumer inference gate | P1 | S | 001, 002 | TODO |
 | [007](007-descendant-exit-registry.md) | 07 | All owned motion descendants finish before automatic removal | P1 | M | 001, 003 | TODO |
 | [008](008-svg-firefox-coverage.md) | 08 | Actual SVG docs route tested in Chromium and Firefox | P1 | M | 001, 002; integrated release gate after all | TODO |
@@ -28,7 +28,10 @@ Plan 004 [visual review follow-up](004-visual-review-follow-up.md) is DONE and u
 - Red: five lifecycle failures and two passes after fresh generated setup. Green independently rerun:931 full units,52 drag/inertia units,15 Chromium checks; root check0 errors/35 existing warnings; package/publint pass with known006 Reorder diagnostics; normal docs build and docs check0 errors/13 existing warnings; Trunk no new issues/one existing; diff integrity pass. See005 plan for fixture/setup reconciliations and log paths.
 - Source and prep commits used normal hooks. Verified unrelated generated registry class-order churn was restored. No merge, push, PR, publication or deployment.
 - Visual review: http://localhost:5205/tests/drag/element-ref-resize#live-targets, purple section03, visible in collaborative tab_2. Old5204 preview retained. User review pending;006 unstarted.
-- The user selected chore/motion-upstream-refresh as the shared release branch. Consolidate all reviewed source through005 there, retain committed plan records, and do not create more per-plan branches by default. Prior isolated branches remain historical verification checkpoints.
+- The user selected chore/motion-upstream-refresh as the shared release branch. All reviewed source through005 is now consolidated there, with committed plan records. This supersedes per-plan fresh-branch instructions for remaining plans: do not create more per-plan branches by default. Prior isolated branches remain historical verification checkpoints.
+- Consolidation completed without conflicts: docs baseline d5245adb, CI 135e5297, presence 9567fcc6, Motion 13.4.4 upgrade 01193714, resting drag 356e4ced, guided page b10243d8, live observers e83cde23. Before this final status note, the entire tracked tree on the shared branch matched tested 005 exactly (including plan records). No user changes were discarded; earlier branches and preview servers were retained.
+
+- Integration validation in the shared checkout: pinned frozen install passed; installed motion and motion-dom are both13.4.4. Package/publint passed (known Reorder declaration diagnostics remain deferred006), root check passed with0 errors/35 existing warnings, and focused drag/inertia smoke passed52/52. Tracked non-plan files remain byte-identical to the tested005 tree; no manifest or lockfile drift.
 
 ### Execution records
 
