@@ -1,5 +1,6 @@
 <script lang="ts">
     import { motion } from '$lib'
+    import { onDestroy } from 'svelte'
     import ResizeMetrics from './ResizeMetrics.svelte'
 
     const originalWidth = 400
@@ -44,6 +45,46 @@
         containerWidth = originalWidth
         momentumReset += 1
     }
+    let liveA: HTMLDivElement | null = $state(null)
+    let liveB: HTMLDivElement | null = $state(null)
+    let liveTarget: 'A' | 'B' | 'numeric' = $state('A')
+    let liveReset = $state(0)
+    let countdown = $state(0)
+    let switchTimer: ReturnType<typeof setInterval> | undefined
+    const numericBounds = { left: -40, right: 280 }
+    const liveConstraints = $derived(
+        liveTarget === 'A' ? liveA : liveTarget === 'B' ? liveB : numericBounds
+    )
+
+    const cancelSwitch = () => {
+        clearInterval(switchTimer)
+        switchTimer = undefined
+        countdown = 0
+    }
+    const selectTarget = (target: typeof liveTarget) => {
+        cancelSwitch()
+        liveTarget = target
+    }
+    const resizeLiveB = (width: number) => {
+        // A DOM-only change is essential: a prop update would remeasure bounds
+        // and hide a missing subscription on the replacement element.
+        if (liveB) liveB.style.width = `${width}px`
+    }
+    const resetLive = () => {
+        cancelSwitch()
+        liveTarget = 'A'
+        resizeLiveB(originalWidth)
+        liveReset += 1
+    }
+    const scheduleSwitch = () => {
+        cancelSwitch()
+        countdown = 3
+        switchTimer = setInterval(() => {
+            countdown -= 1
+            if (countdown === 0) selectTarget('B')
+        }, 1000)
+    }
+    onDestroy(cancelSwitch)
 </script>
 
 <svelte:head><title>Drag constraint resize · Visual review</title></svelte:head>
@@ -51,11 +92,11 @@
 <div class="review-page">
     <div class="review-content">
         <header class="page-header">
-            <p class="eyebrow">004 / Drag constraints</p>
+            <p class="eyebrow">004 + 005 / Drag constraints</p>
             <h1>Resize without surprises.</h1>
             <p>
-                Two quick checks for cards inside a changing boundary. Start with blue, then try
-                orange.
+                Three guided checks for changing boundaries. Start with blue, try orange, then
+                switch the purple card’s live constraint target.
             </p>
         </header>
 
@@ -223,6 +264,133 @@
                 include the 2 px border on each side.
             </p>
         </section>
+        <section id="live-targets" class="test-panel purple" aria-labelledby="live-title">
+            <div class="section-heading">
+                <span class="section-number">03</span>
+                <div>
+                    <p class="eyebrow">New · Live constraint targets</p>
+                    <h2 id="live-title">Switch bounds without restarting</h2>
+                </div>
+            </div>
+            <div class="guide">
+                <ol>
+                    <li>
+                        Click <strong>Reset</strong>, drag the purple card right, then select
+                        <strong>Use B</strong>.
+                    </li>
+                    <li>
+                        Click <strong>Shrink B to 200</strong>, then <strong>Grow B to 400</strong>.
+                        The card should remap and stay inside B.
+                    </li>
+                    <li>
+                        Reset and click <strong>Switch to B in 3 seconds</strong>. Start dragging
+                        and keep the pointer held as the target changes; the same drag should
+                        continue.
+                    </li>
+                </ol>
+                <p class="expected">
+                    <strong>Look for:</strong> B-only resizing moves the dragged card when B is selected.
+                    With A or numeric bounds selected, resizing B should leave the card alone.
+                </p>
+            </div>
+            <div class="controls" aria-label="Live constraint target controls">
+                <button
+                    type="button"
+                    data-testid="live-use-a"
+                    aria-pressed={liveTarget === 'A'}
+                    onclick={() => selectTarget('A')}>Use A</button
+                >
+                <button
+                    class="primary"
+                    type="button"
+                    data-testid="live-use-b"
+                    aria-pressed={liveTarget === 'B'}
+                    onclick={() => selectTarget('B')}>Use B</button
+                >
+                <button
+                    type="button"
+                    data-testid="live-use-numeric"
+                    aria-pressed={liveTarget === 'numeric'}
+                    onclick={() => selectTarget('numeric')}>Use numeric</button
+                >
+                <button class="reset" type="button" data-testid="live-reset" onclick={resetLive}
+                    >Reset</button
+                >
+            </div>
+            <div class="controls secondary-controls" aria-label="Replacement boundary controls">
+                <button
+                    type="button"
+                    data-testid="live-shrink-b"
+                    onclick={() => resizeLiveB(resizedWidth)}>Shrink B to 200</button
+                >
+                <button
+                    type="button"
+                    data-testid="live-grow-b"
+                    onclick={() => resizeLiveB(originalWidth)}>Grow B to 400</button
+                >
+                <button type="button" data-testid="live-delay" onclick={scheduleSwitch}
+                    >Switch to B in 3 seconds</button
+                >
+            </div>
+            <p class="target-status" role="status">
+                Active constraint: <strong data-testid="live-target"
+                    >{liveTarget === 'numeric'
+                        ? 'Numeric (−40 to +280 px)'
+                        : `Element ${liveTarget}`}</strong
+                >
+                <span data-testid="live-countdown"
+                    >{countdown ? ` · Switching to B in ${countdown}… keep dragging` : ''}</span
+                >
+            </p>
+            <!-- svelte-ignore a11y_no_noninteractive_tabindex (Scrollable regions need focus for keyboard scrolling.) -->
+            <div
+                class="stage-scroll"
+                role="region"
+                aria-label="Purple card drag area; scroll horizontally on small screens"
+                tabindex="0"
+            >
+                <div class="stage">
+                    <div
+                        bind:this={liveA}
+                        data-testid="live-a"
+                        class="constraint live-a"
+                        style="box-sizing:content-box;width:400px;height:160px;"
+                    >
+                        <span class="boundary-label label-a">A · fixed 400 px</span>
+                        <div
+                            bind:this={liveB}
+                            data-testid="live-b"
+                            class="constraint live-b"
+                            style="position:absolute;left:-2px;top:-2px;box-sizing:content-box;width:400px;height:160px;"
+                        >
+                            <span class="boundary-label label-b">B · resizable</span>
+                            {#key liveReset}
+                                <motion.div
+                                    drag="x"
+                                    dragConstraints={liveConstraints ?? undefined}
+                                    dragMomentum={false}
+                                    dragElastic={0}
+                                    data-testid="live-card"
+                                    style="position:absolute;left:40px;top:40px;width:80px;height:80px;background:#c4b5fd;border-radius:8px;cursor:grab;user-select:none;display:grid;place-items:center;color:#462476;font-weight:700;font-size:12px;"
+                                >
+                                    Drag ↔
+                                </motion.div>
+                            {/key}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <ResizeMetrics
+                container={liveTarget === 'B' ? liveB : liveA}
+                cardId="live-card"
+                prefix="live-metric"
+            />
+            <p class="metric-note">
+                Metrics follow the selected element. Numeric mode uses fixed drag offsets (−40 to
+                +280 px), with geometry shown against A. Both boundaries and the card stay mounted
+                when you switch; Reset starts a fresh fixture.
+            </p>
+        </section>
         <footer>
             Reset snaps each fixture back to its starting state so you can repeat the same check.
         </footer>
@@ -282,6 +450,45 @@
     .orange {
         --accent: #9a500c;
         --wash: #fff6eb;
+    }
+    .purple {
+        --accent: #6d40a5;
+        --wash: #f5f0fc;
+    }
+    .secondary-controls {
+        margin-top: 10px;
+    }
+    .target-status {
+        font-size: 13px;
+        color: #536176;
+        margin: 14px 0 0;
+    }
+    button[aria-pressed='true'] {
+        box-shadow: 0 0 0 2px var(--accent);
+    }
+    .live-a {
+        outline: 2px dashed #8b9cb0;
+        outline-offset: 5px;
+    }
+    .live-b {
+        border-color: #9470c4;
+        background: #ede7f980;
+    }
+    .boundary-label {
+        position: absolute;
+        z-index: 1;
+        pointer-events: none;
+        right: 8px;
+        font-size: 10px;
+        font-weight: 700;
+    }
+    .label-a {
+        bottom: 6px;
+        color: #536176;
+    }
+    .label-b {
+        top: 6px;
+        color: #6d40a5;
     }
     .section-heading {
         display: flex;

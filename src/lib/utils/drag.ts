@@ -38,6 +38,7 @@ import { type AnimationOptions } from 'motion'
 import {
     frame,
     motionValue,
+    resize,
     setDragLock,
     visualElementStore,
     type AnyResolvedKeyframe,
@@ -480,6 +481,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         if (!dragging && isDomElement(nextOptions.constraints)) {
             constraintsBase = { ...applied }
         }
+        syncConstraintResizeObserver()
         observeProjectionMeasurements()
         panCleanup?.update(dragSessionHandlers, dragSessionOptions())
     }
@@ -600,15 +602,30 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         setXYImmediate(nextX, nextY, applyX, applyY)
     }
 
-    const stopConstraintResizeObserver =
-        isDomElement(opts.constraints) && typeof ResizeObserver !== 'undefined'
-            ? (() => {
-                  const observer = new ResizeObserver(() => scalePositionWithinConstraints())
-                  observer.observe(el)
-                  observer.observe(opts.constraints)
-                  return () => observer.disconnect()
-              })()
-            : null
+    let observedConstraint: Element | null = null
+    let stopConstraintResizeObserver: (() => void) | null = null
+
+    // Own only our two subscriptions; motion-dom shares the native observer.
+    // The active flag also makes a previously queued callback harmless.
+    const syncConstraintResizeObserver = () => {
+        const target = isDomElement(opts.constraints) ? opts.constraints : null
+        if (target === observedConstraint) return
+        stopConstraintResizeObserver?.()
+        stopConstraintResizeObserver = null
+        observedConstraint = target
+        if (!target || typeof ResizeObserver === 'undefined') return
+        let active = true
+        const onResize = () => {
+            if (active) scalePositionWithinConstraints()
+        }
+        const stopCard = resize(el, onResize)
+        const stopTarget = resize(target, onResize)
+        stopConstraintResizeObserver = () => {
+            active = false
+            stopCard()
+            stopTarget()
+        }
+    }
 
     /**
      * The VisualElement that renders `el`, resolved from motion-dom's
@@ -1275,6 +1292,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         scheduleHandlers: false
     })
 
+    syncConstraintResizeObserver()
     observeProjectionMeasurements()
     panCleanup = attachPan(el, dragSessionHandlers, dragSessionOptions())
 

@@ -73,8 +73,30 @@ const registerStubNode = (element: HTMLElement, seed: Record<string, number> = {
     return node
 }
 
+// Keep native observer instances across tests: motion-dom shares one observer.
+const resizeObservers: ControlledResizeObserver[] = []
+class ControlledResizeObserver {
+    targets = new Set<Element>()
+    observe = vi.fn((target: Element) => this.targets.add(target))
+    unobserve = vi.fn((target: Element) => this.targets.delete(target))
+    disconnect = vi.fn(() => this.targets.clear())
+    constructor(readonly callback: ResizeObserverCallback) {
+        resizeObservers.push(this)
+    }
+    deliver(target: Element) {
+        this.callback([{ target } as ResizeObserverEntry], this)
+    }
+}
+const observedTargets = () => new Set(resizeObservers.flatMap((observer) => [...observer.targets]))
+const deliverResize = (target: Element) => {
+    resizeObservers
+        .filter((observer) => observer.targets.has(target))
+        .forEach((observer) => observer.deliver(target))
+}
+
 describe('utils/drag', () => {
     beforeEach(() => {
+        vi.stubGlobal('ResizeObserver', ControlledResizeObserver)
         animateMock.mockClear()
         document.body.innerHTML = ''
     })
@@ -160,6 +182,159 @@ describe('utils/drag', () => {
         el.remove()
     })
 
+    describe('live constraint observers', () => {
+        const cleanups: Array<() => void> = []
+        afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
+
+        const setup = (numeric = false) => {
+            const a = document.createElement('div')
+            const b = document.createElement('div')
+            const card = document.createElement('div')
+            a.append(card)
+            document.body.append(a, b)
+            let width = 400
+            const node = registerStubNode(card, { x: 0, y: 0 })
+            vi.spyOn(a, 'getBoundingClientRect').mockImplementation(
+                () => new DOMRect(0, 0, 400, 400)
+            )
+            vi.spyOn(b, 'getBoundingClientRect').mockImplementation(
+                () => new DOMRect(0, 0, width, 400)
+            )
+            vi.spyOn(card, 'getBoundingClientRect').mockImplementation(
+                () => new DOMRect(40 + Number(node.latestValues.x), 40, 80, 80)
+            )
+            const numericBounds = { left: -40, right: 280 }
+            const options = {
+                axis: 'x' as const,
+                constraints: numeric ? numericBounds : a,
+                momentum: false,
+                elastic: 0,
+                mergedTransition: { duration: 0 }
+            }
+            const cleanup = attachDrag(card, options)
+            cleanups.push(() => {
+                cleanup()
+                visualElementStore.delete(card)
+            })
+            return {
+                a,
+                b,
+                card,
+                node,
+                cleanup,
+                numericBounds,
+                update: (constraints: typeof options.constraints) =>
+                    cleanup.updateOptions({ ...options, constraints }),
+                resizeB: (next: number) => {
+                    width = next
+                    deliverResize(b)
+                },
+                drag: async () => {
+                    card.dispatchEvent(
+                        new PointerEvent('pointerdown', { clientX: 80, clientY: 80, pointerId: 1 })
+                    )
+                    window.dispatchEvent(
+                        new PointerEvent('pointermove', { clientX: 160, clientY: 80, pointerId: 1 })
+                    )
+                    await flushFrame()
+                    window.dispatchEvent(
+                        new PointerEvent('pointerup', { clientX: 160, clientY: 80, pointerId: 1 })
+                    )
+                    await flushFrame()
+                }
+            }
+        }
+
+        it('moves observation from A to B without resizing the card', () => {
+            const { a, b, card, update } = setup()
+            update(b)
+            expect(observedTargets().has(b)).toBe(true)
+            expect(observedTargets().has(card)).toBe(true)
+            expect(observedTargets().has(a)).toBe(false)
+        })
+        it('begins observation when numeric constraints become B', () => {
+            const { b, card, update } = setup(true)
+            expect(observedTargets().has(card)).toBe(false)
+            update(b)
+            expect(observedTargets().has(b)).toBe(true)
+            expect(observedTargets().has(card)).toBe(true)
+        })
+        it('removes owned observations when B becomes numeric', () => {
+            const { a, b, card, update, numericBounds } = setup()
+            update(b)
+            update(numericBounds)
+            expect(observedTargets().has(a)).toBe(false)
+            expect(observedTargets().has(b)).toBe(false)
+            expect(observedTargets().has(card)).toBe(false)
+        })
+        it('does not churn subscriptions for the same ref', () => {
+            const { a, update } = setup()
+            const calls = resizeObservers.map((observer) => [
+                observer.observe.mock.calls.length,
+                observer.unobserve.mock.calls.length,
+                observer.disconnect.mock.calls.length
+            ])
+            update(a)
+            expect(
+                resizeObservers.map((observer) => [
+                    observer.observe.mock.calls.length,
+                    observer.unobserve.mock.calls.length,
+                    observer.disconnect.mock.calls.length
+                ])
+            ).toEqual(calls)
+        })
+        it('remeasures and remaps when only replacement B resizes', async () => {
+            const { b, node, update, drag, resizeB } = setup()
+            await drag()
+            expect(node.latestValues.x).toBe(80)
+            update(b)
+            resizeB(200)
+            expect(node.latestValues.x).toBe(5)
+            resizeB(400)
+            expect(node.latestValues.x).toBe(80)
+        })
+        it('ignores queued old-target deliveries after replacement and teardown', async () => {
+            const { a, b, card, node, update, cleanup, drag, resizeB } = setup()
+            await drag()
+            const old = resizeObservers.find((observer) => observer.targets.has(a))!
+            update(b)
+            // Change B geometry without delivering its active notification.
+            vi.spyOn(b, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 200, 400))
+            node.render.mockClear()
+            old.deliver(a)
+            expect(node.render).not.toHaveBeenCalled()
+            cleanup()
+            resizeObservers.forEach((observer) => {
+                observer.deliver(b)
+                observer.deliver(card)
+            })
+            resizeB(100)
+            expect(node.render).not.toHaveBeenCalled()
+            expect(observedTargets().has(card)).toBe(false)
+            expect(observedTargets().has(b)).toBe(false)
+        })
+        it('keeps a shared target observed until the last drag unsubscribes', async () => {
+            const first = setup()
+            const second = setup()
+            second.update(first.a)
+            await second.drag()
+            first.cleanup()
+            expect(observedTargets().has(first.card)).toBe(false)
+            expect(observedTargets().has(first.a)).toBe(true)
+            vi.spyOn(first.a, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 200, 400))
+            deliverResize(first.a)
+            expect(second.node.latestValues.x).toBe(5)
+            second.cleanup()
+            expect(observedTargets().has(first.a)).toBe(false)
+        })
+        it('supports attach and constraint changes without ResizeObserver', () => {
+            vi.stubGlobal('ResizeObserver', undefined)
+            const { b, update, cleanup } = setup()
+            expect(() => update(b)).not.toThrow()
+            expect(() => cleanup()).not.toThrow()
+        })
+    })
+
     describe('resting constraint resize', () => {
         const cleanups: Array<() => void> = []
 
@@ -175,18 +350,6 @@ describe('utils/drag', () => {
                 boundX?: MotionValue<number>
             } = {}
         ) => {
-            let resize = () => {}
-            const disconnect = vi.fn()
-            vi.stubGlobal(
-                'ResizeObserver',
-                class {
-                    constructor(callback: ResizeObserverCallback) {
-                        resize = () => callback([], this as unknown as ResizeObserver)
-                    }
-                    observe = vi.fn()
-                    disconnect = disconnect
-                }
-            )
             const container = document.createElement('div')
             const element = document.createElement('div')
             container.append(element)
@@ -239,7 +402,8 @@ describe('utils/drag', () => {
             })
             cleanups.push(() => {
                 cleanup()
-                expect(disconnect).toHaveBeenCalledOnce()
+                expect(observedTargets().has(element)).toBe(false)
+                expect(observedTargets().has(container)).toBe(false)
                 visualElementStore.delete(element)
                 container.remove()
             })
@@ -248,7 +412,7 @@ describe('utils/drag', () => {
                 element,
                 resize: (nextSize: number) => {
                     size = nextSize
-                    resize()
+                    deliverResize(container)
                 },
                 drag: async (dx: number, dy: number) => {
                     element.dispatchEvent(
