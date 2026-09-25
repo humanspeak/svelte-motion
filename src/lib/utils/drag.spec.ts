@@ -372,6 +372,40 @@ describe('utils/drag', () => {
             }
         )
 
+        it('refreshes resized ref bounds while a stationary pointer remains held', async () => {
+            const fixture = setup()
+            fixture.update(fixture.b)
+            fixture.card.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 80, clientY: 80, pointerId: 1 })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 280, clientY: 80, pointerId: 1 })
+            )
+            await flushFrame()
+            expect(fixture.node.latestValues.x).toBe(200)
+            fixture.resizeB(200)
+            // The existing held pointer is processed again; no new pointer event.
+            await flushFrame()
+            expect(fixture.node.latestValues.x).toBe(80)
+            expect(fixture.card.dataset.svelteMotionDragActive).toBe('true')
+            fixture.resizeB(400)
+            await flushFrame()
+            expect(fixture.node.latestValues.x).toBe(200)
+            fixture.resizeB(200)
+            await flushFrame()
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: -200, clientY: 80, pointerId: 1 })
+            )
+            await flushFrame()
+            expect(fixture.node.latestValues.x).toBe(-40)
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: -200, clientY: 80, pointerId: 1 })
+            )
+            await flushFrame()
+            expect(fixture.node.latestValues.x).toBe(-40)
+            expect(fixture.card.dataset.svelteMotionDragActive).toBeUndefined()
+        })
+
         it('supports attach and constraint changes without ResizeObserver', () => {
             vi.stubGlobal('ResizeObserver', undefined)
             const { b, update, cleanup } = setup()

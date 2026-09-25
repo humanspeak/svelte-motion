@@ -555,7 +555,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
     })
 
     const scalePositionWithinConstraints = () => {
-        if (dragging || !constraints) return
+        if (!constraints) return
         const isElementRefConstraint = isDomElement(opts.constraints)
         if (!isElementRefConstraint) return
 

@@ -1,7 +1,7 @@
 # Upstream parity and verification checklist
 
 Audited 2026-09-24 against `6f0085ef` on `chore/motion-upstream-refresh`.
-All eight findings selected by the maintainer. Plans 001–004 are complete; the user visually approved004 and its guided review page. Plan005 now includes the reproduced unequal-bounds active-drag fix, visible countdown, and corrected bounds metrics; independent review passed and user visual approval is pending. Continue one plan at a time;006 remains unstarted. Generated with the improve skill on2026-09-24.
+All eight findings selected by the maintainer. Plans 001–004 are complete; the user visually approved004 and its guided review page. Plan005 is complete: the user-approved automatic ref-switch behavior and the corrected same-ref held-resize behavior both match actual React Motion 13.4.4. Continue one plan at a time;006 remains unstarted. Generated with the improve skill on2026-09-24.
 
 ## Execution order and status
 
@@ -13,7 +13,7 @@ Plan numbering follows execution order; audit finding IDs below remain unchanged
 | [002](002-ci-triggers.md) | 05 | Test-only changes trigger tests | P1 | S | — | DONE — 135e5297 on shared branch |
 | [003](003-exit-promise-guard.md) | 01 | Upstream stale-exit promise guard and adapter protection | P1 | S | 001 | DONE — 9567fcc6 on shared branch; user visually approved |
 | [004](004-drag-origin-resize.md) | 02 | Upstream resting drag-origin preservation | P1 | S | 001 | DONE — 356e4ced; guided page b10243d8 on shared branch; user visually approved |
-| [005](005-constraint-observers.md) | 06 | Resize observation follows replacement constraints | P1 | S | 004 | DONE — observer fix e83cde23 plus reviewed active-drag/countdown follow-up; user visual approval pending |
+| [005](005-constraint-observers.md) | 06 | Resize observation follows replacement constraints | P1 | S | 004 | DONE — user approved; ref-switch and held-resize parity verified against React Motion 13.4.4 |
 | [006](006-reorder-declarations.md) | 03 | Emitted Reorder types and consumer inference gate | P1 | S | 001, 002 | TODO |
 | [007](007-descendant-exit-registry.md) | 07 | All owned motion descendants finish before automatic removal | P1 | M | 001, 003 | TODO |
 | [008](008-svg-firefox-coverage.md) | 08 | Actual SVG docs route tested in Chromium and Firefox | P1 | M | 001, 002; integrated release gate after all | TODO |
@@ -22,12 +22,14 @@ Status values: TODO, IN PROGRESS, DONE, BLOCKED (reason), REJECTED (reason). Kee
 
 Plan 004 [visual review follow-up](004-visual-review-follow-up.md) is DONE and user visually approved. Source commit 5291c8b5 and plan commits 13f44fee/a42d99d1 are complete. User authorized proceeding to 005. Fresh origin/main remains c8fbd7a8; cumulative reviewed baseline is a42d99d1. Plan 005 will reuse Motion's public resize subscriptions and retain the guided review layout on a separate preview.
 
-### Plan005 follow-up review — APPROVE; visual checkpoint pending
+### Plan005 final review — APPROVE; upstream parity and user approval complete
 
 - Old delayed-switch coverage used equal-size bounds and missed the user's case. New regression failed with 140 px left overflow; three active element/numeric unit transitions also failed before the runtime correction.
 - Fresh element bounds now pair with the current applied offset during a held drag, while numeric bounds use zero; pointer origin and session are preserved. Countdown visibly runs 3 → 2 → 1, with Reset cancellation covered. The meter's separate 2 px border false alarm was reproduced and corrected without widening tolerance.
 - Independent 934 units, root types (0 errors/35 existing warnings), and final 18 Chromium checks pass. Executor production/package/publint and scoped lint pass with existing Reorder diagnostics deferred to 006. T3 confirms countdown and 0 px / Inside bounds at a legal edge. Full evidence is in plan005.
-- Source, regression tests, changeset, and plan records belong together on chore/motion-upstream-refresh. Preview: http://localhost:5205/tests/drag/element-ref-resize#live-targets, primary final build, tab_2. User visual approval pending; 006 stays unstarted.
+- Source, regression tests, changeset, and plan records belong together on chore/motion-upstream-refresh. Preview: http://localhost:5205/tests/drag/element-ref-resize#live-targets, primary final build, tab_2. User visually approved after upstream parity verification; 006 stays unstarted.
+
+Stationary-pointer parity: actual React Motion 13.4.4 and Svelte both automatically move into smaller B within 100 ms while the pointer stays held, with no additional pointermove and no drag restart (x200 → 82; overflow118 → 0). The existing regression now also checks containment before any post-switch pointermove. Continuous frame updates explain this behavior; the earlier explanation that another physical move was required was incorrect. The user's conditional visual approval of that exact switch is satisfied. The same-ref control exposed stale bounds during held resize; removing one early dragging guard fixed it. Final React/Svelte comparisons now match both cases. Independent 935 units and 19 Chromium checks pass, with focused56, rootcheck, build/package, and scoped lint green. Plan005 is complete; see plan005 for red/green evidence and upstream references.
 
 ### Plan005 original review result — APPROVE
 

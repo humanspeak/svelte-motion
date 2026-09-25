@@ -97,7 +97,6 @@ test.describe('drag/element-ref-resize', () => {
         await page.getByTestId('live-delay').evaluate((button) => button.click())
         await expect(page.getByTestId('live-target')).toHaveText('Element B', { timeout: 5000 })
         await expect(card).toHaveAttribute('data-svelte-motion-drag-active', 'true')
-        await page.mouse.move(start.x + 260, start.y + 40, { steps: 4 })
         const expectInside = async () => {
             await expect
                 .poll(async () => {
@@ -109,6 +108,11 @@ test.describe('drag/element-ref-resize', () => {
                 })
                 .toBeLessThanOrEqual(0.5)
         }
+        // Motion keeps processing the held pointer every frame. Switching refs
+        // must constrain it before another pointermove or pointerup is sent.
+        await expectInside()
+        await expect(card).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+        await page.mouse.move(start.x + 260, start.y + 40, { steps: 4 })
         await expectInside()
         await expect(page.getByTestId('live-metric-overflow')).toHaveText('0.0 px')
         await expect(page.getByTestId('live-metric-bounds')).toContainText('Inside bounds')
@@ -124,6 +128,49 @@ test.describe('drag/element-ref-resize', () => {
         expect((await card.boundingBox())!.width).toBe(start.width)
         await page.mouse.up()
         await expectInside()
+    })
+
+    test('resizing the active ref constrains a stationary held pointer before another move', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        await page.getByTestId('live-reset').click()
+        await page.getByTestId('live-use-b').click()
+        const card = page.getByTestId('live-card')
+        await card.scrollIntoViewIfNeeded()
+        const start = (await card.boundingBox())!
+        await card.evaluate((element) => {
+            element.dataset.stableCard = 'resized-held'
+        })
+        await page.mouse.move(start.x + 40, start.y + 40)
+        await page.mouse.down()
+        await page.mouse.move(start.x + 240, start.y + 40, { steps: 12 })
+        await expect.poll(async () => (await card.boundingBox())!.x - start.x).toBeGreaterThan(190)
+        // Change only the current ref's geometry, leaving the pointer stationary.
+        await page.getByTestId('live-shrink-b').evaluate((button) => button.click())
+        await expect(page.getByTestId('live-metric-width')).toHaveText('200.0 px')
+        const bounds = (await page.getByTestId('live-b').boundingBox())!
+        await expect
+            .poll(async () => (await card.boundingBox())!.x + start.width - bounds.x - bounds.width)
+            .toBeLessThanOrEqual(0.5)
+        await expect(page.getByTestId('live-metric-overflow')).toHaveText('0.0 px')
+        await expect(card).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+        await page.mouse.move(start.x + 260, start.y + 40, { steps: 4 })
+        await expect
+            .poll(async () =>
+                Math.abs((await card.boundingBox())!.x + start.width - bounds.x - bounds.width)
+            )
+            .toBeLessThanOrEqual(0.5)
+        await page.mouse.move(bounds.x - 100, start.y + 40, { steps: 12 })
+        await expect
+            .poll(async () => Math.abs((await card.boundingBox())!.x - bounds.x))
+            .toBeLessThanOrEqual(0.5)
+        await expect(card).toHaveAttribute('data-stable-card', 'resized-held')
+        await expect(card).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+        expect((await card.boundingBox())!.width).toBe(start.width)
+        await page.mouse.up()
+        await expect(page.getByTestId('live-metric-overflow')).toHaveText('0.0 px')
+        await expect(card).not.toHaveAttribute('data-svelte-motion-drag-active', 'true')
     })
 
     test('delay button counts down visibly before switching to B', async ({ page }) => {
