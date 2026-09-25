@@ -1,7 +1,7 @@
 # Upstream parity and verification checklist
 
 Audited 2026-09-24 against `6f0085ef` on `chore/motion-upstream-refresh`.
-All eight findings selected by the maintainer. Plans001–006 are complete, including the user-approved repeated-shuffle Reorder fix. The maintainer authorized committing that checkpoint and proceeding to007. Generated with the improve skill on2026-09-24.
+All eight findings selected by the maintainer. Plans001–007 are complete, including the user-approved Reorder and owned-exit fixes. Plan008 is next on the same shared branch. Generated with the improve skill on2026-09-24.
 
 ## Execution order and status
 
@@ -15,7 +15,7 @@ Plan numbering follows execution order; audit finding IDs below remain unchanged
 | [004](004-drag-origin-resize.md) | 02 | Upstream resting drag-origin preservation | P1 | S | 001 | DONE — 356e4ced; guided page b10243d8 on shared branch; user visually approved |
 | [005](005-constraint-observers.md) | 06 | Resize observation follows replacement constraints | P1 | S | 004 | DONE — user approved; ref-switch and held-resize parity verified against React Motion 13.4.4 |
 | [006](006-reorder-declarations.md) | 03 | Emitted Reorder types and consumer inference gate | P1 | S | 001, 002 | DONE — declaration fix29069bd3 and runtime follow-up verified; user visually approved |
-| [007](007-descendant-exit-registry.md) | 07 | All owned motion descendants finish before automatic removal | P1 | M | 001, 003 | TODO |
+| [007](007-descendant-exit-registry.md) | 07 | All owned motion descendants finish before automatic removal | P1 | M | 001, 003 | DONE — all-descendant exits and re-entry verified; maintainer visually approved |
 | [008](008-svg-firefox-coverage.md) | 08 | Actual SVG docs route tested in Chromium and Firefox | P1 | M | 001, 002; integrated release gate after all | TODO |
 
 Status values: TODO, IN PROGRESS, DONE, BLOCKED (reason), REJECTED (reason). Keep TODO until execution actually begins; a written plan is not a completed fix. S/M estimates include regression coverage and are rough, not deadlines.
@@ -194,3 +194,26 @@ The existing transform-page-point and clone-exit-migration batches were reviewed
 - Reproduced the user's repeated-shuffle jump: at an upward DOM swap the held item moved54px away from the pointer for one frame. A reduced three-gesture regression failed before the fix. The active-drag layout notification now bypasses an occupied frame throttle and reaches the existing upstream projection compensation before paint; no new positioning algorithm or public API change.
 - Green: new regression3/3, original30-gesture sequence without slot jumps,935 units, package/publint, consumer types+SSR, root/docs checks with baseline warnings, scoped Trunk with no new issues. Independent browser matrix:66 passed,1 pre-existing single-frame momentum fixme skipped; includes all23 Reorder checks plus affected layout and drag coverage. Full evidence and commands are in006.
 - The maintainer confirmed the jump is gone and authorized committing all five scoped files, including both plan records, on chore/motion-upstream-refresh, then starting007. Frozen preview is http://localhost:5205/tests/reorder/basic. A separate mid-animation re-grab offset observation needs upstream comparison before classification and is not claimed fixed by this patch.
+
+
+### Plan 007 implementation review — visual checkpoint pending
+
+- Implemented on the shared `chore/motion-upstream-refresh` checkout after the approved 006 runtime commit `40ebd396`. Owned wrappers now wait for every registered automatic motion exit. Reused upstream's ID/completion map model and Motion animation paths, with cycle invalidation and the existing explicit manual `safeToRemove()` release preserved.
+- Public-component red tests exposed premature removal, an injected VisualElement presence-context overwrite, and missing initial exit for a descendant mounted absent. Each has a focused regression and a narrow reviewed fix; 954 units pass. The plan records the scope reconciliation and exact evidence.
+- Public docs and FIG-002 on `/examples/use-presence`, plus the existing `/tests/use-presence` page, demonstrate fast/slow exits, interruption, Reset, real MotionValue progress, wrapper presence, and completion counts. A browser red caught a frozen progress display before handoff; final demo code uses the existing public reactive MotionValue API.
+- Broader Chromium coverage passed 131 checks; the only red was the new progress assertion against the old production demo. All 8 affected-route checks now pass against the final MotionValue production rebuild, including the progress assertion (23.6 seconds). Root/docs type checks now pass with 0 errors and the existing 35/13 warnings. Package/publint and consumer types/SSR pass. Final normal docs build passed in 2m 23s; Trunk found no new issues across 19 files (one existing warning). Generated registry drift was restored; diff integrity passes. Full logs and handoff evidence are in 007.
+- Follow-up discovered while verifying metrics: component-level `onUpdate` is not forwarded by `buildMotionNodeProps`. This is outside the owned-exit registry change; the new examples use supported MotionValue reads. Assess public callback parity separately rather than adding an unreviewed API fix to 007.
+- Review URLs: http://localhost:5205/tests/use-presence (Owned group section) and http://localhost:5199/examples/use-presence (FIG-002). T3 initially demonstrated correct group retention/removal, then its automation host disconnected. Headless browser checks and screenshots continued via the explicitly allowed fallback; both local servers are left running. Source and plan updates for 007 remain uncommitted pending the maintainer's visual checkpoint; 008 is unstarted.
+
+
+### Plan 007 visual follow-up — completed-exit re-entry
+
+- Red first, as explicitly requested: Hide → Fast finished while Slow exits → Show left the original Fast card at opacity 0.15/x100 after 5 seconds, while Slow returned to opacity 1/x0. A feature unit also failed because initial-animation suppression remained set at reset. Existing label-only coverage had missed the actual paint failure.
+- Reused upstream's `blockInitialAnimation = false` before resetting/replaying a completed exit. No demo remount or value-reset workaround. New coverage checks original node identities, eventual computed opacity/transform for both cards across two re-entry cycles, and a later normal removal exactly once.
+- Green: 85 focused units; root check 0 errors/35 baseline warnings; package/publint; Trunk/diff checks; production app build. The other 21 related browser checks passed. New regression passes 3/3 after waiting for the onMount-gated cards before capturing their identities. Same regression passes on the docs example; native T3 independently measured both cards restored to opacity 1/x0.
+- Refreshed production test page: http://localhost:5205/tests/use-presence. Docs example: http://localhost:5199/examples/use-presence, FIG-002. Both servers remain running. T3 tab_d is loaded and Reset, though its visibility flag remains false. Refresh older tabs to pick up the fix. 007 is uncommitted pending renewed visual approval; 008 remains unstarted.
+
+
+### Plan 007 approval and commit
+
+The maintainer approved the repaired group exits and completed-exit re-entry, accepted the demonstrated Show/Reset progress behavior, and authorized committing all 007 work then starting 008. The source/tests/docs/changeset and both plan records are included together in `fix(presence): wait for all owned descendant exits` on the shared branch; the containing commit records the implementation. No push, merge, or release. Plan 008's cross-browser docs coverage is the next step.

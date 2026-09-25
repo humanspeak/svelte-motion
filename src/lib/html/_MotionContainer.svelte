@@ -381,11 +381,10 @@
             id: componentHydrationId,
             // Read here so the calling effect tracks the wrapper's exit flip.
             isPresent: presenceChildContext.isPresent,
-            // The wrapper owns the lifecycle; nothing extra to track per id.
-            register: () => () => {},
+            register: presenceChildContext.register,
             // Capture this cycle's versioned callback so an old context cannot
             // complete a newer exit by reading the getter when it settles.
-            onExitComplete: presenceChildContext.safeToRemove,
+            onExitComplete: presenceChildContext.onExitComplete,
             // `AnimatePresence initial={false}` suppresses the first enter.
             initial: presenceSkipEnter ? false : undefined,
             custom: resolvePresenceCustom()

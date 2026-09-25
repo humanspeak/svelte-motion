@@ -187,7 +187,11 @@ export class ExitAnimationFeature extends Feature<unknown> {
         const { isPresent, onExitComplete } = presenceContext
         const { isPresent: prevIsPresent } = this.node.prevPresenceContext ?? {}
 
-        if (!this.node.animationState || isPresent === prevIsPresent) return
+        if (!this.node.animationState) return
+        // A descendant mounted during an active exit starts absent. Its first
+        // update must still start an exit after registration; later updates
+        // must not restart the same promise.
+        if (isPresent === prevIsPresent && (isPresent || this.exitAnimation)) return
 
         if (isPresent && prevIsPresent === false) {
             // Re-entering. If the exit already finished the element sits at the
@@ -214,6 +218,9 @@ export class ExitAnimationFeature extends Feature<unknown> {
                         }
                     }
                 }
+                // Match upstream: a retained child re-entering after exit is
+                // no longer an initial child, even when initial was false.
+                this.node.blockInitialAnimation = false
                 this.node.animationState.reset()
                 void this.node.animationState.animateChanges()
             } else {

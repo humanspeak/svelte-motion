@@ -90,7 +90,9 @@
         },
         get safeToRemove() {
             return completeExit
-        }
+        },
+        register: () => () => {},
+        onExitComplete: completeExit
     })
 
     // popLayout: when the wrapper flips to "exiting", take the real node out of

@@ -744,6 +744,156 @@ describe('_MotionContainer', () => {
         expect(onExitComplete).toHaveBeenCalledTimes(1)
     })
 
+    async function controlledOwnedGroup(props: Record<string, unknown> = {}) {
+        const { default: Harness } =
+            await import('$lib/components/__tests__/OwnedPresenceGroupHarness.svelte')
+        const { visualElementStore } = await import('motion-dom')
+        const onExitComplete = vi.fn()
+        const result = render(Harness, { props: { present: true, onExitComplete, ...props } })
+        await flushTimers()
+        const completions = new Map<string, ReturnType<typeof Promise.withResolvers<void>>[]>()
+        for (const id of ['owned-fast', 'owned-slow']) {
+            const element = result.queryByTestId(id)
+            if (!element) continue
+            const state = visualElementStore.get(element)!.animationState!
+            const original = state.setActive.bind(state)
+            completions.set(id, [])
+            vi.spyOn(state, 'setActive').mockImplementation((type, active, options) => {
+                const animation = original(type, active, options)
+                if (type !== 'exit' || !active) return animation
+                const completion = Promise.withResolvers<void>()
+                completions.get(id)!.push(completion)
+                return animation.then(() => completion.promise)
+            })
+        }
+        return {
+            result,
+            onExitComplete,
+            async update(next: Record<string, unknown>) {
+                await result.rerender({ ...props, onExitComplete, ...next })
+                await flushTimers()
+            },
+            async complete(id: string, cycle = 0) {
+                completions.get(id)![cycle].resolve()
+                await flushTimers()
+                await flushTimers()
+            }
+        }
+    }
+
+    it.each(['sync', 'wait'] as const)(
+        'retains owned descendant exits until both independent animations complete in %s mode',
+        async (mode) => {
+            const group = await controlledOwnedGroup({ mode, noExit: true, nested: true })
+            await group.update({ present: false })
+            await group.complete('owned-fast')
+            expect(group.result.queryByTestId('owned-fast')).toBeTruthy()
+            expect(group.result.queryByTestId('owned-slow')).toBeTruthy()
+            expect(group.result.queryByTestId('owned-no-exit')).toBeTruthy()
+            expect(group.result.queryByTestId('nested-motion')).toBeTruthy()
+            expect(group.onExitComplete).not.toHaveBeenCalled()
+            await group.complete('owned-slow')
+            expect(group.result.queryByTestId('owned-group')).toBeNull()
+            expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+        }
+    )
+
+    it('manual wrapper release may finish owned descendant exits early without double notification', async () => {
+        const group = await controlledOwnedGroup({ manual: true })
+        await group.update({ present: false })
+        group.result.getByTestId('probe').click()
+        await flushTimers()
+        expect(group.result.queryByTestId('owned-group')).toBeNull()
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+        await group.complete('owned-fast')
+        await group.complete('owned-slow')
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+    })
+
+    it('reading usePresence does not add a barrier to owned descendant exits', async () => {
+        const group = await controlledOwnedGroup({ manual: true })
+        await group.update({ present: false })
+        await group.complete('owned-fast')
+        expect(group.result.queryByTestId('probe')).toBeTruthy()
+        await group.complete('owned-slow')
+        expect(group.result.queryByTestId('owned-group')).toBeNull()
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+    })
+
+    it('unmounting a pending descendant reevaluates owned descendant exits', async () => {
+        const group = await controlledOwnedGroup()
+        await group.update({ present: false })
+        await group.complete('owned-fast')
+        await group.update({ present: false, slowPresent: false })
+        expect(group.result.queryByTestId('owned-group')).toBeNull()
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+        await group.complete('owned-slow')
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+    })
+
+    it('cancelled owned descendant exits cannot finish a later cycle', async () => {
+        const group = await controlledOwnedGroup()
+        await group.update({ present: false })
+        await group.complete('owned-fast')
+        await group.update({ present: true })
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+        await group.update({ present: false })
+        await group.complete('owned-slow', 0)
+        await group.complete('owned-fast', 1)
+        expect(group.result.queryByTestId('owned-group')).toBeTruthy()
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+        await group.complete('owned-slow', 1)
+        expect(group.result.queryByTestId('owned-group')).toBeNull()
+        expect(group.onExitComplete).toHaveBeenCalledTimes(2)
+    })
+
+    it('a motion descendant mounted during owned descendant exits joins the current barrier', async () => {
+        const group = await controlledOwnedGroup({ fastPresent: false })
+        await group.update({ present: false })
+        const late = Promise.withResolvers<void>()
+        const { ExitAnimationFeature } = await import('$lib/utils/visualElementCore')
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- Preserve the original method before spying; the replacement supplies its receiver with call(this).
+        const mount = ExitAnimationFeature.prototype.mount
+        const lateMount = vi
+            .spyOn(ExitAnimationFeature.prototype, 'mount')
+            .mockImplementation(function (this: InstanceType<typeof ExitAnimationFeature>) {
+                mount.call(this)
+                const state = this.node.animationState!
+                const original = state.setActive.bind(state)
+                vi.spyOn(state, 'setActive').mockImplementation((type, active, options) => {
+                    const animation = original(type, active, options)
+                    return type === 'exit' && active
+                        ? animation.then(() => late.promise)
+                        : animation
+                })
+            })
+        try {
+            await group.update({ present: false, fastPresent: true })
+            await flushTimers()
+            await group.complete('owned-slow')
+            expect(group.result.queryByTestId('owned-fast')).toBeTruthy()
+            expect(group.onExitComplete).not.toHaveBeenCalled()
+            late.resolve()
+            await flushTimers()
+            await flushTimers()
+            expect(group.result.queryByTestId('owned-group')).toBeNull()
+            expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+        } finally {
+            lateMount.mockRestore()
+            late.resolve()
+        }
+    })
+
+    it('destroying a wrapper settles owned descendant exits only once', async () => {
+        const group = await controlledOwnedGroup()
+        await group.update({ present: false })
+        group.result.unmount()
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+        await group.complete('owned-fast')
+        await group.complete('owned-slow')
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+    })
+
     it.each(['promise', 'callback'] as const)(
         'retains the owned child when a superseded exit %s completes',
         async (completion) => {

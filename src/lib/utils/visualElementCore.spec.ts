@@ -260,6 +260,27 @@ describe('ExitAnimationFeature', () => {
         visualElementStore.delete(element)
     })
 
+    it('starts one exit for a descendant mounted into an already absent context', async () => {
+        const onExitComplete = vi.fn()
+        const absent = { id: 'late', isPresent: false, register: () => () => {}, onExitComplete }
+        const { ve, element, setActive } = mountWithExit(absent)
+        onExitComplete.mockClear()
+        const pending = Promise.withResolvers<void>()
+        setActive.mockReturnValue(pending.promise)
+        ve.update(ve.getProps(), absent)
+        ve.updateFeatures()
+        ve.updateFeatures()
+        expect(setActive).toHaveBeenCalledExactlyOnceWith('exit', true)
+        expect(onExitComplete).not.toHaveBeenCalled()
+        pending.resolve()
+        await pending.promise
+        expect(onExitComplete).toHaveBeenCalledTimes(1)
+        ve.updateFeatures()
+        expect(setActive).toHaveBeenCalledTimes(1)
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
     it('resets and replays the enter when re-entering after a COMPLETED exit', async () => {
         const onExitComplete = vi.fn()
         const present = {
@@ -285,6 +306,17 @@ describe('ExitAnimationFeature', () => {
 
         setActive.mockClear()
         animateChanges.mockClear()
+
+        // Initial animation suppression must not suppress a retained child's
+        // re-entry after its exit has already completed.
+        ve.blockInitialAnimation = true
+        reset.mockImplementationOnce(() => {
+            expect(ve.blockInitialAnimation).toBe(false)
+        })
+        animateChanges.mockImplementationOnce(() => {
+            expect(ve.blockInitialAnimation).toBe(false)
+            return Promise.resolve()
+        })
 
         // Re-enter.
         ve.update(ve.getProps(), { ...present, isPresent: true })

@@ -128,20 +128,30 @@ When called outside any `PresenceChild`, `useIsPresent()` returns `true` and
   `safeToRemove` fires cancels the exit; the previously-handed-out callback
   becomes a no-op so a stale `transitionend` handler can't tear down a
   now-present component.
-- **Required.** If you call `usePresence()`, you must eventually call
-  `safeToRemove`. Otherwise the wrapper holds children forever and
-  `<AnimatePresence>`'s `onExitComplete` never fires.
+- **Manual holds.** A wrapper with no motion exit participants stays mounted
+  until you call `safeToRemove`. Reading `usePresence()` does not add an
+  independent hold when motion descendants already coordinate automatic removal.
 
 ## Mixing with `motion.*` `exit`
 
-Inside `<PresenceChild>`, the wrapper drives the exit. Any `motion.*`
-descendants automatically opt out of the outer `<AnimatePresence>` clone
-path — their `exit` props are ignored. Pick one approach per element:
+Inside `<PresenceChild>`, independent `motion.*` descendants run their `exit`
+animations on the real nodes. The wrapper automatically waits until **all**
+registered motion exits finish, then removes the whole subtree and reports one
+completion to `<AnimatePresence>`. The same coordination applies to an owned
+`child()` snippet containing a plain wrapper with multiple motion descendants.
 
-- Use `motion.*` with `exit={...}` for a declarative motion-driven exit, no
-  `<PresenceChild>` needed.
-- Use `<PresenceChild>` with a child that calls `safeToRemove` for a custom
-  exit you fully control.
+`safeToRemove()` remains an explicit release of the **whole wrapper**. Calling
+it may remove motion descendants before their animations finish. Merely reading
+`usePresence()` does not register a second completion barrier. For custom exit
+work that must hold independently, use a separate manual `<PresenceChild>`
+boundary rather than combining it with automatic motion exits in one wrapper.
+
+Re-entering cancels the current automatic exit cycle. Stale animation
+completions cannot finish a newer exit. Removing an exiting motion descendant
+also removes its pending participation, so it cannot leave the wrapper stuck.
+
+See [the owned group example](/examples/use-presence) for fast and slow exits
+that retain their common wrapper until both finish.
 
 ## Known limitations
 
@@ -161,7 +171,7 @@ path — their `exit` props are ignored. Pick one approach per element:
 
 | Prop | Type | Default | Description |
 | ---- | ---- | ------- | ----------- |
-| `present` | `boolean` | `true` | When this flips `true → false`, the wrapper holds children rendered with `isPresent=false` until `safeToRemove` fires. |
+| `present` | `boolean` | `true` | When this flips `true → false`, the wrapper holds children rendered with `isPresent=false` until all motion exits finish or `safeToRemove` fires. |
 | `children` | `Snippet` | — | Snippet rendered while `present` is true or while the wrapper is holding. |
 
 ### `useIsPresent(): boolean`

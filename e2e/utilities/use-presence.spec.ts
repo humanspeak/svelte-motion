@@ -1,6 +1,114 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('usePresence', () => {
+    test('owned group retains both descendants after the fast exit and removes once after the slow exit', async ({
+        page
+    }) => {
+        await page.goto('/tests/use-presence')
+        await page.getByTestId('group-hide').click()
+        await expect(page.getByTestId('group-fast-state')).toHaveText('finished')
+        await expect(page.getByTestId('group-slow-state')).toHaveText('exiting')
+        const slowProgress = await page
+            .locator('.group-demo .progress progress')
+            .nth(1)
+            .evaluate((element: HTMLProgressElement) => element.value)
+        expect(slowProgress).toBeGreaterThan(0)
+        expect(slowProgress).toBeLessThan(100)
+        await expect(page.getByTestId('group-mounted')).toHaveText('mounted')
+        await expect(page.getByTestId('group-fast-card')).toBeAttached()
+        await expect(page.getByTestId('group-slow-card')).toBeAttached()
+        await expect(page.getByTestId('group-completions')).toHaveText('0')
+        await expect(page.getByTestId('owned-group-wrapper')).toHaveCount(0)
+        await expect(page.getByTestId('group-slow-state')).toHaveText('finished')
+        await expect(page.getByTestId('group-mounted')).toHaveText('removed')
+        await expect(page.getByTestId('group-completions')).toHaveText('1')
+        await page.getByTestId('group-show').click()
+        await expect(page.getByTestId('owned-group-wrapper')).toBeVisible()
+        await page.getByTestId('group-hide').click()
+        await expect(page.getByTestId('owned-group-wrapper')).toHaveCount(0)
+        await expect(page.getByTestId('group-completions')).toHaveText('2')
+    })
+
+    test('owned group cancels an exit, starts another, and resets its real lifecycle metrics', async ({
+        page
+    }) => {
+        await page.goto('/tests/use-presence')
+        await page.getByTestId('group-hide').click()
+        await expect(page.getByTestId('group-fast-state')).toHaveText('finished')
+        await page.getByTestId('group-show').click()
+        await expect(page.getByTestId('group-fast-state')).toHaveText('ready')
+        await expect(page.getByTestId('group-completions')).toHaveText('0')
+        await page.getByTestId('group-hide').click()
+        await expect(page.getByTestId('group-slow-state')).toHaveText('exiting')
+        await expect(page.getByTestId('owned-group-wrapper')).toBeAttached()
+        await expect(page.getByTestId('owned-group-wrapper')).toHaveCount(0)
+        await expect(page.getByTestId('group-completions')).toHaveText('1')
+        await page.getByTestId('group-reset').click()
+        await expect(page.getByTestId('group-fast-state')).toHaveText('ready')
+        await expect(page.getByTestId('group-slow-state')).toHaveText('ready')
+        await expect(page.getByTestId('group-mounted')).toHaveText('mounted')
+        await expect(page.getByTestId('group-completions')).toHaveText('0')
+    })
+
+    test('owned group restores both retained cards when shown after the fast exit finishes', async ({
+        page
+    }) => {
+        await page.goto('/tests/use-presence')
+        const cards = page.locator(
+            '[data-testid="group-fast-card"], [data-testid="group-slow-card"]'
+        )
+        await expect(cards).toHaveCount(2)
+        const originalCards = await cards.elementHandles()
+        expect(originalCards).toHaveLength(2)
+
+        for (let cycle = 0; cycle < 2; cycle += 1) {
+            await page.getByTestId('group-hide').click()
+            await expect(page.getByTestId('group-fast-state')).toHaveText('finished')
+            await expect(page.getByTestId('group-slow-state')).toHaveText('exiting')
+            await page.getByTestId('group-show').click()
+
+            for (const [index, original] of originalCards.entries()) {
+                expect(
+                    await cards.nth(index).evaluate((node, before) => node === before, original)
+                ).toBe(true)
+            }
+            await expect
+                .poll(() =>
+                    cards.evaluateAll((elements) =>
+                        elements.map((element) => {
+                            const style = getComputedStyle(element)
+                            return {
+                                opacity: Number(style.opacity),
+                                x:
+                                    style.transform === 'none'
+                                        ? 0
+                                        : new DOMMatrixReadOnly(style.transform).m41
+                            }
+                        })
+                    )
+                )
+                .toEqual([
+                    { opacity: expect.closeTo(1, 2), x: expect.closeTo(0, 0) },
+                    { opacity: expect.closeTo(1, 2), x: expect.closeTo(0, 0) }
+                ])
+            await expect(page.getByTestId('group-completions')).toHaveText('0')
+        }
+
+        await page.getByTestId('group-hide').click()
+        await expect(page.getByTestId('owned-group-wrapper')).toHaveCount(0)
+        await expect(page.getByTestId('group-completions')).toHaveText('1')
+    })
+
+    test('owned group reduced-motion exits finish with accurate metrics', async ({ page }) => {
+        await page.emulateMedia({ reducedMotion: 'reduce' })
+        await page.goto('/tests/use-presence')
+        await page.getByTestId('group-hide').click()
+        await expect(page.getByTestId('owned-group-wrapper')).toHaveCount(0)
+        await expect(page.getByTestId('group-fast-state')).toHaveText('finished')
+        await expect(page.getByTestId('group-slow-state')).toHaveText('finished')
+        await expect(page.getByTestId('group-completions')).toHaveText('1')
+    })
+
     test('owned motion child survives a rapid hide/show/hide until the current exit completes', async ({
         page
     }) => {

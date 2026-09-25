@@ -395,6 +395,28 @@ describe('MotionDomProjectionAdapter visual-element injection', () => {
         expect((visualElement.getProps() as { style?: unknown }).style).toEqual({ x: 5 })
     })
 
+    it('preserves the injected presence context before feature registration', () => {
+        const presenceContext = {
+            id: 'owned',
+            isPresent: true,
+            register: vi.fn(() => vi.fn()),
+            onExitComplete: vi.fn()
+        }
+        const visualElement = createMotionVisualElement({
+            props: { exit: { opacity: 0 } },
+            presenceContext
+        })
+        const adapter = new MotionDomProjectionAdapter({ visualElement })
+        adapter.updateOptions({ layout: true })
+        expect(visualElement.presenceContext).toBe(presenceContext)
+        adapter.mount(element)
+        visualElement.updateFeatures()
+        expect(presenceContext.register).toHaveBeenCalledTimes(1)
+        adapter.updateOptions({ layout: false })
+        expect(visualElement.presenceContext).toBe(presenceContext)
+        adapter.unmount()
+    })
+
     it('still constructs its own VisualElement with no injection', () => {
         const adapter = new MotionDomProjectionAdapter()
         adapter.updateOptions({ layout: true, transition: { duration: 1 } })

@@ -41,7 +41,11 @@ export const useIsPresent = (): boolean => {
  * Returns `[isPresent, safeToRemove]`. `isPresent` reflects the wrapper's
  * presence state; `safeToRemove` is the callback to invoke once a custom exit
  * animation finishes. Calling it triggers the actual unmount and decrements
- * the parent `<AnimatePresence>` exit-completion count.
+ * the parent `<AnimatePresence>` exit-completion count. This explicitly releases
+ * the whole wrapper, including any motion descendants still animating. Reading
+ * this hook does not add a separate hold: automatic removal waits for all motion
+ * exits, while a manual-only wrapper waits for `safeToRemove`. For independent
+ * custom exit work, use a separate manual `<PresenceChild>` boundary.
  *
  * Outside of a `<PresenceChild>` returns `[true, null]` — the consumer is
  * effectively always present and there is nothing to safely remove.
