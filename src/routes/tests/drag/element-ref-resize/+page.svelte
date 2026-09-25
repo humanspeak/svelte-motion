@@ -295,19 +295,21 @@
             </div>
             <div class="controls" aria-label="Live constraint target controls">
                 <button
+                    class:primary={liveTarget === 'A'}
                     type="button"
                     data-testid="live-use-a"
                     aria-pressed={liveTarget === 'A'}
                     onclick={() => selectTarget('A')}>Use A</button
                 >
                 <button
-                    class="primary"
+                    class:primary={liveTarget === 'B'}
                     type="button"
                     data-testid="live-use-b"
                     aria-pressed={liveTarget === 'B'}
                     onclick={() => selectTarget('B')}>Use B</button
                 >
                 <button
+                    class:primary={liveTarget === 'numeric'}
                     type="button"
                     data-testid="live-use-numeric"
                     aria-pressed={liveTarget === 'numeric'}

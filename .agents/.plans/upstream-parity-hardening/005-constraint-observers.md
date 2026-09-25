@@ -142,6 +142,8 @@ Fresh-worktree setup reconciliation: the first focused red invocation could not 
 
 ## Review outcome
 
+Visual follow-up: the user caught a fixed primary style on Use B while A was active. All three target buttons now derive their filled state from liveTarget, retaining aria-pressed and existing behavior. T3 verified initial A, switching B/numeric, and Reset restoring only A's fill. Scoped formatting/lint and production build passed; the existing ten resize Chromium tests passed after restarting port 5205 from the shared primary checkout (reviewer session 83725). No runtime change was needed or new regression reproduced after restart. Browser refreshed at section03; user visual checkpoint remains pending.
+
 The user explicitly selected chore/motion-upstream-refresh as the shared release branch and authorized consolidating reviewed work through005 there. The isolated branch below is a historical execution checkpoint, not the ongoing release branch. Keep future reviewed work on the shared branch; do not create more per-plan branches by default.
 
 Consolidated source commit: e83cde23 on chore/motion-upstream-refresh (same patch as ab210b3a). All reviewed predecessors were integrated without conflicts. The shared tracked tree matched the tested005 tree exactly before the final consolidation note. Source remains on the shared branch for ongoing work.
