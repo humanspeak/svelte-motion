@@ -13,8 +13,8 @@
 - Depends on: 004-drag-origin-resize.md; serialize changes to drag.ts
 - Category: bug
 - Audit finding: 06
-- Planned at: commit 6f0085ef, 2026-09-24
-- State: TODO
+- Planned at: commit a42d99d1, reconciled 2026-09-25 against freshly fetched origin/main c8fbd7a8
+- State: IN PROGRESS
 
 ## Why this matters
 
@@ -90,7 +90,7 @@ Add a block named 'live constraint observers' in drag.spec.ts. Attach with ref A
 **Verify:** pnpm test:only src/lib/utils/drag.spec.ts -t 'live constraint observers' fails because B is absent and numeric→B has no observer.
 
 ### Step 2: Make observation follow the current constraint identity
-Introduce local updateable observer ownership in attachDrag. Synchronize initially and when updateOptions changes ref identity/type. Observe the card and current ref for element constraints; disconnect obsolete observation for numeric/absent constraints. Avoid churn for the same ref. Teardown must invalidate queued deliveries and disconnect the owned observer; queued callbacks from A after replacement or teardown must not write stale state.
+Reuse motion-dom's public resize(element, callback) helper for observation and unsubscribe functions. Introduce only local updateable subscription ownership in attachDrag. Synchronize initially and when updateOptions changes ref identity/type. Subscribe to the card and current ref for element constraints; unsubscribe obsolete observation for numeric/absent constraints. Avoid churn for the same ref. Teardown must invalidate queued deliveries and unsubscribe owned callbacks; queued callbacks from A after replacement or teardown must not write stale state. Do not assume shared native ResizeObserver.disconnect is required: upstream resize uses a shared observer and unobserves a target when its last handler is removed.
 Preserve the pointer session, scalePositionWithinConstraints's dragging guard, fresh measurements, constraintsBase synchronization, and plan 004's origin preservation. Initialize helper closures before any invocation that might enter their temporal dead zone.
 **Verify:** focused tests turn green; pnpm test:only src/lib/utils/drag.spec.ts src/lib/utils/dragInertia.spec.ts passes.
 
@@ -124,5 +124,16 @@ Cover A→B, numeric→B, B→numeric, unchanged-ref updates, teardown, queued o
 
 ## Maintenance notes
 
-Keep observer identity lifecycle separate from measurement and gesture state. disconnect does not justify assuming queued callbacks cannot run. Future updateOptions fields should be reviewed for similar one-time initialization assumptions.
+Keep observer identity lifecycle separate from measurement and gesture state. Unsubscribing does not justify assuming queued callbacks cannot run. Future updateOptions fields should be reviewed for similar one-time initialization assumptions.
 
+## Execution reconciliation
+
+User visually approved 004 and the guided page on 2026-09-25. Source 5291c8b5 and evidence a42d99d1 are committed and clean. Fresh origin/main c8fbd7a8 has no new drift. The diff from 6f0085ef consists of the expected 004 per-axis origin guard/writer flags, its fixtures, and the approved guided test page; the one-time observer defect remains present at drag.ts:603.
+
+Create /Users/jasonkummerl/Github/svelte-motion-upstream-005 on fix/upstream-constraint-observers from origin/main and integrate the 15 reviewed cumulative commits in origin/main..a42d99d1 in order (or fast-forward to a42d99d1 only after proving origin/main is its ancestor). Do not merge or change primary source. Carry reviewer plan snapshots; user explicitly authorized committing primary plan docs. Preserve 004 preview port5204; reviewer will own new production preview port5205. Temporary verification ports must be checked first.
+
+Upstream reuse check: ~/Github/motion/packages/framer-motion/src/gestures/drag/VisualElementDragControls.ts uses public resize() for both card and container; motion-dom exports resize from its public index. Installed 13.4.4 provides the same shared callback registration/cleanup primitive. React's private startResizeObservers/skipFirstCall are not importable APIs and do not by themselves manage replacement identity. Keep the Svelte-specific change limited to target lifecycle; no new resize abstraction or animation engine. Preserve current first-delivery semantics unless red evidence shows a compatibility reason to change them. Adapt ResizeObserver unit fixtures to upstream per-target entries and shared subscriptions without weakening 004 behavior assertions. Document any necessary fixture reconciliation.
+
+Extend the approved guided page with section03: explicit switch A/B/numeric controls, reset, current-target label, concise expected results and meaningful geometry metrics. Reuse existing ResizeMetrics.svelte unchanged if sufficient; report before expanding its scope. Preserve both original sections and all eight current browser tests. For replacement while pressed, offer a clear delayed-switch control/countdown or another reproducible mechanism so a human can keep dragging while the target changes; verify no drag restart. No public API is added, so this bug regression extends the existing linked test route rather than adding public feature documentation.
+
+Pin all project commands and normal git hooks using npm exec --yes --package=node@24.18.0 --package=pnpm@11.24.0 -- ... . Global pnpm can fail identity verification. Fresh package build may emit the already-recorded Reorder declaration diagnostics deferred to006; record them explicitly, do not claim they are fixed. Docs build generates prerequisites and may introduce unrelated registry newline churn; restore only that verified generated churn. T3 preview tools are required for visual inspection; normal project Playwright test runs remain the browser test gate. Do not proceed to006 before user visual review of005.

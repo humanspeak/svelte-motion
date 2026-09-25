@@ -32,7 +32,7 @@ No library code, dependency changes, global CSS, public API or other pages.
 Stop/report if unrelated work appears, library change/new dependency is needed, test instrumentation affects drag options, or repeated gate failure cannot be resolved within scope. Explain any justified small reconciliation before proceeding.
 
 ## Status
-DONE — implementation independently approved; user visual approval of plan 004 remains pending.
+DONE — implementation independently approved and user visually approved. User authorized moving to plan 005.
 
 ## Review evidence
 
