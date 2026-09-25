@@ -136,4 +136,6 @@ The user also explicitly authorized committing the plan files and existing .comp
 
 ## Review outcome
 
+User visual checkpoint complete: the user approved the guided page (5291c8b5) and authorized005. Earlier pending-checkpoint language below is historical.
+
 Implementation f1393887f4f9d233e2519df516ccd591cee58a6d approved after independent review. Separate dependency commit 1ecdd5e1 upgrades motion and motion-dom to 13.4.4. Final gates pass: 923 root units, 50 focused drag tests, 25 targeted Chromium tests, root check, package/publint, docs build/check, formatting, Trunk (no new issues), and diff integrity. Known Reorder declaration diagnostics remain for 006. The batch README records red evidence, fixture reconciliations, primary tracking/intel commits, and verification limits. Production preview: http://localhost:5204/tests/drag/element-ref-resize. Wait for user visual approval before 005.

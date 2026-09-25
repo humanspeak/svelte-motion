@@ -14,7 +14,7 @@
 - Category: bug
 - Audit finding: 06
 - Planned at: commit a42d99d1, reconciled 2026-09-25 against freshly fetched origin/main c8fbd7a8
-- State: IN PROGRESS
+- State: DONE — independently reviewed; user visual checkpoint pending
 
 ## Why this matters
 
@@ -108,12 +108,12 @@ Cover A→B, numeric→B, B→numeric, unchanged-ref updates, teardown, queued o
 
 ## Done criteria
 
-- [ ] Observation follows the current ref and is absent for numeric constraints.
-- [ ] Resizing only the replacement container refreshes bounds without a card resize.
-- [ ] Ref replacement preserves active drag; queued callbacks cannot write after teardown.
-- [ ] Final verification commands from the last step pass, with red/green output summarized in the handoff.
-- [ ] No accidental source, manifest, lockfile, or generated registry changes outside scope: inspect git diff --name-only and git status --short.
-- [ ] Record commit, commands/results, and any limitations in the batch README; only then set this plan DONE.
+- [x] Observation follows the current ref and is absent for numeric constraints.
+- [x] Resizing only the replacement container refreshes bounds without a card resize.
+- [x] Ref replacement preserves active drag; queued callbacks cannot write after teardown.
+- [x] Final verification commands from the last step pass, with red/green output summarized in the handoff.
+- [x] No accidental source, manifest, lockfile, or generated registry changes outside scope: inspect git diff --name-only and git status --short.
+- [x] Record commit, commands/results, and any limitations in the batch README; only then set this plan DONE.
 
 ## STOP conditions
 
@@ -137,3 +137,17 @@ Upstream reuse check: ~/Github/motion/packages/framer-motion/src/gestures/drag/V
 Extend the approved guided page with section03: explicit switch A/B/numeric controls, reset, current-target label, concise expected results and meaningful geometry metrics. Reuse existing ResizeMetrics.svelte unchanged if sufficient; report before expanding its scope. Preserve both original sections and all eight current browser tests. For replacement while pressed, offer a clear delayed-switch control/countdown or another reproducible mechanism so a human can keep dragging while the target changes; verify no drag restart. No public API is added, so this bug regression extends the existing linked test route rather than adding public feature documentation.
 
 Pin all project commands and normal git hooks using npm exec --yes --package=node@24.18.0 --package=pnpm@11.24.0 -- ... . Global pnpm can fail identity verification. Fresh package build may emit the already-recorded Reorder declaration diagnostics deferred to006; record them explicitly, do not claim they are fixed. Docs build generates prerequisites and may introduce unrelated registry newline churn; restore only that verified generated churn. T3 preview tools are required for visual inspection; normal project Playwright test runs remain the browser test gate. Do not proceed to006 before user visual review of005.
+
+Fresh-worktree setup reconciliation: the first focused red invocation could not load the absent generated .svelte-kit/tsconfig.json and failed before tests ran. Run pinned pnpm exec svelte-kit sync before the first root Vitest command, then rerun the unchanged red tests. This startup error is not red regression evidence. No source/config change is required for this prerequisite.
+
+## Review outcome
+
+The user explicitly selected chore/motion-upstream-refresh as the shared release branch and authorized consolidating reviewed work through005 there. The isolated branch below is a historical execution checkpoint, not the ongoing release branch. Keep future reviewed work on the shared branch; do not create more per-plan branches by default.
+
+APPROVE: source commit ab210b3a, five scoped files. Reuses motion-dom resize() and its shared native observer; adapter code manages only subscriptions, identity changes and invalidation. No observer engine, private React import or new dependency. Eight lifecycle units cover replacement, numeric transitions, same-ref stability, resize behavior, stale delivery, shared-target cleanup and absent ResizeObserver. Existing 004 assertions are preserved; fixture delivery now supplies actual target entries and checks owned unsubscription instead of shared native disconnect.
+
+Red evidence after generated setup: five failures/two passes, including B missing from observation, numeric transition missing observation, retained old target, x=80 instead of5 after B-only resize, and stale A delivery rendering. Green independent reviewer gates: 82 files/931 units; focused52 drag/inertia units; 15 Chromium checks (22.5 seconds); root check0 errors/35 existing warnings; package/publint exit0 with known Reorder diagnostics deferred006; normal docs build exit0; docs check0 errors/13 existing warnings; Trunk no new issues/one existing; diff integrity pass. Logs: isolated worktree .temp/plan-005/reviewer-*.log.
+
+Fresh self-package imports required normal package generation before root typecheck and prep commit hooks could pass; no bypass or source/config workaround. The new demo initially needed null refs normalized to undefined for the existing prop type. Final normal hooks pass. Docs generation reordered Tailwind tokens in an unrelated registry item; that exact generated churn was inspected and restored.
+
+Guided section03 preserves both earlier sections and all eight prior browser checks. New tests prove stable card identity/size, B-only resize, numeric switching, and continued movement while pressed across a delayed target swap. T3 visual review confirmed both boundary labels, 120px drag followed by B shrink to200 yielding inset60/reset delta20/overflow0. Reviewer-owned production preview session84358 serves http://localhost:5205/tests/drag/element-ref-resize#live-targets and is visible in collaborative tab_2. Earlier5204 server remains available. User visual approval is still required before006.

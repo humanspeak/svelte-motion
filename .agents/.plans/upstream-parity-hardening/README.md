@@ -1,7 +1,7 @@
 # Upstream parity and verification checklist
 
 Audited 2026-09-24 against `6f0085ef` on `chore/motion-upstream-refresh`.
-All eight findings selected by the maintainer. Plans 001–004 are implemented and independently reviewed; the user visually approved 004 and its guided review page. Plan 005 is now in progress. Continue one plan at a time. Generated with the improve skill on 2026-09-24.
+All eight findings selected by the maintainer. Plans 001–005 are implemented and independently reviewed; the user visually approved 004 and its guided review page. Plan005 awaits user visual review before006. Continue one plan at a time. Generated with the improve skill on 2026-09-24.
 
 ## Execution order and status
 
@@ -13,7 +13,7 @@ Plan numbering follows execution order; audit finding IDs below remain unchanged
 | [002](002-ci-triggers.md) | 05 | Test-only changes trigger tests | P1 | S | — | DONE — b0fdb49e |
 | [003](003-exit-promise-guard.md) | 01 | Upstream stale-exit promise guard and adapter protection | P1 | S | 001 | DONE — c0389a83; user visually approved |
 | [004](004-drag-origin-resize.md) | 02 | Upstream resting drag-origin preservation | P1 | S | 001 | DONE — f1393887; guided page 5291c8b5; user visually approved |
-| [005](005-constraint-observers.md) | 06 | Resize observation follows replacement constraints | P1 | S | 004 | IN PROGRESS |
+| [005](005-constraint-observers.md) | 06 | Resize observation follows replacement constraints | P1 | S | 004 | DONE — ab210b3a; visual review pending |
 | [006](006-reorder-declarations.md) | 03 | Emitted Reorder types and consumer inference gate | P1 | S | 001, 002 | TODO |
 | [007](007-descendant-exit-registry.md) | 07 | All owned motion descendants finish before automatic removal | P1 | M | 001, 003 | TODO |
 | [008](008-svg-firefox-coverage.md) | 08 | Actual SVG docs route tested in Chromium and Firefox | P1 | M | 001, 002; integrated release gate after all | TODO |
@@ -21,6 +21,14 @@ Plan numbering follows execution order; audit finding IDs below remain unchanged
 Status values: TODO, IN PROGRESS, DONE, BLOCKED (reason), REJECTED (reason). Keep TODO until execution actually begins; a written plan is not a completed fix. S/M estimates include regression coverage and are rough, not deadlines.
 
 Plan 004 [visual review follow-up](004-visual-review-follow-up.md) is DONE and user visually approved. Source commit 5291c8b5 and plan commits 13f44fee/a42d99d1 are complete. User authorized proceeding to 005. Fresh origin/main remains c8fbd7a8; cumulative reviewed baseline is a42d99d1. Plan 005 will reuse Motion's public resize subscriptions and retain the guided review layout on a separate preview.
+
+### Plan005 review result — APPROVE
+
+- Source ab210b3a uses Motion's public resize subscriptions, with local target ownership and callback invalidation. Five scoped files, no dependency/API changes. New section03 reuses the guided page and metrics component.
+- Red: five lifecycle failures and two passes after fresh generated setup. Green independently rerun:931 full units,52 drag/inertia units,15 Chromium checks; root check0 errors/35 existing warnings; package/publint pass with known006 Reorder diagnostics; normal docs build and docs check0 errors/13 existing warnings; Trunk no new issues/one existing; diff integrity pass. See005 plan for fixture/setup reconciliations and log paths.
+- Source and prep commits used normal hooks. Verified unrelated generated registry class-order churn was restored. No merge, push, PR, publication or deployment.
+- Visual review: http://localhost:5205/tests/drag/element-ref-resize#live-targets, purple section03, visible in collaborative tab_2. Old5204 preview retained. User review pending;006 unstarted.
+- The user selected chore/motion-upstream-refresh as the shared release branch. Consolidate all reviewed source through005 there, retain committed plan records, and do not create more per-plan branches by default. Prior isolated branches remain historical verification checkpoints.
 
 ### Execution records
 
