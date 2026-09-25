@@ -1,7 +1,7 @@
 # Upstream parity and verification checklist
 
 Audited 2026-09-24 against `6f0085ef` on `chore/motion-upstream-refresh`.
-All eight findings selected by the maintainer. Plans 001–004 are complete; the user visually approved004 and its guided review page. Plan005 is complete: the user-approved automatic ref-switch behavior and the corrected same-ref held-resize behavior both match actual React Motion 13.4.4. Continue one plan at a time;006 remains unstarted. Generated with the improve skill on2026-09-24.
+All eight findings selected by the maintainer. Plans 001–004 are complete; the user visually approved004 and its guided review page. Plan005 is complete: the user-approved automatic ref-switch behavior and the corrected same-ref held-resize behavior both match actual React Motion 13.4.4. Plan006 is complete with emitted Reorder declarations and the consumer inference gate. Continue one plan at a time;007 remains unstarted. Generated with the improve skill on2026-09-24.
 
 ## Execution order and status
 
@@ -14,7 +14,7 @@ Plan numbering follows execution order; audit finding IDs below remain unchanged
 | [003](003-exit-promise-guard.md) | 01 | Upstream stale-exit promise guard and adapter protection | P1 | S | 001 | DONE — 9567fcc6 on shared branch; user visually approved |
 | [004](004-drag-origin-resize.md) | 02 | Upstream resting drag-origin preservation | P1 | S | 001 | DONE — 356e4ced; guided page b10243d8 on shared branch; user visually approved |
 | [005](005-constraint-observers.md) | 06 | Resize observation follows replacement constraints | P1 | S | 004 | DONE — user approved; ref-switch and held-resize parity verified against React Motion 13.4.4 |
-| [006](006-reorder-declarations.md) | 03 | Emitted Reorder types and consumer inference gate | P1 | S | 001, 002 | TODO |
+| [006](006-reorder-declarations.md) | 03 | Emitted Reorder types and consumer inference gate | P1 | S | 001, 002 | DONE — emitted declaration and public consumer typing independently verified |
 | [007](007-descendant-exit-registry.md) | 07 | All owned motion descendants finish before automatic removal | P1 | M | 001, 003 | TODO |
 | [008](008-svg-firefox-coverage.md) | 08 | Actual SVG docs route tested in Chromium and Firefox | P1 | M | 001, 002; integrated release gate after all | TODO |
 
@@ -55,7 +55,7 @@ For each completed plan record: execution base and commit, red failure, green fo
 Run these on the final integrated candidate, not on a mixture of individual branch outputs. Do not repeat broad suites after every small step; plans use focused regressions, and the final candidate receives the combined gates.
 
 - [ ] All eight plan rows are DONE with evidence, or an explicit maintainer-approved disposition explains an exception.
-- [ ] Fresh main has been reconciled in an isolated release branch, including the reviewed upstream-refresh commits and all plan dependencies; user worktrees/stashes remain intact.
+- [ ] Fresh main has been reconciled with the shared release branch chore/motion-upstream-refresh, including all reviewed plan dependencies; user worktrees/stashes remain intact. The maintainer's shared-branch workflow supersedes the original per-plan isolation instruction.
 - [ ] `pnpm check` and `pnpm package` pass, with no missing Reorder declaration or hidden declaration emit error.
 - [ ] `pnpm --dir docs check` passes with zero errors.
 - [ ] `pnpm test` passes the full root suite with coverage.
@@ -65,6 +65,7 @@ Run these on the final integrated candidate, not on a mixture of individual bran
 - [ ] `pnpm --dir docs build`, `trunk check`, and `git diff --check` pass; generated registry churn is reviewed and excluded when unrelated.
 - [ ] Focused visual handoff covers `/tests/drag/element-ref-resize`, `/tests/use-presence`, `/examples/use-presence`, `/examples/keyframes`, `/examples/transform-template`, and `/examples/svg-css-variables`. Preserve the existing `/examples/use-follow-value` and `/tests/effects/three` as additional reviewed upgrade examples.
 - [ ] Runtime/type fixes have patch changesets, and release notes distinguish inherited upstream improvements from Svelte adapter fixes and coverage work.
+- [ ] Resolve or document the upstream Motion13.4.4 HTMLWebViewElement failure when checking dependency declarations with skipLibCheck:false; it reproduces without svelte-motion (see006).
 - [ ] Hosted PR checks pass when an authorized PR is opened. Local validation alone does not count as hosted CI evidence.
 
 Publishing, versioning, merging, and deployment are outside this planning batch. No release-readiness box is checked by this audit.
@@ -180,3 +181,10 @@ The existing transform-page-point and clone-exit-migration batches were reviewed
 
 - **Primary tracking correction during 004:** the user asked that plans stop remaining untracked in the primary checkout. All nine plans/checklist files are now committed there as 7b91916d. Keep future status changes tracked in that checkout and commit them at handoff. The existing competitive-intel snapshot is separately authorized for an unchanged-content commit.
 - **13.4.4 upgrade authorized during 004:** npm metadata confirms both motion and motion-dom 13.4.4 are published. A separate dependency commit will update both ranges and lockfile plus a patch changeset before final 004 verification. Drag tests must be rechecked under 13.4.4; shared upstream engine updates are reused through these dependencies.
+
+### Plan006 review result — APPROVE
+
+- Explicit readonly typeof Group/Item annotation repairs declaration emission while retaining generic inference. Runtime JavaScript is byte-identical. Existing CI consumer command now validates the published types, exact inferred numeric/object callbacks, non-any namespace/components, and rejected invalid props.
+- Red: missing declaration before and after fresh package generation, plus deliberate missing/any emitted-artifact faults through the actual consumer entrypoint. Green independently verified: package/publint with no Reorder emit diagnostics, consumer types+SSR,935units (including49Reorder),22Reorder Chromium checks, rootcheck0errors/35existingwarnings, docscheck0errors/13existingwarnings, scopedTrunk/noissues and diff integrity.
+- Optional skipLibCheck:false exposes an upstream Motion13.4.4 HTMLWebViewElement dependency-type diagnostic, independently reproduced by importing motion alone. It remains documented, without a shim or dependency change; required package-boundary inference checks pass. See006 for exact evidence.
+- Primary shared branch, seven scoped files including both plan records, normal hooks. Preview http://localhost:5205/tests/reorder/basic loaded in T3 tab_6. Plan007 remains unstarted.

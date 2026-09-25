@@ -14,7 +14,7 @@
 - Category: dx / bug
 - Audit finding: 03
 - Planned at: commit 6f0085ef, 2026-09-24
-- State: TODO
+- State: DONE — independently reviewed; source and evidence committed on shared branch
 
 ## Why this matters
 
@@ -81,7 +81,7 @@ Out of scope: generated dist edits, component runtime, stripping generics, widen
 
 ## Git workflow
 
-Use a fresh branch named fix/upstream-reorder-declarations in an isolated checkout from freshly fetched origin/main. The audited baseline includes reviewed commits 31657b14, 207dd870, and 6f0085ef; before execution verify that main already contains them or integrate those reviewed changes into the isolated branch. Do not cherry-pick commits already present; do not reset, pop stashes, or overwrite the user's working tree. Apply required predecessor plans before starting. Record the actual execution base and any reconciliation in the index.
+The maintainer explicitly selected the primary checkout on chore/motion-upstream-refresh for all reviewed release work. Execute and commit here; do not create a branch or worktree. Predecessors001–005 are committed and the working tree was clean at0238c52b. Preserve unrelated user edits. The reviewer owns this plan and README updates; include those records with the reviewed source commit.
 
 Use a conventional commit such as "fix(types): emit the public Reorder namespace declaration". Do not push, merge, publish, or open a PR as part of this plan unless separately instructed.
 
@@ -110,12 +110,12 @@ Anchor at the package boundary. Verify declaration existence, namespace/Group/It
 
 ## Done criteria
 
-- [ ] Fresh package output includes dist/reorder.d.ts with no private-type emit errors.
-- [ ] Public import tests reject invalid props and preserve generic callback values.
-- [ ] Existing CI's consumer invocation runs the verifier and fails on missing/any declarations.
-- [ ] Final verification commands from the last step pass, with red/green output summarized in the handoff.
-- [ ] No accidental source, manifest, lockfile, or generated registry changes outside scope: inspect git diff --name-only and git status --short.
-- [ ] Record commit, commands/results, and any limitations in the batch README; only then set this plan DONE.
+- [x] Fresh package output includes dist/reorder.d.ts with no private-type emit errors.
+- [x] Public import tests reject invalid props and preserve generic callback values.
+- [x] Existing CI's consumer invocation runs the verifier and fails on missing/any declarations.
+- [x] Final verification commands from the last step pass, with red/green output summarized in the handoff.
+- [x] No accidental source, manifest, lockfile, or generated registry changes outside scope: inspect git diff --name-only and git status --short.
+- [x] Record commit, commands/results, and any limitations in the batch README; only then set this plan DONE.
 
 ## STOP conditions
 
@@ -128,3 +128,25 @@ Anchor at the package boundary. Verify declaration existence, namespace/Group/It
 
 Svelte upgrades can change generated declaration shapes; retain the package-boundary check. Runtime imports and publint are necessary but insufficient evidence for generic export typing.
 
+
+## Execution reconciliation — 2026-09-25
+
+Preflight at 0238c52b on chore/motion-upstream-refresh: plan dependencies001/002 are DONE, no in-scope drift from6f0085ef, runtime dist/reorder.js exists but dist/reorder.d.ts is absent after the recent normal005 package build. Group's emitted declaration still retains its generic call signature and private $$IsomorphicComponent interface, exactly as audited. This is a Svelte declaration-emit repair: reuse typeof the existing generic components, with no React/private import or runtime change.
+
+Use pinned Node24.18.0 and pnpm11.24.0 for commands and normal hooks: npm exec --yes --package=node@24.18.0 --package=pnpm@11.24.0 -- pnpm ... . Consumer workspace packageManager metadata differs; do not change it or the lockfile to work around the local environment. Resolve any command-wrapper mismatch without bypassing verification. Existing warm docs generated inputs are available; run docs check after package and only regenerate docs if missing prerequisite evidence requires it.
+
+Port5205 currently serves primary .svelte-kit/output (reviewer session66972). Package generation alone does not replace app assets, but a root app build does: notify reviewer before any pnpm build/vite build so the owned preview can be stopped first. Once the final app build is frozen, reviewer restarts5205 and runs targeted Reorder browser checks with an ignored config pointing at that verified output, then opens /tests/reorder/basic. Preserve unrelated servers/archival worktrees. Existing runtime demo coverage is sufficient for this type-only fix; no new demo, docs, or component behavior is in scope.
+
+## Review outcome — APPROVE
+
+Execution base: 0238c52b on chore/motion-upstream-refresh, primary checkout. Five approved source/test/changeset paths plus this plan and batch README. The only library change is the explicit readonly namespace annotation referencing typeof the existing generic Group and Item components. Fresh dist/reorder.d.ts imports both generated component defaults, preserving their generics. Runtime dist/reorder.js is byte-identical before and after (SHA256 d1f3b5046f0bbee98fb343637a58be51d8c14d210a27c2e203234cdbcdd1c5ac). No runtime, public prop, dependency, manifest, lockfile, generated-source, docs-page, or example changes.
+
+Red evidence: the new verifier failed because dist/reorder.d.ts was absent, both against existing output and after a fresh normal package build. That build exited0 and publint passed despite two cannot-be-named $$IsomorphicComponent diagnostics, showing why the package-boundary test is needed. The existing CI consumer entrypoint now imports the verifier. Both deliberate artifact faults also made that same entrypoint fail: missing declaration hits the existence assertion; Reorder:any trips namespace/member checks, callback inference assertions, and unused negative directives. Only ignored output was changed for these probes and then restored through normal package generation.
+
+Consumer tests use the public @humanspeak/svelte-motion export, resolving to dist/index.d.ts, with strict/noEmit/ESNext/Bundler and skipLibCheck:true. Numeric and object values retain exact callback types with nested-any guards, both through inference and explicit specialization. Invalid axes, required-prop omissions, mismatched item values, and incompatible callbacks are rejected. The fixture never executes its component calls. Existing Vite6 SSR checks remain enforced.
+
+Independent reviewer gates: fresh package/publint exits0 without the Reorder emit diagnostics; public consumer typing plus Vite6 SSR passes; 935 unit tests in82files pass, including49 Reorder tests; all22 Reorder Chromium checks pass in41.3seconds; rootcheck0errors/35existingwarnings; docscheck0errors/13existingwarnings; scopedTrunk fivefiles/noissues and diff integrity pass. Executor production build and corresponding gates pass. Logs: ignored .temp/plan-006/red-{existing,fresh,package}.log, red-{any,missing}-consumer.log, reviewer-{package,consumer,units,browser,check,docs-check,trunk}.log.
+
+Optional dependency-wide check: skipLibCheck:false reports one TS2552 for missing HTMLWebViewElement in framer-motion13.4.4/dist/dom.d.ts:310 with TypeScript6.0.3. An isolated ignored fixture importing only public motion reproduces exactly the same diagnostic, with no svelte-motion import. This is an upstream dependency limitation, not introduced by this annotation. It is recorded rather than suppressed; no global shim or dependency change is included. Evidence: skip-lib-check-false.log and upstream-skip-lib-check-false.log. The required skipLibCheck:true consumer leak regression remains fully enforced.
+
+Visual handoff: frozen primary app output served on port5205 (reviewer session3271); /tests/reorder/basic loaded in collaborative tab_6 and inspected with the initial four-item list. Browser tests verify drag order, axis locking, grids, RTL, scrolling, sibling animations, and pointer continuity. This is a declaration fix, so existing examples provide runtime smoke coverage rather than a new visual feature. Prior preview66972 was already gone before this build; no unrelated server was stopped. Commit all seven scoped source/plan files together using normal hooks on the shared branch; no push, merge, publication, or deployment. Plan007 remains unstarted.
