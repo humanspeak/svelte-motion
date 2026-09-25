@@ -20,6 +20,8 @@ Plan numbering follows execution order; audit finding IDs below remain unchanged
 
 Status values: TODO, IN PROGRESS, DONE, BLOCKED (reason), REJECTED (reason). Keep TODO until execution actually begins; a written plan is not a completed fix. S/M estimates include regression coverage and are rough, not deadlines.
 
+Plan 004 [visual review follow-up](004-visual-review-follow-up.md) is DONE and independently approved: guided test instructions, clear controls, and observational live geometry metrics. Eight focused Chromium checks, typecheck, production build and Trunk passed with no new issues. Runtime fix remains approved; user visual approval is pending. Do not start 005 yet.
+
 ### Execution records
 
 For each completed plan record: execution base and commit, red failure, green focused results, package/type checks, browser projects/routes, and any unresolved limitation.
