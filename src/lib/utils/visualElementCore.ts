@@ -173,6 +173,7 @@ let exitFeatureId = 0
 export class ExitAnimationFeature extends Feature<unknown> {
     private id: number = exitFeatureId++
     private isExitComplete = false
+    private exitAnimation?: Promise<unknown>
 
     /**
      * React to a presence flip.
@@ -220,13 +221,20 @@ export class ExitAnimationFeature extends Feature<unknown> {
             }
 
             this.isExitComplete = false
+            this.exitAnimation = undefined
             return
         }
 
-        const exitAnimation = this.node.animationState.setActive('exit', !isPresent)
+        const exitAnimation = (this.exitAnimation = this.node.animationState.setActive(
+            'exit',
+            !isPresent
+        ))
 
         if (onExitComplete && !isPresent) {
             void exitAnimation.then(() => {
+                // Match motion a47d6f25f: stopped exits can settle after re-entry.
+                // Only the current promise may complete this presence cycle.
+                if (this.exitAnimation !== exitAnimation) return
                 this.isExitComplete = true
                 onExitComplete(this.id)
             })

@@ -744,6 +744,73 @@ describe('_MotionContainer', () => {
         expect(onExitComplete).toHaveBeenCalledTimes(1)
     })
 
+    it.each(['promise', 'callback'] as const)(
+        'retains the owned child when a superseded exit %s completes',
+        async (completion) => {
+            const { default: AnimatePresenceOwnedChildHarness } =
+                await import('$lib/components/__tests__/AnimatePresenceOwnedChildHarness.svelte')
+            const { visualElementStore } = await import('motion-dom')
+            const onExitComplete = vi.fn()
+            const result = render(AnimatePresenceOwnedChildHarness, {
+                props: { present: true, onExitComplete }
+            })
+            await flushTimers()
+            const child = result.getByTestId('owned-presence-child')
+            const node = visualElementStore.get(child)!
+            const animationState = node.animationState!
+            const originalSetActive = animationState.setActive.bind(animationState)
+            const first = Promise.withResolvers<void>()
+            const second = Promise.withResolvers<void>()
+            const exits = [first, second]
+            const setActive = vi
+                .spyOn(animationState, 'setActive')
+                .mockImplementation((type, active, options) => {
+                    const animation = originalSetActive(type, active, options)
+                    if (type === 'exit' && active) {
+                        const exit = exits.shift()!
+                        return animation.then(() => exit.promise)
+                    }
+                    return animation
+                })
+
+            try {
+                await result.rerender({ present: false, onExitComplete })
+                await flushTimers()
+                const oldComplete = node.presenceContext!.onExitComplete!
+                expect(result.getByTestId('owned-presence-child')).toBe(child)
+
+                await result.rerender({ present: true, onExitComplete })
+                await flushTimers()
+                expect(result.getByTestId('owned-presence-child')).toBe(child)
+                // Cancelling A balances its parent's pending-exit count.
+                expect(onExitComplete).toHaveBeenCalledTimes(1)
+
+                await result.rerender({ present: false, onExitComplete })
+                await flushTimers()
+                expect(exits).toHaveLength(0)
+                if (completion === 'callback') oldComplete(0)
+                first.resolve()
+                await flushTimers()
+                await flushTimers()
+                expect(result.getByTestId('owned-presence-child')).toBe(child)
+                expect(onExitComplete).toHaveBeenCalledTimes(1)
+
+                second.resolve()
+                await flushTimers()
+                await flushTimers()
+                expect(result.queryByTestId('owned-presence-child')).toBeNull()
+                expect(onExitComplete).toHaveBeenCalledTimes(2)
+                oldComplete(0)
+                await flushTimers()
+                expect(onExitComplete).toHaveBeenCalledTimes(2)
+            } finally {
+                setActive.mockRestore()
+                first.resolve()
+                second.resolve()
+            }
+        }
+    )
+
     it('mounts an owned child when present changes from false to true', async () => {
         const { default: AnimatePresenceOwnedChildHarness } =
             await import('$lib/components/__tests__/AnimatePresenceOwnedChildHarness.svelte')

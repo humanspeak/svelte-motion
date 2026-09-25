@@ -328,6 +328,72 @@ describe('ExitAnimationFeature', () => {
         visualElementStore.delete(element)
     })
 
+    it('ignores a superseded exit promise while the next exit is pending', async () => {
+        const onExitComplete = vi.fn()
+        const present = { id: 'p1', isPresent: true, register: () => () => {}, onExitComplete }
+        const { ve, element, setActive } = mountWithExit(present)
+        const first = Promise.withResolvers<void>()
+        const second = Promise.withResolvers<void>()
+        setActive
+            .mockImplementationOnce(() => first.promise)
+            .mockImplementationOnce(() => Promise.resolve())
+            .mockImplementationOnce(() => second.promise)
+        onExitComplete.mockClear()
+
+        for (const isPresent of [false, true, false]) {
+            ve.update(ve.getProps(), { ...present, isPresent })
+            ve.updateFeatures()
+        }
+        expect(setActive.mock.calls).toEqual([
+            ['exit', true],
+            ['exit', false],
+            ['exit', true]
+        ])
+        first.resolve()
+        await first.promise
+        expect(onExitComplete).not.toHaveBeenCalled()
+
+        second.resolve()
+        await second.promise
+        expect(onExitComplete).toHaveBeenCalledTimes(1)
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    it('does not mark a superseded exit complete when its promise resolves while present', async () => {
+        const onExitComplete = vi.fn()
+        const present = { id: 'p1', isPresent: true, register: () => () => {}, onExitComplete }
+        const { ve, element, setActive, reset, animateChanges } = mountWithExit(present)
+        const first = Promise.withResolvers<void>()
+        const second = Promise.withResolvers<void>()
+        setActive
+            .mockImplementationOnce(() => first.promise)
+            .mockImplementationOnce(() => Promise.resolve())
+            .mockImplementationOnce(() => second.promise)
+        onExitComplete.mockClear()
+
+        for (const isPresent of [false, true]) {
+            ve.update(ve.getProps(), { ...present, isPresent })
+            ve.updateFeatures()
+        }
+        first.resolve()
+        await first.promise
+        expect(onExitComplete).not.toHaveBeenCalled()
+
+        for (const isPresent of [false, true]) {
+            ve.update(ve.getProps(), { ...present, isPresent })
+            ve.updateFeatures()
+        }
+        expect(reset).not.toHaveBeenCalled()
+        expect(animateChanges).not.toHaveBeenCalled()
+        expect(setActive).toHaveBeenLastCalledWith('exit', false)
+        second.resolve()
+        await second.promise
+        expect(onExitComplete).not.toHaveBeenCalled()
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
     it('is inert without a presence context', () => {
         const { ve, element, setActive } = mountWithExit(null)
         ve.update(ve.getProps(), null)

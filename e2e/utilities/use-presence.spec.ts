@@ -1,6 +1,55 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('usePresence', () => {
+    test('owned motion child survives a rapid hide/show/hide until the current exit completes', async ({
+        page
+    }) => {
+        await page.goto('/tests/use-presence')
+        const card = page.getByTestId('owned-motion-card')
+        const phase = page.getByTestId('owned-phase')
+        await expect(card).toBeVisible()
+        await card.evaluate((element) => (element.dataset.marker = 'original'))
+        await page.getByTestId('replay-owned').click()
+
+        await expect(phase).toHaveText('exit A')
+        await expect(card).toHaveAttribute('data-marker', 'original')
+        await expect(phase).toHaveText('reentered')
+        await expect(card).toHaveAttribute('data-marker', 'original')
+        await expect(phase).toHaveText('exit B')
+        await expect(card).toHaveAttribute('data-marker', 'original')
+        await expect(page.getByTestId('owned-completions')).toHaveText(
+            'completion notifications: 1'
+        )
+        await expect(card).toHaveCount(0, { timeout: 4000 })
+        await expect(phase).toHaveText('removed')
+        await expect(page.getByTestId('owned-completions')).toHaveText(
+            'completion notifications: 2'
+        )
+
+        await page.getByTestId('replay-owned').click()
+        await expect(card).toBeAttached()
+        await expect(phase).toHaveText('exit B')
+        await expect(card).toBeAttached()
+        await expect(card).toHaveCount(0, { timeout: 4000 })
+        await expect(page.getByTestId('owned-completions')).toHaveText(
+            'completion notifications: 4'
+        )
+    })
+
+    test('reset cancels the owned child replay timers', async ({ page }) => {
+        await page.goto('/tests/use-presence')
+        const card = page.getByTestId('owned-motion-card')
+        await page.getByTestId('replay-owned').click()
+        await expect(page.getByTestId('owned-phase')).toHaveText('exit A')
+        await page.getByTestId('reset-owned').click()
+        await expect(page.getByTestId('owned-phase')).toHaveText('ready')
+        await expect(card).toBeVisible()
+        await expect(page.getByTestId('replay-owned')).toBeEnabled()
+        await page.getByTestId('toggle-owned').click()
+        await expect(card).toHaveCount(0, { timeout: 4000 })
+        await expect(page.getByTestId('owned-phase')).toHaveText('removed')
+    })
+
     test('basic toggle: card stays mounted during exit transition then unmounts', async ({
         page
     }) => {

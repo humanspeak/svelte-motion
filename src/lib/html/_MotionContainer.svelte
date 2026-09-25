@@ -383,8 +383,9 @@
             isPresent: presenceChildContext.isPresent,
             // The wrapper owns the lifecycle; nothing extra to track per id.
             register: () => () => {},
-            // Completion is how the wrapper learns it may stop rendering.
-            onExitComplete: () => presenceChildContext.safeToRemove(),
+            // Capture this cycle's versioned callback so an old context cannot
+            // complete a newer exit by reading the getter when it settles.
+            onExitComplete: presenceChildContext.safeToRemove,
             // `AnimatePresence initial={false}` suppresses the first enter.
             initial: presenceSkipEnter ? false : undefined,
             custom: resolvePresenceCustom()
