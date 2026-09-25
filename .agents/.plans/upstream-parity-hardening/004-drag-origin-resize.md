@@ -14,7 +14,7 @@
 - Category: bug
 - Audit finding: 02
 - Planned at: commit 6f0085ef, 2026-09-24
-- State: IN PROGRESS — isolated executor; reviewer owns index
+- State: DONE — f1393887; independently reviewed; user visual checkpoint pending
 
 ## Why this matters
 
@@ -105,12 +105,12 @@ Anchor the bug in real attachDrag with a captured observer. Cover independent ax
 
 ## Done criteria
 
-- [ ] The asymmetric idle fixture remains at x=0 through shrink/grow.
-- [ ] Nonzero dragged positions still remap, and mid-inertia bounds tests pass.
-- [ ] The existing visual page includes the new case and every added case has browser coverage.
-- [ ] Final verification commands from the last step pass, with red/green output summarized in the handoff.
-- [ ] No accidental source, manifest, lockfile, or generated registry changes outside scope: inspect git diff --name-only and git status --short.
-- [ ] Record commit, commands/results, and any limitations in the batch README; only then set this plan DONE.
+- [x] The asymmetric idle fixture remains at x=0 through shrink/grow.
+- [x] Nonzero dragged positions still remap, and mid-inertia bounds tests pass.
+- [x] The existing visual page includes the new case and every added case has browser coverage.
+- [x] Final verification commands from the last step pass, with red/green output summarized in the handoff.
+- [x] No accidental source, manifest, lockfile, or generated registry changes outside scope: inspect git diff --name-only and git status --short.
+- [x] Record commit, commands/results, and any limitations in the batch README; only then set this plan DONE.
 
 ## STOP conditions
 
@@ -127,3 +127,13 @@ Fresh origin/main remains c8fbd7a8 on 2026-09-25; no in-scope drift from the aud
 
 Resize logic must refresh measurement even when no position write is necessary. Keep drag's authored transform composition and per-axis ownership separate from resize progress arithmetic. Plan 005 edits nearby observer lifecycle code and must land afterward.
 
+
+## Authorized release update during execution
+
+The user confirmed Motion 13.4.4 is published and requested the upgrade while 004 was active. npm metadata independently confirms motion 13.4.4 -> framer-motion ^13.4.4 -> motion-dom ^13.4.4; motion-dom 13.4.4 is published. Before final 004 gates, make a separate dependency commit updating root package.json motion and motion-dom ranges to ^13.4.4, scoped pnpm-lock.yaml resolutions, and .changeset/motion-13-4-4.md. This is an explicitly authorized separate deliverable, not an expansion of drag runtime scope. Re-run the focused red proof and final gates against the upgraded dependencies. Avoid unrelated dependency updates or library release versioning.
+
+The user also explicitly authorized committing the plan files and existing .competitive-intel/state.json in the primary chore/motion-upstream-refresh checkout. Plan snapshot 7b91916d now tracks all nine files there; future plan changes must appear as tracked diffs and be committed there as well as in the execution branch. Keep the intel snapshot content unchanged and carry its separate commit into the cumulative execution branch.
+
+## Review outcome
+
+Implementation f1393887f4f9d233e2519df516ccd591cee58a6d approved after independent review. Separate dependency commit 1ecdd5e1 upgrades motion and motion-dom to 13.4.4. Final gates pass: 923 root units, 50 focused drag tests, 25 targeted Chromium tests, root check, package/publint, docs build/check, formatting, Trunk (no new issues), and diff integrity. Known Reorder declaration diagnostics remain for 006. The batch README records red evidence, fixture reconciliations, primary tracking/intel commits, and verification limits. Production preview: http://localhost:5204/tests/drag/element-ref-resize. Wait for user visual approval before 005.
