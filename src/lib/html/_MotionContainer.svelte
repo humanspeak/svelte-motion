@@ -2659,8 +2659,13 @@
         }
 
         const scheduleProjectionCommit = () => {
-            if (rafId) return
+            // A sibling animation can occupy this frame's throttle before a
+            // keyed reorder moves the dragged element. Consume its fresh slot
+            // immediately so the upstream delta compensates the drag before
+            // paint; waiting another frame exposes the uncompensated DOM move.
+            if (rafId && element?.dataset.svelteMotionDragActive !== 'true') return
             commitObservedLayout()
+            if (rafId) return
             rafId = requestAnimationFrame(() => {
                 rafId = null
             })

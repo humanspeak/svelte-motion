@@ -102,3 +102,112 @@ test.describe('reorder/basic', () => {
         expect(await order(page)).toBe('tomato,cucumber,cheese,lettuce')
     })
 })
+
+test('keeps a held item pinned during upward swaps after earlier reversals', async ({ page }) => {
+    await page.goto('/tests/reorder/basic?@isPlaywright=true')
+    await page.getByTestId('item-cucumber').waitFor({ state: 'visible' })
+    await page.waitForTimeout(300)
+    const groupBox = await page.getByTestId('reorder-group').boundingBox()
+    const lettuceBox = await page.getByTestId('item-lettuce').boundingBox()
+    if (!groupBox || !lettuceBox) throw new Error('missing reorder geometry')
+    const groupTop = groupBox.y
+
+    // Observe intermediate frames, not just the final order or release position.
+    // A deferred layout commit used to paint the new slot with the old transform
+    // for one frame, putting the held item exactly one 54px row above the pointer.
+    await page.evaluate((halfHeight) => {
+        const samples: { drift: number; order: string | null }[] = []
+        let pointerY = 0
+        let running = true
+        const trackPointer = (event: PointerEvent) => {
+            pointerY = event.clientY
+        }
+        document.addEventListener('pointermove', trackPointer)
+        const sample = () => {
+            if (!running) return
+            setTimeout(() => {
+                const item = document.querySelector<HTMLElement>('[data-testid="item-lettuce"]')
+                if (!running || item?.dataset.svelteMotionDragActive !== 'true') return
+                samples.push({
+                    drift: item.getBoundingClientRect().top + halfHeight - pointerY,
+                    order: document.querySelector('[data-testid="order"]')!.textContent
+                })
+            }, 0)
+            requestAnimationFrame(sample)
+        }
+        requestAnimationFrame(sample)
+        Object.assign(window, {
+            finishReorderFrameReview: () => {
+                running = false
+                document.removeEventListener('pointermove', trackPointer)
+                return samples
+            }
+        })
+    }, lettuceBox.height / 2)
+
+    const dragPath = async (
+        testId: string,
+        legs: { targetY: number; delay: number; pause?: boolean }[],
+        releaseDelay: number
+    ) => {
+        const box = await page.getByTestId(testId).boundingBox()
+        if (!box) throw new Error(`no bounding box for ${testId}`)
+        const x = box.x + box.width / 2
+        let y = box.y + box.height / 2
+        await page.mouse.move(x, y)
+        await page.mouse.down()
+        for (const { targetY, delay, pause } of legs) {
+            const from = y
+            const steps = Math.ceil(Math.abs(targetY - from) / 6)
+            for (let i = 1; i <= steps; i++) {
+                y = from + ((targetY - from) * i) / steps
+                await page.mouse.move(x, y)
+                if (delay) await page.waitForTimeout(delay)
+            }
+            if (pause) await page.waitForTimeout(50)
+        }
+        await page.mouse.up()
+        await page.waitForTimeout(releaseDelay)
+    }
+
+    // Reduced from the first three gestures of the reproducible seed-603 case.
+    // Reversals leave sibling layout observers active when Lettuce next swaps.
+    await dragPath(
+        'item-cucumber',
+        [
+            { targetY: groupTop + 142, delay: 16, pause: true },
+            { targetY: groupTop + 104, delay: 0, pause: true },
+            { targetY: groupTop + 63, delay: 0, pause: true }
+        ],
+        250
+    )
+    await dragPath(
+        'item-cheese',
+        [
+            { targetY: groupTop + 140, delay: 8, pause: true },
+            { targetY: groupTop + 102, delay: 8, pause: true },
+            { targetY: groupTop + 61, delay: 16 }
+        ],
+        80
+    )
+    await dragPath(
+        'item-lettuce',
+        [
+            { targetY: groupTop + 84, delay: 0 },
+            { targetY: groupTop + 83, delay: 16 },
+            { targetY: groupTop + 61, delay: 0 }
+        ],
+        0
+    )
+
+    const samples = await page.evaluate(() => {
+        const reviewWindow = window as Window & {
+            finishReorderFrameReview: () => { drift: number; order: string | null }[]
+        }
+        return reviewWindow.finishReorderFrameReview()
+    })
+    expect(samples.length).toBeGreaterThan(10)
+    expect(new Set(samples.map(({ order }) => order)).size).toBeGreaterThan(1)
+    // Input steps are at most 6px. Allow one update of latency, never a slot jump.
+    expect(samples.filter(({ drift }) => Math.abs(drift) > 8)).toEqual([])
+})

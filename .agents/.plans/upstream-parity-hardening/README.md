@@ -1,7 +1,7 @@
 # Upstream parity and verification checklist
 
 Audited 2026-09-24 against `6f0085ef` on `chore/motion-upstream-refresh`.
-All eight findings selected by the maintainer. Plans 001–004 are complete; the user visually approved004 and its guided review page. Plan005 is complete: the user-approved automatic ref-switch behavior and the corrected same-ref held-resize behavior both match actual React Motion 13.4.4. Plan006 is complete with emitted Reorder declarations and the consumer inference gate. Continue one plan at a time;007 remains unstarted. Generated with the improve skill on2026-09-24.
+All eight findings selected by the maintainer. Plans001–006 are complete, including the user-approved repeated-shuffle Reorder fix. The maintainer authorized committing that checkpoint and proceeding to007. Generated with the improve skill on2026-09-24.
 
 ## Execution order and status
 
@@ -14,7 +14,7 @@ Plan numbering follows execution order; audit finding IDs below remain unchanged
 | [003](003-exit-promise-guard.md) | 01 | Upstream stale-exit promise guard and adapter protection | P1 | S | 001 | DONE — 9567fcc6 on shared branch; user visually approved |
 | [004](004-drag-origin-resize.md) | 02 | Upstream resting drag-origin preservation | P1 | S | 001 | DONE — 356e4ced; guided page b10243d8 on shared branch; user visually approved |
 | [005](005-constraint-observers.md) | 06 | Resize observation follows replacement constraints | P1 | S | 004 | DONE — user approved; ref-switch and held-resize parity verified against React Motion 13.4.4 |
-| [006](006-reorder-declarations.md) | 03 | Emitted Reorder types and consumer inference gate | P1 | S | 001, 002 | DONE — emitted declaration and public consumer typing independently verified |
+| [006](006-reorder-declarations.md) | 03 | Emitted Reorder types and consumer inference gate | P1 | S | 001, 002 | DONE — declaration fix29069bd3 and runtime follow-up verified; user visually approved |
 | [007](007-descendant-exit-registry.md) | 07 | All owned motion descendants finish before automatic removal | P1 | M | 001, 003 | TODO |
 | [008](008-svg-firefox-coverage.md) | 08 | Actual SVG docs route tested in Chromium and Firefox | P1 | M | 001, 002; integrated release gate after all | TODO |
 
@@ -188,3 +188,9 @@ The existing transform-page-point and clone-exit-migration batches were reviewed
 - Red: missing declaration before and after fresh package generation, plus deliberate missing/any emitted-artifact faults through the actual consumer entrypoint. Green independently verified: package/publint with no Reorder emit diagnostics, consumer types+SSR,935units (including49Reorder),22Reorder Chromium checks, rootcheck0errors/35existingwarnings, docscheck0errors/13existingwarnings, scopedTrunk/noissues and diff integrity.
 - Optional skipLibCheck:false exposes an upstream Motion13.4.4 HTMLWebViewElement dependency-type diagnostic, independently reproduced by importing motion alone. It remains documented, without a shim or dependency change; required package-boundary inference checks pass. See006 for exact evidence.
 - Primary shared branch, seven scoped files including both plan records, normal hooks. Preview http://localhost:5205/tests/reorder/basic loaded in T3 tab_6. Plan007 remains unstarted.
+
+### Plan006 runtime visual follow-up — visually approved
+
+- Reproduced the user's repeated-shuffle jump: at an upward DOM swap the held item moved54px away from the pointer for one frame. A reduced three-gesture regression failed before the fix. The active-drag layout notification now bypasses an occupied frame throttle and reaches the existing upstream projection compensation before paint; no new positioning algorithm or public API change.
+- Green: new regression3/3, original30-gesture sequence without slot jumps,935 units, package/publint, consumer types+SSR, root/docs checks with baseline warnings, scoped Trunk with no new issues. Independent browser matrix:66 passed,1 pre-existing single-frame momentum fixme skipped; includes all23 Reorder checks plus affected layout and drag coverage. Full evidence and commands are in006.
+- The maintainer confirmed the jump is gone and authorized committing all five scoped files, including both plan records, on chore/motion-upstream-refresh, then starting007. Frozen preview is http://localhost:5205/tests/reorder/basic. A separate mid-animation re-grab offset observation needs upstream comparison before classification and is not claimed fixed by this patch.
