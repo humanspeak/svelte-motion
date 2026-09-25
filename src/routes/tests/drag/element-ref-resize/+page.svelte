@@ -32,6 +32,19 @@
         containerWidth = containerWidth === originalWidth ? resizedWidth : originalWidth
     }
     let containerEl: HTMLDivElement | null = $state(null)
+
+    let idleContainer: HTMLDivElement | null = $state(null)
+    let idleReset = $state(0)
+
+    const resizeIdle = (width: number) => {
+        // Change only DOM geometry so reactive drag options cannot remeasure first.
+        if (idleContainer) idleContainer.style.width = `${width}px`
+    }
+
+    const resetIdle = () => {
+        resizeIdle(originalWidth)
+        idleReset += 1
+    }
 </script>
 
 <div style="padding: 20px;">
@@ -52,3 +65,35 @@
         />
     </div>
 </div>
+
+<section style="padding:20px;">
+    <h2>Resting origin in asymmetric constraints</h2>
+    <p>
+        The blue card starts 40px from the left edge. Shrink and grow before dragging: it should
+        stay at its authored position. After dragging, resize to see the nonzero offset remap. Reset
+        restores the original card and container.
+    </p>
+    <button type="button" data-testid="idle-shrink" onclick={() => resizeIdle(resizedWidth)}
+        >Shrink to 200</button
+    >
+    <button type="button" data-testid="idle-grow" onclick={() => resizeIdle(originalWidth)}
+        >Grow to 400</button
+    >
+    <button type="button" data-testid="idle-reset" onclick={resetIdle}>Reset</button>
+    <div
+        bind:this={idleContainer}
+        data-testid="idle-container"
+        style="box-sizing:content-box;margin-top:16px;width:400px;height:160px;border:2px dashed #888;position:relative;background:#0d1110;"
+    >
+        {#key idleReset}
+            <motion.div
+                drag="x"
+                dragConstraints={idleContainer}
+                dragMomentum={false}
+                dragElastic={0}
+                data-testid="idle-card"
+                style="position:absolute;left:40px;top:40px;width:80px;height:80px;background:#38bdf8;border-radius:8px;cursor:grab;user-select:none;"
+            />
+        {/key}
+    </div>
+</section>

@@ -160,6 +160,182 @@ describe('utils/drag', () => {
         el.remove()
     })
 
+    describe('resting constraint resize', () => {
+        const cleanups: Array<() => void> = []
+
+        afterEach(() => {
+            cleanups.splice(0).forEach((cleanup) => cleanup())
+            vi.unstubAllGlobals()
+        })
+
+        const setup = (
+            options: {
+                axis?: true | 'x' | 'y'
+                authored?: Record<string, number>
+                boundX?: MotionValue<number>
+            } = {}
+        ) => {
+            let resize = () => {}
+            const disconnect = vi.fn()
+            vi.stubGlobal(
+                'ResizeObserver',
+                class {
+                    constructor(callback: ResizeObserverCallback) {
+                        resize = () => callback([], this as unknown as ResizeObserver)
+                    }
+                    observe = vi.fn()
+                    disconnect = disconnect
+                }
+            )
+            const container = document.createElement('div')
+            const element = document.createElement('div')
+            container.append(element)
+            document.body.append(container)
+            let size = 400
+            const authored = options.authored ?? {}
+            const node = registerStubNode(element, { x: 0, y: 0, ...authored })
+            node.render.mockImplementation(() => {
+                const numericValues: Record<string, number> = {}
+                for (const [key, value] of Object.entries(node.latestValues)) {
+                    if (typeof value === 'number') numericValues[key] = value
+                }
+                element.style.transform = buildDragTransform(numericValues)
+            })
+            node.render()
+            if (options.boundX) {
+                const x = options.boundX
+                node.values.set('x', x)
+                node.latestValues.x = x.get()
+                cleanups.push(
+                    x.on('change', (value) => {
+                        node.latestValues.x = value
+                        node.render()
+                    })
+                )
+            }
+            vi.spyOn(container, 'getBoundingClientRect').mockImplementation(
+                () => new DOMRect(0, 0, size, size)
+            )
+            vi.spyOn(element, 'getBoundingClientRect').mockImplementation(
+                () =>
+                    new DOMRect(
+                        40 + Number(node.latestValues.x),
+                        40 + Number(node.latestValues.y),
+                        80,
+                        80
+                    )
+            )
+            const cleanup = attachDrag(element, {
+                axis: options.axis ?? 'x',
+                constraints: container,
+                momentum: false,
+                elastic: 0,
+                mergedTransition: { duration: 0 },
+                getBaseTransformValues: () => ({
+                    ...authored,
+                    ...(options.boundX ? { x: options.boundX.get() } : {})
+                }),
+                boundMotionValues: options.boundX ? { x: options.boundX } : undefined
+            })
+            cleanups.push(() => {
+                cleanup()
+                expect(disconnect).toHaveBeenCalledOnce()
+                visualElementStore.delete(element)
+                container.remove()
+            })
+            return {
+                node,
+                element,
+                resize: (nextSize: number) => {
+                    size = nextSize
+                    resize()
+                },
+                drag: async (dx: number, dy: number) => {
+                    element.dispatchEvent(
+                        new PointerEvent('pointerdown', { clientX: 80, clientY: 80, pointerId: 1 })
+                    )
+                    window.dispatchEvent(
+                        new PointerEvent('pointermove', {
+                            clientX: 80 + dx,
+                            clientY: 80 + dy,
+                            pointerId: 1
+                        })
+                    )
+                    await flushFrame()
+                    window.dispatchEvent(
+                        new PointerEvent('pointerup', {
+                            clientX: 80 + dx,
+                            clientY: 80 + dy,
+                            pointerId: 1
+                        })
+                    )
+                    await flushFrame()
+                }
+            }
+        }
+
+        it('keeps an untouched asymmetric origin through shrink and grow', () => {
+            const { node, element, resize } = setup()
+            const initialTransform = element.style.transform
+            resize(200)
+            expect(node.latestValues.x).toBe(0)
+            expect(element.style.transform).toBe(initialTransform)
+            resize(400)
+            expect(node.latestValues.x).toBe(0)
+            expect(element.style.transform).toBe(initialTransform)
+        })
+
+        it('preserves zero x independently while remapping nonzero y', async () => {
+            const { node, resize, drag } = setup({ axis: true })
+            await drag(0, 80)
+            expect(node.latestValues).toMatchObject({ x: 0, y: 80 })
+            resize(200)
+            expect(node.latestValues).toMatchObject({ x: 0, y: 5 })
+            resize(400)
+            expect(node.latestValues).toMatchObject({ x: 0, y: 80 })
+        })
+
+        it('continues remapping nonzero x through shrink and grow', async () => {
+            const { node, resize, drag } = setup()
+            await drag(80, 0)
+            resize(200)
+            expect(node.latestValues.x).toBe(5)
+            resize(400)
+            expect(node.latestValues.x).toBe(80)
+        })
+
+        it('retains authored x, rotation and scale when only y remaps', async () => {
+            const { node, element, resize, drag } = setup({
+                axis: true,
+                authored: { x: 20, rotate: 12, scale: 1.2 }
+            })
+            await drag(0, 80)
+            resize(200)
+            expect(node.latestValues).toMatchObject({ x: 20, y: 5, rotate: 12, scale: 1.2 })
+            expect(element.style.transform).toBe(
+                'translateX(20px) translateY(5px) scale(1.2) rotate(12deg)'
+            )
+            resize(400)
+            expect(node.latestValues).toMatchObject({ x: 20, y: 80, rotate: 12, scale: 1.2 })
+            expect(element.style.transform).toBe(
+                'translateX(20px) translateY(80px) scale(1.2) rotate(12deg)'
+            )
+        })
+
+        it('does not overwrite an independently updated bound x when only y remaps', async () => {
+            const x = motionValue(0)
+            const { node, resize, drag } = setup({ axis: true, boundX: x })
+            await drag(0, 80)
+            x.set(25)
+            resize(200)
+            expect(x.get()).toBe(25)
+            expect(node.latestValues).toMatchObject({ x: 25, y: 5 })
+            resize(400)
+            expect(x.get()).toBe(25)
+            expect(node.latestValues).toMatchObject({ x: 25, y: 80 })
+        })
+    })
+
     describe('transformPagePoint', () => {
         it('corrects bound MotionValue movement into the configured coordinate space', async () => {
             const el = document.createElement('div')

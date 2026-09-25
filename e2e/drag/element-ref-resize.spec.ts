@@ -23,6 +23,87 @@ const readRect = (page: import('@playwright/test').Page, selector: string) =>
     }, selector)
 
 test.describe('drag/element-ref-resize', () => {
+    const resizeIdleContainer = async (page: import('@playwright/test').Page, width: number) => {
+        await page.getByTestId('idle-container').evaluate(
+            (element, nextWidth) =>
+                new Promise<void>((resolve) => {
+                    const observer = new ResizeObserver((entries) => {
+                        if (
+                            !entries.some(
+                                (entry) => Math.abs(entry.contentRect.width - nextWidth) < 0.1
+                            )
+                        )
+                            return
+                        observer.disconnect()
+                        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+                    })
+                    observer.observe(element)
+                    element.style.width = `${nextWidth}px`
+                }),
+            width
+        )
+    }
+
+    const idleOffset = async (page: import('@playwright/test').Page) => {
+        const card = await readRect(page, '[data-testid="idle-card"]')
+        const container = await readRect(page, '[data-testid="idle-container"]')
+        if (!card || !container) throw new Error('missing asymmetric fixture')
+        return card.left - container.left
+    }
+
+    test('untouched asymmetric card keeps its authored offset through DOM-only shrink and grow', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        await expect(page.getByTestId('idle-card')).toBeVisible()
+        // Prove client hydration and a fresh drag attachment before changing
+        // only DOM geometry; an SSR-only resize would not exercise the observer.
+        await page
+            .getByTestId('idle-card')
+            .evaluate((element) => (element.dataset.marker = 'before-reset'))
+        await page.getByTestId('idle-reset').click()
+        await expect(page.getByTestId('idle-card')).not.toHaveAttribute(
+            'data-marker',
+            'before-reset'
+        )
+        const initial = await idleOffset(page)
+        for (const width of [200, 400, 200, 400]) {
+            await resizeIdleContainer(page, width)
+            await expect
+                .poll(async () => Math.abs((await idleOffset(page)) - initial))
+                .toBeLessThan(0.5)
+        }
+    })
+
+    test('dragged asymmetric card still remaps and Reset restores its resting origin', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        const initial = await idleOffset(page)
+        const card = await page.getByTestId('idle-card').boundingBox()
+        if (!card) throw new Error('missing asymmetric card')
+        await page.mouse.move(card.x + 40, card.y + 40)
+        await page.mouse.down()
+        await page.mouse.move(card.x + 120, card.y + 40, { steps: 8 })
+        await page.mouse.up()
+        await expect.poll(() => idleOffset(page)).toBeGreaterThan(initial + 70)
+        const dragged = await idleOffset(page)
+        await resizeIdleContainer(page, 200)
+        await expect.poll(() => idleOffset(page)).toBeLessThan(dragged - 40)
+        await resizeIdleContainer(page, 400)
+        await expect
+            .poll(async () => Math.abs((await idleOffset(page)) - dragged))
+            .toBeLessThan(0.5)
+        await page.getByTestId('idle-reset').click()
+        await expect
+            .poll(async () => Math.abs((await idleOffset(page)) - initial))
+            .toBeLessThan(0.5)
+        await resizeIdleContainer(page, 200)
+        await expect
+            .poll(async () => Math.abs((await idleOffset(page)) - initial))
+            .toBeLessThan(0.5)
+    })
+
     const dragCardRightAndRelease = async (page: import('@playwright/test').Page) => {
         const card = page.getByTestId('drag-card')
         await card.waitFor({ state: 'visible' })

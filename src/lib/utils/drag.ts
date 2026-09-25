@@ -572,8 +572,11 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
 
         constraints = freshConstraints
         constraintsBase = { x: applied.x, y: applied.y }
-        const applyX = axis === true || axis === 'x'
-        const applyY = axis === true || axis === 'y'
+        // Match motion 78fca61b7: a resting origin has no resize progress to
+        // preserve. Our unbound offsets exclude authored transform channels.
+        // Refresh the measurements above even when neither axis needs a write.
+        const applyX = (axis === true || axis === 'x') && applied.x !== 0
+        const applyY = (axis === true || axis === 'y') && applied.y !== 0
         const { minX, maxX, minY, maxY } = getConstraintBounds(constraintsBase, freshConstraints)
         const nextX = applyX
             ? progressX == null
@@ -594,7 +597,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
             from: { ...applied },
             to: { x: nextX, y: nextY }
         })
-        setXYImmediate(nextX, nextY)
+        setXYImmediate(nextX, nextY, applyX, applyY)
     }
 
     const stopConstraintResizeObserver =
@@ -641,16 +644,18 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
      * the frame it arrives in, and projection compensation must paint in the same
      * frame as the layout swap that caused it (#379).
      */
-    const setXYImmediate = (x: number, y: number) => {
-        if (dragX) applied.x = x
-        if (dragY) applied.y = y
+    const setXYImmediate = (x: number, y: number, writeX = true, writeY = true) => {
+        if (dragX && writeX) applied.x = x
+        if (dragY && writeY) applied.y = y
 
         // Bound MotionValues remain the public source of truth (#421) — and
         // post-#449 a bound style MotionValue IS the node's axis value
         // (`ve.values.get('y') === ve.props.style.y`), so this already is the
         // VisualElement write for that axis.
-        if (boundX && boundX.get() !== x) boundX.set(x)
-        if (boundY && boundY.get() !== y) boundY.set(y)
+        // A resize may move only one axis. Preserve an independently updated
+        // bound value on the other axis instead of copying its stale offset.
+        if (writeX && boundX && boundX.get() !== x) boundX.set(x)
+        if (writeY && boundY && boundY.get() !== y) boundY.set(y)
 
         const latestValues: DragTransformValues = {
             ...(opts.getBaseTransformValues?.() ?? {}),
@@ -678,10 +683,8 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         // axis is node-owned and no projection offset is active, this path has
         // nothing of its own to paint (#421).
         const shouldWrite =
-            (dragX && !boundX) ||
-            (dragY && !boundY) ||
-            crossAxisOffset.x !== 0 ||
-            crossAxisOffset.y !== 0
+            (writeX && ((dragX && !boundX) || crossAxisOffset.x !== 0)) ||
+            (writeY && ((dragY && !boundY) || crossAxisOffset.y !== 0))
 
         const node = getNode()
         if (node) {
@@ -695,17 +698,17 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
                     if (node.values.has(key)) continue
                     node.setStaticValue(key, value)
                 }
-                if (dragX && !boundX) axisWriteStarted.x = true
-                if (dragY && !boundY) axisWriteStarted.y = true
-                if (crossAxisOffset.x !== 0) axisWriteStarted.x = true
-                if (crossAxisOffset.y !== 0) axisWriteStarted.y = true
+                if (writeX && dragX && !boundX) axisWriteStarted.x = true
+                if (writeY && dragY && !boundY) axisWriteStarted.y = true
+                if (writeX && crossAxisOffset.x !== 0) axisWriteStarted.x = true
+                if (writeY && crossAxisOffset.y !== 0) axisWriteStarted.y = true
                 // Once an axis has been written it keeps being written, so a
                 // cross-axis offset returning to zero paints its way back to the
                 // authored channel instead of freezing at the last offset.
-                if (axisWriteStarted.x && !boundX) {
+                if (writeX && axisWriteStarted.x && !boundX) {
                     node.getValue('x', baseX ?? 0).set(latestValues.x ?? 0)
                 }
-                if (axisWriteStarted.y && !boundY) {
+                if (writeY && axisWriteStarted.y && !boundY) {
                     node.getValue('y', baseY ?? 0).set(latestValues.y ?? 0)
                 }
             }
