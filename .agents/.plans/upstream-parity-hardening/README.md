@@ -1,7 +1,7 @@
 # Upstream parity and verification checklist
 
 Audited 2026-09-24 against `6f0085ef` on `chore/motion-upstream-refresh`.
-All eight findings selected by the maintainer. Plans001–007 are complete, including the user-approved Reorder and owned-exit fixes. Plan008 is next on the same shared branch. Generated with the improve skill on2026-09-24.
+All eight findings selected by the maintainer are locally implemented and verified, including the user-approved Reorder and owned-exit fixes. Plan008 is complete and awaits commit on the same shared branch. Generated with the improve skill on2026-09-24.
 
 ## Execution order and status
 
@@ -16,7 +16,7 @@ Plan numbering follows execution order; audit finding IDs below remain unchanged
 | [005](005-constraint-observers.md) | 06 | Resize observation follows replacement constraints | P1 | S | 004 | DONE — user approved; ref-switch and held-resize parity verified against React Motion 13.4.4 |
 | [006](006-reorder-declarations.md) | 03 | Emitted Reorder types and consumer inference gate | P1 | S | 001, 002 | DONE — declaration fix29069bd3 and runtime follow-up verified; user visually approved |
 | [007](007-descendant-exit-registry.md) | 07 | All owned motion descendants finish before automatic removal | P1 | M | 001, 003 | DONE — all-descendant exits and re-entry verified; maintainer visually approved |
-| [008](008-svg-firefox-coverage.md) | 08 | Actual SVG docs route tested in Chromium and Firefox | P1 | M | 001, 002; integrated release gate after all | TODO |
+| [008](008-svg-firefox-coverage.md) | 08 | Actual SVG docs route tested in Chromium and Firefox | P1 | M | 001, 002; integrated release gate after all | DONE — 12/12 docs browsers; 470 root browsers pass, 2 existing skips; uncommitted review checkpoint |
 
 Status values: TODO, IN PROGRESS, DONE, BLOCKED (reason), REJECTED (reason). Keep TODO until execution actually begins; a written plan is not a completed fix. S/M estimates include regression coverage and are rough, not deadlines.
 
@@ -54,21 +54,21 @@ For each completed plan record: execution base and commit, red failure, green fo
 
 Run these on the final integrated candidate, not on a mixture of individual branch outputs. Do not repeat broad suites after every small step; plans use focused regressions, and the final candidate receives the combined gates.
 
-- [ ] All eight plan rows are DONE with evidence, or an explicit maintainer-approved disposition explains an exception.
+- [x] All eight plan rows are DONE with evidence, or an explicit maintainer-approved disposition explains an exception.
 - [ ] Fresh main has been reconciled with the shared release branch chore/motion-upstream-refresh, including all reviewed plan dependencies; user worktrees/stashes remain intact. The maintainer's shared-branch workflow supersedes the original per-plan isolation instruction.
-- [ ] `pnpm check` and `pnpm package` pass, with no missing Reorder declaration or hidden declaration emit error.
-- [ ] `pnpm --dir docs check` passes with zero errors.
-- [ ] `pnpm test` passes the full root suite with coverage.
-- [ ] `pnpm --filter @humanspeak/svelte-motion-consumer-vite6 test` passes runtime and emitted-type consumer checks.
-- [ ] `pnpm exec playwright test --project=chromium` passes the full root browser suite.
-- [ ] `pnpm exec playwright test --config docs/playwright.config.ts` passes Chromium and Firefox on the real docs route, including the recorded deliberate-regression proof.
-- [ ] `pnpm --dir docs build`, `trunk check`, and `git diff --check` pass; generated registry churn is reviewed and excluded when unrelated.
-- [ ] Focused visual handoff covers `/tests/drag/element-ref-resize`, `/tests/use-presence`, `/examples/use-presence`, `/examples/keyframes`, `/examples/transform-template`, and `/examples/svg-css-variables`. Preserve the existing `/examples/use-follow-value` and `/tests/effects/three` as additional reviewed upgrade examples.
+- [x] `pnpm check` and `pnpm package` pass, with no missing Reorder declaration or hidden declaration emit error.
+- [x] `pnpm --dir docs check` passes with zero errors.
+- [x] `pnpm test` passes the full root suite with coverage.
+- [x] `pnpm --filter @humanspeak/svelte-motion-consumer-vite6 test` passes runtime and emitted-type consumer checks.
+- [x] `pnpm exec playwright test --project=chromium` passes the full root browser suite.
+- [x] `pnpm exec playwright test --config docs/playwright.config.ts` passes Chromium and Firefox on the real docs route, including the recorded deliberate-regression proof.
+- [x] `pnpm --dir docs build`, `trunk check`, and `git diff --check` pass; generated registry churn is reviewed and excluded when unrelated.
+- [x] Focused visual handoff covers `/tests/drag/element-ref-resize`, `/tests/use-presence`, `/examples/use-presence`, `/examples/keyframes`, `/examples/transform-template`, and `/examples/svg-css-variables`. Preserve the existing `/examples/use-follow-value` and `/tests/effects/three` as additional reviewed upgrade examples.
 - [ ] Runtime/type fixes have patch changesets, and release notes distinguish inherited upstream improvements from Svelte adapter fixes and coverage work.
-- [ ] Resolve or document the upstream Motion13.4.4 HTMLWebViewElement failure when checking dependency declarations with skipLibCheck:false; it reproduces without svelte-motion (see006).
+- [x] Resolve or document the upstream Motion13.4.4 HTMLWebViewElement failure when checking dependency declarations with skipLibCheck:false; it reproduces without svelte-motion (see006).
 - [ ] Hosted PR checks pass when an authorized PR is opened. Local validation alone does not count as hosted CI evidence.
 
-Publishing, versioning, merging, and deployment are outside this planning batch. No release-readiness box is checked by this audit.
+Publishing, versioning, merging, and deployment are outside this planning batch. The original audit checked no release-readiness boxes. Checked items now reflect recorded execution evidence; remaining integration and hosted-CI requirements stay explicit.
 
 ### Plan 001 review result — APPROVE
 
@@ -217,3 +217,31 @@ The existing transform-page-point and clone-exit-migration batches were reviewed
 ### Plan 007 approval and commit
 
 The maintainer approved the repaired group exits and completed-exit re-entry, accepted the demonstrated Show/Reset progress behavior, and authorized committing all 007 work then starting 008. The source/tests/docs/changeset and both plan records are included together in `fix(presence): wait for all owned descendant exits` on the shared branch; the containing commit records the implementation. No push, merge, or release. Plan 008's cross-browser docs coverage is the next step.
+
+
+### Plan 008 started
+
+007 committed as `ae920f1e` with all hooks passing and a clean tree. The maintainer authorized moving to 008. Scope matches the original audit; execute docs Chromium/Firefox rendering coverage and dedicated CI in the shared checkout. Root maintains this index and coordinates final integrated release gates. Existing root5205/docs5199 stay available; new test harness uses dedicated5201. Full red/green and hosted-CI limitations will be recorded in 008.
+
+
+### Plan 008 scoped verification
+
+The actual SVG docs route passes12/12 Chromium/Firefox cases through the unchanged fresh package+docs build harness. The old unitless CSS produced `none` on both Firefox paths and failed the same rendering assertion; restored explicit lengths pass without changing the demo. CI now covers the actual route, all controls, Replay progression/interruption, and verified reduced-motion setup. Root unit coverage954/83files, package/publint, root/docs checks, published consumer types/SSR, and lint pass.
+
+The first full root sweep returned468 passed,1 snap-to-origin assertion failure,1 flaky frame-budget case (passed retry2), and2 pre-existing skips. Maintainer confirmed return motion is correct. The assertion now observes an actual intermediate return with unchanged bounds; an instant snap still fails. Focused5/5 and repeated3/3 pass. A final full-root rerun is underway; do not call the initial run green.
+
+Remote main has advanced to b6bfdfde with the docs favicon change (#483); it is not integrated into the tested release candidate yet. Fresh-main reconciliation and hosted CI remain open release steps.008 changes are uncommitted pending the review checkpoint. Full details and logs are in008.
+
+
+### Plan 008 final review — APPROVE
+
+Independent final root Chromium run:470 passed,2 pre-existing skips, no failures or retries (12.9minutes). The snap-to-origin assertion and AI glow frame-budget case both pass on the first attempt. Together with12/12 actualdocs Chromium/Firefox checks,954 coverage units, types/package/consumer/build/lint gates, this completes local verification of all eight selected plans. Exact evidence is recorded in008; the earlier failed run is preserved, not relabeled.
+
+008 changes comprise three new docs testing/CI files, the visually approved snap timing assertion, and the two plan records. They remain uncommitted for review.007 is committed as ae920f1e. No runtime/demo/dependency/generated changes belong to008.
+
+Review example: http://localhost:5199/examples/svg-css-variables (Draw, Erase, Replay, Reset, both sliders). Root test page remains http://localhost:5205/tests/drag/snap-to-origin. Both servers are running. Newer main b6bfdfde integration, final release notes, and hosted PR checks remain open release tasks; no push/merge/version/publish/deployment was performed.
+
+
+### Final visual approval — 2026-09-26
+
+The maintainer approved008 (“Looks great!”), completing the visual checkpoints for all eight plans.008 and its plan records remain uncommitted. Remaining release work: commit008, reconcile newer main b6bfdfde, review changesets/release notes, and run hosted PR checks. This approval does not itself request a push, PR, merge, version, publication, or deployment.

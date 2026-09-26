@@ -39,15 +39,28 @@ test.describe('drag/snap-to-origin', () => {
         const released = await readTranslate(page, '[data-testid="snap-origin-box"]')
         await page.mouse.up()
 
-        await page.waitForTimeout(80)
-        const mid = await readTranslate(page, '[data-testid="snap-origin-box"]')
-
         expect(released.tx).toBeGreaterThan(20)
         expect(released.ty).toBeGreaterThan(8)
-        expect(mid.tx).toBeGreaterThan(4)
-        expect(mid.ty).toBeGreaterThan(2)
-        expect(mid.tx).toBeLessThan(released.tx - 2)
-        expect(mid.ty).toBeLessThan(released.ty - 1)
+
+        // Observe actual return progress instead of assuming a particular spring
+        // frame at 80 ms. An immediate snap cannot satisfy the nonzero bounds.
+        await expect(async () => {
+            const mid = await readTranslate(page, '[data-testid="snap-origin-box"]')
+            expect(mid.tx).toBeGreaterThan(4)
+            expect(mid.ty).toBeGreaterThan(2)
+            expect(mid.tx).toBeLessThan(released.tx - 2)
+            expect(mid.ty).toBeLessThan(released.ty - 1)
+        }).toPass({ timeout: 1500, intervals: [16] })
+
+        await expect
+            .poll(
+                async () => {
+                    const settled = await readTranslate(page, '[data-testid="snap-origin-box"]')
+                    return Math.abs(settled.tx) < 2 && Math.abs(settled.ty) < 2
+                },
+                { timeout: 1500, intervals: [16] }
+            )
+            .toBe(true)
     })
 
     test('axis-specific snap-to-origin only returns the requested axis', async ({ page }) => {
