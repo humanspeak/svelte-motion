@@ -9,6 +9,7 @@
     import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+    import OwnedGroup from '$lib/examples/use-presence/demos/OwnedGroup.svelte'
     import UsePresenceDefault from '$lib/examples/use-presence/demos/Default.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
@@ -45,9 +46,36 @@
             notes: defaultNotes,
             barCells: [{ k: 'pattern', v: 'PresenceChild + safeToRemove' }],
             sourceUrl: `${SOURCE_URL}use-presence/demos/Default.svelte`
+        },
+        {
+            figId: 'FIG-002',
+            tag: 'OWNED-GROUP',
+            title: { prefix: 'wait for ', accent: 'every exit', end: '.' },
+            description:
+                'Independent motion descendants share one owned wrapper. The fast exit finishes first; removal waits for the slow exit too.',
+            snippet: groupSection,
+            codeSnippet: groupCode,
+            barCells: [{ k: 'pattern', v: 'owned group + automatic completion' }],
+            sourceUrl: `${SOURCE_URL}use-presence/demos/OwnedGroup.svelte`
         }
     ]
 </script>
+
+{#snippet groupSection()}
+    <OwnedGroup />
+{/snippet}
+{#snippet groupCode()}
+    <CodeReferenceV2
+        samples={[
+            demoCodeSample(
+                'use-presence/demos/OwnedGroup.svelte',
+                'use-presence-owned-group',
+                'OwnedGroup.svelte'
+            )
+        ]}
+        columns={1}
+    />
+{/snippet}
 
 {#snippet defaultSection()}
     <UsePresenceDefault />

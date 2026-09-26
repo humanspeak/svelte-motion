@@ -73,8 +73,30 @@ const registerStubNode = (element: HTMLElement, seed: Record<string, number> = {
     return node
 }
 
+// Keep native observer instances across tests: motion-dom shares one observer.
+const resizeObservers: ControlledResizeObserver[] = []
+class ControlledResizeObserver {
+    targets = new Set<Element>()
+    observe = vi.fn((target: Element) => this.targets.add(target))
+    unobserve = vi.fn((target: Element) => this.targets.delete(target))
+    disconnect = vi.fn(() => this.targets.clear())
+    constructor(readonly callback: ResizeObserverCallback) {
+        resizeObservers.push(this)
+    }
+    deliver(target: Element) {
+        this.callback([{ target } as ResizeObserverEntry], this)
+    }
+}
+const observedTargets = () => new Set(resizeObservers.flatMap((observer) => [...observer.targets]))
+const deliverResize = (target: Element) => {
+    resizeObservers
+        .filter((observer) => observer.targets.has(target))
+        .forEach((observer) => observer.deliver(target))
+}
+
 describe('utils/drag', () => {
     beforeEach(() => {
+        vi.stubGlobal('ResizeObserver', ControlledResizeObserver)
         animateMock.mockClear()
         document.body.innerHTML = ''
     })
@@ -158,6 +180,403 @@ describe('utils/drag', () => {
         expect(el.style.transform).toBe('rotate(12deg)')
         cleanup()
         el.remove()
+    })
+
+    describe('live constraint observers', () => {
+        const cleanups: Array<() => void> = []
+        afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
+
+        const setup = (numeric = false) => {
+            const a = document.createElement('div')
+            const b = document.createElement('div')
+            const card = document.createElement('div')
+            a.append(card)
+            document.body.append(a, b)
+            let width = 400
+            const node = registerStubNode(card, { x: 0, y: 0 })
+            vi.spyOn(a, 'getBoundingClientRect').mockImplementation(
+                () => new DOMRect(0, 0, 400, 400)
+            )
+            vi.spyOn(b, 'getBoundingClientRect').mockImplementation(
+                () => new DOMRect(0, 0, width, 400)
+            )
+            vi.spyOn(card, 'getBoundingClientRect').mockImplementation(
+                () => new DOMRect(40 + Number(node.latestValues.x), 40, 80, 80)
+            )
+            const numericBounds = { left: -40, right: 280 }
+            const options = {
+                axis: 'x' as const,
+                constraints: numeric ? numericBounds : a,
+                momentum: false,
+                elastic: 0,
+                mergedTransition: { duration: 0 }
+            }
+            const cleanup = attachDrag(card, options)
+            cleanups.push(() => {
+                cleanup()
+                visualElementStore.delete(card)
+            })
+            return {
+                a,
+                b,
+                card,
+                node,
+                cleanup,
+                numericBounds,
+                update: (constraints: typeof options.constraints) =>
+                    cleanup.updateOptions({ ...options, constraints }),
+                resizeB: (next: number) => {
+                    width = next
+                    deliverResize(b)
+                },
+                drag: async (dx = 80) => {
+                    card.dispatchEvent(
+                        new PointerEvent('pointerdown', { clientX: 80, clientY: 80, pointerId: 1 })
+                    )
+                    window.dispatchEvent(
+                        new PointerEvent('pointermove', {
+                            clientX: 80 + dx,
+                            clientY: 80,
+                            pointerId: 1
+                        })
+                    )
+                    await flushFrame()
+                    window.dispatchEvent(
+                        new PointerEvent('pointerup', {
+                            clientX: 80 + dx,
+                            clientY: 80,
+                            pointerId: 1
+                        })
+                    )
+                    await flushFrame()
+                }
+            }
+        }
+
+        it('moves observation from A to B without resizing the card', () => {
+            const { a, b, card, update } = setup()
+            update(b)
+            expect(observedTargets().has(b)).toBe(true)
+            expect(observedTargets().has(card)).toBe(true)
+            expect(observedTargets().has(a)).toBe(false)
+        })
+        it('begins observation when numeric constraints become B', () => {
+            const { b, card, update } = setup(true)
+            expect(observedTargets().has(card)).toBe(false)
+            update(b)
+            expect(observedTargets().has(b)).toBe(true)
+            expect(observedTargets().has(card)).toBe(true)
+        })
+        it('removes owned observations when B becomes numeric', () => {
+            const { a, b, card, update, numericBounds } = setup()
+            update(b)
+            update(numericBounds)
+            expect(observedTargets().has(a)).toBe(false)
+            expect(observedTargets().has(b)).toBe(false)
+            expect(observedTargets().has(card)).toBe(false)
+        })
+        it('does not churn subscriptions for the same ref', () => {
+            const { a, update } = setup()
+            const calls = resizeObservers.map((observer) => [
+                observer.observe.mock.calls.length,
+                observer.unobserve.mock.calls.length,
+                observer.disconnect.mock.calls.length
+            ])
+            update(a)
+            expect(
+                resizeObservers.map((observer) => [
+                    observer.observe.mock.calls.length,
+                    observer.unobserve.mock.calls.length,
+                    observer.disconnect.mock.calls.length
+                ])
+            ).toEqual(calls)
+        })
+        it('remeasures and remaps when only replacement B resizes', async () => {
+            const { b, node, update, drag, resizeB } = setup()
+            await drag()
+            expect(node.latestValues.x).toBe(80)
+            update(b)
+            resizeB(200)
+            expect(node.latestValues.x).toBe(5)
+            resizeB(400)
+            expect(node.latestValues.x).toBe(80)
+        })
+        it('ignores queued old-target deliveries after replacement and teardown', async () => {
+            const { a, b, card, node, update, cleanup, drag, resizeB } = setup()
+            await drag()
+            const old = resizeObservers.find((observer) => observer.targets.has(a))!
+            update(b)
+            // Change B geometry without delivering its active notification.
+            vi.spyOn(b, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 200, 400))
+            node.render.mockClear()
+            old.deliver(a)
+            expect(node.render).not.toHaveBeenCalled()
+            cleanup()
+            resizeObservers.forEach((observer) => {
+                observer.deliver(b)
+                observer.deliver(card)
+            })
+            resizeB(100)
+            expect(node.render).not.toHaveBeenCalled()
+            expect(observedTargets().has(card)).toBe(false)
+            expect(observedTargets().has(b)).toBe(false)
+        })
+        it('keeps a shared target observed until the last drag unsubscribes', async () => {
+            const first = setup()
+            const second = setup()
+            second.update(first.a)
+            await second.drag()
+            first.cleanup()
+            expect(observedTargets().has(first.card)).toBe(false)
+            expect(observedTargets().has(first.a)).toBe(true)
+            vi.spyOn(first.a, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 200, 400))
+            deliverResize(first.a)
+            expect(second.node.latestValues.x).toBe(5)
+            second.cleanup()
+            expect(observedTargets().has(first.a)).toBe(false)
+        })
+        it.each(['element to element', 'element to numeric', 'numeric to element'] as const)(
+            'anchors fresh bounds during an active %s transition',
+            async (transition) => {
+                const fixture = setup(transition === 'numeric to element')
+                await fixture.drag(40)
+                fixture.resizeB(200)
+                const move = async (x: number) => {
+                    window.dispatchEvent(
+                        new PointerEvent('pointermove', { clientX: x, clientY: 80, pointerId: 1 })
+                    )
+                    await flushFrame()
+                }
+                fixture.card.dispatchEvent(
+                    new PointerEvent('pointerdown', { clientX: 120, clientY: 80, pointerId: 1 })
+                )
+                await move(240)
+                expect(fixture.node.latestValues.x).toBe(160)
+                fixture.update(
+                    transition === 'element to numeric' ? { left: -40, right: 80 } : fixture.b
+                )
+                await move(400)
+                expect(fixture.node.latestValues.x).toBe(80)
+                expect(fixture.card.dataset.svelteMotionDragActive).toBe('true')
+                await move(-200)
+                expect(fixture.node.latestValues.x).toBe(-40)
+                // Back inside the range: the original pointer origin is retained.
+                await move(140)
+                expect(fixture.node.latestValues.x).toBe(60)
+                window.dispatchEvent(
+                    new PointerEvent('pointerup', { clientX: 140, clientY: 80, pointerId: 1 })
+                )
+                await flushFrame()
+                expect(fixture.node.latestValues.x).toBe(60)
+                expect(fixture.card.dataset.svelteMotionDragActive).toBeUndefined()
+            }
+        )
+
+        it('refreshes resized ref bounds while a stationary pointer remains held', async () => {
+            const fixture = setup()
+            fixture.update(fixture.b)
+            fixture.card.dispatchEvent(
+                new PointerEvent('pointerdown', { clientX: 80, clientY: 80, pointerId: 1 })
+            )
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: 280, clientY: 80, pointerId: 1 })
+            )
+            await flushFrame()
+            expect(fixture.node.latestValues.x).toBe(200)
+            fixture.resizeB(200)
+            // The existing held pointer is processed again; no new pointer event.
+            await flushFrame()
+            expect(fixture.node.latestValues.x).toBe(80)
+            expect(fixture.card.dataset.svelteMotionDragActive).toBe('true')
+            fixture.resizeB(400)
+            await flushFrame()
+            expect(fixture.node.latestValues.x).toBe(200)
+            fixture.resizeB(200)
+            await flushFrame()
+            window.dispatchEvent(
+                new PointerEvent('pointermove', { clientX: -200, clientY: 80, pointerId: 1 })
+            )
+            await flushFrame()
+            expect(fixture.node.latestValues.x).toBe(-40)
+            window.dispatchEvent(
+                new PointerEvent('pointerup', { clientX: -200, clientY: 80, pointerId: 1 })
+            )
+            await flushFrame()
+            expect(fixture.node.latestValues.x).toBe(-40)
+            expect(fixture.card.dataset.svelteMotionDragActive).toBeUndefined()
+        })
+
+        it('supports attach and constraint changes without ResizeObserver', () => {
+            vi.stubGlobal('ResizeObserver', undefined)
+            const { b, update, cleanup } = setup()
+            expect(() => update(b)).not.toThrow()
+            expect(() => cleanup()).not.toThrow()
+        })
+    })
+
+    describe('resting constraint resize', () => {
+        const cleanups: Array<() => void> = []
+
+        afterEach(() => {
+            cleanups.splice(0).forEach((cleanup) => cleanup())
+            vi.unstubAllGlobals()
+        })
+
+        const setup = (
+            options: {
+                axis?: true | 'x' | 'y'
+                authored?: Record<string, number>
+                boundX?: MotionValue<number>
+            } = {}
+        ) => {
+            const container = document.createElement('div')
+            const element = document.createElement('div')
+            container.append(element)
+            document.body.append(container)
+            let size = 400
+            const authored = options.authored ?? {}
+            const node = registerStubNode(element, { x: 0, y: 0, ...authored })
+            node.render.mockImplementation(() => {
+                const numericValues: Record<string, number> = {}
+                for (const [key, value] of Object.entries(node.latestValues)) {
+                    if (typeof value === 'number') numericValues[key] = value
+                }
+                element.style.transform = buildDragTransform(numericValues)
+            })
+            node.render()
+            if (options.boundX) {
+                const x = options.boundX
+                node.values.set('x', x)
+                node.latestValues.x = x.get()
+                cleanups.push(
+                    x.on('change', (value) => {
+                        node.latestValues.x = value
+                        node.render()
+                    })
+                )
+            }
+            vi.spyOn(container, 'getBoundingClientRect').mockImplementation(
+                () => new DOMRect(0, 0, size, size)
+            )
+            vi.spyOn(element, 'getBoundingClientRect').mockImplementation(
+                () =>
+                    new DOMRect(
+                        40 + Number(node.latestValues.x),
+                        40 + Number(node.latestValues.y),
+                        80,
+                        80
+                    )
+            )
+            const cleanup = attachDrag(element, {
+                axis: options.axis ?? 'x',
+                constraints: container,
+                momentum: false,
+                elastic: 0,
+                mergedTransition: { duration: 0 },
+                getBaseTransformValues: () => ({
+                    ...authored,
+                    ...(options.boundX ? { x: options.boundX.get() } : {})
+                }),
+                boundMotionValues: options.boundX ? { x: options.boundX } : undefined
+            })
+            cleanups.push(() => {
+                cleanup()
+                expect(observedTargets().has(element)).toBe(false)
+                expect(observedTargets().has(container)).toBe(false)
+                visualElementStore.delete(element)
+                container.remove()
+            })
+            return {
+                node,
+                element,
+                resize: (nextSize: number) => {
+                    size = nextSize
+                    deliverResize(container)
+                },
+                drag: async (dx: number, dy: number) => {
+                    element.dispatchEvent(
+                        new PointerEvent('pointerdown', { clientX: 80, clientY: 80, pointerId: 1 })
+                    )
+                    window.dispatchEvent(
+                        new PointerEvent('pointermove', {
+                            clientX: 80 + dx,
+                            clientY: 80 + dy,
+                            pointerId: 1
+                        })
+                    )
+                    await flushFrame()
+                    window.dispatchEvent(
+                        new PointerEvent('pointerup', {
+                            clientX: 80 + dx,
+                            clientY: 80 + dy,
+                            pointerId: 1
+                        })
+                    )
+                    await flushFrame()
+                }
+            }
+        }
+
+        it('keeps an untouched asymmetric origin through shrink and grow', () => {
+            const { node, element, resize } = setup()
+            const initialTransform = element.style.transform
+            resize(200)
+            expect(node.latestValues.x).toBe(0)
+            expect(element.style.transform).toBe(initialTransform)
+            resize(400)
+            expect(node.latestValues.x).toBe(0)
+            expect(element.style.transform).toBe(initialTransform)
+        })
+
+        it('preserves zero x independently while remapping nonzero y', async () => {
+            const { node, resize, drag } = setup({ axis: true })
+            await drag(0, 80)
+            expect(node.latestValues).toMatchObject({ x: 0, y: 80 })
+            resize(200)
+            expect(node.latestValues).toMatchObject({ x: 0, y: 5 })
+            resize(400)
+            expect(node.latestValues).toMatchObject({ x: 0, y: 80 })
+        })
+
+        it('continues remapping nonzero x through shrink and grow', async () => {
+            const { node, resize, drag } = setup()
+            await drag(80, 0)
+            resize(200)
+            expect(node.latestValues.x).toBe(5)
+            resize(400)
+            expect(node.latestValues.x).toBe(80)
+        })
+
+        it('retains authored x, rotation and scale when only y remaps', async () => {
+            const { node, element, resize, drag } = setup({
+                axis: true,
+                authored: { x: 20, rotate: 12, scale: 1.2 }
+            })
+            await drag(0, 80)
+            resize(200)
+            expect(node.latestValues).toMatchObject({ x: 20, y: 5, rotate: 12, scale: 1.2 })
+            expect(element.style.transform).toBe(
+                'translateX(20px) translateY(5px) scale(1.2) rotate(12deg)'
+            )
+            resize(400)
+            expect(node.latestValues).toMatchObject({ x: 20, y: 80, rotate: 12, scale: 1.2 })
+            expect(element.style.transform).toBe(
+                'translateX(20px) translateY(80px) scale(1.2) rotate(12deg)'
+            )
+        })
+
+        it('does not overwrite an independently updated bound x when only y remaps', async () => {
+            const x = motionValue(0)
+            const { node, resize, drag } = setup({ axis: true, boundX: x })
+            await drag(0, 80)
+            x.set(25)
+            resize(200)
+            expect(x.get()).toBe(25)
+            expect(node.latestValues).toMatchObject({ x: 25, y: 5 })
+            resize(400)
+            expect(x.get()).toBe(25)
+            expect(node.latestValues).toMatchObject({ x: 25, y: 80 })
+        })
     })
 
     describe('transformPagePoint', () => {

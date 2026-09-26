@@ -19,7 +19,10 @@ import Item from '$lib/components/Reorder/Item.svelte'
  * </Reorder.Group>
  * ```
  */
-export const Reorder = {
+export const Reorder: {
+    readonly Group: typeof Group
+    readonly Item: typeof Item
+} = {
     Group,
     Item
 } as const

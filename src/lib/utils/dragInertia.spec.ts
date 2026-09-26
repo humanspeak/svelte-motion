@@ -1,4 +1,4 @@
-import { inertia, motionValue, type AnyResolvedKeyframe } from 'motion-dom'
+import { inertia, JSAnimation, motionValue, type AnyResolvedKeyframe } from 'motion-dom'
 import { describe, expect, it } from 'vitest'
 import {
     createDragInertiaGenerator,
@@ -69,8 +69,11 @@ describe('drag inertia', () => {
         // (the constraint-ledger rule against hand-rolled sampling).
         const animation = value.animation
         expect(animation, 'the release animation was not registered on the value').toBeDefined()
+        if (!(animation instanceof JSAnimation)) {
+            throw new Error('Expected the synchronous upstream JSAnimation release path')
+        }
         expect(
-            animation!.duration,
+            animation.duration,
             'the release animation was flattened to an instant landing'
         ).toBeGreaterThan(0.1)
 

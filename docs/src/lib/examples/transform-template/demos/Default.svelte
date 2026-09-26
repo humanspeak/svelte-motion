@@ -16,7 +16,7 @@
     const progress = useMotionValue(0)
     const x = useTransform(progress, (p) => p * travel)
 
-    let state = $state<'start' | 'moving' | 'end'>('start')
+    let playbackState = $state<'start' | 'moving' | 'end'>('start')
     let activeAnimation: { stop: () => void } | null = null
     let runId = 0
 
@@ -37,7 +37,7 @@
     async function moveTo(target: 0 | 1) {
         stopActiveAnimation()
         const id = ++runId
-        state = 'moving'
+        playbackState = 'moving'
 
         const animation = animate(progress, target, {
             duration: 1,
@@ -47,14 +47,14 @@
         activeAnimation = animation
         await animation
         if (activeAnimation === animation) activeAnimation = null
-        if (id === runId) state = target === 1 ? 'end' : 'start'
+        if (id === runId) playbackState = target === 1 ? 'end' : 'start'
     }
 
     function reset() {
         stopActiveAnimation()
         runId += 1
         progress.jump(0)
-        state = 'start'
+        playbackState = 'start'
     }
 </script>
 
@@ -63,7 +63,7 @@
     <div class="strip">
         <div class="strip-head">
             <span class="micro">// transform-template</span>
-            <span class="micro state">state: {state}</span>
+            <span class="micro state">state: {playbackState}</span>
         </div>
 
         <div class="toolbar" aria-label="Transform template controls">
@@ -110,12 +110,12 @@
                     <div class="rail highlighted"></div>
                     <motion.div
                         class="card template-card"
-                        data-state={state}
+                        data-state={playbackState}
                         style={{ x }}
                         {transformTemplate}
                     >
                         <small>with template</small>
-                        <strong>{state === 'end' ? 'rewritten' : 'composed'}</strong>
+                        <strong>{playbackState === 'end' ? 'rewritten' : 'composed'}</strong>
                     </motion.div>
                 </div>
             </section>

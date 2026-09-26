@@ -39,7 +39,7 @@
             tag: 'HOOK',
             title: { prefix: 'one source, ', accent: 'six personalities', end: '.' },
             description:
-                'A single pointer-position `MotionValue` drives six `useFollowValue` outputs. Each follower has a different transition (spring crisp/bouncy/floaty/wobbly, tween short/long) so the comet trail visually shows how each animation type behaves under the same input.',
+                'A single pointer-position `MotionValue` drives six `useFollowValue` outputs. Each follower has a different transition (spring crisp/bouncy/floaty/wobbly, tween short/long) so the comet trail visually shows how each animation type behaves under the same input. Move, tap, or use arrow keys to steer. Replay traces a shared route; Reset centers every follower.',
             snippet: defaultSection,
             codeSnippet: defaultCode,
             notes: defaultNotes,
@@ -75,9 +75,9 @@
         <li>
             <Layers />
             <span>
-                Layer with <code>mix-blend-mode: screen</code> + a soft <code>box-shadow</code> per follower
-                so the colours add up where they overlap — the same trick framer-motion's docs use to
-                make the trail legible. The animation is real; only the visual treatment is decorative.
+                Replay uses <code>animate()</code> on the shared source values; Reset uses
+                <code>jump()</code> on the source and every follower. Reduced-motion preferences make
+                changes immediate.
             </span>
         </li>
     </ul>

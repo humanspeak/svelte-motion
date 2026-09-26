@@ -93,15 +93,9 @@ const createSubject = (values: Record<string, number | string> = {}): Subject =>
 
 const subjectEffect = createEffect<Subject>(
     (subject, state, key, value) =>
-        state.set(
-            key,
-            value,
-            () => {
-                subject.values[key] = state.latest[key]
-            },
-            undefined,
-            false
-        ),
+        state.set(key, value, () => {
+            subject.values[key] = value.get() as number | string
+        }),
     {
         test: (subject): subject is Subject => Boolean((subject as Subject)?.isSubject),
         read: (subject, key) => subject.values[key]

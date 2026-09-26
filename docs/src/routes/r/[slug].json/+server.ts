@@ -3,6 +3,12 @@ import { getPostHogClient } from '$lib/server/posthog'
 import { error, json } from '@sveltejs/kit'
 import type { RequestHandler } from './$types'
 
+/**
+ * Serves registry metadata and records downloads when telemetry is available.
+ *
+ * @param input - The registry slug, platform bindings, and incoming request.
+ * @returns The registry index or component payload with its response headers.
+ */
 export const GET: RequestHandler = async ({ params, platform, request }) => {
     const slug = params.slug
 
@@ -20,6 +26,7 @@ export const GET: RequestHandler = async ({ params, platform, request }) => {
     // completes after the response is returned without blocking it.
     const phFlush = (async () => {
         const posthog = getPostHogClient()
+        if (!posthog) return
         posthog.capture({
             distinctId,
             event: 'registry_component_downloaded',

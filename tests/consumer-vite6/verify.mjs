@@ -2,6 +2,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { createServer } from 'vite'
+import './verify-types.mjs'
 
 /**
  * Loads and server-renders a consumer component through Vite 6.

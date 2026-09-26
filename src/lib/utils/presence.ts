@@ -2,6 +2,7 @@ import type { AnimatePresenceMode, MotionExit, MotionTransition } from '$lib/typ
 import { mergeTransitions } from '$lib/utils/animation'
 import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
+import type { PresenceContextProps } from 'motion-dom'
 import { getContext, setContext } from 'svelte'
 import { createSubscriber } from 'svelte/reactivity'
 
@@ -1240,6 +1241,10 @@ export type PresenceChildContext = {
      * Idempotent and versioned (calls from a canceled exit cycle are no-ops).
      */
     safeToRemove: () => void
+    /** Register a motion descendant with this wrapper's exit barrier. */
+    register: PresenceContextProps['register']
+    /** Completion callback captured for the current exit cycle. */
+    readonly onExitComplete: NonNullable<PresenceContextProps['onExitComplete']>
 }
 
 const PRESENCE_CHILD_CONTEXT = Symbol('presence-child-context')

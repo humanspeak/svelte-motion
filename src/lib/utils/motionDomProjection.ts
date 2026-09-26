@@ -234,14 +234,15 @@ export class MotionDomProjectionAdapter {
         // write would drop the owner's `animate`/`variants`/`while*`. The
         // `style` write itself is load-bearing and must keep happening — it is
         // what binds the style MotionValues onto the node, mirroring them into
-        // `latestValues` for the projection transform math.
+        // `latestValues` for the projection transform math. Preserve the owner's
+        // presence context too: exit features register when the node mounts.
         this.visualElement.update(
             {
                 ...(this.ownsVisualElement ? {} : this.visualElement.props),
                 transition: options.transition,
                 style: options.style
             } as never,
-            null
+            this.ownsVisualElement ? null : this.visualElement.presenceContext
         )
         this.projection.setOptions({
             layout: options.layout,

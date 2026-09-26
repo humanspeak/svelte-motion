@@ -12,12 +12,15 @@ on:
         paths:
             - src/**
             - tests/**
+            - e2e/**
             - '!docs/**'
             - package.json
             - pnpm-lock.yaml
             - pnpm-workspace.yaml
             - svelte.config.*
             - vite.config.*
+            - vitest.config.*
+            - vitest.setup.*
             - playwright.config.*
             - tsconfig*.json
             - .github/workflows/run-tests.yml

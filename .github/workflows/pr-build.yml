@@ -47,11 +47,15 @@ jobs:
               with:
                   node-version: 24
 
-            - name: Install dependencies
-              run: pnpm install --filter . --frozen-lockfile --config.engine-strict=false
+            - name: Install workspace dependencies
+              run: pnpm install --frozen-lockfile --config.engine-strict=false
 
             - name: Build package and app
               run: pnpm build
+
+            # Consumer fixtures import the emitted package declarations.
+            - name: Check package and app
+              run: pnpm check
 
     docs-build:
         if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
@@ -82,3 +86,6 @@ jobs:
               env:
                   NODE_OPTIONS: --max-old-space-size=4096
               run: pnpm run build
+
+            - name: Check docs
+              run: pnpm --dir docs check

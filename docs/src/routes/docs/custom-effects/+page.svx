@@ -46,15 +46,9 @@ type Dial = { angle: number; radius: number }
 
 const dialEffect = createEffect<Dial>(
   (dial, state, key, value) =>
-    state.set(
-      key,
-      value,
-      () => {
-        (dial as Record<string, number>)[key] = state.latest[key] as number
-      },
-      undefined,
-      false
-    ),
+    state.set(key, value, () => {
+      (dial as Record<string, number>)[key] = value.get() as number
+    }),
   {
     test: (subject): subject is Dial =>
       typeof subject === 'object' && subject !== null && 'angle' in subject && 'radius' in subject,
@@ -64,7 +58,7 @@ const dialEffect = createEffect<Dial>(
 )
 ```
 
-The full `state.set(key, value, render, computed, useDefaultValueType)` call stores the bound value, schedules `render` when it changes, optionally tracks a computed dependency, and controls Motion's default property-specific value conversion.
+The `state.set(key, value, render, computed?)` call binds the motion value and schedules its renderer when the value changes. Read `value.get()` inside the renderer to write the current value. The optional `computed` argument shares the renderer of another bound motion value.
 
 | Option | Description |
 |---|---|
@@ -107,6 +101,8 @@ angle.destroy()
 ```
 
 `propEffect` provides the same `.get(subject, key)` lookup for manually bound object properties.
+
+Custom effects also expose upstream's `.flush(subject)` to write pending values immediately, and `.state(subject)` to access the subject's bound `MotionValueState`. Use `flush` before measuring a subject that needs its latest values applied.
 
 ## Three.js and vgpu
 

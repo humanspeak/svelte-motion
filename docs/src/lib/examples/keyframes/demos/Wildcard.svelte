@@ -2,7 +2,8 @@
     import { MoveRight, RotateCcw, Sparkles, Zap } from '@lucide/svelte'
     import { motion, styleString, useAnimationControls } from '@humanspeak/svelte-motion'
 
-    // Wildcard keyframes: `null` = "the current value", and relative strings
+    // Wildcard keyframes: a leading `null` reads the current value, later nulls
+    // hold the previous keyframe, and relative strings
     // (`'+=30'`) offset from the current value. Both resolve against the live
     // value at the moment the animation STARTS — so a pulse picks up wherever
     // the card happens to be, even mid-flight.
@@ -27,13 +28,13 @@
 
     // Pulse from wherever you are: the leading `null` reads the live scale at
     // start, so the pulse begins from the current value (not a hardcoded 1) and
-    // eases back to 1. `x: null` means "hold x at its current value" — another
-    // wildcard — so pulsing from a drifted spot keeps the card exactly where it
-    // is instead of snapping back to the origin.
+    // eases back to 1. In `x: [null, null, null]`, the first null samples x
+    // at start and the later nulls hold the previous keyframe, keeping the
+    // card at that position throughout all three pulse keyframes.
     const pulse = () => {
         note = 'scale [null, 1.15, 1]'
         void controls.start(
-            { scale: [null, 1.15, 1], x: null },
+            { scale: [null, 1.15, 1], x: [null, null, null] },
             { duration: 0.5, ease: 'easeInOut', times: [0, 0.4, 1] }
         )
     }

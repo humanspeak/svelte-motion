@@ -1,5 +1,7 @@
 <script lang="ts">
     import { onDestroy, type Snippet } from 'svelte'
+    import { createPresenceExitRegistry } from '$lib/utils/presenceExitRegistry'
+    import type { PresenceContextProps } from 'motion-dom'
     import {
         getAnimatePresenceContext,
         getPresenceDepth,
@@ -9,7 +11,8 @@
 
     /**
      * Holds its `children` snippet rendered until the consumer signals the
-     * exit is complete via `safeToRemove()`. Lets a child run its own (non-
+     * exit is complete via `safeToRemove()`, or all registered motion exits
+     * finish. Manual removal releases the entire wrapper. Lets a child run its own (non-
      * `motion.*`) exit animation — fade via CSS transition, canvas effect,
      * GSAP, etc — while still participating in `AnimatePresence`'s
      * `onExitComplete` accounting and `mode='wait'` enter blocking.
@@ -61,6 +64,8 @@
     // it was minted for. Re-entry / completion invalidates older closures so a
     // captured-then-late-fired callback (setTimeout, external lib, stray
     // listener after cleanup) from cycle A cannot complete cycle B.
+    const exitRegistry = createPresenceExitRegistry()
+    let completeDescendant: NonNullable<PresenceContextProps['onExitComplete']> = () => {}
     let currentSafeToRemove: () => void = noopSafeToRemove
     let waitEnterVersion = 0
     let unsubscribeEnterUnblocked: (() => void) | null = null
@@ -115,6 +120,7 @@
         // this branch no-ops — a stale capture cannot complete a later exit.
         const self: () => void = () => {
             if (currentSafeToRemove !== self || phase !== 'holding') return
+            exitRegistry.cancel()
             phase = 'completed'
             currentSafeToRemove = noopSafeToRemove
             animatePresence?.notifyExitComplete()
@@ -130,6 +136,10 @@
         },
         get safeToRemove() {
             return currentSafeToRemove
+        },
+        register: exitRegistry.register,
+        get onExitComplete() {
+            return completeDescendant
         }
     })
 
@@ -155,18 +165,21 @@
         }
         if (prevPresent && !current && currentPhase === 'enter-blocked') {
             cancelWaitEnterBlock()
+            exitRegistry.cancel()
             phase = 'idle'
             currentSafeToRemove = noopSafeToRemove
         } else if (prevPresent && !current && currentPhase === 'idle') {
             cancelWaitEnterBlock()
             phase = 'holding'
             currentSafeToRemove = mintSafeToRemove()
+            completeDescendant = exitRegistry.begin(currentSafeToRemove)
             animatePresence?.notifyExitStart()
         } else if (!prevPresent && current && currentPhase === 'holding') {
             // Re-entry mid-hold cancels the exit accounting. Replacing the
             // slot invalidates the cycle's `safeToRemove` for any consumer
             // that captured it.
             cancelWaitEnterBlock()
+            exitRegistry.cancel()
             phase = 'idle'
             currentSafeToRemove = noopSafeToRemove
             animatePresence?.notifyExitComplete()
@@ -194,6 +207,7 @@
 
     onDestroy(() => {
         cancelWaitEnterBlock()
+        exitRegistry.cancel()
         // Settle a pending exit when the wrapper itself unmounts mid-hold
         // (an outer conditional removed us before the consumer called
         // safeToRemove). Without this the parent AnimatePresence's

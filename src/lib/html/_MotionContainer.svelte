@@ -381,10 +381,10 @@
             id: componentHydrationId,
             // Read here so the calling effect tracks the wrapper's exit flip.
             isPresent: presenceChildContext.isPresent,
-            // The wrapper owns the lifecycle; nothing extra to track per id.
-            register: () => () => {},
-            // Completion is how the wrapper learns it may stop rendering.
-            onExitComplete: () => presenceChildContext.safeToRemove(),
+            register: presenceChildContext.register,
+            // Capture this cycle's versioned callback so an old context cannot
+            // complete a newer exit by reading the getter when it settles.
+            onExitComplete: presenceChildContext.onExitComplete,
             // `AnimatePresence initial={false}` suppresses the first enter.
             initial: presenceSkipEnter ? false : undefined,
             custom: resolvePresenceCustom()
@@ -2658,8 +2658,13 @@
         }
 
         const scheduleProjectionCommit = () => {
-            if (rafId) return
+            // A sibling animation can occupy this frame's throttle before a
+            // keyed reorder moves the dragged element. Consume its fresh slot
+            // immediately so the upstream delta compensates the drag before
+            // paint; waiting another frame exposes the uncompensated DOM move.
+            if (rafId && element?.dataset.svelteMotionDragActive !== 'true') return
             commitObservedLayout()
+            if (rafId) return
             rafId = requestAnimationFrame(() => {
                 rafId = null
             })

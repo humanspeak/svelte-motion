@@ -5,11 +5,11 @@ import {
     styleEffect as styleEffectCore,
     svgEffect as svgEffectCore,
     type AddEffectValue,
+    type Effect as CoreEffect,
     type EffectOptions,
     type EffectRead,
     type EffectTest,
-    type ElementOrSelector,
-    type MotionValue
+    type ElementOrSelector
 } from 'motion-dom'
 import type { AnyMotionValue } from './transform.svelte.js'
 
@@ -36,12 +36,14 @@ type ElementEffect = (subject: ElementOrSelector, values: EffectValues) => VoidF
  *
  * `get` returns whatever was bound, typed as the base `MotionValue`; the
  * Svelte-only members of an augmented value are not re-advertised on the way
- * back out.
+ * back out. All effect properties, including `flush` and `state`, are
+ * inherited from upstream; only the callable values parameter is widened.
  */
-export interface Effect<Subject extends object = object> extends EffectOptions<Subject> {
+export interface Effect<Subject extends object = object> extends Pick<
+    CoreEffect<Subject>,
+    keyof CoreEffect<Subject>
+> {
     (subject: Subject, values: EffectValues): VoidFunction
-    /** The motion value currently bound to `key` on `subject`, if any. */
-    get(subject: Subject, key: string): MotionValue | undefined
 }
 
 /**
@@ -77,8 +79,8 @@ export interface AnimateEffect<Subject extends object = object> extends Effect<S
  * const dialEffect = createEffect<Dial>(
  *     (dial, state, key, value) =>
  *         state.set(key, value, () => {
- *             ;(dial as Record<string, number>)[key] = state.latest[key] as number
- *         }, undefined, false),
+ *             ;(dial as Record<string, number>)[key] = value.get() as number
+ *         }),
  *     {
  *         test: (s): s is Dial => typeof s === 'object' && s !== null && 'angle' in s,
  *         read: (dial, key) => (dial as Record<string, number>)[key]

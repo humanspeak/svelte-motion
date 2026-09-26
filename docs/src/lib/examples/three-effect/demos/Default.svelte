@@ -22,6 +22,7 @@
     let displayedRotation = $state(0)
     let displayedProgress = $state(0)
     let targetProgress = $state(0)
+    let moved = $state(false)
 
     let mesh: import('three').Mesh | undefined
     let moveAnimation: { stop: () => void } | undefined
@@ -34,13 +35,15 @@
         displayedProgress = progress.get()
     }
 
+    /** Reverse the mesh's target, including while its spring is moving. */
     const move = () => {
         if (!mesh) return
 
+        moved = !moved
         moveAnimation?.stop()
         moveAnimation = animate(
             mesh,
-            { x: 1.5, rotateY: 360 },
+            { x: moved ? 1.5 : 0, rotateY: moved ? 360 : 0 },
             { type: 'spring', stiffness: 80, damping: 12 }
         )
     }
@@ -49,6 +52,18 @@
         targetProgress = Number((event.currentTarget as HTMLInputElement).value)
         progressAnimation?.stop()
         progressAnimation = animate(progress, targetProgress, { duration: 0.25 })
+    }
+
+    /** Stop both animations and restore the mesh, shader and slider. */
+    const reset = () => {
+        if (!mesh) return
+
+        moveAnimation?.stop()
+        progressAnimation?.stop()
+        moved = false
+        targetProgress = 0
+        moveAnimation = animate(mesh, { x: 0, rotateY: 0 }, { duration: 0 })
+        progress.jump(0)
     }
 
     onMount(() => {
@@ -151,7 +166,8 @@
         {/if}
 
         <div class="controls">
-            <button onclick={move} disabled={!ready}>Move</button>
+            <button onclick={move} disabled={!ready}>{moved ? 'Move back' : 'Move'}</button>
+            <button onclick={reset} disabled={!ready}>Reset</button>
             <label class="micro" for="three-progress">progress {targetProgress.toFixed(2)}</label>
             <input
                 id="three-progress"

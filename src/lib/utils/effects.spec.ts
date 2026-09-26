@@ -34,15 +34,9 @@ describe('utils/effects - public effect surface', () => {
     it('binds a value to a subject and exposes it through get()', () => {
         type Dial = { angle: number }
         const dialEffect = createEffect<Dial>((dial, state, key, value) =>
-            state.set(
-                key,
-                value,
-                () => {
-                    ;(dial as Record<string, number>)[key] = state.latest[key] as number
-                },
-                undefined,
-                false
-            )
+            state.set(key, value, () => {
+                ;(dial as Record<string, number>)[key] = value.get() as number
+            })
         )
 
         const dial: Dial = { angle: 0 }
@@ -50,6 +44,11 @@ describe('utils/effects - public effect surface', () => {
         const unbind = dialEffect(dial, { angle })
 
         expect(dialEffect.get(dial, 'angle')).toBe(angle)
+        expect(dialEffect.state(dial)?.get('angle')).toBe(angle)
+
+        angle.set(90)
+        dialEffect.flush(dial)
+        expect(dial.angle).toBe(90)
 
         unbind()
         expect(dialEffect.get(dial, 'angle')).toBeUndefined()
@@ -81,15 +80,9 @@ function typeAssertions() {
     type Dial = { angle: number }
     const dialEffect = createEffect<Dial>(
         (dial, state, key, value) =>
-            state.set(
-                key,
-                value,
-                () => {
-                    ;(dial as Record<string, number>)[key] = state.latest[key] as number
-                },
-                undefined,
-                false
-            ),
+            state.set(key, value, () => {
+                ;(dial as Record<string, number>)[key] = value.get() as number
+            }),
         {
             test: (subject): subject is Dial =>
                 typeof subject === 'object' && subject !== null && 'angle' in subject,

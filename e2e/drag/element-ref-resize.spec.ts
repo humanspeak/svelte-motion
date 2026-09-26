@@ -23,9 +23,300 @@ const readRect = (page: import('@playwright/test').Page, selector: string) =>
     }, selector)
 
 test.describe('drag/element-ref-resize', () => {
+    test('replacement-only resize follows B without remounting or resizing the card', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        await page.getByTestId('live-reset').click()
+        const card = page.getByTestId('live-card')
+        await card.scrollIntoViewIfNeeded()
+        await card.evaluate((element) => {
+            element.dataset.stableCard = 'same'
+        })
+        const start = await card.boundingBox()
+        if (!start) throw new Error('missing live card')
+        await page.mouse.move(start.x + 40, start.y + 40)
+        await page.mouse.down()
+        await page.mouse.move(start.x + 160, start.y + 40, { steps: 12 })
+        await page.mouse.up()
+        await expect.poll(async () => (await card.boundingBox())!.x - start.x).toBeGreaterThan(100)
+        await page.getByTestId('live-use-b').click()
+        await expect(page.getByTestId('live-target')).toHaveText('Element B')
+        const before = await card.boundingBox()
+        await page.getByTestId('live-shrink-b').click()
+        await expect(page.getByTestId('live-metric-width')).toHaveText('200.0 px')
+        await expect
+            .poll(async () => {
+                const current = await card.boundingBox()
+                const bounds = await page.getByTestId('live-b').boundingBox()
+                return current!.x + current!.width - (bounds!.x + bounds!.width)
+            })
+            .toBeLessThanOrEqual(0.5)
+        await expect.poll(async () => before!.x - (await card.boundingBox())!.x).toBeGreaterThan(50)
+        await expect(card).toHaveAttribute('data-stable-card', 'same')
+        expect((await card.boundingBox())!.width).toBe(start.width)
+        expect((await card.boundingBox())!.height).toBe(start.height)
+        await page.getByTestId('live-grow-b').click()
+        await expect
+            .poll(async () => Math.abs((await card.boundingBox())!.x - before!.x))
+            .toBeLessThan(0.5)
+        // Numeric bounds must release B; its later size changes do not remap.
+        await page.getByTestId('live-use-numeric').click()
+        await page.getByTestId('live-shrink-b').click()
+        await expect(page.getByTestId('live-target')).toContainText('Numeric')
+        await page.waitForTimeout(150)
+        expect(Math.abs((await card.boundingBox())!.x - before!.x)).toBeLessThan(0.5)
+        await page.getByTestId('live-grow-b').click()
+        await page.getByTestId('live-use-b').click()
+        await page.getByTestId('live-shrink-b').click()
+        await expect.poll(async () => before!.x - (await card.boundingBox())!.x).toBeGreaterThan(50)
+    })
+
+    test('switching to smaller B while pressed preserves both bounds and the pointer session', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        await page.getByTestId('live-reset').click()
+        await page.getByTestId('live-shrink-b').click()
+        const card = page.getByTestId('live-card')
+        await card.scrollIntoViewIfNeeded()
+        await card.evaluate((element) => {
+            element.dataset.stableCard = 'smaller-held'
+        })
+        const start = await card.boundingBox()
+        const bounds = await page.getByTestId('live-b').boundingBox()
+        if (!start || !bounds) throw new Error('missing live fixture')
+        await page.mouse.move(start.x + 40, start.y + 40)
+        await page.mouse.down()
+        await page.mouse.move(start.x + 240, start.y + 40, { steps: 12 })
+        await expect
+            .poll(async () => (await card.boundingBox())!.x + start.width - bounds.x - bounds.width)
+            .toBeGreaterThan(50)
+        // Arm the real delay after establishing the held pointer, avoiding a
+        // setup race while still exercising the page's actual timer callback.
+        await page.getByTestId('live-delay').evaluate((button) => button.click())
+        await expect(page.getByTestId('live-target')).toHaveText('Element B', { timeout: 5000 })
+        await expect(card).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+        const expectInside = async () => {
+            await expect
+                .poll(async () => {
+                    const rect = (await card.boundingBox())!
+                    return Math.max(
+                        bounds.x - rect.x,
+                        rect.x + rect.width - bounds.x - bounds.width
+                    )
+                })
+                .toBeLessThanOrEqual(0.5)
+        }
+        // Motion keeps processing the held pointer every frame. Switching refs
+        // must constrain it before another pointermove or pointerup is sent.
+        await expectInside()
+        await expect(card).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+        await page.mouse.move(start.x + 260, start.y + 40, { steps: 4 })
+        await expectInside()
+        await expect(page.getByTestId('live-metric-overflow')).toHaveText('0.0 px')
+        await expect(page.getByTestId('live-metric-bounds')).toContainText('Inside bounds')
+        await page.mouse.move(bounds.x - 100, start.y + 40, { steps: 12 })
+        await expectInside()
+        await expect(page.getByTestId('live-metric-overflow')).toHaveText('0.0 px')
+        await expect(page.getByTestId('live-metric-bounds')).toContainText('Inside bounds')
+        await expect
+            .poll(async () => Math.abs((await card.boundingBox())!.x - bounds.x))
+            .toBeLessThanOrEqual(0.5)
+        await expect(card).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+        await expect(card).toHaveAttribute('data-stable-card', 'smaller-held')
+        expect((await card.boundingBox())!.width).toBe(start.width)
+        await page.mouse.up()
+        await expectInside()
+    })
+
+    test('resizing the active ref constrains a stationary held pointer before another move', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        await page.getByTestId('live-reset').click()
+        await page.getByTestId('live-use-b').click()
+        const card = page.getByTestId('live-card')
+        await card.scrollIntoViewIfNeeded()
+        const start = (await card.boundingBox())!
+        await card.evaluate((element) => {
+            element.dataset.stableCard = 'resized-held'
+        })
+        await page.mouse.move(start.x + 40, start.y + 40)
+        await page.mouse.down()
+        await page.mouse.move(start.x + 240, start.y + 40, { steps: 12 })
+        await expect.poll(async () => (await card.boundingBox())!.x - start.x).toBeGreaterThan(190)
+        // Change only the current ref's geometry, leaving the pointer stationary.
+        await page.getByTestId('live-shrink-b').evaluate((button) => button.click())
+        await expect(page.getByTestId('live-metric-width')).toHaveText('200.0 px')
+        const bounds = (await page.getByTestId('live-b').boundingBox())!
+        await expect
+            .poll(async () => (await card.boundingBox())!.x + start.width - bounds.x - bounds.width)
+            .toBeLessThanOrEqual(0.5)
+        await expect(page.getByTestId('live-metric-overflow')).toHaveText('0.0 px')
+        await expect(card).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+        await page.mouse.move(start.x + 260, start.y + 40, { steps: 4 })
+        await expect
+            .poll(async () =>
+                Math.abs((await card.boundingBox())!.x + start.width - bounds.x - bounds.width)
+            )
+            .toBeLessThanOrEqual(0.5)
+        await page.mouse.move(bounds.x - 100, start.y + 40, { steps: 12 })
+        await expect
+            .poll(async () => Math.abs((await card.boundingBox())!.x - bounds.x))
+            .toBeLessThanOrEqual(0.5)
+        await expect(card).toHaveAttribute('data-stable-card', 'resized-held')
+        await expect(card).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+        expect((await card.boundingBox())!.width).toBe(start.width)
+        await page.mouse.up()
+        await expect(page.getByTestId('live-metric-overflow')).toHaveText('0.0 px')
+        await expect(card).not.toHaveAttribute('data-svelte-motion-drag-active', 'true')
+    })
+
+    test('delay button counts down visibly before switching to B', async ({ page }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        await page.getByTestId('live-reset').click()
+        const delay = page.getByTestId('live-delay')
+        await delay.click()
+        for (const seconds of [3, 2, 1]) {
+            await expect(delay).toHaveText(`Switching to B in ${seconds}…`, { timeout: 1800 })
+            await expect(page.getByTestId('live-target')).toHaveText('Element A')
+        }
+        await expect(page.getByTestId('live-target')).toHaveText('Element B', { timeout: 1800 })
+        await expect(page.getByTestId('live-countdown')).toContainText('Switched to B')
+        await expect(delay).toHaveText('Switch to B in 3 seconds')
+    })
+
+    test('Reset cancels the visible countdown and pending target switch', async ({ page }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        await page.getByTestId('live-delay').click()
+        await expect(page.getByTestId('live-delay')).toHaveText('Switching to B in 2…', {
+            timeout: 1800
+        })
+        await page.getByTestId('live-reset').click()
+        await expect(page.getByTestId('live-delay')).toHaveText('Switch to B in 3 seconds')
+        await expect(page.getByTestId('live-countdown')).toBeEmpty()
+        await page.waitForTimeout(2500)
+        await expect(page.getByTestId('live-target')).toHaveText('Element A')
+        await expect(page.getByTestId('live-countdown')).toBeEmpty()
+    })
+
+    test('delayed ref replacement preserves a pointer that is still pressed', async ({ page }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        await page.getByTestId('live-reset').click()
+        await page.getByTestId('live-delay').click()
+        const card = page.getByTestId('live-card')
+        await card.scrollIntoViewIfNeeded()
+        const start = await card.boundingBox()
+        if (!start) throw new Error('missing live card')
+        await card.evaluate((element) => {
+            element.dataset.stableCard = 'held'
+        })
+        await page.mouse.move(start.x + 40, start.y + 40)
+        await page.mouse.down()
+        await page.mouse.move(start.x + 80, start.y + 40, { steps: 8 })
+        await expect(card).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+        await expect(page.getByTestId('live-target')).toHaveText('Element B', { timeout: 5000 })
+        await expect(card).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+        const switched = await card.boundingBox()
+        await page.mouse.move(start.x + 140, start.y + 40, { steps: 8 })
+        await expect
+            .poll(async () => (await card.boundingBox())!.x - switched!.x)
+            .toBeGreaterThan(50)
+        await expect(card).toHaveAttribute('data-stable-card', 'held')
+        await page.mouse.up()
+        await expect(card).not.toHaveAttribute('data-svelte-motion-drag-active', 'true')
+        await page.getByTestId('live-reset').click()
+        await expect(page.getByTestId('live-target')).toHaveText('Element A')
+        await expect(page.getByTestId('live-metric-delta')).toHaveText('0.0 px')
+    })
+
+    const resizeIdleContainer = async (page: import('@playwright/test').Page, width: number) => {
+        await page.getByTestId('idle-container').evaluate(
+            (element, nextWidth) =>
+                new Promise<void>((resolve) => {
+                    const observer = new ResizeObserver((entries) => {
+                        if (
+                            !entries.some(
+                                (entry) => Math.abs(entry.contentRect.width - nextWidth) < 0.1
+                            )
+                        )
+                            return
+                        observer.disconnect()
+                        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+                    })
+                    observer.observe(element)
+                    element.style.width = `${nextWidth}px`
+                }),
+            width
+        )
+    }
+
+    const idleOffset = async (page: import('@playwright/test').Page) => {
+        const card = await readRect(page, '[data-testid="idle-card"]')
+        const container = await readRect(page, '[data-testid="idle-container"]')
+        if (!card || !container) throw new Error('missing asymmetric fixture')
+        return card.left - container.left
+    }
+
+    test('untouched asymmetric card keeps its authored offset through DOM-only shrink and grow', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        await expect(page.getByTestId('idle-card')).toBeVisible()
+        // Prove client hydration and a fresh drag attachment before changing
+        // only DOM geometry; an SSR-only resize would not exercise the observer.
+        await page
+            .getByTestId('idle-card')
+            .evaluate((element) => (element.dataset.marker = 'before-reset'))
+        await page.getByTestId('idle-reset').click()
+        await expect(page.getByTestId('idle-card')).not.toHaveAttribute(
+            'data-marker',
+            'before-reset'
+        )
+        const initial = await idleOffset(page)
+        for (const width of [200, 400, 200, 400]) {
+            await resizeIdleContainer(page, width)
+            await expect
+                .poll(async () => Math.abs((await idleOffset(page)) - initial))
+                .toBeLessThan(0.5)
+        }
+    })
+
+    test('dragged asymmetric card still remaps and Reset restores its resting origin', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        const initial = await idleOffset(page)
+        await page.getByTestId('idle-card').scrollIntoViewIfNeeded()
+        const card = await page.getByTestId('idle-card').boundingBox()
+        if (!card) throw new Error('missing asymmetric card')
+        await page.mouse.move(card.x + 40, card.y + 40)
+        await page.mouse.down()
+        await page.mouse.move(card.x + 120, card.y + 40, { steps: 8 })
+        await page.mouse.up()
+        await expect.poll(() => idleOffset(page)).toBeGreaterThan(initial + 70)
+        const dragged = await idleOffset(page)
+        await resizeIdleContainer(page, 200)
+        await expect.poll(() => idleOffset(page)).toBeLessThan(dragged - 40)
+        await resizeIdleContainer(page, 400)
+        await expect
+            .poll(async () => Math.abs((await idleOffset(page)) - dragged))
+            .toBeLessThan(0.5)
+        await page.getByTestId('idle-reset').click()
+        await expect
+            .poll(async () => Math.abs((await idleOffset(page)) - initial))
+            .toBeLessThan(0.5)
+        await resizeIdleContainer(page, 200)
+        await expect
+            .poll(async () => Math.abs((await idleOffset(page)) - initial))
+            .toBeLessThan(0.5)
+    })
+
     const dragCardRightAndRelease = async (page: import('@playwright/test').Page) => {
         const card = page.getByTestId('drag-card')
         await card.waitFor({ state: 'visible' })
+        await card.scrollIntoViewIfNeeded()
 
         const start = await readRect(page, '[data-testid="drag-card"]')
         if (!start) throw new Error('no card rect')
@@ -119,5 +410,117 @@ test.describe('drag/element-ref-resize', () => {
 
         expect(transition?.property).toContain('width')
         expect(transition?.duration).toContain('3.2s')
+    })
+
+    test('guided resting controls report measured geometry and reset the movement delta', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        await expect(page.getByTestId('idle-metric-width')).toHaveText('400.0 px')
+        await expect(page.getByTestId('idle-metric-inset')).toHaveText('40.0 px')
+        for (const [button, width] of [
+            ['idle-shrink', 200],
+            ['idle-grow', 400]
+        ] as const) {
+            await page.getByTestId(button).click()
+            await expect(page.getByTestId('idle-metric-width')).toHaveText(`${width}.0 px`)
+            await expect(page.getByTestId('idle-metric-delta')).toHaveText('0.0 px')
+            await expect(page.getByTestId('idle-metric-overflow')).toHaveText('0.0 px')
+        }
+        await page.getByTestId('idle-card').scrollIntoViewIfNeeded()
+        const card = await page.getByTestId('idle-card').boundingBox()
+        if (!card) throw new Error('missing asymmetric card')
+        await page.mouse.move(card.x + 40, card.y + 40)
+        await page.mouse.down()
+        await page.mouse.move(card.x + 120, card.y + 40, { steps: 8 })
+        await page.mouse.up()
+        await expect
+            .poll(async () =>
+                Number.parseFloat(await page.getByTestId('idle-metric-delta').innerText())
+            )
+            .toBeGreaterThan(70)
+        await expect
+            .poll(async () => {
+                const reported = Number.parseFloat(
+                    await page.getByTestId('idle-metric-inset').innerText()
+                )
+                return Math.abs(reported - ((await idleOffset(page)) - 2))
+            })
+            .toBeLessThan(0.1)
+        await page.getByTestId('idle-reset').click()
+        await expect(page.getByTestId('idle-metric-width')).toHaveText('400.0 px')
+        await expect(page.getByTestId('idle-metric-inset')).toHaveText('40.0 px')
+        await expect(page.getByTestId('idle-metric-delta')).toHaveText('0.0 px')
+        await expect(page.getByTestId('idle-metric-bounds')).toContainText('Inside bounds')
+    })
+
+    test('momentum reset restores a centered full-size fixture and fresh metrics in slow mode', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true&slow')
+        await page.getByTestId('resize-btn').click()
+        await expect
+            .poll(async () =>
+                Number.parseFloat(await page.getByTestId('momentum-metric-width').innerText())
+            )
+            .toBeLessThan(250)
+        await page
+            .getByTestId('drag-card')
+            .evaluate((element) => (element.dataset.marker = 'before-reset'))
+        await page.getByTestId('momentum-reset').click()
+        await expect(page.getByTestId('drag-card')).not.toHaveAttribute(
+            'data-marker',
+            'before-reset'
+        )
+        await expect(page.getByTestId('resize-btn')).toHaveText('Shrink to 200')
+        const geometry = await page.getByTestId('container').evaluate((container) => {
+            const card = container.querySelector('[data-testid="drag-card"]')!
+            const bounds = container.getBoundingClientRect()
+            const rect = card.getBoundingClientRect()
+            const style = getComputedStyle(container)
+            return {
+                width:
+                    bounds.width -
+                    Number.parseFloat(style.borderLeftWidth) -
+                    Number.parseFloat(style.borderRightWidth),
+                inset: rect.left - bounds.left - Number.parseFloat(style.borderLeftWidth)
+            }
+        })
+        expect(geometry.width).toBe(396)
+        expect(geometry.inset).toBe(158)
+        await expect(page.getByTestId('momentum-metric-width')).toHaveText(
+            `${geometry.width.toFixed(1)} px`
+        )
+        await expect(page.getByTestId('momentum-metric-inset')).toHaveText(
+            `${geometry.inset.toFixed(1)} px`
+        )
+        await expect(page.getByTestId('momentum-metric-delta')).toHaveText('0.0 px')
+        await expect(page.getByTestId('momentum-metric-overflow')).toHaveText('0.0 px')
+    })
+
+    test('narrow screens keep fixed-size fixtures inside local scrolling regions', async ({
+        page
+    }) => {
+        await page.setViewportSize({ width: 375, height: 812 })
+        await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+            375
+        )
+        await expect(page.getByTestId('idle-container')).toHaveCSS('width', '400px')
+        await expect(page.getByTestId('container')).toHaveCSS('width', '400px')
+        for (const name of ['Blue card drag area', 'Orange card drag area']) {
+            const region = page.getByRole('region', { name: new RegExp(name) })
+            expect(
+                await region.evaluate((element) => element.scrollWidth > element.clientWidth)
+            ).toBe(true)
+            await region.evaluate((element) => (element.scrollLeft = 80))
+            expect(await region.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0)
+        }
+        await expect(page.getByTestId('idle-metric-inset')).toHaveText('40.0 px')
+        await expect(page.getByTestId('momentum-metric-inset')).toHaveText('158.0 px')
+        await page.getByTestId('idle-shrink').click()
+        await expect(page.getByTestId('idle-metric-width')).toHaveText('200.0 px')
+        await page.getByTestId('idle-reset').click()
+        await expect(page.getByTestId('idle-metric-inset')).toHaveText('40.0 px')
     })
 })

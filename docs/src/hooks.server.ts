@@ -42,10 +42,16 @@ const handlePostHogProxy: Handle = async ({ event, resolve }) => {
 
 export const handle: Handle = sequence(handlePostHogProxy, createSecurityHeadersHandle())
 
+/**
+ * Reports server errors when analytics is configured and preserves the error response.
+ *
+ * @param input - The SvelteKit server error and response details.
+ * @returns The original public error message and status.
+ */
 export const handleError: HandleServerError = async ({ error, status, message }) => {
     const posthog = getPostHogClient()
 
-    posthog.capture({
+    posthog?.capture({
         distinctId: 'server',
         event: 'server_error',
         properties: {

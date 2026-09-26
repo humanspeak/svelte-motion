@@ -21,6 +21,8 @@
     let rendererAvailable = $state(true)
     let displayedRotation = $state(0)
     let displayedProgress = $state(0)
+    let moved = $state(false)
+    let rippled = $state(false)
 
     let mesh: import('three').Mesh | undefined
     let moveAnimation: { stop: () => void } | undefined
@@ -33,20 +35,36 @@
         displayedProgress = progress.get()
     }
 
+    /** Reverse the mesh's target, including while its spring is moving. */
     const move = () => {
         if (!mesh) return
 
+        moved = !moved
         moveAnimation?.stop()
         moveAnimation = animate(
             mesh,
-            { x: 1.5, rotateY: 360 },
+            { x: moved ? 1.5 : 0, rotateY: moved ? 360 : 0 },
             { type: 'spring', stiffness: 80, damping: 12 }
         )
     }
 
+    /** Toggle the shader between its plain and rippled states. */
     const ripple = () => {
+        rippled = !rippled
         rippleAnimation?.stop()
-        rippleAnimation = animate(progress, 1, { duration: 1 })
+        rippleAnimation = animate(progress, rippled ? 1 : 0, { duration: 1 })
+    }
+
+    /** Stop both animations and restore their initial targets for another run. */
+    const reset = () => {
+        if (!mesh) return
+
+        moveAnimation?.stop()
+        rippleAnimation?.stop()
+        moved = false
+        rippled = false
+        moveAnimation = animate(mesh, { x: 0, rotateY: 0 }, { duration: 0 })
+        progress.jump(0)
     }
 
     onMount(() => {
@@ -144,8 +162,13 @@
         {/if}
 
         <div class="controls">
-            <button data-testid="move" onclick={move} disabled={!ready}>Move</button>
-            <button data-testid="ripple" onclick={ripple} disabled={!ready}>Ripple</button>
+            <button data-testid="move" onclick={move} disabled={!ready}>
+                {moved ? 'Move back' : 'Move'}
+            </button>
+            <button data-testid="ripple" onclick={ripple} disabled={!ready}>
+                {rippled ? 'Undo ripple' : 'Ripple'}
+            </button>
+            <button data-testid="reset" onclick={reset} disabled={!ready}>Reset</button>
         </div>
 
         <div class="readout">
@@ -196,6 +219,7 @@
 
     .controls {
         display: flex;
+        flex-wrap: wrap;
         gap: 8px;
         margin-top: 16px;
     }
