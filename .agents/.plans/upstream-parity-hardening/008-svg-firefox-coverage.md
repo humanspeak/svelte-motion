@@ -14,7 +14,7 @@
 - Category: tests
 - Audit finding: 08
 - Planned at: commit 6f0085ef, 2026-09-24
-- State: DONE — local implementation and verification complete; source awaiting commit
+- State: DONE — committed f00c5677; local and visual verification complete
 
 ## Why this matters
 
@@ -198,3 +198,8 @@ All eight selected plans are locally implemented and verified. This does not cla
 
 
 Maintainer visual approval received2026-09-26 (“Looks great!”). The008 implementation and plan records remain uncommitted; all scoped implementation/visual verification is complete.
+
+
+### PR handoff — 2026-09-26
+
+Committed as f00c5677 following the maintainer's full PR request. The shared release branch now includes main b6bfdfde through merge fef862ef. Integration verification and the clean-checkout CI ordering correction are recorded in the batch README; earlier uncommitted-checkpoint statements are historical. The upstream comparison remains bounded at Motion v13.4.4.

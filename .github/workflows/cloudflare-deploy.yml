@@ -49,11 +49,12 @@ jobs:
             - name: Install Root Dependencies
               run: pnpm install --frozen-lockfile
 
-            - name: Check Package
-              run: pnpm check
-
             - name: Build Package
               run: pnpm run build
+
+            # Consumer fixtures import the emitted package declarations.
+            - name: Check Package
+              run: pnpm check
 
             - name: Build Docs
               env:

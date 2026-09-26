@@ -1,7 +1,7 @@
 # Upstream parity and verification checklist
 
 Audited 2026-09-24 against `6f0085ef` on `chore/motion-upstream-refresh`.
-All eight findings selected by the maintainer are locally implemented and verified, including the user-approved Reorder and owned-exit fixes. Plan008 is complete and awaits commit on the same shared branch. Generated with the improve skill on2026-09-24.
+All eight findings selected by the maintainer are locally implemented and verified, including the user-approved Reorder and owned-exit fixes. Plan008 is committed as f00c5677 on the same shared branch. Newer main b6bfdfde is integrated by fef862ef; local integration verification is complete; hosted PR checks remain pending. Generated with the improve skill on2026-09-24.
 
 ## Execution order and status
 
@@ -16,7 +16,7 @@ Plan numbering follows execution order; audit finding IDs below remain unchanged
 | [005](005-constraint-observers.md) | 06 | Resize observation follows replacement constraints | P1 | S | 004 | DONE — user approved; ref-switch and held-resize parity verified against React Motion 13.4.4 |
 | [006](006-reorder-declarations.md) | 03 | Emitted Reorder types and consumer inference gate | P1 | S | 001, 002 | DONE — declaration fix29069bd3 and runtime follow-up verified; user visually approved |
 | [007](007-descendant-exit-registry.md) | 07 | All owned motion descendants finish before automatic removal | P1 | M | 001, 003 | DONE — all-descendant exits and re-entry verified; maintainer visually approved |
-| [008](008-svg-firefox-coverage.md) | 08 | Actual SVG docs route tested in Chromium and Firefox | P1 | M | 001, 002; integrated release gate after all | DONE — 12/12 docs browsers; 470 root browsers pass, 2 existing skips; uncommitted review checkpoint |
+| [008](008-svg-firefox-coverage.md) | 08 | Actual SVG docs route tested in Chromium and Firefox | P1 | M | 001, 002; integrated release gate after all | DONE — 12/12 docs browsers; 470 root browsers pass, 2 existing skips; committed f00c5677 |
 
 Status values: TODO, IN PROGRESS, DONE, BLOCKED (reason), REJECTED (reason). Keep TODO until execution actually begins; a written plan is not a completed fix. S/M estimates include regression coverage and are rough, not deadlines.
 
@@ -55,7 +55,7 @@ For each completed plan record: execution base and commit, red failure, green fo
 Run these on the final integrated candidate, not on a mixture of individual branch outputs. Do not repeat broad suites after every small step; plans use focused regressions, and the final candidate receives the combined gates.
 
 - [x] All eight plan rows are DONE with evidence, or an explicit maintainer-approved disposition explains an exception.
-- [ ] Fresh main has been reconciled with the shared release branch chore/motion-upstream-refresh, including all reviewed plan dependencies; user worktrees/stashes remain intact. The maintainer's shared-branch workflow supersedes the original per-plan isolation instruction.
+- [x] Fresh main has been reconciled with the shared release branch chore/motion-upstream-refresh, including all reviewed plan dependencies; user worktrees/stashes remain intact. The maintainer's shared-branch workflow supersedes the original per-plan isolation instruction.
 - [x] `pnpm check` and `pnpm package` pass, with no missing Reorder declaration or hidden declaration emit error.
 - [x] `pnpm --dir docs check` passes with zero errors.
 - [x] `pnpm test` passes the full root suite with coverage.
@@ -64,7 +64,7 @@ Run these on the final integrated candidate, not on a mixture of individual bran
 - [x] `pnpm exec playwright test --config docs/playwright.config.ts` passes Chromium and Firefox on the real docs route, including the recorded deliberate-regression proof.
 - [x] `pnpm --dir docs build`, `trunk check`, and `git diff --check` pass; generated registry churn is reviewed and excluded when unrelated.
 - [x] Focused visual handoff covers `/tests/drag/element-ref-resize`, `/tests/use-presence`, `/examples/use-presence`, `/examples/keyframes`, `/examples/transform-template`, and `/examples/svg-css-variables`. Preserve the existing `/examples/use-follow-value` and `/tests/effects/three` as additional reviewed upgrade examples.
-- [ ] Runtime/type fixes have patch changesets, and release notes distinguish inherited upstream improvements from Svelte adapter fixes and coverage work.
+- [x] Runtime/type fixes have patch changesets, and release notes distinguish inherited upstream improvements from Svelte adapter fixes and coverage work.
 - [x] Resolve or document the upstream Motion13.4.4 HTMLWebViewElement failure when checking dependency declarations with skipLibCheck:false; it reproduces without svelte-motion (see006).
 - [ ] Hosted PR checks pass when an authorized PR is opened. Local validation alone does not count as hosted CI evidence.
 
@@ -124,12 +124,12 @@ All findings have HIGH confidence. S = hours; M = roughly a day including regres
 | --- | --- | --- | --- | --- | --- | --- |
 | [x] | 01 | Invalidate stale exit promises: an old exit can complete a newer exit and remove its DOM early. | Correctness / upstream parity | S | Low: localized lifecycle guard | `src/lib/utils/visualElementCore.ts:226`; `src/lib/html/_MotionContainer.svelte:387` |
 | [x] | 02 | Preserve zero drag offsets on constraint resize: an untouched, off-center draggable moves when its container shrinks. | Correctness / upstream parity | S | Medium: preserve authored transforms and per-axis ownership | `src/lib/utils/drag.ts:567` |
-| [ ] | 03 | Emit the public Reorder declaration: current package output re-exports a missing declaration, silently degrading the import to `any` with skipLibCheck. | Consumer types | S | Low: preserve generic component inference | `src/lib/reorder.ts:22`; `dist/index.d.ts:13`; `.agents/.plans-closed/motion-13.2-effects/README.md:93` |
+| [x] | 03 | Emit the public Reorder declaration: current package output re-exports a missing declaration, silently degrading the import to `any` with skipLibCheck. | Consumer types | S | Low: preserve generic component inference | `src/lib/reorder.ts:22`; `dist/index.d.ts:13`; `.agents/.plans-closed/motion-13.2-effects/README.md:93` |
 | [x] | 04 | Restore docs typechecking and gate it in CI: five current errors in copyable examples can pass build-only verification. | Verification / docs | S | Low: example corrections and CI gate | `docs/src/lib/examples/keyframes/demos/Wildcard.svelte:36`; `docs/src/lib/examples/transform-template/demos/Default.svelte:14`; `.github/workflows/pr-build.yml:77` |
 | [x] | 05 | Trigger test CI for test-only changes: e2e and Vitest configuration/setup changes are missing from the workflow path filter. | CI | S | Low: additional relevant CI executions | `.github/workflows/run-tests.yml:12` |
-| [ ] | 06 | Rebind resize observation when constraint refs change: a replacement container is measured once but never observed for later resizing. | Correctness | S | Low: observer lifecycle must preserve the pointer session | `src/lib/utils/drag.ts:456`; `src/lib/utils/drag.ts:600`; `src/lib/html/_MotionContainer.svelte:1618` |
-| [ ] | 07 | Wait for every motion descendant in an owned exit: the fastest descendant currently removes the whole held subtree. Correct the contradictory usePresence docs alongside the contract. | Correctness / docs | M | Medium: registration, re-entry, teardown, and manual completion interact | `src/lib/html/_MotionContainer.svelte:385`; `src/lib/components/PresenceChild.svelte:117`; `docs/src/routes/docs/use-presence/+page.svx:137` |
-| [ ] | 08 | Add Chromium and Firefox regression coverage for the actual SVG CSS-variable docs example: existing browser suites do not protect the repaired Firefox behavior. | Browser coverage | M | Low: bounded docs suite with rendering assertions | `docs/src/lib/examples/svg-css-variables/demos/Default.svelte:175`; `playwright.config.ts:46`; `docs/vite.config.ts:204` |
+| [x] | 06 | Rebind resize observation when constraint refs change: a replacement container is measured once but never observed for later resizing. | Correctness | S | Low: observer lifecycle must preserve the pointer session | `src/lib/utils/drag.ts:456`; `src/lib/utils/drag.ts:600`; `src/lib/html/_MotionContainer.svelte:1618` |
+| [x] | 07 | Wait for every motion descendant in an owned exit: the fastest descendant currently removes the whole held subtree. Correct the contradictory usePresence docs alongside the contract. | Correctness / docs | M | Medium: registration, re-entry, teardown, and manual completion interact | `src/lib/html/_MotionContainer.svelte:385`; `src/lib/components/PresenceChild.svelte:117`; `docs/src/routes/docs/use-presence/+page.svx:137` |
+| [x] | 08 | Add Chromium and Firefox regression coverage for the actual SVG CSS-variable docs example: existing browser suites do not protect the repaired Firefox behavior. | Browser coverage | M | Low: bounded docs suite with rendering assertions | `docs/src/lib/examples/svg-css-variables/demos/Default.svelte:175`; `playwright.config.ts:46`; `docs/vite.config.ts:204` |
 
 ## Verification targets for selected plans
 
@@ -245,3 +245,12 @@ Review example: http://localhost:5199/examples/svg-css-variables (Draw, Erase, R
 ### Final visual approval — 2026-09-26
 
 The maintainer approved008 (“Looks great!”), completing the visual checkpoints for all eight plans.008 and its plan records remain uncommitted. Remaining release work: commit008, reconcile newer main b6bfdfde, review changesets/release notes, and run hosted PR checks. This approval does not itself request a push, PR, merge, version, publication, or deployment.
+
+
+### PR preparation — 2026-09-26
+
+The maintainer requested the full PR into main, authorizing commit and push of the reviewed release work. Plan008 committed as f00c5677 with normal hooks. Newer main b6bfdfde (docs favicon and docs-kit update) merged without conflicts as fef862ef. Motion and motion-dom remain at13.4.4; no later upstream changes are included. Release notes now describe the final13.4.4 baseline rather than the intermediate13.4.3 upgrade. Earlier pending-commit and integration notes above are historical.
+
+The full release diff received a read-only review against upstream v13.4.4, including pending008, with160 focused units rerun successfully. Subsequent clean-checkout PR validation caught a CI ordering defect missed by that review: root checking ran before package declaration generation in PR/deploy workflows. An isolated archive with workspace linking but no dist reproduces29errors/35warnings in consumer fixtures. Running the existing package generator before the unchanged checker resolves all29errors (0errors/35warnings). Evidence: .temp/pr-clean-check-linked-red2.log, pr-clean-package.log, pr-clean-check-green.log. Workflows now build before root checking, still before job success/deployment, and the PR build installs the whole workspace so consumer dependencies are available. No runtime change or relaxed assertion.
+
+Post-integration verification passes: frozen workspace install, package/declarations/publint, actual docs production build including the new favicon validation, 12/12 Chromium/Firefox cases (4.1minutes), root check0errors/35existingwarnings, docs check0errors/13existingwarnings, published Reorder consumer types and Vite6SSR, scoped workflow lint, and diff integrity. Logs: .temp/pr-{install,docs-browsers,root-check,docs-check,consumer,lint}.log. Generated registry class-order churn was inspected and restored. The earlier full954-unit/470-browser runtime gate remains applicable because the main integration and subsequent corrections change no core runtime or root demo source. The final PR-preparation diff was reviewed; the clean-checkout CI defect is corrected, with no remaining actionable findings. Hosted checks remain pending PR creation.
