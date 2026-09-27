@@ -1,3 +1,4 @@
+import { rehypeKeepCase } from '@humanspeak/docs-kit/mdsvex'
 import { scopedProps } from '@humanspeak/svelte-scoped-props'
 import adapter from '@sveltejs/adapter-cloudflare'
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte'
@@ -31,6 +32,7 @@ const config = {
         scopedPropsSvelteOnly,
         vitePreprocess(),
         mdsvex({
+            rehypePlugins: [rehypeKeepCase],
             highlight: {
                 highlighter: async (code, lang = 'text', meta = '') => {
                     const lightHtml = highlighter.codeToHtml(code, {
