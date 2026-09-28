@@ -18,7 +18,7 @@ rewrite). They first ship in the 13.4.5 package, so they are in this batch.
 | [002](002-snap-to-cursor-live-box.md) | snapToCursor uses live box + transformed cursor | P1 | M | — | DONE — 3f7d00ef; guard PASS (React ref check in 006) |
 | [003](003-reorder-guard-values.md) | Reorder guard clears only when `values` changes | P1 | S | — | DONE — 4144edf7; guard PASS |
 | [004](004-presence-add-during-exit.md) | Characterize AnimatePresence add-during-exit (#3856) | P2 | S | — | DONE — 4c221667; guard PASS (characterization, all green) |
-| [005](005-layout-group-parity-suite.md) | Port upstream's LayoutGroup parity suite (red tests) | P1 | M | — | BLOCKED — executor STOP: upstream Cypress absolute tops differ from Chromium by the 10px column gap; awaiting maintainer decision |
+| [005](005-layout-group-parity-suite.md) | Port upstream's LayoutGroup parity suite (red tests) | P1 | M | — | DONE — 8747d80e; guard PASS (11 expected reds) |
 | [007](007-layout-group-node-groups.md) | LayoutGroup owns a projection node group (upstream parity) | P1 | L | 005 | TODO |
 | [006](006-bump-motion-13-4-5.md) | Bump motion/motion-dom to 13.4.5 + verify inherited fixes | P1 | S | 001–003, 005, 007; npm publish | BLOCKED — awaiting npm publish of 13.4.5 |
 
@@ -67,4 +67,22 @@ in a separate LayoutGroup, which we couldn't express before.
 
 ## LayoutGroup parity matrix
 
-(Filled in by Plan 005 Step 6; updated by 007 and 006.)
+Recorded 2026-09-28 by Plan 005 (build+preview, chromium, 3/3 repeats). Owner that must flip it in brackets.
+
+| Spec | Case | Status |
+| --- | --- | --- |
+| layout-group | relative children should not instantly jump to new layout | red: #button snaps 39→114 in one frame [007/006] |
+| layout-group | …after performing their own layout animation | red: snaps 149→224 [007/006] |
+| layout-group | return to original state when expander clicked twice with delay | red: first click snaps, no mid-animation [007/006] |
+| layout-group-interrupt | relative child follows parent when parent re-layout interrupts its animation | red: ~163px single-frame jump (limit <20) [007/006] |
+| layout-group-interrupt-measurements | doesn't re-measure a non-animating relative child | red: #text-wrapper never measured (0 reads) [007] |
+| layout-group-interrupt-measurements | re-measures a layout-animating relative child once per parent re-layout | red: 0 reads [007/006] |
+| layout-group-unmount | sibling animation on unmount | red: #b lands at 20 immediately, expected frozen midpoint 90 [007] |
+| layout-group-unmount | sibling whose relative position changed stays put | green |
+| relative-child-measurements | doesn't measure a child that isn't animating | red: #parent never measured [007] |
+| relative-child-measurements | doesn't measure an animating child without a relative target | red: same cause [007] |
+| relative-child-measurements | measures a layout-animating child once, so it doesn't jump | red: child0 0 reads, expected 1 [007/006] |
+| relative-child-measurements | doesn't measure a child whose animation finished while parent animates | green |
+| relative-child-measurements | doesn't measure a child whose animation finished once settled | green |
+| relative-child-measurements | measures each layout-animating child once per parent re-layout | red: 0 reads, expected 50 [007/006] |
+| layoutGroup.context.spec (unit) | 4 upstream id-chaining cases | green |
