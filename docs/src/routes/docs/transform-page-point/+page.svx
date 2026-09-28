@@ -87,7 +87,7 @@ Ordinary pan does not subscribe to ancestor or window scroll as gesture movement
 
 Browser page coordinates can still change at pointerup after document scrolling. In the verified held-scroll fixture, the last move offset and rendered drag translation stay `(60, 40)`, while the terminal callback reports `(150, 180)`. Treat terminal payload and displayed translation as distinct in this case.
 
-Layout projection stays the transform owner. A real 60-local-pixel layout displacement while held compensates bound `x` from `60` to `0`, and the next pointer move produces `(20, 40)`. Imperative `snapToCursor` also follows Motion's projection layout calculation. With page scroll `(120, 160)` in the matched fixture it snaps to bound `(-49, -436)`, then moves to `(1, -406)`; it does not physically center the rendered box under the cursor.
+Layout projection stays the transform owner. A real 60-local-pixel layout displacement while held compensates bound `x` from `60` to `0`, and the next pointer move produces `(20, 40)`. Imperative `snapToCursor` maps the pointer's client position and the element's live box through `transformPagePoint`, centering the rendered box under the cursor (Motion 13.4.5). With page scroll `(120, 160)` in the matched fixture it snaps to bound `(716, -202)`, then moves to `(766, -172)`.
 
 ## See also
 
