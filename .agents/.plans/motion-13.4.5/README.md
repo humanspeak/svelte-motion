@@ -14,11 +14,11 @@ rewrite). They first ship in the 13.4.5 package, so they are in this batch.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | ---- | ----- | -------- | ------ | ---------- | ------ |
-| [001](001-pan-final-move.md) | Apply a pointermove in the same frame as pointerup | P1 | S | — | TODO |
-| [002](002-snap-to-cursor-live-box.md) | snapToCursor uses live box + transformed cursor | P1 | M | — | TODO |
-| [003](003-reorder-guard-values.md) | Reorder guard clears only when `values` changes | P1 | S | — | TODO |
-| [004](004-presence-add-during-exit.md) | Characterize AnimatePresence add-during-exit (#3856) | P2 | S | — | TODO |
-| [005](005-layout-group-parity-suite.md) | Port upstream's LayoutGroup parity suite (red tests) | P1 | M | — | TODO |
+| [001](001-pan-final-move.md) | Apply a pointermove in the same frame as pointerup | P1 | S | — | DONE — 5ab97b49; guard PASS |
+| [002](002-snap-to-cursor-live-box.md) | snapToCursor uses live box + transformed cursor | P1 | M | — | DONE — 3f7d00ef; guard PASS (React ref check in 006) |
+| [003](003-reorder-guard-values.md) | Reorder guard clears only when `values` changes | P1 | S | — | DONE — 4144edf7; guard PASS |
+| [004](004-presence-add-during-exit.md) | Characterize AnimatePresence add-during-exit (#3856) | P2 | S | — | DONE — 4c221667; guard PASS (characterization, all green) |
+| [005](005-layout-group-parity-suite.md) | Port upstream's LayoutGroup parity suite (red tests) | P1 | M | — | BLOCKED — executor STOP: upstream Cypress absolute tops differ from Chromium by the 10px column gap; awaiting maintainer decision |
 | [007](007-layout-group-node-groups.md) | LayoutGroup owns a projection node group (upstream parity) | P1 | L | 005 | TODO |
 | [006](006-bump-motion-13-4-5.md) | Bump motion/motion-dom to 13.4.5 + verify inherited fixes | P1 | S | 001–003, 005, 007; npm publish | BLOCKED — awaiting npm publish of 13.4.5 |
 

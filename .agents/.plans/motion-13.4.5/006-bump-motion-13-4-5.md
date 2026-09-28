@@ -6,6 +6,8 @@
 > report — do not improvise. When done, update the status row for this plan
 > in `.agents/.plans/motion-13.4.5/README.md`.
 >
+> Revision 2026-09-28: version checks read `node_modules/<pkg>/package.json` via fs — `require('motion-dom/package.json')` throws ERR_PACKAGE_PATH_NOT_EXPORTED (verified in the main checkout).
+>
 > **Gate (run first)**: `npm view motion version && npm view motion-dom version`
 > → both must print `13.4.5` (or later 13.4.x — if later, STOP and ask whether to
 > target it). If either still prints `13.4.4`, STOP: this plan is BLOCKED until
@@ -71,7 +73,7 @@ ourselves (Plans 001–003), not inherited.
 | Purpose       | Command | Expected |
 | ------------- | ------- | -------- |
 | Bump          | `pnpm add motion@^13.4.5 motion-dom@^13.4.5` | exit 0 |
-| Verify install| `node -p "require('motion-dom/package.json').version"` | `13.4.5` |
+| Verify install| `node -e "console.log(JSON.parse(require('fs').readFileSync('node_modules/motion-dom/package.json','utf8')).version)"` | `13.4.5` |
 | Full unit     | `pnpm test` | all pass |
 | Typecheck     | `pnpm check` | 0 errors |
 | Build+package | `pnpm build` | exit 0 (publint clean) |
@@ -108,7 +110,7 @@ maintainer to free it rather than using `PW_REUSE_SERVER=1` for this gate
 
 Run the Gate. Then `pnpm add motion@^13.4.5 motion-dom@^13.4.5`. Confirm
 `git diff --stat` shows only `package.json` and `pnpm-lock.yaml`, and the
-installed versions are 13.4.5 (also check `node -p "require('motion/package.json').version"`).
+installed versions are 13.4.5 (also check `node -e "console.log(JSON.parse(require('fs').readFileSync('node_modules/motion/package.json','utf8')).version)"`).
 Create `.changeset/motion-13-4-5.md` mirroring the 13.4.4 changeset with
 "13.4.5".
 
@@ -169,7 +171,7 @@ Do not edit files under `.agents/.plans/motion-config-transform-page-point/`.
 
 ## Done criteria
 
-- [ ] `node -p "require('motion-dom/package.json').version"` → `13.4.5`
+- [ ] `node -e "console.log(JSON.parse(require('fs').readFileSync('node_modules/motion-dom/package.json','utf8')).version)"` → `13.4.5`
 - [ ] `grep -rn "Needs motion-dom 13.4.5" e2e/layout/layout-group-parity` → no match
 - [ ] `pnpm test`, `pnpm check`, `pnpm build`, docs build/check, `pnpm test:e2e` pass
 - [ ] Reference fixture snap values match Plan 002's numbers (±1px)
