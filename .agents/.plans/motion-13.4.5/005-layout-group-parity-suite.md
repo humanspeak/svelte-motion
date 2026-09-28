@@ -7,6 +7,13 @@
 > in `.agents/.plans/motion-13.4.5/README.md`, **including the red/green
 > matrix from Step 6** — Plan 007 depends on it.
 >
+> Revision 2026-09-28: maintainer decision after the executor's STOP — upstream Cypress's absolute
+> `#button` tops (29/104/129/204) don't reproduce in Chromium; upstream's own page as static HTML
+> measures 39/114/149/224, same as our port (difference = the 10px column gap). For
+> `layout-group.spec.ts` use the measured tops **39 / 114 / 149 / 224** (initial / after expander /
+> after button / button then expander) and keep upstream's "intermediate frames exist, no instant
+> jump" checks exactly as written. This is not a STOP condition anymore.
+>
 > **Drift check (run first)**: `git diff --stat 67815169..HEAD -- src/lib/components/LayoutGroup.svelte src/lib/components/layoutGroup.context.ts src/lib/utils/motionDomProjection.ts src/lib/html/_MotionContainer.svelte src/routes/tests/layout e2e/layout`
 
 ## Status
