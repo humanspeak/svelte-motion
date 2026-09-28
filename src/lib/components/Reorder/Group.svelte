@@ -66,14 +66,11 @@
     }
 
     /**
-     * Swap-in-flight guard: set when `onReorder` fires and released on
-     * the next frame, after an accepted synchronous values update has
-     * patched the keyed children. Releasing independently of `values`
-     * also lets controlled consumers reject a proposed reorder without
-     * permanently disabling the gesture.
+     * Swap-in-flight guard: set when `onReorder` fires, cleared when
+     * `values` changes. A consumer that rejects a proposal won't be asked
+     * again until `values` changes — Motion 13.4.5 semantics.
      */
     let isReordering = false
-    let reorderingFrame: number | null = null
 
     setReorderContext<V>({
         get axis() {
@@ -100,10 +97,6 @@
             if (order !== newOrder) {
                 isReordering = true
                 onReorder(applyOrderSwap(values, order, newOrder))
-                reorderingFrame = requestAnimationFrame(() => {
-                    isReordering = false
-                    reorderingFrame = null
-                })
             }
         },
         getGroupElement: () => ref ?? null
@@ -117,8 +110,17 @@
         updateDetectedAxis()
     })
 
-    $effect(() => () => {
-        if (reorderingFrame !== null) cancelAnimationFrame(reorderingFrame)
+    /**
+     * Only clear the guard once the new order has been rendered. Releasing on
+     * a timer re-enables onReorder while a pending (async/deferred) order is
+     * still unapplied, proposing the same swap twice
+     * (Motion 13.4.5 `Reorder/Group.tsx`). Kept separate from the pruning
+     * effect so an `axis` change doesn't clear the guard.
+     */
+    $effect(() => {
+        // Track identity and contents so in-place $state mutations count too.
+        values.forEach(() => {})
+        isReordering = false
     })
 
     /**

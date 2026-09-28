@@ -375,6 +375,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/deferred') + searchParams}
+                    >
+                        Reorder Deferred (no duplicate onReorder, Motion 13.4.5)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/reorder/axis-x') + searchParams}
                     >
                         Reorder Axis X
