@@ -654,6 +654,14 @@
                         Grid exit (siblings hold slots)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/add-during-exit') + searchParams}
+                    >
+                        Add during exit (child added as an exit completes)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
