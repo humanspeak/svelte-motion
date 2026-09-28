@@ -752,6 +752,46 @@
                         LayoutGroup — scoped layoutId
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/layout-group') + searchParams}
+                    >
+                        LayoutGroup inherit="id" — button glides with its row when a sibling resizes
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/layout-group-interrupt') + searchParams}
+                    >
+                        LayoutGroup inherit="id" — interrupted slide keeps its offset from the row
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/layout-group-unmount') + searchParams}
+                    >
+                        LayoutGroup — removing a box animates its sibling into the gap
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/layout-group-unmount-list') + searchParams}
+                    >
+                        LayoutGroup — list sibling stays put when a neighbour is removed
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/relative-children') + searchParams}
+                    >
+                        LayoutGroup — relative children follow a re-laid-out parent
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

@@ -1,4 +1,5 @@
 import LayoutGroupProbeHarness from '$lib/components/__tests__/LayoutGroupProbeHarness.svelte'
+import NestedLayoutGroupProbeHarness from '$lib/components/__tests__/NestedLayoutGroupProbeHarness.svelte'
 import { chainLayoutGroupId, scopeLayoutId } from '$lib/components/layoutGroup.context'
 import { render, screen } from '@testing-library/svelte'
 import { describe, expect, it } from 'vitest'
@@ -88,5 +89,33 @@ describe('layoutGroup.context — Svelte context', () => {
         })
         const probe = screen.getByTestId('layout-group-probe')
         expect(probe.getAttribute('data-id')).toBe('outer-inner')
+    })
+})
+
+/**
+ * One-to-one port of upstream's
+ * `packages/framer-motion/src/components/LayoutGroup/__tests__/LayoutGroup.test.tsx`
+ * (Motion v13.4.5) id-chaining cases.
+ */
+describe('layoutGroup.context — upstream LayoutGroup.test.tsx parity', () => {
+    const probeId = (ids: Array<string | undefined>) => {
+        render(NestedLayoutGroupProbeHarness, { props: { ids } })
+        return screen.getByTestId('layout-group-probe').getAttribute('data-id')
+    }
+
+    it("if it's the first LayoutGroup it sets the group id", () => {
+        expect(probeId(['a'])).toBe('a')
+    })
+
+    it("if it's a nested LayoutGroup it appends to the group id", () => {
+        expect(probeId(['a', 'b'])).toBe('a-b')
+    })
+
+    it("if the value of id is undefined, it doesn't change the group id", () => {
+        expect(probeId(['a', undefined])).toBe('a')
+    })
+
+    it('if the parent group id is undefined, child LayoutGroups still append the group id', () => {
+        expect(probeId(['a', undefined, 'b'])).toBe('a-b')
     })
 })
