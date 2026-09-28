@@ -7,7 +7,16 @@
 > section occurs, stop and report — do not improvise. When done, update the
 > status row for this plan in `.agents/.plans/motion-13.4.5/README.md`.
 >
-> **Drift check (run first)**: `git diff --stat 67815169..HEAD -- src/lib/components/LayoutGroup.svelte src/lib/components/layoutGroup.context.ts src/lib/components/layoutGroup.context.spec.ts src/lib/components/__tests__/LayoutGroupProbe.svelte src/lib/utils/motionDomProjection.ts src/lib/html/_MotionContainer.svelte`
+> Revision 2026-09-28 (guard pre-flight): Plan 005 landed (8747d80e, 5f9abf50). Baseline moved to
+> `5f9abf50`. The red specs live in `e2e/layout/layout-group-parity/` and the red/green matrix is in the
+> batch README ("LayoutGroup parity matrix") — that matrix is your acceptance list. 005 also added
+> `src/lib/components/__tests__/NestedLayoutGroupProbeHarness.svelte` and extra cases in
+> `layoutGroup.context.spec.ts` (both now in scope), plus tester panels in `src/routes/tests/layout/_parity/`
+> and the five `src/routes/tests/layout/*` parity pages: you may update ONLY their "Status on this build"
+> text when cases flip green; do not change fixtures. Report matrix changes in your final report
+> instead of editing the README (the guard maintains it).
+>
+> **Drift check (run first)**: `git diff --stat 5f9abf50..HEAD -- src/lib/components/LayoutGroup.svelte src/lib/components/layoutGroup.context.ts src/lib/components/layoutGroup.context.spec.ts src/lib/components/__tests__/LayoutGroupProbe.svelte src/lib/utils/motionDomProjection.ts src/lib/html/_MotionContainer.svelte`
 > Plan 005 is expected to have added test pages/specs only. Any library
 > change in these files since `67815169` → compare with the excerpts, STOP on mismatch.
 
@@ -18,7 +27,7 @@
 - **Risk**: HIGH (touches the layout commit path every `layout` element uses)
 - **Depends on**: 005 (its red specs + parity matrix are this plan's acceptance tests)
 - **Category**: bug / upstream parity
-- **Planned at**: commit `67815169`, 2026-09-28
+- **Planned at**: commit `67815169`, 2026-09-28; re-baselined to `5f9abf50` (guard pre-flight)
 - **Upstream reference** (`~/Github/motion`, tag `v13.4.5`):
   `packages/framer-motion/src/components/LayoutGroup/index.tsx`,
   `packages/framer-motion/src/context/LayoutGroupContext.ts`,
@@ -206,7 +215,8 @@ build+preview for gates (several specs differ under `vite dev`).
 
 - `src/lib/components/LayoutGroup.svelte`
 - `src/lib/components/layoutGroup.context.ts`, `layoutGroup.context.spec.ts`
-- `src/lib/components/__tests__/LayoutGroupProbe.svelte`
+- `src/lib/components/__tests__/LayoutGroupProbe.svelte`, `NestedLayoutGroupProbeHarness.svelte`
+- `src/routes/tests/layout/_parity/*.svelte` and the five parity pages — "Status on this build" text only
 - `src/lib/utils/motionDomProjection.ts`, `motionDomProjection.spec.ts`
 - `src/lib/html/_MotionContainer.svelte` (only: context read, adapter construction, D4 hook, D6 check)
 - `src/lib/components/AnimatePresence.svelte` and/or `src/lib/utils/presence.ts` (only the D7 call)
