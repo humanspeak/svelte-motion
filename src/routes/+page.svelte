@@ -572,6 +572,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/release-before-frame') + searchParams}
+                    >
+                        Drag: final pointermove in the same frame as release
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/mobile-drawer') + searchParams}
                     >
                         Drag Close Drawer (mobile drawer)

@@ -303,4 +303,32 @@ describe('attachPan transformPagePoint', () => {
             velocity: { x: 750, y: 500 }
         })
     })
+
+    it('applies a pointermove that arrives in the same frame as pointerup', async () => {
+        // Browsers flush a coalesced pointermove immediately before pointerup,
+        // so the final move can still be waiting for a frame when the release
+        // lands (Motion 13.4.5 `PanSession.handlePointerUp`).
+        vi.useFakeTimers()
+        const clock = vi.spyOn(performance, 'now').mockReturnValue(0)
+        frameData.timestamp = 0
+        const onMove = vi.fn()
+        const onEnd = vi.fn()
+        attach({ onMove, onEnd }, { scheduleHandlers: false })
+
+        element.dispatchEvent(pointer('pointerdown', 0, 0, 11))
+        await vi.runOnlyPendingTimersAsync()
+        clock.mockReturnValue(1000)
+        window.dispatchEvent(pointer('pointermove', 10, 0, 11))
+        await vi.runOnlyPendingTimersAsync()
+        clock.mockReturnValue(1050)
+        // No frame may run between the final move and the release.
+        window.dispatchEvent(pointer('pointermove', 60, 0, 11))
+        window.dispatchEvent(pointer('pointerup', 60, 0, 11))
+        await vi.runOnlyPendingTimersAsync()
+
+        expect(onMove.mock.calls.at(-1)![1].offset.x).toBe(60)
+        expect(onEnd).toHaveBeenCalledTimes(1)
+        expect(onEnd.mock.calls[0][1].offset.x).toBe(60)
+        expect(onEnd.mock.calls[0][1].velocity.x).toBe(1000)
+    })
 })

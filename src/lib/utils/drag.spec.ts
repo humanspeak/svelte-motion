@@ -1285,6 +1285,43 @@ describe('utils/drag', () => {
         cleanup()
     })
 
+    it('attachDrag: rests at a pointermove that arrives in the same frame as pointerup', async () => {
+        const el = document.createElement('div')
+        document.body.appendChild(el)
+        const x = motionValue(0)
+        const onEnd = vi.fn()
+        const cleanup = attachDrag(el, {
+            axis: 'x',
+            momentum: false,
+            mergedTransition: { duration: 0 },
+            boundMotionValues: { x },
+            callbacks: { onEnd }
+        })
+
+        el.dispatchEvent(new PointerEvent('pointerdown', { clientX: 0, clientY: 0, pointerId: 1 }))
+        window.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: 10, clientY: 0, pointerId: 1 })
+        )
+        await flushFrame()
+        expect(x.get()).toBe(10)
+
+        // Browsers flush the coalesced final move right before pointerup, so
+        // both land before the next frame (Motion 13.4.5 parity).
+        window.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: 100, clientY: 0, pointerId: 1 })
+        )
+        window.dispatchEvent(
+            new PointerEvent('pointerup', { clientX: 100, clientY: 0, pointerId: 1 })
+        )
+        await flushFrame()
+
+        expect(x.get()).toBe(100)
+        expect(onEnd).toHaveBeenCalledTimes(1)
+        expect(onEnd.mock.calls[0][1].offset.x).toBe(100)
+        cleanup()
+        el.remove()
+    })
+
     it('writes the axis MotionValues on the VisualElement in the sampled frame', async () => {
         const el = document.createElement('div')
         document.body.appendChild(el)

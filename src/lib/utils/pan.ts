@@ -35,7 +35,7 @@
  *   gestures.
  */
 import type { DragInfo, MotionTransformPoint } from '$lib/types'
-import { cancelFrame, frame, frameData, isPrimaryPointer } from 'motion-dom'
+import { cancelFrame, frame, frameData, isPrimaryPointer, time } from 'motion-dom'
 
 /**
  * Per-handler frame-loop scheduling, mirroring upstream's `asyncHandler` /
@@ -158,12 +158,12 @@ const getVelocity = (history: TimestampedPoint[], timeDelta: number): Point => {
         timestampedPoint = history[1]
     }
 
-    const time = millisecondsToSeconds(lastPoint.timestamp - timestampedPoint.timestamp)
-    if (time === 0) return { x: 0, y: 0 }
+    const seconds = millisecondsToSeconds(lastPoint.timestamp - timestampedPoint.timestamp)
+    if (seconds === 0) return { x: 0, y: 0 }
 
     const v: Point = {
-        x: (lastPoint.x - timestampedPoint.x) / time,
-        y: (lastPoint.y - timestampedPoint.y) / time
+        x: (lastPoint.x - timestampedPoint.x) / seconds,
+        y: (lastPoint.y - timestampedPoint.y) / seconds
     }
     if (v.x === Infinity) v.x = 0
     if (v.y === Infinity) v.y = 0
@@ -376,6 +376,8 @@ class PanSession {
     private lastMoveEvent: PointerEvent | null = null
     private lastMovePoint: Point | null = null
     private lastRawMovePoint: Point | null = null
+    /** Whether a pointermove has arrived since the last updatePoint. */
+    private hasPendingMove = false
     private handlers: PanHandlers = {}
     private contextWindow: Window = window
     private distanceThreshold = 3
@@ -442,10 +444,16 @@ class PanSession {
         this.lastRawMovePoint = extractEventPoint(event)
         this.lastMovePoint = this.transformPoint(this.lastRawMovePoint)
         // Per-frame throttle so a 1000hz mouse doesn't drown handlers.
+        this.hasPendingMove = true
         frame.update(this.updatePoint, true)
     }
 
     private handlePointerUp = (event: PointerEvent): void => {
+        // Browsers flush a coalesced pointermove immediately before pointerup,
+        // so the final move can still be waiting for a frame
+        // (Motion 13.4.5 `packages/framer-motion/src/gestures/pan/PanSession.ts`
+        // `handlePointerUp`). Flush it before `end()` cancels that frame.
+        if (this.hasPendingMove) this.updatePoint()
         this.end()
         if (this.terminalDispatched) return
         if (!(this.lastMoveEvent && this.lastMovePoint)) {
@@ -472,6 +480,7 @@ class PanSession {
 
     private updatePoint = (): void => {
         if (!(this.lastMoveEvent && this.lastRawMovePoint)) return
+        this.hasPendingMove = false
 
         this.lastMovePoint = this.transformPoint(this.lastRawMovePoint)
 
@@ -481,7 +490,7 @@ class PanSession {
 
         if (!panAlreadyStarted && !pastThreshold) return
 
-        this.history.push({ ...this.lastMovePoint, timestamp: frameData.timestamp })
+        this.history.push({ ...this.lastMovePoint, timestamp: time.now() })
 
         if (!panAlreadyStarted) {
             this.handlers.onStart?.(this.lastMoveEvent, info)
