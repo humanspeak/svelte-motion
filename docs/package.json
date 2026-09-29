@@ -83,9 +83,8 @@
         "vitest-browser-svelte": "^3.0.0",
         "wrangler": "^4.125.0"
     },
-    "packageManager": "pnpm@11.24.0",
+    "packageManager": "pnpm@12.6.0",
     "volta": {
         "node": "24.18.0"
-    },
-    "pnpm": {}
+    }
 }
