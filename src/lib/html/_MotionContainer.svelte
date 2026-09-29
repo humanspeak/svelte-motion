@@ -60,8 +60,8 @@
         attachPressGesture
     } from '$lib/utils/gestures'
     import { readTransformChannels } from '$lib/utils/hover'
+    import { observeMove } from '$lib/utils/observeMove'
     import {
-        measureRect,
         computeFlipTransforms,
         runLayoutSizeAnimation,
         finishFlipAnimations,
@@ -320,11 +320,6 @@
             const inherited = ancestorScrollContainerRef?.() ?? []
             return element ? [...inherited, element] : inherited
         })
-    }
-    const resolveLayoutScrollAncestors = (): HTMLElement[] => {
-        const refs = ancestorScrollContainerRef?.() ?? []
-        // Filter out unbound refs (HTMLElement | null | undefined → HTMLElement[]).
-        return refs.filter((el): el is HTMLElement => Boolean(el))
     }
 
     const serializedStyleProp = $derived(serializeMotionStyle(styleProp, transformTemplateProp))
@@ -741,40 +736,62 @@
         return () => cancelAnimationFrame(rafId)
     })
 
-    // Keep a live snapshot of the layoutId element's rect so the next element can FLIP from it.
-    // We store the last-known-good rect and push it to the registry on cleanup,
-    // because onDestroy fires after the element is removed from DOM (rect would be zeros).
-    let layoutIdLastRect: DOMRect | null = null
+    // Hand the departing layoutId element's on-screen rect to the next
+    // element with the same id, so it can animate from there (plan 008).
+    //
+    // Upstream measures once, in `unmount()` → `willUpdate()`, while the
+    // element is still attached (create-projection-node.ts `unmount`). Svelte
+    // removes the DOM BEFORE effect teardowns run (`destroy_effect` →
+    // `remove_effect_dom`, then the child teardowns; pinned by
+    // `__tests__/layoutIdTeardown.svelte.spec.ts`), so this cleanup can't
+    // measure. Rather than re-measure every animation frame for the
+    // element's whole lifetime, the projection adapter derives the on-screen
+    // rect with zero DOM reads from what it already tracks (last layout read,
+    // projection target mid layout animation, `latestValues` transforms).
+    // This effect is declared before the adapter's mount effect, so the
+    // adapter is still mounted when this cleanup runs. The rect is in PAGE
+    // space: the consumer (`commitObservedLayoutChange`) seeds it as a
+    // projection snapshot against a layout measured by upstream
+    // `measurePageBox()`, so a scrolled page's handoff stays aligned.
+    let layoutIdLastRect: RectLike | null = null
     $effect(() => {
         if (!(element && layoutIdProp && layoutIdRegistry)) return
-
-        // Capture rect on every frame while mounted, in PAGE space: the
-        // consumer (`commitObservedLayoutChange`) seeds it as a projection
-        // snapshot against a layout measured by upstream `measurePageBox()`,
-        // so a viewport-relative rect makes a scrolled page's handoff start
-        // `window.scrollY` px off. Deliberately NOT `pageRectOf()`: its
-        // phase-cached scroll only refreshes during projection updates, so a
-        // continuous rAF capture would read stale offsets after a scroll —
-        // live window/container reads are the correct form for this loop.
-        let rafId: number
-        const captureRect = () => {
-            if (element) {
-                layoutIdLastRect = measureRect(
-                    element,
-                    resolveLayoutScrollAncestors(),
-                    'none',
-                    true
-                )
-            }
-            rafId = requestAnimationFrame(captureRect)
+        const adapter = motionDomProjection
+        // Fallback only: the rect seen at the last measurement / update pass,
+        // in case the adapter can no longer answer at cleanup.
+        const remember = () => {
+            layoutIdLastRect = adapter?.currentVisualPageRect() ?? layoutIdLastRect
         }
-        rafId = requestAnimationFrame(captureRect)
+        const offMeasure = adapter?.onMeasure(remember)
+        const offCommit = adapter?.onProjectionCommit(remember)
+        remember()
 
-        // On cleanup (before DOM removal), push last-known rect to registry
+        // A plain-DOM change (a sibling growing, a font swap, a resize) can
+        // move the element without any update this component sees, and the
+        // cached rect would go stale. Watch for moves read-free
+        // (IntersectionObserver, `observeMove`); when the browser reports a
+        // position the projection can't explain by motion or scroll, take ONE
+        // silent measurement to refresh the cache. Nothing is read while the
+        // element sits still.
+        const target = element
+        const stopWatching = observeMove(target, (viewportRect) => {
+            if (!adapter || !target.isConnected || adapter.isDrawnAt(viewportRect)) return
+            adapter.measurePageRect('measure', { silent: true })
+            remember()
+        })
+
         return () => {
-            cancelAnimationFrame(rafId)
-            if (layoutIdLastRect && scopedLayoutId) {
-                layoutIdRegistry.snapshot(scopedLayoutId, layoutIdLastRect, mergedTransition ?? {})
+            stopWatching()
+            offMeasure?.()
+            offCommit?.()
+            const rect = adapter?.currentVisualPageRect() ?? layoutIdLastRect
+            layoutIdLastRect = null
+            if (rect && scopedLayoutId) {
+                layoutIdRegistry.snapshot(
+                    scopedLayoutId,
+                    new DOMRect(rect.left, rect.top, rect.width, rect.height),
+                    mergedTransition ?? {}
+                )
             }
         }
     })

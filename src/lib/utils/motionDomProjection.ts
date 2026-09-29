@@ -23,6 +23,7 @@ type ProjectionTreeNode<Instance = unknown> = IProjectionNode<Instance>
 type LayoutOption = boolean | string | undefined
 type AnimationType = 'position' | 'x' | 'y' | 'size' | 'both' | 'preserve-aspect'
 type RectLike = { left: number; top: number; width: number; height: number }
+type Box = ReturnType<typeof createBox>
 
 /**
  * Development-only measurement counters.
@@ -215,6 +216,17 @@ export class MotionDomProjectionAdapter {
     private offProjectionDidUpdate: (() => void) | null = null
     /** Before/after layout of this node's most recent upstream update pass. */
     private lastUpdate: { previous: RectLike; next: RectLike } | null = null
+    /**
+     * Most recent page-space layout box ANY read produced for this node —
+     * upstream `updateLayout()` (seeds, refreshes, every update pass that
+     * re-measured it, whoever triggered the pass) and direct
+     * `measurePageRect()` reads — kept in step with ancestor-follow shifts.
+     * Unlike `lastLayout` (the observer path's snapshot cache, deliberately
+     * advanced only at commit boundaries) this is purely "where the node's
+     * layout was last seen", the idle source of {@link currentVisualPageRect}.
+     */
+    private latestLayoutBox: Box | undefined
+    private offProjectionMeasure: (() => void) | null = null
 
     constructor(options: MotionDomProjectionOptions = {}) {
         const parent = options.parent ?? null
@@ -308,6 +320,12 @@ export class MotionDomProjectionAdapter {
         if (this.visualElement.current !== element) {
             this.visualElement.mount(element)
         }
+        // Upstream `updateLayout()` notifies 'measure' with every layout it
+        // reads for this node (create-projection-node.ts `updateLayout`), so
+        // this costs no extra DOM read.
+        this.offProjectionMeasure = this.projection.addEventListener('measure', (box: Box) => {
+            this.rememberLayoutBox(box)
+        })
         this.seedLayout()
         // Only grouped nodes are re-measured by passes they didn't trigger
         // themselves in a way the observer path must reconcile (plan 007
@@ -369,6 +387,9 @@ export class MotionDomProjectionAdapter {
         this.leaveGroup()
         this.offProjectionDidUpdate?.()
         this.offProjectionDidUpdate = null
+        this.offProjectionMeasure?.()
+        this.offProjectionMeasure = null
+        this.latestLayoutBox = undefined
         this.lastUpdate = null
         // An injected VisualElement may already have been unmounted by its
         // owner; unmounting twice would re-run the projection/feature teardown.
@@ -534,7 +555,9 @@ export class MotionDomProjectionAdapter {
             // drag x/y MotionValues, mirrored into the visual element via its
             // style) a SECOND time and report slot − offset instead of the
             // slot.
-            rect = rectFromBox(this.projection.measure(false).layoutBox)
+            const { layoutBox } = this.projection.measure(false)
+            rect = rectFromBox(layoutBox)
+            this.rememberLayoutBox(layoutBox)
         } finally {
             restore()
         }
@@ -615,6 +638,131 @@ export class MotionDomProjectionAdapter {
     get lastMeasuredRect(): RectLike | null {
         const box = this.lastLayout?.layoutBox
         return box ? rectFromBox(box) : null
+    }
+
+    /**
+     * Where this element is currently drawn, in the same scroll-invariant
+     * page space {@link measurePageRect} measures in — derived with ZERO DOM
+     * reads.
+     *
+     * Composed from:
+     * 1. the box: the projection `target` while this node is mid layout
+     *    animation (or rides an animating relative parent) — that is the box
+     *    motion-dom projects it onto; otherwise the last layout any read saw
+     *    (seeds, refreshes, update passes, observer commits, group fan-outs,
+     *    ancestor-follow shifts);
+     * 2. the motion transforms: this node's and its ancestors' `latestValues`
+     *    (`x`/`y`/`scale`…), applied like upstream
+     *    `applyTransform(box, transformOnly = true)` — `layoutScroll` offsets
+     *    stay removed, so a container or window scroll never moves the rect.
+     *
+     * This is the box upstream's `unmount()` → `willUpdate()` snapshot
+     * measures for a departing `layoutId` node (create-projection-node.ts
+     * `unmount`, `measuredBox` in `measure()`), which a shared handoff
+     * animates from (`notifyLayoutUpdate` uses `snapshot.measuredBox` when
+     * `isShared`). Svelte removes the DOM before effect teardown, so the
+     * departing element can't measure itself; this accessor stands in.
+     *
+     * @returns The on-screen page-space rect, or `null` before mount / before
+     * the first layout read.
+     *
+     * @example
+     * ```ts
+     * // In a teardown, after Svelte already detached the element:
+     * const rect = adapter.currentVisualPageRect()
+     * if (rect) registry.snapshot(id, rect)
+     * ```
+     */
+    currentVisualPageRect(): RectLike | null {
+        if (!this.element) return null
+        const base =
+            this.visualTargetBox() ??
+            this.latestLayoutBox ??
+            this.lastLayout?.layoutBox ??
+            this.projection.layout?.layoutBox
+        if (!base) return null
+        const box = createBox()
+        copyBoxInto(box, base)
+        return rectFromBox(this.projection.applyTransform(box, true))
+    }
+
+    /**
+     * Whether a viewport rect the browser reported for this element (e.g. an
+     * IntersectionObserver entry) is where the projection already thinks it
+     * is drawn: {@link currentVisualPageRect}, moved into the viewport by the
+     * live window and `layoutScroll` container scroll. `true` means the move
+     * is explained by motion (a layout or transform animation, a scroll) and
+     * the cached layout is still valid; `false` means the layout itself moved
+     * without any update this adapter saw.
+     *
+     * Reads scroll offsets, never the element's box.
+     *
+     * @param viewportRect The element's reported viewport rect.
+     * @param tolerance Allowed difference per edge, in px.
+     * @returns Whether the cached state explains the rect.
+     *
+     * @example
+     * ```ts
+     * if (!adapter.isDrawnAt(entry.boundingClientRect)) adapter.measurePageRect()
+     * ```
+     */
+    isDrawnAt(viewportRect: RectLike, tolerance = 1): boolean {
+        // While this node or an ancestor layout-animates, every frame moves
+        // it and only the projection knows where: a non-animating child of
+        // an animating parent rides the parent's transform, which its own
+        // cached layout doesn't encode. Those moves are motion by definition;
+        // when the animation settles, the element's last move is checked
+        // against the settled layout like any other.
+        if (this.projection.currentAnimation) return true
+        for (const node of this.projection.path) {
+            if (node.currentAnimation) return true
+        }
+        const page = this.currentVisualPageRect()
+        if (!page || typeof window === 'undefined') return false
+        // Same document scroll source as upstream's root node
+        // (DocumentProjectionNode `measureScroll`).
+        const doc = document.documentElement
+        let left = page.left - (doc.scrollLeft || document.body?.scrollLeft || 0)
+        let top = page.top - (doc.scrollTop || document.body?.scrollTop || 0)
+        const element = this.element
+        for (const node of this.projection.path) {
+            if (node === this.projection.root || !node.options.layoutScroll) continue
+            const container = MotionDomProjectionAdapter.adapters.get(node)?.element
+            if (container && element && container.contains(element)) {
+                left -= container.scrollLeft
+                top -= container.scrollTop
+            }
+        }
+        return (
+            Math.abs(viewportRect.left - left) <= tolerance &&
+            Math.abs(viewportRect.top - top) <= tolerance &&
+            Math.abs(viewportRect.width - page.width) <= tolerance &&
+            Math.abs(viewportRect.height - page.height) <= tolerance
+        )
+    }
+
+    /**
+     * The projection target, when it — not the layout — is what's on screen:
+     * this node is layout animating, or it follows (via a relative target) a
+     * parent that is. Otherwise `undefined`: an idle node's `target` can be a
+     * leftover of a finished animation.
+     */
+    private visualTargetBox(): Box | undefined {
+        const projection = this.projection
+        const target = projection.target
+        if (!target) return undefined
+        if (projection.currentAnimation) return target
+        let parent = projection.relativeTarget ? projection.relativeParent : undefined
+        while (parent) {
+            if (parent.currentAnimation) return target
+            parent = parent.relativeTarget ? parent.relativeParent : undefined
+        }
+        return undefined
+    }
+
+    private rememberLayoutBox(box: Box): void {
+        if (!this.latestLayoutBox) this.latestLayoutBox = createBox()
+        copyBoxInto(this.latestLayoutBox, box)
     }
 
     /**
@@ -1031,14 +1179,17 @@ export class MotionDomProjectionAdapter {
         const visit = (node: ProjectionTreeNode) => {
             for (const child of node.children) {
                 if (child.snapshot) continue
-                const layout = MotionDomProjectionAdapter.adapters.get(child)?.lastLayout
-                if (layout) {
-                    for (const box of [layout.layoutBox, layout.measuredBox]) {
-                        box.x.min += dx
-                        box.x.max += dx
-                        box.y.min += dy
-                        box.y.max += dy
-                    }
+                const adapter = MotionDomProjectionAdapter.adapters.get(child)
+                const layout = adapter?.lastLayout
+                const boxes = layout ? [layout.layoutBox, layout.measuredBox] : []
+                // Also the read-free "last seen" layout (plan 008), so a
+                // following layoutId node hands off from where it now is.
+                if (adapter?.latestLayoutBox) boxes.push(adapter.latestLayoutBox)
+                for (const box of boxes) {
+                    box.x.min += dx
+                    box.x.max += dx
+                    box.y.min += dy
+                    box.y.max += dy
                 }
                 visit(child)
             }

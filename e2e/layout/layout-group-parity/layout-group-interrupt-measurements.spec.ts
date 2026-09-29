@@ -53,8 +53,7 @@ async function expectMeasured(page: Page, id: string) {
 }
 
 test.describe('LayoutGroup inherit="id" measurements', () => {
-    // Red: reads come from the per-frame layoutId capture loop (_MotionContainer.svelte layoutId $effect). Plan 008 must turn this green.
-    test.fail("doesn't re-measure a relative child that isn't animating", async ({ page }) => {
+    test("doesn't re-measure a relative child that isn't animating", async ({ page }) => {
         await visit(page)
         await click(page, 'expander')
         await expectMeasured(page, 'text-wrapper')
@@ -64,19 +63,17 @@ test.describe('LayoutGroup inherit="id" measurements', () => {
         await expectReads(page, 'button', 0)
     })
 
-    // Red: reads come from the per-frame layoutId capture loop (_MotionContainer.svelte layoutId $effect). Plan 008 must turn this green.
-    test.fail(
-        're-measures a layout-animating relative child once per parent re-layout',
-        async ({ page }) => {
-            await visit(page)
-            // Starts #button's 10s layout animation
-            await click(page, 'button')
-            await click(page, 'expander')
-            await expectMeasured(page, 'text-wrapper')
-            await expectReads(page, 'button', 1)
-            await click(page, 'expander')
-            await expectMeasured(page, 'text-wrapper')
-            await expectReads(page, 'button', 1)
-        }
-    )
+    test('re-measures a layout-animating relative child once per parent re-layout', async ({
+        page
+    }) => {
+        await visit(page)
+        // Starts #button's 10s layout animation
+        await click(page, 'button')
+        await click(page, 'expander')
+        await expectMeasured(page, 'text-wrapper')
+        await expectReads(page, 'button', 1)
+        await click(page, 'expander')
+        await expectMeasured(page, 'text-wrapper')
+        await expectReads(page, 'button', 1)
+    })
 })

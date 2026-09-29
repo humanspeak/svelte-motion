@@ -731,6 +731,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/read-budget') + searchParams}
+                    >
+                        layoutId — idle read budget and handoff after a layout shift
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout/scroll') + searchParams}
                     >
                         layoutScroll — single container

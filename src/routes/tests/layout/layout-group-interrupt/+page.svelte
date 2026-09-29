@@ -90,7 +90,7 @@
 <TesterPanel
     eyebrow="Upstream parity · layout-group-interrupt.ts"
     title="Interrupted slide keeps its place in the row"
-    status="The glide passes on this build when clicked by hand (plan 007). Its e2e case stays marked failing because of a Playwright click-timing issue in the spec port, and the read-count cases wait on plan 008 (per-frame layoutId capture loop)."
+    status="Passes on this build. The glide works (plan 007) and its e2e case is green now that the spec clicks natively like Cypress. The read-count cases are green too: since plan 008, the button is not measured while it sits still."
     {steps}
 >
     {#snippet checks()}

@@ -1,4 +1,10 @@
-import { measurePageBox, measureViewportBox, nodeGroup, visualElementStore } from 'motion-dom'
+import {
+    frame,
+    measurePageBox,
+    measureViewportBox,
+    nodeGroup,
+    visualElementStore
+} from 'motion-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MotionDomProjectionAdapter, layoutMeasureStats } from './motionDomProjection.js'
 import { createMotionVisualElement } from './visualElementCore.js'
@@ -247,22 +253,16 @@ describe('MotionDomProjectionAdapter.measurePageRect', () => {
         //
         // Capture the scheduled rAF instead of running it so we can flush it
         // deterministically AFTER unmount.
+        //
+        // `vi.stubGlobal`, not `vi.spyOn(globalThis, …)`: restoring a spy on
+        // jsdom's rAF leaves it (and motion-dom's frameloop, which captured
+        // it at import) permanently dead for the rest of this file.
         const rafCallbacks: FrameRequestCallback[] = []
-        const rafSpy = vi
-            .spyOn(
-                globalThis as unknown as { requestAnimationFrame: typeof requestAnimationFrame },
-                'requestAnimationFrame'
-            )
-            .mockImplementation((fn: FrameRequestCallback): number => {
-                rafCallbacks.push(fn)
-                return rafCallbacks.length
-            })
-        const cafSpy = vi
-            .spyOn(
-                globalThis as unknown as { cancelAnimationFrame: typeof cancelAnimationFrame },
-                'cancelAnimationFrame'
-            )
-            .mockImplementation(() => {})
+        vi.stubGlobal('requestAnimationFrame', (fn: FrameRequestCallback): number => {
+            rafCallbacks.push(fn)
+            return rafCallbacks.length
+        })
+        vi.stubGlobal('cancelAnimationFrame', () => {})
 
         setScrollAndRect(element, 0, 100)
         adapter.mount(element)
@@ -285,8 +285,7 @@ describe('MotionDomProjectionAdapter.measurePageRect', () => {
         for (const cb of rafCallbacks) cb(0)
         expect(probe.lastLayout).toBeUndefined()
 
-        rafSpy.mockRestore()
-        cafSpy.mockRestore()
+        vi.unstubAllGlobals()
     })
 
     it('commitDraggedLayoutChange: delivers the slot delta from the upstream didUpdate, measuring with the drag transform stripped', async () => {
@@ -915,5 +914,246 @@ describe('MotionDomProjectionAdapter.commitGroup', () => {
 
     it('is a no-op for an unknown or empty group', () => {
         expect(() => MotionDomProjectionAdapter.commitGroup(nodeGroup())).not.toThrow()
+    })
+})
+
+describe('MotionDomProjectionAdapter.currentVisualPageRect (plan 008)', () => {
+    type RectLike = { left: number; top: number; width: number; height: number }
+    const rects = new Map<HTMLElement, DOMRect>()
+    /** Give an element a viewport rect (page rect minus current scroll). */
+    const place = (element: HTMLElement, top: number, left = 10) =>
+        rects.set(element, new DOMRect(left, top, 100, 50))
+    const create = (parent: HTMLElement = document.body) => {
+        const element = document.createElement('div')
+        parent.appendChild(element)
+        const reads = vi
+            .spyOn(element, 'getBoundingClientRect')
+            .mockImplementation(() => rects.get(element)!)
+        return { element, reads }
+    }
+    // motion-dom's own frameloop (it captured the real rAF at load, so an
+    // earlier spec's rAF spy can't strand these waits).
+    const frames = async (count: number) => {
+        for (let i = 0; i < count; i++) {
+            await new Promise<void>((resolve) => frame.postRender(() => resolve()))
+        }
+    }
+    const within1px = (actual: RectLike | null, expected: RectLike) => {
+        expect(actual).not.toBeNull()
+        for (const key of ['left', 'top', 'width', 'height'] as const) {
+            expect(Math.abs(actual![key] - expected[key]), key).toBeLessThanOrEqual(1)
+        }
+    }
+
+    /**
+     * The box a browser would draw for `layout` under the element's inline
+     * `transform` / `transform-origin`, for the transform functions
+     * motion-dom writes (translate3d / translateX / translateY / scale).
+     */
+    const drawnBox = (element: HTMLElement, layout: RectLike): RectLike => {
+        let tx = 0
+        let ty = 0
+        let sx = 1
+        let sy = 1
+        for (const [, name, args] of element.style.transform.matchAll(/(\w+)\(([^)]*)\)/g)) {
+            const values = args.split(',').map((part) => parseFloat(part))
+            if (name === 'translate3d' || name === 'translate') {
+                tx += values[0]
+                ty += values[1] ?? 0
+            } else if (name === 'translateX') tx += values[0]
+            else if (name === 'translateY') ty += values[0]
+            else if (name === 'scale') {
+                sx *= values[0]
+                sy *= values[1] ?? values[0]
+            } else if (name === 'scaleX') sx *= values[0]
+            else if (name === 'scaleY') sy *= values[0]
+        }
+        const [ox = '50%', oy = '50%'] = (element.style.transformOrigin || '50% 50%').split(' ')
+        const origin = (value: string, start: number, size: number) =>
+            value.endsWith('%')
+                ? start + (parseFloat(value) / 100) * size
+                : start + parseFloat(value)
+        const originX = origin(ox, layout.left, layout.width)
+        const originY = origin(oy, layout.top, layout.height)
+        return {
+            left: originX + (layout.left - originX) * sx + tx,
+            top: originY + (layout.top - originY) * sy + ty,
+            width: layout.width * sx,
+            height: layout.height * sy
+        }
+    }
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+    })
+
+    it('is null before mount', () => {
+        expect(new MotionDomProjectionAdapter().currentVisualPageRect()).toBeNull()
+    })
+
+    it('idle: returns the last layout read, with zero DOM reads of its own', async () => {
+        const adapter = new MotionDomProjectionAdapter()
+        adapter.updateOptions({ layoutId: 'idle' })
+        const { element, reads } = create()
+        place(element, 100)
+        adapter.mount(element)
+        reads.mockClear()
+
+        expect(adapter.currentVisualPageRect()).toEqual({
+            left: 10,
+            top: 100,
+            width: 100,
+            height: 50
+        })
+        // The element moved, but nothing read it yet: still the last read.
+        place(element, 300)
+        await frames(2)
+        expect(adapter.currentVisualPageRect()?.top).toBe(100)
+        expect(reads).not.toHaveBeenCalled()
+
+        // Any read (an update boundary) refreshes it.
+        adapter.measurePageRect('measure', { silent: true })
+        expect(adapter.currentVisualPageRect()?.top).toBe(300)
+        adapter.unmount()
+        expect(adapter.currentVisualPageRect()).toBeNull()
+    })
+
+    it('mid layout animation: the projected box, within 1px of the drawn box', async () => {
+        const adapter = new MotionDomProjectionAdapter()
+        adapter.updateOptions({
+            layoutId: 'animating',
+            transition: { duration: 10, ease: 'linear' }
+        })
+        const { element, reads } = create()
+        place(element, 100)
+        adapter.mount(element)
+
+        // The layout moved 200px down; animate from the old slot.
+        place(element, 300)
+        adapter.commitObservedLayoutChange({ left: 10, top: 100, width: 100, height: 50 })
+        await frames(6)
+        expect(adapter.isAnimating()).toBe(true)
+
+        reads.mockClear()
+        const rect = adapter.currentVisualPageRect()
+        expect(reads).not.toHaveBeenCalled()
+        // Early in a 10s glide from 100 to 300: drawn near the old slot.
+        expect(rect!.top).toBeLessThan(150)
+        within1px(rect, drawnBox(element, { left: 10, top: 300, width: 100, height: 50 }))
+        adapter.unmount()
+    })
+
+    it('mid transform animation: applies latestValues x/scale like the CSS transform', () => {
+        const adapter = new MotionDomProjectionAdapter()
+        adapter.updateOptions({ layoutId: 'transformed' })
+        const { element, reads } = create()
+        place(element, 100)
+        adapter.mount(element)
+
+        // e.g. `animate={{ x: 30, scale: 2 }}` part-way: the values live in
+        // latestValues and render as a CSS transform.
+        adapter.visualElement.latestValues.x = 30
+        adapter.visualElement.latestValues.scale = 2
+        adapter.visualElement.render()
+        expect(element.style.transform).toContain('scale(2)')
+
+        reads.mockClear()
+        const rect = adapter.currentVisualPageRect()
+        expect(reads).not.toHaveBeenCalled()
+        expect(rect).toEqual({ left: -10, top: 75, width: 200, height: 100 })
+        within1px(rect, drawnBox(element, { left: 10, top: 100, width: 100, height: 50 }))
+        adapter.unmount()
+    })
+
+    it('inside a layoutScroll container: stays in measurePageRect space across scrolls', () => {
+        const container = document.createElement('div')
+        document.body.appendChild(container)
+        let scrollTop = 200
+        Object.defineProperty(container, 'scrollTop', {
+            get: () => scrollTop,
+            configurable: true
+        })
+        vi.spyOn(container, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 400))
+        const parent = new MotionDomProjectionAdapter()
+        parent.updateOptions({ layout: true, layoutScroll: true })
+        parent.mount(container)
+
+        const child = new MotionDomProjectionAdapter({ parent })
+        child.updateOptions({ layoutId: 'scrolled' })
+        const { element, reads } = create(container)
+        // Content-space top 500 with the container scrolled 200: viewport 300.
+        place(element, 500 - scrollTop)
+        child.mount(element)
+        const measured = child.measurePageRect('measure', { silent: true })
+        expect(measured?.top).toBe(500)
+
+        // Scrolling the container moves the element on screen but not in
+        // (scroll-removed) page space: the handoff rect must not move.
+        scrollTop = 350
+        place(element, 500 - scrollTop)
+        reads.mockClear()
+        expect(child.currentVisualPageRect()).toEqual(measured)
+        expect(reads).not.toHaveBeenCalled()
+        // A fresh read agrees.
+        expect(child.measurePageRect('measure', { silent: true })).toEqual(measured)
+        child.unmount()
+        parent.unmount()
+    })
+
+    describe('isDrawnAt (plan 008 Step 3b)', () => {
+        it('explains a window scroll, but not a layout move, without reading the element', () => {
+            document.documentElement.scrollTop = 0
+            const adapter = new MotionDomProjectionAdapter()
+            adapter.updateOptions({ layoutId: 'drawn' })
+            const { element, reads } = create()
+            place(element, 100)
+            adapter.mount(element)
+            reads.mockClear()
+
+            expect(adapter.isDrawnAt({ left: 10, top: 100, width: 100, height: 50 })).toBe(true)
+            // Within the 1px tolerance.
+            expect(adapter.isDrawnAt({ left: 10.6, top: 100.8, width: 100, height: 50 })).toBe(true)
+            // The window scrolled 40px: drawn 40px higher in the viewport.
+            document.documentElement.scrollTop = 40
+            expect(adapter.isDrawnAt({ left: 10, top: 60, width: 100, height: 50 })).toBe(true)
+            // A layout shift nothing told the adapter about.
+            expect(adapter.isDrawnAt({ left: 10, top: 132, width: 100, height: 50 })).toBe(false)
+            expect(adapter.isDrawnAt({ left: 10, top: 60, width: 120, height: 50 })).toBe(false)
+            expect(reads).not.toHaveBeenCalled()
+            document.documentElement.scrollTop = 0
+            adapter.unmount()
+        })
+
+        it('explains any move while this node or an ancestor layout-animates', () => {
+            const parent = new MotionDomProjectionAdapter()
+            parent.updateOptions({ layout: true })
+            const { element: parentElement } = create()
+            place(parentElement, 0)
+            parent.mount(parentElement)
+            const child = new MotionDomProjectionAdapter({ parent })
+            child.updateOptions({ layoutId: 'follower' })
+            const { element } = create(parentElement)
+            place(element, 100)
+            child.mount(element)
+
+            const elsewhere = { left: 10, top: 170, width: 100, height: 50 }
+            expect(child.isDrawnAt(elsewhere)).toBe(false)
+            parent.projection.currentAnimation = {} as never
+            expect(child.isDrawnAt(elsewhere)).toBe(true)
+            parent.projection.currentAnimation = undefined
+            child.projection.currentAnimation = {} as never
+            expect(child.isDrawnAt(elsewhere)).toBe(true)
+            child.projection.currentAnimation = undefined
+            child.unmount()
+            parent.unmount()
+        })
+
+        it('is false before mount', () => {
+            expect(
+                new MotionDomProjectionAdapter().isDrawnAt({ left: 0, top: 0, width: 1, height: 1 })
+            ).toBe(false)
+        })
     })
 })
