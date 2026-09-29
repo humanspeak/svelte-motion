@@ -208,7 +208,7 @@ look is whatever the page's selectors match at that new spot:
 <TesterPanel
     eyebrow="AnimatePresence · exit clone"
     title="Fading card keeps its look"
-    status="Expected to FAIL on this build: the fading card turns unstyled mid-fade (bug under investigation). Card A flips from blue to tomato and the solo card fades out unstyled; Card B (plain descendant selector) is the control and keeps its look."
+    status="Passes on this build."
     {steps}
 >
     {#snippet checks()}
@@ -291,6 +291,16 @@ look is whatever the page's selectors match at that new spot:
     .cards :global(.card:first-child) {
         background: #2b59c3;
         border-radius: 24px;
+    }
+
+    /*
+     * Never matches a live card: AnimatePresence's `display: contents`
+     * container sits between `.cards` and every card. An exit clone must not
+     * pick it up either (lime ring, wide letter-spacing).
+     */
+    .cards > :global(.card) {
+        box-shadow: 0 0 0 4px lime;
+        letter-spacing: 4px;
     }
 
     .readout {

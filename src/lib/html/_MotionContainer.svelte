@@ -725,7 +725,10 @@
                 if (isAnimating || wasAnimating) {
                     const rect = element.getBoundingClientRect()
                     const cs = getComputedStyle(element)
-                    context.updateChildState(presenceKey, rect, cs)
+                    // The settle frame (animation just ended) also refreshes
+                    // the full style snapshot the exit clone freezes; the
+                    // animating frames before it only copy layout fields.
+                    context.updateChildState(presenceKey, rect, cs, !isAnimating)
                     context.updateChildAnimatedStyle(presenceKey, cs.opacity, cs.transform)
                 }
                 wasAnimating = isAnimating

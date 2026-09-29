@@ -33,15 +33,26 @@ type PresenceChild = {
     resolveExit?: PresenceExitResolver
     mergedTransition?: MotionTransition
     lastRect: DOMRect
-    lastComputedStyle: CSSStyleDeclaration
     /**
-     * Layout fields captured as STRINGS while the element was still connected.
-     * `lastComputedStyle` is a live CSSStyleDeclaration, and once Svelte
-     * detaches the node (keyed swaps detach before unregister) every property
-     * on it reads back as '' — so out-of-flow detection and the exit
-     * placeholder (margins, display, flex/grid placement) must not rely on it.
+     * Every computed property, captured as STRINGS while the element was
+     * still connected — what the exit clone freezes onto itself. Never keep
+     * the `CSSStyleDeclaration` itself: it is live, and once Svelte detaches
+     * the node (keyed `{#each}` and `{#if}` both detach before unregister)
+     * every property on it reads back as ''.
+     *
+     * Refreshed event-driven, never per animation frame: at registration,
+     * when an attribute on the element changes (see `observeStyleChanges`),
+     * and on the settle frame after an animation (`updateChildState`).
+     */
+    lastStyleSnapshot: ComputedStyleSnapshot
+    /**
+     * Layout fields captured as STRINGS while the element was still connected,
+     * for out-of-flow detection and the exit placeholder (margins, display,
+     * flex/grid placement). Cheap enough to refresh on every animating frame.
      */
     lastLayoutStyle: LayoutStyleSnapshot
+    /** Stops the attribute watcher that keeps `lastStyleSnapshot` fresh. */
+    stopObservingStyle?: () => void
     lastPopLayoutSnapshot?: PopLayoutSnapshot
     /**
      * The element's parent captured at registration. The exit placeholder is
@@ -108,6 +119,102 @@ const snapshotLayoutStyle = (style: CSSStyleDeclaration): LayoutStyleSnapshot =>
     gridRowStart: style.gridRowStart,
     gridRowEnd: style.gridRowEnd
 })
+
+/**
+ * Plain-string copy of every computed property of an element, keyed by
+ * property name. Computed declarations never carry an `!important` priority,
+ * so the value alone is enough to re-apply them.
+ */
+export type ComputedStyleSnapshot = Record<string, string>
+
+/**
+ * Copy every computed property out of a (live) computed style as strings.
+ *
+ * The result stays valid after the element is detached, unlike the
+ * `CSSStyleDeclaration` it was read from. Serializing every property costs a
+ * few hundred string reads, so callers take it on discrete events
+ * (registration, attribute changes, animation settle) — never per frame.
+ *
+ * @param style The computed style of a connected element.
+ * @returns A detached property → value map; empty values are omitted.
+ * @example
+ * ```ts
+ * const snapshot = snapshotComputedStyle(getComputedStyle(element))
+ * snapshot['background-color'] // 'rgb(43, 89, 195)', even after detach
+ * ```
+ */
+export const snapshotComputedStyle = (style: CSSStyleDeclaration): ComputedStyleSnapshot => {
+    const snapshot: ComputedStyleSnapshot = {}
+    for (let i = 0; i < style.length; i += 1) {
+        const prop = style[i]
+        const value = style.getPropertyValue(prop)
+        if (value) snapshot[prop] = value
+    }
+    return snapshot
+}
+
+/**
+ * Keep a presence child's style snapshot fresh while it is connected.
+ *
+ * Watches the element's own attributes (class, style, data-* state, …) — the
+ * changes that restyle an element without a layout or animation signal.
+ * Non-style attribute changes are rare and re-snapshot immediately.
+ * `style` writes can arrive every frame (JS-driven animations render
+ * inline styles), so they are coalesced: the snapshot is taken only once a
+ * whole frame has passed without a further `style` write.
+ *
+ * @param element The registered presence child.
+ * @param onChange Takes the snapshot; only called while `element` is connected.
+ * @returns A function that stops watching and cancels any pending snapshot.
+ * @example
+ * ```ts
+ * const stop = observeStyleChanges(element, () => {
+ *     record.lastStyleSnapshot = snapshotComputedStyle(getComputedStyle(element))
+ * })
+ * ```
+ */
+export const observeStyleChanges = (element: HTMLElement, onChange: () => void): (() => void) => {
+    if (typeof MutationObserver === 'undefined') return () => {}
+
+    let settling = false
+    let frameId = 0
+    let styleWritten = false
+
+    const snapshotIfConnected = () => {
+        if (element.isConnected) onChange()
+    }
+    // Snapshot only when the interval between two consecutive frames saw no
+    // `style` write, whatever order our callback and the animation's own
+    // frame callback run in.
+    const settleStyleWrites = () => {
+        if (!settling) return
+        if (styleWritten) {
+            styleWritten = false
+            frameId = requestAnimationFrame(settleStyleWrites)
+            return
+        }
+        settling = false
+        snapshotIfConnected()
+    }
+
+    const observer = new MutationObserver((records) => {
+        if (records.some((record) => record.attributeName !== 'style')) {
+            snapshotIfConnected()
+            return
+        }
+        styleWritten = true
+        if (settling) return
+        settling = true
+        frameId = requestAnimationFrame(settleStyleWrites)
+    })
+    observer.observe(element, { attributes: true })
+
+    return () => {
+        observer.disconnect()
+        if (settling) cancelAnimationFrame(frameId)
+        settling = false
+    }
+}
 
 /**
  * A measured `popLayout` box in the same coordinate space used by Motion's
@@ -372,8 +479,22 @@ export type AnimatePresenceContext = {
         mergedTransition?: MotionTransition,
         resolveExit?: PresenceExitResolver
     ) => void
-    /** Update the last known rect/style snapshot for a registered child. */
-    updateChildState: (key: string, rect: DOMRect, computedStyle: CSSStyleDeclaration) => void
+    /**
+     * Update the last known rect/style snapshot for a registered child.
+     *
+     * @param key The child's presence key.
+     * @param rect The child's current bounding rect.
+     * @param computedStyle The child's (connected) computed style.
+     * @param settled Pass `true` on the frame an animation comes to rest to
+     *   also refresh the full computed-style snapshot the exit clone freezes.
+     *   Leave unset on per-frame calls: that snapshot is too costly per frame.
+     */
+    updateChildState: (
+        key: string,
+        rect: DOMRect,
+        computedStyle: CSSStyleDeclaration,
+        settled?: boolean
+    ) => void
     /** Update the last captured mid-animation style values for a child. */
     updateChildAnimatedStyle: (key: string, opacity: string, transform: string) => void
     /** Unregister a child. If it has an exit, clone and animate it out. */
@@ -807,20 +928,27 @@ export const createAnimatePresenceContext = (context: {
             rect: { w: initialRect.width, h: initialRect.height }
         })
 
-        children.set(key, {
+        // Re-registration (exit/transition props changed) replaces the record;
+        // stop the previous record's attribute watcher first.
+        children.get(key)?.stopObservingStyle?.()
+        const record: PresenceChild = {
             element,
             exit,
             resolveExit,
             mergedTransition,
             lastRect: initialRect,
-            lastComputedStyle: initialStyle,
+            lastStyleSnapshot: snapshotComputedStyle(initialStyle),
             lastLayoutStyle: snapshotLayoutStyle(initialStyle),
             lastPopLayoutSnapshot:
                 mode === 'popLayout' ? measurePopLayoutSnapshot(element, initialStyle) : undefined,
             insertionParent: element.parentElement ?? undefined,
             hasScrollableAncestor: initialScrollSnapshot.length > 0,
             lastScrollSnapshot: initialScrollSnapshot
+        }
+        record.stopObservingStyle = observeStyleChanges(element, () => {
+            record.lastStyleSnapshot = snapshotComputedStyle(getComputedStyle(element))
         })
+        children.set(key, record)
         // A new sibling may have landed between existing children — re-anchor
         // everyone (including this child) while the whole set is connected.
         refreshSiblingAnchors()
@@ -828,13 +956,24 @@ export const createAnimatePresenceContext = (context: {
 
     /**
      * Update the last known rect/style snapshot for a registered child.
+     *
+     * Runs on every animating frame, so it only copies the cheap layout
+     * fields; the full computed-style snapshot is taken when `settled` is set
+     * (the frame an animation comes to rest).
      */
-    const updateChildState = (key: string, rect: DOMRect, computedStyle: CSSStyleDeclaration) => {
+    const updateChildState = (
+        key: string,
+        rect: DOMRect,
+        computedStyle: CSSStyleDeclaration,
+        settled = false
+    ) => {
         const child = children.get(key)
         if (child && rect.width > 0 && rect.height > 0) {
             child.lastRect = rect
-            child.lastComputedStyle = computedStyle
             child.lastLayoutStyle = snapshotLayoutStyle(computedStyle)
+            if (settled && child.element.isConnected) {
+                child.lastStyleSnapshot = snapshotComputedStyle(computedStyle)
+            }
             child.lastScrollSnapshot = captureScrollSnapshot(child.element)
             child.hasScrollableAncestor = child.lastScrollSnapshot.length > 0
             if (mode === 'popLayout') {
@@ -877,6 +1016,10 @@ export const createAnimatePresenceContext = (context: {
 
         // Mark this key as exited so re-entry will animate
         exitedKeys.add(key)
+        // The element is leaving: nothing after this point may refresh its
+        // style snapshot.
+        child.stopObservingStyle?.()
+        child.stopObservingStyle = undefined
 
         if (!child.exit && !child.resolveExit) {
             pwLog('[presence] unregisterChild - no exit animation, removing immediately')
@@ -902,13 +1045,13 @@ export const createAnimatePresenceContext = (context: {
         let rect = elementIsLive
             ? child.element.getBoundingClientRect()
             : translateRectByScrollDelta(child.lastRect, staleScrollDelta)
-        const computedStyle = elementIsLive
-            ? getComputedStyle(child.element)
-            : child.lastComputedStyle
-        // Layout fields for the placeholder / out-of-flow check. A detached
-        // element's stored declaration is live and reads '' for everything,
-        // so fall back to the string snapshot taken while it was connected.
-        const computed = elementIsLive ? snapshotLayoutStyle(computedStyle) : child.lastLayoutStyle
+        // Read styles live only while the element is still connected. A
+        // detached element's computed style reads '' for everything, so fall
+        // back to the string snapshots taken while it was connected.
+        const liveStyle = elementIsLive ? getComputedStyle(child.element) : undefined
+        const frozenStyle = liveStyle ? snapshotComputedStyle(liveStyle) : child.lastStyleSnapshot
+        // Layout fields for the placeholder / out-of-flow check.
+        const computed = liveStyle ? snapshotLayoutStyle(liveStyle) : child.lastLayoutStyle
         if (elementIsLive) {
             child.lastScrollSnapshot = captureScrollSnapshot(child.element)
             child.hasScrollableAncestor = child.lastScrollSnapshot.length > 0
@@ -973,17 +1116,19 @@ export const createAnimatePresenceContext = (context: {
             }
         }
 
-        // Clone original node to preserve structure/classes, then inline computed styles to freeze look
+        // Clone original node to preserve structure/classes, then inline the
+        // snapshotted computed styles to freeze its look.
         const clone = child.element.cloneNode(true) as HTMLElement
         if (clone.id) clone.removeAttribute('id')
         try {
-            for (let i = 0; i < computedStyle.length; i += 1) {
-                const prop = computedStyle[i]
+            for (const prop in frozenStyle) {
                 // Skip transforms to avoid double offset/scale on the absolutely positioned clone
                 if (/transform/i.test(prop)) continue
-                const value = computedStyle.getPropertyValue(prop)
-                const priority = computedStyle.getPropertyPriority(prop)
-                if (value) clone.style.setProperty(prop, value, priority)
+                // The cloned `style` attribute is the element's latest inline
+                // styling — fresher than any snapshot (JS-driven animations
+                // write it every frame), so it wins.
+                if (clone.style.getPropertyValue(prop)) continue
+                clone.style.setProperty(prop, frozenStyle[prop])
             }
             // Ensure no transform remains on the clone (including vendor-prefixed)
             resetTransforms(clone)
@@ -999,14 +1144,19 @@ export const createAnimatePresenceContext = (context: {
             clone.style.opacity = child.lastAnimatedOpacity
         }
 
-        // Attach to the original insertion parent and position absolutely at the
-        // last known rect. Svelte can detach keyed nodes before unregister runs,
-        // so fall back to the parent captured at registration time instead of
-        // escaping to <body>, which would bypass clipping parents.
-        let parent = insertionParent ?? document.body
-        let positioningParent = parent
+        // The clone goes back into the element's own DOM slot (below), like
+        // upstream, where the real element stays mounted until its exit
+        // finishes. It is absolutely positioned against its containing block:
+        // the nearest ancestor with a box. Svelte can detach keyed nodes
+        // before unregister runs, so fall back to the parent captured at
+        // registration time instead of escaping to <body>, which would bypass
+        // clipping parents.
+        const slotParent = insertionParent ?? document.body
+        let positioningParent = slotParent
 
-        // Walk up to find a parent that has actual layout (not display: contents)
+        // Walk up to find a parent that has actual layout (not display: contents).
+        // A `display: contents` element generates no box, so it can never be
+        // the clone's containing block: whatever this walk finds is.
         while (positioningParent && positioningParent !== document.body) {
             const parentDisplay = getComputedStyle(positioningParent).display
             if (parentDisplay !== 'contents') {
@@ -1017,8 +1167,8 @@ export const createAnimatePresenceContext = (context: {
 
         const popLayoutSnapshot =
             mode === 'popLayout'
-                ? child.element.isConnected
-                    ? measurePopLayoutSnapshot(child.element, computedStyle)
+                ? liveStyle
+                    ? measurePopLayoutSnapshot(child.element, liveStyle)
                     : child.lastPopLayoutSnapshot
                 : undefined
         const parentRect = popLayoutSnapshot ? undefined : positioningParent.getBoundingClientRect()
@@ -1030,11 +1180,8 @@ export const createAnimatePresenceContext = (context: {
             }
         }
 
-        // Append to the actual positioning parent
-        parent = positioningParent
-
         // Preserve the original display property (especially flex for centered content)
-        const originalDisplay = computedStyle.display
+        const originalDisplay = frozenStyle.display ?? ''
 
         clone.style.left = ''
         clone.style.right = ''
@@ -1051,10 +1198,14 @@ export const createAnimatePresenceContext = (context: {
             if (popStyles.bottom) clone.style.bottom = popStyles.bottom
         } else {
             clone.style.position = 'absolute'
-            clone.style.top = `${rect.top - parentRect!.top + (parent.scrollTop ?? 0)}px`
-            clone.style.left = `${rect.left - parentRect!.left + (parent.scrollLeft ?? 0)}px`
+            clone.style.top = `${rect.top - parentRect!.top + (positioningParent.scrollTop ?? 0)}px`
+            clone.style.left = `${rect.left - parentRect!.left + (positioningParent.scrollLeft ?? 0)}px`
             clone.style.width = `${rect.width}px`
             clone.style.height = `${rect.height}px`
+            // In its original slot the clone can be a grid item; frozen
+            // explicit grid lines would make its grid AREA the containing
+            // block and shift it off the offsets computed above.
+            clone.style.gridArea = 'auto'
         }
         clone.style.pointerEvents = 'none'
         clone.inert = true
@@ -1070,9 +1221,14 @@ export const createAnimatePresenceContext = (context: {
         clone.style.boxSizing = 'border-box'
         // Redundantly ensure no transforms are applied before positioning/z-index take effect
         resetTransforms(clone)
-        // Elevate clone above siblings to ensure it renders on top during exit
+        // Elevate clone above siblings to ensure it renders on top during exit.
+        // Its stacking siblings are both its DOM siblings in the slot and the
+        // boxes laid out in its containing block.
         try {
-            const siblings = Array.from(parent.children) as HTMLElement[]
+            const siblings = new Set([
+                ...Array.from(slotParent.children),
+                ...Array.from(positioningParent.children)
+            ]) as Set<HTMLElement>
             let maxZ = 0
             for (const sib of siblings) {
                 if (sib === clone) continue
@@ -1094,7 +1250,13 @@ export const createAnimatePresenceContext = (context: {
             mode,
             rect: { w: rect.width, h: rect.height, top: rect.top, left: rect.left }
         })
-        parent.appendChild(clone)
+        // Structural placement like upstream: the element's original slot, so
+        // ancestor, child-combinator and structural selectors (`> .card`,
+        // `:first-child`) match the clone exactly as they matched the element.
+        // With a placeholder holding the slot, the clone goes right before it
+        // and takes the element's original sibling index.
+        const slotAnchor = placeholder ?? resolvePlaceholderAnchor(child)
+        slotParent.insertBefore(clone, slotAnchor?.parentElement === slotParent ? slotAnchor : null)
 
         // Capture the element reference for this specific exit animation
         // This prevents race conditions where re-entry registers a new element with the same key
