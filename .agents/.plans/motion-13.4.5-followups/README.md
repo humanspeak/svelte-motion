@@ -7,7 +7,7 @@ maintainer ruled them not acceptable to ship. Lands on `chore/motion-13.4.5` bef
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | ---- | ----- | -------- | ------ | ---------- | ------ |
-| [009](009-presence-placeholder-and-handoff.md) | Exit placeholders keep margins; pin same-update handoffs; link presence demo | P1 | S–M | motion-13.4.5 (closed) | TODO |
+| [009](009-presence-placeholder-and-handoff.md) | Exit placeholders keep margins; pin same-update handoffs; link presence demo | P1 | S–M | motion-13.4.5 (closed) | DONE — 9a3a8df5; guard PASS |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason).
 
