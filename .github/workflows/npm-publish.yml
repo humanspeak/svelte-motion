@@ -609,7 +609,7 @@ jobs:
                   # Configure registry for scoped package
                   pnpm config set @humanspeak:registry https://registry.npmjs.org/
                   # Publish using pnpm with OIDC (trusted publishing)
-                  pnpm publish --provenance --access public --no-git-checks
+                  pnpm publish --provenance --access public --no-git-checks --tag latest
 
             - name: Cleanup on failure
               if: failure()
