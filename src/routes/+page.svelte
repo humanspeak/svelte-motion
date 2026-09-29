@@ -649,6 +649,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/clone-parent-styles') + searchParams}
+                    >
+                        Clone keeps parent-dependent styles
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/animate-presence/owned-child') + searchParams}
                     >
                         Clone vs owned child (real-node exit)
