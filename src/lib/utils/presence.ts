@@ -35,12 +35,13 @@ type PresenceChild = {
     lastRect: DOMRect
     lastComputedStyle: CSSStyleDeclaration
     /**
-     * `position` captured as a STRING while the element was still connected.
+     * Layout fields captured as STRINGS while the element was still connected.
      * `lastComputedStyle` is a live CSSStyleDeclaration, and once Svelte
      * detaches the node (keyed swaps detach before unregister) every property
-     * on it reads back as '' — so out-of-flow detection must not rely on it.
+     * on it reads back as '' — so out-of-flow detection and the exit
+     * placeholder (margins, display, flex/grid placement) must not rely on it.
      */
-    lastPosition: string
+    lastLayoutStyle: LayoutStyleSnapshot
     lastPopLayoutSnapshot?: PopLayoutSnapshot
     /**
      * The element's parent captured at registration. The exit placeholder is
@@ -65,6 +66,48 @@ type PresenceChild = {
     /** Last captured mid-animation transform (from rAF polling). */
     lastAnimatedTransform?: string
 }
+
+/**
+ * String copies of the computed-style fields an exit placeholder needs to
+ * reproduce the exiting element's layout slot.
+ */
+type LayoutStyleSnapshot = Pick<
+    CSSStyleDeclaration,
+    | 'position'
+    | 'display'
+    | 'margin'
+    | 'boxSizing'
+    | 'flex'
+    | 'alignSelf'
+    | 'gridColumnStart'
+    | 'gridColumnEnd'
+    | 'gridRowStart'
+    | 'gridRowEnd'
+>
+
+/**
+ * Copy the placeholder-relevant layout fields out of a computed style.
+ *
+ * A `CSSStyleDeclaration` from `getComputedStyle` is live: once its element
+ * is detached every property reads back as `''`. Snapshotting the values as
+ * plain strings while the element is connected keeps them usable after
+ * Svelte detaches a keyed node ahead of `unregisterChild`.
+ *
+ * @param style The computed style of a connected element.
+ * @returns A detached, plain-string copy of the layout fields.
+ */
+const snapshotLayoutStyle = (style: CSSStyleDeclaration): LayoutStyleSnapshot => ({
+    position: style.position,
+    display: style.display,
+    margin: style.margin,
+    boxSizing: style.boxSizing,
+    flex: style.flex,
+    alignSelf: style.alignSelf,
+    gridColumnStart: style.gridColumnStart,
+    gridColumnEnd: style.gridColumnEnd,
+    gridRowStart: style.gridRowStart,
+    gridRowEnd: style.gridRowEnd
+})
 
 /**
  * A measured `popLayout` box in the same coordinate space used by Motion's
@@ -771,7 +814,7 @@ export const createAnimatePresenceContext = (context: {
             mergedTransition,
             lastRect: initialRect,
             lastComputedStyle: initialStyle,
-            lastPosition: initialStyle.position,
+            lastLayoutStyle: snapshotLayoutStyle(initialStyle),
             lastPopLayoutSnapshot:
                 mode === 'popLayout' ? measurePopLayoutSnapshot(element, initialStyle) : undefined,
             insertionParent: element.parentElement ?? undefined,
@@ -791,7 +834,7 @@ export const createAnimatePresenceContext = (context: {
         if (child && rect.width > 0 && rect.height > 0) {
             child.lastRect = rect
             child.lastComputedStyle = computedStyle
-            child.lastPosition = computedStyle.position
+            child.lastLayoutStyle = snapshotLayoutStyle(computedStyle)
             child.lastScrollSnapshot = captureScrollSnapshot(child.element)
             child.hasScrollableAncestor = child.lastScrollSnapshot.length > 0
             if (mode === 'popLayout') {
@@ -859,7 +902,13 @@ export const createAnimatePresenceContext = (context: {
         let rect = elementIsLive
             ? child.element.getBoundingClientRect()
             : translateRectByScrollDelta(child.lastRect, staleScrollDelta)
-        const computed = elementIsLive ? getComputedStyle(child.element) : child.lastComputedStyle
+        const computedStyle = elementIsLive
+            ? getComputedStyle(child.element)
+            : child.lastComputedStyle
+        // Layout fields for the placeholder / out-of-flow check. A detached
+        // element's stored declaration is live and reads '' for everything,
+        // so fall back to the string snapshot taken while it was connected.
+        const computed = elementIsLive ? snapshotLayoutStyle(computedStyle) : child.lastLayoutStyle
         if (elementIsLive) {
             child.lastScrollSnapshot = captureScrollSnapshot(child.element)
             child.hasScrollableAncestor = child.lastScrollSnapshot.length > 0
@@ -872,10 +921,7 @@ export const createAnimatePresenceContext = (context: {
         // An out-of-flow child holds no layout slot, so a placeholder would
         // INSERT space that never existed — e.g. absolutely-positioned labels
         // crossfading inside a fixed-size pill briefly balloon the pill.
-        // Read position from the live element when possible, else from the
-        // string snapshot (a detached element's computed style is all '').
-        const exitPosition = elementIsLive ? computed.position : child.lastPosition
-        const isOutOfFlow = exitPosition === 'absolute' || exitPosition === 'fixed'
+        const isOutOfFlow = computed.position === 'absolute' || computed.position === 'fixed'
         let placeholder: HTMLElement | null = null
         const insertionParent =
             (child.element.parentElement?.isConnected ? child.element.parentElement : null) ??
@@ -931,12 +977,12 @@ export const createAnimatePresenceContext = (context: {
         const clone = child.element.cloneNode(true) as HTMLElement
         if (clone.id) clone.removeAttribute('id')
         try {
-            for (let i = 0; i < computed.length; i += 1) {
-                const prop = computed[i]
+            for (let i = 0; i < computedStyle.length; i += 1) {
+                const prop = computedStyle[i]
                 // Skip transforms to avoid double offset/scale on the absolutely positioned clone
                 if (/transform/i.test(prop)) continue
-                const value = computed.getPropertyValue(prop)
-                const priority = computed.getPropertyPriority(prop)
+                const value = computedStyle.getPropertyValue(prop)
+                const priority = computedStyle.getPropertyPriority(prop)
                 if (value) clone.style.setProperty(prop, value, priority)
             }
             // Ensure no transform remains on the clone (including vendor-prefixed)
@@ -972,7 +1018,7 @@ export const createAnimatePresenceContext = (context: {
         const popLayoutSnapshot =
             mode === 'popLayout'
                 ? child.element.isConnected
-                    ? measurePopLayoutSnapshot(child.element, computed)
+                    ? measurePopLayoutSnapshot(child.element, computedStyle)
                     : child.lastPopLayoutSnapshot
                 : undefined
         const parentRect = popLayoutSnapshot ? undefined : positioningParent.getBoundingClientRect()
@@ -988,7 +1034,7 @@ export const createAnimatePresenceContext = (context: {
         parent = positioningParent
 
         // Preserve the original display property (especially flex for centered content)
-        const originalDisplay = computed.display
+        const originalDisplay = computedStyle.display
 
         clone.style.left = ''
         clone.style.right = ''

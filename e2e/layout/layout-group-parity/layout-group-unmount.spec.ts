@@ -59,6 +59,41 @@ test.describe('Shared layout: component unmounts in a LayoutGroup', () => {
  * backward jump in #b's per-frame position.
  */
 test.describe('LayoutGroup + AnimatePresence: exit completes', () => {
+    test('a layout sibling holds its slot while the exit is still running', async ({ page }) => {
+        await page.goto('/tests/layout/layout-group-presence?@isPlaywright=true')
+        await page.locator('#b').waitFor({ state: 'visible' })
+        await page.waitForTimeout(250)
+
+        const start = (await bbox(page.locator('#b'))).top
+        // Sample #b every frame from the click until 250ms in — #a's exit
+        // runs 300ms, so its (placeholder-held) slot must not collapse yet.
+        const tops = await page.evaluate(
+            () =>
+                new Promise<number[]>((resolve) => {
+                    const b = document.getElementById('b')!
+                    const samples: number[] = []
+                    const t0 = performance.now()
+                    const record = () => {
+                        samples.push(b.getBoundingClientRect().top)
+                        if (performance.now() - t0 < 250) requestAnimationFrame(record)
+                        else resolve(samples)
+                    }
+                    document
+                        .getElementById('a')!
+                        .dispatchEvent(new MouseEvent('click', { bubbles: true }))
+                    requestAnimationFrame(record)
+                })
+        )
+
+        expect(tops.length).toBeGreaterThan(5)
+        for (const [i, top] of tops.entries()) {
+            expect(
+                Math.abs(top - start),
+                `frame ${i} (start ${start}): ${tops.map(Math.round).join(',')}`
+            ).toBeLessThanOrEqual(0.5)
+        }
+    })
+
     test('a layout sibling animates into the freed space exactly once', async ({ page }) => {
         await page.goto('/tests/layout/layout-group-presence?@isPlaywright=true')
         await page.locator('#b').waitFor({ state: 'visible' })

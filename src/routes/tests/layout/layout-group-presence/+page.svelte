@@ -8,8 +8,10 @@
     // layout-group-unmount.spec.ts).
     //
     // #a exits inside AnimatePresence; #b is a `layout` sibling in the same
-    // LayoutGroup. Once #a's exit finishes and it leaves the layout, #b must
-    // animate up into the freed space exactly once — no snap, no restart.
+    // LayoutGroup. While #a's exit runs, its placeholder (margins included)
+    // holds the slot, so #b must not move. Once the exit finishes and #a
+    // leaves the layout, #b animates up into the freed space exactly once —
+    // no snap, no restart.
 
     let showA = $state(true)
 
@@ -19,8 +21,13 @@
         {
             text: 'Click the red box (#a) to remove it.',
             expected:
-                'Red fades out. Then the blue box (#b) glides up into the empty space over 1 second, once, without jumping.',
+                'Blue stays put while red fades. After red is gone, blue glides up once into the empty space over 1 second, without jumping.',
             action: { run: () => document.getElementById('a')?.click() }
+        },
+        {
+            text: 'Reload the page and watch blue closely during the first third of a second after clicking red.',
+            expected:
+                'Blue does not move at all while red is still visible — no 40px hop up at the start of the fade.'
         }
     ]
 </script>
@@ -65,7 +72,8 @@
             <code>layout</code> sibling in the same <code>LayoutGroup</code>.
         </p>
         <p>
-            When red's exit completes, the group re-measures (upstream's
+            While red fades, its exit placeholder keeps red's full slot — margins included — so blue
+            holds still. When red's exit completes, the group re-measures (upstream's
             <code>forceRender</code>) and blue animates into the freed space exactly once.
         </p>
     {/snippet}

@@ -739,6 +739,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/shift-swap') + searchParams}
+                    >
+                        layoutId — same-update shift + swap starts from the painted position
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout/scroll') + searchParams}
                     >
                         layoutScroll — single container
@@ -790,6 +798,15 @@
                         href={resolve('/tests/layout/layout-group-unmount-list') + searchParams}
                     >
                         LayoutGroup — list sibling stays put when a neighbour is removed
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/layout-group-presence') + searchParams}
+                    >
+                        LayoutGroup + AnimatePresence — sibling holds still during the exit, then
+                        glides into the gap once
                     </a>
                 </li>
                 <li>

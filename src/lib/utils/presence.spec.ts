@@ -701,6 +701,49 @@ describe('AnimatePresence modes', () => {
             expect(clone).toBeTruthy()
             expect(clone?.parentElement).toBe(parent)
         })
+
+        it('keeps margin, display and box-sizing on placeholders for detached children', () => {
+            // Model the browser's LIVE CSSStyleDeclaration: every property
+            // reads back as '' once the element leaves the document.
+            const connectedValues: Record<string, string> = {
+                position: 'static',
+                display: 'flex',
+                margin: '20px',
+                boxSizing: 'border-box',
+                flex: '0 0 auto',
+                alignSelf: 'center'
+            }
+            const liveStyle = new Proxy(mockComputedStyle(), {
+                get(target, prop, receiver) {
+                    if (typeof prop === 'string' && prop in connectedValues) {
+                        return el.isConnected ? connectedValues[prop] : ''
+                    }
+                    return Reflect.get(target, prop, receiver)
+                }
+            })
+            vi.spyOn(window, 'getComputedStyle').mockImplementation((target: Element) =>
+                target === el
+                    ? liveStyle
+                    : mockComputedStyle({ position: 'relative', display: 'block' })
+            )
+
+            const ctx = createAnimatePresenceContext({ mode: 'sync' })
+            ctx.registerChild('k1', el, { opacity: 0 })
+
+            // Svelte detaches keyed nodes before unregister runs.
+            el.remove()
+            ctx.unregisterChild('k1')
+
+            const placeholder = parent.querySelector<HTMLElement>(
+                '[data-presence-placeholder="true"]'
+            )
+            expect(placeholder).toBeTruthy()
+            expect(placeholder?.style.margin).toBe('20px')
+            expect(placeholder?.style.display).toBe('flex')
+            expect(placeholder?.style.boxSizing).toBe('border-box')
+            expect(placeholder?.style.flex).toBe('0 0 auto')
+            expect(placeholder?.style.alignSelf).toBe('center')
+        })
     })
 })
 
