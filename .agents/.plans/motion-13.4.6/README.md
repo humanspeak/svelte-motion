@@ -2,9 +2,11 @@
 
 Generated with improve on 2026-09-29 against `07a1b1ae` on `chore/motion-13.4.6`, created from freshly fetched origin/main. The maintainer selected both audit findings and requested dispatch to Sol. Run serially on this branch; the conductor owns commits, plan changes, verification records, and this index. No push, PR, publication, or deployment is part of this batch.
 
+Standing PR instruction (2026-09-29): every PR created or updated for this work must carry the `skip-publish` label. No PR exists for this branch yet; apply and verify the label when PR work is authorized.
+
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-wait-exit-key-change.md) | Characterize latest-key wins at wait exit completion | P2 | S–M | — | TODO |
+| [001](001-wait-exit-key-change.md) | Characterize latest-key wins at wait exit completion | P2 | S–M | — | IN PROGRESS — Sol dispatched from c48fa24f |
 | [002](002-motion-dependency-refresh.md) | Align Motion with 13.4.6 and verify the release | P3 | S | 001 | TODO |
 
 ## Dependency and execution notes
@@ -12,6 +14,7 @@ Generated with improve on 2026-09-29 against `07a1b1ae` on `chore/motion-13.4.6`
 - 001 establishes Svelte behavior on Motion 13.4.5 before 002 changes the dependency baseline. A runtime defect is not established by the audit; 001 is coverage work, not permission for a speculative presence rewrite.
 - Use native Sol subagents with completion reports delivered to the conductor. The dispatch reference's Claude-hosted Codex companion is unnecessary in this native Codex environment. Executors can run local commands, install dependencies and browsers here; they must not commit, edit plans, or change files outside their plan. Guard independently reproduces gates.
 - The system pnpm launcher cannot obtain a darwin-x64 native 11.24.0 binary. `npm exec --yes --package=pnpm@11.24.0 -- pnpm --version` works. The cached launcher is `/Users/jasonkummerl/.npm/_npx/0c20c093bc303280/node_modules/.bin/pnpm`; prepend its directory to PATH for commands/hooks so subprocesses also use 11.24.0. Do not change repo packageManager declarations to work around this host.
+- Execution correction: also export process-local `pnpm_config_pm_on_fail=ignore` and `pnpm_config_verify_deps_before_run=false`. The first prevents nested git-dependency preparation switching to an unavailable native executable; the second prevents test commands unexpectedly repairing dependencies. Guard performs the actual frozen install separately. Both plans document this environment-only amendment.
 - Branch has no upstream configured; upstream safety must be checked again before each commit.
 - Audit baseline: 83 focused presence tests passed with installed Vitest. Broader build/browser gates were not run during the read-only audit.
 - The user's failed-full-e2e workflow applies: inspect each failing page in the collaborative in-app browser, explain the intended behavior/assertion/visible result, and obtain the user's behavior-versus-test decision before changing it. Targeted failures are diagnosed normally; never weaken an assertion without evidence.

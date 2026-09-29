@@ -2,6 +2,8 @@
 
 > **Executor instructions:** Follow this plan and report STOP conditions. The conductor owns all commits, index updates and guard records; never edit plans. Run only after plan 001 is DONE. Do not claim the React AnimatePresence fix changes Svelte runtime behavior.
 >
+> Revision 2026-09-29: native pnpm preparation requires process-local `pnpm_config_pm_on_fail=ignore` to retain the pinned JavaScript launcher in nested git-dependency builds; use `pnpm_config_verify_deps_before_run=false` to prevent surprise install attempts during checks. Keep the pinned PATH and all frozen-install/version checks. No tracked toolchain configuration changes are authorized.
+>
 > **Drift check:** `git diff --stat 07a1b1ae..HEAD -- package.json pnpm-lock.yaml .changeset/motion-13-4-5.md`. Inspect any drift before proceeding; plan 001 must not change these files.
 
 ## Status
@@ -11,7 +13,7 @@
 - Risk: LOW
 - Depends on: 001-wait-exit-key-change.md (reviewed DONE)
 - Category: migration
-- Planned at: commit `07a1b1ae`, 2026-09-29
+- Planned at: commit `c48fa24f`, 2026-09-29 (source baseline unchanged by the plans-only commit)
 
 ## Why this matters
 

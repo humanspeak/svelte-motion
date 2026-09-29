@@ -2,6 +2,8 @@
 
 > **Executor instructions:** Follow the ordered steps and boundaries. The conductor maintains the index and commits your changes; never edit `.agents/**` or commit. This is characterization, not an assumed bug fix. Report unexpected runtime failures with their evidence before changing library implementation.
 >
+> Revision 2026-09-29: native execution discovered pnpm's default pre-run auto-install and nested git-dependency launcher selection. Use process-local `pnpm_config_verify_deps_before_run=false` and `pnpm_config_pm_on_fail=ignore` with the pinned JavaScript pnpm PATH. Guard owns frozen environment repair. Direct installed CLI/npm-script equivalents are valid if these settings are inherited by subprocesses; all original gates still apply. No source scope or behavior criterion changed.
+>
 > **Drift check:** `git diff --stat 07a1b1ae..HEAD -- src/routes/tests/animate-presence/wait-exit-key-change src/routes/+page.svelte e2e/animate-presence/wait-exit-key-change.spec.ts`. Compare any changes with the facts below before proceeding.
 
 ## Status
@@ -11,7 +13,7 @@
 - Risk: LOW for coverage; a runtime fix requires a separate decision
 - Depends on: none
 - Category: tests
-- Planned at: commit `07a1b1ae`, 2026-09-29
+- Planned at: commit `c48fa24f`, 2026-09-29 (source baseline remains 07a1b1ae; intervening commit is plans only)
 
 ## Why this matters
 
