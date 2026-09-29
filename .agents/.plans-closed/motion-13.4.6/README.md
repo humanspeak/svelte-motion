@@ -1,5 +1,7 @@
 # Motion 13.4.6 release alignment
 
+> **CLOSED 2026-09-29.** Both plans DONE with independent guard PASS: 001 at cd900593 (completion-boundary characterization and reset-isolation red/green), 002 at61c00d15 (Motion13.4.6 dependency alignment). Delivered focused regression demo/tests/root link, minimal manifest/lock update and accurate patch note. Full units1,029; new browser repetitions12; neighbor browsers12; final upgraded browser smoke16; root/docs types, build/package/publint, consumer and scoped Trunk gates passed. Remaining for the maintainer: PR/release decision. Nothing pushed, published or deployed.
+
 Generated with improve on 2026-09-29 against `07a1b1ae` on `chore/motion-13.4.6`, created from freshly fetched origin/main. The maintainer selected both audit findings and requested dispatch to Sol. Run serially on this branch; the conductor owns commits, plan changes, verification records, and this index. No push, PR, publication, or deployment is part of this batch.
 
 PR label correction (2026-09-29): the maintainer retracted the `skip-publish` instruction because it belonged to another window. No label override applies to this batch and no PR labels were changed.
