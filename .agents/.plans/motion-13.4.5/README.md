@@ -19,7 +19,7 @@ rewrite). They first ship in the 13.4.5 package, so they are in this batch.
 | [003](003-reorder-guard-values.md) | Reorder guard clears only when `values` changes | P1 | S | — | DONE — 4144edf7; guard PASS |
 | [004](004-presence-add-during-exit.md) | Characterize AnimatePresence add-during-exit (#3856) | P2 | S | — | DONE — 4c221667; guard PASS (characterization, all green) |
 | [005](005-layout-group-parity-suite.md) | Port upstream's LayoutGroup parity suite (red tests) | P1 | M | — | DONE — 8747d80e; guard PASS (11 expected reds) |
-| [007](007-layout-group-node-groups.md) | LayoutGroup owns a projection node group (upstream parity) | P1 | L | 005 | IN PROGRESS — checkpoint passed 2026-09-29; resumes after 006 with Step 4b (gaps a–d) per revision |
+| [007](007-layout-group-node-groups.md) | LayoutGroup owns a projection node group (upstream parity) | P1 | L | 005 | DONE — 4a69292c; guard PASS (14/17 parity green; 2 → 008, 1 spec-click follow-up) |
 | [008](008-layoutid-update-driven-capture.md) | layoutId handoff rects captured on updates, not per frame (read-count parity) | P1 **release blocker** | M–L | 006, 007 | TODO |
 | [006](006-bump-motion-13-4-5.md) | Bump motion/motion-dom to 13.4.5 + verify inherited fixes | P1 | S | 001–003, 005 | DONE — 30b0088e; guard PASS (no parity flips on 13.4.5 alone) |
 
@@ -68,22 +68,19 @@ in a separate LayoutGroup, which we couldn't express before.
 
 ## LayoutGroup parity matrix
 
-Recorded 2026-09-28 by Plan 005 (build+preview, chromium, 3/3 repeats). Owner that must flip it in brackets.
+Updated 2026-09-29 after Plans 006 + 007 (Motion 13.4.5, node groups; chromium, 3/3 repeats). The original 2026-09-28 baseline had 11 reds; see git history of this file.
 
 | Spec | Case | Status |
 | --- | --- | --- |
-| layout-group | relative children should not instantly jump to new layout | red: #button snaps 39→114 in one frame [007/006] |
-| layout-group | …after performing their own layout animation | red: snaps 149→224 [007/006] |
-| layout-group | return to original state when expander clicked twice with delay | red: first click snaps, no mid-animation [007/006] |
-| layout-group-interrupt | relative child follows parent when parent re-layout interrupts its animation | red: ~163px single-frame jump (limit <20) [007/006] |
-| layout-group-interrupt-measurements | doesn't re-measure a non-animating relative child | red: #text-wrapper never measured (0 reads) [007] |
-| layout-group-interrupt-measurements | re-measures a layout-animating relative child once per parent re-layout | red: 0 reads [007/006] |
-| layout-group-unmount | sibling animation on unmount | red: #b lands at 20 immediately, expected frozen midpoint 90 [007] |
-| layout-group-unmount | sibling whose relative position changed stays put | green |
-| relative-child-measurements | doesn't measure a child that isn't animating | red: #parent never measured [007] |
-| relative-child-measurements | doesn't measure an animating child without a relative target | red: same cause [007] |
-| relative-child-measurements | measures a layout-animating child once, so it doesn't jump | red: child0 0 reads, expected 1 [007/006] |
-| relative-child-measurements | doesn't measure a child whose animation finished while parent animates | green |
-| relative-child-measurements | doesn't measure a child whose animation finished once settled | green |
-| relative-child-measurements | measures each layout-animating child once per parent re-layout | red: 0 reads, expected 50 [007/006] |
-| layoutGroup.context.spec (unit) | 4 upstream id-chaining cases | green |
+| layout-group | should not instantly jump | green |
+| layout-group | after their own layout animation | green |
+| layout-group | clicked twice with delay | green |
+| layout-group-subtree (new, 007 d) | separate-group descendant on committer's own change | green |
+| layout-group-interrupt | relative child follows parent through interrupt | red (test.fail): Playwright click waits ~7s for "stable"; native click passes 3/3 — spec-port fix pending |
+| interrupt-measurements | doesn't re-measure non-animating child | red (test.fail) → Plan 008 |
+| interrupt-measurements | re-measures animating child once | red (test.fail) → Plan 008 |
+| layout-group-unmount | sibling animation on unmount | green |
+| layout-group-unmount | sibling whose relative position changed stays | green |
+| layout-group-unmount (new, 007 D7) | exit frees space, animates once | green |
+| relative-child-measurements | all 6 cases | green |
+| layoutGroup.context.spec (unit) | id chaining + node-group cases | green |
