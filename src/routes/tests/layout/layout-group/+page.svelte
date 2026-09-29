@@ -115,6 +115,5 @@
     :global(.container),
     :global(#sandbox) {
         display: block;
-        min-height: 0;
     }
 </style>
