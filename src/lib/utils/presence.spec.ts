@@ -7,6 +7,7 @@ import {
     getPresenceDepth,
     measurePopLayoutSnapshot,
     observeStyleChanges,
+    readAnimatedValues,
     resolvePopLayoutStyles,
     setPresenceDepth,
     snapshotComputedStyle
@@ -1086,6 +1087,88 @@ describe('exit clone style freeze', () => {
         expect(container.firstElementChild).toBe(exitClone())
         // Still positioned against the nearest box-generating ancestor.
         expect(host.style.position).toBe('relative')
+    })
+
+    it("re-snapshots a connected child when a sibling's exit restyles it structurally", () => {
+        const first = document.createElement('div')
+        container.insertBefore(first, card)
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        ctx.registerChild('first', first, { opacity: 0 })
+        ctx.registerChild('card', card, { opacity: 0 })
+
+        // `first` leaves; `card` becomes :first-child and restyles — no
+        // attribute on `card` changes.
+        first.remove()
+        cardValues['background-color'] = 'rgb(43, 89, 195)'
+        cardValues['border-top-left-radius'] = '4px'
+        ctx.unregisterChild('first')
+
+        card.remove()
+        ctx.unregisterChild('card')
+        const cardClone = document.querySelector<HTMLElement>('.card[data-clone="true"]')!
+        expect(cardClone.style.getPropertyValue('border-top-left-radius')).toBe('4px')
+    })
+
+    it('hands a mid-exit clone over to the re-entering element', async () => {
+        const onExitComplete = vi.fn()
+        vi.spyOn(window, 'getComputedStyle').mockImplementation((target) =>
+            target === card
+                ? liveComputedStyle(card, cardValues)
+                : target.hasAttribute?.('data-clone')
+                  ? liveComputedStyle(target, { opacity: '0.53' })
+                  : mockComputedStyle(
+                        target === container
+                            ? { display: 'contents', position: 'static' }
+                            : { display: 'block', position: 'static' }
+                    )
+        )
+        const ctx = createAnimatePresenceContext({ mode: 'sync', onExitComplete })
+        ctx.registerChild('card', card, { opacity: 0 })
+        card.remove()
+        ctx.unregisterChild('card')
+        expect(exitClone()).toBeTruthy()
+
+        const handoff = ctx.takeExitHandoff('card')
+        expect(handoff?.from).toEqual({ opacity: 0.53 })
+        // The clone and its slot placeholder go at once: no overlap.
+        expect(document.querySelector('[data-clone="true"]')).toBeNull()
+        expect(document.querySelector('[data-presence-placeholder="true"]')).toBeNull()
+        // A second claim finds nothing in flight.
+        expect(ctx.takeExitHandoff('card')).toBeUndefined()
+
+        // The reversed exit never completes (upstream deletes it from
+        // exitComplete on re-entry), even once its animation settles.
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(onExitComplete).not.toHaveBeenCalled()
+    })
+})
+
+describe('readAnimatedValues', () => {
+    beforeEach(() => {
+        vi.restoreAllMocks()
+        document.body.innerHTML = ''
+    })
+
+    it('reads transforms from the matrix, opacity as a number and other keys as CSS', () => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        const values: Record<string, string> = {
+            transform: 'matrix(1, 0, 0, 1, 12, -4)',
+            opacity: '0.25',
+            'background-color': 'rgb(1, 2, 3)'
+        }
+        vi.spyOn(window, 'getComputedStyle').mockImplementation(
+            () =>
+                ({
+                    transform: values.transform,
+                    getPropertyValue: (prop: string) => values[prop] ?? ''
+                }) as unknown as CSSStyleDeclaration
+        )
+
+        expect(
+            readAnimatedValues(element, ['x', 'y', 'opacity', 'backgroundColor', 'transition'])
+        ).toEqual({ x: 12, y: -4, opacity: 0.25, backgroundColor: 'rgb(1, 2, 3)' })
     })
 })
 

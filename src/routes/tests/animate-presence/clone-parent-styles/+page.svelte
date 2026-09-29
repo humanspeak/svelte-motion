@@ -122,8 +122,9 @@ look is whatever the page's selectors match at that new spot:
             action: { label: 'Remove Card A', run: () => click('remove-a') }
         },
         {
-            text: 'Remove Card B (control: plain descendant selector).',
-            expected: 'Card B fades out and stays tomato with 12px corners and white bold text.',
+            text: 'Once Card A is gone, Card B is the first card and turns blue. Remove Card B.',
+            expected:
+                'Card B fades out blue with 24px corners — the look it had when removed, not the tomato look it had when it first appeared.',
             action: { label: 'Remove Card B', run: () => click('remove-b') }
         },
         {
@@ -131,6 +132,27 @@ look is whatever the page's selectors match at that new spot:
             expected:
                 'The solo card fades out over 1.5 s and keeps its tomato background, rounded corners and white bold text until it is gone.',
             action: { label: 'Hide solo card', run: () => click('toggle-solo') }
+        },
+        {
+            text: 'Show the solo card, then hide it and show it again mid-fade (about 0.5 s in).',
+            expected:
+                'It fades back in from where it was — no jump to full opacity, and never two solo cards at once.',
+            action: {
+                label: 'Hide, then show at 0.5 s',
+                run: () => {
+                    const hideThenShow = () => {
+                        click('toggle-solo')
+                        setTimeout(() => click('toggle-solo'), 500)
+                    }
+                    if (soloVisible) {
+                        hideThenShow()
+                    } else {
+                        // Let the card finish entering first.
+                        soloVisible = true
+                        setTimeout(hideThenShow, 1600)
+                    }
+                }
+            }
         },
         {
             text: 'Watch the live readout during each exit.',
@@ -169,6 +191,8 @@ look is whatever the page's selectors match at that new spot:
                     class="card"
                     data-card
                     data-testid={`card-${card.id}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 1.5 }}
                 >
@@ -195,6 +219,8 @@ look is whatever the page's selectors match at that new spot:
                     class="card"
                     data-card
                     data-testid="card-solo"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 1.5 }}
                 >

@@ -1224,6 +1224,50 @@
             reducedMotion
         )
     )
+    // Re-entry while this key's exit clone is still animating out (plan 010
+    // Step 5). Upstream never unmounts an exiting child: AnimatePresence keeps
+    // rendering it and flips its `isPresent` back to true
+    // (AnimatePresence/index.tsx render map, PresenceChild context), so the
+    // SAME element animates from wherever the exit had got to back to its
+    // `animate` target. The clone path can't keep the element, so this one
+    // takes the exit over: the clone is removed (no overlap) and this
+    // element starts from the values it was showing, instead of replaying
+    // `initial`. Runs before first paint, while `latestValues` is only seeded.
+    let reentryRestore: Record<string, string | number> | undefined
+    const reentryHandoff =
+        visualElement && shouldRegisterPresenceExit
+            ? context?.takeExitHandoff(presenceKey)
+            : undefined
+    if (visualElement && reentryHandoff) {
+        untrack(() => {
+            const lastKeyframe = (value: unknown): unknown =>
+                Array.isArray(value) ? (value as unknown[])[value.length - 1] : value
+            const target = (animateKeyframes ?? {}) as Record<string, unknown>
+            const seed: Record<string, unknown> = {}
+            // Keys the enter would replay from `initial` start where the
+            // element already was — its animate target — like upstream, where
+            // the element never went back to `initial`.
+            for (const key of Object.keys((initialKeyframes ?? {}) as Record<string, unknown>)) {
+                const value = lastKeyframe(target[key])
+                if (value != null) seed[key] = value
+            }
+            // Exit keys start from what the clone was showing.
+            Object.assign(seed, reentryHandoff.from)
+            for (const [key, value] of Object.entries(seed)) {
+                const motionValue = visualElement.getValue(key)
+                if (motionValue) motionValue.jump(value as AnyResolvedKeyframe)
+                else visualElement.setStaticValue(key, value as AnyResolvedKeyframe)
+            }
+            // Exit keys the enter won't animate go back to their pre-exit
+            // value once mounted (upstream animates them to the base target).
+            for (const key of Object.keys(reentryHandoff.from)) {
+                if (key in target || reentryHandoff.base[key] === undefined) continue
+                reentryRestore ??= {}
+                reentryRestore[key] = reentryHandoff.base[key]
+            }
+        })
+    }
+
     const optimizedAppearEntries = $derived(
         createOptimizedAppearData(
             initialKeyframes as Record<string, unknown> | undefined,
@@ -2142,6 +2186,18 @@
         // the seeded starting state is actually applied before anything animates.
         // Safe now that `animationState` drives `latestValues`.
         visualElement.scheduleRenderMicrotask()
+        // Re-entry handoff (see `reentryHandoff`): exit keys outside the
+        // `animate` target animate back to their pre-exit values. One-shot and
+        // untracked, so a later transition change never re-runs this effect.
+        if (reentryRestore) {
+            const restore = reentryRestore
+            reentryRestore = undefined
+            untrack(() =>
+                animateTarget(visualElement, restore as TargetAndTransition, {
+                    transitionOverride: mergedTransition as Transition | undefined
+                })
+            )
+        }
         // The FIRST `animateChanges()` is fired by the mount/enter effect below,
         // which owns the `isLoaded` phase transitions and the wait-mode gate
         // (upstream does the equivalent in a later effect,

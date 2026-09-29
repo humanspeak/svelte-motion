@@ -136,11 +136,69 @@ const expectCloneAvoidsTrap = (record: ExitRecord) => {
     })
 }
 
+const waitForCardsEntered = (page: Page) =>
+    page.waitForFunction(() => {
+        const cards = document.querySelectorAll('[data-card]:not([data-clone])')
+        return (
+            cards.length > 0 &&
+            Array.from(cards).every((card) => Number(getComputedStyle(card).opacity) === 1)
+        )
+    })
+
+type ReentryFrame = {
+    /** Solo-card nodes (live or clone) painted with opacity > 0.05. */
+    visible: number
+    /** Opacity of the topmost visible solo-card node (0 when none). */
+    opacity: number
+}
+
+/**
+ * Hide the solo card, show it again `showAfterMs` later, and sample every
+ * animation frame until the card is settled again.
+ */
+const recordReentry = async (page: Page, showAfterMs: number) =>
+    page.evaluate(
+        (showAfterMs) =>
+            new Promise<ReentryFrame[]>((resolve) => {
+                const toggle = document.querySelector<HTMLElement>('[data-testid="toggle-solo"]')!
+                const frames: ReentryFrame[] = []
+                const started = performance.now()
+                let shown = false
+                const tick = () => {
+                    const nodes = Array.from(
+                        document.querySelectorAll<HTMLElement>('[data-testid="card-solo"]')
+                    )
+                    const opacities = nodes
+                        .map((node) => Number(getComputedStyle(node).opacity))
+                        .filter((opacity) => opacity > 0.05)
+                    frames.push({
+                        visible: opacities.length,
+                        opacity: opacities.length ? Math.max(...opacities) : 0
+                    })
+                    const elapsed = performance.now() - started
+                    if (!shown && elapsed >= showAfterMs) {
+                        shown = true
+                        toggle.click()
+                    }
+                    if (elapsed > showAfterMs + 2200) {
+                        resolve(frames)
+                        return
+                    }
+                    requestAnimationFrame(tick)
+                }
+                toggle.click()
+                requestAnimationFrame(tick)
+            }),
+        showAfterMs
+    )
+
 test.describe('AnimatePresence exit clone keeps parent-dependent styles', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto(URL)
         await expect(page.getByTestId('card-a')).toBeVisible()
         await expect(page.getByTestId('card-solo')).toBeVisible()
+        // The cards fade in (initial opacity 0 → 1); start from settled cards.
+        await waitForCardsEntered(page)
     })
 
     test('keyed {#each} Card A keeps its :first-child featured look', async ({ page }) => {
@@ -163,5 +221,33 @@ test.describe('AnimatePresence exit clone keeps parent-dependent styles', () => 
         expect(record.live.backgroundColor).toBe('rgb(255, 99, 71)')
         expect(record.live.fontWeight).toBe('600')
         expectCloneKeepsLook(record)
+    })
+
+    test('Card B exits with the look it had at removal, after Card A left', async ({ page }) => {
+        // Card A's exit finishes; Card B becomes :first-child and turns blue.
+        await recordExit(page, 'card-a', 'remove-a')
+        await page.waitForTimeout(500)
+
+        const record = await recordExit(page, 'card-b', 'remove-b')
+        expect(record.live.backgroundColor).toBe('rgb(43, 89, 195)')
+        expect(record.live.borderTopLeftRadius).toBe('24px')
+        expectCloneKeepsLook(record)
+    })
+
+    test('{#if} solo card re-shown mid-exit fades back in from where it was', async ({ page }) => {
+        const frames = await recordReentry(page, 500)
+        const opacities = frames.map((frame) => frame.opacity)
+
+        // The exit really was underway, and the card really came back.
+        expect(Math.min(...opacities)).toBeLessThan(0.9)
+        expect(opacities[opacities.length - 1]).toBe(1)
+
+        frames.forEach((frame, index) => {
+            expect(frame.visible, `visible solo cards on frame ${index}`).toBeLessThanOrEqual(1)
+            if (index > 0) {
+                const jump = Math.abs(frame.opacity - frames[index - 1].opacity)
+                expect(jump, `opacity jump into frame ${index}`).toBeLessThanOrEqual(0.15)
+            }
+        })
     })
 })

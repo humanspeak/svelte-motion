@@ -2,7 +2,7 @@ import type { AnimatePresenceMode, MotionExit, MotionTransition } from '$lib/typ
 import { mergeTransitions } from '$lib/utils/animation'
 import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
-import type { PresenceContextProps } from 'motion-dom'
+import { readTransformValue, transformProps, type PresenceContextProps } from 'motion-dom'
 import { getContext, setContext } from 'svelte'
 import { createSubscriber } from 'svelte/reactivity'
 
@@ -214,6 +214,57 @@ export const observeStyleChanges = (element: HTMLElement, onChange: () => void):
         if (settling) cancelAnimationFrame(frameId)
         settling = false
     }
+}
+
+/**
+ * The values an exit clone was showing when its key re-entered, handed to the
+ * re-entering element so it animates back from there (upstream reverses the
+ * exit on the same element instead of starting a fresh enter).
+ */
+export type ExitHandoff = {
+    /** Each exit key's value on the clone at the moment of re-entry. */
+    from: Record<string, string | number>
+    /** Each exit key's value before the exit started (its pre-exit look). */
+    base: Record<string, string | number>
+}
+
+const nonValueExitKeys = new Set(['transition', 'transitionEnd', 'ease'])
+
+/**
+ * Read the current value of each animated key from an element, in the units
+ * Motion animates them in: transform shorthands (`x`, `scale`, `rotate`, …)
+ * are decomposed from the computed matrix the way Motion's own DOM keyframe
+ * resolver does (`readTransformValue`); `opacity` is a number; any other
+ * property is its computed string.
+ *
+ * @param element The element to read (connected).
+ * @param keys Motion value keys, camelCase or CSS custom properties.
+ * @returns Key → current value; keys with no readable value are omitted.
+ * @example
+ * ```ts
+ * readAnimatedValues(clone, ['opacity', 'x']) // { opacity: 0.53, x: 12 }
+ * ```
+ */
+export const readAnimatedValues = (
+    element: HTMLElement,
+    keys: string[]
+): Record<string, string | number> => {
+    const values: Record<string, string | number> = {}
+    const style = getComputedStyle(element)
+    for (const key of keys) {
+        if (nonValueExitKeys.has(key)) continue
+        if (transformProps.has(key)) {
+            values[key] = readTransformValue(element, key)
+            continue
+        }
+        const cssName = key.startsWith('--')
+            ? key
+            : key.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)
+        const value = style.getPropertyValue(cssName).trim()
+        if (!value) continue
+        values[key] = key === 'opacity' ? Number(value) : value
+    }
+    return values
 }
 
 /**
@@ -499,6 +550,22 @@ export type AnimatePresenceContext = {
     updateChildAnimatedStyle: (key: string, opacity: string, transform: string) => void
     /** Unregister a child. If it has an exit, clone and animate it out. */
     unregisterChild: (key: string) => void
+    /**
+     * Claim the in-flight exit of `key` for a re-entering element.
+     *
+     * When a key comes back while its exit clone is still animating out,
+     * upstream keeps the SAME element and reverses the exit from its current
+     * values. The clone path can't keep the element, so the re-entering one
+     * takes over instead: this stops the exit, removes the clone (no overlap)
+     * and returns the values it was showing, for the new element to start
+     * from. The reversed exit does not count as completed, so
+     * `onExitComplete` does not fire for it.
+     *
+     * @param key The re-entering child's presence key.
+     * @returns The clone's current and pre-exit values, or `undefined` when
+     *   no exit is in flight for `key`.
+     */
+    takeExitHandoff: (key: string) => ExitHandoff | undefined
     /**
      * @internal Used by `PresenceChild` to participate in the same exit
      * accounting as the clone-based motion-element exit path. Increments the
@@ -808,6 +875,48 @@ export const createAnimatePresenceContext = (context: {
     // Track number of in-flight exit animations to invoke onExitComplete once
     let inFlightExits = 0
 
+    type ActiveExit = {
+        clone: HTMLElement
+        child: PresenceChild
+        placeholder: HTMLElement | null
+        /** Set once the exit animation (and its `startExit`) has begun. */
+        animation?: { stop?: () => void }
+        /** Pre-exit values of the exit keys, read before the animation starts. */
+        base?: Record<string, string | number>
+        /** A re-entry took the exit over; its completion must not clean up. */
+        handedOff: boolean
+    }
+    const activeExits = new Map<string, ActiveExit>()
+
+    /**
+     * Re-snapshot every still-connected child's computed style.
+     *
+     * A child's look can change with no attribute change on it: a sibling
+     * leaving turns it into `:first-child`, an exit clone or placeholder
+     * appearing or disappearing shifts `:nth-child`/`+` matches. Any such
+     * structural change schedules this pass, coalesced to one per frame, so
+     * a child that is removed later freezes the look it had at removal.
+     */
+    let snapshotRefreshScheduled = false
+    const refreshConnectedSnapshots = () => {
+        snapshotRefreshScheduled = false
+        for (const child of children.values()) {
+            if (!child.element.isConnected) continue
+            child.lastStyleSnapshot = snapshotComputedStyle(getComputedStyle(child.element))
+        }
+    }
+    const scheduleSnapshotRefresh = () => {
+        if (snapshotRefreshScheduled || typeof requestAnimationFrame === 'undefined') return
+        snapshotRefreshScheduled = true
+        requestAnimationFrame(refreshConnectedSnapshots)
+    }
+    // Sibling insertions/removals in any registered child's parent (including
+    // ones this context never hears about) restyle structural selectors.
+    const structureObserver =
+        typeof MutationObserver === 'undefined'
+            ? undefined
+            : new MutationObserver(scheduleSnapshotRefresh)
+
     const removeExitPlaceholder = (key: string, placeholder?: HTMLElement | null) => {
         const current = exitPlaceholders.get(key)
         const target = placeholder ?? current
@@ -821,6 +930,7 @@ export const createAnimatePresenceContext = (context: {
         // it — re-capture from the reflowed DOM so later exits don't anchor
         // on a removed node.
         refreshSiblingAnchors()
+        scheduleSnapshotRefresh()
     }
 
     /**
@@ -887,6 +997,23 @@ export const createAnimatePresenceContext = (context: {
     }
 
     /**
+     * Stop counting an exit that was reversed by a re-entry.
+     *
+     * Pairs with the exit's {@link startExit} like {@link finishExit}, but a
+     * reversed exit never completed: upstream deletes the key from its
+     * `exitComplete` map on re-entry (AnimatePresence/index.tsx), so neither
+     * `onExitComplete` nor the LayoutGroup re-render fire for it. Enters
+     * blocked by `mode='wait'` are still released once nothing is exiting.
+     */
+    const cancelExit = () => {
+        inFlightExits -= 1
+        if (inFlightExits === 0 && mode === 'wait' && enterBlocked) {
+            enterBlocked = false
+            notifyEnterUnblocked()
+        }
+    }
+
+    /**
      * Register a child element and snapshot its initial rect/styles.
      */
     const registerChild = (
@@ -949,9 +1076,13 @@ export const createAnimatePresenceContext = (context: {
             record.lastStyleSnapshot = snapshotComputedStyle(getComputedStyle(element))
         })
         children.set(key, record)
+        if (element.parentElement) {
+            structureObserver?.observe(element.parentElement, { childList: true })
+        }
         // A new sibling may have landed between existing children — re-anchor
         // everyone (including this child) while the whole set is connected.
         refreshSiblingAnchors()
+        scheduleSnapshotRefresh()
     }
 
     /**
@@ -1020,6 +1151,8 @@ export const createAnimatePresenceContext = (context: {
         // style snapshot.
         child.stopObservingStyle?.()
         child.stopObservingStyle = undefined
+        // Its siblings' structural matches change once it is gone.
+        scheduleSnapshotRefresh()
 
         if (!child.exit && !child.resolveExit) {
             pwLog('[presence] unregisterChild - no exit animation, removing immediately')
@@ -1257,6 +1390,11 @@ export const createAnimatePresenceContext = (context: {
         // and takes the element's original sibling index.
         const slotAnchor = placeholder ?? resolvePlaceholderAnchor(child)
         slotParent.insertBefore(clone, slotAnchor?.parentElement === slotParent ? slotAnchor : null)
+        const activeExit: ActiveExit = { clone, child, placeholder, handedOff: false }
+        activeExits.set(key, activeExit)
+        const releaseActiveExit = () => {
+            if (activeExits.get(key) === activeExit) activeExits.delete(key)
+        }
 
         // Capture the element reference for this specific exit animation
         // This prevents race conditions where re-entry registers a new element with the same key
@@ -1264,10 +1402,13 @@ export const createAnimatePresenceContext = (context: {
         const exitingElement = child.element
 
         requestAnimationFrame(() => {
+            // A re-entry already took this exit over before it started.
+            if (activeExit.handedOff) return
             const resolvedExit = child.resolveExit?.(getCustom()) ?? child.exit
 
             if (!resolvedExit) {
                 pwLog('[presence] unregisterChild - no resolved exit animation after custom update')
+                releaseActiveExit()
                 clone.remove()
                 removeExitPlaceholder(key, placeholder)
                 const currentChild = children.get(key)
@@ -1302,9 +1443,19 @@ export const createAnimatePresenceContext = (context: {
             // Start exit and track in-flight count (handles wait-mode blocking)
             startExit()
 
-            animate(clone, exitKeyframes as unknown as DOMKeyframesDefinition, finalTransition)
-                .finished.catch(() => {})
+            activeExit.base = readAnimatedValues(clone, Object.keys(exitKeyframes))
+            const exitAnimation = animate(
+                clone,
+                exitKeyframes as unknown as DOMKeyframesDefinition,
+                finalTransition
+            )
+            activeExit.animation = exitAnimation
+            exitAnimation.finished
+                .catch(() => {})
                 .finally(() => {
+                    // A re-entry took this exit over and already cleaned up.
+                    if (activeExit.handedOff) return
+                    releaseActiveExit()
                     pwLog('[presence] exit animation complete', { key, mode })
 
                     // Reset elevated styles then remove
@@ -1351,6 +1502,32 @@ export const createAnimatePresenceContext = (context: {
         })
     }
 
+    const takeExitHandoff = (key: string): ExitHandoff | undefined => {
+        const active = activeExits.get(key)
+        if (!active || !active.clone.isConnected) return undefined
+
+        const resolvedExit = (active.child.resolveExit?.(getCustom()) ?? active.child.exit) as
+            Record<string, unknown> | undefined
+        const keys = Object.keys(resolvedExit ?? {})
+        const from = readAnimatedValues(active.clone, keys)
+        // Not started yet: the clone still shows its pre-exit values.
+        const base = active.base ?? from
+
+        active.handedOff = true
+        activeExits.delete(key)
+        active.animation?.stop?.()
+        active.clone.remove()
+        removeExitPlaceholder(key, active.placeholder)
+        if (children.get(key) === active.child) {
+            children.delete(key)
+            refreshSiblingAnchors()
+        }
+        if (active.animation) cancelExit()
+
+        pwLog('[presence] exit handed off to re-entering element', { key, from, base })
+        return { from, base }
+    }
+
     return {
         initial,
         mode,
@@ -1368,6 +1545,7 @@ export const createAnimatePresenceContext = (context: {
         updateChildState,
         updateChildAnimatedStyle,
         unregisterChild,
+        takeExitHandoff,
         notifyExitStart: startExit,
         notifyExitComplete: finishExit
     }
