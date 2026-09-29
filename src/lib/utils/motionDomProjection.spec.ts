@@ -1,4 +1,4 @@
-import { measurePageBox, measureViewportBox, visualElementStore } from 'motion-dom'
+import { measurePageBox, measureViewportBox, nodeGroup, visualElementStore } from 'motion-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MotionDomProjectionAdapter, layoutMeasureStats } from './motionDomProjection.js'
 import { createMotionVisualElement } from './visualElementCore.js'
@@ -425,5 +425,495 @@ describe('MotionDomProjectionAdapter visual-element injection', () => {
         expect(visualElementStore.get(element)).toBe(adapter.visualElement)
         expect(adapter.visualElement.getProps().transition).toEqual({ duration: 1 })
         adapter.unmount()
+    })
+})
+
+/**
+ * LayoutGroup node-group membership (plan 007 D3). Upstream MeasureLayout
+ * adds the projection node to `layoutGroup.group` on mount and removes it on
+ * unmount (MeasureLayout.tsx componentDidMount / componentWillUnmount); the
+ * group snapshots every non-dirty member when any member `willUpdate`s or
+ * leaves (motion-dom projection/node/group.ts).
+ */
+describe('MotionDomProjectionAdapter node group membership', () => {
+    const mountAt = (adapter: MotionDomProjectionAdapter, top: number) => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(new DOMRect(10, top, 100, 50))
+        adapter.updateOptions({ layout: true })
+        adapter.mount(element)
+        return element
+    }
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+    })
+
+    it("a member's willUpdate snapshots the other members (pre-patch fan-out)", () => {
+        const group = nodeGroup()
+        const a = new MotionDomProjectionAdapter({ group })
+        const b = new MotionDomProjectionAdapter({ group })
+        mountAt(a, 0)
+        mountAt(b, 100)
+        expect(b.projection.snapshot).toBeUndefined()
+
+        a.willUpdate()
+
+        expect(b.projection.snapshot).toBeDefined()
+        expect(b.projection.isLayoutDirty).toBe(true)
+        a.unmount()
+        b.unmount()
+    })
+
+    it('unmounting a member snapshots the remaining members', () => {
+        const group = nodeGroup()
+        const a = new MotionDomProjectionAdapter({ group })
+        const b = new MotionDomProjectionAdapter({ group })
+        mountAt(a, 0)
+        mountAt(b, 100)
+        expect(b.projection.snapshot).toBeUndefined()
+
+        a.unmount()
+
+        expect(b.projection.snapshot).toBeDefined()
+        b.unmount()
+    })
+
+    it('a sibling snapshotted via fan-out notifies its commit hook exactly once after root.didUpdate()', async () => {
+        const group = nodeGroup()
+        const a = new MotionDomProjectionAdapter({ group })
+        const b = new MotionDomProjectionAdapter({ group })
+        mountAt(a, 0)
+        const bElement = mountAt(b, 100)
+        const aHook = vi.fn()
+        const bHook = vi.fn()
+        a.onProjectionCommit(aHook)
+        b.onProjectionCommit(bHook)
+
+        a.willUpdate()
+        // The DOM patch moves b down by 40px.
+        vi.spyOn(bElement, 'getBoundingClientRect').mockReturnValue(new DOMRect(10, 140, 100, 50))
+        a.didUpdate()
+        // The upstream update pass flushes on a microtask.
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        expect(bHook).toHaveBeenCalledTimes(1)
+        expect(bHook).toHaveBeenCalledWith({ left: 10, top: 140, width: 100, height: 50 })
+        expect(aHook).toHaveBeenCalledTimes(1)
+        // The cached layout the observer path fans out is kept in step.
+        expect(b.lastMeasuredRect).toEqual({ left: 10, top: 140, width: 100, height: 50 })
+        a.unmount()
+        b.unmount()
+    })
+
+    it('an ungrouped adapter never fires its commit hook', async () => {
+        const a = new MotionDomProjectionAdapter()
+        mountAt(a, 0)
+        const hook = vi.fn()
+        a.onProjectionCommit(hook)
+
+        a.willUpdate()
+        a.didUpdate()
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        expect(hook).not.toHaveBeenCalled()
+        a.unmount()
+    })
+
+    it('adapters without a group, or in different groups, are not snapshotted', () => {
+        const a = new MotionDomProjectionAdapter({ group: nodeGroup() })
+        const other = new MotionDomProjectionAdapter({ group: nodeGroup() })
+        const ungrouped = new MotionDomProjectionAdapter()
+        mountAt(a, 0)
+        mountAt(other, 100)
+        mountAt(ungrouped, 200)
+
+        a.willUpdate()
+
+        expect(other.projection.snapshot).toBeUndefined()
+        expect(ungrouped.projection.snapshot).toBeUndefined()
+        a.unmount()
+        other.unmount()
+        ungrouped.unmount()
+    })
+})
+
+/**
+ * Observer-path group fan-out and group boundaries (plan 007 D5) and
+ * separate-group ancestor following (D6).
+ */
+describe('MotionDomProjectionAdapter observed commits across node groups', () => {
+    const rects = new Map<HTMLElement, DOMRect>()
+    const place = (element: HTMLElement, top: number, left = 10) =>
+        rects.set(element, new DOMRect(left, top, 100, 50))
+    const mount = (adapter: MotionDomProjectionAdapter, top: number, left = 10) => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        place(element, top, left)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => rects.get(element)!)
+        adapter.updateOptions({ layout: true })
+        adapter.mount(element)
+        return element
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+    const rect = (top: number, left = 10) => ({ left, top, width: 100, height: 50 })
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+    })
+
+    it('seeds a same-group descendant and the other group members, not a different-group descendant', async () => {
+        const group = nodeGroup()
+        const parent = new MotionDomProjectionAdapter({ group })
+        const sameGroupChild = new MotionDomProjectionAdapter({ parent, group })
+        const separateChild = new MotionDomProjectionAdapter({ parent, group: nodeGroup() })
+        const sibling = new MotionDomProjectionAdapter({ group })
+        const parentElement = mount(parent, 100)
+        mount(sameGroupChild, 105)
+        mount(separateChild, 120)
+        mount(sibling, 300)
+
+        place(parentElement, 175)
+        parent.commitObservedLayoutChange(rect(100))
+
+        expect(sameGroupChild.projection.snapshot?.layoutBox.y.min).toBe(105)
+        expect(sibling.projection.snapshot?.layoutBox.y.min).toBe(300)
+        expect(sibling.projection.isLayoutDirty).toBe(true)
+        expect(separateChild.projection.snapshot).toBeUndefined()
+        expect(separateChild.projection.isLayoutDirty).toBe(false)
+
+        await flush()
+        for (const adapter of [separateChild, sameGroupChild, sibling, parent]) adapter.unmount()
+    })
+
+    it('keeps a group member that is already layout-dirty on its own (pre-patch) snapshot', async () => {
+        const group = nodeGroup()
+        const a = new MotionDomProjectionAdapter({ group })
+        const b = new MotionDomProjectionAdapter({ group })
+        const aElement = mount(a, 0)
+        mount(b, 100)
+        // A real pre-patch snapshot via b's own willUpdate…
+        b.projection.willUpdate()
+        const ownSnapshot = b.projection.snapshot
+        expect(ownSnapshot).toBeDefined()
+
+        place(aElement, 40)
+        a.commitObservedLayoutChange(rect(0))
+
+        // …is not overwritten by the cached one.
+        expect(b.projection.snapshot).toBe(ownSnapshot)
+        await flush()
+        a.unmount()
+        b.unmount()
+    })
+
+    it('an ungrouped committer still seeds its ungrouped descendants (unchanged behaviour)', async () => {
+        const parent = new MotionDomProjectionAdapter()
+        const child = new MotionDomProjectionAdapter({ parent })
+        const parentElement = mount(parent, 100)
+        mount(child, 105)
+
+        place(parentElement, 175)
+        parent.commitObservedLayoutChange(rect(100))
+
+        expect(child.projection.snapshot?.layoutBox.y.min).toBe(105)
+        await flush()
+        child.unmount()
+        parent.unmount()
+    })
+
+    it('an ungrouped committer does not seed a grouped descendant', async () => {
+        const parent = new MotionDomProjectionAdapter()
+        const child = new MotionDomProjectionAdapter({ parent, group: nodeGroup() })
+        const parentElement = mount(parent, 100)
+        mount(child, 105)
+
+        place(parentElement, 175)
+        parent.commitObservedLayoutChange(rect(100))
+
+        expect(child.projection.snapshot).toBeUndefined()
+        await flush()
+        child.unmount()
+        parent.unmount()
+    })
+
+    describe('isFollowingAncestorUpdate', () => {
+        const setup = () => {
+            const parent = new MotionDomProjectionAdapter({ group: nodeGroup() })
+            const child = new MotionDomProjectionAdapter({ parent, group: nodeGroup() })
+            const parentElement = mount(parent, 100)
+            const childElement = mount(child, 105)
+            return { parent, child, parentElement, childElement }
+        }
+
+        it('is true when the offset from an ancestor that already updated is unchanged', async () => {
+            const { parent, child, parentElement, childElement } = setup()
+            parent.willUpdate()
+            place(parentElement, 175)
+            place(childElement, 180)
+            parent.didUpdate()
+            await flush()
+
+            expect(child.isFollowingAncestorUpdate(rect(105), rect(180))).toBe(true)
+            child.unmount()
+            parent.unmount()
+        })
+
+        it('is true when the ancestor moved but has not committed yet', () => {
+            const { parent, child, parentElement, childElement } = setup()
+            place(parentElement, 175)
+            place(childElement, 180)
+
+            expect(child.isFollowingAncestorUpdate(rect(105), rect(180))).toBe(true)
+            child.unmount()
+            parent.unmount()
+        })
+
+        it("is false when the node's own offset changed", async () => {
+            const { parent, child, parentElement, childElement } = setup()
+            parent.willUpdate()
+            place(parentElement, 175)
+            place(childElement, 180, 60)
+            parent.didUpdate()
+            await flush()
+
+            expect(child.isFollowingAncestorUpdate(rect(105), rect(180, 60))).toBe(false)
+            expect(child.isFollowingAncestorUpdate(rect(105), rect(200))).toBe(false)
+            child.unmount()
+            parent.unmount()
+        })
+
+        it('is false when the ancestor did not move', () => {
+            const { parent, child, childElement } = setup()
+            place(childElement, 180)
+
+            expect(child.isFollowingAncestorUpdate(rect(105), rect(180))).toBe(false)
+            child.unmount()
+            parent.unmount()
+        })
+
+        it('is false for an ungrouped node', () => {
+            const parent = new MotionDomProjectionAdapter()
+            const ungrouped = new MotionDomProjectionAdapter({ parent })
+            const parentElement = mount(parent, 100)
+            mount(ungrouped, 105)
+            place(parentElement, 175)
+
+            expect(ungrouped.isFollowingAncestorUpdate(rect(105), rect(180))).toBe(false)
+            ungrouped.unmount()
+            parent.unmount()
+        })
+
+        it('is false for a layout-dirty (snapshotted) node', () => {
+            const { parent, child, parentElement } = setup()
+            place(parentElement, 175)
+            child.projection.isLayoutDirty = true
+
+            expect(child.isFollowingAncestorUpdate(rect(105), rect(180))).toBe(false)
+            child.projection.isLayoutDirty = false
+            child.unmount()
+            parent.unmount()
+        })
+    })
+})
+
+/**
+ * Plan 007 Step 4b: the four checkpoint gaps.
+ */
+describe('MotionDomProjectionAdapter node-group gaps (plan 007 Step 4b)', () => {
+    const rects = new Map<HTMLElement, DOMRect>()
+    const place = (element: HTMLElement, top: number, left = 10) =>
+        rects.set(element, new DOMRect(left, top, 100, 50))
+    const mount = (
+        adapter: MotionDomProjectionAdapter,
+        top: number,
+        options: { layout?: boolean; layoutId?: string } = { layout: true }
+    ) => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        place(element, top)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => rects.get(element)!)
+        adapter.updateOptions(options)
+        adapter.mount(element)
+        return element
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+    const rect = (top: number, left = 10) => ({ left, top, width: 100, height: 50 })
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+    })
+
+    it('(a) seeds a mid-animation group member from its on-screen (target) box', async () => {
+        const group = nodeGroup()
+        const a = new MotionDomProjectionAdapter({ group })
+        const b = new MotionDomProjectionAdapter({ group })
+        const aElement = mount(a, 0)
+        mount(b, 100)
+        // b is mid layout animation, drawn 60px above its layout slot.
+        const target = { x: { min: 10, max: 110 }, y: { min: 40, max: 90 } }
+        b.projection.currentAnimation = {} as never
+        b.projection.target = target
+
+        place(aElement, 40)
+        a.commitObservedLayoutChange(rect(0))
+
+        expect(b.projection.snapshot?.layoutBox.y.min).toBe(40)
+        b.projection.currentAnimation = undefined
+        await flush()
+        a.unmount()
+        b.unmount()
+    })
+
+    it('(a) seeds an idle group member from its cached layout', async () => {
+        const group = nodeGroup()
+        const a = new MotionDomProjectionAdapter({ group })
+        const b = new MotionDomProjectionAdapter({ group })
+        const aElement = mount(a, 0)
+        mount(b, 100)
+        b.projection.target = { x: { min: 10, max: 110 }, y: { min: 40, max: 90 } }
+
+        place(aElement, 40)
+        a.commitObservedLayoutChange(rect(0))
+
+        expect(b.projection.snapshot?.layoutBox.y.min).toBe(100)
+        await flush()
+        a.unmount()
+        b.unmount()
+    })
+
+    it('(b) unmounting a member seeds the others from cached (pre-removal) layouts', async () => {
+        const group = nodeGroup()
+        const a = new MotionDomProjectionAdapter({ group })
+        const b = new MotionDomProjectionAdapter({ group })
+        mount(a, 0)
+        const bElement = mount(b, 100)
+        // Svelte has already removed a's DOM: b now measures in a's old slot.
+        place(bElement, 0)
+        const onCommit = vi.fn()
+        b.onProjectionCommit(onCommit)
+
+        a.unmount()
+
+        // Seeded from the cache, not the live post-removal read (0).
+        expect(b.projection.snapshot?.layoutBox.y.min).toBe(100)
+        await flush()
+        // …and the update pass ran: b was re-measured at its new slot.
+        expect(onCommit).toHaveBeenCalledWith(rect(0))
+        b.unmount()
+    })
+
+    it("(c) a layoutId-only member's willUpdate fans out to its group", async () => {
+        const group = nodeGroup()
+        const trigger = new MotionDomProjectionAdapter({ group })
+        const sibling = new MotionDomProjectionAdapter({ group })
+        mount(trigger, 0, { layoutId: 'expander' })
+        const siblingElement = mount(sibling, 100)
+        const onCommit = vi.fn()
+        sibling.onProjectionCommit(onCommit)
+
+        trigger.willUpdate()
+        expect(sibling.projection.snapshot?.layoutBox.y.min).toBe(100)
+        place(siblingElement, 175)
+        trigger.didUpdate()
+        await flush()
+
+        expect(onCommit).toHaveBeenCalledWith(rect(175))
+        trigger.unmount()
+        sibling.unmount()
+    })
+
+    it('(d) a commit whose own subtree changed seeds separate-group descendants too', async () => {
+        const parent = new MotionDomProjectionAdapter({ group: nodeGroup() })
+        const child = new MotionDomProjectionAdapter({ parent, group: nodeGroup() })
+        const parentElement = mount(parent, 100)
+        mount(child, 105)
+
+        place(parentElement, 175)
+        parent.commitObservedLayoutChange(rect(100), { ownSubtreeChanged: true })
+
+        expect(child.projection.snapshot?.layoutBox.y.min).toBe(105)
+        await flush()
+        child.unmount()
+        parent.unmount()
+    })
+
+    it("(d) keeps a following descendant's cached layout in step with its ancestor's moves", async () => {
+        const parent = new MotionDomProjectionAdapter({ group: nodeGroup() })
+        const child = new MotionDomProjectionAdapter({ parent, group: nodeGroup() })
+        const parentElement = mount(parent, 100)
+        const childElement = mount(child, 105)
+
+        // The ancestor moves by 75px; the separate-group child rides along
+        // without being re-measured.
+        place(parentElement, 175)
+        place(childElement, 180)
+        parent.commitObservedLayoutChange(rect(100))
+        expect(child.projection.snapshot).toBeUndefined()
+        await flush()
+
+        // A later own-subtree commit seeds the child from its CURRENT slot.
+        expect(child.lastMeasuredRect).toEqual(rect(180))
+        child.unmount()
+        parent.unmount()
+    })
+})
+
+/**
+ * LayoutGroup `forceRender` (plan 007 D7): `commitGroup` re-commits every
+ * member of a node group from cached / on-screen snapshots.
+ */
+describe('MotionDomProjectionAdapter.commitGroup', () => {
+    const rects = new Map<HTMLElement, DOMRect>()
+    const place = (element: HTMLElement, top: number) =>
+        rects.set(element, new DOMRect(10, top, 100, 50))
+    const mount = (adapter: MotionDomProjectionAdapter, top: number) => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        place(element, top)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => rects.get(element)!)
+        adapter.updateOptions({ layout: true })
+        adapter.mount(element)
+        return element
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+    })
+
+    it('re-measures every member and reports the ones that moved', async () => {
+        const group = nodeGroup()
+        const a = new MotionDomProjectionAdapter({ group })
+        const b = new MotionDomProjectionAdapter({ group })
+        mount(a, 0)
+        const bElement = mount(b, 200)
+        const aCommit = vi.fn()
+        const bCommit = vi.fn()
+        a.onProjectionCommit(aCommit)
+        b.onProjectionCommit(bCommit)
+        // A sibling exit freed space above b, unobserved so far.
+        place(bElement, 120)
+
+        MotionDomProjectionAdapter.commitGroup(group)
+        expect(b.projection.snapshot?.layoutBox.y.min).toBe(200)
+        await flush()
+
+        expect(bCommit).toHaveBeenCalledWith({ left: 10, top: 120, width: 100, height: 50 })
+        expect(aCommit).toHaveBeenCalledTimes(1)
+        expect(b.lastMeasuredRect?.top).toBe(120)
+        a.unmount()
+        b.unmount()
+    })
+
+    it('is a no-op for an unknown or empty group', () => {
+        expect(() => MotionDomProjectionAdapter.commitGroup(nodeGroup())).not.toThrow()
     })
 })

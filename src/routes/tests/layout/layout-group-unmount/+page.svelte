@@ -66,6 +66,7 @@
 <TesterPanel
     eyebrow="Upstream parity · layout-shared.ts (unmount)"
     title="Removing a box moves its sibling smoothly"
+    status="Passes on this build: removing #a re-measures the group from cached layouts, so #b animates (plan 007)."
     {steps}
 >
     {#snippet checks()}

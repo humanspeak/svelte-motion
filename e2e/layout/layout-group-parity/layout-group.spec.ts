@@ -68,8 +68,7 @@ function expectFramesBetween(tops: number[], from: number, to: number) {
 }
 
 test.describe('LayoutGroup inherit="id"', () => {
-    // Red on 2026-09-28: #button snaps 39 -> 114 in one frame (no intermediate frames). Plan 007 (LayoutGroup node groups) + Plan 006 (motion-dom 13.4.5) must turn this green.
-    test.fail('relative children should not instantly jump to new layout', async ({ page }) => {
+    test('relative children should not instantly jump to new layout', async ({ page }) => {
         await visit(page)
 
         await recordButtonTops(page)
@@ -81,44 +80,40 @@ test.describe('LayoutGroup inherit="id"', () => {
         expectFramesBetween(tops, tops[0], EXPANDED_TOP)
     })
 
-    // Red on 2026-09-28: #button snaps 149 -> 224 in one frame (no intermediate frames). Plan 007 (LayoutGroup node groups) + Plan 006 (motion-dom 13.4.5) must turn this green.
-    test.fail(
-        'relative children should not instantly jump to new layout, after performing their own layout animation',
-        async ({ page }) => {
-            await visit(page)
+    test('relative children should not instantly jump to new layout, after performing their own layout animation', async ({
+        page
+    }) => {
+        await visit(page)
 
-            // Click button first and let it finish its own layout animation
-            await page.locator('#button').click()
-            await expectButtonToSettleAt(page, VISIBLE_TOP)
+        // Click button first and let it finish its own layout animation
+        await page.locator('#button').click()
+        await expectButtonToSettleAt(page, VISIBLE_TOP)
 
-            await recordButtonTops(page)
-            await page.locator('#expander').click()
-            await expectButtonToSettleAt(page, VISIBLE_EXPANDED_TOP)
+        await recordButtonTops(page)
+        await page.locator('#expander').click()
+        await expectButtonToSettleAt(page, VISIBLE_EXPANDED_TOP)
 
-            expectFramesBetween(await readTops(page), VISIBLE_TOP, VISIBLE_EXPANDED_TOP)
-        }
-    )
+        expectFramesBetween(await readTops(page), VISIBLE_TOP, VISIBLE_EXPANDED_TOP)
+    })
 
-    // Red on 2026-09-28: #button snaps on the first #expander click, so it never reaches mid-animation (no intermediate frames). Plan 007 (LayoutGroup node groups) + Plan 006 (motion-dom 13.4.5) must turn this green.
-    test.fail(
-        'should return to original state when expander is clicked twice with delay',
-        async ({ page }) => {
-            await visit(page)
+    test('should return to original state when expander is clicked twice with delay', async ({
+        page
+    }) => {
+        await visit(page)
 
-            await recordButtonTops(page)
-            const initial = (await readTops(page))[0]
-            expect(initial).toBe(INITIAL_TOP)
-            await page.locator('#expander').click()
+        await recordButtonTops(page)
+        const initial = (await readTops(page))[0]
+        expect(initial).toBe(INITIAL_TOP)
+        await page.locator('#expander').click()
 
-            // Click the expander again once the button is mid-animation
-            await expect
-                .poll(async () => framesBetween(await readTops(page), initial, EXPANDED_TOP).length)
-                .toBeGreaterThan(0)
-            await page.waitForTimeout(50)
-            await page.locator('#expander').click()
+        // Click the expander again once the button is mid-animation
+        await expect
+            .poll(async () => framesBetween(await readTops(page), initial, EXPANDED_TOP).length)
+            .toBeGreaterThan(0)
+        await page.waitForTimeout(50)
+        await page.locator('#expander').click()
 
-            // Should be back to original state
-            await expectButtonToSettleAt(page, initial)
-        }
-    )
+        // Should be back to original state
+        await expectButtonToSettleAt(page, initial)
+    })
 })

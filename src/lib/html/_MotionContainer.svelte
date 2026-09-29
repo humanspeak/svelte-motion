@@ -295,8 +295,10 @@
     // Scope layoutId by the surrounding <LayoutGroup>, so identical
     // layoutId values in two sibling groups don't cross-animate (#311).
     // Undefined when no group is in scope — descendants behave exactly
-    // as before relative to the global registry.
-    const layoutGroupId = getLayoutGroupContext()
+    // as before relative to the global registry. The group's projection
+    // node group is handed to the adapter below (plan 007 D3).
+    const layoutGroupContext = getLayoutGroupContext()
+    const layoutGroupId = layoutGroupContext?.id
     const scopedLayoutId = $derived(
         layoutIdProp ? scopeLayoutId(layoutGroupId, layoutIdProp) : undefined
     )
@@ -1124,7 +1126,8 @@
             ? new MotionDomProjectionAdapter({
                   parent: motionDomProjectionParent,
                   getBaseTransform: () => userBaseTransform,
-                  visualElement: visualElement ?? undefined
+                  visualElement: visualElement ?? undefined,
+                  group: layoutGroupContext?.group
               })
             : null
     if (motionDomProjection) {
@@ -2369,7 +2372,10 @@
         if (hasRectChanged(prev, next)) {
             lastRect = next
             if (!commitDraggedLayoutChange(prev)) {
-                motionDomProjection?.commitObservedLayoutChange(prev)
+                // A Svelte-owned prop change is this component re-rendering:
+                // upstream re-renders (and so snapshots) every descendant,
+                // including ones in a separate LayoutGroup (Step 4b-d).
+                motionDomProjection?.commitObservedLayoutChange(prev, { ownSubtreeChanged: true })
             }
             return
         }
@@ -2414,6 +2420,45 @@
             reactiveCommitSerialAtSchedule = observerCommitSerial
         }
         frame.postRender(runReactiveCommit)
+    })
+
+    // Grouped `layoutId`-only nodes (plan 007 Step 4b-c). Upstream mounts
+    // MeasureLayout for `layout || layoutId`, so a layoutId node's own
+    // update `willUpdate()`s pre-render — and inside a LayoutGroup that
+    // snapshots every other group member before the DOM changes. The
+    // `layout` effects above only run for `layout` nodes (layoutId-only
+    // nodes have no observer/commit machinery), so without this a
+    // layoutId-only trigger (e.g. an expander toggling its own height) is
+    // only discovered post-patch by some member's observer, sometimes a
+    // frame late: one frame is painted at the new layout. Mirror
+    // getSnapshotBeforeUpdate / componentDidUpdate: willUpdate pre-patch,
+    // `root.didUpdate()` once this flush has patched the DOM. The own-prop
+    // style/class writes land synchronously in the flush (the attribute
+    // spread), so the update pass — flushed on motion-dom's microtask like
+    // upstream's — runs before the next frame is drawn.
+    let layoutIdGroupUpdatePending = false
+    const shouldFanOutLayoutIdUpdate = () =>
+        !!(
+            element &&
+            !layoutProp &&
+            scopedLayoutId &&
+            layoutGroupContext?.group &&
+            isLoaded === 'ready' &&
+            hasLayoutFeatures
+        )
+    $effect.pre(() => {
+        const shouldFanOut = shouldFanOutLayoutIdUpdate()
+        trackLayoutProjectionDependencies()
+        if (!shouldFanOut) return
+        motionDomProjection?.willUpdate()
+        layoutIdGroupUpdatePending = true
+    })
+    $effect(() => {
+        const shouldFanOut = shouldFanOutLayoutIdUpdate()
+        trackLayoutProjectionDependencies()
+        if (!shouldFanOut || !layoutIdGroupUpdatePending) return
+        layoutIdGroupUpdatePending = false
+        motionDomProjection?.didUpdate()
     })
 
     // Cancel a pending reactive commit when the component tears down.
@@ -2556,6 +2601,31 @@
             if (next) lastRect = next
         }
 
+        // Own-subtree DOM changes (children added/removed, text changed) are
+        // this element "re-rendering" in upstream terms, so its commit also
+        // snapshots descendants in a separate LayoutGroup (Step 4b-d).
+        // `takeRecords()` at commit time sees mutations queued before the
+        // commit regardless of observer callback order; the callback only
+        // remembers records a throttled frame didn't consume yet.
+        let ownSubtreeChangedSinceCommit = false
+        const ownSubtreeObserver =
+            layoutGroupContext && typeof MutationObserver !== 'undefined'
+                ? new MutationObserver(() => {
+                      ownSubtreeChangedSinceCommit = true
+                  })
+                : null
+        ownSubtreeObserver?.observe(observedElement, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        })
+        const takeOwnSubtreeChange = () => {
+            const changed =
+                ownSubtreeChangedSinceCommit || (ownSubtreeObserver?.takeRecords().length ?? 0) > 0
+            ownSubtreeChangedSinceCommit = false
+            return changed
+        }
+
         const commitObservedLayout = () => {
             if (suppressObservedLayoutCommit()) return
             if (isObservedCommitGated()) {
@@ -2568,6 +2638,19 @@
             const previous = lastRect
             lastRect = next
             if (previous && hasRectChanged(previous, next)) {
+                // Separate LayoutGroup node group (plan 007 D6): a grouped
+                // node that wasn't snapshotted and only moved because its
+                // nearest projecting ancestor re-laid out rides that
+                // ancestor's projection upstream — it is never re-measured
+                // or FLIPped on its own. Refresh the cache, don't commit.
+                if (
+                    layoutGroupContext?.group &&
+                    motionDomProjection?.isFollowingAncestorUpdate(previous, next)
+                ) {
+                    takeOwnSubtreeChange()
+                    refreshGatedLayoutCache()
+                    return
+                }
                 // Mark that the observer path consumed a changed rect on this
                 // commit, so a reactive commit scheduled for the same logical
                 // change (`runReactiveCommit`) can detect the overlap and skip
@@ -2604,8 +2687,12 @@
                     finishFlipAnimations(element!)
                     runLayoutSizeAnimation(element!, transforms, mergedTransition ?? {})
                 } else {
-                    motionDomProjection?.commitObservedLayoutChange(previous)
+                    motionDomProjection?.commitObservedLayoutChange(previous, {
+                        ownSubtreeChanged: takeOwnSubtreeChange()
+                    })
                 }
+            } else {
+                takeOwnSubtreeChange()
             }
         }
 
@@ -2720,7 +2807,24 @@
         }
         element!.addEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
 
+        // LayoutGroup fan-out (plan 007 D4): a group sibling's `willUpdate`
+        // snapshots this node pre-patch and the sibling's commit re-measures
+        // and animates it. Adopt that re-measured rect as the cached layout
+        // and advance the observer serial — the same bookkeeping an observer
+        // commit does — so this element's own observers (and a pending
+        // reactive commit) see the change as already consumed instead of
+        // restarting the animation from origin. Grouped nodes only, so
+        // ungrouped elements keep their existing arbitration untouched.
+        const offProjectionCommit = layoutGroupContext?.group
+            ? motionDomProjection?.onProjectionCommit((rect) => {
+                  lastRect = rect
+                  observerCommitSerial += 1
+              })
+            : undefined
+
         return () => {
+            ownSubtreeObserver?.disconnect()
+            offProjectionCommit?.()
             disconnectObservers()
             siblingLayoutObserver?.disconnect()
             element?.removeEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)

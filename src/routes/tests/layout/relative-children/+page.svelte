@@ -111,6 +111,7 @@
 <TesterPanel
     eyebrow="Upstream parity · relative-child-measurements.test.tsx"
     title="Children follow a re-laid-out parent"
+    status="Passes on this build: #parent re-measures with its group, children follow via their relative targets (plan 007 + motion-dom 13.4.5). All six e2e cases are green."
     {steps}
 >
     {#snippet checks()}

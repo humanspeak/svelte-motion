@@ -374,6 +374,12 @@ export const createAnimatePresenceContext = (context: {
     initial?: boolean
     mode?: AnimatePresenceMode
     onExitComplete?: () => void
+    /**
+     * The nearest `<LayoutGroup>`'s `forceRender`, called once every exit
+     * has completed so the group's members re-measure the freed space
+     * (upstream AnimatePresence `forceRender?.()` on `isEveryExitComplete`).
+     */
+    forceRender?: () => void
     custom?: unknown
     getCustom?: () => unknown
 }): AnimatePresenceContext => {
@@ -707,6 +713,7 @@ export const createAnimatePresenceContext = (context: {
     const finishExit = () => {
         inFlightExits -= 1
         if (inFlightExits === 0) {
+            context.forceRender?.()
             context.onExitComplete?.()
             if (mode === 'wait' && enterBlocked) {
                 enterBlocked = false

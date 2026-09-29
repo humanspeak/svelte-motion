@@ -25,8 +25,7 @@ async function expectBbox(locator: Locator, expected: BoundingBox) {
 }
 
 test.describe('Shared layout: component unmounts in a LayoutGroup', () => {
-    // Red on 2026-09-28: #b snaps to top 20 when #a unmounts instead of animating (expected frozen midpoint top 90). Plan 007 (LayoutGroup node groups) + Plan 006 (motion-dom 13.4.5) must turn this green.
-    test.fail('Should trigger sibling animation when unmount', async ({ page }) => {
+    test('Should trigger sibling animation when unmount', async ({ page }) => {
         await page.goto('/tests/layout/layout-group-unmount?@isPlaywright=true')
         await page.waitForTimeout(50)
         await page.locator('#a').dispatchEvent('click')
@@ -48,5 +47,50 @@ test.describe('Shared layout: component unmounts in a LayoutGroup', () => {
         await page.locator('#a').dispatchEvent('click')
         await page.waitForTimeout(50)
         await expectBbox(page.locator('#b'), initial)
+    })
+})
+
+/**
+ * Plan 007 D7 against `/tests/layout/layout-group-presence`: upstream
+ * AnimatePresence calls the nearest LayoutGroup's `forceRender` once every
+ * exit completes, so a `layout` sibling animates into the freed space. The
+ * port must animate it (intermediate frames) and animate it once: a second
+ * commit of the same change would restart the animation and show up as a
+ * backward jump in #b's per-frame position.
+ */
+test.describe('LayoutGroup + AnimatePresence: exit completes', () => {
+    test('a layout sibling animates into the freed space exactly once', async ({ page }) => {
+        await page.goto('/tests/layout/layout-group-presence?@isPlaywright=true')
+        await page.locator('#b').waitFor({ state: 'visible' })
+        await page.waitForTimeout(250)
+
+        const start = (await bbox(page.locator('#b'))).top
+        await page.evaluate(() => {
+            const w = window as unknown as { __tops: number[] }
+            const b = document.getElementById('b')!
+            w.__tops = []
+            const record = () => {
+                w.__tops.push(b.getBoundingClientRect().top)
+                requestAnimationFrame(record)
+            }
+            record()
+            document.getElementById('a')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        })
+        await expect.poll(async () => (await bbox(page.locator('#b'))).top).toBe(20)
+        const tops = await page.evaluate(() => [
+            ...(window as unknown as { __tops: number[] }).__tops
+        ])
+
+        // Animated: many distinct positions strictly between start and end.
+        const between = new Set(
+            tops.filter((top) => top < start - 1 && top > 21).map((top) => Math.round(top))
+        )
+        expect(between.size, `tops: ${tops.map(Math.round).join(',')}`).toBeGreaterThan(10)
+        // Once: #b only ever moves toward its new slot (no restart).
+        for (let i = 1; i < tops.length; i++) {
+            expect(tops[i], `frame ${i}: ${tops.map(Math.round).join(',')}`).toBeLessThanOrEqual(
+                tops[i - 1] + 0.5
+            )
+        }
     })
 })

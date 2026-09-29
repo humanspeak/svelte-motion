@@ -53,7 +53,7 @@ async function expectMeasured(page: Page, id: string) {
 }
 
 test.describe('LayoutGroup inherit="id" measurements', () => {
-    // Red on 2026-09-28: #text-wrapper is never re-measured when #expander toggles (reads 0). Plan 007 (LayoutGroup node groups) + Plan 006 (motion-dom 13.4.5) must turn this green.
+    // Red: reads come from the per-frame layoutId capture loop (_MotionContainer.svelte layoutId $effect). Plan 008 must turn this green.
     test.fail("doesn't re-measure a relative child that isn't animating", async ({ page }) => {
         await visit(page)
         await click(page, 'expander')
@@ -64,7 +64,7 @@ test.describe('LayoutGroup inherit="id" measurements', () => {
         await expectReads(page, 'button', 0)
     })
 
-    // Red on 2026-09-28: #text-wrapper is never re-measured when #expander toggles (reads 0). Plan 007 (LayoutGroup node groups) + Plan 006 (motion-dom 13.4.5) must turn this green.
+    // Red: reads come from the per-frame layoutId capture loop (_MotionContainer.svelte layoutId $effect). Plan 008 must turn this green.
     test.fail(
         're-measures a layout-animating relative child once per parent re-layout',
         async ({ page }) => {

@@ -90,6 +90,7 @@
 <TesterPanel
     eyebrow="Upstream parity · layout-group-interrupt.ts"
     title="Interrupted slide keeps its place in the row"
+    status="The glide passes on this build when clicked by hand (plan 007). Its e2e case stays marked failing because of a Playwright click-timing issue in the spec port, and the read-count cases wait on plan 008 (per-frame layoutId capture loop)."
     {steps}
 >
     {#snippet checks()}

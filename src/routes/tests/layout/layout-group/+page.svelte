@@ -93,6 +93,7 @@
 <TesterPanel
     eyebrow="Upstream parity · layout-group.ts"
     title="Buttons glide with their row"
+    status="Passes on this build: LayoutGroup node groups (plan 007) with motion-dom 13.4.5 (plan 006). All three e2e cases are green."
     {steps}
 >
     {#snippet checks()}

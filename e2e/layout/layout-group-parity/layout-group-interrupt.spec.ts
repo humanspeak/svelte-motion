@@ -26,7 +26,7 @@ const nextFrame = (page: Page) =>
     page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
 
 test.describe('LayoutGroup inherit="id"', () => {
-    // Red on 2026-09-28: #button jumps ~163px in one frame when #expander toggles mid-animation (expected <20px). Plan 007 (LayoutGroup node groups) + Plan 006 (motion-dom 13.4.5) must turn this green.
+    // Red: the port's `page.locator('#expander').click()` waits for Playwright's "stable" check, which the fixture's 10s linear animations only pass once they finish, so `before`/`after` straddle ~7s of animation (~88px). With `click({ force: true })` (closer to Cypress's click, which ignores sub-5px/frame motion) the upstream assertions pass 3/3 on this build. Needs a Plan 005 spec-port fix; the maintainer decides.
     test.fail(
         'relative child follows its parent when a parent layout change interrupts its own layout animation',
         async ({ page }) => {

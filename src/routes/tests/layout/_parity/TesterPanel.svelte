@@ -37,7 +37,7 @@
         title,
         checks,
         steps,
-        status = 'Expected to SNAP on the current code. Upstream parity needs LayoutGroup node groups (plan 007) plus motion-dom 13.4.5 (plan 006).',
+        status = 'See the page’s e2e spec for its current status on this build.',
         children
     }: {
         eyebrow: string

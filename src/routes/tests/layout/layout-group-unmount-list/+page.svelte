@@ -63,7 +63,7 @@
 <TesterPanel
     eyebrow="Upstream parity · layout-shared.ts (unmount list)"
     title="A sibling that didn't really move stays put"
-    status="Passes on the current code (the yellow box stays put). Kept as a guard for LayoutGroup node groups (plan 007) and motion-dom 13.4.5 (plan 006)."
+    status="Passes on this build (the yellow box stays put), with LayoutGroup node groups (plan 007) and motion-dom 13.4.5 (plan 006)."
     {steps}
 >
     {#snippet checks()}
