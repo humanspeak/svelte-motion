@@ -375,6 +375,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/deferred') + searchParams}
+                    >
+                        Reorder Deferred (no duplicate onReorder, Motion 13.4.5)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/reorder/axis-x') + searchParams}
                     >
                         Reorder Axis X
@@ -564,6 +572,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/release-before-frame') + searchParams}
+                    >
+                        Drag: final pointermove in the same frame as release
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/mobile-drawer') + searchParams}
                     >
                         Drag Close Drawer (mobile drawer)
@@ -633,6 +649,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/clone-parent-styles') + searchParams}
+                    >
+                        Clone keeps parent-dependent styles
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/animate-presence/owned-child') + searchParams}
                     >
                         Clone vs owned child (real-node exit)
@@ -644,6 +668,14 @@
                         href={resolve('/tests/animate-presence/grid-exit') + searchParams}
                     >
                         Grid exit (siblings hold slots)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/add-during-exit') + searchParams}
+                    >
+                        Add during exit (child added as an exit completes)
                     </a>
                 </li>
             </ul>
@@ -707,6 +739,22 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/read-budget') + searchParams}
+                    >
+                        layoutId — idle read budget and handoff after a layout shift
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/shift-swap') + searchParams}
+                    >
+                        layoutId — same-update shift + swap starts from the painted position
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout/scroll') + searchParams}
                     >
                         layoutScroll — single container
@@ -726,6 +774,55 @@
                         href={resolve('/tests/layout/group') + searchParams}
                     >
                         LayoutGroup — scoped layoutId
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/layout-group') + searchParams}
+                    >
+                        LayoutGroup inherit="id" — button glides with its row when a sibling resizes
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/layout-group-interrupt') + searchParams}
+                    >
+                        LayoutGroup inherit="id" — interrupted slide keeps its offset from the row
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/layout-group-unmount') + searchParams}
+                    >
+                        LayoutGroup — removing a box animates its sibling into the gap
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/layout-group-unmount-list') + searchParams}
+                    >
+                        LayoutGroup — list sibling stays put when a neighbour is removed
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/layout-group-presence') + searchParams}
+                    >
+                        LayoutGroup + AnimatePresence — sibling holds still during the exit, then
+                        glides into the gap once
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/relative-children') + searchParams}
+                    >
+                        LayoutGroup — relative children follow a re-laid-out parent
                     </a>
                 </li>
             </ul>

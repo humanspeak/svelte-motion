@@ -898,29 +898,13 @@ describe('utils/drag', () => {
             clock.mockRestore()
         })
 
-        it('uses the raw page point against the transformed projection center for controlled snap', async () => {
+        it('maps the cursor client point and live box through transformPagePoint for controlled snap', async () => {
             const el = document.createElement('div')
             document.body.appendChild(el)
-            const node = registerStubNode(el) as ReturnType<typeof registerStubNode> & {
-                projection?: {
-                    layout: {
-                        layoutBox: {
-                            x: { min: number; max: number }
-                            y: { min: number; max: number }
-                        }
-                    }
-                }
-            }
-            node.projection = {
-                layout: {
-                    // The VisualElement projection has already consumed the
-                    // scale-2 transformPagePoint mapping.
-                    layoutBox: {
-                        x: { min: 200, max: 240 },
-                        y: { min: 80, max: 120 }
-                    }
-                }
-            }
+            registerStubNode(el)
+            // Live client box; mapped x2 it spans x 200-240 / y 80-120, so its
+            // center is (220, 100).
+            vi.spyOn(el, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 40, 20, 20))
             const x = motionValue(0)
             const y = motionValue(0)
             const controls = createDragControls()
@@ -941,39 +925,73 @@ describe('utils/drag', () => {
 
             cleanup()
             el.remove()
-            // Raw page point (130, 50) minus transformed layout center
-            // (220, 100). Reusing mapped info.point would incorrectly yield
-            // (40, 0), the exact scaled/scrolled public parity regression.
-            expect({ x: x.get(), y: y.get() }).toEqual({ x: -90, y: -50 })
+            // Motion 13.4.5 `VisualElementDragControls.snapToCursor`: the
+            // cursor's client point (130, 50) mapped through transformPagePoint
+            // is (260, 100); the live box (`measureViewportBox`) mapped through
+            // the same callback is centered at (220, 100). Both are viewport
+            // coordinates, so the snap is (260 - 220, 100 - 100).
+            expect({ x: x.get(), y: y.get() }).toEqual({ x: 40, y: 0 })
+        })
+
+        it('snapToCursor centres the element under the pointer on every drag start', async () => {
+            const el = document.createElement('div')
+            document.body.appendChild(el)
+            // Port of Motion 13.4.5 `use-drag-controls.test.tsx`: a 100x100 box
+            // laid out at (500, 0) whose live rect follows its transform.
+            const x = motionValue(100)
+            const y = motionValue(40)
+            vi.spyOn(el, 'getBoundingClientRect').mockImplementation(
+                () => new DOMRect(500 + x.get(), y.get(), 100, 100)
+            )
+            const controls = createDragControls()
+            const cleanup = attachDrag(el, {
+                axis: true,
+                controls,
+                momentum: false,
+                mergedTransition: { duration: 0 },
+                boundMotionValues: { x, y },
+                baselineSources: { initial: { x: 100, y: 40 } }
+            })
+
+            const snapTo = async (clientX: number, clientY: number, pointerId: number) => {
+                controls.start(new PointerEvent('pointerdown', { clientX, clientY, pointerId }), {
+                    snapToCursor: true
+                })
+                const snapped = { x: x.get(), y: y.get() }
+                window.dispatchEvent(new PointerEvent('pointerup', { clientX, clientY, pointerId }))
+                await flushFrame()
+                return snapped
+            }
+
+            // center = (550 + x, 50 + y) → x + 50 - (550 + x) = -500; y → 0.
+            expect(await snapTo(50, 50, 97)).toEqual({ x: -500, y: 0 })
+
+            // Simulate the element having been dragged elsewhere.
+            x.set(-350)
+            y.set(50)
+
+            expect(await snapTo(50, 50, 98)).toEqual({ x: -500, y: 0 })
+
+            cleanup()
+            el.remove()
         })
 
         it('does not accumulate repeated controlled snaps with authored initial axis values', async () => {
             const el = document.createElement('div')
             el.style.transform = 'matrix(1, 0, 0, 1, 100, 40)'
             document.body.appendChild(el)
-            const node = registerStubNode(el, { x: 100, y: 40 }) as ReturnType<
-                typeof registerStubNode
-            > & {
-                projection?: {
-                    layout: {
-                        layoutBox: {
-                            x: { min: number; max: number }
-                            y: { min: number; max: number }
-                        }
-                    }
-                }
-            }
-            node.projection = {
-                layout: {
-                    layoutBox: {
-                        x: { min: 700, max: 780 },
-                        y: { min: 477, max: 557 }
-                    }
-                }
-            }
-            node.render.mockImplementation(() => {
-                el.style.transform = `matrix(1, 0, 0, 1, ${String(node.latestValues.x)}, ${String(node.latestValues.y)})`
-            })
+            const node = registerStubNode(el, { x: 100, y: 40 })
+            // An 80x80 box laid out at (600, 437); the live rect follows the
+            // axis values, so at the initial (100, 40) it is centered at (740, 517).
+            vi.spyOn(el, 'getBoundingClientRect').mockImplementation(
+                () =>
+                    new DOMRect(
+                        600 + Number(node.latestValues.x),
+                        437 + Number(node.latestValues.y),
+                        80,
+                        80
+                    )
+            )
             const controls = createDragControls()
             const cleanup = attachDrag(el, {
                 axis: true,
@@ -1033,24 +1051,18 @@ describe('utils/drag', () => {
         it('does not accumulate repeated controlled snaps from zero axis values', async () => {
             const el = document.createElement('div')
             document.body.appendChild(el)
-            const node = registerStubNode(el) as ReturnType<typeof registerStubNode> & {
-                projection?: {
-                    layout: {
-                        layoutBox: {
-                            x: { min: number; max: number }
-                            y: { min: number; max: number }
-                        }
-                    }
-                }
-            }
-            node.projection = {
-                layout: {
-                    layoutBox: {
-                        x: { min: 460, max: 540 },
-                        y: { min: 260, max: 340 }
-                    }
-                }
-            }
+            const node = registerStubNode(el)
+            // An 80x80 box laid out at (460, 260), centered at (500, 300) at
+            // rest; the live rect follows the axis values.
+            vi.spyOn(el, 'getBoundingClientRect').mockImplementation(
+                () =>
+                    new DOMRect(
+                        460 + Number(node.latestValues.x ?? 0),
+                        260 + Number(node.latestValues.y ?? 0),
+                        80,
+                        80
+                    )
+            )
             const controls = createDragControls()
             const cleanup = attachDrag(el, {
                 axis: true,
@@ -1101,150 +1113,6 @@ describe('utils/drag', () => {
             cleanup()
             el.remove()
         })
-
-        it('pairs a refreshed projection measurement with its then-current axis value', () => {
-            const el = document.createElement('div')
-            document.body.appendChild(el)
-            const node = registerStubNode(el)
-            const measureListeners = new Set<() => void>()
-            const stopMeasureListener = vi.fn()
-            const projection = {
-                layout: {
-                    layoutBox: {
-                        x: { min: 80, max: 120 },
-                        y: { min: 30, max: 70 }
-                    }
-                },
-                addEventListener: (name: string, listener: () => void) => {
-                    expect(name).toBe('measure')
-                    measureListeners.add(listener)
-                    return () => {
-                        measureListeners.delete(listener)
-                        stopMeasureListener()
-                    }
-                }
-            }
-            ;(node as typeof node & { projection: typeof projection }).projection = projection
-            const controls = createDragControls()
-            const cleanup = attachDrag(el, {
-                axis: 'x',
-                controls,
-                momentum: false,
-                mergedTransition: { duration: 0 },
-                getBaseTransform: () => ''
-            })
-
-            // A new layout measurement includes x=40. A later writer advances
-            // the shared axis to 70 without refreshing the layout box.
-            node.getValue('x').set(40)
-            el.style.transform = 'translateX(40px)'
-            projection.layout = {
-                layoutBox: {
-                    x: { min: 120, max: 160 },
-                    y: { min: 30, max: 70 }
-                }
-            }
-            for (const listener of measureListeners) listener()
-            node.getValue('x').set(70)
-            el.style.transform = 'translateX(70px)'
-
-            controls.start(
-                new PointerEvent('pointerdown', {
-                    clientX: 100,
-                    clientY: 50,
-                    pointerId: 95
-                }),
-                { snapToCursor: true }
-            )
-
-            // Cached center 140 represented x=40. At x=70 the live center is
-            // 170, so pointer 100 snaps the axis to 0 (70 + 100 - 170).
-            expect(node.latestValues.x).toBe(0)
-
-            cleanup()
-            expect(stopMeasureListener).toHaveBeenCalledOnce()
-            el.remove()
-        })
-
-        it.each([
-            {
-                name: 'a translated and rotated authored base',
-                authoredBase: 'translateX(12px) rotate(5deg)',
-                physicalTransform: 'translateX(12px) rotate(5deg)'
-            },
-            {
-                name: 'an empty authored base and empty physical transform',
-                authoredBase: '',
-                physicalTransform: ''
-            },
-            {
-                name: 'an empty authored base and physical none',
-                authoredBase: '',
-                physicalTransform: 'none'
-            }
-        ])(
-            'pairs a base-only projection measurement with zero represented motion axes for $name',
-            ({ authoredBase, physicalTransform }) => {
-                const el = document.createElement('div')
-                el.style.transform = `translateX(45px) translateY(-30px)${authoredBase ? ` ${authoredBase}` : ''}`
-                document.body.appendChild(el)
-                const node = registerStubNode(el, { x: 45, y: -30 })
-                const measureListeners = new Set<() => void>()
-                const projection = {
-                    layout: {
-                        layoutBox: {
-                            x: { min: 230, max: 270 },
-                            y: { min: 130, max: 170 }
-                        }
-                    },
-                    addEventListener: (_name: string, listener: () => void) => {
-                        measureListeners.add(listener)
-                        return () => measureListeners.delete(listener)
-                    }
-                }
-                ;(node as typeof node & { projection: typeof projection }).projection = projection
-                const controls = createDragControls()
-                const cleanup = attachDrag(el, {
-                    axis: true,
-                    controls,
-                    momentum: false,
-                    mergedTransition: { duration: 0 },
-                    baselineSources: { initial: { x: 45, y: -30 } },
-                    getBaseTransform: () => authoredBase
-                })
-
-                // refreshLayout() strips the live motion axes to the authored raw
-                // transform before updateLayout(). Its measure event is synchronous
-                // within that strip, while the MotionValues remain nonzero.
-                const liveTransform = el.style.transform
-                el.style.transform = physicalTransform
-                projection.layout = {
-                    layoutBox: {
-                        x: { min: 280, max: 320 },
-                        y: { min: 180, max: 220 }
-                    }
-                }
-                for (const listener of measureListeners) listener()
-                el.style.transform = liveTransform
-
-                controls.start(
-                    new PointerEvent('pointerdown', {
-                        clientX: 300,
-                        clientY: 200,
-                        pointerId: 96
-                    }),
-                    { snapToCursor: true }
-                )
-
-                // The measured center already includes authoredBase but neither
-                // motion axis. At the current x=45/y=-30, snapping that live center
-                // back to the measured center therefore returns both axes to zero.
-                expect(node.latestValues).toMatchObject({ x: 0, y: 0 })
-
-                cleanup()
-                el.remove()
-            }
-        )
     })
 
     it('attachDrag: attaches pointerdown and animates during move', async () => {
@@ -1283,6 +1151,43 @@ describe('utils/drag', () => {
         expect(el.style.transform).toContain('translateX(10px)')
         expect(el.style.transform).toContain('translateY(20px)')
         cleanup()
+    })
+
+    it('attachDrag: rests at a pointermove that arrives in the same frame as pointerup', async () => {
+        const el = document.createElement('div')
+        document.body.appendChild(el)
+        const x = motionValue(0)
+        const onEnd = vi.fn()
+        const cleanup = attachDrag(el, {
+            axis: 'x',
+            momentum: false,
+            mergedTransition: { duration: 0 },
+            boundMotionValues: { x },
+            callbacks: { onEnd }
+        })
+
+        el.dispatchEvent(new PointerEvent('pointerdown', { clientX: 0, clientY: 0, pointerId: 1 }))
+        window.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: 10, clientY: 0, pointerId: 1 })
+        )
+        await flushFrame()
+        expect(x.get()).toBe(10)
+
+        // Browsers flush the coalesced final move right before pointerup, so
+        // both land before the next frame (Motion 13.4.5 parity).
+        window.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: 100, clientY: 0, pointerId: 1 })
+        )
+        window.dispatchEvent(
+            new PointerEvent('pointerup', { clientX: 100, clientY: 0, pointerId: 1 })
+        )
+        await flushFrame()
+
+        expect(x.get()).toBe(100)
+        expect(onEnd).toHaveBeenCalledTimes(1)
+        expect(onEnd.mock.calls[0][1].offset.x).toBe(100)
+        cleanup()
+        el.remove()
     })
 
     it('writes the axis MotionValues on the VisualElement in the sampled frame', async () => {

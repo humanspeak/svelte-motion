@@ -358,17 +358,27 @@ test.describe('AnimatePresence re-entry animation', () => {
         // 4. Click Show - start enter animation while exit is still running
         await toggle.click()
 
-        // 5. During transition, both clone and new box should exist
+        // 5. During transition, only the re-entered box exists
         await page.waitForTimeout(100)
         const elementsDuringTransition = await page.evaluate(() => ({
             // Use :not([data-clone]) to exclude clones which also have data-testid="box"
             boxes: document.querySelectorAll('[data-testid="box"]:not([data-clone="true"])').length,
-            clones: document.querySelectorAll('[data-clone="true"]').length
+            clones: document.querySelectorAll('[data-clone="true"]').length,
+            opacity: Number(
+                getComputedStyle(
+                    document.querySelector('[data-testid="box"]:not([data-clone="true"])')!
+                ).opacity
+            )
         }))
 
-        // During sync mode, we expect both to be visible
-        expect(elementsDuringTransition.boxes).toBe(1) // New box (excluding clone)
-        expect(elementsDuringTransition.clones).toBe(1) // Exiting clone
+        // Upstream never runs a second copy: the exiting child becomes present
+        // again and reverses its exit on the same element
+        // (AnimatePresence/index.tsx:108-126, render map 194-240). So one box,
+        // no clone, and it is reversing from the mid-exit value, not popping to 1.
+        expect(elementsDuringTransition.boxes).toBe(1) // Re-entered box (excluding clone)
+        expect(elementsDuringTransition.clones).toBe(0) // Exit handed over, no crossfade
+        expect(elementsDuringTransition.opacity).toBeGreaterThan(0)
+        expect(elementsDuringTransition.opacity).toBeLessThan(1)
 
         // 6. Wait for ALL animations to complete (exit is 1s, enter is also animating)
         await page.waitForTimeout(2000)

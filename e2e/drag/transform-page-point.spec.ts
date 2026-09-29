@@ -656,12 +656,16 @@ test.describe('MotionConfig transformPagePoint drag', () => {
         await page.mouse.move(start.x, start.y)
         await page.mouse.down()
         await advance(page, 20)
-        expect((await snapshot(page, 'snap')).boundValues).toMatchObject({ x: -49, y: -436 })
+        // Motion 13.4.5 snaps in viewport space: the transformed client point
+        // against the live transformed box. Client cursor (645, 74) maps to
+        // (1290, 148); the live 40x40 box at client (267, 155) maps to center
+        // (574, 350), so the bound axes snap to (716, -202).
+        expect((await snapshot(page, 'snap')).boundValues).toMatchObject({ x: 716, y: -202 })
         await page.mouse.move(start.x + 25, start.y + 15)
         await advance(page, 40)
         expect((await gestures(page)).at(-1)).toMatchObject({
             info: { offset: { x: 50, y: 30 } },
-            boundValues: { x: 1, y: -406 }
+            boundValues: { x: 766, y: -172 }
         })
         await page.mouse.up()
         await advance(page, 20)

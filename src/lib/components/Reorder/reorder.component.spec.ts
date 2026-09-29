@@ -183,7 +183,7 @@ describe('Reorder.Group / Reorder.Item', () => {
         await flushFrame()
     })
 
-    it('continues proposing swaps when a controlled consumer rejects one', async () => {
+    it('does not re-propose a swap until values change', async () => {
         const onReorder = vi.fn()
         vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
             this: HTMLElement
@@ -193,7 +193,7 @@ describe('Reorder.Group / Reorder.Item', () => {
             return new DOMRect(index * 100, 0, 100, 100)
         })
 
-        render(ReorderHarness, {
+        const result = render(ReorderHarness, {
             props: { axis: 'x', values: [0, 1, 2], onReorder }
         })
         const item = await screen.findByTestId('item-0')
@@ -213,16 +213,38 @@ describe('Reorder.Group / Reorder.Item', () => {
         expect(onReorder).toHaveBeenCalledOnce()
         expect(onReorder).toHaveBeenLastCalledWith([1, 0, 2])
 
+        // `values` hasn't changed (pending or rejected): the same swap must
+        // not be proposed again (Motion 13.4.5 `Reorder/Group.tsx`).
         dispatchMousePointer(window, 'pointermove', {
             clientX: 71,
             clientY: 10,
             pointerId: 23
         })
         await flushFrame(16)
+        expect(onReorder).toHaveBeenCalledOnce()
+
+        dispatchMousePointer(window, 'pointermove', {
+            clientX: 72,
+            clientY: 10,
+            pointerId: 23
+        })
+        await flushFrame(32)
+        expect(onReorder).toHaveBeenCalledOnce()
+
+        await result.rerender({ values: [1, 0, 2] })
+        await vi.advanceTimersByTimeAsync(0)
+
+        dispatchMousePointer(window, 'pointermove', {
+            clientX: 170,
+            clientY: 10,
+            pointerId: 23
+        })
+        await flushFrame()
         expect(onReorder).toHaveBeenCalledTimes(2)
+        expect(onReorder.mock.lastCall?.[0]).not.toEqual([1, 0, 2])
 
         dispatchMousePointer(window, 'pointercancel', {
-            clientX: 71,
+            clientX: 170,
             clientY: 10,
             pointerId: 23
         })

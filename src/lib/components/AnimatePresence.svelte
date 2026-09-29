@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { Snippet } from 'svelte'
     import PresenceChild from '$lib/components/PresenceChild.svelte'
+    import { getLayoutGroupContext } from '$lib/components/layoutGroup.context'
     import type { AnimatePresenceMode } from '$lib/types'
     import {
         createAnimatePresenceContext,
@@ -70,6 +71,9 @@
         initial,
         mode,
         onExitComplete,
+        // Upstream re-renders the surrounding LayoutGroup once every exit
+        // completes, so its members animate into the freed space.
+        forceRender: getLayoutGroupContext()?.forceRender,
         custom
     })
     setAnimatePresenceContext(context)

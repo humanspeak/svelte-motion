@@ -11,7 +11,7 @@ import { expect, test } from '@playwright/test'
  * the two strips.
  *
  * With scoping, each strip's underline produces a different registry
- * key (`strip-a::underline` vs `strip-b::underline`), so the strips
+ * key (`strip-a-underline` vs `strip-b-underline`), so the strips
  * animate independently.
  *
  * The decisive signal here is the on-mount FLIP delta. When clicking a

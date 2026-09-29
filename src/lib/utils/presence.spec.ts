@@ -6,8 +6,11 @@ import {
     createAnimatePresenceContext,
     getPresenceDepth,
     measurePopLayoutSnapshot,
+    observeStyleChanges,
+    readAnimatedValues,
     resolvePopLayoutStyles,
-    setPresenceDepth
+    setPresenceDepth,
+    snapshotComputedStyle
 } from './presence'
 
 // Shared context store for mock - exposed for clearing between tests
@@ -701,6 +704,49 @@ describe('AnimatePresence modes', () => {
             expect(clone).toBeTruthy()
             expect(clone?.parentElement).toBe(parent)
         })
+
+        it('keeps margin, display and box-sizing on placeholders for detached children', () => {
+            // Model the browser's LIVE CSSStyleDeclaration: every property
+            // reads back as '' once the element leaves the document.
+            const connectedValues: Record<string, string> = {
+                position: 'static',
+                display: 'flex',
+                margin: '20px',
+                boxSizing: 'border-box',
+                flex: '0 0 auto',
+                alignSelf: 'center'
+            }
+            const liveStyle = new Proxy(mockComputedStyle(), {
+                get(target, prop, receiver) {
+                    if (typeof prop === 'string' && prop in connectedValues) {
+                        return el.isConnected ? connectedValues[prop] : ''
+                    }
+                    return Reflect.get(target, prop, receiver)
+                }
+            })
+            vi.spyOn(window, 'getComputedStyle').mockImplementation((target: Element) =>
+                target === el
+                    ? liveStyle
+                    : mockComputedStyle({ position: 'relative', display: 'block' })
+            )
+
+            const ctx = createAnimatePresenceContext({ mode: 'sync' })
+            ctx.registerChild('k1', el, { opacity: 0 })
+
+            // Svelte detaches keyed nodes before unregister runs.
+            el.remove()
+            ctx.unregisterChild('k1')
+
+            const placeholder = parent.querySelector<HTMLElement>(
+                '[data-presence-placeholder="true"]'
+            )
+            expect(placeholder).toBeTruthy()
+            expect(placeholder?.style.margin).toBe('20px')
+            expect(placeholder?.style.display).toBe('flex')
+            expect(placeholder?.style.boxSizing).toBe('border-box')
+            expect(placeholder?.style.flex).toBe('0 0 auto')
+            expect(placeholder?.style.alignSelf).toBe('center')
+        })
     })
 })
 
@@ -806,6 +852,10 @@ describe('exit placeholder slot preservation', () => {
     const placeholders = () =>
         Array.from(document.querySelectorAll<HTMLElement>('[data-presence-placeholder="true"]'))
 
+    // Exit clones sit in the element's original slot, immediately before the
+    // placeholder that holds its space (upstream keeps the real element there).
+    const clones = () => Array.from(document.querySelectorAll<HTMLElement>('[data-clone="true"]'))
+
     it('holds a detached middle child slot between its registered siblings', () => {
         const ctx = registerAll()
 
@@ -816,7 +866,9 @@ describe('exit placeholder slot preservation', () => {
         expect(placeholder).toBeTruthy()
         expect(placeholder.parentElement).toBe(wrapper)
         expect(placeholder.nextElementSibling).toBe(cardC)
-        expect(placeholder.previousElementSibling).toBe(cardA)
+        const [clone] = clones()
+        expect(placeholder.previousElementSibling).toBe(clone)
+        expect(clone.previousElementSibling).toBe(cardA)
     })
 
     it('holds a detached last child slot after every surviving sibling', () => {
@@ -828,7 +880,9 @@ describe('exit placeholder slot preservation', () => {
         const [placeholder] = placeholders()
         expect(placeholder).toBeTruthy()
         expect(placeholder.parentElement).toBe(wrapper)
-        expect(placeholder.previousElementSibling).toBe(scriptB)
+        const [clone] = clones()
+        expect(placeholder.previousElementSibling).toBe(clone)
+        expect(clone.previousElementSibling).toBe(scriptB)
         expect(placeholder.nextElementSibling).toBeNull()
     })
 
@@ -842,6 +896,11 @@ describe('exit placeholder slot preservation', () => {
         expect(placeholder).toBeTruthy()
         expect(placeholder.parentElement).toBe(wrapper)
         expect(placeholder.nextElementSibling).toBe(cardB)
+        const [clone] = clones()
+        expect(placeholder.previousElementSibling).toBe(clone)
+        // The clone keeps the element's original sibling index (first child),
+        // so structural selectors like `:first-child` still match it.
+        expect(wrapper.firstElementChild).toBe(clone)
     })
 
     it('positions the exit clone at the current slot, not the stale registration rect', () => {
@@ -881,7 +940,321 @@ describe('exit placeholder slot preservation', () => {
         expect(second).toBeTruthy()
         expect(first.parentElement).toBe(wrapper)
         expect(second.parentElement).toBe(wrapper)
-        expect(cardA.nextElementSibling).toBe(first)
-        expect(first.nextElementSibling).toBe(second)
+        const [cloneB, cloneC] = clones()
+        expect(cardA.nextElementSibling).toBe(cloneB)
+        expect(cloneB.nextElementSibling).toBe(first)
+        expect(first.nextElementSibling).toBe(cloneC)
+        expect(cloneC.nextElementSibling).toBe(second)
+    })
+})
+
+describe('exit clone style freeze', () => {
+    // A real `getComputedStyle` result is LIVE: once Svelte detaches the node
+    // (keyed {#each} and {#if} both detach before unregisterChild) every
+    // property reads back as ''. This mock reproduces that, so the clone can
+    // only carry the card's look if it was snapshotted as strings while the
+    // element was still connected.
+    const liveComputedStyle = (target: Element, values: Record<string, string>) => {
+        const props = Object.keys(values)
+        return new Proxy({} as CSSStyleDeclaration, {
+            get(_, key) {
+                const connected = target.isConnected
+                if (key === 'length') return connected ? props.length : 0
+                if (key === 'getPropertyValue') {
+                    return (prop: string) => (connected ? (values[prop] ?? '') : '')
+                }
+                if (key === 'getPropertyPriority') return () => ''
+                if (typeof key === 'string' && /^\d+$/.test(key)) {
+                    return connected ? props[Number(key)] : undefined
+                }
+                if (typeof key === 'string') {
+                    const kebab = key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)
+                    return connected ? (values[kebab] ?? '') : ''
+                }
+                return undefined
+            }
+        })
+    }
+
+    let host: HTMLElement
+    let container: HTMLElement
+    let card: HTMLElement
+    let cardValues: Record<string, string>
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        document.body.innerHTML = ''
+        host = document.createElement('div')
+        container = document.createElement('div')
+        container.className = 'animate-presence-container'
+        card = document.createElement('div')
+        card.className = 'card'
+        cardValues = {
+            display: 'flex',
+            position: 'static',
+            'background-color': 'rgb(43, 89, 195)',
+            'border-top-left-radius': '24px',
+            'font-weight': '600'
+        }
+        container.appendChild(card)
+        host.appendChild(container)
+        document.body.appendChild(host)
+
+        vi.spyOn(window, 'getComputedStyle').mockImplementation((target) =>
+            target === card
+                ? liveComputedStyle(card, cardValues)
+                : mockComputedStyle(
+                      target === container
+                          ? { display: 'contents', position: 'static' }
+                          : { display: 'block', position: 'static' }
+                  )
+        )
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
+            cb(0)
+            return 1
+        })
+    })
+
+    it('freezes a detached child clone from the connected-time snapshot, not a live declaration', () => {
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        ctx.registerChild('card', card, { opacity: 0 })
+
+        card.remove()
+        ctx.unregisterChild('card')
+
+        const clone = document.querySelector<HTMLElement>('[data-clone="true"]')
+        expect(clone).toBeTruthy()
+        expect(clone!.style.getPropertyValue('background-color')).toBe('rgb(43, 89, 195)')
+        expect(clone!.style.getPropertyValue('border-top-left-radius')).toBe('24px')
+        expect(clone!.style.getPropertyValue('font-weight')).toBe('600')
+        expect(clone!.style.display).toBe('flex')
+    })
+
+    const exitClone = () => document.querySelector<HTMLElement>('[data-clone="true"]')!
+
+    it('re-snapshots when a class change restyles the connected element', async () => {
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        ctx.registerChild('card', card, { opacity: 0 })
+
+        cardValues['background-color'] = 'rgb(255, 99, 71)'
+        card.classList.add('selected')
+        await Promise.resolve() // MutationObserver delivers in a microtask
+
+        card.remove()
+        ctx.unregisterChild('card')
+        expect(exitClone().style.getPropertyValue('background-color')).toBe('rgb(255, 99, 71)')
+    })
+
+    it('refreshes the full snapshot only on the settled updateChildState call', () => {
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        ctx.registerChild('card', card, { opacity: 0 })
+
+        cardValues['border-top-left-radius'] = '4px'
+        ctx.updateChildState('card', makeRect(0), getComputedStyle(card))
+        cardValues['font-weight'] = '800'
+        ctx.updateChildState('card', makeRect(0), getComputedStyle(card), true)
+        cardValues['font-weight'] = '100'
+        ctx.updateChildState('card', makeRect(0), getComputedStyle(card))
+
+        card.remove()
+        ctx.unregisterChild('card')
+        // Settled call captured both changes made up to it; the later
+        // per-frame call did not re-serialize.
+        expect(exitClone().style.getPropertyValue('border-top-left-radius')).toBe('4px')
+        expect(exitClone().style.getPropertyValue('font-weight')).toBe('800')
+    })
+
+    it("lets the clone's own inline style win over the snapshot", () => {
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        ctx.registerChild('card', card, { opacity: 0 })
+        card.style.backgroundColor = 'rgb(1, 2, 3)'
+
+        card.remove()
+        ctx.unregisterChild('card')
+        expect(exitClone().style.getPropertyValue('background-color')).toBe('rgb(1, 2, 3)')
+    })
+
+    it('inserts the clone into the element slot, not the positioning ancestor', () => {
+        const sibling = document.createElement('div')
+        container.appendChild(sibling)
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        ctx.registerChild('card', card, { opacity: 0 })
+        ctx.registerChild('sibling', sibling, { opacity: 0 })
+
+        card.remove()
+        ctx.unregisterChild('card')
+        expect(exitClone().parentElement).toBe(container)
+        expect(container.firstElementChild).toBe(exitClone())
+        // Still positioned against the nearest box-generating ancestor.
+        expect(host.style.position).toBe('relative')
+    })
+
+    it("re-snapshots a connected child when a sibling's exit restyles it structurally", () => {
+        const first = document.createElement('div')
+        container.insertBefore(first, card)
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        ctx.registerChild('first', first, { opacity: 0 })
+        ctx.registerChild('card', card, { opacity: 0 })
+
+        // `first` leaves; `card` becomes :first-child and restyles — no
+        // attribute on `card` changes.
+        first.remove()
+        cardValues['background-color'] = 'rgb(43, 89, 195)'
+        cardValues['border-top-left-radius'] = '4px'
+        ctx.unregisterChild('first')
+
+        card.remove()
+        ctx.unregisterChild('card')
+        const cardClone = document.querySelector<HTMLElement>('.card[data-clone="true"]')!
+        expect(cardClone.style.getPropertyValue('border-top-left-radius')).toBe('4px')
+    })
+
+    it('hands a mid-exit clone over to the re-entering element', async () => {
+        const onExitComplete = vi.fn()
+        vi.spyOn(window, 'getComputedStyle').mockImplementation((target) =>
+            target === card
+                ? liveComputedStyle(card, cardValues)
+                : target.hasAttribute?.('data-clone')
+                  ? liveComputedStyle(target, { opacity: '0.53' })
+                  : mockComputedStyle(
+                        target === container
+                            ? { display: 'contents', position: 'static' }
+                            : { display: 'block', position: 'static' }
+                    )
+        )
+        const ctx = createAnimatePresenceContext({ mode: 'sync', onExitComplete })
+        ctx.registerChild('card', card, { opacity: 0 })
+        card.remove()
+        ctx.unregisterChild('card')
+        expect(exitClone()).toBeTruthy()
+
+        const handoff = ctx.takeExitHandoff('card')
+        expect(handoff?.from).toEqual({ opacity: 0.53 })
+        // The clone and its slot placeholder go at once: no overlap.
+        expect(document.querySelector('[data-clone="true"]')).toBeNull()
+        expect(document.querySelector('[data-presence-placeholder="true"]')).toBeNull()
+        // A second claim finds nothing in flight.
+        expect(ctx.takeExitHandoff('card')).toBeUndefined()
+
+        // The reversed exit never completes (upstream deletes it from
+        // exitComplete on re-entry), even once its animation settles.
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(onExitComplete).not.toHaveBeenCalled()
+    })
+})
+
+describe('readAnimatedValues', () => {
+    beforeEach(() => {
+        vi.restoreAllMocks()
+        document.body.innerHTML = ''
+    })
+
+    it('reads transforms from the matrix, opacity as a number and other keys as CSS', () => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        const values: Record<string, string> = {
+            transform: 'matrix(1, 0, 0, 1, 12, -4)',
+            opacity: '0.25',
+            'background-color': 'rgb(1, 2, 3)'
+        }
+        vi.spyOn(window, 'getComputedStyle').mockImplementation(
+            () =>
+                ({
+                    transform: values.transform,
+                    getPropertyValue: (prop: string) => values[prop] ?? ''
+                }) as unknown as CSSStyleDeclaration
+        )
+
+        expect(
+            readAnimatedValues(element, ['x', 'y', 'opacity', 'backgroundColor', 'transition'])
+        ).toEqual({ x: 12, y: -4, opacity: 0.25, backgroundColor: 'rgb(1, 2, 3)' })
+    })
+})
+
+describe('snapshotComputedStyle', () => {
+    it('copies every non-empty computed property as a plain string', () => {
+        const values: Record<string, string> = { color: 'red', 'font-weight': '', width: '10px' }
+        const props = Object.keys(values)
+        const style = {
+            ...Object.fromEntries(props.map((prop, index) => [index, prop])),
+            length: props.length,
+            getPropertyValue: (prop: string) => values[prop] ?? ''
+        } as unknown as CSSStyleDeclaration
+
+        const snapshot = snapshotComputedStyle(style)
+        values.color = 'blue' // the source changing later must not leak in
+        expect(snapshot).toEqual({ color: 'red', width: '10px' })
+    })
+})
+
+describe('observeStyleChanges', () => {
+    let element: HTMLElement
+    let frames: FrameRequestCallback[]
+
+    const flushMicrotasks = async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+    }
+    const runFrame = () => {
+        const pending = frames
+        frames = []
+        pending.forEach((cb) => cb(0))
+    }
+
+    beforeEach(() => {
+        vi.restoreAllMocks()
+        document.body.innerHTML = ''
+        element = document.createElement('div')
+        document.body.appendChild(element)
+        frames = []
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+            frames.push(cb)
+            return frames.length
+        })
+        vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {
+            frames = []
+        })
+    })
+
+    it('snapshots immediately on a non-style attribute change', async () => {
+        const onChange = vi.fn()
+        observeStyleChanges(element, onChange)
+        element.setAttribute('data-state', 'open')
+        await flushMicrotasks()
+        expect(onChange).toHaveBeenCalledTimes(1)
+    })
+
+    it('coalesces per-frame style writes into one snapshot after they stop', async () => {
+        const onChange = vi.fn()
+        observeStyleChanges(element, onChange)
+
+        for (let frame = 0; frame < 5; frame += 1) {
+            element.style.opacity = String(frame / 10)
+            await flushMicrotasks()
+            runFrame()
+        }
+        expect(onChange).not.toHaveBeenCalled()
+
+        runFrame() // first frame without a style write
+        expect(onChange).toHaveBeenCalledTimes(1)
+    })
+
+    it('never snapshots a detached element and stops cleanly', async () => {
+        const onChange = vi.fn()
+        const stop = observeStyleChanges(element, onChange)
+
+        element.style.opacity = '0.5'
+        await flushMicrotasks()
+        element.remove()
+        runFrame()
+        expect(onChange).not.toHaveBeenCalled()
+
+        document.body.appendChild(element)
+        stop()
+        element.className = 'after-stop'
+        await flushMicrotasks()
+        runFrame()
+        expect(onChange).not.toHaveBeenCalled()
     })
 })

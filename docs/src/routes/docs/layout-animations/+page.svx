@@ -135,12 +135,14 @@ Wrap each region in `<LayoutGroup id="…">` to scope the registry to that subtr
 </LayoutGroup>
 ```
 
-Nested groups chain by default (`inherit={true}`), so a `<LayoutGroup id="inner">` inside a `<LayoutGroup id="outer">` yields an effective id of `"outer-inner"`. Pass `inherit={false}` to start a fresh scope that ignores any surrounding group — useful for embedded widgets that should not be affected by ambient grouping.
+A `<LayoutGroup>` also groups layout animations, like Motion's: every `layout` / `layoutId` element inside it is re-measured whenever any member changes layout or unmounts, so siblings animate together. Remove an item from a list and the remaining items glide into the freed space, even though only the removed item changed.
+
+Nested groups chain by default (`inherit={true}`), so a `<LayoutGroup id="inner">` inside a `<LayoutGroup id="outer">` yields an effective id of `"outer-inner"` and joins the outer group's animations. `inherit="id"` chains the id but starts a separate group: the outer group's updates don't re-measure those elements, which ride along with their parent instead of animating on their own. Pass `inherit={false}` to start a fresh scope and a separate group that ignore any surrounding LayoutGroup — useful for embedded widgets that should not be affected by ambient grouping.
 
 | Prop | Type | Description |
 |---|---|---|
 | `id` | `string?` | Stable identifier for this group. Combined with any surrounding LayoutGroup's id when `inherit` is `true`. |
-| `inherit` | `boolean \| 'id'` (default `true`) | When `true` (or `'id'`), chain onto the parent group's id. When `false`, ignore any outer group and start a fresh scope. `'id'` is accepted for drop-in compatibility with framer-motion examples; it behaves the same as `true` here. |
+| `inherit` | `boolean \| 'id'` (default `true`) | `true`: chain onto the parent group's id and join its layout-animation group. `'id'`: chain onto the parent's id but start a separate group, so the outer group's updates don't re-measure these elements (they follow their parent instead). `false`: ignore any outer group; fresh id scope and separate group. |
 
 ## API reference
 
