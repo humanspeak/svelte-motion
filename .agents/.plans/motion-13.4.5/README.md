@@ -21,7 +21,7 @@ rewrite). They first ship in the 13.4.5 package, so they are in this batch.
 | [005](005-layout-group-parity-suite.md) | Port upstream's LayoutGroup parity suite (red tests) | P1 | M | — | DONE — 8747d80e; guard PASS (11 expected reds) |
 | [007](007-layout-group-node-groups.md) | LayoutGroup owns a projection node group (upstream parity) | P1 | L | 005 | IN PROGRESS — checkpoint passed 2026-09-29; resumes after 006 with Step 4b (gaps a–d) per revision |
 | [008](008-layoutid-update-driven-capture.md) | layoutId handoff rects captured on updates, not per frame (read-count parity) | P1 **release blocker** | M–L | 006, 007 | TODO |
-| [006](006-bump-motion-13-4-5.md) | Bump motion/motion-dom to 13.4.5 + verify inherited fixes | P1 | S | 001–003, 005 | TODO — 13.4.5 published 2026-09-29; runs before 007 resumes |
+| [006](006-bump-motion-13-4-5.md) | Bump motion/motion-dom to 13.4.5 + verify inherited fixes | P1 | S | 001–003, 005 | DONE — 30b0088e; guard PASS (no parity flips on 13.4.5 alone) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason).
 
