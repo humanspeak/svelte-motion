@@ -6,6 +6,24 @@
 > report — do not improvise. Report results in your final message; the
 > reviewer maintains the batch README.
 >
+> Revision 2026-09-29 (operator decision after executor report): the update-driven capture opens a regression —
+> a plain-DOM layout shift (e.g. a spacer inserted above the element, no resize, no motion update) leaves the
+> cached rect stale and the handoff flies from the old position (72px measured). Upstream reads live at unmount,
+> so this must be closed. **Step 3b (added):** (1) RED first: add an e2e case to `e2e/layout-id/read-budget.spec.ts`
+> (or a sibling spec) that inserts a plain-DOM spacer above an idle `layoutId` element, then swaps it to its
+> counterpart; assert the incoming element's first frame starts from the element's real pre-swap position (≤1px),
+> not the stale one. It must fail on the Step 3 code. (2) Implement a read-free **position watcher** per
+> `layoutId` element using the IntersectionObserver layout-shift technique (floating-ui `autoUpdate`
+> `layoutShift`/`observeMove`: observe the element with rootMargin insets derived from its last rect and
+> threshold 1, so any move of ≥1px fires; on fire, take ONE silent measurement, refresh the cached rect, and
+> re-arm the observer with the new rect). Zero reads while idle must still hold (read-budget test), and the
+> two interrupt-measurements parity cases must stay green 3/3. Scroll-triggered fires are acceptable (reads
+> only while things move). Tear the observer down with the capture effect. Unit-test the re-arm math.
+> Scope additions: `e2e/layout-id/*.spec.ts`, a small helper module under `src/lib/utils/` (e.g.
+> `observeMove.ts` + spec). Also update the stale TesterPanel status text in
+> `src/routes/tests/layout/layout-group-interrupt/+page.svelte` and link the new read-budget page from
+> `src/routes/+page.svelte` (both now in scope).
+>
 > Revision 2026-09-29 (guard pre-flight): 006 and 007 are DONE; baseline is `02938b9b`. `_MotionContainer.svelte`
 > line numbers in "Current state" shifted (007 added ~200 lines); locate the loop by searching for
 > `requestAnimationFrame(captureRect)` and the consume site by `layoutIdRegistry.consume`. 007 added
