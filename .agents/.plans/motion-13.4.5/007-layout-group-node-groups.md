@@ -7,6 +7,24 @@
 > section occurs, stop and report — do not improvise. When done, update the
 > status row for this plan in `.agents/.plans/motion-13.4.5/README.md`.
 >
+> Revision 2026-09-29 (operator decisions at the Step 4 checkpoint): (1) resume from the guard snapshot
+> `8cc9119a` (branch `guard/plan-007-checkpoint`), rebased onto the branch tip that includes Plan 006's
+> Motion 13.4.5 bump; re-measure the whole parity matrix on 13.4.5 first. (2) Add **Step 4b** before Step 5,
+> closing the four design gaps found at the checkpoint, each with a unit test and its parity case:
+>   (a) D5b: seed a group member that is mid-layout-animation from its current on-screen (projected) box,
+>       not its cached layout — upstream snapshots the visual position (interrupt case).
+>   (b) Unmount fan-out: because Svelte removes the DOM before effect teardown, seed the remaining group
+>       members from cached layouts when a member leaves, instead of relying on `group.remove()`'s live
+>       `willUpdate(false)` measurement (layout-group-unmount sibling case).
+>   (c) `layoutId`-only nodes must trigger group fan-out on their own updates (pre-patch `willUpdate` on
+>       the reactive path, like `layout` nodes) (layout-group jump cases).
+>   (d) When the committer's own subtree changed, separate-group descendants are snapshotted too (upstream
+>       re-render semantics); add a parity/unit case covering it.
+> (3) The two `layout-group-interrupt-measurements` read-count cases are OUT of 007: they're caused by the
+>     per-frame layoutId capture loop and belong to Plan 008 (release blocker). Keep them `test.fail` with a
+>     comment naming Plan 008. (4) Scope for Step 4b: same files as D3–D6 (`motionDomProjection.ts`,
+>     `_MotionContainer.svelte` layout/presence-release hunks, their specs).
+>
 > Revision 2026-09-28 (guard pre-flight): Plan 005 landed (8747d80e, 5f9abf50). Baseline moved to
 > `5f9abf50`. The red specs live in `e2e/layout/layout-group-parity/` and the red/green matrix is in the
 > batch README ("LayoutGroup parity matrix") — that matrix is your acceptance list. 005 also added

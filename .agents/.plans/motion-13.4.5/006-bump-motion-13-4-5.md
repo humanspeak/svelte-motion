@@ -6,6 +6,13 @@
 > report — do not improvise. When done, update the status row for this plan
 > in `.agents/.plans/motion-13.4.5/README.md`.
 >
+> Revision 2026-09-29 (operator: 13.4.5 is published — bump now): run this plan BEFORE 007 finishes. Dependencies
+> 001–003 and 005 are DONE; 007 is mid-flight and will rebase onto this bump. Step 2 changes: run
+> `e2e/layout/layout-group-parity` with `--repeat-each=3`; any `test.fail` case Playwright now reports as
+> "expected to fail but passed" must be flipped to `test(` (assertions unchanged) — record the full
+> 13.4.5-only matrix in your report. Cases still red stay `test.fail`; 007 owns them. Use a private
+> Playwright config/port instead of 4198 for every e2e run, including the full gate.
+>
 > Revision 2026-09-28: version checks read `node_modules/<pkg>/package.json` via fs — `require('motion-dom/package.json')` throws ERR_PACKAGE_PATH_NOT_EXPORTED (verified in the main checkout).
 >
 > **Gate (run first)**: `npm view motion version && npm view motion-dom version`
@@ -20,7 +27,7 @@
 - **Priority**: P1
 - **Effort**: S
 - **Risk**: MED (dependency bump; spring and projection internals change)
-- **Depends on**: 001, 002, 003 should be DONE first (so the bump PR carries the ports); 005 and 007 must be DONE so the remaining `test.fail` markers (annotated "Needs motion-dom 13.4.5 (Plan 006)") can be flipped here
+- **Depends on**: 001, 002, 003, 005 (DONE). 007 is resequenced after this bump (2026-09-29).
 - **Category**: migration
 - **Planned at**: commit `67815169`, 2026-09-28
 - **Upstream reference**: `~/Github/motion` tag `v13.4.5`; CHANGELOG entries for 13.4.5 and (mis-tagged) 13.4.4
