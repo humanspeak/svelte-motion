@@ -145,7 +145,7 @@
     },
     "dependencies": {
         "acorn": "^8.18.0",
-        "motion": "^13.4.5",
+        "motion": "^13.4.6",
         "motion-dom": "^13.4.5"
     },
     "devDependencies": {

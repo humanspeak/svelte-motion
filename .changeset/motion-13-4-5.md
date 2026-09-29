@@ -2,4 +2,4 @@
 '@humanspeak/svelte-motion': patch
 ---
 
-Update the upstream Motion and motion-dom dependencies to 13.4.5.
+Update the upstream Motion dependency to 13.4.6 and retain motion-dom at 13.4.5.
