@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte'
+    import { registerTesterSummary } from './TesterPanel.svelte'
 
     /**
      * Read-only rAF sampler that classifies each movement of a fixture element
@@ -17,6 +18,9 @@
      * @prop expectedTop Optional function returning the expected settle top
      *     for the current state (read from the DOM or page state, read-only).
      * @prop emphasizeOffset Show "offset from row" as the headline number.
+     *
+     * Also puts a one-line summary (latest verdict + headline number) in the
+     * enclosing `TesterPanel`'s compact bar via `registerTesterSummary`.
      */
     let {
         targetId,
@@ -158,7 +162,32 @@
     const offsetDrift = $derived(
         current?.offset != null && baselineOffset !== null ? current.offset - baselineOffset : null
     )
+
+    registerTesterSummary(compactSummary)
 </script>
+
+{#snippet compactSummary()}
+    <p class="compact">
+        {#if history[0]}
+            <span class="chip" class:snapped={history[0].verdict === 'SNAPPED'}
+                >{history[0].verdict}</span
+            >
+        {:else}
+            <span class="chip idle">NO MOVE YET</span>
+        {/if}
+        <span>
+            {#if emphasizeOffset && parentId}
+                offset from row <b>{fmt(current?.offset)} px</b>
+                {#if offsetDrift !== null && Math.abs(offsetDrift) > 1}
+                    <em class="bad">(off by {offsetDrift.toFixed(1)})</em>
+                {/if}
+            {:else}
+                #{targetId} top <b>{fmt(current?.top)} px</b>
+            {/if}
+            · {moving ? 'moving…' : 'at rest'}
+        </span>
+    </p>
+{/snippet}
 
 <div class="meter" aria-label="Live movement readout">
     <dl class:emphasize-offset={emphasizeOffset}>
@@ -309,6 +338,30 @@
     }
     .chip.snapped {
         background: #b42318;
+    }
+    .chip.idle {
+        background: #647185;
+    }
+    .compact {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin: 0;
+        font-size: 12px;
+        color: #43536a;
+    }
+    .compact b {
+        font:
+            700 13px/1.3 ui-monospace,
+            SFMono-Regular,
+            monospace;
+        font-variant-numeric: tabular-nums;
+        color: #182437;
+    }
+    .compact em.bad {
+        font-style: normal;
+        font-weight: 700;
+        color: #b42318;
     }
     .empty,
     .note {

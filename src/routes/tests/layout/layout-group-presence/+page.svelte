@@ -1,5 +1,6 @@
 <script lang="ts">
     import { AnimatePresence, LayoutGroup, motion } from '$lib'
+    import JumpRecorder from '../_parity/JumpRecorder.svelte'
     import TesterPanel, { type TesterStep } from '../_parity/TesterPanel.svelte'
 
     // Plan 007 D7: LayoutGroup `forceRender` after AnimatePresence exits
@@ -25,9 +26,19 @@
             action: { run: () => document.getElementById('a')?.click() }
         },
         {
-            text: 'Reload the page and watch blue closely during the first third of a second after clicking red.',
+            text: 'Press "Reset page" at the top of this panel and watch blue closely during the first third of a second after clicking red again.',
             expected:
                 'Blue does not move at all while red is still visible — no 40px hop up at the start of the fade.'
+        },
+        {
+            text: 'Press "Reset page" and watch the boxes appear.',
+            expected:
+                'Red is on top and blue below it from the very first frame. Blue never flashes in red’s spot. The pop recorder below (and in the bar) should say SMOOTH for “Page load”.'
+        },
+        {
+            text: 'If you ever see a pop, look at the pop recorder.',
+            expected:
+                'It says POP DETECTED with the frame number. Press Copy under the frame trace and send us the text.'
         }
     ]
 </script>
@@ -63,7 +74,7 @@
 <TesterPanel
     eyebrow="Plan 007 · LayoutGroup forceRender"
     title="A sibling fills the space an exit frees"
-    status="Passes on this build."
+    status="Passes on this build in headless e2e. A one-frame pop of blue into red’s spot after “Reset page” has been seen by hand but not reproduced headless — the pop recorder is here to catch it."
     {steps}
 >
     {#snippet checks()}
@@ -77,6 +88,15 @@
             <code>forceRender</code>) and blue animates into the freed space exactly once.
         </p>
     {/snippet}
+    <!-- Red's exit (0.3 s) holds the slot, then blue glides for 1 s: it can't reach the
+         settle spot before ~1.3 s (minus 50 ms of frame-timing slack). -->
+    <JumpRecorder
+        targetId="b"
+        triggerId="a"
+        durationMs={2000}
+        jumpPx={30}
+        earliestSettleMs={1250}
+    />
 </TesterPanel>
 
 <style>
