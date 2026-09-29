@@ -6,6 +6,30 @@
 > report — do not improvise. Report results in your final message; the
 > reviewer maintains the batch README.
 >
+> Revision 2026-09-29 (maintainer review of f34fd411, confirmed by guard probe): two gaps. Add **Step 5**.
+> **(a) Stale snapshot after a structural change.** Remove Card A, wait for its exit to finish (live Card B becomes
+> `:first-child` → blue rgb(43,89,195), 24px), then remove B → B's clone shows the REGISTRATION snapshot (tomato, 12px).
+> Snapshots must also refresh when a child's cascade can change without an attribute change: at minimum re-snapshot
+> every still-connected registered child after any registration, unregistration, placeholder removal and clone
+> removal (exit complete) in the same presence context, and on childList mutations of each child's parent
+> (MutationObserver, coalesced to one pass per frame). Keep it off the per-frame path; report cost.
+> **(b) Re-entry mid-exit pops.** Hide the solo card, show it again at ~500ms: the re-added element renders at
+> opacity 1 immediately while the old clone keeps fading (0.53→0.03). Upstream reverses the exit on the same
+> element (the exiting child becomes present again and animates back to its target from its current values).
+> Match that: when a key re-registers while its clone is mid-exit, the entering element must start from the
+> clone's current animated values (opacity etc.) and animate to its target; the clone is removed at that moment
+> (no overlap). First check whether this already fails at 61a58d35 (pre-010) and say so. Cite upstream
+> (`AnimatePresence/index.tsx` + `PresenceChild`) for the re-entry behavior.
+> Fixture: give the solo card and the list cards `initial={{ opacity: 0 }} animate={{ opacity: 1 }}` so enter is
+> visible, and add TesterPanel steps for (a) "remove A, then B — B fades out blue" and (b) "hide, then show again
+> mid-fade — it fades back in from where it was".
+> Red first for both (e2e: B clone look equals live B look at removal; re-entry opacity is continuous — no
+> frame-to-frame jump > 0.15 on the visible card, and never two visible solo cards at once). Paint-level checks
+> via screencast region pixels. Scope additions: `src/lib/components/AnimatePresence.svelte`,
+> `src/lib/components/PresenceChild.svelte`, `src/lib/html/_MotionContainer.svelte` (presence hunks), the repro page
+> (fixture props + tester text), `e2e/animate-presence/*.spec.ts`. STOP if (b) requires changing how enter
+> animations are scheduled for all elements, or if existing re-entry specs (key-change, owned-child) regress.
+>
 > **Drift check (run first)**: `git diff --stat 6f3612ab..HEAD -- src/lib/utils/presence.ts src/lib/utils/presence.spec.ts src/lib/html/_MotionContainer.svelte src/routes/tests/animate-presence e2e/animate-presence`
 > Any change → compare with the excerpts; on mismatch STOP.
 
