@@ -678,6 +678,15 @@
                         Add during exit (child added as an exit completes)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/wait-exit-key-change') +
+                            searchParams}
+                    >
+                        Wait exit completion (latest requested key remains)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
