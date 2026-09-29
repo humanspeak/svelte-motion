@@ -6,8 +6,18 @@
 > report — do not improvise. Report results in your final message; the
 > reviewer maintains the batch README.
 >
-> **Drift check (run first)**: `git diff --stat <tip-after-007>..HEAD -- src/lib/html/_MotionContainer.svelte src/lib/utils/motionDomProjection.ts src/lib/utils/layoutId.ts`
-> (The reviewer fills `<tip-after-007>` when dispatching; on mismatch with the excerpts → STOP.)
+> Revision 2026-09-29 (guard pre-flight): 006 and 007 are DONE; baseline is `02938b9b`. `_MotionContainer.svelte`
+> line numbers in "Current state" shifted (007 added ~200 lines); locate the loop by searching for
+> `requestAnimationFrame(captureRect)` and the consume site by `layoutIdRegistry.consume`. 007 added
+> `onProjectionCommit` and `onScreenSnapshot()` in `motionDomProjection.ts`, which are reusable sources for Step 2.
+> **Step 0 (added):** in `e2e/layout/layout-group-parity/layout-group-interrupt.spec.ts`, replace Playwright
+> `locator.click()` on the animating fixture elements with a native `el.click()` via `page.evaluate` (the
+> measurements spec already does this). Cypress's actionability treats <5px/frame motion as stable and clicks
+> immediately; Playwright waits ~7s for the 10s tween, which made the port measure the wrong moment. Assertions
+> unchanged. Flip that case's `test.fail` only if it passes 3/3; this file is now in scope.
+>
+> **Drift check (run first)**: `git diff --stat 02938b9b..HEAD -- src/lib/html/_MotionContainer.svelte src/lib/utils/motionDomProjection.ts src/lib/utils/layoutId.ts`
+> (The reviewer fills `02938b9b` when dispatching; on mismatch with the excerpts → STOP.)
 
 ## Status
 
