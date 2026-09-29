@@ -43,7 +43,7 @@ async function expectSettled(page: Page, key: number) {
     ).toHaveCount(0)
 }
 
-async function runScenario(page: Page) {
+async function runScenario(page: Page, generation = 0) {
     await expectSettled(page, 0)
     await page.locator('#run').click()
     await expect(page.locator('#state')).toHaveText('1')
@@ -51,7 +51,7 @@ async function runScenario(page: Page) {
     await expect(page.locator('#state')).toHaveText('2')
     await expect(page.locator('#callback-count')).toHaveText('1')
     await expect(page.locator('#events')).toHaveText(
-        'initial:0|requested:1|exit-complete:requested-1|requested:2'
+        `initial:0|requested:1|exit-complete:generation-${generation}:requested-1|requested:2`
     )
     await expectSettled(page, 2)
     await expect(page.locator('#callback-count')).toHaveText('1')
@@ -72,13 +72,27 @@ for (const form of FORMS) {
         await expectSettled(page, 0)
         await page.locator('#run').click()
         await expect(page.locator('#state')).toHaveText('1')
+        await expect(page.locator('#scenario [data-clone="true"]')).toHaveCount(1)
+        await page.locator('#reset').click()
+        await expect(page.locator('#scenario .scenario-child:not([data-clone])')).toHaveAttribute(
+            'id',
+            'child-0'
+        )
+        await page.locator('#run').click()
+        await expect(page.locator('#state')).toHaveText('2')
+        await expect(page.locator('#events')).toHaveText(
+            'initial:0|requested:1|exit-complete:generation-1:requested-1|requested:2'
+        )
+        await expect(page.locator('#ignored-generations')).toHaveText('0')
+        await expect(page.locator('#callback-count')).toHaveText('1')
+        await expectSettled(page, 2)
         await page.locator('#reset').click()
         await expectSettled(page, 0)
         await expect(page.locator('#callback-count')).toHaveText('0')
         await expect(page.locator('#events')).toHaveText('initial:0')
-        await runScenario(page)
+        await runScenario(page, 2)
         await page.locator('#reset').click()
         await expectSettled(page, 0)
-        await runScenario(page)
+        await runScenario(page, 3)
     })
 }

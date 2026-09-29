@@ -8,7 +8,24 @@
     let callbackCount = $state(0)
     let events = $state('initial:0')
     let generation = $state(0)
+    let ignoredGenerations = $state<number[]>([])
     let armed = false
+
+    const createScenario = (id: number) => ({
+        generation: id,
+        onExitComplete: () => {
+            if (id !== generation) {
+                ignoredGenerations = [...ignoredGenerations, id]
+                return
+            }
+            if (!armed) return
+            armed = false
+            callbackCount += 1
+            events += `|exit-complete:generation-${id}:requested-${requestedKey}|requested:2`
+            requestedKey = 2
+        }
+    })
+    let scenario = $state(createScenario(0))
 
     const run = () => {
         if (requestedKey !== 0) return
@@ -17,17 +34,11 @@
         requestedKey = 1
     }
 
-    const handleExitComplete = () => {
-        if (!armed) return
-        armed = false
-        callbackCount += 1
-        events += `|exit-complete:requested-${requestedKey}|requested:2`
-        requestedKey = 2
-    }
-
     const reset = () => {
         armed = false
         generation += 1
+        scenario = createScenario(generation)
+        ignoredGenerations = []
         requestedKey = 0
         callbackCount = 0
         events = 'initial:0'
@@ -46,10 +57,16 @@
     <button id="reset" onclick={reset}>Reset</button>
     <p>Requested key: <span id="state">{requestedKey}</span></p>
     <p>Armed completion callbacks: <span id="callback-count">{callbackCount}</span></p>
+    <p>Generation: <span id="generation">{generation}</span></p>
+    <p>
+        Ignored completion generations: <span id="ignored-generations"
+            >{ignoredGenerations.join(',')}</span
+        >
+    </p>
     <p id="events">{events}</p>
     <div id="scenario">
-        {#key generation}
-            <AnimatePresence mode="wait" initial={false} onExitComplete={handleExitComplete}>
+        {#key scenario.generation}
+            <AnimatePresence mode="wait" initial={false} onExitComplete={scenario.onExitComplete}>
                 {#key requestedKey}
                     <MotionDiv
                         key={requestedKey}
