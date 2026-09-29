@@ -1,5 +1,8 @@
 # Motion 13.4.5 follow-ups
 
+> **CLOSED 2026-09-29.** 009 (9a3a8df5) and 010 (f34fd411, 1b5d70dc) DONE with guard PASS, plus the
+> fixture clipping fix (0ae30275). Remaining for the operator: visual sign-off, then the PR.
+
 Generated 2026-09-29 from the closed `motion-13.4.5` batch's residual risks, after the
 maintainer ruled them not acceptable to ship. Lands on `chore/motion-13.4.5` before the PR.
 
@@ -7,7 +10,7 @@ maintainer ruled them not acceptable to ship. Lands on `chore/motion-13.4.5` bef
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | ---- | ----- | -------- | ------ | ---------- | ------ |
-| [010](010-exit-clone-keeps-styles.md) | Exit clones keep the look of the element they replace | P1 | M | 009 | TODO |
+| [010](010-exit-clone-keeps-styles.md) | Exit clones keep the look of the element they replace | P1 | M | 009 | DONE — f34fd411, 1b5d70dc; guard PASS |
 | [009](009-presence-placeholder-and-handoff.md) | Exit placeholders keep margins; pin same-update handoffs; link presence demo | P1 | S–M | motion-13.4.5 (closed) | DONE — 9a3a8df5; guard PASS |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason).
