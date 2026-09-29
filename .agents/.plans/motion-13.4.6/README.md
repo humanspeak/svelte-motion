@@ -7,7 +7,7 @@ PR label correction (2026-09-29): the maintainer retracted the `skip-publish` in
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
 | [001](001-wait-exit-key-change.md) | Characterize latest-key wins at wait exit completion | P2 | S–M | — | DONE — cd900593; guard PASS, meaningful reset red/green |
-| [002](002-motion-dependency-refresh.md) | Align Motion with 13.4.6 and verify the release | P3 | S | 001 | TODO |
+| [002](002-motion-dependency-refresh.md) | Align Motion with 13.4.6 and verify the release | P3 | S | 001 | DONE —61c00d15; guard PASS, all integration gates reproduced |
 
 ## Dependency and execution notes
 
