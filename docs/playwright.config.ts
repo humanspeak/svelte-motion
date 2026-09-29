@@ -25,6 +25,10 @@ export default defineConfig({
             'pnpm package && pnpm --dir docs build && pnpm --dir docs exec vite preview --host 127.0.0.1 --port 5201 --strictPort',
         url: 'http://127.0.0.1:5201',
         timeout: 300000,
+        // pnpm 12 runs scripts in their own process group, so Playwright's default
+        // SIGKILL of the server's group orphans the server and the run never exits.
+        // SIGTERM is forwarded by pnpm to the script.
+        gracefulShutdown: { signal: 'SIGTERM', timeout: 5000 },
         reuseExistingServer: false
     },
     projects: [
