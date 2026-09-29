@@ -19,7 +19,7 @@ rewrite). They first ship in the 13.4.5 package, so they are in this batch.
 | [003](003-reorder-guard-values.md) | Reorder guard clears only when `values` changes | P1 | S | — | DONE — 4144edf7; guard PASS |
 | [004](004-presence-add-during-exit.md) | Characterize AnimatePresence add-during-exit (#3856) | P2 | S | — | DONE — 4c221667; guard PASS (characterization, all green) |
 | [005](005-layout-group-parity-suite.md) | Port upstream's LayoutGroup parity suite (red tests) | P1 | M | — | DONE — 8747d80e; guard PASS (11 expected reds) |
-| [007](007-layout-group-node-groups.md) | LayoutGroup owns a projection node group (upstream parity) | P1 | L | 005 | TODO |
+| [007](007-layout-group-node-groups.md) | LayoutGroup owns a projection node group (upstream parity) | P1 | L | 005 | IN PROGRESS — checkpoint after Step 4 (snapshot 8cc9119a on guard/plan-007-checkpoint); awaiting operator |
 | [006](006-bump-motion-13-4-5.md) | Bump motion/motion-dom to 13.4.5 + verify inherited fixes | P1 | S | 001–003, 005, 007; npm publish | BLOCKED — awaiting npm publish of 13.4.5 |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason).
