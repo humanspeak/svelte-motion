@@ -9,7 +9,7 @@ branch's existing `useTransform` acceleration work.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | ---- | ----- | -------- | ------ | ---------- | ------ |
-| 001 | `useScroll` decides ViewTimeline acceleration with upstream's 13.4.7 offset rule | P2 | S | — | TODO |
+| 001 | `useScroll` decides ViewTimeline acceleration with upstream's 13.4.7 offset rule | P2 | S | — | DONE (guard PASS, e93fcf03) |
 | 002 | Align with Motion 13.4.7 and prove target offsets attach natively | P2 | M | 001 + Motion 13.4.7 on npm | BLOCKED (13.4.7 not yet on npm as of 2026-09-30) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
