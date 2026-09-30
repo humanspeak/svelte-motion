@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Snippet } from 'svelte'
+    import { onDestroy, type Snippet } from 'svelte'
     import PresenceChild from '$lib/components/PresenceChild.svelte'
     import { getLayoutGroupContext } from '$lib/components/layoutGroup.context'
     import type { AnimatePresenceMode } from '$lib/types'
@@ -16,6 +16,7 @@
      * Wrap content whose children may be conditionally rendered so exit
      * animations can run after teardown. When a motion element unmounts, a
      * styled clone is animated out before being removed from the DOM.
+     * Removing this boundary cancels its exits and removes clones immediately.
      *
      * Pass `present` with a named `child` snippet when AnimatePresence should
      * own the conditional rendering. This keeps the real DOM node mounted
@@ -77,6 +78,7 @@
         custom
     })
     setAnimatePresenceContext(context)
+    onDestroy(context.dispose)
 
     // Initialize presence depth to 0 for direct children
     // Only direct children (depth 0) require explicit key props, matching Framer Motion behavior

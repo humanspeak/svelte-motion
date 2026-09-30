@@ -673,6 +673,22 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/boundary-teardown') + searchParams}
+                    >
+                        Boundary teardown and navigation
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/clone-typography') + searchParams}
+                    >
+                        Exit typography and inheritance
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/animate-presence/grid-exit') + searchParams}
                     >
                         Grid exit (siblings hold slots)

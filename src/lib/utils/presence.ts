@@ -136,30 +136,132 @@ export type ComputedStyleSnapshot = Record<string, string>
  * (registration, attribute changes, animation settle) — never per frame.
  *
  * @param style The computed style of a connected element.
+ * @param element Optional connected element used to preserve line-height inheritance.
  * @returns A detached property → value map; empty values are omitted.
  * @example
  * ```ts
- * const snapshot = snapshotComputedStyle(getComputedStyle(element))
+ * const snapshot = snapshotComputedStyle(getComputedStyle(element), element)
  * snapshot['background-color'] // 'rgb(43, 89, 195)', even after detach
  * ```
  */
-export const snapshotComputedStyle = (style: CSSStyleDeclaration): ComputedStyleSnapshot => {
+export const snapshotComputedStyle = (
+    style: CSSStyleDeclaration,
+    element?: HTMLElement
+): ComputedStyleSnapshot => {
     const snapshot: ComputedStyleSnapshot = {}
     for (let i = 0; i < style.length; i += 1) {
         const prop = style[i]
         const value = style.getPropertyValue(prop)
         if (value) snapshot[prop] = value
     }
+    if (element) {
+        const lineHeight = snapshotLineHeight(element, style)
+        if (lineHeight) snapshot['line-height'] = lineHeight
+        else delete snapshot['line-height']
+    }
     return snapshot
 }
+
+/** Attribute identifying a temporary, non-rendered inheritance probe. */
+const STYLE_PROBE_ATTRIBUTE = 'data-presence-style-probe'
+
+/**
+ * Capture the root's line height without converting inherited numbers to pixels.
+ *
+ * Typed OM exposes the computed number directly. Without it, a hidden probe
+ * inherits the root's value at twice its font size: only a unitless line height
+ * doubles. The probe is removed synchronously and never occupies a layout slot.
+ *
+ * @param element The connected presence child.
+ * @param style Its computed style before any probe is inserted.
+ * @returns The inheritable CSS value, or undefined when it must remain stylesheet-driven.
+ */
+const snapshotLineHeight = (
+    element: HTMLElement,
+    style: CSSStyleDeclaration
+): string | undefined => {
+    const lineHeight = style.lineHeight
+    if (!lineHeight || lineHeight === 'normal') return lineHeight
+    if (typeof element.computedStyleMap === 'function') {
+        const value = element.computedStyleMap().get('line-height')
+        if (value) return value.toString()
+    }
+    const fontSize = parseFloat(style.fontSize)
+    const usedHeight = parseFloat(lineHeight)
+    if (
+        !element.isConnected ||
+        !Number.isFinite(fontSize) ||
+        fontSize <= 0 ||
+        !Number.isFinite(usedHeight)
+    )
+        return lineHeight
+    if (usedHeight === 0) return '0'
+    // Empty roots need a pseudo-element probe: adding a child changes :empty.
+    // This also preserves ID-dependent line heights before the clone loses its ID.
+    if (element.matches(':empty')) {
+        const root = element.getRootNode() as Document | ShadowRoot
+        const Sheet = element.ownerDocument.defaultView?.CSSStyleSheet
+        if (!Sheet || !('adoptedStyleSheets' in root)) return undefined
+        const sheets = root.adoptedStyleSheets
+        const marker = element.getAttribute(STYLE_PROBE_ATTRIBUTE)
+        const sheet = new Sheet()
+        sheet.replaceSync(
+            `[${STYLE_PROBE_ATTRIBUTE}="line-height"]::after { display: none !important; font-size: ${fontSize * 2}px !important; line-height: inherit !important; }`
+        )
+        try {
+            element.setAttribute(STYLE_PROBE_ATTRIBUTE, 'line-height')
+            root.adoptedStyleSheets = [...sheets, sheet]
+            const pseudo = getComputedStyle(element, '::after')
+            const inheritedHeight = parseFloat(pseudo.lineHeight)
+            if (parseFloat(pseudo.fontSize) !== fontSize * 2) return undefined
+            return Math.abs(inheritedHeight / usedHeight - 2) < 0.0001
+                ? String(inheritedHeight / (fontSize * 2))
+                : lineHeight
+        } finally {
+            root.adoptedStyleSheets = sheets
+            if (marker === null) element.removeAttribute(STYLE_PROBE_ATTRIBUTE)
+            else element.setAttribute(STYLE_PROBE_ATTRIBUTE, marker)
+        }
+    }
+    const probe = element.ownerDocument.createElement('span')
+    probe.setAttribute(STYLE_PROBE_ATTRIBUTE, '')
+    probe.style.cssText = `all: initial !important; display: none !important; font-size: ${fontSize * 2}px !important; line-height: inherit !important;`
+    element.appendChild(probe)
+    try {
+        const rootStyle = getComputedStyle(element)
+        // :empty and :has() can react to even a non-rendered child. Leave the
+        // original stylesheet in charge rather than snapshot a perturbed value.
+        if (rootStyle.lineHeight !== lineHeight || parseFloat(rootStyle.fontSize) !== fontSize)
+            return undefined
+        const inheritedHeight = parseFloat(getComputedStyle(probe).lineHeight)
+        return Math.abs(inheritedHeight / usedHeight - 2) < 0.0001
+            ? String(inheritedHeight / (fontSize * 2))
+            : lineHeight
+    } finally {
+        probe.remove()
+    }
+}
+
+/**
+ * Identify a probe insertion/removal so snapshot observers cannot retrigger themselves.
+ *
+ * @param record An observed DOM mutation.
+ * @returns Whether every changed node is a temporary style probe.
+ */
+const isStyleProbeMutation = (record: MutationRecord): boolean =>
+    (record.type === 'attributes' && record.attributeName === STYLE_PROBE_ATTRIBUTE) ||
+    (record.type === 'childList' &&
+        [...record.addedNodes, ...record.removedNodes].every(
+            (node) => node.nodeType === 1 && (node as Element).hasAttribute(STYLE_PROBE_ATTRIBUTE)
+        ))
 
 /**
  * Keep a presence child's style snapshot fresh while it is connected.
  *
- * Watches the element's own attributes (class, style, data-* state, …) — the
- * changes that restyle an element without a layout or animation signal.
- * Non-style attribute changes are rare and re-snapshot immediately.
- * `style` writes can arrive every frame (JS-driven animations render
+ * Watches the element's attributes and descendant structure/state changes that
+ * can restyle the root through structural selectors.
+ * Non-style attribute and descendant structure changes re-snapshot immediately.
+ * Root `style` writes can arrive every frame (JS-driven animations render
  * inline styles), so they are coalesced: the snapshot is taken only once a
  * whole frame has passed without a further `style` write.
  *
@@ -169,7 +271,7 @@ export const snapshotComputedStyle = (style: CSSStyleDeclaration): ComputedStyle
  * @example
  * ```ts
  * const stop = observeStyleChanges(element, () => {
- *     record.lastStyleSnapshot = snapshotComputedStyle(getComputedStyle(element))
+ *     record.lastStyleSnapshot = snapshotComputedStyle(getComputedStyle(element), element)
  * })
  * ```
  */
@@ -198,7 +300,14 @@ export const observeStyleChanges = (element: HTMLElement, onChange: () => void):
     }
 
     const observer = new MutationObserver((records) => {
-        if (records.some((record) => record.attributeName !== 'style')) {
+        const changes = records.filter(
+            (record) =>
+                !isStyleProbeMutation(record) &&
+                // Descendant animations must not delay the root's own snapshot.
+                (record.attributeName !== 'style' || record.target === element)
+        )
+        if (changes.length === 0) return
+        if (changes.some((record) => record.attributeName !== 'style')) {
             snapshotIfConnected()
             return
         }
@@ -207,7 +316,7 @@ export const observeStyleChanges = (element: HTMLElement, onChange: () => void):
         settling = true
         frameId = requestAnimationFrame(settleStyleWrites)
     })
-    observer.observe(element, { attributes: true })
+    observer.observe(element, { attributes: true, childList: true, subtree: true })
 
     return () => {
         observer.disconnect()
@@ -551,6 +660,13 @@ export type AnimatePresenceContext = {
     /** Unregister a child. If it has an exit, clone and animate it out. */
     unregisterChild: (key: string) => void
     /**
+     * Dispose the owning boundary without completing its cancelled exits.
+     *
+     * Stops observers and animations, removes exit clones/placeholders, and
+     * prevents descendant teardown or queued work from starting new exits.
+     */
+    dispose: () => void
+    /**
      * Claim the in-flight exit of `key` for a re-entering element.
      *
      * When a key comes back while its exit clone is still animating out,
@@ -614,6 +730,7 @@ export const createAnimatePresenceContext = (context: {
     custom?: unknown
     getCustom?: () => unknown
 }): AnimatePresenceContext => {
+    let disposed = false
     // Default initial to true (animate on first mount) unless explicitly false
     const initial = context.initial !== false
 
@@ -650,9 +767,13 @@ export const createAnimatePresenceContext = (context: {
 
     // After first frame, mark initial render phase as complete
     // Guard for SSR - requestAnimationFrame only exists in browser
+    let initialRenderFrame: number | undefined
     if (isInitialRenderPhase && typeof window !== 'undefined') {
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
+        initialRenderFrame = requestAnimationFrame(() => {
+            if (disposed) return
+            initialRenderFrame = requestAnimationFrame(() => {
+                initialRenderFrame = undefined
+                if (disposed) return
                 pwLog('[presence] initial render phase complete, enabling animations for new keys')
                 isInitialRenderPhase = false
             })
@@ -718,6 +839,7 @@ export const createAnimatePresenceContext = (context: {
      * ```
      */
     const isEnterBlocked = (key?: string): boolean => {
+        if (disposed) return false
         if (mode !== 'wait') {
             pwLog('[presence] isEnterBlocked', { blocked: false, mode, inFlightExits, key })
             return false
@@ -756,6 +878,7 @@ export const createAnimatePresenceContext = (context: {
      * ```
      */
     const onEnterUnblocked = (callback: () => void): (() => void) => {
+        if (disposed) return () => {}
         pwLog('[presence] onEnterUnblocked: registering callback')
         enterUnblockedCallbacks.add(callback)
         return () => {
@@ -883,8 +1006,10 @@ export const createAnimatePresenceContext = (context: {
         animation?: { stop?: () => void }
         /** Pre-exit values of the exit keys, read before the animation starts. */
         base?: Record<string, string | number>
-        /** A re-entry took the exit over; its completion must not clean up. */
-        handedOff: boolean
+        /** Scheduled animation start, cancelled if the boundary is disposed. */
+        frame?: number
+        /** Re-entry or boundary disposal cancelled this exit. */
+        cancelled: boolean
     }
     const activeExits = new Map<string, ActiveExit>()
 
@@ -898,24 +1023,34 @@ export const createAnimatePresenceContext = (context: {
      * a child that is removed later freezes the look it had at removal.
      */
     let snapshotRefreshScheduled = false
+    let snapshotRefreshFrame: number | undefined
     const refreshConnectedSnapshots = () => {
         snapshotRefreshScheduled = false
+        snapshotRefreshFrame = undefined
+        if (disposed) return
         for (const child of children.values()) {
             if (!child.element.isConnected) continue
-            child.lastStyleSnapshot = snapshotComputedStyle(getComputedStyle(child.element))
+            child.lastStyleSnapshot = snapshotComputedStyle(
+                getComputedStyle(child.element),
+                child.element
+            )
         }
     }
     const scheduleSnapshotRefresh = () => {
-        if (snapshotRefreshScheduled || typeof requestAnimationFrame === 'undefined') return
+        if (disposed || snapshotRefreshScheduled || typeof requestAnimationFrame === 'undefined')
+            return
         snapshotRefreshScheduled = true
-        requestAnimationFrame(refreshConnectedSnapshots)
+        snapshotRefreshFrame = requestAnimationFrame(refreshConnectedSnapshots)
     }
     // Sibling insertions/removals in any registered child's parent (including
     // ones this context never hears about) restyle structural selectors.
     const structureObserver =
         typeof MutationObserver === 'undefined'
             ? undefined
-            : new MutationObserver(scheduleSnapshotRefresh)
+            : new MutationObserver((records) => {
+                  if (records.some((record) => !isStyleProbeMutation(record)))
+                      scheduleSnapshotRefresh()
+              })
 
     const removeExitPlaceholder = (key: string, placeholder?: HTMLElement | null) => {
         const current = exitPlaceholders.get(key)
@@ -959,6 +1094,7 @@ export const createAnimatePresenceContext = (context: {
      * ```
      */
     const startExit = () => {
+        if (disposed) return
         if (mode === 'wait') {
             enterBlocked = true
         }
@@ -985,6 +1121,7 @@ export const createAnimatePresenceContext = (context: {
      * ```
      */
     const finishExit = () => {
+        if (disposed) return
         inFlightExits -= 1
         if (inFlightExits === 0) {
             context.forceRender?.()
@@ -1023,6 +1160,7 @@ export const createAnimatePresenceContext = (context: {
         mergedTransition?: MotionTransition,
         resolveExit?: PresenceExitResolver
     ) => {
+        if (disposed) return
         const wasExited = exitedKeys.has(key)
         if (wasExited) {
             removeExitPlaceholder(key)
@@ -1064,7 +1202,7 @@ export const createAnimatePresenceContext = (context: {
             resolveExit,
             mergedTransition,
             lastRect: initialRect,
-            lastStyleSnapshot: snapshotComputedStyle(initialStyle),
+            lastStyleSnapshot: snapshotComputedStyle(initialStyle, element),
             lastLayoutStyle: snapshotLayoutStyle(initialStyle),
             lastPopLayoutSnapshot:
                 mode === 'popLayout' ? measurePopLayoutSnapshot(element, initialStyle) : undefined,
@@ -1073,7 +1211,7 @@ export const createAnimatePresenceContext = (context: {
             lastScrollSnapshot: initialScrollSnapshot
         }
         record.stopObservingStyle = observeStyleChanges(element, () => {
-            record.lastStyleSnapshot = snapshotComputedStyle(getComputedStyle(element))
+            record.lastStyleSnapshot = snapshotComputedStyle(getComputedStyle(element), element)
         })
         children.set(key, record)
         if (element.parentElement) {
@@ -1103,7 +1241,7 @@ export const createAnimatePresenceContext = (context: {
             child.lastRect = rect
             child.lastLayoutStyle = snapshotLayoutStyle(computedStyle)
             if (settled && child.element.isConnected) {
-                child.lastStyleSnapshot = snapshotComputedStyle(computedStyle)
+                child.lastStyleSnapshot = snapshotComputedStyle(computedStyle, child.element)
             }
             child.lastScrollSnapshot = captureScrollSnapshot(child.element)
             child.hasScrollableAncestor = child.lastScrollSnapshot.length > 0
@@ -1130,6 +1268,7 @@ export const createAnimatePresenceContext = (context: {
      * clone and run the exit animation using Motion. Cleans up after finish.
      */
     const unregisterChild = (key: string) => {
+        if (disposed) return
         const child = children.get(key)
         pwLog('[presence] unregisterChild', {
             key,
@@ -1182,7 +1321,9 @@ export const createAnimatePresenceContext = (context: {
         // detached element's computed style reads '' for everything, so fall
         // back to the string snapshots taken while it was connected.
         const liveStyle = elementIsLive ? getComputedStyle(child.element) : undefined
-        const frozenStyle = liveStyle ? snapshotComputedStyle(liveStyle) : child.lastStyleSnapshot
+        const frozenStyle = liveStyle
+            ? snapshotComputedStyle(liveStyle, child.element)
+            : child.lastStyleSnapshot
         // Layout fields for the placeholder / out-of-flow check.
         const computed = liveStyle ? snapshotLayoutStyle(liveStyle) : child.lastLayoutStyle
         if (elementIsLive) {
@@ -1390,7 +1531,7 @@ export const createAnimatePresenceContext = (context: {
         // and takes the element's original sibling index.
         const slotAnchor = placeholder ?? resolvePlaceholderAnchor(child)
         slotParent.insertBefore(clone, slotAnchor?.parentElement === slotParent ? slotAnchor : null)
-        const activeExit: ActiveExit = { clone, child, placeholder, handedOff: false }
+        const activeExit: ActiveExit = { clone, child, placeholder, cancelled: false }
         activeExits.set(key, activeExit)
         const releaseActiveExit = () => {
             if (activeExits.get(key) === activeExit) activeExits.delete(key)
@@ -1401,9 +1542,10 @@ export const createAnimatePresenceContext = (context: {
         // before this exit animation completes
         const exitingElement = child.element
 
-        requestAnimationFrame(() => {
-            // A re-entry already took this exit over before it started.
-            if (activeExit.handedOff) return
+        activeExit.frame = requestAnimationFrame(() => {
+            activeExit.frame = undefined
+            // Re-entry or boundary teardown can cancel before the first frame.
+            if (activeExit.cancelled || disposed) return
             const resolvedExit = child.resolveExit?.(getCustom()) ?? child.exit
 
             if (!resolvedExit) {
@@ -1453,8 +1595,8 @@ export const createAnimatePresenceContext = (context: {
             exitAnimation.finished
                 .catch(() => {})
                 .finally(() => {
-                    // A re-entry took this exit over and already cleaned up.
-                    if (activeExit.handedOff) return
+                    // Re-entry or boundary teardown already cleaned up.
+                    if (activeExit.cancelled || disposed) return
                     releaseActiveExit()
                     pwLog('[presence] exit animation complete', { key, mode })
 
@@ -1513,7 +1655,7 @@ export const createAnimatePresenceContext = (context: {
         // Not started yet: the clone still shows its pre-exit values.
         const base = active.base ?? from
 
-        active.handedOff = true
+        active.cancelled = true
         activeExits.delete(key)
         active.animation?.stop?.()
         active.clone.remove()
@@ -1526,6 +1668,39 @@ export const createAnimatePresenceContext = (context: {
 
         pwLog('[presence] exit handed off to re-entering element', { key, from, base })
         return { from, base }
+    }
+
+    /**
+     * Release a removed AnimatePresence boundary immediately.
+     *
+     * Boundary removal is cancellation, so it must not fire completion or
+     * deferred-enter callbacks. Idempotent for repeated lifecycle cleanup.
+     *
+     * @returns Nothing; stops owned work and removes all exit artifacts.
+     */
+    const dispose = (): void => {
+        if (disposed) return
+        disposed = true
+        structureObserver?.disconnect()
+        if (initialRenderFrame !== undefined) cancelAnimationFrame(initialRenderFrame)
+        if (snapshotRefreshFrame !== undefined) cancelAnimationFrame(snapshotRefreshFrame)
+        for (const child of children.values()) child.stopObservingStyle?.()
+        for (const active of activeExits.values()) {
+            active.cancelled = true
+            if (active.frame !== undefined) cancelAnimationFrame(active.frame)
+            active.animation?.stop?.()
+            active.clone.remove()
+        }
+        for (const placeholder of exitPlaceholders.values()) placeholder.remove()
+        children.clear()
+        activeExits.clear()
+        exitPlaceholders.clear()
+        seenKeys.clear()
+        exitedKeys.clear()
+        enterUnblockedCallbacks.clear()
+        customSubscribers.clear()
+        inFlightExits = 0
+        enterBlocked = false
     }
 
     return {
@@ -1545,6 +1720,7 @@ export const createAnimatePresenceContext = (context: {
         updateChildState,
         updateChildAnimatedStyle,
         unregisterChild,
+        dispose,
         takeExitHandoff,
         notifyExitStart: startExit,
         notifyExitComplete: finishExit
