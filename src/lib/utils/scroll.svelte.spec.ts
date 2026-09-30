@@ -255,6 +255,54 @@ describe('utils/scroll - useScroll', () => {
         expect(ctx.scrollYProgress.accelerate).toBeUndefined()
     })
 
+    // Offsets that Motion 13.4.7's `offsetToViewTimelineRange` maps to a native range.
+    it.each([
+        ['cover strings', ['start end', 'end start']],
+        [
+            'cover numeric',
+            [
+                [0, 1],
+                [1, 0]
+            ]
+        ],
+        ['partial center edges', ['center end', 'center start']],
+        [
+            'partial numeric',
+            [
+                [0.25, 1],
+                [0.75, 0]
+            ]
+        ],
+        ['All strings', ['start start', 'end end']],
+        ['reversed All', ['end end', 'start start']]
+    ] as const)('sets accelerate for offset the 13.4.7 rule maps: %s', (_name, offset) => {
+        supportsViewTimelineMock.mockReturnValue(true)
+        const target = document.createElement('div')
+        const ctx = inRoot(() =>
+            useScroll({ target, offset: offset as unknown as Array<[number, number]> })
+        )
+        expect(ctx.scrollXProgress.accelerate).toBeDefined()
+        expect(ctx.scrollYProgress.accelerate).toBeDefined()
+    })
+
+    // Offsets the 13.4.7 rule rejects; must stay on the JS path.
+    it.each([
+        ['container edge other than start/end', ['start center', 'end start']],
+        ['absolute px length', ['100px end', 'end start']],
+        ['absolute vh length', ['start end', 'end 50vh']],
+        ['identical points', ['start start', 'start start']],
+        ['not exactly two points', ['start end', 'center center', 'end start']]
+    ] as const)(
+        'does not set accelerate for offset the 13.4.7 rule rejects: %s',
+        (_name, offset) => {
+            supportsViewTimelineMock.mockReturnValue(true)
+            const target = document.createElement('div')
+            const ctx = inRoot(() => useScroll({ target, offset: offset as unknown as string[] }))
+            expect(ctx.scrollXProgress.accelerate).toBeUndefined()
+            expect(ctx.scrollYProgress.accelerate).toBeUndefined()
+        }
+    )
+
     // -------- SSR --------
 
     it('SSR fallback: returns motion values with no observer when window is undefined', () => {
