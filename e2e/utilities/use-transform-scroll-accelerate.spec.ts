@@ -40,6 +40,23 @@ test.describe('useTransform scroll acceleration', () => {
         await expect.poll(opacity).toBe('0.2')
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
         await expect.poll(opacity).toBe('1')
+
+        // Computed opacity alone can't see missing 0/1 padding (the JS path also
+        // writes inline opacity), so assert the native animation's keyframes.
+        const keyframes = () =>
+            page.getByTestId('partial').evaluate((el) => {
+                const animation = el
+                    .getAnimations()
+                    .find((a) => a.timeline?.constructor?.name === 'ScrollTimeline')
+                const frames = (animation?.effect as KeyframeEffect | undefined)?.getKeyframes()
+                return frames?.map((f) => ({ offset: f.offset, opacity: String(f.opacity) }))
+            })
+        await expect.poll(keyframes).toEqual([
+            { offset: 0, opacity: '0.2' },
+            { offset: 0.25, opacity: '0.2' },
+            { offset: 0.5, opacity: '1' },
+            { offset: 1, opacity: '1' }
+        ])
     })
 
     test('no page errors across load and a full scroll', async ({ page }) => {
