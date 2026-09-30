@@ -2,6 +2,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { createServer } from 'vite'
+import './verify-tree-shaking.mjs'
 import './verify-types.mjs'
 
 /**
