@@ -244,3 +244,130 @@ describe('utils/transform - useTransform', () => {
         expect(ctx.stepB.current).toBeCloseTo(100)
     })
 })
+
+describe('useTransform accelerate propagation', () => {
+    let cleanups: VoidFunction[]
+
+    beforeEach(() => {
+        cleanups = []
+    })
+
+    afterEach(() => {
+        for (const fn of cleanups) fn()
+    })
+
+    const inRoot = <T>(fn: () => T): T => {
+        let result: T
+        const stop = $effect.root(() => {
+            result = fn()
+        })
+        cleanups.push(stop)
+        return result!
+    }
+
+    const sourceEase = (v: number) => v
+    const fakeAccelerate = () => ({
+        factory: () => () => undefined,
+        times: [0, 1],
+        keyframes: [0, 1],
+        ease: sourceEase,
+        duration: 1
+    })
+    const accelerated = () => {
+        const src = useMotionValue(0)
+        src.accelerate = fakeAccelerate()
+        return src
+    }
+
+    it('partial range holds end values', () => {
+        inRoot(() => {
+            const src = accelerated()
+            const out = useTransform(src, [0.25, 0.5], [0.2, 1])
+            expect(out.accelerate).toBeDefined()
+            expect(out.accelerate!.times).toEqual([0, 0.25, 0.5, 1])
+            expect(out.accelerate!.keyframes).toEqual([0.2, 0.2, 1, 1])
+            expect(out.accelerate!.isTransformed).toBe(true)
+            expect(out.accelerate!.duration).toBe(1)
+            expect(out.accelerate!.factory).toBe(src.accelerate!.factory)
+            expect(out.accelerate!.ease).toBe(sourceEase)
+        })
+    })
+
+    it('ease array gets an extra leading ease', () => {
+        inRoot(() => {
+            const e1 = (v: number) => v
+            const e2 = (v: number) => v
+            const out = useTransform(accelerated(), [0, 0.5, 1], [0, 1, 0], { ease: [e1, e2] })
+            const ease = out.accelerate!.ease as unknown[]
+            expect(ease).toHaveLength(3)
+            expect(ease[0]).toBe(e1)
+            expect(ease[1]).toBe(e1)
+            expect(ease[2]).toBe(e2)
+        })
+    })
+
+    it('single ease function is passed through as-is', () => {
+        inRoot(() => {
+            const e = (v: number) => v
+            const out = useTransform(accelerated(), [0, 1], [0, 1], { ease: e })
+            expect(out.accelerate!.ease).toBe(e)
+        })
+    })
+
+    it('clamp: false does not accelerate', () => {
+        inRoot(() => {
+            const out = useTransform(accelerated(), [0, 1], [0, 1], { clamp: false })
+            expect(out.accelerate).toBeUndefined()
+        })
+    })
+
+    it('chained transform does not accelerate', () => {
+        inRoot(() => {
+            const first = useTransform(accelerated(), [0, 1], [1, 0.5])
+            expect(first.accelerate?.isTransformed).toBe(true)
+            const second = useTransform(first, [0, 1], [1, 0])
+            expect(second.accelerate).toBeUndefined()
+        })
+    })
+
+    it('source without accelerate does not accelerate', () => {
+        inRoot(() => {
+            const out = useTransform(useMotionValue(0), [0, 1], [0, 1])
+            expect(out.accelerate).toBeUndefined()
+        })
+    })
+
+    it('non-motion-value sources do not accelerate', () => {
+        inRoot(() => {
+            expect(useTransform(() => 0.5, [0, 1], [0, 1]).accelerate).toBeUndefined()
+            expect(useTransform(readable(0), [0, 1], [0, 1]).accelerate).toBeUndefined()
+        })
+    })
+
+    it('multi-output map form gives each key its own config', () => {
+        inRoot(() => {
+            const out = useTransform(accelerated(), [0, 1], {
+                opacity: [0, 1],
+                blur: [10, 0]
+            })
+            expect(out.opacity.accelerate!.keyframes).toEqual([0, 0, 1, 1])
+            expect(out.blur.accelerate!.keyframes).toEqual([10, 10, 0, 0])
+            expect(out.opacity.accelerate).not.toBe(out.blur.accelerate)
+        })
+    })
+
+    it('monotonic guard: descending, out-of-bounds and negative ranges do not accelerate', () => {
+        inRoot(() => {
+            expect(useTransform(accelerated(), [1, 0], [0, 1]).accelerate).toBeUndefined()
+            expect(useTransform(accelerated(), [0, 2], [0, 1]).accelerate).toBeUndefined()
+            expect(useTransform(accelerated(), [-0.5, 0.5], [0, 1]).accelerate).toBeUndefined()
+        })
+    })
+
+    it('non-numeric outputs still propagate', () => {
+        inRoot(() => {
+            const out = useTransform(accelerated(), [0, 1], ['#ff0000', '#0000ff'])
+            expect(out.accelerate!.keyframes).toEqual(['#ff0000', '#ff0000', '#0000ff', '#0000ff'])
+        })
+    })
+})

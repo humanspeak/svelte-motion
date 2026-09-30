@@ -1,6 +1,11 @@
 // Utilities for building and validating transform strings
 
-import { type MotionValue, type TransformOptions } from 'motion-dom'
+import {
+    isMotionValue,
+    type AccelerateConfig,
+    type MotionValue,
+    type TransformOptions
+} from 'motion-dom'
 import { type AugmentedMotionValue } from './augmentMotionValue.svelte.js'
 import { resolveMotionValueSource, type MotionValueSource } from './toMotionValue.svelte.js'
 import {
@@ -157,6 +162,66 @@ export type MultiTransformer<I, O> = (inputs: I[]) => O
 export type TransformOutputMap<O> = { [key: string]: O[] }
 
 /**
+ * Returns `true` when every input stop is within `[0, 1]` and the stops are
+ * non-decreasing.
+ *
+ * WAAPI takes keyframe offsets straight from the input range, and
+ * `element.animate()` throws a `TypeError` for offsets outside `[0, 1]` or
+ * that decrease. This guard keeps such ranges on the JS path, which handles
+ * them correctly. Deliberately stricter than framer-motion, which has no guard.
+ *
+ * @param input - The input range stops.
+ * @returns Whether the range is safe to use as WAAPI keyframe offsets.
+ */
+const isMonotonicUnitRange = (input: number[]): boolean => {
+    let previous = 0
+    for (const stop of input) {
+        if (!(stop >= previous && stop <= 1)) return false
+        previous = stop
+    }
+    return true
+}
+
+/**
+ * Copies a source's `.accelerate` config onto a mapped result so bound style
+ * values can run as native scroll-timeline animations.
+ *
+ * Mirrors framer-motion's `useTransform` (`packages/framer-motion/src/value/use-transform.ts`,
+ * after motion#3857). WAAPI fills missing 0 and 1 offsets with the element's
+ * underlying value, so the end values are padded to hold the clamped
+ * transform's ends. Chained transforms (`isTransformed`), `clamp: false`, and
+ * non-motion-value sources are not accelerated. Additionally skips ranges that
+ * fail `isMonotonicUnitRange` (see there).
+ *
+ * @param source - The original (un-bridged) source passed to `useTransform`.
+ * @param input - The input range stops.
+ * @param output - The output stops.
+ * @param options - Transform options.
+ * @param result - The mapped value to attach the config to.
+ */
+const propagateAccelerate = <O>(
+    source: unknown,
+    input: number[],
+    output: O[],
+    options: TransformOptions<O> | undefined,
+    result: AugmentedMotionValue<O>
+): void => {
+    if (!isMotionValue(source)) return
+    const inputAccelerate = (source as MotionValue<number>).accelerate
+    if (!inputAccelerate || inputAccelerate.isTransformed || options?.clamp === false) return
+    if (output.length === 0 || !isMonotonicUnitRange(input)) return
+
+    const ease = options?.ease
+    result.accelerate = {
+        ...inputAccelerate,
+        times: [0, ...input, 1],
+        keyframes: [output[0], ...output, output[output.length - 1]],
+        isTransformed: true,
+        ...(ease ? { ease: Array.isArray(ease) ? [ease[0], ...ease] : ease } : {})
+    } satisfies AccelerateConfig
+}
+
+/**
  * Creates an augmented `MotionValue<O>` derived from one or more `MotionValue`s
  * (or Svelte readables / reactive getters), composed via a range mapping or a
  * compute function.
@@ -168,6 +233,9 @@ export type TransformOutputMap<O> = { [key: string]: O[] }
  *   and a pluggable mixer for non-numeric outputs. The source may be a motion
  *   value, a Svelte readable, or a reactive getter (`$state` / `$derived`
  *   reads inside it are tracked). Delegates to motion-dom's `mapValue`.
+ *   When the source is a `useScroll` progress value accelerated by a native
+ *   scroll timeline, the result is accelerated too (first hop only, clamped,
+ *   input stops ascending within 0-1), matching framer-motion.
  * - **Multi-output mapping form** — `useTransform(source, input, outputMap, options?)`
  *   produces an object of motion values, one per key in `outputMap`. Each
  *   value is the same mapping form applied to that key's output stops; all
@@ -339,6 +407,13 @@ export function useTransform<O>(
                 outputMap[key],
                 options as TransformOptions<O> | undefined
             )
+            propagateAccelerate(
+                source,
+                input,
+                outputMap[key],
+                options as TransformOptions<O> | undefined,
+                result[key]
+            )
         }
         // One cleanup effect for all per-key MVs plus the shared bridge —
         // saves N effect nodes vs. registering one per key.
@@ -354,6 +429,7 @@ export function useTransform<O>(
     // and chains that bridge's teardown onto the value's own destroy.
     const output = (outputOrOutputMap as O[]) ?? []
     const value = createMapValue(source, input, output, options as TransformOptions<O> | undefined)
+    propagateAccelerate(source, input, output, options as TransformOptions<O> | undefined, value)
     $effect(() => () => value.destroy())
     return value
 }

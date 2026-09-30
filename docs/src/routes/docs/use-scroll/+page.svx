@@ -162,6 +162,15 @@ Scroll animations work best with CSS properties that can be GPU-accelerated:
 
 These properties don't trigger layout or paint, so the browser can animate them on the compositor thread for smooth 60fps performance even during rapid scrolling.
 
+`scrollXProgress` and `scrollYProgress`, and values mapped from them with `useTransform(progress, [input], [output])`, run as native scroll-timeline animations when the browser supports them and they are bound to `opacity`, `filter`, `clipPath`, `transform`, or `backgroundColor`. The following fall back to a JavaScript update on every scroll event:
+
+- Chained transforms (a transform of another transformed value)
+- `clamp: false`
+- Function transformers, such as `useTransform(progress, (v) => ...)`
+- Input stops outside ascending `0`-`1` (for example, descending ranges)
+
+The `x`, `y`, and `scale` shortcuts also update in JavaScript, to match Framer Motion. Map to a full `transform` string when you need compositor-driven movement.
+
 ## Options
 
 | Option | Type | Description |

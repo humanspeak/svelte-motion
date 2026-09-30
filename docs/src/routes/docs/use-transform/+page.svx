@@ -170,6 +170,21 @@ Map a single source to many output ranges in one call. Returns an object of moti
 - If outputs are numeric, a linear mixer is used; otherwise provide a custom `mixer`.
 - Descending input ranges are supported. Equal segment endpoints produce zero progress for that segment.
 
+### Scroll acceleration
+
+When the source is a `useScroll` progress value and the browser supports native scroll timelines, the mapped value runs on the compositor thread instead of updating in JavaScript. This applies to the first hop only, with `clamp` left on, and input stops that ascend within `0`-`1`. Chained transforms, `clamp: false`, function transformers, and other ranges fall back to JavaScript. The value must be bound to `opacity`, `filter`, `clipPath`, `transform`, or `backgroundColor`.
+
+```svelte
+<script>
+  import { motion, useScroll, useTransform } from '@humanspeak/svelte-motion'
+
+  const { scrollYProgress } = useScroll()
+  const opacity = useTransform(scrollYProgress, [0.25, 0.5], [0.2, 1])
+</script>
+
+<motion.div style={{ opacity }} />
+```
+
 ## API Reference
 
 ### Signatures

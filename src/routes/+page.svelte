@@ -160,6 +160,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/use-transform/scroll-accelerate') + searchParams}
+                    >
+                        useTransform scroll acceleration (compositor-driven scroll fades)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout-dependency') + searchParams}
                     >
                         layoutDependency
