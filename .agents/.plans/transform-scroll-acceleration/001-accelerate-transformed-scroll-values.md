@@ -21,6 +21,16 @@
 > 4198. If 4198 is already in use, the run fails fast with "already used". In
 > that case do NOT kill the process on 4198 (it is the maintainer's). Report
 > e2e as verification-blocked; the guard will run it.
+>
+> Revision 2026-09-30 (guard, after first execution): e2e test 3's computed
+> opacity check cannot detect a missing #3857 padding in this library. Our
+> container still writes the inline `opacity` in JavaScript, so the underlying
+> value WAAPI falls back to is already correct (mutation-probed: with the
+> padding removed, test 3 still passed). Step 5 test 3 must ALSO assert the
+> browser-level keyframes of the native animation on `partial`:
+> `el.getAnimations()` → the ScrollTimeline animation's
+> `effect.getKeyframes()` offsets equal `[0, 0.25, 0.5, 1]` and opacities equal
+> `['0.2', '0.2', '1', '1']`. Keep the existing computed-opacity assertions.
 
 ## Status
 
