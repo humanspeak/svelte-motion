@@ -1,6 +1,6 @@
 import { animate } from 'motion'
 import { getContext, setContext } from 'svelte'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import {
     containsStatefulCloneContent,
     createAnimatePresenceContext,
@@ -1286,6 +1286,16 @@ describe('snapshotComputedStyle', () => {
         ['normal', 'normal', 'normal'],
         ['0', '0px', '0px']
     ])('captures %s line height without Typed OM', (expected, rootHeight, inheritedHeight) => {
+        // jsdom has constructable sheets but no adoptedStyleSheets; browsers do.
+        let adopted: CSSStyleSheet[] = []
+        Object.defineProperty(document, 'adoptedStyleSheets', {
+            configurable: true,
+            get: () => adopted,
+            set: (sheets: CSSStyleSheet[]) => (adopted = sheets)
+        })
+        onTestFinished(() => {
+            delete (document as { adoptedStyleSheets?: unknown }).adoptedStyleSheets
+        })
         const element = document.createElement('div')
         element.append(document.createElement('strong'))
         document.body.append(element)
@@ -1298,12 +1308,20 @@ describe('snapshotComputedStyle', () => {
             getPropertyValue: (prop: string) =>
                 prop === 'line-height' ? rootHeight : prop === 'font-size' ? '16px' : ''
         }
-        vi.spyOn(window, 'getComputedStyle').mockImplementation((target) =>
-            target === element ? style : mockComputedStyle({ lineHeight: inheritedHeight })
+        // The probe is the root's own ::after at twice the font size.
+        vi.spyOn(window, 'getComputedStyle').mockImplementation((target, pseudo) =>
+            target === element && pseudo === '::after'
+                ? mockComputedStyle({ fontSize: '32px', lineHeight: inheritedHeight })
+                : style
         )
+        const sheetsBefore = document.adoptedStyleSheets
         const snapshot = snapshotComputedStyle(style, element)
         expect(snapshot['line-height']).toBe(expected)
+        // No child is inserted (it would restyle :last-child etc.), and the
+        // probe attribute and sheet are gone afterwards.
         expect(element.children).toHaveLength(1)
+        expect(element.hasAttribute('data-presence-style-probe')).toBe(false)
+        expect(document.adoptedStyleSheets).toEqual(sheetsBefore)
         element.remove()
     })
 
@@ -1362,10 +1380,6 @@ describe('observeStyleChanges', () => {
     it('ignores temporary inheritance probes without ignoring real subtree changes', async () => {
         const onChange = vi.fn()
         observeStyleChanges(element, onChange)
-        const probe = document.createElement('span')
-        probe.setAttribute('data-presence-style-probe', '')
-        element.append(probe)
-        probe.remove()
         element.setAttribute('data-presence-style-probe', 'line-height')
         element.removeAttribute('data-presence-style-probe')
         await flushMicrotasks()

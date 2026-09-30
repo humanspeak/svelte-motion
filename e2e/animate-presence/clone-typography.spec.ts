@@ -107,6 +107,37 @@ for (const fallback of [false, true]) {
             }
         })
 
+        test('style snapshots do not restyle children or start their transitions', async ({
+            page
+        }) => {
+            await page.goto(URL)
+            // A probe child would steal :last-child from the description and
+            // start this transition on every snapshot.
+            await page.addStyleTag({
+                content:
+                    '.typography-card > :last-child { outline-offset: 6px; transition: outline-offset 1s; }'
+            })
+            const transitionsInCard = () =>
+                page
+                    .locator('#typography-card')
+                    .evaluate(
+                        (card) =>
+                            card
+                                .getAnimations({ subtree: true })
+                                .filter((animation) => animation instanceof CSSTransition).length
+                    )
+            // Let the stylesheet's own initial transition finish first.
+            await expect.poll(transitionsInCard, { timeout: 5000 }).toBe(0)
+            // A non-style attribute change makes the presence child re-snapshot.
+            await page.locator('#typography-card').evaluate(async (card) => {
+                for (let poke = 0; poke < 3; poke += 1) {
+                    card.setAttribute('data-poke', String(poke))
+                    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+                }
+            })
+            expect(await transitionsInCard()).toBe(0)
+        })
+
         test('preserves :empty typography without leaving a probe behind', async ({ page }) => {
             await page.goto(URL)
             // Both states resolve to 24px on the root, but only :empty retains

@@ -168,12 +168,13 @@ const STYLE_PROBE_ATTRIBUTE = 'data-presence-style-probe'
 /**
  * Capture the root's line height without converting inherited numbers to pixels.
  *
- * Typed OM exposes the computed number directly. Without it, a hidden probe
- * inherits the root's value at twice its font size: only a unitless line height
- * doubles. The probe is removed synchronously and never occupies a layout slot.
+ * Typed OM exposes the computed number directly. Without it (Firefox), the
+ * root's undisplayed `::after` inherits its value at twice its font size: only
+ * a unitless line height doubles. The probe rule and attribute are removed
+ * synchronously; no element is inserted, so no child's selectors change.
  *
  * @param element The connected presence child.
- * @param style Its computed style before any probe is inserted.
+ * @param style Its computed style before the probe is applied.
  * @returns The inheritable CSS value, or undefined when it must remain stylesheet-driven.
  */
 const snapshotLineHeight = (
@@ -196,64 +197,44 @@ const snapshotLineHeight = (
     )
         return lineHeight
     if (usedHeight === 0) return '0'
-    // Empty roots need a pseudo-element probe: adding a child changes :empty.
+    // Probe through the root's own ::after, never a child element: a child,
+    // even an undisplayed one, flips :empty, :last-child, and :nth-* on the
+    // root's children and can start their CSS transitions. The pseudo is
+    // display: none, so it has no box and cannot start transitions either.
     // This also preserves ID-dependent line heights before the clone loses its ID.
-    if (element.matches(':empty')) {
-        const root = element.getRootNode() as Document | ShadowRoot
-        const Sheet = element.ownerDocument.defaultView?.CSSStyleSheet
-        if (!Sheet || !('adoptedStyleSheets' in root)) return undefined
-        const sheets = root.adoptedStyleSheets
-        const marker = element.getAttribute(STYLE_PROBE_ATTRIBUTE)
-        const sheet = new Sheet()
-        sheet.replaceSync(
-            `[${STYLE_PROBE_ATTRIBUTE}="line-height"]::after { display: none !important; font-size: ${fontSize * 2}px !important; line-height: inherit !important; }`
-        )
-        try {
-            element.setAttribute(STYLE_PROBE_ATTRIBUTE, 'line-height')
-            root.adoptedStyleSheets = [...sheets, sheet]
-            const pseudo = getComputedStyle(element, '::after')
-            const inheritedHeight = parseFloat(pseudo.lineHeight)
-            if (parseFloat(pseudo.fontSize) !== fontSize * 2) return undefined
-            return Math.abs(inheritedHeight / usedHeight - 2) < 0.0001
-                ? String(inheritedHeight / (fontSize * 2))
-                : lineHeight
-        } finally {
-            root.adoptedStyleSheets = sheets
-            if (marker === null) element.removeAttribute(STYLE_PROBE_ATTRIBUTE)
-            else element.setAttribute(STYLE_PROBE_ATTRIBUTE, marker)
-        }
-    }
-    const probe = element.ownerDocument.createElement('span')
-    probe.setAttribute(STYLE_PROBE_ATTRIBUTE, '')
-    probe.style.cssText = `all: initial !important; display: none !important; font-size: ${fontSize * 2}px !important; line-height: inherit !important;`
-    element.appendChild(probe)
+    const root = element.getRootNode() as Document | ShadowRoot
+    const Sheet = element.ownerDocument.defaultView?.CSSStyleSheet
+    if (!Sheet || !('adoptedStyleSheets' in root)) return undefined
+    const sheets = root.adoptedStyleSheets
+    const marker = element.getAttribute(STYLE_PROBE_ATTRIBUTE)
+    const sheet = new Sheet()
+    sheet.replaceSync(
+        `[${STYLE_PROBE_ATTRIBUTE}="line-height"]::after { display: none !important; font-size: ${fontSize * 2}px !important; line-height: inherit !important; }`
+    )
     try {
-        const rootStyle = getComputedStyle(element)
-        // :empty and :has() can react to even a non-rendered child. Leave the
-        // original stylesheet in charge rather than snapshot a perturbed value.
-        if (rootStyle.lineHeight !== lineHeight || parseFloat(rootStyle.fontSize) !== fontSize)
-            return undefined
-        const inheritedHeight = parseFloat(getComputedStyle(probe).lineHeight)
+        element.setAttribute(STYLE_PROBE_ATTRIBUTE, 'line-height')
+        root.adoptedStyleSheets = [...sheets, sheet]
+        const pseudo = getComputedStyle(element, '::after')
+        const inheritedHeight = parseFloat(pseudo.lineHeight)
+        if (parseFloat(pseudo.fontSize) !== fontSize * 2) return undefined
         return Math.abs(inheritedHeight / usedHeight - 2) < 0.0001
             ? String(inheritedHeight / (fontSize * 2))
             : lineHeight
     } finally {
-        probe.remove()
+        root.adoptedStyleSheets = sheets
+        if (marker === null) element.removeAttribute(STYLE_PROBE_ATTRIBUTE)
+        else element.setAttribute(STYLE_PROBE_ATTRIBUTE, marker)
     }
 }
 
 /**
- * Identify a probe insertion/removal so snapshot observers cannot retrigger themselves.
+ * Identify the probe's own attribute toggle so snapshot observers cannot retrigger themselves.
  *
  * @param record An observed DOM mutation.
- * @returns Whether every changed node is a temporary style probe.
+ * @returns Whether the mutation is the temporary style-probe attribute.
  */
 const isStyleProbeMutation = (record: MutationRecord): boolean =>
-    (record.type === 'attributes' && record.attributeName === STYLE_PROBE_ATTRIBUTE) ||
-    (record.type === 'childList' &&
-        [...record.addedNodes, ...record.removedNodes].every(
-            (node) => node.nodeType === 1 && (node as Element).hasAttribute(STYLE_PROBE_ATTRIBUTE)
-        ))
+    record.type === 'attributes' && record.attributeName === STYLE_PROBE_ATTRIBUTE
 
 /**
  * Keep a presence child's style snapshot fresh while it is connected.
@@ -1047,10 +1028,7 @@ export const createAnimatePresenceContext = (context: {
     const structureObserver =
         typeof MutationObserver === 'undefined'
             ? undefined
-            : new MutationObserver((records) => {
-                  if (records.some((record) => !isStyleProbeMutation(record)))
-                      scheduleSnapshotRefresh()
-              })
+            : new MutationObserver(scheduleSnapshotRefresh)
 
     const removeExitPlaceholder = (key: string, placeholder?: HTMLElement | null) => {
         const current = exitPlaceholders.get(key)
