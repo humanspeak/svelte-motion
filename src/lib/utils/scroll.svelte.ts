@@ -54,12 +54,17 @@ type ScrollOffset = Array<[number | string, number | string]> | string[]
  * `scroll/utils/offset-to-range.ts`, ported in `viewTimelineRange.ts`): any
  * two-point offset whose container edges are `start`/`end` and whose lengths
  * are proportional (no px/vw/vh).
+ *
+ * Without a `target`, only an offset-free page/container scroll can use a
+ * ScrollTimeline, which has no notion of an offset; with one, the JS timeline
+ * applies it. Mirrors motion v13.5.0 `use-scroll.ts`
+ * (`supportsScrollTimeline() && !offset`).
  */
 const canAccelerateScroll = (target?: ElementOrGetter, offset?: ScrollOffset): boolean => {
     if (typeof window === 'undefined') return false
     return target
         ? supportsViewTimeline() && !!offsetToViewTimelineRange(offset)
-        : supportsScrollTimeline()
+        : supportsScrollTimeline() && !offset
 }
 
 /**

@@ -168,6 +168,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/use-scroll/view-timeline-offsets') + searchParams}
+                    >
+                        useScroll ViewTimeline offsets (element vs page offsets)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout-dependency') + searchParams}
                     >
                         layoutDependency

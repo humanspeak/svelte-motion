@@ -171,6 +171,13 @@ These properties don't trigger layout or paint, so the browser can animate them 
 
 The `x`, `y`, and `scale` shortcuts also update in JavaScript, to match Framer Motion. Map to a full `transform` string when you need compositor-driven movement.
 
+Which `offset` values can run natively depends on whether you pass a `target`:
+
+- **With a `target`**, the progress values run on a native view timeline when the offset's two points sit on the container's `start`/`end` edges with proportional target positions. For example, `["start end", "end start"]` (while the target is in view), `["start end", "end end"]` (entering), and `["center end", "center start"]`. Pixel and `vw`/`vh` lengths, and container edges such as `center`, fall back to JavaScript.
+- **Without a `target`**, page or container progress runs natively only when no `offset` is set. A scroll timeline can't express an offset, so `useScroll({ offset })` always updates in JavaScript.
+
+A native view timeline follows the target's nearest scrolling ancestor. If your CSS makes `body` a scroll container that doesn't actually scroll (for example `overflow-y: auto` on both `html` and `body`), native view-timeline animations stay frozen. Leave `body` at `overflow: visible` so the document is the scroller.
+
 ## Options
 
 | Option | Type | Description |

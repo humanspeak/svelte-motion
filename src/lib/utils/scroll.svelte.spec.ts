@@ -211,6 +211,14 @@ describe('utils/scroll - useScroll', () => {
         expect(typeof ctx.scrollXProgress.accelerate?.factory).toBe('function')
     })
 
+    it('does not set accelerate for a page offset (a ScrollTimeline has no offset)', () => {
+        // Motion 13.5.0 use-scroll.ts: `supportsScrollTimeline() && !offset`.
+        supportsScrollTimelineMock.mockReturnValue(true)
+        const ctx = inRoot(() => useScroll({ offset: ['start start', 'end end'] }))
+        expect(ctx.scrollXProgress.accelerate).toBeUndefined()
+        expect(ctx.scrollYProgress.accelerate).toBeUndefined()
+    })
+
     it('does not set accelerate when target is provided but view-timeline is unsupported', () => {
         supportsScrollTimelineMock.mockReturnValue(true)
         supportsViewTimelineMock.mockReturnValue(false)
