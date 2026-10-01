@@ -70,6 +70,16 @@ This approach ensures smooth exit animations even though the original Svelte com
 
 Exit clones are non-interactive (`inert`) and hidden from the accessibility tree. A subtree containing `canvas`, `iframe`, `video`, or `audio` is removed immediately instead of animating a clone that would lose its live bitmap, browsing context, or playback state.
 
+Clone exits preserve unitless line-height inheritance instead of freezing every descendant's line height to pixels. Nested text and CSS-generated `::before`/`::after` captions keep their spacing when the exit starts and scale with font-size animations. Fixed line heights remain fixed.
+
+### Boundary removal and navigation
+
+Exit animations run when a child is removed while its `AnimatePresence` boundary remains mounted. Removing the entire boundary cancels its queued and running clone exits and removes their clones and layout placeholders immediately. Cancelled clone exits do not call `onExitComplete`.
+
+For example, navigating away from a SvelteKit page containing `AnimatePresence` does not leave that page's exit clones over the destination. This applies to `sync`, `wait`, and `popLayout` modes.
+
+To animate route changes intentionally, keep the boundary mounted in a persistent layout and change its children inside that boundary.
+
 ## Owned real-node exits
 
 Pass `present` and a named `child` snippet when the exiting element must remain the original DOM node. `AnimatePresence` owns the conditional rendering, holds the snippet while it exits, and removes it after the nested `motion.*` component reports completion.

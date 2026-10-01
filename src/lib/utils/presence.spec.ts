@@ -1,6 +1,6 @@
 import { animate } from 'motion'
 import { getContext, setContext } from 'svelte'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import {
     containsStatefulCloneContent,
     createAnimatePresenceContext,
@@ -119,6 +119,39 @@ describe('presence context', () => {
         expect(clone?.getAttribute('aria-hidden')).toBe('true')
     })
 
+    it.each([false, true])(
+        'preserves unitless inheritance without freezing descendants when detached=%s',
+        (detached) => {
+            const caption = document.createElement('span')
+            const title = document.createElement('strong')
+            title.style.lineHeight = 'inherit'
+            el.append(caption, title)
+            Object.defineProperty(el, 'computedStyleMap', {
+                value: () => ({ get: () => ({ toString: () => '1.5' }) })
+            })
+            vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+                const lineHeight =
+                    element === caption ? '15.36px' : element === title ? '33.6px' : '24px'
+                const values: Record<string, string> = { 'line-height': lineHeight }
+                return {
+                    ...mockComputedStyle({ lineHeight, boxSizing: 'border-box' }),
+                    length: 1,
+                    0: 'line-height',
+                    getPropertyValue: (prop: string) => values[prop] ?? ''
+                }
+            })
+            const ctx = createAnimatePresenceContext({})
+            ctx.registerChild('typography', el, { opacity: 0 })
+            if (detached) el.remove()
+            ctx.unregisterChild('typography')
+            const clone = document.querySelector<HTMLElement>('[data-clone="true"]')!
+            expect(clone.style.lineHeight).toBe('1.5')
+            expect((clone.children[0] as HTMLElement).style.lineHeight).toBe('')
+            expect((clone.children[1] as HTMLElement).style.lineHeight).toBe('inherit')
+            ctx.dispose()
+        }
+    )
+
     it.each(['canvas', 'iframe', 'video', 'audio'])(
         'detects a nested %s as stateful clone content',
         (tag) => {
@@ -150,6 +183,79 @@ describe('presence context', () => {
         ctx.unregisterChild('noexit')
         const clone = document.querySelector('[data-clone="true"]')
         expect(clone).toBeFalsy()
+    })
+
+    it('disposal prevents descendant teardown from starting exits', () => {
+        const ctx = createAnimatePresenceContext({})
+        ctx.registerChild('card', el, { opacity: 0 })
+        const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect')
+
+        ctx.dispose()
+        ctx.unregisterChild('card')
+        ctx.registerChild('late-child', el, { opacity: 0 })
+        ctx.unregisterChild('late-child')
+
+        expect(document.querySelector('[data-clone="true"]')).toBeNull()
+        expect(document.querySelector('[data-presence-placeholder="true"]')).toBeNull()
+        expect(animate).not.toHaveBeenCalled()
+        expect(disconnect).toHaveBeenCalledTimes(2)
+        disconnect.mockRestore()
+    })
+
+    it('disposal cancels queued exits before animation starts', () => {
+        const frames: FrameRequestCallback[] = []
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            frames.push(callback)
+            return frames.length
+        })
+        const ctx = createAnimatePresenceContext({ initial: false })
+        ctx.registerChild('card', el, { opacity: 0 })
+        ctx.unregisterChild('card')
+        expect(document.querySelector('[data-clone="true"]')).not.toBeNull()
+
+        ctx.dispose()
+        // Even a callback already dequeued by the browser must be harmless.
+        for (const frame of frames) frame(0)
+
+        expect(document.querySelector('[data-clone="true"]')).toBeNull()
+        expect(document.querySelector('[data-presence-placeholder="true"]')).toBeNull()
+        expect(animate).not.toHaveBeenCalled()
+    })
+
+    it('disposal stops active exits without completion or deferred-enter callbacks', async () => {
+        let finish!: () => void
+        const stop = vi.fn()
+        vi.mocked(animate).mockReturnValueOnce({
+            finished: new Promise<void>((resolve) => (finish = resolve)),
+            stop
+        } as unknown as ReturnType<typeof animate>)
+        const onExitComplete = vi.fn()
+        const forceRender = vi.fn()
+        const onEnter = vi.fn()
+        const ctx = createAnimatePresenceContext({ mode: 'wait', onExitComplete, forceRender })
+        ctx.registerChild('card', el, { opacity: 0 })
+        ctx.unregisterChild('card')
+        ctx.onEnterUnblocked(onEnter)
+        expect(ctx.isEnterBlocked()).toBe(true)
+
+        ctx.dispose()
+        ctx.dispose()
+        expect(stop).toHaveBeenCalledTimes(1)
+        expect(ctx.isEnterBlocked()).toBe(false)
+        expect(document.querySelector('[data-clone="true"]')).toBeNull()
+        expect(document.querySelector('[data-presence-placeholder="true"]')).toBeNull()
+
+        finish()
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+        // A late descendant signal must not settle a cancelled boundary.
+        ctx.notifyExitComplete()
+        ctx.notifyExitStart()
+        expect(onExitComplete).not.toHaveBeenCalled()
+        expect(forceRender).not.toHaveBeenCalled()
+        expect(onEnter).not.toHaveBeenCalled()
+        expect(ctx.isEnterBlocked()).toBe(false)
     })
 
     it('resolves exit variants with the latest AnimatePresence custom value', () => {
@@ -523,7 +629,7 @@ describe('AnimatePresence modes', () => {
                 offsetHeight: { configurable: true, value: 80 }
             })
 
-            vi.mocked(window.getComputedStyle).mockImplementation((target: Element) => {
+            vi.spyOn(window, 'getComputedStyle').mockImplementation((target: Element) => {
                 if (target === el) {
                     return mockComputedStyle({
                         borderRadius: '8px',
@@ -1173,6 +1279,52 @@ describe('readAnimatedValues', () => {
 })
 
 describe('snapshotComputedStyle', () => {
+    it.each([
+        ['1.5', '24px', '48px'],
+        ['24px', '24px', '24px'],
+        ['0.0048px', '0.0048px', '0.0048px'],
+        ['normal', 'normal', 'normal'],
+        ['0', '0px', '0px']
+    ])('captures %s line height without Typed OM', (expected, rootHeight, inheritedHeight) => {
+        // jsdom has constructable sheets but no adoptedStyleSheets; browsers do.
+        let adopted: CSSStyleSheet[] = []
+        Object.defineProperty(document, 'adoptedStyleSheets', {
+            configurable: true,
+            get: () => adopted,
+            set: (sheets: CSSStyleSheet[]) => (adopted = sheets)
+        })
+        onTestFinished(() => {
+            delete (document as { adoptedStyleSheets?: unknown }).adoptedStyleSheets
+        })
+        const element = document.createElement('div')
+        element.append(document.createElement('strong'))
+        document.body.append(element)
+        Object.defineProperty(element, 'computedStyleMap', { value: undefined })
+        const style = {
+            ...mockComputedStyle({ fontSize: '16px', lineHeight: rootHeight }),
+            length: 2,
+            0: 'line-height',
+            1: 'font-size',
+            getPropertyValue: (prop: string) =>
+                prop === 'line-height' ? rootHeight : prop === 'font-size' ? '16px' : ''
+        }
+        // The probe is the root's own ::after at twice the font size.
+        vi.spyOn(window, 'getComputedStyle').mockImplementation((target, pseudo) =>
+            target === element && pseudo === '::after'
+                ? mockComputedStyle({ fontSize: '32px', lineHeight: inheritedHeight })
+                : style
+        )
+        const sheetsBefore = document.adoptedStyleSheets
+        const snapshot = snapshotComputedStyle(style, element)
+        expect(snapshot['line-height']).toBe(expected)
+        // No child is inserted (it would restyle :last-child etc.), and the
+        // probe attribute and sheet are gone afterwards.
+        expect(element.children).toHaveLength(1)
+        expect(element.hasAttribute('data-presence-style-probe')).toBe(false)
+        expect(document.adoptedStyleSheets).toEqual(sheetsBefore)
+        element.remove()
+    })
+
     it('copies every non-empty computed property as a plain string', () => {
         const values: Record<string, string> = { color: 'red', 'font-weight': '', width: '10px' }
         const props = Object.keys(values)
@@ -1225,6 +1377,31 @@ describe('observeStyleChanges', () => {
         expect(onChange).toHaveBeenCalledTimes(1)
     })
 
+    it('ignores temporary inheritance probes without ignoring real subtree changes', async () => {
+        const onChange = vi.fn()
+        observeStyleChanges(element, onChange)
+        element.setAttribute('data-presence-style-probe', 'line-height')
+        element.removeAttribute('data-presence-style-probe')
+        await flushMicrotasks()
+        expect(onChange).not.toHaveBeenCalled()
+        element.append(document.createElement('strong'))
+        await flushMicrotasks()
+        expect(onChange).toHaveBeenCalledTimes(1)
+    })
+
+    it('refreshes typography when descendants change or are added', async () => {
+        const title = document.createElement('strong')
+        element.append(title)
+        const onChange = vi.fn()
+        observeStyleChanges(element, onChange)
+        title.className = 'larger'
+        await flushMicrotasks()
+        expect(onChange).toHaveBeenCalledTimes(1)
+        title.append(document.createElement('span'))
+        await flushMicrotasks()
+        expect(onChange).toHaveBeenCalledTimes(2)
+    })
+
     it('coalesces per-frame style writes into one snapshot after they stop', async () => {
         const onChange = vi.fn()
         observeStyleChanges(element, onChange)
@@ -1237,6 +1414,23 @@ describe('observeStyleChanges', () => {
         expect(onChange).not.toHaveBeenCalled()
 
         runFrame() // first frame without a style write
+        expect(onChange).toHaveBeenCalledTimes(1)
+    })
+
+    it('settles root styles while a descendant keeps animating', async () => {
+        const child = document.createElement('span')
+        element.append(child)
+        const onChange = vi.fn()
+        observeStyleChanges(element, onChange)
+        element.style.setProperty('--leading', '2')
+        await flushMicrotasks()
+        runFrame()
+
+        for (let frame = 0; frame < 3; frame += 1) {
+            child.style.opacity = String(frame / 10)
+            await flushMicrotasks()
+            runFrame()
+        }
         expect(onChange).toHaveBeenCalledTimes(1)
     })
 

@@ -58,6 +58,38 @@ async function runScenario(page: Page, generation = 0) {
 }
 
 for (const form of FORMS) {
+    test(`${form}: card text keeps its position during the exit handoff`, async ({ page }) => {
+        await page.goto(
+            `/tests/animate-presence/wait-exit-key-change?form=${form}&@isPlaywright=true`
+        )
+        await expectSettled(page, 0)
+        const before = await page.locator('#child-0').evaluate((card) =>
+            [card, ...card.children].map((element) => {
+                const { x, y, width, height } = element.getBoundingClientRect()
+                const origin = card.getBoundingClientRect()
+                return { x: x - origin.x, y: y - origin.y, width, height }
+            })
+        )
+        await page.locator('#run').click()
+        const clone = page.locator('#scenario [data-clone="true"]')
+        await expect(clone).toBeVisible()
+        const during = await clone.evaluate((card) =>
+            [card, ...card.children].map((element) => {
+                const { x, y, width, height } = element.getBoundingClientRect()
+                const origin = card.getBoundingClientRect()
+                return { x: x - origin.x, y: y - origin.y, width, height }
+            })
+        )
+        expect(during).toHaveLength(before.length)
+        for (let index = 0; index < before.length; index++) {
+            for (const dimension of ['x', 'y', 'width', 'height'] as const) {
+                expect(Math.abs(during[index][dimension] - before[index][dimension])).toBeLessThan(
+                    1
+                )
+            }
+        }
+    })
+
     test(`${form}: latest key survives wait exit completion`, async ({ page }) => {
         await page.goto(
             `/tests/animate-presence/wait-exit-key-change?form=${form}&@isPlaywright=true`
@@ -83,7 +115,9 @@ for (const form of FORMS) {
         await expect(page.locator('#events')).toHaveText(
             'initial:0|requested:1|exit-complete:generation-1:requested-1|requested:2'
         )
-        await expect(page.locator('#ignored-generations')).toHaveText('0')
+        // Reset removes the old boundary, cancelling its exit and callback.
+        // No stale generation should reach the consumer's completion guard.
+        await expect(page.locator('#ignored-generations')).toHaveText('')
         await expect(page.locator('#callback-count')).toHaveText('1')
         await expectSettled(page, 2)
         await page.locator('#reset').click()

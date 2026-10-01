@@ -1,0 +1,344 @@
+body {
+    background: #090c12;
+    color: #edf0f7;
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+.teardown-lab {
+    width: min(1120px, calc(100% - 40px));
+    margin: 0 auto;
+    padding: 40px 0 56px;
+}
+.teardown-lab * {
+    box-sizing: border-box;
+}
+.teardown-lab h1,
+.teardown-lab h2,
+.teardown-lab p {
+    margin: 0;
+}
+.teardown-lab h1 {
+    max-width: 880px;
+    font-size: clamp(2rem, 4.6vw, 3.6rem);
+    line-height: 1.05;
+    letter-spacing: -0.055em;
+    font-weight: 750;
+}
+.teardown-lab h2 {
+    font-size: 1.05rem;
+    font-weight: 650;
+    letter-spacing: -0.025em;
+}
+.teardown-lab .eyebrow {
+    font-size: 0.66rem;
+    font-family: ui-monospace, monospace;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: #a99afc;
+}
+.teardown-lab .lab-header {
+    margin-bottom: 30px;
+}
+.teardown-lab .back-link {
+    display: inline-block;
+    margin-bottom: 28px;
+    font-size: 0.8rem;
+    color: #8e9bb3;
+    text-decoration: none;
+}
+.teardown-lab .lab-header > .eyebrow {
+    margin-bottom: 14px;
+}
+.teardown-lab .lede {
+    margin-top: 16px;
+    font-size: 1.15rem;
+    color: #d2d9e8;
+}
+.teardown-lab .explanation {
+    max-width: 720px;
+    margin-top: 10px;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: #91a0b9;
+}
+.teardown-lab .lab-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 22px;
+}
+.teardown-lab .demo-panel,
+.teardown-lab .guide-panel {
+    border: 1px solid #293349;
+    border-radius: 18px;
+    background: #111722;
+    overflow: hidden;
+}
+.teardown-lab .panel-heading {
+    padding: 22px;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    align-items: center;
+}
+.teardown-lab .panel-heading h2 {
+    margin-top: 7px;
+}
+.teardown-lab .status {
+    flex-shrink: 0;
+    padding: 6px 9px;
+    border: 1px solid #36415a;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    color: #bec9df;
+}
+.teardown-lab .demo-stage {
+    padding: 20px 24px 24px;
+    background: radial-gradient(ellipse at center, #27203d, #111722 80%);
+}
+.teardown-lab .boundary-outline {
+    min-height: 244px;
+    position: relative;
+    display: grid;
+    place-content: center;
+    border: 1px dashed #746293;
+    border-radius: 12px;
+}
+.teardown-lab .boundary-outline.removed {
+    border-color: #304c45;
+}
+.teardown-lab .boundary-label {
+    position: absolute;
+    top: -8px;
+    left: 16px;
+    padding: 0 6px;
+    background: #181b2b;
+    color: #9f90be;
+    font-size: 0.6rem;
+    font-family: ui-monospace, monospace;
+}
+.teardown-lab .teardown-card {
+    width: 246px;
+    min-height: 152px;
+    padding: 20px;
+    background: #7c3aed;
+    border: 1px solid #c4a6ff;
+    border-radius: 14px;
+    box-shadow: 0 14px 38px #0005;
+    color: white;
+}
+.teardown-lab .card-icon {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 1.45rem;
+    color: #e1d0ff;
+}
+.teardown-lab .teardown-card strong {
+    font-size: 1.05rem;
+}
+.teardown-lab .teardown-card p {
+    margin-top: 8px;
+    line-height: 1.5;
+    font-size: 0.8rem;
+    color: #eee2ff;
+}
+.teardown-lab .empty-stage {
+    padding: 18px;
+    text-align: center;
+    color: #8ed8bc;
+}
+.teardown-lab .empty-stage span {
+    display: block;
+    margin-bottom: 14px;
+    font-size: 1.8rem;
+}
+.teardown-lab .empty-stage strong {
+    font-size: 0.9rem;
+}
+.teardown-lab .empty-stage p {
+    margin-top: 8px;
+    color: #869b9a;
+    font-size: 0.8rem;
+}
+.teardown-lab .demo-controls {
+    display: flex;
+    gap: 8px;
+    padding: 18px 22px;
+    border-top: 1px solid #293349;
+    flex-wrap: wrap;
+}
+.teardown-lab button,
+.teardown-lab .navigation-button {
+    padding: 10px 14px;
+    border: 1px solid #41506c;
+    background: #202a3c;
+    border-radius: 8px;
+    color: #eff3ff;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+}
+.teardown-lab button.primary {
+    background: #7950de;
+    border-color: #a385ea;
+}
+.teardown-lab button.subtle {
+    background: transparent;
+    color: #aab7ce;
+}
+.teardown-lab button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.teardown-lab button:not(:disabled):hover,
+.teardown-lab a:hover {
+    filter: brightness(1.15);
+}
+.teardown-lab button:focus-visible,
+.teardown-lab a:focus-visible,
+.teardown-lab select:focus-visible {
+    outline: 2px solid #c4adff;
+    outline-offset: 4px;
+}
+.teardown-lab .demo-readout {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    padding: 0 22px;
+    font-size: 0.7rem;
+    color: #94a3bd;
+}
+.teardown-lab .demo-readout label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.teardown-lab select {
+    padding: 6px 8px;
+    background: #192131;
+    color: #d7dff0;
+    border: 1px solid #36415a;
+    border-radius: 6px;
+}
+.teardown-lab output {
+    margin-left: 4px;
+    color: #d2c2ff;
+    font-family: ui-monospace, monospace;
+}
+.teardown-lab .mode-note {
+    padding: 14px 22px 20px;
+    font-size: 0.65rem;
+    color: #8190ab;
+}
+.teardown-lab .guide-panel {
+    padding: 24px;
+}
+.teardown-lab .steps {
+    list-style: none;
+    margin: 22px 0 24px;
+    padding: 0;
+}
+.teardown-lab .steps li {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 22px;
+}
+.teardown-lab .steps li:last-child {
+    margin-bottom: 0;
+}
+.teardown-lab .step-number {
+    padding-top: 2px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.72rem;
+    color: #9c83dd;
+}
+.teardown-lab .steps p {
+    margin-top: 7px;
+    font-size: 0.8rem;
+    line-height: 1.65;
+    color: #98a7c0;
+}
+.teardown-lab .steps strong {
+    color: #d5ddef;
+    font-weight: 550;
+}
+.teardown-lab .navigation-button {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    background: #243529;
+    border-color: #426650;
+    color: #c7f4d4;
+}
+.teardown-lab .guide-note {
+    margin-top: 12px;
+    font-size: 0.7rem;
+    line-height: 1.55;
+    color: #8190ab;
+}
+.teardown-lab .lab-footer {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    margin-top: 22px;
+    padding: 18px 22px;
+    background: #111722;
+    border: 1px solid #293349;
+    border-radius: 12px;
+}
+.teardown-lab .lab-footer p {
+    font-size: 0.75rem;
+    color: #a9b6cd;
+}
+.teardown-lab.destination-lab {
+    width: min(840px, calc(100% - 40px));
+}
+.teardown-lab .destination-panel {
+    padding: clamp(28px, 6vw, 64px);
+    background: #17372c;
+    border: 1px solid #488668;
+    border-radius: 22px;
+}
+.teardown-lab .destination-check {
+    display: grid;
+    place-items: center;
+    width: 60px;
+    height: 60px;
+    margin-bottom: 30px;
+    border-radius: 50%;
+    background: #2b634d;
+    color: #b2f3d2;
+    font-size: 1.8rem;
+}
+.teardown-lab .destination-panel .eyebrow {
+    margin-bottom: 14px;
+    color: #96ddb9;
+}
+.teardown-lab .destination-panel .explanation {
+    margin-bottom: 30px;
+    color: #b1c9bd;
+}
+@media (max-width: 800px) {
+    .teardown-lab .lab-grid {
+        grid-template-columns: 1fr;
+    }
+    .teardown-lab .lab-footer {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 10px;
+    }
+}
+@media (max-width: 420px) {
+    .teardown-lab .panel-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .teardown-lab .demo-readout {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .teardown-lab .teardown-card {
+        width: 220px;
+    }
+}

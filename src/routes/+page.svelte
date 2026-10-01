@@ -160,6 +160,22 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/use-transform/scroll-accelerate') + searchParams}
+                    >
+                        useTransform scroll acceleration (compositor-driven scroll fades)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/use-scroll/view-timeline-offsets') + searchParams}
+                    >
+                        useScroll ViewTimeline offsets (element vs page offsets)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout-dependency') + searchParams}
                     >
                         layoutDependency
@@ -660,6 +676,22 @@
                         href={resolve('/tests/animate-presence/owned-child') + searchParams}
                     >
                         Clone vs owned child (real-node exit)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/boundary-teardown') + searchParams}
+                    >
+                        Boundary teardown and navigation
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/clone-typography') + searchParams}
+                    >
+                        Exit typography and inheritance
                     </a>
                 </li>
                 <li>
