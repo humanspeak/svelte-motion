@@ -32,6 +32,16 @@
 > on PR #493, which sets `package.json` to 1.5.0. Do NOT change `version`: the
 > release workflow patch-bumps it to 1.5.1 on merge. The drift-check baseline moves
 > to this branch's plan commit.
+>
+> Revision 2026-10-02 #2 (guard, after the executor's STOP at Step 3): 13.5.1's
+> types remove `getBaseTarget`, so `src/lib/utils/baseTarget.spec.ts`'s parity
+> block (which calls it directly) fails `pnpm check` with 2 type errors, even though
+> it skips at runtime. **Scope is widened** to: delete that parity
+> `describe.skipIf(...)` block and its now-unused `cases`/imports (it can never run
+> again on 13.5.1+; the value tests keep the behavior pinned); and in
+> `src/lib/utils/baseTarget.ts` keep the cast but fix its comment.
+> `baseTarget`/`initialValues` are absent from motion-dom's public `.d.ts` in
+> 13.5.1 too (internal fields), so the cast is still required.
 
 ## Status
 
