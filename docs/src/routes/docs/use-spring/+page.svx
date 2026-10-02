@@ -174,9 +174,14 @@ When you'd rather tune by feel than by physics constants, use the duration API:
 | ----------------- | ------- | ------------------------------------------------------------------------------------ |
 | `duration`        | `800`ms | Total animation duration                                                             |
 | `visualDuration`  | —       | Visual settle time (overrides `duration` when set); easier to coordinate with tweens |
-| `bounce`          | `0.3`   | `0` = no bounce, `1` = very bouncy                                                   |
+| `bounce`          | `0.3`   | `1` = very bouncy, `0` = no overshoot, negative values down to `-1` = overdamped (never overshoots, eases in softly) |
 
 Setting `stiffness`, `damping`, or `mass` overrides `duration` / `bounce`.
+
+```svelte
+// Settles gently without overshooting
+const gentle = useSpring(0, { duration: 600, bounce: -0.4 })
+```
 
 ### `skipInitialAnimation`
 
