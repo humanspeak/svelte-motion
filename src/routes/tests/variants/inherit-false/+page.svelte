@@ -63,18 +63,19 @@
 
     const steps: TesterStep[] = [
         {
-            text: 'Look at the Control card, then press its "Switch parent" button a few times.',
+            text: 'Press "Switch parent" on the Control card a few times.',
             expected:
-                'The control child follows its parent: 0.20 opacity when the parent is on "a", 0.80 on "b". Its chip stays ✓.'
+                'The parent badge flips "a" (grey) / "b" (indigo) and the child follows: faint at 0.20, solid at 0.80. Chip stays ✓.'
         },
         {
-            text: 'Press "Switch parent" on cards 1, 2 and 3 (or "Switch all parents" at the top), back and forth.',
+            text: 'On cards 1, 2 and 3, press "Switch parent" back and forth (or use "Switch all parents").',
             expected:
-                'The highlighted child or grandchild never changes. It stays at 0.50 with a ✓ chip, whatever the parent label says.'
+                'The italic "reference · follows parent" block flips faint/solid on every click, which proves the button works. The inherit={false} child or grandchild below it never changes (mid-tone 0.50, chip ✓).'
         },
         {
             text: 'Move the mouse over the indigo-outlined box in card 4.',
-            expected: 'The parent box reacts to hover, but the child inside stays at 0.50 (✓).'
+            expected:
+                'The badge shows "hover" and the reference block brightens. The inherit={false} child stays at 0.50 (✓).'
         }
     ]
 </script>
@@ -123,7 +124,9 @@
                 Switch parent to "{flip(control)}"
             </button>
             <motion.div animate={control} initial="a" data-testid="parent-control" class="parent">
-                <span class="parent-label">parent · "{control}"</span>
+                <span class="parent-label"
+                    >parent <b class="badge" class:b={control === 'b'}>"{control}"</b></span
+                >
                 <motion.div
                     data-testid="child-control"
                     {variants}
@@ -138,12 +141,20 @@
 
         <article class="card">
             <h2>1 · Child opts out</h2>
-            <p class="expect">The child stays at 0.50.</p>
+            <p class="expect">
+                Each click flips the <b>reference</b>; the <code>inherit={'{false}'}</code> child stays
+                at 0.50.
+            </p>
             <button type="button" data-testid="switch-1" onclick={() => (one = flip(one))}>
                 Switch parent to "{flip(one)}"
             </button>
             <motion.div animate={one} initial="a" data-testid="parent-1" class="parent">
-                <span class="parent-label">parent · "{one}"</span>
+                <span class="parent-label"
+                    >parent <b class="badge" class:b={one === 'b'}>"{one}"</b></span
+                >
+                <motion.div class="ref block" {variants} {transition} style="opacity: 0.5">
+                    reference · follows parent
+                </motion.div>
                 <motion.div
                     inherit={false}
                     data-testid="child-1"
@@ -159,12 +170,19 @@
 
         <article class="card">
             <h2>2 · Middle node opts out (has variants)</h2>
-            <p class="expect">The grandchild stays at 0.50.</p>
+            <p class="expect">
+                Each click flips the <b>reference</b>; the grandchild stays at 0.50.
+            </p>
             <button type="button" data-testid="switch-2" onclick={() => (two = flip(two))}>
                 Switch parent to "{flip(two)}"
             </button>
             <motion.div animate={two} initial="a" data-testid="parent-2" class="parent">
-                <span class="parent-label">parent · "{two}"</span>
+                <span class="parent-label"
+                    >parent <b class="badge" class:b={two === 'b'}>"{two}"</b></span
+                >
+                <motion.div class="ref block" {variants} {transition} style="opacity: 0.5">
+                    reference · follows parent
+                </motion.div>
                 <motion.div inherit={false} variants={{}} class="middle">
                     <span class="parent-label">middle · inherit={'{false}'}</span>
                     <motion.div
@@ -182,12 +200,19 @@
 
         <article class="card">
             <h2>3 · Plain middle node opts out</h2>
-            <p class="expect">The grandchild stays at 0.50.</p>
+            <p class="expect">
+                Each click flips the <b>reference</b>; the grandchild stays at 0.50.
+            </p>
             <button type="button" data-testid="switch-3" onclick={() => (three = flip(three))}>
                 Switch parent to "{flip(three)}"
             </button>
             <motion.div animate={three} initial="a" data-testid="parent-3" class="parent">
-                <span class="parent-label">parent · "{three}"</span>
+                <span class="parent-label"
+                    >parent <b class="badge" class:b={three === 'b'}>"{three}"</b></span
+                >
+                <motion.div class="ref block" {variants} {transition} style="opacity: 0.5">
+                    reference · follows parent
+                </motion.div>
                 <motion.div inherit={false} class="middle">
                     <span class="parent-label">middle · inherit={'{false}'} (no variants)</span>
                     <motion.div
@@ -205,7 +230,10 @@
 
         <article class="card">
             <h2>4 · Child ignores parent gestures</h2>
-            <p class="expect">Hover the outlined box: the child stays at 0.50.</p>
+            <p class="expect">
+                Hover the outlined box: the <b>reference</b> brightens; the
+                <code>inherit={'{false}'}</code> child stays at 0.50.
+            </p>
             <motion.div
                 animate="rest"
                 whileHover="hover"
@@ -215,8 +243,17 @@
                 onHoverEnd={() => (hovering = false)}
             >
                 <span class="parent-label"
-                    >parent · {hovering ? '"hover" (hovered)' : '"rest" — hover me'}</span
+                    >parent <b class="badge" class:b={hovering}>{hovering ? '"hover"' : '"rest"'}</b
+                    >{hovering ? '' : ' — hover me'}</span
                 >
+                <motion.div
+                    class="ref block"
+                    variants={hoverVariants}
+                    {transition}
+                    style="opacity: 0.5"
+                >
+                    reference · follows parent
+                </motion.div>
                 <motion.div
                     inherit={false}
                     data-testid="child-4"
@@ -416,7 +453,8 @@
         color: #64748b;
     }
     :global([data-testid^='child-']),
-    :global([data-testid^='grandchild-']) {
+    :global([data-testid^='grandchild-']),
+    :global(.block) {
         display: flex;
         align-items: center;
         height: 2.75rem;
@@ -426,6 +464,24 @@
         color: white;
         font-size: 0.8rem;
         font-weight: 600;
+    }
+    :global(.block.ref) {
+        font-weight: 500;
+        font-style: italic;
+    }
+    .badge {
+        display: inline-block;
+        margin-left: 0.2rem;
+        padding: 0 0.4rem;
+        border-radius: 999px;
+        background: #e2e8f0;
+        color: #334155;
+        font-weight: 700;
+        font-style: normal;
+    }
+    .badge.b {
+        background: #4f46e5;
+        color: white;
     }
     .readout {
         font-size: 0.8rem;
