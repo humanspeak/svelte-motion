@@ -10,7 +10,7 @@ runnable on 13.5.0 today are in `.agents/.plans/motion-13.5.0/`.
 | Plan | Title | Priority | Effort | Depends on | Status |
 | ---- | ----- | -------- | ------ | ---------- | ------ |
 | 001 | Align with Motion 13.5.1 | P1 | M | `motion-13.5.0/001` + 13.5.1 on npm | PASS, awaiting operator eye test (25379974) |
-| 002 | `inherit={false}` stops variant inheritance, matching Motion 13.5.1 | P2 | M | 001 | TODO (001 integrated) |
+| 002 | `inherit={false}` stops variant inheritance, matching Motion 13.5.1 | P2 | M | 001 | PASS, awaiting operator eye test (11ba3cfc) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
