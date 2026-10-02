@@ -149,7 +149,7 @@ Customize the spring physics by passing options:
   const heavy = useSpring(0, { stiffness: 100, damping: 20, mass: 3 })
 
   // Duration-based instead of physics-based
-  const timed = useSpring(0, { duration: 0.5, bounce: 0.25 })
+  const timed = useSpring(0, { duration: 500, bounce: 0.25 })
 </script>
 ```
 
