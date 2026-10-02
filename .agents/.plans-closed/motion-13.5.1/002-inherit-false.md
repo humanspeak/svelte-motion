@@ -12,6 +12,15 @@
 >
 > **Drift check**: `git diff --stat 9eba7a61..HEAD -- src/lib/html/_MotionContainer.svelte src/lib/types.ts src/lib/utils/visualElementCore.ts docs/src/routes/docs/variants/+page.svx`.
 > Plan 001 should not touch these. If they changed, re-check the excerpts below.
+>
+> Revision 2026-10-02 (guard pre-flight): the drift baseline moves to **`25379974`**
+> (plan 001 integrated; motion-dom 13.5.1 installed). `_MotionContainer.svelte`
+> changed since `9eba7a61` (Motion 13.5.0 follow-ups), but every excerpt below was
+> verified present. The line numbers moved: `parentVariantStore` is at ~919, the
+> subscriptions at ~926/943, `effectiveAnimate` at ~950,
+> `setVariantContext(localVariantStore)` at ~977, `getInitialVariantContext()` at
+> ~991, its non-controlling return at ~1006, and the store `$effect` at ~1146. Use
+> `git diff --stat 25379974..HEAD -- <paths>` as the drift check. **NEVER use `git stash`.**
 
 ## Status
 

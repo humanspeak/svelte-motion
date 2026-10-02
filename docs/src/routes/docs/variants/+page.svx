@@ -148,6 +148,21 @@ One of the most powerful features of variants is **automatic propagation** throu
 3. Each child resolves its own `visible` variant from its local variants definition
 4. No need to pass `animate` props to children!
 
+### Opting out with `inherit={false}`
+
+Set `inherit={false}` on a motion element to stop it following its parent's variant changes, including gesture variants such as `whileHover`. Its descendants stop following the outer parent too, and follow this element instead.
+
+```svelte
+<motion.div initial="a" animate={variant}>
+    <!-- Stays at opacity 0.5 when the parent switches variants -->
+    <motion.div
+        inherit={false}
+        variants={{ a: { opacity: 0.2 }, b: { opacity: 0.8 } }}
+        style="opacity: 0.5"
+    />
+</motion.div>
+```
+
 ## Stagger animations
 
 You can create staggered animations by using the `delay` in individual item transitions:

@@ -170,6 +170,7 @@
         tag = 'div',
         key: keyProp,
         variants: variantsProp,
+        inherit: inheritProp,
         custom: customProp,
         initial: initialProp,
         animate: animateProp,
@@ -575,6 +576,10 @@
                 ? undefined
                 : filterReducedMotionDefinition(resolveRelativeAnimate(declarativeAnimateProp)),
             variants: reducedMotionVariants,
+            // motion-dom 13.5.1's VisualElement mount/animateChanges and
+            // `makeLatestValues` read `props.inherit`; forward it so the
+            // VisualElement tree honours `inherit={false}` too (motion b63833cb0).
+            inherit: inheritProp,
             custom: effectiveCustom,
             transition: mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {}),
             whileHover: filterReducedMotionDefinition(whileHoverProp),
@@ -916,7 +921,13 @@
     })
 
     // Variant inheritance and resolution
-    const parentVariantStore = getVariantContext()
+    // `inherit={false}` severs BOTH label channels (animate store + initial
+    // context) so the node neither follows its parent nor lets the parent's
+    // labels reach its descendants. Matches motion b63833cb0 ("Honour
+    // inherit={false} in variant inheritance and propagation"). Read once at
+    // init, like the rest of the context wiring.
+    const inheritsVariants = untrack(() => inheritProp !== false)
+    const parentVariantStore = inheritsVariants ? getVariantContext() : undefined
     const animateControls = $derived(isAnimationControls(animateProp) ? animateProp : undefined)
     const declarativeAnimateProp = $derived(animateControls ? undefined : animateProp)
 
@@ -988,7 +999,7 @@
     //
     // `initial === false` is deliberately NOT carried here: it keeps its own
     // boolean channel (`setInitialFalseContext`), as upstream keeps them separate.
-    const inheritedInitialVariant = getInitialVariantContext()
+    const inheritedInitialVariant = inheritsVariants ? getInitialVariantContext() : undefined
     // `untrack`: variant context is resolved ONCE during init, exactly as
     // upstream's `useCreateMotionContext` memoizes on the label values. Reading
     // the props reactively here would only add spurious dependencies.
