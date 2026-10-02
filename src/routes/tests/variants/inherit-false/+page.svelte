@@ -73,7 +73,7 @@
                 'The highlighted child or grandchild never changes. It stays at 0.50 with a ✓ chip, whatever the parent label says.'
         },
         {
-            text: 'Move the mouse over the grey box in card 4.',
+            text: 'Move the mouse over the indigo-outlined box in card 4.',
             expected: 'The parent box reacts to hover, but the child inside stays at 0.50 (✓).'
         }
     ]
@@ -92,6 +92,17 @@
             <code>b</code> (0.8 opacity). Only the <strong>Control</strong> child is allowed to
             follow. Every element marked <code>inherit={'{false}'}</code> must stay at its own 0.5.
         </p>
+        <div class="legend" aria-label="Opacity reference">
+            <span class="legend-title">Reference:</span>
+            {#each [0.2, 0.5, 0.8] as level (level)}
+                <span class="swatch-wrap">
+                    <span class="swatch-frame"
+                        ><span class="swatch" style="opacity: {level}"></span></span
+                    >
+                    {level.toFixed(1)}
+                </span>
+            {/each}
+        </div>
         <div class="global-controls">
             <button type="button" class="primary" onclick={() => setAll(flip(control))}>
                 Switch all parents to "{flip(control)}"
@@ -194,7 +205,7 @@
 
         <article class="card">
             <h2>4 · Child ignores parent gestures</h2>
-            <p class="expect">Hover the grey box: the child stays at 0.50.</p>
+            <p class="expect">Hover the outlined box: the child stays at 0.50.</p>
             <motion.div
                 animate="rest"
                 whileHover="hover"
@@ -339,6 +350,12 @@
     button.primary:hover {
         background: #4338ca;
     }
+    /* Checkerboard behind the blocks so translucency is obvious at a glance. */
+    :global(.parent),
+    .swatch-frame {
+        --checker: conic-gradient(#cbd5e1 25%, #ffffff 0 50%, #cbd5e1 0 75%, #ffffff 0) 0 0 / 14px
+            14px;
+    }
     :global(.parent),
     :global(.middle) {
         display: flex;
@@ -348,12 +365,50 @@
         border: 1.5px dashed #94a3b8;
         border-radius: 0.6rem;
     }
+    :global(.parent) {
+        background: var(--checker);
+    }
     :global(.middle) {
         border-color: #f59e0b;
+        background: rgba(255, 255, 255, 0.55);
     }
     :global(.hover-box) {
-        background: #e5e7eb;
         cursor: pointer;
+        border-color: #6366f1;
+    }
+    :global(.hover-box:hover) {
+        outline: 3px solid #a5b4fc;
+    }
+    .legend {
+        display: flex;
+        align-items: center;
+        gap: 0.9rem;
+        margin-top: 0.75rem;
+        font-size: 0.8rem;
+        color: #475569;
+    }
+    .legend-title {
+        font-weight: 600;
+    }
+    .swatch-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-family: ui-monospace, monospace;
+    }
+    .swatch-frame {
+        display: inline-flex;
+        padding: 3px;
+        border-radius: 0.4rem;
+        background: var(--checker);
+        box-shadow: 0 0 0 1px #cbd5e1;
+    }
+    .swatch {
+        display: inline-block;
+        width: 2.25rem;
+        height: 1.25rem;
+        border-radius: 0.3rem;
+        background: #3730a3;
     }
     .parent-label {
         font-size: 0.7rem;
@@ -367,7 +422,7 @@
         height: 2.75rem;
         padding: 0 0.75rem;
         border-radius: 0.5rem;
-        background: #0891b2;
+        background: #3730a3;
         color: white;
         font-size: 0.8rem;
         font-weight: 600;
