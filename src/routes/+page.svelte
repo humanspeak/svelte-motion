@@ -748,6 +748,14 @@
                         Notifications stack
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/variants/inherit-false') + searchParams}
+                    >
+                        Variants: inherit={'{false}'}
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

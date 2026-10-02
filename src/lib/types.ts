@@ -543,6 +543,11 @@ export type MotionProps = {
     /** Variants define named animation states */
     variants?: Variants
     /**
+     * Set to `false` to stop this element from inheriting variant changes from its
+     * parent; its descendants then follow it instead. Matches Framer Motion's `inherit`.
+     */
+    inherit?: boolean
+    /**
      * Value passed into function-form variants. Children without their own
      * `custom` prop inherit this from the nearest motion ancestor — matching
      * framer-motion's variant-tree custom propagation.
