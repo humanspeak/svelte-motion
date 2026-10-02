@@ -1,4 +1,5 @@
 import { createEffect as createEffectCore } from 'motion'
+import { frameData, frameSteps } from 'motion-dom'
 import { describe, expect, it } from 'vitest'
 import {
     animate,
@@ -100,3 +101,58 @@ function typeAssertions() {
 
 // Compile-time only: referenced so the checker keeps it, and lint sees a use.
 void typeAssertions
+
+/**
+ * Motion 13.5.1 routes SVG transforms and origins through CSS style. Keys that
+ * are not CSS properties (e.g. `scaleX`, `originX`) were written as SVG
+ * attributes before 13.5.1; `attrX`/`attrY` still write attributes.
+ */
+describe('utils/effects - svgEffect routing (Motion 13.5.1)', () => {
+    // jsdom has no requestAnimationFrame when motion-dom loads, so its frameloop
+    // never self-schedules; drive one batch by hand.
+    const flushFrames = () => {
+        frameSteps.setup.process(frameData)
+        frameSteps.read.process(frameData)
+        frameSteps.resolveKeyframes.process(frameData)
+        frameSteps.preUpdate.process(frameData)
+        frameSteps.update.process(frameData)
+        frameSteps.preRender.process(frameData)
+        frameSteps.render.process(frameData)
+        frameSteps.postRender.process(frameData)
+    }
+
+    it('writes scaleX as a CSS transform, not an attribute', () => {
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+        const stop = svgEffect(rect, { scaleX: motionValue(2) })
+        flushFrames()
+        expect(rect.getAttribute('scaleX')).toBeNull()
+        expect(rect.style.transform).toContain('scaleX(2)')
+        stop()
+    })
+
+    it('writes originX as CSS transform-origin, not an attribute', () => {
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+        const stop = svgEffect(rect, { originX: motionValue(0.5) })
+        flushFrames()
+        expect(rect.getAttribute('originX')).toBeNull()
+        expect(rect.style.transformOrigin).toContain('50%')
+        stop()
+    })
+
+    it('control (unchanged): x is a CSS property and writes translateX', () => {
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+        const stop = svgEffect(rect, { x: motionValue(10) })
+        flushFrames()
+        expect(rect.getAttribute('x')).toBeNull()
+        expect(rect.style.transform).toContain('translateX(10px)')
+        stop()
+    })
+
+    it('writes attrX as the x attribute', () => {
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+        const stop = svgEffect(rect, { attrX: motionValue(5) })
+        flushFrames()
+        expect(rect.getAttribute('x')).toBe('5px')
+        stop()
+    })
+})

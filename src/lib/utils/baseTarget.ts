@@ -18,7 +18,8 @@ import { isMotionValue, resolveVariant, type VisualElement } from 'motion-dom'
  * const base = resolveBaseTarget(visualElement, 'opacity') ?? visualElement.readValue('opacity')
  */
 export const resolveBaseTarget = (visualElement: VisualElement, key: string): unknown => {
-    // `baseTarget`/`initialValues` are private in motion-dom 13.5.0 (public in 13.5.1).
+    // `baseTarget`/`initialValues` are internal, not part of motion-dom's public types
+    // (`private` in 13.5.0, omitted from the 13.5.1 typings), so the cast stays.
     const internals = visualElement as unknown as {
         baseTarget: Record<string, unknown>
         initialValues: Record<string, unknown>

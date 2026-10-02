@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { VisualElement, motionValue, type MotionNodeOptions } from 'motion-dom'
+import { type MotionNodeOptions } from 'motion-dom'
 import { describe, expect, it } from 'vitest'
 import { resolveBaseTarget } from './baseTarget.js'
 import { createMotionVisualElement } from './visualElementCore.js'
@@ -17,30 +17,6 @@ const mount = (props: Props) => {
     ve.mount(document.createElement('div'))
     return ve
 }
-
-type Case = { name: string; props: Props; prime?: boolean }
-
-const cases: Case[] = [
-    { name: 'initial object', props: { initial: { opacity: 0 } } },
-    { name: 'initial variant label', props: { initial: 'hidden', variants } },
-    { name: 'style value', props: { style: { opacity: 0.5 } } },
-    { name: 'MotionValue in style', props: { style: { opacity: motionValue(0.4) } } },
-    { name: 'read value only', props: {}, prime: true },
-    { name: 'initial false + style', props: { initial: false, style: { opacity: 0.3 } } },
-    { name: 'array initial', props: { initial: ['hidden', 'other'], variants } }
-]
-
-describe.skipIf(typeof VisualElement.prototype.getBaseTarget !== 'function')(
-    'resolveBaseTarget parity with VisualElement.getBaseTarget',
-    () => {
-        it.each(cases)('$name', ({ props, prime }) => {
-            const ve = mount(props)
-            if (prime) ve.readValue('opacity')
-            const expected = ve.getBaseTarget('opacity')
-            expect(resolveBaseTarget(ve, 'opacity') ?? null).toEqual(expected ?? null)
-        })
-    }
-)
 
 describe('resolveBaseTarget values', () => {
     it.each([
