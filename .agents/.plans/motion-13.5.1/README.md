@@ -9,8 +9,8 @@ runnable on 13.5.0 today are in `.agents/.plans/motion-13.5.0/`.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | ---- | ----- | -------- | ------ | ---------- | ------ |
-| 001 | Align with Motion 13.5.1 | P1 | M | `motion-13.5.0/001` + 13.5.1 on npm | TODO (13.5.1 published 2026-10-02; dependency 13.5.0/001 DONE) |
-| 002 | `inherit={false}` stops variant inheritance, matching Motion 13.5.1 | P2 | M | 001 | BLOCKED (needs 001) |
+| 001 | Align with Motion 13.5.1 | P1 | M | `motion-13.5.0/001` + 13.5.1 on npm | PASS, awaiting operator eye test (25379974) |
+| 002 | `inherit={false}` stops variant inheritance, matching Motion 13.5.1 | P2 | M | 001 | TODO (001 integrated) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
