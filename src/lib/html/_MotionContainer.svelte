@@ -37,6 +37,8 @@
         animateVisualElement,
         isControllingVariants,
         isVariantLabel,
+        scrapeHTMLMotionValuesFromProps,
+        scrapeSVGMotionValuesFromProps,
         transformProps,
         visualElementStore,
         type AnyResolvedKeyframe,
@@ -101,7 +103,7 @@
         setVisualElementParent
     } from '$lib/components/visualElementTree.context'
     import { resolveBaseTarget } from '$lib/utils/baseTarget'
-    import { createMotionVisualElement } from '$lib/utils/visualElementCore'
+    import { createMotionVisualElement, makeLatestValues } from '$lib/utils/visualElementCore'
     import {
         resolveInitial,
         resolveAnimate,
@@ -245,21 +247,6 @@
         }
     })
     let isLoaded = $state<'mounting' | 'initial' | 'ready' | 'animated'>('mounting')
-    // True once the enter/animate animation has COMPLETED. Until then the
-    // WAAPI animation owns the transform; flipping the inline baseline to
-    // the target mid-run causes a one-frame snap (the target shows through
-    // for the frame the inline changes). We therefore only apply the target
-    // as the inline style once settled — see the style derivation. (#377)
-    let enterAnimationSettled = $state(false)
-    let lastAnimateRestingValues = $state<Record<string, unknown> | undefined>(undefined)
-    let lastAnimateRestingJson = $state<string | undefined>(undefined)
-    // Raw animate-prop JSON the settle-resolved resting values were computed
-    // FROM: lets the reactive baseline detect that its raw wildcard/relative
-    // definition already has a resolved settle snapshot to prefer.
-    let lastAnimateSourceJson = $state<string | undefined>(undefined)
-    /** An unresolved wildcard (`null`) or relative (`'+=50'`) keyframe value. */
-    const isUnresolvedKeyframeValue = (value: unknown): boolean =>
-        value === null || value === undefined || (typeof value === 'string' && /^[+-]=/.test(value))
     let dataPath = $state<number>(-1)
     const motionConfig = $derived(getMotionConfig())
     const effectiveTransformPagePoint = $derived(motionConfig?.transformPagePoint)
@@ -1311,37 +1298,6 @@
             ? optimizedAppearScript
             : ''
     )
-    const renderedAnimateBaseline = $derived.by(() => {
-        const restingValues = resolveRestingValues(
-            animateKeyframes as DOMKeyframesDefinition | undefined
-        ) as unknown as Record<string, unknown> | undefined
-        // Wildcard/relative definitions (animate={{ x: null }} / '+=50')
-        // collapse to UNRESOLVED resting values here — the animation layer
-        // resolved them against the live value, so the baseline must reuse the
-        // settle-resolved snapshot (adversarial-review finding: recomputing
-        // from the raw definition snapped x:null holds to 0). When no snapshot
-        // exists yet, drop the unresolved channels rather than serializing
-        // null/'+=50' into the inline transform.
-        if (restingValues && Object.values(restingValues).some(isUnresolvedKeyframeValue)) {
-            if (
-                enterAnimationSettled &&
-                lastAnimateRestingValues &&
-                lastAnimateSourceJson === JSON.stringify(animateKeyframes)
-            ) {
-                return lastAnimateRestingValues
-            }
-            const stripped: Record<string, unknown> = {}
-            for (const [key, value] of Object.entries(restingValues)) {
-                if (!isUnresolvedKeyframeValue(value)) stripped[key] = value
-            }
-            return stripped
-        }
-        if (!transformTemplateProp || !restingValues) return restingValues
-
-        const restingJson = JSON.stringify(restingValues)
-        if (enterAnimationSettled && lastAnimateRestingJson === restingJson) return restingValues
-        return lastAnimateRestingValues ?? restingValues
-    })
     // A ~215-line block lived here: the SVG path-drawing MotionValue readers
     // (`readSVGPathDrawingState`, `cleanupSVGPathAttributeEffect`), the
     // stoppable-control promise plumbing (`getFinishedPromise`,
@@ -1474,21 +1430,12 @@
             }
             return isNotEmpty(values) ? values : undefined
         }
-        if (isNotEmpty(values)) return values
-        // First-paint fallback, for a node with its OWN `animate` only.
-        // `initial={}` (or no `initial`) resolves to no seeded values, but this
-        // library deliberately pins the `animate` target's resting values into the
-        // very first paint so there is no flash of unstyled state — a documented
-        // deviation from upstream, pinned by `_MotionContainer.ssr.spec.ts`
-        // ("falls back to first animate keyframe").
-        //
-        // It MUST NOT apply to a node that INHERITS its animate from a variant
-        // parent: such a child also starts with an empty `latestValues`, and
-        // pinning the inherited target here would snap it declaratively to the
-        // end state before the parent's propagated animation ever runs (measured:
-        // the notifications stack jumped instead of animating).
-        if (declarativeAnimateProp === undefined) return undefined
-        return renderedAnimateBaseline
+        // No first-paint fallback to the `animate` target: `latestValues` is seeded
+        // by `makeLatestValues` (from `initial`, or from `animate` only when the
+        // initial animation is blocked), exactly like upstream. Pinning the
+        // `animate` resting values here made a server-rendered element start at
+        // its final state on hydration, so it never animated.
+        return isNotEmpty(values) ? values : undefined
     }
 
     const renderedInlineStyle = $derived.by(() =>
@@ -1496,9 +1443,11 @@
         // (settle targets, first-command holds, `animationControlsHasReceivedCommand`)
         // is gone with Step 7: controls drive the SAME VisualElement, so
         // `latestValues` is the single source of truth for every animated key
-        // regardless of which writer set it. SSR has no VisualElement and falls
-        // back to the initial/animate serialization, keeping the server-rendered
-        // style byte-identical.
+        // regardless of which writer set it. SSR has no VisualElement, so it seeds
+        // the first paint with the SAME function and arguments the client
+        // VisualElement is created with (`makeLatestValues`): from `initial`, or
+        // from `animate` only when the initial animation is blocked
+        // (`initial={false}` / presence). Upstream `use-visual-state.ts`.
         visualElement
             ? mergeInlineStyles(
                   inlineStyleBaseWithHolds,
@@ -1508,15 +1457,17 @@
               )
             : mergeInlineStyles(
                   inlineStyleBaseWithHolds,
-                  isLoaded === 'mounting' || isLoaded === 'initial' ? initialKeyframes : undefined,
-                  {
-                      ...((isNotEmpty(initialKeyframes) && !effectiveAnimate
-                          ? initialKeyframes
-                          : renderedAnimateBaseline) ?? {}),
-                      ...(svgAttrSplit
-                          ? computeSSRSVGStyleValues(svgAttrSplit.motionValueAttrs)
-                          : {})
-                  },
+                  makeLatestValues(
+                      buildMotionNodeProps(false),
+                      { initial: inheritedInitialVariant, animate: effectiveAnimate },
+                      buildPresenceContext(),
+                      isSVGTag(String(tag))
+                          ? scrapeSVGMotionValuesFromProps
+                          : scrapeHTMLMotionValuesFromProps
+                  ),
+                  svgAttrSplit
+                      ? computeSSRSVGStyleValues(svgAttrSplit.motionValueAttrs)
+                      : undefined,
                   transformTemplateProp
               )
     )

@@ -59,6 +59,33 @@ test.describe('unresolved animation origins', () => {
         await expect.poll(read, { timeout: 6000 }).toBeGreaterThanOrEqual(60)
     })
 
+    test('server HTML does not seed the animate target', async ({ page }) => {
+        const html = await (await page.request.get(`${ROUTE}?@isPlaywright=true`)).text()
+        expect(html).not.toMatch(/id="css-var"[^>]*style="[^"]*--x:\s*100/u)
+        expect(html).not.toContain('style="points:')
+    })
+
+    test('CSS variable is mid-animation at ~5s, not already at its target', async ({ page }) => {
+        const hydrationMessages: string[] = []
+        page.on('console', (msg) => {
+            if (/hydrat/iu.test(msg.text())) hydrationMessages.push(msg.text())
+        })
+        const start = Date.now()
+        await page.goto(`${ROUTE}?@isPlaywright=true`)
+        const el = page.locator('#css-var')
+        await expect(el).toBeAttached()
+        const read = () =>
+            el.evaluate((node) => parseFloat(getComputedStyle(node).getPropertyValue('--x')))
+
+        await expect.poll(read, { timeout: 6000 }).toBeGreaterThanOrEqual(51)
+        const wait = 5000 - (Date.now() - start)
+        if (wait > 0) await page.waitForTimeout(wait)
+        const value = await read()
+        expect(value).toBeGreaterThanOrEqual(60)
+        expect(value).toBeLessThanOrEqual(90)
+        expect(hydrationMessages).toEqual([])
+    })
+
     test('is linked from the index', async ({ page }) => {
         await page.goto('/?@isPlaywright=true')
         await expect(
