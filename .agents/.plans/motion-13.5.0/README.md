@@ -11,9 +11,9 @@ the 13.5.1 bump live in `.agents/.plans/motion-13.5.1/`.
 | Plan | Title | Priority | Effort | Depends on | Status |
 | ---- | ----- | -------- | ------ | ---------- | ------ |
 | 001 | `whilePan` restore no longer depends on `VisualElement.getBaseTarget` | P1 | S | — | PASS, awaiting operator eye test (b1d3c86c) |
-| 002 | Pin that values animated without a base value never render placeholders | P2 | S | — | REOPENED: eye test exposed an SSR bug and a vacuous CSS-var test; fixed in 004 |
+| 002 | Pin that values animated without a base value never render placeholders | P2 | S | — | PASS via 004 (test made strict), awaiting operator eye test (3d84ecd5, f2d3df7a) |
 | 003 | Document negative `bounce` (overdamped springs) | P3 | S | — | PASS, awaiting operator eye test (a10e21e6) |
-| 004 | The server render starts elements from `initial`, never from the `animate` target | P1 | M | — | TODO |
+| 004 | The server render starts elements from `initial`, never from the `animate` target | P1 | M | — | PASS, awaiting operator eye test (f2d3df7a) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
