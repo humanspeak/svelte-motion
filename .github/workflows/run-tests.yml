@@ -24,6 +24,11 @@ on:
             - playwright.config.*
             - tsconfig*.json
             - .github/workflows/run-tests.yml
+            - eslint.config.*
+            - .npmrc
+            - .github/scripts/**
+            - .github/release-policy.json
+            - .github/release-source.json
 
 concurrency:
     group: run-tests-${{ github.ref }}
@@ -72,6 +77,12 @@ jobs:
                   pnpm install --filter .
                   --filter @humanspeak/svelte-motion-consumer-vite6
                   --frozen-lockfile --config.engine-strict=false
+
+            - name: Check library types
+              run: pnpm run check
+
+            - name: Test release safety offline
+              run: node --test .github/scripts/*.test.mjs
 
             - name: Run unit tests
               run: |
