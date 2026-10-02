@@ -17,6 +17,21 @@
 > matches outside `src/lib/utils/baseTarget.spec.ts`. If `_MotionContainer.svelte`
 > still calls it, STOP: plan `.agents/.plans/motion-13.5.0/001-whilepan-base-target.md`
 > must land first, or `whilePan` throws after this bump.
+>
+> Revision 2026-10-02 (guard pre-flight): **the gate passes.** Motion 13.5.1 was
+> published on 2026-10-02 (`motion`, `motion-dom`, `framer-motion`). **14.0.0 is
+> also published.** It is out of scope: the `^13.5.1` range excludes it, so do not
+> install it. Upstream now pins internal packages exactly: `motion-dom@13.5.1`
+> depends on `motion-utils@13.5.0`, and **there is no motion-utils 13.5.1**. The
+> expected tree is motion, framer-motion, and motion-dom at 13.5.1, plus
+> motion-utils at **13.5.0**. Beyond the audited delta, v13.5.1 also restores the
+> deprecated `observeTimeline` export, honours `attachTimeline` `rangeStart`/`rangeEnd`,
+> and fixes `sortNodePosition` for unmounted siblings. All of that arrives with the
+> bump, and none of it needs porting. The dependency `motion-13.5.0/001` is DONE
+> (b1d3c86c, on this branch's base). This branch (`chore/motion-13.5.1`) is stacked
+> on PR #493, which sets `package.json` to 1.5.0. Do NOT change `version`: the
+> release workflow patch-bumps it to 1.5.1 on merge. The drift-check baseline moves
+> to this branch's plan commit.
 
 ## Status
 
@@ -25,7 +40,7 @@
 - **Risk**: MED (motion-dom rewrites `animateChanges` and VisualElement variant-tree registration)
 - **Depends on**: `motion-13.5.0/001` DONE, plus Motion 13.5.1 on npm
 - **Category**: migration
-- **Planned at**: commit `9eba7a61`, 2026-10-01 (upstream audited to `e7f7cfe6f`)
+- **Planned at**: commit `9eba7a61`, 2026-10-01 (upstream audited to `e7f7cfe6f`); re-stamped on `chore/motion-13.5.1` 2026-10-02 (v13.5.1 delta reviewed)
 
 ## Why this matters
 
@@ -65,7 +80,7 @@ dependency-only bump. Behavior differences must surface in our tests.
 | -------------- | ----------------------------------------------------------------------------- | ----------------------------------------- |
 | Bump           | `pnpm --filter @humanspeak/svelte-motion update motion@13.5.1 motion-dom@13.5.1` | manifest `^13.5.1` for both              |
 | Frozen install | `pnpm install --frozen-lockfile`                                              | exit 0, no tracked changes                |
-| Tree           | `pnpm list motion motion-dom framer-motion motion-utils --depth 3`           | all four at 13.5.1 (or report actuals)    |
+| Tree           | `pnpm list motion motion-dom framer-motion motion-utils --depth 3`           | motion/framer-motion/motion-dom 13.5.1; motion-utils 13.5.0 |
 | Build          | `pnpm build`                                                                  | exit 0, publint "All good!"               |
 | Types / units  | `pnpm check` ; `pnpm test:only`                                               | 0 errors ; all pass                       |
 | Consumer       | `pnpm --filter @humanspeak/svelte-motion-consumer-vite6 test`                  | 3 "…passed." lines                        |
@@ -93,7 +108,7 @@ with the failing test. The `inherit={false}` feature work is plan 002.
 
 Run the Bump command, then the frozen install and the Tree command. Inspect every
 `pnpm-lock.yaml` hunk: only motion, framer-motion, motion-dom, and motion-utils
-entries may change.
+entries may change (motion-utils stays 13.5.0).
 
 **Verify**: the manifest shows `^13.5.1` for both, the tree matches, and
 `git status` shows only `package.json` and `pnpm-lock.yaml`.
@@ -141,7 +156,7 @@ the package version and never add minor/major labels. Versions mirror upstream.
 
 ## Done criteria
 
-- [ ] Gate passes; motion and motion-dom are `^13.5.1`; lock and tree match; frozen install is clean
+- [ ] Gate passes; motion and motion-dom are `^13.5.1`; tree is 13.5.1 (+ motion-utils 13.5.0); frozen install is clean
 - [ ] `grep -rn "getBaseTarget(" src/lib` → only `baseTarget.spec.ts`
 - [ ] svgEffect routing tests pass
 - [ ] build, check, test:only, consumer, docs build/check, and full e2e pass (0 failed)
