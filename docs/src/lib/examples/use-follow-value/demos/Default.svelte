@@ -61,15 +61,15 @@
             label: 'quick tween',
             color: '#3b82f6',
             size: 50,
-            x: useFollowValue(targetX, { type: 'tween', duration: 0.35, ease: 'easeOut' }),
-            y: useFollowValue(targetY, { type: 'tween', duration: 0.35, ease: 'easeOut' })
+            x: useFollowValue(targetX, { type: 'tween', duration: 350, ease: 'easeOut' }),
+            y: useFollowValue(targetY, { type: 'tween', duration: 350, ease: 'easeOut' })
         },
         {
             label: 'long tween',
             color: '#8b5cf6',
             size: 50,
-            x: useFollowValue(targetX, { type: 'tween', duration: 1.2, ease: 'easeInOut' }),
-            y: useFollowValue(targetY, { type: 'tween', duration: 1.2, ease: 'easeInOut' })
+            x: useFollowValue(targetX, { type: 'tween', duration: 1200, ease: 'easeInOut' }),
+            y: useFollowValue(targetY, { type: 'tween', duration: 1200, ease: 'easeInOut' })
         },
         {
             label: 'wobbly spring',
