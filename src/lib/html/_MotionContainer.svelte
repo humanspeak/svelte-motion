@@ -100,6 +100,7 @@
         getVisualElementParent,
         setVisualElementParent
     } from '$lib/components/visualElementTree.context'
+    import { resolveBaseTarget } from '$lib/utils/baseTarget'
     import { createMotionVisualElement } from '$lib/utils/visualElementCore'
     import {
         resolveInitial,
@@ -1725,7 +1726,7 @@
      * fixed type list. It therefore animates the node's MotionValues directly via
      * `animateTarget` — single-writer compliant and velocity-continuous — with
      * the restore driven by the node's OWN base target
-     * (`getBaseTarget`/`readValue`), which is what the animationState would use
+     * (`resolveBaseTarget`/`readValue`), which is what the animationState would use
      * for a removed key. Consequence of being outside the resolver: priority
      * against whileHover/whileTap is by construction (pan owns the pointer
      * session), not resolver-enforced. If upstream ever adds a pan type, this
@@ -1772,7 +1773,7 @@
             if (resolvedWhilePan && visualElement) {
                 const definition = resolvedWhilePan as Record<string, unknown>
                 // Capture what each key reverts to BEFORE animating, from the
-                // node itself: `getBaseTarget` is the same source the
+                // node itself: `resolveBaseTarget` is the same source the
                 // animationState uses when a key drops out of a target
                 // (props.initial → props.style → the value read at creation).
                 // `readValue` is the fallback for a key whilePan INTRODUCES —
@@ -1783,7 +1784,7 @@
                 const restore: Record<string, unknown> = {}
                 for (const key of Object.keys(definition)) {
                     if (key === 'transition') continue
-                    const base = visualElement.getBaseTarget(key)
+                    const base = resolveBaseTarget(visualElement, key)
                     restore[key] =
                         base ?? visualElement.readValue(key, definition[key] as AnyResolvedKeyframe)
                 }
@@ -2297,7 +2298,7 @@
             // And never while imperative controls are attached: the subscriber is
             // the writer then, and `props.animate` is `undefined`, so a pass would
             // see every key the previous declarative target animated as REMOVED
-            // and animate it back to `getBaseTarget` — snapping the element to
+            // and animate it back to its base target — snapping the element to
             // `initial` on a declarative -> controls swap. Upstream never hits
             // this because it hands `animateChanges` the controls object itself,
             // which it early-skips; our props shape cannot do that without
