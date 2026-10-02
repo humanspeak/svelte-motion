@@ -2,6 +2,7 @@ import { isMotionValue, motionValue } from 'motion-dom'
 import { flushSync } from 'svelte'
 import { get, writable } from 'svelte/store'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { spring } from '../index.js'
 import { useSpring } from './spring.svelte.js'
 
 /**
@@ -167,5 +168,30 @@ describe('utils/spring - useSpring', () => {
             s.jump(200)
             expect(s.get()).toBe(0)
         })
+    })
+})
+
+describe('negative bounce (Motion 13.5.0)', () => {
+    const sample = (bounce: number) => {
+        const gen = spring({ keyframes: [0, 100], duration: 800, bounce })
+        return Array.from({ length: 41 }, (_, i) => gen.next(i * 20).value)
+    }
+
+    it('never overshoots and is monotonic for bounce: -0.5', () => {
+        const values = sample(-0.5)
+        for (let i = 0; i < values.length; i++) {
+            expect(values[i]).toBeLessThanOrEqual(100)
+            if (i > 0) expect(values[i]).toBeGreaterThanOrEqual(values[i - 1])
+        }
+    })
+
+    it('is front-loaded relative to bounce: 0 at t = 200ms (fixed duration)', () => {
+        // Overdamped at a fixed duration covers more ground early, then eases in
+        // without overshoot, so it is ahead of the critically damped curve here.
+        expect(sample(-0.5)[10]).toBeGreaterThan(sample(0)[10])
+    })
+
+    it('overshoots for bounce: 0.5 (control)', () => {
+        expect(sample(0.5).some((v) => v > 100)).toBe(true)
     })
 })

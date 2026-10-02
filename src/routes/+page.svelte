@@ -887,6 +887,14 @@
                         SVG MotionValue Attributes
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/svg/unresolved-origin') + searchParams}
+                    >
+                        SVG unresolved animation origins
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

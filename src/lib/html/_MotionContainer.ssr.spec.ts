@@ -28,7 +28,10 @@ describe('_MotionContainer SSR styles', () => {
         expect(style).toMatch(/border-radius: 12px/)
     })
 
-    it('falls back to first animate keyframe when initial is empty', () => {
+    // Upstream parity: framer-motion `makeLatestValues` (use-visual-state.ts) seeds only
+    // from `initial`, or from `animate` when the initial animation is blocked
+    // (`initial={false}`). An empty `initial` therefore renders nothing for animate keys.
+    it('does not seed animate keyframes when initial is empty', () => {
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'div',
@@ -39,9 +42,50 @@ describe('_MotionContainer SSR styles', () => {
         })
         const el = container.firstElementChild as HTMLElement
         const style = el.getAttribute('style') ?? ''
-        expect(style).toMatch(/opacity: 0.8/)
-        // Transform string should contain scale(2)
-        expect(style).toMatch(/transform: .*scale\(2\)/)
+        expect(style).not.toMatch(/opacity:/)
+        expect(style).not.toMatch(/transform:/)
+    })
+
+    it('does not seed a CSS variable from animate when initial is absent', () => {
+        const { container } = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', animate: { '--x': 100 } }
+        })
+        expect(container.firstElementChild?.getAttribute('style') ?? '').not.toMatch(/--x/)
+    })
+
+    it('does not seed a transform from animate when initial is absent', () => {
+        const { container } = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', animate: { x: 100 } }
+        })
+        expect(container.firstElementChild?.getAttribute('style') ?? '').not.toMatch(/transform/)
+    })
+
+    it('does not seed opacity keyframes from animate when initial is absent', () => {
+        const { container } = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', animate: { opacity: [0, 1] } }
+        })
+        expect(container.firstElementChild?.getAttribute('style') ?? '').not.toMatch(/opacity/)
+    })
+
+    it('control: initial={false} renders the animate value', () => {
+        const { container } = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', initial: false, animate: { opacity: 0.5 } }
+        })
+        expect(container.firstElementChild?.getAttribute('style') ?? '').toMatch(/opacity: 0.5/)
+    })
+
+    it('control: initial={false} renders the last animate keyframe', () => {
+        const { container } = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', initial: false, animate: { opacity: [0.2, 0.7] } }
+        })
+        expect(container.firstElementChild?.getAttribute('style') ?? '').toMatch(/opacity: 0.7/)
+    })
+
+    it('control: own initial wins over animate', () => {
+        const { container } = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', initial: { opacity: 0.3 }, animate: { opacity: 1 } }
+        })
+        expect(container.firstElementChild?.getAttribute('style') ?? '').toMatch(/opacity: 0.3/)
     })
 
     it('does not emit invalid styles for null/undefined initial props', () => {

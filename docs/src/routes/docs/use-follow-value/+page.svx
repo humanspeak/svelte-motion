@@ -28,7 +28,7 @@ description: Create a MotionValue that animates to its latest value using any tr
     import { useFollowValue, useMotionValue } from '@humanspeak/svelte-motion'
 
     const x = useMotionValue(0)
-    const eased = useFollowValue(x, { type: 'tween', duration: 0.4, ease: 'easeOut' })
+    const eased = useFollowValue(x, { type: 'tween', duration: 400, ease: 'easeOut' })
 </script>
 
 <button onclick={() => x.set(x.get() === 0 ? 200 : 0)}>Toggle</button>
@@ -95,11 +95,13 @@ All `SpringOptions` are accepted: `stiffness`, `damping`, `mass`, `velocity`, `r
 
     const eased = useFollowValue(target, {
         type: 'tween',
-        duration: 0.4,
+        duration: 400,
         ease: 'easeOut'
     })
 </script>
 ```
+
+Follower `duration` values are in **milliseconds** (`400` = 0.4s), unlike `transition` durations passed to `animate`, which are in seconds.
 
 `ease` accepts a string (`'linear'`, `'easeIn'`, `'easeOut'`, `'easeInOut'`, `'circIn'` / `'circOut'` / `'circInOut'`, `'backIn'` / `'backOut'` / `'backInOut'`, `'anticipate'`), a function `(t: number) => number`, or a cubic-bezier array `[x1, y1, x2, y2]`.
 
@@ -129,7 +131,7 @@ All `SpringOptions` are accepted: `stiffness`, `damping`, `mass`, `velocity`, `r
         type: 'keyframes',
         values: [0, 100, 50, 80, 0],
         times: [0, 0.3, 0.5, 0.7, 1],
-        duration: 1
+        duration: 1000
     })
 </script>
 ```
@@ -146,7 +148,7 @@ Like `useSpring`, `useFollowValue` accepts a Svelte `Readable` as the source via
     import { useFollowValue } from '@humanspeak/svelte-motion'
 
     const target = writable(0)
-    const eased = useFollowValue(target, { type: 'tween', duration: 0.3 })
+    const eased = useFollowValue(target, { type: 'tween', duration: 300 })
 </script>
 
 <button onclick={() => target.set(200)}>set 200</button>
