@@ -14,8 +14,10 @@ import tailwindcss from '@tailwindcss/vite'
 // import path from 'node:path'
 // import { fileURLToPath } from 'node:url'
 import { playwright } from '@vitest/browser-playwright'
+import { chromium } from 'playwright'
 import devtoolsJson from 'vite-plugin-devtools-json'
 import { defineConfig } from 'vitest/config'
+import { resolveChromiumLaunchOptions } from '../scripts/chromium-launch-options'
 import { competitors, ours } from './src/lib/compare-data'
 import { docsConfig } from './src/lib/docs-config'
 
@@ -197,10 +199,11 @@ export default defineConfig({
                 extends: './vite.config.ts',
                 test: {
                     name: 'client',
-                    environment: 'browser',
                     browser: {
                         enabled: true,
-                        provider: playwright(),
+                        provider: playwright({
+                            launchOptions: resolveChromiumLaunchOptions(chromium.executablePath())
+                        }),
                         instances: [{ browser: 'chromium' }]
                     },
                     include: ['src/**/*.svelte.{test,spec}.{js,ts}'],

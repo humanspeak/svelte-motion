@@ -1,5 +1,6 @@
-import { defineConfig, devices } from '@playwright/test'
+import { chromium, defineConfig, devices } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
+import { resolveChromiumLaunchOptions } from '../scripts/chromium-launch-options'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 
@@ -32,7 +33,13 @@ export default defineConfig({
         reuseExistingServer: false
     },
     projects: [
-        { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+        {
+            name: 'chromium',
+            use: {
+                ...devices['Desktop Chrome'],
+                launchOptions: resolveChromiumLaunchOptions(chromium.executablePath())
+            }
+        },
         { name: 'firefox', use: { ...devices['Desktop Firefox'] } }
     ]
 })

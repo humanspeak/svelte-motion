@@ -14,6 +14,7 @@ on:
             - src/**
             - tests/**
             - e2e/**
+            - scripts/chromium-launch-options.ts
             - package.json
             - pnpm-lock.yaml
             - pnpm-workspace.yaml

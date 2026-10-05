@@ -1,4 +1,5 @@
-import { defineConfig, devices } from '@playwright/test'
+import { chromium, defineConfig, devices } from '@playwright/test'
+import { resolveChromiumLaunchOptions } from './scripts/chromium-launch-options'
 
 export default defineConfig({
     testDir: './e2e',
@@ -45,7 +46,10 @@ export default defineConfig({
     projects: [
         {
             name: 'chromium',
-            use: { ...devices['Desktop Chrome'] }
+            use: {
+                ...devices['Desktop Chrome'],
+                launchOptions: resolveChromiumLaunchOptions(chromium.executablePath())
+            }
         }
         // {
         //     name: 'firefox',
