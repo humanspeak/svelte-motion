@@ -6,7 +6,7 @@ Prepared with the improve skill on 2026-10-05 against `d40a038f` on `feat/motion
 
 | Plan | Deliverable | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-portable-chromium.md) | Shared optional Chromium resolver across root e2e, docs e2e, docs browser units; config red regression and actual browser smoke; helper CI path coverage | P2 | M | — | BLOCKED — round 2 count correction verified; combined docs units hit mirror-generation race; further scope decision pending |
+| [001](001-portable-chromium.md) | Shared optional Chromium resolver across root e2e, docs e2e, docs browser units; config red regression and actual browser smoke; helper CI path coverage | P2 | M | — | IN PROGRESS — Vitest-only isolation approved; Sonnet round 3 pending |
 | [002](002-fresh-session-setup.md) | Provider-neutral setup/verification guide, four scoped Claude WebFetch rules, personal-settings ignore and contract tests | P2 | S | 001 for accurate shipped fallback docs | TODO |
 
 Status values: TODO, IN PROGRESS, DONE, BLOCKED (reason), REJECTED (reason). A written plan is not an implemented change. An executor records baseline, named red failure (when applicable), green test counts/commands, selected browser/version, environment limits and review result before changing status.
@@ -57,3 +57,7 @@ Operator selected Claude Sonnet 5.5. Source drift from d40a038f is empty. T3 chi
 ## Approved correction — 2026-10-05
 
 Operator approved both baseline corrections after independent verification: remove the invalid Vitest browser environment option and correct the SEO test exact count/message from 67 to 68. All title assertions remain intact; no full-suite gate is waived. Plan 001 re-stamped at 9eedf490. Plan 002 remains gated until reviewed PASS.
+
+## Approved Vitest isolation — 2026-10-05
+
+Operator approved omitting only docMirrorsPlugin and llmsFullPlugin during Vitest, focused config coverage, and normal production output verification. Combined docs units stay mandatory; all other plugins and dev/build behavior stay intact. Plan 001 re-stamped at db7223a7. Plan 002 remains gated on PASS.

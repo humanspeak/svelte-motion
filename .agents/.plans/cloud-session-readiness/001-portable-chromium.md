@@ -6,7 +6,9 @@
 >
 > Revision 2026-10-05 (operator-approved baseline correction): Accept removal of the obsolete Vitest client `environment: 'browser'` option; installed Vitest 4.1.11 rejects it and the retained `browser.enabled` option selects Browser Mode. Add only `docs/src/lib/seo-title-policy.spec.ts` to scope for changing both the expected-page-count message and exact assertion from 67 to the independently verified 68. Preserve all literal-title, length, suffix, uniqueness and index-title assertions. Full docs units remain mandatory; no timeout/watcher changes or additional existing test edits are authorized. Source snapshot 2aa90cec was independently verified except for this count assertion; all prior runtime/browser gates may be reused for this assertion-only follow-up.
 >
-> **Drift check first:** `git diff --stat 9eedf490..HEAD -- playwright.config.ts docs/playwright.config.ts docs/vite.config.ts scripts/chromium-launch-options.ts src/testing/chromiumLaunchOptions.spec.ts docs/src/testing/chromium-provider.svelte.spec.ts .github/workflows/run-tests.yml .github/workflows/docs-browser-tests.yml .github/workflows/pr-build.yml docs/src/lib/seo-title-policy.spec.ts`. Compare existing excerpts on drift; reconcile unexpected changes before execution.
+> Revision 2026-10-05 (operator-approved Vitest isolation): The combined docs unit run independently reproduced a docs-kit mirror-directory deletion/read race. Allow only docs/vite.config.ts to omit docMirrorsPlugin and llmsFullPlugin when process.env.VITEST === 'true', plus new src/testing/docsTestConfig.spec.ts coverage of actual config imports in child processes. Installed Vitest 4.1.11 sets this flag before starting Vite. Keep every other plugin, both projects, imports, browser settings and normal dev/build behavior intact. This supersedes the earlier no-watcher/config-change restriction solely for these two test-run plugin omissions. Full combined docs units remain mandatory; do not replace them with split-project checks. Production build/output verification below is mandatory.
+>
+> **Drift check first:** `git diff --stat db7223a7..HEAD -- playwright.config.ts docs/playwright.config.ts docs/vite.config.ts scripts/chromium-launch-options.ts src/testing/chromiumLaunchOptions.spec.ts docs/src/testing/chromium-provider.svelte.spec.ts .github/workflows/run-tests.yml .github/workflows/docs-browser-tests.yml .github/workflows/pr-build.yml docs/src/lib/seo-title-policy.spec.ts src/testing/docsTestConfig.spec.ts`. Compare existing excerpts on drift; reconcile unexpected changes before execution.
 
 ## Status
 
@@ -15,7 +17,7 @@
 - Risk: MED — arbitrary Chromium versions have no Playwright compatibility guarantee
 - Depends on: none
 - Category: dx / tests
-- Planned at: commit `9eedf490`, 2026-10-05
+- Planned at: commit `db7223a7`, 2026-10-05
 
 ## Why this matters
 
@@ -80,9 +82,10 @@ Only modify:
 - `scripts/chromium-launch-options.ts` (create, shared Node-only resolver).
 - `src/testing/chromiumLaunchOptions.spec.ts` (create; root Vitest includes src specs).
 - `docs/src/testing/chromium-provider.svelte.spec.ts` (create; actual browser-runner smoke).
-- `playwright.config.ts`, `docs/playwright.config.ts`, `docs/vite.config.ts` (launch configuration plus removal of the invalid client browser environment setting only).
+- `playwright.config.ts`, `docs/playwright.config.ts`, `docs/vite.config.ts` (launch configuration, invalid client browser environment removal, and the two approved Vitest-only writer omissions).
 - `.github/workflows/run-tests.yml`, `.github/workflows/docs-browser-tests.yml`, `.github/workflows/pr-build.yml` (only add the helper's exact path to PR filters).
 - `docs/src/lib/seo-title-policy.spec.ts` (only expected-page-count message/assertion 67 → 68).
+- `src/testing/docsTestConfig.spec.ts` (create; focused actual-config plugin-selection regression).
 - This batch's README execution status/evidence.
 
 Out of scope: manifests/lockfile/dependency versions; library runtime/exports; existing test assertions/tolerances/snapshots except the expressly approved SEO page-count correction above; server ports/reuse/timeouts/shards; Firefox settings; browser sandbox flags; managed release workflows including npm-publish.yml; deployment; broad CI/tooling cleanup; changesets for runtime packages. No feature demo or public animation-docs page is needed for this contributor tooling change.
@@ -166,6 +169,17 @@ The root config regression is red on existing 14.0.0 code and green after wiring
 - A verification command fails twice after a reasonable in-scope correction, or further work needs out-of-scope files.
 
 A full e2e failure must follow the maintainer's page-by-page browser review workflow: show the related page and discuss behavior versus stale assertions before changes. Do not bulk-update tests.
+
+## Approved isolation follow-up
+
+1. Add focused config regression before changing docs config. Import the actual docs/vite.config.ts from a fresh Node/tsx child process, set VITEST=true explicitly, and assert docs-kit:doc-mirrors and docs-kit:llms-full are absent. Red must be those registered plugins being present, not a module-resolution failure. Resolve the real plugins (including nested arrays/promises if needed); never mock their names or factories.
+2. Omit only the two named plugin factories when process.env.VITEST === 'true'. Prefer direct short-circuit plugin entries in the existing config. Do not change project extends, ordering of retained plugins, metadata/demo generators, browser provider, dependencies or production publishing.
+3. Config tests also import with VITEST unset and with VITEST=false; both generators must remain present. Assert all other plugin names match and both client/server project settings remain intact. Do not launch servers during config tests.
+4. Run focused config tests and Chromium config tests, full root units, the normal combined docs unit command, docs build/check, scoped Trunk and diff integrity. Run docs Chromium/Firefox e2e against its usual fresh production build. Prior independently verified root browser/package checks may be reused where their files/runtime stay unchanged; root typecheck runs via normal snapshot hooks and is recorded.
+5. After normal production docs build (VITEST unset), assert nonempty generated docs/static/docs/animate-presence-custom.md and docs/static/llms-full.txt, and confirm the full reference contains the generated custom-presence mirror content. No build must silently omit generators. Review/restore unrelated generated tracked churn as routine verification cleanup.
+6. STOP after two failed verification attempts following a reasonable in-scope correction. No retry/timeout increases, plugin source patches, cache changes, additional disabled plugins or weakened assertions. Distinguish isolated probe success from success of the normal combined command.
+
+Additional done criteria: focused regression red then green; only the two writers absent during Vitest; both remain present outside Vitest; normal combined docs units and production docs build/output checks and Chromium/Firefox e2e pass. Config test and docs config are the only implementation paths newly authorized. Operator approved this amendment; all earlier scope boundaries remain.
 
 ## Maintenance notes
 

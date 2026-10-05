@@ -37,3 +37,11 @@ b2e23dc4 · round 2 correction snapshot and independent verification
 - Installed docs-kit doc-mirrors.js:242 wipes/rebuilds mirror directory; llms-full.js:110 reads files after listing; watcher handler at :203 regenerates on add/change/unlink. Multiple test project servers share outputs.
 - First ignored probe changed inheritance and omitted writer plugins: 13 tests pass. Inheritance-only control passed twice too; those runs do not isolate writer removal. A separate copied config retained self-referential project extension and omitted only docMirrorsPlugin/llmsFullPlugin; 13 tests pass. Absolute imports/probe paths preserve resolution; source untouched. Failed initial copy probe could not resolve docs dependencies; moved probe into ignored docs/node_modules/.cache, then passed.
 - Action: NO-PASS remains on required combined docs unit gate; operator asked to allow only Vitest-mode omission of the two writers plus config coverage and production-output checks. No amendment yet; Plan 002 remains gated. Other verified runtime/browser checks reused as expressly approved for the count-only follow-up.
+
+## Checkpoint 5 — 2026-10-05 16:53 — PLAN AMENDED
+
+db7223a7 · operator approved test-mode isolation
+
+- Allow only the two named writers to be omitted when installed Vitest sets VITEST=true, plus actual-config regression coverage and production output checks. Full combined suite remains required; all other plugin/project/production behavior retained.
+- Source baseline re-stamped at db7223a7; README updated. Prior failed gate is not waived.
+- Action: commit amendment before Sonnet round 3; no guard source edits.
