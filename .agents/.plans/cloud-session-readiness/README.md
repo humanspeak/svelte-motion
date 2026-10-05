@@ -6,7 +6,7 @@ Prepared with the improve skill on 2026-10-05 against `d40a038f` on `feat/motion
 
 | Plan | Deliverable | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-portable-chromium.md) | Shared optional Chromium resolver across root e2e, docs e2e, docs browser units; config red regression and actual browser smoke; helper CI path coverage | P2 | M | — | IN PROGRESS — Vitest-only isolation approved; Sonnet round 3 pending |
+| [001](001-portable-chromium.md) | Shared optional Chromium resolver across root e2e, docs e2e, docs browser units; config red regression and actual browser smoke; helper CI path coverage | P2 | M | — | IN PROGRESS — snapshot 7cdf6076 independently verified; generated registry cleanup pending before PASS |
 | [002](002-fresh-session-setup.md) | Provider-neutral setup/verification guide, four scoped Claude WebFetch rules, personal-settings ignore and contract tests | P2 | S | 001 for accurate shipped fallback docs | TODO |
 
 Status values: TODO, IN PROGRESS, DONE, BLOCKED (reason), REJECTED (reason). A written plan is not an implemented change. An executor records baseline, named red failure (when applicable), green test counts/commands, selected browser/version, environment limits and review result before changing status.

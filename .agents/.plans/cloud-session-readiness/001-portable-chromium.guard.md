@@ -45,3 +45,14 @@ db7223a7 · operator approved test-mode isolation
 - Allow only the two named writers to be omitted when installed Vitest sets VITEST=true, plus actual-config regression coverage and production output checks. Full combined suite remains required; all other plugin/project/production behavior retained.
 - Source baseline re-stamped at db7223a7; README updated. Prior failed gate is not waived.
 - Action: commit amendment before Sonnet round 3; no guard source edits.
+
+## Checkpoint 6 — 2026-10-05 17:18 — ON TRACK
+
+7cdf6076 · round 3 snapshot; all gates green, generated cleanup pending
+
+- Full diff read: only two approved conditional plugin entries and actual-config regression. Historical red.log records writer registered; independent focused tests 28/28 pass.
+- Independent root units: 92 files / 1,142 tests pass on shell Node26.10.0 and pinned Node24.18.0. Independent combined docs units: four files / 13 tests pass on Node26 and on Node24 after builds finish.
+- A Node24 combined run during concurrent production build timed out in existing PostHog first-import test (5s). No assertion/timeout changed; normal full combined command rerun after e2e/build completion passes. Retain this timing limitation in close-out rather than erase failed evidence.
+- Production docs build/check and fresh production docs e2e: exit0, zero type errors, 12 tests (six Chromium/six Firefox). Both production outputs were deleted only after confirming ignored status, then regenerated: custom mirror2,327bytes; llms-full306,086bytes includes entire exact mirror after manual and e2e builds. VITEST unset. Production gates used shell Node26; units additionally validated pinned24.
+- Scoped Trunk/diff/dependency integrity pass; root typecheck passed normal snapshot hook. Earlier root browser/external Chromium/package evidence reused per amendment; e2e fresh package step passed.
+- Action: delegate only routine generated-registry cleanup; no source change. After clean status, write PASS report and preflight/disptach Plan002.
