@@ -1,3 +1,5 @@
+> CLOSED 2026-10-05 — Plans001and002 PASS. Delivered optional Chromium fallback, Vitest mirror-writer isolation with production-output checks, contributor setup guide, four scoped Claude fetch rules and contract tests. Work committed locally on feat/motion-14.0.1-parity; PR/publication remains the operator's decision. Actual Claude cloud testing and Motion14.0.1 runtime parity remain outside this batch.
+
 # Cloud session readiness
 
 Prepared with the improve skill on 2026-10-05 against `d40a038f` on `feat/motion-14.0.1-parity`. The maintainer selected work that can proceed without Motion14.0.1. This is a new bounded batch; prior upstream-parity-hardening plans are already marked DONE and are not reopened. Only advisory plan files were written; no implementation was performed.
