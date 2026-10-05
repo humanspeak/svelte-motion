@@ -3360,6 +3360,7 @@
     })
 </script>
 
+<!-- Keep each appear block adjacent to its element: separating whitespace becomes consumer text. -->
 {#if isVoidTag}
     {#if isSVGTag(String(tag))}
         <svelte:element
@@ -3367,13 +3368,19 @@
             bind:this={element}
             xmlns={SVG_NAMESPACE}
             {...derivedAttrs}
-        />
-        <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
-        {@html renderedOptimizedAppearScript}
+        />{#if renderedOptimizedAppearScript}
+            <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
+            {@html renderedOptimizedAppearScript}
+        {/if}
     {:else}
-        <svelte:element this={tag} bind:this={element} {...derivedAttrs} />
-        <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
-        {@html renderedOptimizedAppearScript}
+        <svelte:element
+            this={tag}
+            bind:this={element}
+            {...derivedAttrs}
+        />{#if renderedOptimizedAppearScript}
+            <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
+            {@html renderedOptimizedAppearScript}
+        {/if}
     {/if}
 {:else if isSVGTag(String(tag))}
     <svelte:element this={renderTag} bind:this={element} xmlns={SVG_NAMESPACE} {...derivedAttrs}>
@@ -3382,9 +3389,10 @@
         {:else}
             {@render children?.()}
         {/if}
-    </svelte:element>
-    <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
-    {@html renderedOptimizedAppearScript}
+    </svelte:element>{#if renderedOptimizedAppearScript}
+        <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
+        {@html renderedOptimizedAppearScript}
+    {/if}
 {:else}
     <svelte:element this={tag} bind:this={element} {...derivedAttrs}>
         {#if motionValueChild}
@@ -3392,7 +3400,8 @@
         {:else}
             {@render children?.()}
         {/if}
-    </svelte:element>
-    <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
-    {@html renderedOptimizedAppearScript}
+    </svelte:element>{#if renderedOptimizedAppearScript}
+        <!-- trunk-ignore(eslint/svelte/no-at-html-tags): optimized appear emits a JSON-escaped SSR bootstrap script, not user-authored HTML. -->
+        {@html renderedOptimizedAppearScript}
+    {/if}
 {/if}

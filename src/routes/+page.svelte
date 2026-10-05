@@ -22,6 +22,11 @@
             <h2 class="mb-3 text-xl font-medium">Motion</h2>
             <ul class="list-disc space-y-2 pl-5">
                 <li>
+                    <a href={resolve('/tests/exact-text') + searchParams}
+                        >Exact text preservation (#498)</a
+                    >
+                </li>
+                <li>
                     <a
                         class="font-semibold text-amber-300 hover:underline"
                         href={resolve('/tests/ve-signoff') + searchParams}
