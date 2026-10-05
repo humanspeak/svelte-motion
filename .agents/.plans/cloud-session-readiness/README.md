@@ -6,7 +6,7 @@ Prepared with the improve skill on 2026-10-05 against `d40a038f` on `feat/motion
 
 | Plan | Deliverable | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-portable-chromium.md) | Shared optional Chromium resolver across root e2e, docs e2e, docs browser units; config red regression and actual browser smoke; helper CI path coverage | P2 | M | — | BLOCKED — round 1 snapshot 2aa90cec; docs unit gate fails on baseline SEO count; scope amendment awaiting operator |
+| [001](001-portable-chromium.md) | Shared optional Chromium resolver across root e2e, docs e2e, docs browser units; config red regression and actual browser smoke; helper CI path coverage | P2 | M | — | IN PROGRESS — operator approved narrow baseline corrections; Sonnet round 2 pending |
 | [002](002-fresh-session-setup.md) | Provider-neutral setup/verification guide, four scoped Claude WebFetch rules, personal-settings ignore and contract tests | P2 | S | 001 for accurate shipped fallback docs | TODO |
 
 Status values: TODO, IN PROGRESS, DONE, BLOCKED (reason), REJECTED (reason). A written plan is not an implemented change. An executor records baseline, named red failure (when applicable), green test counts/commands, selected browser/version, environment limits and review result before changing status.
@@ -53,3 +53,7 @@ The intended review gates are red/green configuration and resolver tests, a real
 ## Dispatch pre-flight — 2026-10-05
 
 Operator selected Claude Sonnet 5.5. Source drift from d40a038f is empty. T3 children inherit the current checkout, so the dispatch uses the documented serial shared-checkout exception: one active executor, guard reads only while it runs, guard owns all plan/index writes and commits. No PR will be opened by this batch unless separately requested. Plan002 remains gated on001 PASS.
+
+## Approved correction — 2026-10-05
+
+Operator approved both baseline corrections after independent verification: remove the invalid Vitest browser environment option and correct the SEO test exact count/message from 67 to 68. All title assertions remain intact; no full-suite gate is waived. Plan 001 re-stamped at 9eedf490. Plan 002 remains gated until reviewed PASS.

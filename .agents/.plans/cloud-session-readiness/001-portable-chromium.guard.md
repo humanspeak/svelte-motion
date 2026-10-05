@@ -18,3 +18,12 @@
 - Docs Chromium/Firefox e2e: 12 tests pass, exit 0. All other reproduced gates remain as recorded above.
 - Full docs units remain failing on the pre-existing SEO count. Removal of obsolete browser environment remains a pending plan amendment; no operator answer received.
 - Action: NO-PASS report written; Plan 002 gated. Executor cleanup will discard only generated registry churn. No source correction or plan amendment performed by guard.
+
+## Checkpoint 3 — 2026-10-05 15:56 — PLAN AMENDED
+
+9eedf490 · operator explicitly approved both corrections
+
+- Accepted the necessary obsolete Vitest setting removal and added only the SEO exact count/message 67 → 68 to scope. All remaining assertions and full docs unit gate preserved; no timeout/watcher repair authorized.
+- Prior snapshot gates may be reused for this assertion-only follow-up. Plan re-stamped at 9eedf490; README updated; Plan 002 remains gated.
+- Cleanup task restored generated registry churn; independent git status was clean before this amendment.
+- Action: amended contract committed before Sonnet round 2 dispatch.

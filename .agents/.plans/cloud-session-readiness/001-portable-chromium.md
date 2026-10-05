@@ -4,7 +4,9 @@
 >
 > Revision 2026-10-05 (dispatch pre-flight): The operator selected Claude Sonnet 5.5. T3 delegated children inherit this thread's current checkout; this batch will use the dispatch skill's serial, otherwise-idle shared-checkout exception. Only one executor writes at a time. Guard will not modify repo files while an executor runs, and owns all commits/index updates. This supersedes the isolated-worktree wording below for this dispatch; there is no worktree binding override or parallel implementation. Source baseline remains d40a038f because no in-scope source drift was found.
 >
-> **Drift check first:** `git diff --stat d40a038f..HEAD -- playwright.config.ts docs/playwright.config.ts docs/vite.config.ts scripts/chromium-launch-options.ts src/testing/chromiumLaunchOptions.spec.ts docs/src/testing/chromium-provider.svelte.spec.ts .github/workflows/run-tests.yml .github/workflows/docs-browser-tests.yml .github/workflows/pr-build.yml`. Compare existing excerpts on drift; reconcile unexpected changes before execution.
+> Revision 2026-10-05 (operator-approved baseline correction): Accept removal of the obsolete Vitest client `environment: 'browser'` option; installed Vitest 4.1.11 rejects it and the retained `browser.enabled` option selects Browser Mode. Add only `docs/src/lib/seo-title-policy.spec.ts` to scope for changing both the expected-page-count message and exact assertion from 67 to the independently verified 68. Preserve all literal-title, length, suffix, uniqueness and index-title assertions. Full docs units remain mandatory; no timeout/watcher changes or additional existing test edits are authorized. Source snapshot 2aa90cec was independently verified except for this count assertion; all prior runtime/browser gates may be reused for this assertion-only follow-up.
+>
+> **Drift check first:** `git diff --stat 9eedf490..HEAD -- playwright.config.ts docs/playwright.config.ts docs/vite.config.ts scripts/chromium-launch-options.ts src/testing/chromiumLaunchOptions.spec.ts docs/src/testing/chromium-provider.svelte.spec.ts .github/workflows/run-tests.yml .github/workflows/docs-browser-tests.yml .github/workflows/pr-build.yml docs/src/lib/seo-title-policy.spec.ts`. Compare existing excerpts on drift; reconcile unexpected changes before execution.
 
 ## Status
 
@@ -13,7 +15,7 @@
 - Risk: MED — arbitrary Chromium versions have no Playwright compatibility guarantee
 - Depends on: none
 - Category: dx / tests
-- Planned at: commit `d40a038f`, 2026-10-05
+- Planned at: commit `9eedf490`, 2026-10-05
 
 ## Why this matters
 
@@ -78,11 +80,12 @@ Only modify:
 - `scripts/chromium-launch-options.ts` (create, shared Node-only resolver).
 - `src/testing/chromiumLaunchOptions.spec.ts` (create; root Vitest includes src specs).
 - `docs/src/testing/chromium-provider.svelte.spec.ts` (create; actual browser-runner smoke).
-- `playwright.config.ts`, `docs/playwright.config.ts`, `docs/vite.config.ts` (launch configuration only).
+- `playwright.config.ts`, `docs/playwright.config.ts`, `docs/vite.config.ts` (launch configuration plus removal of the invalid client browser environment setting only).
 - `.github/workflows/run-tests.yml`, `.github/workflows/docs-browser-tests.yml`, `.github/workflows/pr-build.yml` (only add the helper's exact path to PR filters).
+- `docs/src/lib/seo-title-policy.spec.ts` (only expected-page-count message/assertion 67 → 68).
 - This batch's README execution status/evidence.
 
-Out of scope: manifests/lockfile/dependency versions; library runtime/exports; existing test assertions/tolerances/snapshots; server ports/reuse/timeouts/shards; Firefox settings; browser sandbox flags; managed release workflows including npm-publish.yml; deployment; broad CI/tooling cleanup; changesets for runtime packages. No feature demo or public animation-docs page is needed for this contributor tooling change.
+Out of scope: manifests/lockfile/dependency versions; library runtime/exports; existing test assertions/tolerances/snapshots except the expressly approved SEO page-count correction above; server ports/reuse/timeouts/shards; Firefox settings; browser sandbox flags; managed release workflows including npm-publish.yml; deployment; broad CI/tooling cleanup; changesets for runtime packages. No feature demo or public animation-docs page is needed for this contributor tooling change.
 
 ## Git workflow
 
