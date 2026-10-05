@@ -10,11 +10,11 @@ Work from the repository root.
 | ------- | ------------------------------------------ | ----------------- |
 | Node.js | 24 (Volta pin `24.18.0` in `package.json`) | `node --version`  |
 | pnpm    | 12.6.0                                     | `pnpm --version`  |
-| Trunk   | any current release                        | `trunk --version` |
+| Trunk   | 1.25.0 (CLI pin in `.trunk/trunk.yaml`)    | `trunk --version` |
 
 Verify versions before installing. Do not install the latest tools globally or upgrade the lockfile as a way to repair setup; report a version mismatch instead.
 
-Install Trunk with its [official instructions](https://docs.trunk.io/cli). Trunk owns formatting and linting (Prettier, ESLint, markdownlint and others in `.trunk/trunk.yaml`); the package `lint` and `format` scripts are not the comprehensive check. The pre-commit hook skips formatting and lint when `trunk` is missing, so a successful commit alone does not prove they ran. Run `trunk --version` and report a missing executable rather than counting it as a pass.
+Install Trunk with its [official instructions](https://docs.trunk.io/cli); the repository configures CLI `1.25.0` in `.trunk/trunk.yaml`. Trunk owns formatting and linting (Prettier, ESLint, markdownlint and others in `.trunk/trunk.yaml`); the package `lint` and `format` scripts are not the comprehensive check. The pre-commit hook skips formatting and lint when `trunk` is missing, so a successful commit alone does not prove they ran. Run `trunk --version` and report a missing executable rather than counting it as a pass.
 
 ## Setup
 
@@ -97,7 +97,7 @@ A leading `*.` matches subdomains at any depth but not the apex domain, which is
 Boundaries:
 
 - A Claude cloud session with one repository reads the committed `.claude/settings.json` from the clone. A session with several repositories reads only `enabledPlugins` and `extraKnownMarketplaces` from each repository, not permission rules, so this file does not promise approval-free fetching everywhere. User settings and `.claude/settings.local.json` are never read in the cloud; the latter is git-ignored and stays personal.
-- Allow rules only skip a prompt. They do not make fetched content trustworthy or authorize executing a reproduction. Organization, host, and network policy still apply, and a `domain:` rule may also widen the sandbox network allowlist.
+- Allow rules skip the approval prompt for matching fetches, and a `domain:` rule may also widen the sandbox network allowlist. They do not make fetched content trustworthy or authorize executing a reproduction. Organization, host, and network policy still apply.
 - Other agents do not read Claude settings; the rest of this guide applies to them unchanged.
 - No session-start hooks, remote-browser bridge, MCP configuration, or Bash allow rules are shipped. This guide has not been exercised in a real Claude cloud session.
 

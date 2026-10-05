@@ -10,7 +10,7 @@
 
 ## Fresh-session setup
 
-For a fresh checkout or cloud session, follow [CONTRIBUTING.md](CONTRIBUTING.md): Node 24 and pnpm 12.6.0, the frozen install, Playwright browsers (with the Chromium fallback), Trunk (the pre-commit hook silently skips it when missing), and the verification order. Shared fetch permissions live in `.claude/settings.json`; do not copy personal settings into a clone.
+For a fresh checkout or cloud session, follow [CONTRIBUTING.md](CONTRIBUTING.md): Node 24 and pnpm 12.6.0, the frozen install, Playwright browsers (with the Chromium fallback), Trunk (the pre-commit hook warns and skips formatting and lint when it is missing), and the verification order. Shared fetch permissions live in `.claude/settings.json`; do not copy personal settings into a clone.
 
 ## Notes
 
