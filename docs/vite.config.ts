@@ -72,7 +72,12 @@ export default defineConfig({
         // runs on `buildStart` and rewatches via Vite's own file watcher.
         // `siteUrl` controls the `<!-- Source: ... -->` header in each
         // mirror, which is the citation surface for ChatGPT / Perplexity.
-        docMirrorsPlugin({ siteUrl: docsConfig.url }),
+        //
+        // Skipped under Vitest (`VITEST === 'true'`, set before Vite starts):
+        // it wipes and rebuilds `static/docs` while `llmsFullPlugin` and the
+        // docs unit specs read from it, which races in the combined unit run.
+        // Normal dev and build runs still register it.
+        process.env.VITEST !== 'true' && docMirrorsPlugin({ siteUrl: docsConfig.url }),
         // Scans `src/routes/examples/**/+page.svelte` plus the matching
         // `src/lib/examples/<slug>/demos/*.svelte` files, then emits
         // `static/examples.md` (the index) and `static/examples/<slug>.md`
@@ -103,11 +108,15 @@ export default defineConfig({
             prepend: 'llms-positioning.md',
             comparisons: { ours, competitors }
         }),
-        llmsFullPlugin({
-            siteUrl: docsConfig.url,
-            pkgName: docsConfig.name,
-            prepend: 'llms-positioning.md'
-        }),
+        //
+        // Also skipped under Vitest: it reads `static/docs` after listing it
+        // and would race with the mirror writer's rebuild.
+        process.env.VITEST !== 'true' &&
+            llmsFullPlugin({
+                siteUrl: docsConfig.url,
+                pkgName: docsConfig.name,
+                prepend: 'llms-positioning.md'
+            }),
         // Renders `static/og-default.png` + per-page social cards from
         // docs-kit's satori templates. The compare index and competitor pages
         // get their SEO state from docs-kit components, so static route-file
