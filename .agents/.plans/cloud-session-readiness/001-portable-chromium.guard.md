@@ -56,3 +56,10 @@ db7223a7 · operator approved test-mode isolation
 - Production docs build/check and fresh production docs e2e: exit0, zero type errors, 12 tests (six Chromium/six Firefox). Both production outputs were deleted only after confirming ignored status, then regenerated: custom mirror2,327bytes; llms-full306,086bytes includes entire exact mirror after manual and e2e builds. VITEST unset. Production gates used shell Node26; units additionally validated pinned24.
 - Scoped Trunk/diff/dependency integrity pass; root typecheck passed normal snapshot hook. Earlier root browser/external Chromium/package evidence reused per amendment; e2e fresh package step passed.
 - Action: delegate only routine generated-registry cleanup; no source change. After clean status, write PASS report and preflight/disptach Plan002.
+
+## Checkpoint 7 — 2026-10-05 17:20 — ON TRACK
+
+7cdf6076 · final PASS after cleanup
+
+- Executor discarded only generated registry class-order churn; independent working tree clean at15f93ed7. All gate evidence from checkpoint6 retained, with prior failures explicitly recorded in final report.
+- Action: PASS report written, README001DONE; preflight002 has empty scoped source drift and no tracked shared settings. No PR; batch continues with selectedSonnet5.5.

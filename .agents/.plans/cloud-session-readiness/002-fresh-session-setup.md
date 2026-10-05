@@ -4,7 +4,9 @@
 >
 > Revision 2026-10-05 (dispatch pre-flight): The operator selected Claude Sonnet 5.5. T3 delegated children inherit this thread's current checkout; this batch will use the dispatch skill's serial, otherwise-idle shared-checkout exception. Only one executor writes at a time. Guard will not modify repo files while an executor runs, and owns all commits/index updates. This supersedes the isolated-worktree wording below for this dispatch; there is no worktree binding override or parallel implementation. Source baseline remains d40a038f because no in-scope source drift was found.
 >
-> **Drift check first:** `git diff --stat d40a038f..HEAD -- CLAUDE.md README.md CONTRIBUTING.md .claude/settings.json .gitignore src/testing/claudeProjectSettings.spec.ts`. Compare the current-state excerpts against live files. Expected predecessor Plan 001 changes are outside this scope; do not rewrite them.
+> Revision 2026-10-05 (dependency pre-flight): Plan001 is independently PASS at source snapshot7cdf6076, including approved Vitest-only mirror-writer isolation and production-output checks. Scoped drift from d40a038f is empty and no shared Claude settings are tracked. Re-baseline at15f93ed7 for the reviewed predecessor. The shell defaults to Node26, but installed Node24.18.0 is available; executor must prefix that binary directory for verification commands and record actual versions, without changing global settings or repo pins. Shared checkout remains serial; guard owns commits/plans/index. Prior package/docs/browser gates may be reused per Step4; no prose-only browser rebuild required.
+>
+> **Drift check first:** `git diff --stat 15f93ed7..HEAD -- CLAUDE.md README.md CONTRIBUTING.md .claude/settings.json .gitignore src/testing/claudeProjectSettings.spec.ts`. Compare the current-state excerpts against live files. Expected predecessor Plan 001 changes are outside this scope; do not rewrite them.
 
 ## Status
 
@@ -13,7 +15,7 @@
 - Risk: LOW — shared allow rules change fetch approvals for contributors
 - Depends on: 001-portable-chromium.md for documenting the completed browser fallback
 - Category: docs / dx
-- Planned at: commit `d40a038f`, 2026-10-05
+- Planned at: commit `15f93ed7`, 2026-10-05
 
 ## Why this matters
 
