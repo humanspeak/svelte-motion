@@ -7,7 +7,7 @@ Prepared with the improve skill on 2026-10-05 against `d40a038f` on `feat/motion
 | Plan | Deliverable | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
 | [001](001-portable-chromium.md) | Shared optional Chromium resolver across root e2e, docs e2e, docs browser units; config red regression and actual browser smoke; helper CI path coverage | P2 | M | — | DONE — PASS at7cdf6076; independent units/browser/production checks; generated churn discarded |
-| [002](002-fresh-session-setup.md) | Provider-neutral setup/verification guide, four scoped Claude WebFetch rules, personal-settings ignore and contract tests | P2 | S | 001 for accurate shipped fallback docs | IN PROGRESS — snapshot7ae63ac1 tests/config verified; three wording corrections queued |
+| [002](002-fresh-session-setup.md) | Provider-neutral setup/verification guide, four scoped Claude WebFetch rules, personal-settings ignore and contract tests | P2 | S | 001 for accurate shipped fallback docs | DONE — PASS at1d9828c6; independent settings/units/types/lint/consumer checks |
 
 Status values: TODO, IN PROGRESS, DONE, BLOCKED (reason), REJECTED (reason). A written plan is not an implemented change. An executor records baseline, named red failure (when applicable), green test counts/commands, selected browser/version, environment limits and review result before changing status.
 
@@ -65,3 +65,7 @@ Operator approved omitting only docMirrorsPlugin and llmsFullPlugin during Vites
 ## Plan001 close-out / Plan002 pre-flight — 2026-10-05
 
 Plan001 PASS: source7cdf6076, guard report records independent28focused/1142root/13docs/12docse2e and exact regenerated production outputs. Node24 and26 units passed; one concurrent-build PostHog timeout remains recorded as a harness limitation. No gate weakened. Plan002 scoped drift empty; shared settings absent; use installedNode24.18.0 for remaining verification. Selected executor remains Sonnet5.5; no PR opened.
+
+## Batch verification complete — 2026-10-05
+
+Both plans PASS. Delivered optional installed-Chromium selection across three consumers, exact-text regression preserved, normal combined docs tests with two approved writer omissions underVitest, production outputs verified, and contributor setup/shared Claude fetch contracts. Source snapshots7cdf6076 and7ae63ac1/1d9828c6. Latest independent root93files/1147tests onNode24; docs13 and docs browsers12 from001 reused for unchangedfiles. ActualClaudeclouduntested; Motion14.0.1 runtime work remains deferred. No PR or push.
