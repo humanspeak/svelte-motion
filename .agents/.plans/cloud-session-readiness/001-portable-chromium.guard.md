@@ -27,3 +27,13 @@
 - Prior snapshot gates may be reused for this assertion-only follow-up. Plan re-stamped at 9eedf490; README updated; Plan 002 remains gated.
 - Cleanup task restored generated registry churn; independent git status was clean before this amendment.
 - Action: amended contract committed before Sonnet round 2 dispatch.
+
+## Checkpoint 4 — 2026-10-05 16:13 — DRIFTING
+
+b2e23dc4 · round 2 correction snapshot and independent verification
+
+- Snapshot committed before review; only approved count/message changed 67 → 68. Other SEO assertions intact. Independent focused SEO: five tests pass; scoped Trunk/diff pass. Normal commit hook root check passed.
+- Combined docs units independently fail before assertions: ENOENT scanning docs/static/docs. Sonnet reported three failures reading animate-presence-custom.md. Prior round 1 independent run did not show this race; no claim of baseline reproduction is made.
+- Installed docs-kit doc-mirrors.js:242 wipes/rebuilds mirror directory; llms-full.js:110 reads files after listing; watcher handler at :203 regenerates on add/change/unlink. Multiple test project servers share outputs.
+- First ignored probe changed inheritance and omitted writer plugins: 13 tests pass. Inheritance-only control passed twice too; those runs do not isolate writer removal. A separate copied config retained self-referential project extension and omitted only docMirrorsPlugin/llmsFullPlugin; 13 tests pass. Absolute imports/probe paths preserve resolution; source untouched. Failed initial copy probe could not resolve docs dependencies; moved probe into ignored docs/node_modules/.cache, then passed.
+- Action: NO-PASS remains on required combined docs unit gate; operator asked to allow only Vitest-mode omission of the two writers plus config coverage and production-output checks. No amendment yet; Plan 002 remains gated. Other verified runtime/browser checks reused as expressly approved for the count-only follow-up.

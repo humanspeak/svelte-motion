@@ -1,40 +1,45 @@
 # Guard report — 001 portable Chromium
 
-**Recommendation: NO-PASS** — required full docs unit gate fails; accepting an obsolete browser-setting removal and fixing a baseline assertion requires a narrow plan amendment.
+**Recommendation: NO-PASS** — approved baseline corrections are complete; combined docs units hit a shared docs-kit mirror-generation race.
 
-**Reviewed at** 2aa90cec · 2026-10-05 15:33 · **Plan planned at** d40a038f
+**Reviewed at** b2e23dc4 · 2026-10-05 16:13 · **Plan planned at** 9eedf490
 
 ## Done criteria
 
 | Criterion | Result | Evidence |
 | --- | --- | --- |
-| Named launch-options regression failed before config changes and passes afterward. | met | Executor historical red.log records undefined launchOptions assertion; independent focused.log: 23 pass. |
-| Resolver branch/platform tests pass, and both Playwright configs use the shared helper. | met | 23 focused tests pass; complete diff read of both configs and helper. |
-| Docs client project discovers/passes its browser smoke; configured provider uses helper output. | met | Independent docs-client.log: one browser test passes; provider diff inspected. |
-| Existing root SSR/hydration smoke and docs Chromium/Firefox e2e pass. | met | Independent root-e2e.log: two pass; docs-e2e.log: 12 pass. |
-| Real helper-selected browser smoke passes; actual cloud validation is distinguished from local simulation. | met | Independent fallback.log: external Chromium 149.0.7827.55 selected with deliberately absent pinned argument; page text verified. Actual cloud image untested. |
-| pnpm test, docs tests, package, root/docs checks/build, scoped Trunk, and diff checks pass. | FAIL | Root 1,137 tests pass; client smoke, publint, root/docs checks (zero errors), docs build, scoped Trunk and diff checks pass. All docs units: 12 pass, one fails at seo-title-policy.spec.ts:51, expected 67 pages, received 68. |
-| Each workflow filter includes shared helper; pinned installation remains unchanged. | met | One exact helper entry in each of three filters; existing browser install commands retained. |
-| git diff -- package.json docs/package.json pnpm-lock.yaml is empty; no out-of-scope edits. | FAIL | Dependency diff empty; all nine changed paths allowed, but removing environment: browser exceeds launch-only config scope. Verification generated unstaged registry churn excluded from snapshot. |
-| README status and verification evidence updated. | met | Guard marked BLOCKED, dependency 002 TODO; this report and running log record reproduced evidence. |
+| Named launch-options regression failed before config changes and passes afterward. | met | Round 1 historical red and independent 23-test focused run, source unchanged this round. |
+| Resolver branch/platform tests pass, and both Playwright configs use the shared helper. | met | Round 1 full diff review and focused run reused per approved amendment. |
+| Docs client project discovers/passes its browser smoke; configured provider uses helper output. | met | Round 1 independent client smoke and provider review; source unchanged. |
+| Existing root SSR/hydration smoke and docs Chromium/Firefox e2e pass. | met | Round 1 independent root two and docs 12 tests, unchanged config/runtime after snapshot. |
+| Real helper-selected browser smoke passes; actual cloud validation is distinguished from local simulation. | met | Round 1 independent external Chromium 149.0.7827.55 text probe; actual cloud image untested. |
+| pnpm test, docs tests, package, root/docs checks/build, scoped Trunk, and diff checks pass. | FAIL | Prior reproduced gates reused for assertion-only follow-up. Independent SEO five tests, Trunk/diff and snapshot commit root-check pass. Required combined docs unit command exits 1 on mirror-directory ENOENT. |
+| Each workflow filter includes shared helper; pinned installation remains unchanged. | met | Round 1 verified filters/install commands; unchanged. |
+| git diff -- package.json docs/package.json pnpm-lock.yaml is empty; no out-of-scope edits. | met | Only approved count/message change in round 2; dependency diff empty. Obsolete Vitest option removal accepted by operator amendment. |
+| README status and verification evidence updated. | met | BLOCKED on watcher race; this report and append-only log record evidence. |
 
-Local independent logs: `.temp/cloud-session-001/guard/`. Historical red evidence: `.temp/cloud-session-001/red.log`.
+Logs: `.temp/cloud-session-001/guard-round2/`; predecessor independent logs under `.temp/cloud-session-001/guard/`. This review reuses prior gates only as explicitly permitted for the count-only follow-up; it does not count alternative configuration probes as passing the required command.
 
 ## Spirit
 
-The implementation supplies a real optional installed Chromium path across all three consumers, retains pinned precedence and Firefox, and tests actual browser startup. It serves the cloud readiness goal. It cannot be declared complete while the required docs unit suite fails.
+The resolver serves optional installed-browser verification and preserves pinned CI. The combined browser/server unit workflow must also start reliably. Passing split projects or an ignored probe cannot satisfy the normal integrated command.
 
 ## Scope & conduct
 
-- Executor touched only nine allowed paths and left plans, dependencies and runtime code unchanged. Temporary fixture files rather than filesystem mocks are confined to independently created temp directories and do not alter browser caches.
-- The plan incorrectly assumed the existing browser environment setting could remain. An ignored probe restoring that setting reproduces Vitest 4.1.11 startup rejection; the executor removed it before obtaining an amendment, rather than stopping at the launch-only boundary.
-- The SEO assertion is a baseline defect: both dispatch base 768ece5e and snapshot contain 68 example detail pages, and the policy test did not change. Scope currently excludes existing assertions.
-- No execution-time amendment made. Operator asked to accept the setting removal and allow only the exact count change 67 to 68, retaining every title assertion. No answer received as of this report.
-- No PR opened. Plan 002 remains dependent on Plan 001 PASS.
+- Approved count correction exactly matches scope: message/assertion 67 → 68, all title assertions preserved. Snapshot b2e23dc4; plan amendment a97c05bd records explicit operator agreement.
+- No source edits by guard. Only ignored verification configs and guard artifacts written. No dependency, timeout, watcher or production config correction by executor in round 2.
+- Combined-run failure is independently reproduced, while focused SEO passes. Code inspection shows non-atomic mirror wiping versus watcher reads in installed docs-kit. Prior round 1 did not reproduce this error; no baseline-checkout claim is made.
+- Sonnet ran the failing full command three times and separately verified client/server, but those split results do not waive the contract gate. No additional source repair was attempted.
+- Plan 002 remains gated and no PR opened.
+
+## Proposed next move
+
+Operator asked to approve only omission of docMirrorsPlugin and llmsFullPlugin during Vitest mode, focused config coverage, and production build/output verification retaining both plugins for regular dev/build. The required combined suite and every assertion stay intact. No approval received yet; plan remains unchanged.
+
+An ignored copied config retained project self-extension and omitted these two generators: four files / 13 tests passed. An earlier imported-config probe also changed inheritance, so its success and the inheritance-only controls are diagnostic, not proof of a source fix. First copied probe failed module resolution; rerunning from ignored docs/node_modules/.cache resolved normal docs dependencies and passed.
 
 ## Residual risk / follow-ups
 
-- To reach PASS: obtain agreement to the narrow amendment, have Sonnet change the exact SEO count, snapshot its correction, then reproduce the failed docs unit gate and relevant checks. Do not waive it or broaden repairs silently.
-- External browser compatibility is demonstrated locally, not in a Claude cloud image. Arbitrary Chromium builds remain unsupported by Playwright guarantees; pinned CI remains authoritative.
-- Executor reported intermittent PostHog timeout and docs-kit watcher errors in earlier full runs. Neither reproduced in this independent full docs unit run; no timeout, assertion or watcher changes authorized.
-- Docs builds regenerate unrelated registry JSON content. Keep this churn out of implementation commits; cleanup is assigned to the executor.
+- To reach PASS: approved narrow repair through Sonnet, new snapshot, independent normal full docs units and targeted config checks, plus production build/output verification. No retries/tolerances may replace the failure.
+- External Chromium is locally proven, not a tested Claude cloud image.
+- Docs-kit watcher coordination may also need upstream work outside this batch; test-mode isolation would leave normal publishing behavior unchanged.
