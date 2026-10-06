@@ -1,4 +1,6 @@
 import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -166,5 +168,59 @@ describe('docs vite config plugin selection', () => {
                 }
             }
         ])
+    })
+})
+
+describe('docs vite config Chromium resolution', () => {
+    /**
+     * Imports the docs Vite config in a fresh Node process with no pinned
+     * Playwright browser and an invalid `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
+     *
+     * @param vitest - Value for `VITEST`, or `null` to leave it unset.
+     * @returns The child's combined output, or the thrown error's output.
+     */
+    const importWithInvalidChromium = (vitest: string | null): { ok: boolean; output: string } => {
+        const emptyBrowsers = mkdtempSync(join(tmpdir(), 'docs-no-browsers-'))
+        const env: NodeJS.ProcessEnv = { ...process.env }
+        for (const key of Object.keys(env)) {
+            if (key === 'VITEST' || key.startsWith('VITEST_')) delete env[key]
+        }
+        if (vitest !== null) env.VITEST = vitest
+        env.PLAYWRIGHT_BROWSERS_PATH = emptyBrowsers
+        env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH = '/nonexistent/chromium'
+
+        try {
+            const output = execFileSync(
+                process.execPath,
+                [
+                    '--import',
+                    'tsx',
+                    '--input-type=module',
+                    '-e',
+                    `await import(${JSON.stringify(docsConfigPath)}); console.log('LOADED')`
+                ],
+                { cwd: docsRoot, encoding: 'utf8', env, stdio: 'pipe' }
+            )
+            return { ok: true, output }
+        } catch (error) {
+            const { stdout = '', stderr = '' } = error as { stdout?: string; stderr?: string }
+            return { ok: false, output: `${stdout}${stderr}` }
+        } finally {
+            rmSync(emptyBrowsers, { recursive: true, force: true })
+        }
+    }
+
+    it('does not resolve Chromium outside Vitest, so dev and build ignore a bad override', () => {
+        const result = importWithInvalidChromium(null)
+
+        expect(result.output).toContain('LOADED')
+        expect(result.ok).toBe(true)
+    })
+
+    it('still rejects an invalid override under Vitest', () => {
+        const result = importWithInvalidChromium('true')
+
+        expect(result.ok).toBe(false)
+        expect(result.output).toContain('PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH is set to')
     })
 })

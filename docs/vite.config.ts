@@ -36,6 +36,11 @@ const compareSocialFeatures = [
 // do not reuse the svelte-markdown key here.
 const indexNowKey = 'f56cc8a9-a818-41b2-b47c-52f658061fbc'
 
+// Resolved only under Vitest (`VITEST === 'true'`): dev and build never launch
+// a browser, so an invalid `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` must not stop them.
+const chromiumLaunchOptions =
+    process.env.VITEST === 'true' ? resolveChromiumLaunchOptions(chromium.executablePath()) : {}
+
 export default defineConfig({
     plugins: [
         // Emits `src/lib/sitemap-manifest.json` (consumed by
@@ -211,7 +216,7 @@ export default defineConfig({
                     browser: {
                         enabled: true,
                         provider: playwright({
-                            launchOptions: resolveChromiumLaunchOptions(chromium.executablePath())
+                            launchOptions: chromiumLaunchOptions
                         }),
                         instances: [{ browser: 'chromium' }]
                     },
