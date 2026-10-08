@@ -526,9 +526,10 @@ const canElementScroll = (element: HTMLElement): boolean => {
 
 const captureScrollSnapshot = (element: HTMLElement): ScrollSnapshot[] => {
     const snapshots: ScrollSnapshot[] = []
+    const doc = element.ownerDocument
     let parent = element.parentElement
 
-    while (parent && parent !== document.body && parent !== document.documentElement) {
+    while (parent && parent !== doc.body && parent !== doc.documentElement) {
         if (canElementScroll(parent)) {
             snapshots.push({
                 element: parent,
@@ -540,7 +541,7 @@ const captureScrollSnapshot = (element: HTMLElement): ScrollSnapshot[] => {
         parent = parent.parentElement
     }
 
-    const scrollingElement = document.scrollingElement
+    const scrollingElement = doc.scrollingElement
     if (snapshots.length === 0 && isHTMLElement(scrollingElement)) {
         snapshots.push({
             element: scrollingElement,
@@ -1318,11 +1319,14 @@ export const createAnimatePresenceContext = (context: {
         // crossfading inside a fixed-size pill briefly balloon the pill.
         const isOutOfFlow = computed.position === 'absolute' || computed.position === 'fixed'
         let placeholder: HTMLElement | null = null
+        // The element's own document, not the global one, so exits work when
+        // rendering into another window or iframe (motion cc77f7878).
+        const doc = child.element.ownerDocument
         const insertionParent =
             (child.element.parentElement?.isConnected ? child.element.parentElement : null) ??
             (child.insertionParent?.isConnected ? child.insertionParent : null)
         if (shouldPreserveLayout && !isOutOfFlow && insertionParent) {
-            placeholder = document.createElement(child.element.tagName.toLowerCase())
+            placeholder = doc.createElement(child.element.tagName.toLowerCase())
             placeholder.setAttribute('data-presence-placeholder', 'true')
             placeholder.style.display = computed.display === 'contents' ? 'block' : computed.display
             placeholder.style.width = `${rect.width}px`
@@ -1403,18 +1407,18 @@ export const createAnimatePresenceContext = (context: {
         // before unregister runs, so fall back to the parent captured at
         // registration time instead of escaping to <body>, which would bypass
         // clipping parents.
-        const slotParent = insertionParent ?? document.body
+        const slotParent = insertionParent ?? doc.body
         let positioningParent = slotParent
 
         // Walk up to find a parent that has actual layout (not display: contents).
         // A `display: contents` element generates no box, so it can never be
         // the clone's containing block: whatever this walk finds is.
-        while (positioningParent && positioningParent !== document.body) {
+        while (positioningParent && positioningParent !== doc.body) {
             const parentDisplay = getComputedStyle(positioningParent).display
             if (parentDisplay !== 'contents') {
                 break
             }
-            positioningParent = positioningParent.parentElement ?? document.body
+            positioningParent = positioningParent.parentElement ?? doc.body
         }
 
         const popLayoutSnapshot =
