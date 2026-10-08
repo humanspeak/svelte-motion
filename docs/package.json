@@ -35,8 +35,8 @@
         "@lucide/svelte": "^1.33.0",
         "bits-ui": "^2.19.0",
         "flubber": "^0.4.2",
-        "posthog-js": "^1.418.9",
-        "posthog-node": "^5.49.3",
+        "posthog-js": "^1.438.1",
+        "posthog-node": "^5.55.0",
         "runed": "^0.37.1"
     },
     "devDependencies": {
