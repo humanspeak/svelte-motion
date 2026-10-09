@@ -383,6 +383,27 @@
             </ul>
         </div>
         <div>
+            <h2 class="mb-3 text-xl font-medium">animateLayout (vanilla layout)</h2>
+            <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-layout/toggle') + searchParams}
+                    >
+                        animateLayout Toggle (data-layout knobs, scope, async update)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-layout/shared') + searchParams}
+                    >
+                        animateLayout Shared Underline (data-layout-id handoff)
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div>
             <h2 class="mb-3 text-xl font-medium">Reorder</h2>
             <ul class="list-disc space-y-2 pl-5">
                 <li>

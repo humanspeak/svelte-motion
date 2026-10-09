@@ -44,7 +44,9 @@ export type AnimateViewBuilder = ViewTransitionBuilder
  * call sites.
  *
  * @param update Applies the state/DOM change producing the new view. May
- *     be async; the new snapshot is captured after it settles.
+ *     be async; the new snapshot is captured after a returned promise
+ *     settles. Any other return value is ignored, so
+ *     `() => (open = true)` works.
  * @param options Default transition options for every layer (a subject's
  *     own `.layout()`/`.enter()`/… options win), plus `interrupt`:
  *     `'wait'` (default) queues behind an in-flight transition,
@@ -69,7 +71,7 @@ export type AnimateViewBuilder = ViewTransitionBuilder
  * ```
  */
 export const animateView = (
-    update: () => void | Promise<void>,
+    update: () => unknown,
     options?: ViewTransitionOptions
 ): AnimateViewBuilder =>
     animateViewCore(() => {

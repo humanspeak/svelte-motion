@@ -13,6 +13,7 @@ on:
             - src/**
             - tests/**
             - e2e/**
+            - scripts/chromium-launch-options.ts
             - '!docs/**'
             - package.json
             - pnpm-lock.yaml

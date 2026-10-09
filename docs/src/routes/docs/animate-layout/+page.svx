@@ -1,0 +1,202 @@
+---
+title: animateLayout
+description: Animate layout changes on plain HTML elements with animateLayout — position, size, and shared-element handoffs via data-layout attributes, no motion components required
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte'
+  import AnimateLayoutExample from '$lib/examples/AnimateLayoutExample.svelte'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'animateLayout | Docs | Svelte Motion'
+      seo.description = 'Animate layout changes on plain HTML elements with animateLayout — data-layout position and size animations plus data-layout-id shared-element handoffs in Svelte.'
+      seo.ogTitle = 'animateLayout'
+      seo.ogTagline = 'Layout animations for plain elements, no motion components'
+      seo.ogFeatures = ['data-layout Attributes', 'Shared Elements', 'Spring Timing', 'Svelte State Flush']
+      seo.ogSlug = 'docs-animate-layout'
+  }
+</script>
+
+# animateLayout
+
+`animateLayout` animates layout changes on **plain HTML elements** — no `motion.*` component required. Tag an element with `data-layout`, make your change inside the update callback, and the element animates from its old position and size to its new one. Elements that share a `data-layout-id` hand off to each other, so an underline or highlight can travel between parents.
+
+```svelte
+<script lang="ts">
+    import { animateLayout } from '@humanspeak/svelte-motion'
+
+    let on = $state(false)
+
+    const toggle = () => {
+        animateLayout(
+            () => {
+                on = !on
+            },
+            { type: 'spring', bounce: 0.25 }
+        )
+    }
+</script>
+
+<button class="switch" class:on onclick={toggle}>
+    <span class="knob" data-layout></span>
+</button>
+```
+
+<Example isSmall>
+  <AnimateLayoutExample />
+</Example>
+
+## How it works
+
+`animateLayout(update, options?)` runs in three steps:
+
+1. **Measure** every tagged element (`[data-layout]` and `[data-layout-id]`) in the scope.
+2. **Run `update`**, which changes the DOM — toggling a class, reordering a list, mounting or removing elements.
+3. **Measure again** and animate each element from its old box to its new one with a transform, so the animation never triggers layout on each frame.
+
+Svelte `$state` mutations made inside `update` are flushed to the DOM synchronously (via `flushSync`) before the new layout is measured, so plain assignment just works — no `tick()` ceremony:
+
+```ts
+animateLayout(() => { items = shuffle(items) })
+```
+
+The second argument sets the transition for every animated element. It accepts the same options as `animate` — tweens, springs, and `visualDuration`:
+
+```ts
+animateLayout(
+    () => {
+        expanded = !expanded
+    },
+    { type: 'spring', visualDuration: 0.4, bounce: 0.2 }
+)
+```
+
+The returned builder is **thenable** — `await` it to get the running animation group once the layout animations have started:
+
+```ts
+const animation = await animateLayout(() => { open = true })
+await animation.finished
+```
+
+## Tagging elements
+
+Only elements that opt in with a `data-layout` or `data-layout-id` attribute are animated. The attribute value chooses what animates:
+
+| Attribute | Animates |
+|-----------|----------|
+| `data-layout` | Position and size |
+| `data-layout="position"` | Position only — the element snaps to its new size |
+| `data-layout="size"` | Size only — the element snaps to its new position |
+| `data-layout-id="name"` | Position and size, plus shared-element handoff between elements with the same id |
+
+`data-layout="true"` is treated the same as a bare `data-layout`. Nested tagged elements are scale-corrected against their tagged ancestor, so a child does not stretch while its parent animates size.
+
+## Limiting the scope
+
+By default every tagged element in the document is measured. Pass an element or selector first to limit the animation to tagged elements inside it (including the element itself):
+
+```ts
+animateLayout(list, () => { items = [newItem, ...items] }, { duration: 0.3 })
+```
+
+Scoping is worth doing on pages with several independent widgets — it keeps the measurement cheap, and an update in one widget never animates tagged elements elsewhere on the page.
+
+## Shared elements
+
+Elements with the same `data-layout-id` are treated as one element across the update. When one is removed and another is added in the same update, the new element animates from the old one's position and size. The classic case is a tab underline that only the selected tab renders:
+
+```svelte
+<script lang="ts">
+    import { animateLayout } from '@humanspeak/svelte-motion'
+
+    let selected = $state('home')
+
+    const select = (tab: string) => {
+        animateLayout(() => {
+            selected = tab
+        })
+    }
+</script>
+
+{#each tabs as tab (tab)}
+    <button onclick={() => select(tab)}>
+        {tab}
+        {#if selected === tab}
+            <div class="underline" data-layout-id="underline"></div>
+        {/if}
+    </button>
+{/each}
+```
+
+### Per-element transitions with `.shared()`
+
+Chain `.shared(layoutId, transition)` to give one shared element its own transition. Every other element keeps the default from the options argument:
+
+```ts
+animateLayout(() => { selected = tab }, { duration: 0.25 })
+    .shared('underline', { type: 'spring', visualDuration: 0.45, bounce: 0.35 })
+```
+
+## Async updates
+
+`update` may return a promise. The new layout is measured after the promise settles, so you can wait for data before changing the DOM:
+
+```ts
+animateLayout(async () => {
+    const next = await fetchItems()
+    items = next
+})
+```
+
+The Svelte flush runs after the promise resolves, so state assigned after an `await` still lands in the DOM before measurement. If `update` throws or rejects, the awaited builder rejects with the same error.
+
+## Batching
+
+`animateLayout` calls made in the same tick are batched into a single commit: every tagged element across all of the calls is measured before **any** update runs, then all of the updates run, then everything is measured again. Two widgets that update at the same moment animate together instead of one measuring the other mid-change.
+
+```ts
+// One commit: both lists are measured before either update runs.
+animateLayout(inbox, () => { inboxItems = inboxItems.slice(1) })
+animateLayout(archive, () => { archiveItems = [moved, ...archiveItems] })
+```
+
+Starting a new call while elements are still animating interrupts the running animation and continues from the element's current visual position, so rapid clicks never jump back first.
+
+## animateLayout or the `layout` prop?
+
+`animateLayout` and the [`layout` prop](/docs/layout-animations) on motion components are built on the same projection engine. Choose by how the element is rendered:
+
+- **Use the `layout` prop** when the element is already a `motion.*` component. Layout changes are detected automatically on every render, and you get `layoutId`, `LayoutGroup`, `layoutDependency`, `onLayoutAnimationComplete`, and border-radius correction.
+- **Use `animateLayout`** for plain elements, markup you do not control (rendered by a third-party component, `{@html}`, or a CMS), or when you want to animate only specific changes — the animation runs only when you call it, never on unrelated re-renders.
+
+Plain elements have no tracked `border-radius`, so a rounded element that changes size will stretch its corners mid-animation. Keep size-animating plain elements square-cornered, or use a motion component with the `layout` prop.
+
+## API
+
+```ts
+animateLayout(update, options?)
+animateLayout(scope, update, options?)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `scope` | `Element \| string` | Optional element or selector; only tagged elements inside it animate |
+| `update` | `() => void \| Promise<void>` | Makes the DOM change; Svelte state is flushed after it returns or resolves |
+| `options` | `AnimationOptions` | Default transition for every animated element |
+
+| Builder method | Description |
+|----------------|-------------|
+| `.shared(layoutId, transition)` | Override the transition for elements with this `data-layout-id` |
+| `await builder` | Resolves with a `GroupAnimation` of the running layout animations |
+
+## Related
+
+- [Layout Animations](/docs/layout-animations) — the `layout` prop on motion components
+- [View Transitions](/docs/view) — snapshot-based transitions with the browser View Transitions API
+- [Reorder](/docs/reorder) — drag-to-reorder lists
+
+---
+
+Based on [Motion's animateLayout](https://github.com/motiondivision/motion/blob/v14.1.0/packages/motion-dom/src/layout/animate-layout.ts) API (added in Motion 14.1).

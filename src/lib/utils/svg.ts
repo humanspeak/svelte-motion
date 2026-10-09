@@ -1,9 +1,18 @@
 import { camelCaseAttributes, camelToDash, isMotionValue, type MotionValue } from 'motion-dom'
 
-/** SVG values Motion 13 renders through CSS instead of presentation attributes. */
+/**
+ * SVG values Motion renders through CSS instead of presentation attributes.
+ *
+ * Mirrors motion-dom's unexported `cssStyleProperties` (`build-attrs.ts`). It
+ * must include every value WAAPI can accelerate: WAAPI writes its final value
+ * to style, which would otherwise override later attribute writes. `clipPath`
+ * and `filter` joined in motion `49452fafb` (#3790).
+ */
 export const SVG_CSS_STYLE_PROPERTIES = new Set([
     'transform',
     'opacity',
+    'clipPath',
+    'filter',
     'offsetDistance',
     'offsetPath',
     'offsetRotate',

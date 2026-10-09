@@ -1009,6 +1009,27 @@ describe('exit placeholder slot preservation', () => {
         expect(wrapper.firstElementChild).toBe(clone)
     })
 
+    it("falls back to the element's own document body, not the global one", () => {
+        // Rendering into another window or iframe (e.g. via window.open()):
+        // once the slot parent is gone too, the clone must land in the
+        // element's own document, as upstream's PopChild does (motion cc77f7878).
+        const iframe = document.createElement('iframe')
+        document.body.appendChild(iframe)
+        const doc = iframe.contentDocument!
+        const host = doc.createElement('div')
+        const card = doc.createElement('div')
+        host.appendChild(card)
+        doc.body.appendChild(host)
+
+        const ctx = createAnimatePresenceContext({ mode: 'popLayout' })
+        ctx.registerChild('card', card, { opacity: 0 })
+        host.remove()
+        ctx.unregisterChild('card')
+
+        expect(doc.body.querySelector('[data-clone="true"]')).toBeTruthy()
+        expect(document.querySelector('[data-clone="true"]')).toBeNull()
+    })
+
     it('positions the exit clone at the current slot, not the stale registration rect', () => {
         // B registers while sitting in column 2…
         vi.spyOn(cardB, 'getBoundingClientRect').mockReturnValue(makeRect(200))

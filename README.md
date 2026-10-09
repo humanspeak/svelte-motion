@@ -33,6 +33,8 @@ npm install @humanspeak/svelte-motion
 </motion.button>
 ```
 
+Contributing to this repository? See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and verification.
+
 ## Framer Motion API Parity
 
 Goal: Framer Motion API parity for Svelte where common React examples can be translated with minimal changes.

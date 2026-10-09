@@ -42,26 +42,26 @@
     "compare_validation": {
         "_open_nits": [],
         "framer-motion": {
-            "note": "Tier 1 clean. Tier 2 ran 13.4.3->13.4.6: bug fixes/size cuts only (scroll, AnimatePresence, layout, Reorder) -- no them: row flipped.",
-            "validated_against_version": "13.4.6"
+            "note": "Tier 1 clean. Tier 2 ran 13.4.6->14.0.0: internal API removal, fixes, size cuts, negative spring bounce -- no them: row flipped.",
+            "validated_against_version": "14.0.0"
         },
         "gsap": {
-            "note": "No version movement since 3.15.0; Tier 1 clean (re-checked 2026-10-01).",
+            "note": "No version movement since 3.15.0; Tier 1 clean (re-checked 2026-10-06).",
             "validated_against_version": "3.15.0"
         },
         "motion": {
-            "note": "Tier 1 clean. Tier 2 ran 13.4.3->13.4.6: bug fixes/size cuts only (scroll, AnimatePresence, layout, Reorder) -- no them: row flipped.",
-            "validated_against_version": "13.4.6"
+            "note": "Tier 1 clean. Tier 2 ran 13.4.6->14.0.0: internal API removal, fixes, size cuts, negative spring bounce -- no them: row flipped.",
+            "validated_against_version": "14.0.0"
         }
     },
-    "last_run": "2026-10-01",
+    "last_run": "2026-10-06",
     "notes": {
-        "competitive": "Fifth consecutive run with zero competitor version bumps. motion-sv quiet since 2026-07-07 at 0.1.13.",
-        "downloads": "Clean npm data this run: self 19935/wk includes a 14942 one-day spike (~5k organic); motion-sv 22232; namesake 10254. Prior run figures were depressed by npm zero-days.",
+        "competitive": "Sixth consecutive run with zero competitor version bumps. motion-sv quiet since 2026-07-07 at 0.1.13.",
+        "downloads": "Self 6288/wk via downloads API (prior 19935 incl. ~15k spike); npm search reports 21890. motion-sv 13872 (-38%); namesake 10738.",
         "gaps": "Only MotionConfig features / isValidProp remains (upstream-only, low urgency).",
-        "seo": "SEO not enabled in config; legacy rank_tracker block dropped (Ahrefs retired).",
-        "triage": "Inbox clear; #482 closed.",
-        "upstream": "13.4.3 -> 13.4.6 on npm; 13.4.7 in CHANGELOG."
+        "seo": "SEO not enabled in config.",
+        "triage": "#492 (external issue) open, maintainer replied twice, awaiting reporter.",
+        "upstream": "13.4.6 -> 14.0.0 on npm; self v2.0.0 aligns with 14.0.0 (#497)."
     },
     "open_gaps": [
         {
@@ -111,9 +111,9 @@
                     }
                 ],
                 "repo": "hanielu/motion-svelte",
-                "stars": 164,
+                "stars": 163,
                 "svelte_peer": "^5.0.0",
-                "weekly_downloads": 22232
+                "weekly_downloads": 13872
             },
             {
                 "archived": false,
@@ -131,7 +131,7 @@
                 "repo": "micha-lmxt/svelte-motion",
                 "stars": 662,
                 "svelte_peer": ">=3.35.0 || ^4.0.0 || ^5.0.0 || ^5.0.0-next.0",
-                "weekly_downloads": 10254
+                "weekly_downloads": 10738
             },
             {
                 "archived": false,
@@ -145,26 +145,47 @@
                 "pushed_at": "2026-04-13",
                 "recent_releases": [],
                 "repo": "greensock/GSAP",
-                "stars": 28743,
+                "stars": 28830,
                 "svelte_peer": null,
-                "weekly_downloads": 6395708
+                "weekly_downloads": 7084295
             }
         ],
-        "fetched_at": "2026-10-01T05:00:53Z",
+        "fetched_at": "2026-10-06T05:00:51Z",
         "project": "@humanspeak/svelte-motion",
         "self": {
             "archived": false,
             "error": null,
             "first_publish": "2025-02-21",
-            "last_publish": "2026-09-30",
-            "last_release": "2026-09-30",
-            "latest_version": "1.4.6",
+            "last_publish": "2026-10-03",
+            "last_release": "2026-10-03",
+            "latest_version": "2.0.0",
             "npm": "@humanspeak/svelte-motion",
             "peer_deps": {
                 "svelte": "^5.0.0"
             },
-            "pushed_at": "2026-09-30",
+            "pushed_at": "2026-10-03",
             "recent_releases": [
+                {
+                    "date": "2026-10-03",
+                    "notes": "Changes in this Release\nfeat!: align with Motion 14.0.0 (release 2.0.0)\n\nFor more details, see the [Pull Request](https://github.com/humanspeak/svelte-motion/pull/497)",
+                    "notes_truncated": false,
+                    "url": "https://github.com/humanspeak/svelte-motion/releases/tag/v2.0.0",
+                    "version": "v2.0.0"
+                },
+                {
+                    "date": "2026-10-02",
+                    "notes": "Changes in this Release\nfeat: align with Motion 13.5.1 and honour inherit={false}\n\nFor more details, see the [Pull Request](https://github.com/humanspeak/svelte-motion/pull/495)",
+                    "notes_truncated": false,
+                    "url": "https://github.com/humanspeak/svelte-motion/releases/tag/v1.5.1",
+                    "version": "v1.5.1"
+                },
+                {
+                    "date": "2026-10-01",
+                    "notes": "Changes in this Release\nfeat: align with Motion 13.5.0 and accelerate scroll-linked values\n\nFor more details, see the [Pull Request](https://github.com/humanspeak/svelte-motion/pull/491)",
+                    "notes_truncated": false,
+                    "url": "https://github.com/humanspeak/svelte-motion/releases/tag/v1.4.7",
+                    "version": "v1.4.7"
+                },
                 {
                     "date": "2026-09-30",
                     "notes": "Changes in this Release",
@@ -248,61 +269,40 @@
                     "notes_truncated": false,
                     "url": "https://github.com/humanspeak/svelte-motion/releases/tag/v0.8.2",
                     "version": "v0.8.2"
-                },
-                {
-                    "date": "2026-07-25",
-                    "notes": "Changes in this Release\nfeat(core): adopt motion-dom VisualElement + createAnimationState as the animation core\n\nFor more details, see the [Pull Request](https://github.com/humanspeak/svelte-motion/pull/454)",
-                    "notes_truncated": false,
-                    "url": "https://github.com/humanspeak/svelte-motion/releases/tag/v0.8.1",
-                    "version": "v0.8.1"
-                },
-                {
-                    "date": "2026-07-23",
-                    "notes": "Changes in this Release\nfeat(gesture): upstream parity \u2014 velocity continuity, first-start idle, wildcard keyframes\n\nFor more details, see the [Pull Request](https://github.com/humanspeak/svelte-motion/pull/453)",
-                    "notes_truncated": false,
-                    "url": "https://github.com/humanspeak/svelte-motion/releases/tag/v0.8.0",
-                    "version": "v0.8.0"
-                },
-                {
-                    "date": "2026-07-23",
-                    "notes": "Changes in this Release\nfeat(docs): brutalist v2 examples, pager, and surfaced library fixes\n\nFor more details, see the [Pull Request](https://github.com/humanspeak/svelte-motion/pull/450)",
-                    "notes_truncated": false,
-                    "url": "https://github.com/humanspeak/svelte-motion/releases/tag/v0.7.21",
-                    "version": "v0.7.21"
                 }
             ],
             "repo": "humanspeak/svelte-motion",
             "stars": 102,
             "svelte_peer": "^5.0.0",
-            "weekly_downloads": 19935
+            "weekly_downloads": 6288
         },
         "upstream": [
             {
                 "archived": false,
                 "error": null,
                 "first_publish": "2013-12-26",
-                "last_publish": "2026-09-29",
+                "last_publish": "2026-10-02",
                 "last_release": null,
-                "latest_version": "13.4.6",
+                "latest_version": "14.0.0",
                 "npm": "motion",
                 "peer_deps": {
                     "react": "^18.0.0 || ^19.0.0",
                     "react-dom": "^18.0.0 || ^19.0.0"
                 },
-                "pushed_at": "2026-10-01",
+                "pushed_at": "2026-10-06",
                 "recent_releases": [],
                 "repo": "motiondivision/motion",
-                "stars": 33785,
+                "stars": 33840,
                 "svelte_peer": null,
-                "weekly_downloads": 26832526
+                "weekly_downloads": 28260335
             },
             {
                 "archived": null,
                 "error": null,
                 "first_publish": "2019-01-14",
-                "last_publish": "2026-09-29",
+                "last_publish": "2026-10-02",
                 "last_release": null,
-                "latest_version": "13.4.6",
+                "latest_version": "14.0.0",
                 "npm": "framer-motion",
                 "peer_deps": {
                     "react": "^18.0.0 || ^19.0.0",
@@ -313,7 +313,7 @@
                 "repo": null,
                 "stars": null,
                 "svelte_peer": null,
-                "weekly_downloads": 55947950
+                "weekly_downloads": 58492608
             }
         ],
         "watchlist": [
@@ -333,7 +333,7 @@
                 "repo": "animotionjs/motion",
                 "stars": 59,
                 "svelte_peer": "^5.0.0",
-                "weekly_downloads": 619
+                "weekly_downloads": 492
             },
             {
                 "archived": false,
@@ -352,7 +352,7 @@
                 "repo": "epavanello/motion-svelte",
                 "stars": 25,
                 "svelte_peer": "^5.0.0",
-                "weekly_downloads": 60
+                "weekly_downloads": 29
             },
             {
                 "archived": false,
@@ -368,9 +368,9 @@
                 "pushed_at": "2026-08-10",
                 "recent_releases": [],
                 "repo": "PuruVJ/neodrag",
-                "stars": 2452,
+                "stars": 2451,
                 "svelte_peer": "^3.0.0 || ^4.0.0 || ^5.0.0",
-                "weekly_downloads": 13013
+                "weekly_downloads": 15282
             },
             {
                 "archived": false,
@@ -386,7 +386,7 @@
                 "repo": "Rezi/svelte-gestures",
                 "stars": 183,
                 "svelte_peer": null,
-                "weekly_downloads": 51337
+                "weekly_downloads": 51730
             },
             {
                 "archived": false,
@@ -402,25 +402,25 @@
                 "pushed_at": "2024-10-01",
                 "recent_releases": [],
                 "repo": "svelte-inview/svelte-inview",
-                "stars": 776,
+                "stars": 774,
                 "svelte_peer": "^3.0.0 || ^4.0.0 || ^5.0.0 || ^5.0.0-next",
-                "weekly_downloads": 19282
+                "weekly_downloads": 18592
             }
         ]
     },
     "tickets": {
         "known": {},
-        "last_checked": "2026-10-01"
+        "last_checked": "2026-10-06"
     },
     "upstream_status": {
         "framer-motion": {
             "api_parity_anchor": true,
-            "latest": "13.4.6"
+            "latest": "14.0.0"
         },
         "motion": {
-            "consumed": "motion ^13.4.6, motion-dom ^13.4.5 (package.json)",
-            "latest": "13.4.6 (npm); 13.4.7 in CHANGELOG 2026-09-30",
-            "note": "13.4.4 ported in v1.4.4 (#484); 13.4.5 ported (#487). Open: verify 13.4.6 AnimatePresence wait-mode dropped-children fix; 13.4.7 (useScroll ViewTimeline offsets, useTransform accelerated clamp) in progress on chore/upstream-delta-2026-09-30."
+            "consumed": "self v2.0.0 aligned with Motion 14.0.0 (#497)",
+            "latest": "14.0.0 (npm, 2026-10-02)",
+            "note": "Verify negative spring bounce (13.5.0) passes through spring/useSpring types; 13.4.6 AnimatePresence wait-mode fix verification still open; local branch feat/motion-14.0.1-parity suggests 14.0.1 in progress."
         }
     },
     "watchlist_candidates": [

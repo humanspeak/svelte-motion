@@ -8,6 +8,10 @@
 - **Homepage**: <https://motion.svelte.page>
 - **Repository**: <https://github.com/humanspeak/svelte-motion>
 
+## Fresh-session setup
+
+For a fresh checkout or cloud session, follow [CONTRIBUTING.md](CONTRIBUTING.md): Node 24 and pnpm 12.6.0, the frozen install, Playwright browsers (with the Chromium fallback), Trunk (the pre-commit hook warns and skips formatting and lint when it is missing), and the verification order. Shared fetch permissions live in `.claude/settings.json`; do not copy personal settings into a clone.
+
 ## Notes
 
 - When giving the user a shortlist of possible next features, include an online/live example for each option and call out the specific "WOW" behavior we would be trying to recreate.

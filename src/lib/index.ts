@@ -134,6 +134,8 @@ export type {
 } from '$lib/types'
 export { useAnimate } from '$lib/utils/animate.svelte'
 export type { AnimationScope } from '$lib/utils/animate.svelte'
+export { animateLayout } from '$lib/utils/animateLayout'
+export type { AnimateLayoutBuilder, LayoutUpdate } from '$lib/utils/animateLayout'
 export { animateView } from '$lib/utils/animateView'
 export type {
     AnimateViewBuilder,

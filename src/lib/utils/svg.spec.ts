@@ -352,11 +352,13 @@ describe('computeSSRSVGAttrValues', () => {
         })
     })
 
-    it('should leave Motion 13 CSS channels out of the attribute spread', () => {
+    it('should leave Motion CSS channels out of the attribute spread', () => {
         expect(
             computeSSRSVGAttrValues({
                 opacity: motionValue(0.5),
                 transform: motionValue('translateX(10px)'),
+                clipPath: motionValue('inset(10%)'),
+                filter: motionValue('blur(2px)'),
                 fill: motionValue('red')
             })
         ).toEqual({ fill: 'red' })
@@ -451,18 +453,22 @@ describe('computeSSRSVGAttrValues', () => {
 })
 
 describe('computeSSRSVGStyleValues', () => {
-    it('should seed the Motion 13 SVG CSS channels and exclude paint attributes', () => {
+    it('should seed the Motion SVG CSS channels and exclude paint attributes', () => {
         expect(
             computeSSRSVGStyleValues({
                 opacity: motionValue(0.5),
                 transform: motionValue('translateX(10px)'),
                 offsetDistance: motionValue('25%'),
+                clipPath: motionValue('inset(10%)'),
+                filter: motionValue('blur(2px)'),
                 fill: motionValue('red')
             })
         ).toEqual({
             opacity: 0.5,
             transform: 'translateX(10px)',
-            offsetDistance: '25%'
+            offsetDistance: '25%',
+            clipPath: 'inset(10%)',
+            filter: 'blur(2px)'
         })
     })
 })

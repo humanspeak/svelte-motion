@@ -14,8 +14,10 @@ import tailwindcss from '@tailwindcss/vite'
 // import path from 'node:path'
 // import { fileURLToPath } from 'node:url'
 import { playwright } from '@vitest/browser-playwright'
+import { chromium } from 'playwright'
 import devtoolsJson from 'vite-plugin-devtools-json'
 import { defineConfig } from 'vitest/config'
+import { resolveChromiumLaunchOptions } from '../scripts/chromium-launch-options'
 import { competitors, ours } from './src/lib/compare-data'
 import { docsConfig } from './src/lib/docs-config'
 
@@ -33,6 +35,11 @@ const compareSocialFeatures = [
 // we own the host before accepting URL-change submissions. Unique per domain —
 // do not reuse the svelte-markdown key here.
 const indexNowKey = 'f56cc8a9-a818-41b2-b47c-52f658061fbc'
+
+// Resolved only under Vitest (`VITEST === 'true'`): dev and build never launch
+// a browser, so an invalid `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` must not stop them.
+const chromiumLaunchOptions =
+    process.env.VITEST === 'true' ? resolveChromiumLaunchOptions(chromium.executablePath()) : {}
 
 export default defineConfig({
     plugins: [
@@ -70,7 +77,12 @@ export default defineConfig({
         // runs on `buildStart` and rewatches via Vite's own file watcher.
         // `siteUrl` controls the `<!-- Source: ... -->` header in each
         // mirror, which is the citation surface for ChatGPT / Perplexity.
-        docMirrorsPlugin({ siteUrl: docsConfig.url }),
+        //
+        // Skipped under Vitest (`VITEST === 'true'`, set before Vite starts):
+        // it wipes and rebuilds `static/docs` while `llmsFullPlugin` and the
+        // docs unit specs read from it, which races in the combined unit run.
+        // Normal dev and build runs still register it.
+        process.env.VITEST !== 'true' && docMirrorsPlugin({ siteUrl: docsConfig.url }),
         // Scans `src/routes/examples/**/+page.svelte` plus the matching
         // `src/lib/examples/<slug>/demos/*.svelte` files, then emits
         // `static/examples.md` (the index) and `static/examples/<slug>.md`
@@ -101,11 +113,15 @@ export default defineConfig({
             prepend: 'llms-positioning.md',
             comparisons: { ours, competitors }
         }),
-        llmsFullPlugin({
-            siteUrl: docsConfig.url,
-            pkgName: docsConfig.name,
-            prepend: 'llms-positioning.md'
-        }),
+        //
+        // Also skipped under Vitest: it reads `static/docs` after listing it
+        // and would race with the mirror writer's rebuild.
+        process.env.VITEST !== 'true' &&
+            llmsFullPlugin({
+                siteUrl: docsConfig.url,
+                pkgName: docsConfig.name,
+                prepend: 'llms-positioning.md'
+            }),
         // Renders `static/og-default.png` + per-page social cards from
         // docs-kit's satori templates. The compare index and competitor pages
         // get their SEO state from docs-kit components, so static route-file
@@ -197,10 +213,11 @@ export default defineConfig({
                 extends: './vite.config.ts',
                 test: {
                     name: 'client',
-                    environment: 'browser',
                     browser: {
                         enabled: true,
-                        provider: playwright(),
+                        provider: playwright({
+                            launchOptions: chromiumLaunchOptions
+                        }),
                         instances: [{ browser: 'chromium' }]
                     },
                     include: ['src/**/*.svelte.{test,spec}.{js,ts}'],

@@ -11,6 +11,7 @@ on:
         paths:
             - docs/**
             - src/**
+            - scripts/chromium-launch-options.ts
             - package.json
             - pnpm-lock.yaml
             - pnpm-workspace.yaml

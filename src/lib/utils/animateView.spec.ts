@@ -36,6 +36,15 @@ describe('animateView', () => {
         ).rejects.toThrow('boom')
     })
 
+    it('accepts a concise assignment update', async () => {
+        // `() => (open = true)` returns the assigned value, the natural
+        // Svelte form. Compile-checked by `pnpm check`: a `void | Promise<void>`
+        // update type rejects it.
+        let open = false
+        await animateView(() => (open = true))
+        expect(open).toBe(true)
+    })
+
     it('returns the chainable builder', async () => {
         const el = document.createElement('div')
         document.body.appendChild(el)
