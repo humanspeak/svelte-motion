@@ -31,6 +31,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'Production-style archive and delete wait button microinteractions built with Svelte Motion.'
     },
+    'animate-layout': {
+        title: 'animateLayout',
+        description:
+            'Layout animations on plain elements with animateLayout — a switch knob, a shared tab underline, and a shuffled grid, no motion components.'
+    },
     'animate-presence': {
         title: 'AnimatePresence',
         description: 'Interactive AnimatePresence animation example using Svelte Motion.'
