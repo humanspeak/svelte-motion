@@ -42,26 +42,26 @@
     "compare_validation": {
         "_open_nits": [],
         "framer-motion": {
-            "note": "Tier 1 clean. Tier 2 ran 13.4.6->14.0.0: internal API removal, fixes, size cuts, negative spring bounce -- no them: row flipped.",
-            "validated_against_version": "14.0.0"
+            "note": "Tier 2 ran 14.0.0->14.1.0: layout rows already them:true; fixes only -- no row flipped.",
+            "validated_against_version": "14.1.0"
         },
         "gsap": {
-            "note": "No version movement since 3.15.0; Tier 1 clean (re-checked 2026-10-06).",
+            "note": "No version movement since 3.15.0; Tier 1 clean (re-checked 2026-10-12).",
             "validated_against_version": "3.15.0"
         },
         "motion": {
-            "note": "Tier 1 clean. Tier 2 ran 13.4.6->14.0.0: internal API removal, fixes, size cuts, negative spring bounce -- no them: row flipped.",
-            "validated_against_version": "14.0.0"
+            "note": "Tier 2 ran 14.0.0->14.1.0: animateLayout (FLIP + data-layout-id shared) flips 'FLIP layout' + 'Shared layoutId' them:false rows and consThem line -- ticketed HUM-149.",
+            "validated_against_version": "14.1.0"
         }
     },
-    "last_run": "2026-10-06",
+    "last_run": "2026-10-12",
     "notes": {
-        "competitive": "Sixth consecutive run with zero competitor version bumps. motion-sv quiet since 2026-07-07 at 0.1.13.",
-        "downloads": "Self 6288/wk via downloads API (prior 19935 incl. ~15k spike); npm search reports 21890. motion-sv 13872 (-38%); namesake 10738.",
+        "competitive": "Seventh consecutive run with zero competitor version bumps. motion-sv quiet since 2026-07-07 at 0.1.13.",
+        "downloads": "Self 7370/wk (+17%); motion-sv 14568 (+5%); namesake 9191 (-14%).",
         "gaps": "Only MotionConfig features / isValidProp remains (upstream-only, low urgency).",
         "seo": "SEO not enabled in config.",
-        "triage": "#492 (external issue) open, maintainer replied twice, awaiting reporter.",
-        "upstream": "13.4.6 -> 14.0.0 on npm; self v2.0.0 aligns with 14.0.0 (#497)."
+        "triage": "Inbox clear; #492 open awaiting reporter.",
+        "upstream": "14.0.0 -> 14.1.0 (animateLayout). Self PR #501 merged to main 2026-10-09; npm still 2.0.0, release not cut."
     },
     "open_gaps": [
         {
@@ -90,14 +90,14 @@
                 "recent_releases": [
                     {
                         "date": "2026-07-07",
-                        "notes": "This release rebases motion-sv on the **motion-vue v2 architecture (motion-v 2.3)**, catching it up with upstream. Mostly an internal rewrite, but two things matter for you:\n\n### Build fix\n\nIf you were on a recent Vite (or anything pulling `motion-dom` \u2265 12.41), your build probably died with `\"activeAnimations\" is not exported by motion-dom`. No need for [#16](https://github.com/hanielu/motion-svelte/issues/16).\n\n### New\n\n- **`arc()` path animations** \u2014 curved motion paths ([docs](https://motion.dev/docs/arc)).\n- **`MotionConfig skipAnimations`** \u2014 kill all animations globally (reduced-motion,",
+                        "notes": "This release rebases motion-sv on the **motion-vue v2 architecture (motion-v 2.3)**, catching it up with upstream. Mostly an internal rewrite, but two things matter for you:\n\n### Build fix\n\nIf you were on a recent Vite (or anything pulling `motion-dom` ≥ 12.41), your build probably died with `\"activeAnimations\" is not exported by motion-dom`. No need for [#16](https://github.com/hanielu/motion-svelte/issues/16).\n\n### New\n\n- **`arc()` path animations** — curved motion paths ([docs](https://motion.dev/docs/arc)).\n- **`MotionConfig skipAnimations`** — kill all animations globally (reduced-motion,",
                         "notes_truncated": true,
                         "url": "https://github.com/hanielu/motion-svelte/releases/tag/motion-sv%400.1.13",
                         "version": "motion-sv@0.1.13"
                     },
                     {
                         "date": "2026-04-06",
-                        "notes": "### Improvements\n\n- **Narrowed `useSpring` type signature** \u2014 Source parameter changed from `T | MotionValue<T>` (generic) to `MotionValue<string> | MotionValue<number> | number`, which more accurately reflects the supported input types.\n\n### Breaking Changes\n\n- `useSpring` no longer accepts `string` as a standalone source value (only `number` or a `MotionValue`). If you were passing a raw string, wrap it in a `motionValue()` first.",
+                        "notes": "### Improvements\n\n- **Narrowed `useSpring` type signature** — Source parameter changed from `T | MotionValue<T>` (generic) to `MotionValue<string> | MotionValue<number> | number`, which more accurately reflects the supported input types.\n\n### Breaking Changes\n\n- `useSpring` no longer accepts `string` as a standalone source value (only `number` or a `MotionValue`). If you were passing a raw string, wrap it in a `motionValue()` first.",
                         "notes_truncated": false,
                         "url": "https://github.com/hanielu/motion-svelte/releases/tag/motion-sv%400.1.12",
                         "version": "motion-sv@0.1.12"
@@ -113,7 +113,7 @@
                 "repo": "hanielu/motion-svelte",
                 "stars": 163,
                 "svelte_peer": "^5.0.0",
-                "weekly_downloads": 13872
+                "weekly_downloads": 14568
             },
             {
                 "archived": false,
@@ -131,7 +131,7 @@
                 "repo": "micha-lmxt/svelte-motion",
                 "stars": 662,
                 "svelte_peer": ">=3.35.0 || ^4.0.0 || ^5.0.0 || ^5.0.0-next.0",
-                "weekly_downloads": 10738
+                "weekly_downloads": 9191
             },
             {
                 "archived": false,
@@ -145,12 +145,12 @@
                 "pushed_at": "2026-04-13",
                 "recent_releases": [],
                 "repo": "greensock/GSAP",
-                "stars": 28830,
+                "stars": 29085,
                 "svelte_peer": null,
-                "weekly_downloads": 7084295
+                "weekly_downloads": 5917768
             }
         ],
-        "fetched_at": "2026-10-06T05:00:51Z",
+        "fetched_at": "2026-10-12T05:00:31Z",
         "project": "@humanspeak/svelte-motion",
         "self": {
             "archived": false,
@@ -163,7 +163,7 @@
             "peer_deps": {
                 "svelte": "^5.0.0"
             },
-            "pushed_at": "2026-10-03",
+            "pushed_at": "2026-10-09",
             "recent_releases": [
                 {
                     "date": "2026-10-03",
@@ -274,35 +274,35 @@
             "repo": "humanspeak/svelte-motion",
             "stars": 102,
             "svelte_peer": "^5.0.0",
-            "weekly_downloads": 6288
+            "weekly_downloads": 7370
         },
         "upstream": [
             {
                 "archived": false,
                 "error": null,
                 "first_publish": "2013-12-26",
-                "last_publish": "2026-10-02",
+                "last_publish": "2026-10-09",
                 "last_release": null,
-                "latest_version": "14.0.0",
+                "latest_version": "14.1.0",
                 "npm": "motion",
                 "peer_deps": {
                     "react": "^18.0.0 || ^19.0.0",
                     "react-dom": "^18.0.0 || ^19.0.0"
                 },
-                "pushed_at": "2026-10-06",
+                "pushed_at": "2026-10-09",
                 "recent_releases": [],
                 "repo": "motiondivision/motion",
-                "stars": 33840,
+                "stars": 33996,
                 "svelte_peer": null,
-                "weekly_downloads": 28260335
+                "weekly_downloads": 24988183
             },
             {
                 "archived": null,
                 "error": null,
                 "first_publish": "2019-01-14",
-                "last_publish": "2026-10-02",
+                "last_publish": "2026-10-09",
                 "last_release": null,
-                "latest_version": "14.0.0",
+                "latest_version": "14.1.0",
                 "npm": "framer-motion",
                 "peer_deps": {
                     "react": "^18.0.0 || ^19.0.0",
@@ -313,7 +313,7 @@
                 "repo": null,
                 "stars": null,
                 "svelte_peer": null,
-                "weekly_downloads": 58492608
+                "weekly_downloads": 50936387
             }
         ],
         "watchlist": [
@@ -333,7 +333,7 @@
                 "repo": "animotionjs/motion",
                 "stars": 59,
                 "svelte_peer": "^5.0.0",
-                "weekly_downloads": 492
+                "weekly_downloads": 385
             },
             {
                 "archived": false,
@@ -352,7 +352,7 @@
                 "repo": "epavanello/motion-svelte",
                 "stars": 25,
                 "svelte_peer": "^5.0.0",
-                "weekly_downloads": 29
+                "weekly_downloads": 230
             },
             {
                 "archived": false,
@@ -368,9 +368,9 @@
                 "pushed_at": "2026-08-10",
                 "recent_releases": [],
                 "repo": "PuruVJ/neodrag",
-                "stars": 2451,
+                "stars": 2453,
                 "svelte_peer": "^3.0.0 || ^4.0.0 || ^5.0.0",
-                "weekly_downloads": 15282
+                "weekly_downloads": 9803
             },
             {
                 "archived": false,
@@ -386,7 +386,7 @@
                 "repo": "Rezi/svelte-gestures",
                 "stars": 183,
                 "svelte_peer": null,
-                "weekly_downloads": 51730
+                "weekly_downloads": 40264
             },
             {
                 "archived": false,
@@ -402,25 +402,30 @@
                 "pushed_at": "2024-10-01",
                 "recent_releases": [],
                 "repo": "svelte-inview/svelte-inview",
-                "stars": 774,
+                "stars": 773,
                 "svelte_peer": "^3.0.0 || ^4.0.0 || ^5.0.0 || ^5.0.0-next",
-                "weekly_downloads": 18592
+                "weekly_downloads": 16855
             }
         ]
     },
     "tickets": {
-        "known": {},
-        "last_checked": "2026-10-06"
+        "known": {
+            "vs-motion-layout-claims": {
+                "identifier": "HUM-149",
+                "status": "todo"
+            }
+        },
+        "last_checked": "2026-10-12"
     },
     "upstream_status": {
         "framer-motion": {
             "api_parity_anchor": true,
-            "latest": "14.0.0"
+            "latest": "14.1.0"
         },
         "motion": {
-            "consumed": "self v2.0.0 aligned with Motion 14.0.0 (#497)",
-            "latest": "14.0.0 (npm, 2026-10-02)",
-            "note": "Verify negative spring bounce (13.5.0) passes through spring/useSpring types; 13.4.6 AnimatePresence wait-mode fix verification still open; local branch feat/motion-14.0.1-parity suggests 14.0.1 in progress."
+            "consumed": "main aligned with Motion 14.1.0 via PR #501 (merged; unreleased on npm, latest 2.0.0)",
+            "latest": "14.1.0 (npm, 2026-10-09)",
+            "note": "Release #501 to npm. Earlier verification items (negative spring bounce types, 13.4.6 wait-mode fix) unconfirmed."
         }
     },
     "watchlist_candidates": [
