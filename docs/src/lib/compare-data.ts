@@ -138,8 +138,18 @@ export const competitors: Competitor[] = [
                 note: 'Motion has an imperative inView() helper; Svelte Motion exposes it as a whileInView prop.'
             },
             { name: 'Drag (constraints / momentum / elastic)', us: true, them: false },
-            { name: 'FLIP layout animation (layout prop)', us: true, them: false },
-            { name: 'Shared layoutId animation', us: true, them: false },
+            {
+                name: 'FLIP layout animation',
+                us: 'layout prop',
+                them: 'animateLayout()',
+                note: 'Since Motion 14.1, animateLayout() animates elements tagged data-layout around a DOM update. Svelte Motion re-exports it and adds the declarative layout prop.'
+            },
+            {
+                name: 'Shared layoutId animation',
+                us: 'layoutId prop',
+                them: 'data-layout-id',
+                note: 'Motion hands off between elements sharing a data-layout-id inside an animateLayout() call; Svelte Motion does it from the layoutId prop as components mount and unmount.'
+            },
             { name: 'Variants with propagation', us: true, them: false },
             { name: 'Spring physics', us: true, them: true },
             {
@@ -161,7 +171,7 @@ export const competitors: Competitor[] = [
             ...shared.prosUs,
             'Declarative prop-based API — set props, framework reconciles',
             'Component lifecycle, gesture state, and presence handled automatically',
-            "Re-exports motion's imperative API — no second dependency needed for one-shot effects"
+            "Re-exports motion's imperative API, including animateLayout() — no second dependency needed for one-shot effects"
         ],
         prosThem: [
             'Framework-agnostic — works in vanilla JS, Web Components, any framework',
@@ -175,7 +185,7 @@ export const competitors: Competitor[] = [
             'No declarative component layer — you wire DOM refs and lifecycle yourself',
             'No AnimatePresence — exit animations require manual unmount delay',
             'No drag with constraints / momentum / elastic out of the box',
-            'No FLIP layout or shared layoutId animation',
+            'Layout animation is imperative — you wrap each DOM change in animateLayout() and tag elements with data-layout attributes',
             'No reactive motion values — you manage subscriptions manually'
         ],
         verdict:
