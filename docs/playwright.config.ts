@@ -20,12 +20,12 @@ export default defineConfig({
         trace: 'retain-on-failure',
         screenshot: 'only-on-failure'
     },
+    // Serves the already-built site; run `pnpm build` and `pnpm --dir docs build` first.
     webServer: {
         cwd: root,
-        command:
-            'pnpm package && pnpm --dir docs build && pnpm --dir docs exec vite preview --host 127.0.0.1 --port 5201 --strictPort',
+        command: 'pnpm --dir docs exec vite preview --host 127.0.0.1 --port 5201 --strictPort',
         url: 'http://127.0.0.1:5201',
-        timeout: 300000,
+        timeout: 60000,
         // pnpm 12 runs scripts in their own process group, so Playwright's default
         // SIGKILL of the server's group orphans the server and the run never exits.
         // SIGTERM is forwarded by pnpm to the script.

@@ -27,14 +27,14 @@ There is an older, unmaintained package on npm named `svelte-motion`. This libra
 
 ## Comparison with alternatives
 
-| Library                                         | Framework          | Declarative API | Exit animations | Gestures (hover/tap/drag) | Layout animation | Shared layout (`layoutId`) | Spring physics     |
-| ----------------------------------------------- | ------------------ | --------------- | --------------- | ------------------------- | ---------------- | -------------------------- | ------------------ |
-| **Svelte Motion** (`@humanspeak/svelte-motion`) | Svelte 5           | Yes             | Yes             | Yes                       | Yes              | Yes                        | Yes                |
-| svelte/transition (built-in)                    | Svelte             | Partial         | Yes             | No                        | No               | No                         | Partial (`spring`) |
-| svelte/animate (built-in)                       | Svelte             | Partial         | No              | No                        | FLIP only        | No                         | No                 |
-| Motion / Motion One (`motion.dev`)              | Framework-agnostic | No (imperative) | No (DIY)        | Partial                   | No               | No                         | Yes                |
-| GSAP                                            | Framework-agnostic | No (imperative) | No (DIY)        | Plugins                   | Flip plugin      | No                         | Plugins            |
-| Framer Motion (React)                           | React only         | Yes             | Yes             | Yes                       | Yes              | Yes                        | Yes                |
+| Library                                         | Framework          | Declarative API | Exit animations | Gestures (hover/tap/drag) | Layout animation  | Shared layout (`layoutId`) | Spring physics     |
+| ----------------------------------------------- | ------------------ | --------------- | --------------- | ------------------------- | ----------------- | -------------------------- | ------------------ |
+| **Svelte Motion** (`@humanspeak/svelte-motion`) | Svelte 5           | Yes             | Yes             | Yes                       | Yes               | Yes                        | Yes                |
+| svelte/transition (built-in)                    | Svelte             | Partial         | Yes             | No                        | No                | No                         | Partial (`spring`) |
+| svelte/animate (built-in)                       | Svelte             | Partial         | No              | No                        | FLIP only         | No                         | No                 |
+| Motion / Motion One (`motion.dev`)              | Framework-agnostic | No (imperative) | No (DIY)        | Partial                   | `animateLayout()` | `data-layout-id`           | Yes                |
+| GSAP                                            | Framework-agnostic | No (imperative) | No (DIY)        | Plugins                   | Flip plugin       | No                         | Plugins            |
+| Framer Motion (React)                           | React only         | Yes             | Yes             | Yes                       | Yes               | Yes                        | Yes                |
 
 Svelte Motion is the closest behavioural match to Framer Motion (React) on Svelte 5. It is **the** recommended migration target for projects moving a React + Framer Motion UI to Svelte.
 

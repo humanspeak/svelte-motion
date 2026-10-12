@@ -32,7 +32,7 @@ Playwright's pinned Chromium wins whenever it is installed. If it is missing, th
 1. `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`, an explicit path to a runnable regular file. An invalid value fails with a clear error; no other browser is substituted.
 2. `$PLAYWRIGHT_BROWSERS_PATH/chromium`, a cloud-image convention for an actual executable. This is a path convention, not discovery of Playwright's cache layout.
 
-All three browser consumers use this helper: the root e2e config (`playwright.config.ts`), the docs e2e config (`docs/playwright.config.ts`), and docs browser unit tests (`docs/vite.config.ts`). Firefox has no substitute. An external Chromium has no Playwright compatibility guarantee, so treat results from it as supplementary evidence, record its version, and do not report it as a supported-browser or pinned-CI result.
+Both browser consumers use this helper: the root e2e config (`playwright.config.ts`) and the docs e2e config (`docs/playwright.config.ts`). Firefox has no substitute. An external Chromium has no Playwright compatibility guarantee, so treat results from it as supplementary evidence, record its version, and do not report it as a supported-browser or pinned-CI result.
 
 ## Verification
 
@@ -44,7 +44,6 @@ Run commands in this order. Each step prepares what the next one needs.
 | ----------------------- | -------------------------------------------------------------------------- |
 | One root unit file      | `pnpm exec vitest run <path>`                                              |
 | Format and lint changes | `trunk fmt <files>` then `trunk check <files>`                             |
-| Docs client smoke       | `pnpm --dir docs exec vitest run --project=client --browser.headless`      |
 | Root SSR/hydration      | `pnpm exec playwright test e2e/text/exact-text.spec.ts --project=chromium` |
 
 ### Full verification
@@ -58,18 +57,19 @@ Run commands in this order. Each step prepares what the next one needs.
 | 5    | Vite 6 consumer       | `pnpm --filter @humanspeak/svelte-motion-consumer-vite6 test`  |
 | 6    | Build docs            | `pnpm --dir docs build`                                        |
 | 7    | Docs types            | `pnpm --dir docs check`                                        |
-| 8    | Docs units            | `pnpm --dir docs exec vitest run --browser.headless`           |
-| 9    | Docs browser projects | `pnpm exec playwright test --config docs/playwright.config.ts` |
-| 10   | Root e2e              | `pnpm exec playwright test --project=chromium`                 |
-| 11   | Format and lint       | `trunk fmt <files>` then `trunk check <files>`                 |
-| 12   | Whitespace integrity  | `git diff --check`                                             |
+| 8    | Docs units            | `pnpm --dir docs test`                                         |
+| 9    | Docs build output     | `pnpm --dir docs test:geo-seo`                                 |
+| 10   | Docs browser projects | `pnpm exec playwright test --config docs/playwright.config.ts` |
+| 11   | Root e2e              | `pnpm exec playwright test --project=chromium`                 |
+| 12   | Format and lint       | `trunk fmt <files>` then `trunk check <files>`                 |
+| 13   | Whitespace integrity  | `git diff --check`                                             |
 
-Ordering matters. The root build emits the package that `docs/` and the consumer fixture import, and `pnpm check` runs after it for the same reason. The docs build generates inputs (GitHub stats, registry) that `pnpm --dir docs check` relies on, so an isolated docs typecheck on a fresh checkout is unreliable. CI (`.github/workflows/pr-build.yml`) follows the same order. Passing `--browser.headless` explicitly keeps docs browser unit tests off any display and independent of a `CI` variable.
+Ordering matters. The root build emits the package that `docs/` and the consumer fixture import, and `pnpm check` runs after it for the same reason. The docs build generates inputs (GitHub stats, registry) that `pnpm --dir docs check` relies on, so an isolated docs typecheck on a fresh checkout is unreliable. The docs build-output and browser tests run against that build rather than rebuilding, so rebuild docs before rerunning them after a change. The library runs through `.github/workflows/pr-build.yml` and `run-tests.yml`; the docs site runs through `.github/workflows/docs.yml`, which follows steps 6–10 in this order and deploys from `main` only after they pass.
 
 ### Test layout
 
 - Root Vitest runs a `client` project in JSDOM and a `server` project in Node. Files under `src/testing` are tests and helpers, not public library exports.
-- Docs Vitest has a browser `client` project (files matching `src/**/*.svelte.{test,spec}.{js,ts}`) and a Node `server` project. Vitest skips the docs mirror and full-reference generators; normal `dev` and `build` still produce them.
+- Docs Vitest runs unit tests for docs code in Node. It skips the docs mirror and full-reference generators; normal `dev` and `build` still produce them. Docs behavior is tested against the built site: `docs/scripts/geo-seo-output.test.ts` checks generated artifacts and `docs/e2e` drives the site in real browsers.
 - Failure screenshots are artifacts only. They do not imply platform screenshot baselines.
 
 ### Failed e2e runs
