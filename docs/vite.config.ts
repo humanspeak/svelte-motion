@@ -13,11 +13,8 @@ import { sveltekit } from '@sveltejs/kit/vite'
 import tailwindcss from '@tailwindcss/vite'
 // import path from 'node:path'
 // import { fileURLToPath } from 'node:url'
-import { playwright } from '@vitest/browser-playwright'
-import { chromium } from 'playwright'
 import devtoolsJson from 'vite-plugin-devtools-json'
 import { defineConfig } from 'vitest/config'
-import { resolveChromiumLaunchOptions } from '../scripts/chromium-launch-options'
 import { competitors, ours } from './src/lib/compare-data'
 import { docsConfig } from './src/lib/docs-config'
 
@@ -35,11 +32,6 @@ const compareSocialFeatures = [
 // we own the host before accepting URL-change submissions. Unique per domain —
 // do not reuse the svelte-markdown key here.
 const indexNowKey = 'f56cc8a9-a818-41b2-b47c-52f658061fbc'
-
-// Resolved only under Vitest (`VITEST === 'true'`): dev and build never launch
-// a browser, so an invalid `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` must not stop them.
-const chromiumLaunchOptions =
-    process.env.VITEST === 'true' ? resolveChromiumLaunchOptions(chromium.executablePath()) : {}
 
 export default defineConfig({
     plugins: [
@@ -208,32 +200,7 @@ export default defineConfig({
     // With pnpm workspace linking, no manual alias is required
     test: {
         expect: { requireAssertions: true },
-        projects: [
-            {
-                extends: './vite.config.ts',
-                test: {
-                    name: 'client',
-                    browser: {
-                        enabled: true,
-                        provider: playwright({
-                            launchOptions: chromiumLaunchOptions
-                        }),
-                        instances: [{ browser: 'chromium' }]
-                    },
-                    include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
-                    exclude: ['src/lib/server/**'],
-                    setupFiles: ['./vitest-setup-client.ts']
-                }
-            },
-            {
-                extends: './vite.config.ts',
-                test: {
-                    name: 'server',
-                    environment: 'node',
-                    include: ['src/**/*.{test,spec}.{js,ts}'],
-                    exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
-                }
-            }
-        ]
+        environment: 'node',
+        include: ['src/**/*.{test,spec}.{js,ts}']
     }
 })
