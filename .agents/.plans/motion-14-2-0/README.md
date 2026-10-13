@@ -10,7 +10,7 @@ All three plans ship on one branch, `feat/motion-14.2.0` off `origin/main`, and 
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-bump-motion-14-2-0.md) | Pins → 14.2.0, upstream independent-transforms parity page/spec, full e2e triage | P1 | M | — | TODO |
+| [001](001-bump-motion-14-2-0.md) | Pins → 14.2.0, upstream independent-transforms parity page/spec, full e2e triage | P1 | M | — | BLOCKED (2 of 5 parity tests fail: no `onUpdate` prop; `layout` never accelerated. Maintainer triage) |
 | [002](002-demote-accelerated-transforms-before-measure.md) | Demote accelerated transforms before svelte-motion's own layout measurements | P1 | S–M | 001 | TODO |
 | [003](003-reorder-click-after-drag.md) | Port Reorder click-after-drag guard (#2682, 14.1.1) | P2 | S | — (ship after 001) | TODO |
 
