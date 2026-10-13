@@ -13,6 +13,7 @@ All three plans ship on one branch, `feat/motion-14.2.0` off `origin/main`, and 
 | [001](001-bump-motion-14-2-0.md) | Pins → 14.2.0, upstream independent-transforms parity page/spec, full e2e triage | P1 | M | — | BLOCKED (2 of 5 parity tests fail: no `onUpdate` prop; `layout` never accelerated. Maintainer triage) |
 | [002](002-demote-accelerated-transforms-before-measure.md) | Demote accelerated transforms before svelte-motion's own layout measurements | P1 | S–M | 001 | TODO |
 | [003](003-reorder-click-after-drag.md) | Port Reorder click-after-drag guard (#2682, 14.1.1) | P2 | S | — (ship after 001) | TODO |
+| [004](004-on-update-prop.md) | `onUpdate(latest)` prop, forwarded to motion-dom (keeps transforms on the main thread) | P1 | S–M | 001 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason)
 
@@ -21,6 +22,9 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason)
 - 2026-10-13 (dispatch pre-flight): maintainer chose `"version": "2.1.0"` + `minor` changeset → releases as 2.2.0
   (001 amended). Plans run serially (001 → 003 → 002) in `../svelte-motion-1420` on `feat/motion-14.2.0`, because
   Playwright's port 4198 is fixed. Drift baselines moved to `origin/main` `962a56df`.
+
+- 2026-10-13 (001 triage, failure 1): maintainer chose to add the missing `onUpdate` prop properly → plan 004.
+  Failure 2 (`layout` elements never accelerated) is still awaiting triage.
 
 ## Dependency notes
 
