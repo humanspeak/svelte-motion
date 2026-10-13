@@ -404,6 +404,19 @@
             </ul>
         </div>
         <div>
+            <h2 class="mb-3 text-xl font-medium">Independent transforms (Motion 14.2)</h2>
+            <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/basic') + searchParams}
+                    >
+                        Accelerated independent transforms (parity)
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div>
             <h2 class="mb-3 text-xl font-medium">Reorder</h2>
             <ul class="list-disc space-y-2 pl-5">
                 <li>
