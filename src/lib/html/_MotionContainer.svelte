@@ -178,6 +178,7 @@
         transition: transitionProp,
         onAnimationStart: onAnimationStartProp,
         onAnimationComplete: onAnimationCompleteProp,
+        onUpdate: onUpdateProp,
         transformTemplate: transformTemplateProp,
         style: styleProp,
         class: classProp,
@@ -600,6 +601,15 @@
             // template off the props, so the VE composes templated transforms
             // natively — the job `applyMotionStyleEffect` used to do.
             transformTemplate: transformTemplateProp,
+            // Forwarded only, never invoked here: motion-dom subscribes it
+            // through `propEventHandlers` and fires it on `preRender` with
+            // `latestValues` whenever a bound value changes. Its presence also
+            // makes `canAccelerateTransform` keep transforms off the
+            // compositor, and adding it later demotes a running transform
+            // group in `VisualElement.update` (motion-dom
+            // `render/VisualElement.ts`, `animation/waapi/transforms/
+            // TransformAnimation.ts` @ v14.2.0).
+            onUpdate: onUpdateProp,
             transformPagePoint: effectiveTransformPagePoint,
             exit: exitProp,
             layoutId: scopedLayoutId

@@ -121,6 +121,7 @@ export type {
     MotionOnInViewEnd,
     MotionOnInViewStart,
     MotionOnProjectionUpdate,
+    MotionOnUpdate,
     MotionTransformPoint,
     MotionTransition,
     MotionWhileDrag,

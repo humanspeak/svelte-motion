@@ -414,6 +414,14 @@
                         Accelerated independent transforms (parity)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/on-update') + searchParams}
+                    >
+                        onUpdate prop (main thread + latest values)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

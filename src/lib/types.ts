@@ -1,6 +1,7 @@
 import type { MotionValueChild } from '$lib/utils/motionValueChild'
 import type { MotionStyle, MotionStyleValue, TransformTemplate } from '$lib/utils/style'
 import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
+import type { ResolvedValues } from 'motion-dom'
 import type { Snippet } from 'svelte'
 
 /**
@@ -378,6 +379,15 @@ export type MotionAnimationStart =
 export type MotionAnimationComplete =
     ((_definition: DOMKeyframesDefinition | undefined) => void) | undefined
 
+/**
+ * Called once per frame while any of the element's values change, with every
+ * latest value (e.g. `{ x: 42, opacity: 0.5 }`). Mirrors Motion's `onUpdate`.
+ * Having it keeps the element's transforms on the main thread.
+ *
+ * @param latest - Every current value on the element, keyed by value name.
+ */
+export type MotionOnUpdate = ((latest: ResolvedValues) => void) | undefined
+
 /** Hover lifecycle callbacks */
 export type MotionOnHoverStart = (() => void) | undefined
 export type MotionOnHoverEnd = (() => void) | undefined
@@ -579,6 +589,8 @@ export type MotionProps = {
     onAnimationStart?: MotionAnimationStart
     /** Called after a main animate transition completes */
     onAnimationComplete?: MotionAnimationComplete
+    /** Called once per frame while any value changes, with every latest value; keeps transforms on the main thread */
+    onUpdate?: MotionOnUpdate
     /**
      * Customize the CSS `transform` string generated from Motion transform
      * shortcuts.

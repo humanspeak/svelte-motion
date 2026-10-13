@@ -1,0 +1,96 @@
+---
+title: 'onUpdate'
+description: 'Read every latest motion value once per frame with the onUpdate prop.'
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte';
+  import OnUpdateExample from '$lib/examples/on-update/demos/Default.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'onUpdate | Docs | Svelte Motion'
+      seo.description = 'Use the onUpdate prop to read every latest motion value once per frame on a Svelte motion component, as in Motion.'
+      seo.ogTitle = 'onUpdate'
+      seo.ogTagline = 'Every value, every frame'
+      seo.ogFeatures = ['Latest Values', 'Per-frame Callback', 'Main Thread', 'Motion Parity']
+      seo.ogSlug = 'docs-on-update'
+  }
+</script>
+
+# onUpdate
+
+`onUpdate` is called once per frame while any of a motion component's values
+change. It receives every latest value on the element, not just the one that
+changed.
+
+```svelte
+<script lang="ts">
+  import { motion } from '@humanspeak/svelte-motion'
+
+  let x = $state(0)
+</script>
+
+<motion.div
+  animate={{ x: 100, opacity: 1 }}
+  onUpdate={(latest) => (x = Number(latest.x))}
+/>
+```
+
+<Example isSmall exampleUrl="/examples/on-update">
+  <OnUpdateExample />
+</Example>
+
+## Callback Shape
+
+```ts
+type MotionOnUpdate = (latest: ResolvedValues) => void
+```
+
+- `latest` holds every current value on the element, keyed by name, for
+  example `{ x: 42, rotate: 90, opacity: 0.5 }`.
+- It runs at most once per frame, after values change and before they render,
+  however many values changed that frame.
+
+## Prop vs transition `onUpdate`
+
+`onUpdate` can also go in a `transition`. The two are different:
+
+```svelte
+<!-- Prop: every value on the element, once per frame -->
+<motion.div animate={{ x: 100, opacity: 1 }} onUpdate={(latest) => console.log(latest)} />
+
+<!-- Transition: per animation, only that animation's value -->
+<motion.div
+  animate={{ x: 100 }}
+  transition={{ duration: 1, onUpdate: (x) => console.log(x) }}
+/>
+```
+
+The transition-level callback is called by each animation it applies to, with
+that one value.
+
+## Hardware acceleration
+
+Having `onUpdate` keeps the element's transforms on the main thread, so only
+use it when you need every frame. Since Motion 14.2, transform shortcuts like
+`x`, `scale`, and `rotate` otherwise run as one hardware-accelerated animation
+per element. Adding `onUpdate` while an accelerated animation is playing moves
+it to the main thread. For a single value, prefer
+[`useMotionValueEvent`](/docs/use-motion-value-event).
+[`transformTemplate`](/docs/transform-template) has the same effect on
+acceleration.
+
+## API Reference
+
+### `onUpdate`
+
+```ts
+onUpdate?: (latest: ResolvedValues) => void
+```
+
+Pass a callback to any `motion.*` component. The `MotionOnUpdate` type is
+exported from `@humanspeak/svelte-motion`.
+
+Based on [Motion's onUpdate prop](https://motion.dev/docs/react-motion-component#onupdate).

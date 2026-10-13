@@ -1003,3 +1003,40 @@ describe('_MotionContainer', () => {
         expect(animateMock).not.toHaveBeenCalled()
     })
 })
+
+describe('onUpdate', () => {
+    it('is called by the VisualElement with the latest values', async () => {
+        const onUpdate = vi.fn()
+
+        render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                animate: { opacity: 0.5 },
+                transition: { duration: 0.05 },
+                onUpdate
+            }
+        })
+
+        // Flush RAF + timers: the mocked animation jumps opacity to its
+        // target, and motion-dom fires `Update` on the next preRender.
+        await flushTimers()
+
+        expect(onUpdate.mock.calls.length).toBeGreaterThanOrEqual(1)
+        expect(onUpdate.mock.calls.at(-1)?.[0]).toMatchObject({ opacity: 0.5 })
+    })
+
+    it('does not leak onto the DOM element', async () => {
+        const { container } = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                animate: { opacity: 0.5 },
+                onUpdate: () => {}
+            }
+        })
+        await flushTimers()
+
+        const el = container.firstElementChild as HTMLElement
+        expect(el.getAttribute('onupdate')).toBeNull()
+        expect(el.getAttribute('onUpdate')).toBeNull()
+    })
+})

@@ -82,6 +82,7 @@ export const docsSections: NavSection[] = [
             { title: 'animateLayout', href: '/docs/animate-layout', icon: LayoutGrid },
             { title: 'arc()', href: '/docs/arc', icon: Spline },
             { title: 'layoutDependency', href: '/docs/layout-dependency', icon: Gauge },
+            { title: 'onUpdate', href: '/docs/on-update', icon: Activity },
             { title: 'SVG Animation', href: '/docs/svg-animation', icon: Wand },
             { title: 'transformTemplate', href: '/docs/transform-template', icon: Code },
             { title: 'Variants', href: '/docs/variants', icon: Layers },
