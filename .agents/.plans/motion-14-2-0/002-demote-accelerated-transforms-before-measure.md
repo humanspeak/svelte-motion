@@ -7,6 +7,15 @@
 > `.agents/.plans/motion-14-2-0/README.md`, unless a reviewer dispatched you
 > and told you they maintain the index.
 >
+> **Revision 2026-10-13 (guard, after 001 triage)**: run this **after plan 005**. Until 005 lands, every `layout`
+> element is moved off the compositor right after mount by a mount-time `willUpdate()`, so this plan's red test
+> can't reproduce (the box is never accelerated when the width changes: the "count 0 at 600 ms" STOP). Once 005
+> lands, the upstream parity test `e2e/independent-transforms/basic.spec.ts` › "a layout animation moves the element
+> to the main thread" is a second red anchor. After 005 it may fail on its `x` range (lines 96-97) or final bounds,
+> and this plan must turn it green unchanged. Add it to Step 1's red run and to the done criteria. Workspace:
+> `/Users/jasonkummerl/Github/svelte-motion-1420`, branch `feat/motion-14.2.0`. Drift-check baseline: the commit
+> that lands 005. The `_MotionContainer.svelte` diff from 005 (the mount-pass guard) is expected.
+>
 > **Never use `git stash`.**
 >
 > **Drift check (run first)**: `git diff --stat b9e59066..HEAD -- src/lib/utils/motionDomProjection.ts src/lib/html/_MotionContainer.svelte src/lib/utils/motionDomProjection.spec.ts`
@@ -18,7 +27,7 @@
 - **Priority**: P1
 - **Effort**: S–M
 - **Risk**: MED. Touches the measurement path every `layout` element uses.
-- **Depends on**: 001-bump-motion-14-2-0.md (needs motion-dom 14.2.0 installed)
+- **Depends on**: 001-bump-motion-14-2-0.md (needs motion-dom 14.2.0 installed), 005-no-layout-update-on-mount.md
 - **Category**: bug (a regression introduced by the 14.2.0 bump)
 - **Planned at**: commit `b9e59066`, 2026-10-13
 

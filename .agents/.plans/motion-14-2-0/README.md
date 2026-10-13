@@ -11,9 +11,10 @@ All three plans ship on one branch, `feat/motion-14.2.0` off `origin/main`, and 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
 | [001](001-bump-motion-14-2-0.md) | Pins → 14.2.0, upstream independent-transforms parity page/spec, full e2e triage | P1 | M | — | BLOCKED (2 of 5 parity tests fail: no `onUpdate` prop; `layout` never accelerated. Maintainer triage) |
-| [002](002-demote-accelerated-transforms-before-measure.md) | Demote accelerated transforms before svelte-motion's own layout measurements | P1 | S–M | 001 | TODO |
+| [002](002-demote-accelerated-transforms-before-measure.md) | Demote accelerated transforms before svelte-motion's own layout measurements | P1 | S–M | 001, 005 | TODO |
 | [003](003-reorder-click-after-drag.md) | Port Reorder click-after-drag guard (#2682, 14.1.1) | P2 | S | — (ship after 001) | TODO |
 | [004](004-on-update-prop.md) | `onUpdate(latest)` prop, forwarded to motion-dom (keeps transforms on the main thread) | P1 | S–M | 001 | TODO |
+| [005](005-no-layout-update-on-mount.md) | Mounting a `layout` element doesn't call `willUpdate()` (keeps entry transforms accelerated) | P1 | S | 001 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason)
 
@@ -24,7 +25,10 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason)
   Playwright's port 4198 is fixed. Drift baselines moved to `origin/main` `962a56df`.
 
 - 2026-10-13 (001 triage, failure 1): maintainer chose to add the missing `onUpdate` prop properly → plan 004.
-  Failure 2 (`layout` elements never accelerated) is still awaiting triage.
+- 2026-10-13 (001 triage, failure 2): root cause is a mount-time `willUpdate()` in the layout `$effect.pre`, which
+  demotes the entry animation and snapshots its first compositor frame (spurious 0.8 px layout animation). Plan 005
+  fixes it; 002 now depends on 005, because its red test can't reproduce until elements stay accelerated.
+  Run order: 004 → 005 → 002 → 003.
 
 ## Dependency notes
 
