@@ -7,6 +7,11 @@
 > `.agents/.plans/motion-14-2-0/README.md`, unless a reviewer dispatched you
 > and told you they maintain the index.
 >
+> **Revision 2026-10-13 (guard pre-flight)**: plan 004 landed as `735071af`. It added the `onUpdate` destructure and
+> one `buildMotionNodeProps` entry to `_MotionContainer.svelte` (expected; the two `$effect.pre` blocks are untouched),
+> plus `e2e/motion/on-update.spec.ts` (4 tests, all passing). Full-e2e baseline for Step 4 is now: plan 001's run plus
+> those 4 passes, with the parity `onUpdate` test passing. The only known failure is the parity `layout` test.
+>
 > **Never use `git stash`** (the stash is shared by every worktree of this repo).
 >
 > **Workspace**: `/Users/jasonkummerl/Github/svelte-motion-1420`, branch `feat/motion-14.2.0`
