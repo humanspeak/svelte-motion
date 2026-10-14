@@ -2281,6 +2281,12 @@
     })
 
     let explicitLayoutSnapshot: RectLike | null = null
+    // The element whose mount pass the pre-update effects have already seen.
+    // Upstream's MeasureLayout calls `willUpdate()` only in getSnapshotBeforeUpdate
+    // (updates), never on mount (componentDidMount → root.didUpdate() only).
+    // A mount-time willUpdate demotes Motion 14.2's compositor transforms and
+    // snapshots the entry animation's first frame as if it were a layout change.
+    let layoutUpdateMountedElement: HTMLElement | null = null
     let lastRect: RectLike | null = null
     let observerRestartRect: RectLike | null = null
     let observerRestartElement: HTMLElement | null = null
@@ -2339,6 +2345,13 @@
         trackLayoutProjectionDependencies()
 
         if (!shouldProject) {
+            explicitLayoutSnapshot = null
+            return
+        }
+
+        // Mount pass: not an update (MeasureLayout.tsx componentDidMount).
+        if (layoutUpdateMountedElement !== element) {
+            layoutUpdateMountedElement = element
             explicitLayoutSnapshot = null
             return
         }
@@ -2486,6 +2499,9 @@
     // spread), so the update pass — flushed on motion-dom's microtask like
     // upstream's — runs before the next frame is drawn.
     let layoutIdGroupUpdatePending = false
+    // Own mount-pass marker (see `layoutUpdateMountedElement`), so the two
+    // pre-update effects never consume each other's mount pass.
+    let layoutIdUpdateMountedElement: HTMLElement | null = null
     const shouldFanOutLayoutIdUpdate = () =>
         !!(
             element &&
@@ -2499,6 +2515,11 @@
         const shouldFanOut = shouldFanOutLayoutIdUpdate()
         trackLayoutProjectionDependencies()
         if (!shouldFanOut) return
+        // Mount pass: not an update (MeasureLayout.tsx componentDidMount).
+        if (layoutIdUpdateMountedElement !== element) {
+            layoutIdUpdateMountedElement = element
+            return
+        }
         motionDomProjection?.willUpdate()
         layoutIdGroupUpdatePending = true
     })

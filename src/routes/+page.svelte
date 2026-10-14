@@ -417,6 +417,23 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-idle') + searchParams}
+                    >
+                        Layout elements stay accelerated at rest
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-measure') +
+                            searchParams}
+                    >
+                        Accelerated x + layout width change
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/on-update') + searchParams}
                     >
                         onUpdate prop (main thread + latest values)

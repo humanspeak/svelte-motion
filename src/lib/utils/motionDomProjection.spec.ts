@@ -333,6 +333,107 @@ describe('MotionDomProjectionAdapter.measurePageRect', () => {
 })
 
 /**
+ * Compositor-proof measurements (plan 005 Step 4).
+ *
+ * Motion 14.2 runs x/y/scale/rotate as one WAAPI `transform` animation, which
+ * overrides the inline base transform the measurement writes. The measurement
+ * detaches those animations' effects (`effect.target = null`) for the
+ * synchronous read and reattaches them afterwards, without demoting.
+ */
+describe('MotionDomProjectionAdapter.measurePageRect with WAAPI transform animations', () => {
+    let element: HTMLElement
+    let adapter: MotionDomProjectionAdapter
+
+    /** Minimal stand-in for a script-created WAAPI animation. */
+    const stubAnimation = (keyframes: Keyframe[], extra: Record<string, unknown> = {}) => {
+        const effect = {
+            target: element as Element | null,
+            getKeyframes: () => keyframes
+        }
+        return { effect, ...extra }
+    }
+
+    const stubAnimations = (animations: Array<ReturnType<typeof stubAnimation>>) => {
+        ;(element as unknown as { getAnimations: () => unknown[] }).getAnimations = () => animations
+    }
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        document.documentElement.scrollLeft = 0
+        element = document.createElement('div')
+        document.body.appendChild(element)
+        adapter = new MotionDomProjectionAdapter()
+        adapter.updateOptions({ layout: true })
+    })
+
+    it('detaches a transform animation for the read and reattaches it afterwards', () => {
+        const transform = stubAnimation([
+            { transform: 'translateX(0px)' },
+            { transform: 'translateX(200px)' }
+        ])
+        stubAnimations([transform])
+        const targetsDuringRead: Array<Element | null> = []
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
+            targetsDuringRead.push(transform.effect.target)
+            // The in-flight x would add 87px if the animation stayed attached.
+            return new DOMRect(transform.effect.target ? 97 : 10, 100, 100, 50)
+        })
+        adapter.mount(element)
+        targetsDuringRead.length = 0
+
+        const rect = adapter.measurePageRect('measure')
+
+        expect(targetsDuringRead.length).toBeGreaterThan(0)
+        expect(targetsDuringRead.every((target) => target === null)).toBe(true)
+        expect(rect!.left).toBe(10)
+        expect(transform.effect.target).toBe(element)
+        adapter.unmount()
+    })
+
+    it('never detaches non-transform animations or CSS animations/transitions', () => {
+        const opacity = stubAnimation([{ opacity: 0 }, { opacity: 1 }])
+        const cssAnimation = stubAnimation([{ transform: 'scale(1)' }, { transform: 'scale(2)' }], {
+            animationName: 'pulse'
+        })
+        const cssTransition = stubAnimation([{ transform: 'none' }, { transform: 'scale(2)' }], {
+            transitionProperty: 'transform'
+        })
+        stubAnimations([opacity, cssAnimation, cssTransition])
+        const targetsDuringRead: Array<Array<Element | null>> = []
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
+            targetsDuringRead.push([
+                opacity.effect.target,
+                cssAnimation.effect.target,
+                cssTransition.effect.target
+            ])
+            return new DOMRect(10, 100, 100, 50)
+        })
+        adapter.mount(element)
+        targetsDuringRead.length = 0
+
+        adapter.measurePageRect('measure')
+
+        expect(targetsDuringRead.length).toBeGreaterThan(0)
+        for (const targets of targetsDuringRead) {
+            expect(targets).toEqual([element, element, element])
+        }
+        adapter.unmount()
+    })
+
+    it('measures normally when the element has no getAnimations', () => {
+        ;(element as unknown as { getAnimations: unknown }).getAnimations = undefined
+        setScrollAndRect(element, 0, 100)
+        adapter.mount(element)
+
+        const rect = adapter.measurePageRect('measure')
+
+        expect(rect).toMatchObject({ left: 10, top: 100, width: 100, height: 50 })
+        adapter.unmount()
+    })
+})
+
+/**
  * Single-VisualElement invariant (#449, plan 001).
  *
  * `visualElementStore` is a `WeakMap<instance, VisualElement>` written in

@@ -175,6 +175,42 @@ const animationTypeForLayout = (layout: LayoutOption): AnimationType =>
         : 'both'
 
 /**
+ * Detach an element's compositor transform animations for a synchronous read.
+ *
+ * Motion 14.2 runs x/y/scale/rotate as one WAAPI `transform` animation, and a
+ * WAAPI animation overrides the inline transform `stripToBaseTransforms`
+ * writes, so the read would include the in-flight value. Upstream only
+ * measures inside a real update, after `willUpdate()` demotes; svelte-motion
+ * also measures speculatively (layout observers), where demoting would move
+ * every observed element off the compositor. Clearing `effect.target` removes
+ * the animation's effect without touching its timing; restoring it before the
+ * next frame keeps `currentTime` and `playState`, so nothing is painted detached.
+ *
+ * Only script-created animations are detached: CSS animations and transitions
+ * (recognised by `animationName` / `transitionProperty`, so this works where
+ * the `CSSAnimation` / `CSSTransition` globals are absent) stay part of the
+ * measured layout. Never `await` between detaching and restoring.
+ *
+ * @param el - Element about to be measured.
+ * @returns Restore function that reattaches every detached effect.
+ */
+const detachTransformAnimations = (el: HTMLElement): (() => void) => {
+    if (typeof el.getAnimations !== 'function') return () => {}
+    const detached: KeyframeEffect[] = []
+    for (const animation of el.getAnimations()) {
+        if ('animationName' in animation || 'transitionProperty' in animation) continue
+        const effect = animation.effect as KeyframeEffect | null
+        if (!effect || effect.target !== el || typeof effect.getKeyframes !== 'function') continue
+        if (!effect.getKeyframes().some((keyframe) => 'transform' in keyframe)) continue
+        effect.target = null
+        detached.push(effect)
+    }
+    return () => {
+        for (let i = detached.length - 1; i >= 0; i--) detached[i].target = el
+    }
+}
+
+/**
  * Svelte lifecycle adapter for motion-dom's upstream projection node system.
  *
  * The public Svelte API stays unchanged (`layout`, `layoutId`, `transition`).
@@ -1281,12 +1317,20 @@ export class MotionDomProjectionAdapter {
      * `'' → 'none'` write is NOT skipped: an inline `none` overrides a
      * stylesheet-authored transform during the read, and that stripping is
      * part of the measurement contract.
+     *
+     * Each element's accelerated WAAPI transform animations are detached
+     * first (see `detachTransformAnimations`), including on elements whose
+     * inline transform already equals base: motion-dom doesn't write the
+     * inline transform while WAAPI drives it. They are reattached after the
+     * inline styles are restored.
      */
     private stripToBaseTransforms(): () => void {
         const restoreList: Array<{ el: HTMLElement; prev: string }> = []
+        const reattachList: Array<() => void> = []
         const strip = (adapter: MotionDomProjectionAdapter) => {
             const el = adapter.element
             if (!el) return
+            reattachList.push(detachTransformAnimations(el))
             const prev = el.style.transform
             const base = adapter.getBaseTransform?.() ?? 'none'
             if (prev === base) return
@@ -1302,6 +1346,7 @@ export class MotionDomProjectionAdapter {
             for (let i = restoreList.length - 1; i >= 0; i--) {
                 restoreList[i].el.style.transform = restoreList[i].prev
             }
+            for (let i = reattachList.length - 1; i >= 0; i--) reattachList[i]()
         }
     }
 
