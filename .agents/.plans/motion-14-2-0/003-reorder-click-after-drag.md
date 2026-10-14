@@ -11,6 +11,12 @@
 > `/Users/jasonkummerl/Github/svelte-motion-1420`, not in parallel (both plans need Playwright's fixed port 4198).
 > Drift-check baseline moved to `origin/main` (`962a56df`); 001 does not touch `src/lib/components/Reorder`.
 >
+> **Revision 2026-10-14 (guard pre-flight)**: 001, 004 and 005 have landed (HEAD `1a3e6ade`). `src/lib/components/Reorder`
+> is unchanged. `src/routes/+page.svelte` gained links in the Independent transforms section, so the "Reorder"
+> section line numbers have shifted; find it by heading. 005 changed `stripToBaseTransforms` in
+> `src/lib/utils/motionDomProjection.ts`, which Reorder drag commits use; take your red run on current HEAD. The guard
+> maintains the README index, so don't edit it. Gate with `--reporter=line` (the config's only reporter is junit).
+>
 > **Never use `git stash`.**
 >
 > **Drift check (run first)**: `git diff --stat origin/main..HEAD -- src/lib/components/Reorder`
