@@ -12,7 +12,7 @@ All three plans ship on one branch, `feat/motion-14.2.0` off `origin/main`, and 
 | --- | --- | --- | --- | --- | --- |
 | [001](001-bump-motion-14-2-0.md) | Pins → 14.2.0, upstream independent-transforms parity page/spec, full e2e triage | P1 | M | — | DONE (both parity failures fixed by 004 + 005) |
 | [002](002-demote-accelerated-transforms-before-measure.md) | Demote accelerated transforms before svelte-motion's own layout measurements | P1 | S–M | 001, 005 | SUPERSEDED (folded into 005: detach instead of demote) |
-| [003](003-reorder-click-after-drag.md) | Port Reorder click-after-drag guard (#2682, 14.1.1) | P2 | S | — (ship after 001) | TODO |
+| [003](003-reorder-click-after-drag.md) | Port Reorder click-after-drag guard (#2682, 14.1.1) | P2 | S | — (ship after 001) | DONE (`3c51ee6b`, guard-verified) |
 | [004](004-on-update-prop.md) | `onUpdate(latest)` prop, forwarded to motion-dom (keeps transforms on the main thread) | P1 | S–M | 001 | DONE (`735071af`, guard-verified) |
 | [005](005-no-layout-update-on-mount.md) | `layout` elements stay accelerated: no mount-time `willUpdate()`, compositor-proof measurements | P1 | M | 001 | DONE (`3ab94f92`, guard-verified) |
 
