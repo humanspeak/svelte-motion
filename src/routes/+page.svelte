@@ -524,6 +524,14 @@
                         Reorder with Window Scroll (below the fold)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/click-after-drag') + searchParams}
+                    >
+                        Reorder click after drag (#2682)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

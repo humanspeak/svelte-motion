@@ -28,6 +28,9 @@ export interface ItemData<V> {
  * - `unregisterItem` exists because our order registry persists across
  *   renders — React rebuilds `order` from scratch every render, so
  *   unmounted items vanish for free; here they must deregister.
+ * - `clearReordered` replaces upstream's shared `hasReordered` ref
+ *   (Motion 14.1.1, #2682): the group keeps the flag private and items
+ *   only ever clear it.
  */
 export interface ReorderContextProps<V> {
     /** The group's reorder axis. Items drag-lock to this by default. */
@@ -48,6 +51,8 @@ export interface ReorderContextProps<V> {
     updateOrder: (value: V, offset: DragPoint, velocity: DragPoint) => void
     /** The group's rendered element, for edge auto-scrolling. */
     getGroupElement: () => HTMLElement | null
+    /** Ends the reorder-click guard; called from Reorder.Item's onDragEnd, a frame after the release's click. */
+    clearReordered: () => void
 }
 
 const REORDER_CONTEXT_KEY = Symbol('reorder-group')
