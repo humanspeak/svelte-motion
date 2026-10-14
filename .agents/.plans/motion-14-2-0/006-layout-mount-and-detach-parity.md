@@ -4,12 +4,35 @@
 > expected result before moving on. If anything in "STOP conditions" occurs, stop and report. Do not improvise.
 > The guard (your dispatcher) maintains the README index; don't edit it. Don't commit; the guard commits.
 >
+> **Revision 2026-10-14 (guard, after the first 006 run STOPPED at finding 4; maintainer decided)**:
+> - Findings 1-3 are done in the working tree (uncommitted). Keep them.
+> - **Finding 4 → option A.** Gate `detachTransformAnimations` on this element's own Motion transform values being
+>   on the compositor: `value.animation?.liveValue?.() !== undefined` (public `MotionValueAnimation` type). No
+>   private group access, no heuristic. React Motion reaches the same measured result: its `willUpdate` demotes
+>   only `transformGroups.get(instance)` (`create-projection-node.ts:123-124, 707, 713, 1007`), so user transform
+>   animations stay applied. You may change the SETUP of the existing unit test "detaches a transform animation for
+>   the read" so it declares a Motion-accelerated value. Its assertion must not change.
+> - **`layoutId` self-consume → fix it.** `src/lib/utils/layoutId.ts` is now in scope: tag each registry entry
+>   with the element that wrote it, and don't let an element consume its own entry when its `layoutId` turns back
+>   on (upstream: the node stays lead of its own stack, so nothing animates). `toggle-layout-id` must go green.
+> - **Post-finish inline overwrite** (`stripToBaseTransforms` writes base over an inline `translateY(40px)`
+>   committed by a finished `animate(el, {transform})`): don't change it. Compare with upstream `resetTransform`
+>   (`create-projection-node.ts` ~998-1030, which also rewrites the inline transform for the read) and report
+>   whether it's a real divergence.
+> - The `_paintedFrames.ts` ResizeObserver sampler replaces the MessageChannel one in the plan. Accepted.
+>
+> **Revision 2 2026-10-14 (guard; maintainer: "these should be planned for and fixed as part of this build")**:
+> findings 1-8 are done in the working tree (guard-verified: unit 1177 passed, `pnpm check` 0 errors, full e2e
+> 607 passed / 2 skipped / 0 failed). Keep all of it. Work only **Step 5 (findings 9-11)** below, red tests first.
+> The "don't change the post-finish inline overwrite" bullet above is replaced by finding 10.
+>
 > **Never use `git stash`** (the stash is shared by every worktree of this repo).
 >
 > **Workspace**: `/Users/jasonkummerl/Github/svelte-motion-1420`, branch `feat/motion-14.2.0`.
 >
-> **Drift check (run first)**: `git log --oneline -1` → `f5df8fbb` (or this plan's own docs commit on top of it),
-> and `git status --short` → empty apart from this plan file. Anything else: STOP.
+> **Drift check (run first)**: `git log --oneline -1` → this plan's revision-2 docs commit. `git status --short`
+> lists only the uncommitted findings 1-8 work (`git diff --stat` touches the files named in "Current state", plus
+> `layoutId.ts`, the new pages/specs/helpers and `.changeset/layout-mount-parity.md`). Anything else: STOP.
 
 ## Status
 
@@ -76,7 +99,7 @@ Verify against the built preview (Playwright default), not `vite dev`.
 
 ## Scope
 
-In: the files above, new test pages under `src/routes/tests/independent-transforms/` (link each from
+In: the files above, `src/lib/utils/layoutId.ts` (revision 2026-10-14), new test pages under `src/routes/tests/independent-transforms/` (link each from
 `src/routes/+page.svelte`), new specs under `e2e/independent-transforms/`, unit tests in
 `src/lib/utils/motionDomProjection.spec.ts` / `src/lib/html/_MotionContainer.spec.ts`, one patch changeset
 (`.changeset/layout-mount-parity.md`) if any library behaviour changes.
@@ -163,11 +186,71 @@ fail after an honest attempt, record what you tried and the observed behaviour, 
 5. Full e2e `pnpm test:e2e`: 0 failed. Any failure outside the pre-existing flake: STOP (CLAUDE.md: failures are
    reviewed with the maintainer one at a time).
 
+### Step 5: Findings 9-11 (revision 2)
+
+Same rules as Step 1: record each red output against the current working tree before changing code; a case you
+can't make red after an honest attempt is reported "not reproduced" with what you tried, not fixed blind.
+
+9. **The detach-scope unit test proves nothing (test-only).** `motionDomProjection.spec.ts` "never detaches
+   non-transform animations or CSS animations/transitions" (~409) passes because the element has no
+   Motion-accelerated transform, so `stripToBaseTransforms` never collects anything. Change its SETUP only: give
+   the VisualElement a transform value whose `animation.liveValue()` returns a number (the way "detaches a
+   transform animation for the read" does after finding 4), and add one Motion transform effect next to the
+   three it already has. The existing assertion (opacity / CSS animation / CSS transition stay attached on every
+   read) must not change; add one assertion that the Motion transform effect IS detached during the read, so the
+   test fails if the gate ever goes back to "detach nothing". Prove it bites: temporarily make
+   `collectTransformEffects` skip the `animationName` / `transitionProperty` check, see it go red, restore it.
+   Record that red output.
+10. **Post-finish inline overwrite (library).** Upstream `resetTransform()` (motion-dom
+    `create-projection-node.ts` @ v14.2.0, 999-1031) only writes the inline transform when
+    `hasProjection || hasTransform(this.latestValues) || transformTemplateHasChanged`; `HTMLProjectionNode.ts:23`
+    writes the template value or `'none'`. An element whose inline transform came from someone else (a finished
+    `animate(el, { transform: 'translateY(40px)' })` that committed its styles, or page code writing
+    `el.style.transform`) and that has no Motion transform values, no projection delta and no template is measured
+    WITH that transform upstream. Ours writes base (`'none'`) over it for every read (`stripToBaseTransforms`,
+    `motionDomProjection.ts` ~1414-1420), so the measured box is 40px off from upstream's.
+    - **Red e2e** (`e2e/independent-transforms/layout-user-transform.spec.ts`, new case, same page or a new
+      `layout-inline-transform` page with a TesterPanel): a `layout` element; `await animate(el, { transform:
+      'translateY(40px)' }).finished`, then a layout change (widen). Expected (upstream): no vertical
+      jump/FLIP at the change; the element stays at +40px throughout (paint-sampled, `_paintedFrames.ts`).
+      Also a unit test in `motionDomProjection.spec.ts`: inline `translateY(40px)`, no Motion transform values,
+      no projection delta → the read sees the inline transform untouched. Before writing the e2e, confirm the
+      upstream behaviour on the fixture server (port 9991, `~/Github/motion/dev/react-19`, already running; add
+      no files to `~/Github/motion`; if you need a fixture there, STOP and ask) or justify it from the source
+      with line refs.
+    - **Fix**: skip the strip for an element exactly when upstream's `resetTransform` would skip it: no
+      non-zero projection delta (`isDeltaZero` is exported from `motion-dom`), `hasTransform(latestValues)`
+      false (`hasTransform` is exported), and no `transformTemplate` change. Keep the `'' → 'none'` write
+      for elements that DO qualify, keep the read-all-then-write ordering, keep base-transform handling for
+      elements with a user `style` transform (`getBaseTransform`), and update the JSDoc on
+      `stripToBaseTransforms` with the line refs. Don't touch the detach gate (finding 4).
+    - Must stay green: `layout-idle`, `layout-measure`, `basic`, `layout-user-transform` (existing cases),
+      `e2e/layout`, `e2e/transform-template`, `e2e/drag`, `e2e/reorder`.
+11. **Hydrated (server-rendered) mount (library).** SvelteKit renders every test page on the server, so a full
+    `page.goto` hydrates, while a client-side navigation or a `{#if}` mount (what `layout-mount-ready` does with
+    its Mount button) does not. The 006 run flagged that a layout change made during the hydrating flush (a
+    parent `onMount` / `$effect` that changes the element's size or class on first run) may be folded into the
+    mount pass and snap, where React (hydrate → `componentDidMount` → `useEffect` setState → a new commit →
+    `getSnapshotBeforeUpdate` → `willUpdate()`, `MeasureLayout.tsx` 39-98) animates it.
+    - **Red e2e** (new page `layout-hydration` with a TesterPanel, new spec): a `layout` box whose width goes
+      100 → 300 from the page's `onMount` (and a second box from a `$effect`). Load it two ways: `page.goto`
+      (hydrated) and client navigation from the index (`page.click` on its link, not `goto`). Expected: both
+      animate (paint-sampled widths between 100 and 300 over the transition), same as the client-mounted case.
+      If the hydrated path animates too, record "not reproduced" with the sampled widths for both paths and
+      skip the fix.
+    - **Fix** (only if red): make the mount pass the run where `MeasureLayout` mounts on the hydrated element,
+      and treat any later flush as an update, same rule as finding 1. Justify it in the
+      `createMeasureLayoutMountTracker` comment with the upstream refs. No mount-time `willUpdate()` (005).
+12. Changeset: extend `.changeset/layout-mount-parity.md` (patch) with one line each for 10 and 11 if fixed.
+13. Verify: Step 4 in full again (targeted `--repeat-each=5`, area, unit, check, `trunk fmt` / `trunk check`,
+    full e2e). Report exact counts, every red/green excerpt, `git diff --stat`, and upstream line refs.
+
 ## Done criteria
 
 - For each of findings 1-4: either (a) red output recorded before the fix + green after, or (b) "not reproduced"
   with the attempts and observations.
 - Findings 5-8 done (or 6 explained).
+- Findings 9-11 (revision 2): red then green, or "not reproduced" with evidence; finding 9 shown to bite.
 - All Step 4 commands green; exact pass/fail counts reported.
 - Report includes: `git diff --stat`, each red/green output excerpt, upstream line refs for each behaviour, and
   anything you were unsure about.
@@ -176,6 +259,7 @@ fail after an honest attempt, record what you tried and the observed behaviour, 
 
 - Drift check fails.
 - Port 4198 is in use.
+- Finding 10's upstream behaviour can't be confirmed from the fixture or the source.
 - A fix needs a motion-dom internal import, a prototype patch, or a heuristic for finding 4 (report options).
 - An existing spec fails and the fix would mean editing its assertion.
 - 005's `layout-idle` / `layout-measure` / `basic` go red and you can't restore them within the plan's approach.
