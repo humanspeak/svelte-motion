@@ -10,13 +10,13 @@ All three plans ship on one branch, `feat/motion-14.2.0` off `origin/main`, and 
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-bump-motion-14-2-0.md) | Pins → 14.2.0, upstream independent-transforms parity page/spec, full e2e triage | P1 | M | — | BLOCKED (parity `layout` test fails until 005/002; `onUpdate` half fixed by 004) |
-| [002](002-demote-accelerated-transforms-before-measure.md) | Demote accelerated transforms before svelte-motion's own layout measurements | P1 | S–M | 001, 005 | TODO |
+| [001](001-bump-motion-14-2-0.md) | Pins → 14.2.0, upstream independent-transforms parity page/spec, full e2e triage | P1 | M | — | BLOCKED (parity `layout` test fails until 005; `onUpdate` half fixed by 004) |
+| [002](002-demote-accelerated-transforms-before-measure.md) | Demote accelerated transforms before svelte-motion's own layout measurements | P1 | S–M | 001, 005 | SUPERSEDED (folded into 005: detach instead of demote) |
 | [003](003-reorder-click-after-drag.md) | Port Reorder click-after-drag guard (#2682, 14.1.1) | P2 | S | — (ship after 001) | TODO |
 | [004](004-on-update-prop.md) | `onUpdate(latest)` prop, forwarded to motion-dom (keeps transforms on the main thread) | P1 | S–M | 001 | DONE (`735071af`, guard-verified) |
-| [005](005-no-layout-update-on-mount.md) | Mounting a `layout` element doesn't call `willUpdate()` (keeps entry transforms accelerated) | P1 | S | 001 | TODO |
+| [005](005-no-layout-update-on-mount.md) | `layout` elements stay accelerated: no mount-time `willUpdate()`, compositor-proof measurements | P1 | M | 001 | IN PROGRESS (amended 2026-10-14) |
 
-Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason)
+Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason) | SUPERSEDED (by)
 
 ## Revisions
 
@@ -29,6 +29,12 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason)
   demotes the entry animation and snapshots its first compositor frame (spurious 0.8 px layout animation). Plan 005
   fixes it; 002 now depends on 005, because its red test can't reproduce until elements stay accelerated.
   Run order: 004 → 005 → 002 → 003.
+- 2026-10-14 (005 first run STOPPED): the mount guard works, but the layout observer's trailing-rAF read after the
+  mount ResizeObserver notification measures with the compositor `x` included (WAAPI overrides the inline strip),
+  commits a fake change and demotes. 002's demote-before-measure would demote on every observer read, so the
+  maintainer approved folding 002 into 005 with a different fix: detach the element's WAAPI transform effects
+  (`effect.target = null`) around the synchronous read, then reattach (guard-validated in Chromium). 002 is
+  superseded; its red test and parity anchor moved to 005. Run order: 005 → 003.
 
 ## Dependency notes
 

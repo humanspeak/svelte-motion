@@ -1,5 +1,9 @@
 # Plan 002: Layout measurements never include a compositor-accelerated transform
 
+> **SUPERSEDED 2026-10-14 by plan 005 (maintainer approved). Do not execute.** Demoting before every measurement
+> would move every observed `layout` element off the compositor, because svelte-motion's layout observers measure
+> speculatively. 005 detaches the WAAPI transform effects around the read instead; this plan's red test moved there.
+
 > **Executor instructions**: Follow this plan step by step. Run every
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
