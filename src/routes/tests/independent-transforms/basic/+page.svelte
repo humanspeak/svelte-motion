@@ -104,7 +104,7 @@
         {
             text: 'Reload the page and watch the six blue boxes in the top-left corner for one second.',
             expected:
-                'Every box slides 100px right. "accelerated" and "external" also grow to 1.5×; "late-template" tilts 45° and "layout" widens to 200px about a third of the way in. The verdict list reads PASS for all six.',
+                'Every box slides 100px right. "accelerated" and "external" also grow to 1.5×; "layout" widens to 200px about a third of the way in, and at that moment "late-template" snaps to a 45° tilt (its new template appends a fixed rotate, as in the upstream Motion fixture) while its slide right carries on without a jump. The verdict list reads PASS for all six.',
             action: { label: 'Reload', run: () => window.location.reload() }
         },
         {

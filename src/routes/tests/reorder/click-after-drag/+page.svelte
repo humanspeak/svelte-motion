@@ -170,6 +170,7 @@
         padding: 2px 8px;
         border-radius: 999px;
         background: #7f1d1d;
+        color: white;
         font-size: 12px;
         font-weight: 600;
     }
