@@ -434,6 +434,41 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-mount-ready') +
+                            searchParams}
+                    >
+                        Layout changes during the enter frames
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-toggle') + searchParams}
+                    >
+                        Re-enabling layout / layoutId is a mount
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-user-transform') +
+                            searchParams}
+                    >
+                        Layout keeps user transform animations
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-hydration') +
+                            searchParams}
+                    >
+                        Layout change right after hydration
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/on-update') + searchParams}
                     >
                         onUpdate prop (main thread + latest values)

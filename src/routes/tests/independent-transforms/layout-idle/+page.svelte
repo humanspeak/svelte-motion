@@ -1,6 +1,10 @@
 <script lang="ts">
     import { LayoutGroup, motion } from '$lib'
     import { onMount } from 'svelte'
+    import {
+        countTransformAnimations,
+        exposeCountTransformAnimations
+    } from '../_countTransformAnimations'
     import TesterPanel, { type TesterStep } from '../../layout/_parity/TesterPanel.svelte'
 
     /**
@@ -27,20 +31,6 @@
     /** Ids of the four fixture boxes, in render order. */
     const ids = ['layout', 'layout-dependency', 'layout-id', 'control']
 
-    /**
-     * Counts the running animations on `#id` whose keyframes animate
-     * `transform`. Same body as upstream's `window.countTransformAnimations`.
-     */
-    const countTransformAnimations = (id: string) =>
-        document
-            .getElementById(id)!
-            .getAnimations()
-            .filter((animation) =>
-                (animation.effect as KeyframeEffect)
-                    .getKeyframes()
-                    .some((keyframe) => 'transform' in keyframe)
-            ).length
-
     // ---- Live verdicts (tester only; never under `@isPlaywright=true`) ----
     const sampleTimes = [150, 450, 800]
     let isTester = $state(false)
@@ -53,8 +43,7 @@
     }
 
     onMount(() => {
-        ;(window as unknown as Record<string, unknown>).countTransformAnimations =
-            countTransformAnimations
+        exposeCountTransformAnimations()
         isTester = !window.location.search.includes('@isPlaywright=true')
 
         const timers = isTester ? sampleTimes.map((time) => setTimeout(sampleAll, time)) : []

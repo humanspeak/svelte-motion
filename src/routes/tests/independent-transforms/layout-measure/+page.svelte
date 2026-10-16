@@ -1,6 +1,10 @@
 <script lang="ts">
     import { motion } from '$lib'
     import { onMount } from 'svelte'
+    import {
+        countTransformAnimations,
+        exposeCountTransformAnimations
+    } from '../_countTransformAnimations'
     import TesterPanel, { type TesterStep } from '../../layout/_parity/TesterPanel.svelte'
 
     /**
@@ -19,20 +23,6 @@
     } as const
 
     let width = $state(100)
-
-    /**
-     * Counts the running animations on `#id` whose keyframes animate
-     * `transform`. Same body as upstream's `window.countTransformAnimations`.
-     */
-    const countTransformAnimations = (id: string) =>
-        document
-            .getElementById(id)!
-            .getAnimations()
-            .filter((animation) =>
-                (animation.effect as KeyframeEffect)
-                    .getKeyframes()
-                    .some((keyframe) => 'transform' in keyframe)
-            ).length
 
     /**
      * Samples `#box`'s painted left edge on every animation frame.
@@ -60,7 +50,7 @@
 
     onMount(() => {
         const target = window as unknown as Record<string, unknown>
-        target.countTransformAnimations = countTransformAnimations
+        exposeCountTransformAnimations()
         target.sampleLeft = sampleLeft
         isTester = !window.location.search.includes('@isPlaywright=true')
     })

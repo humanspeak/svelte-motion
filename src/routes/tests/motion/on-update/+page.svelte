@@ -2,6 +2,10 @@
     import { motion } from '$lib'
     import type { ResolvedValues } from 'motion-dom'
     import { onMount } from 'svelte'
+    import {
+        countTransformAnimations,
+        exposeCountTransformAnimations
+    } from '../../independent-transforms/_countTransformAnimations'
     import TesterPanel, { type TesterStep } from '../../layout/_parity/TesterPanel.svelte'
 
     /**
@@ -40,20 +44,6 @@
     /** Ids of the fixture boxes, in render order. */
     const ids = ['prop', 'transition', 'late', 'control']
 
-    /**
-     * Counts the running animations on `#id` whose keyframes animate
-     * `transform`. Same body as upstream's `window.countTransformAnimations`.
-     */
-    const countTransformAnimations = (id: string) =>
-        document
-            .getElementById(id)!
-            .getAnimations()
-            .filter((animation) =>
-                (animation.effect as KeyframeEffect)
-                    .getKeyframes()
-                    .some((keyframe) => 'transform' in keyframe)
-            ).length
-
     // ---- Live verdicts (tester only; never under `@isPlaywright=true`) ----
     type Track = { early: number | null; late: number | null }
     let isTester = $state(false)
@@ -76,8 +66,7 @@
     }
 
     onMount(() => {
-        ;(window as unknown as Record<string, unknown>).countTransformAnimations =
-            countTransformAnimations
+        exposeCountTransformAnimations()
         isTester = !window.location.search.includes('@isPlaywright=true')
 
         const timeout = setTimeout(() => (hasLateUpdate = true), 300)

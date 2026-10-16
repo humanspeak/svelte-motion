@@ -354,6 +354,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -388,6 +389,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -422,6 +424,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -456,6 +459,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -490,6 +494,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -524,6 +529,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -558,6 +564,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -592,6 +599,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -626,6 +634,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -660,6 +669,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -694,6 +704,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -728,6 +739,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -762,6 +774,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -796,6 +809,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -830,6 +844,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -864,6 +879,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -898,6 +914,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -932,6 +949,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -966,6 +984,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1000,6 +1019,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1034,6 +1054,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1068,6 +1089,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1102,6 +1124,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1136,6 +1159,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1170,6 +1194,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1204,6 +1229,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1238,6 +1264,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1272,6 +1299,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1306,6 +1334,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1340,6 +1369,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1374,6 +1404,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1408,6 +1439,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1442,6 +1474,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1476,6 +1509,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1510,6 +1544,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1544,6 +1579,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1578,6 +1614,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1612,6 +1649,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1646,6 +1684,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1680,6 +1719,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1714,6 +1754,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1748,6 +1789,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1782,6 +1824,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1816,6 +1859,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1850,6 +1894,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1884,6 +1929,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1918,6 +1964,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1952,6 +1999,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -1986,6 +2034,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2020,6 +2069,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2054,6 +2104,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2088,6 +2139,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2122,6 +2174,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2156,6 +2209,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2190,6 +2244,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2224,6 +2279,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2258,6 +2314,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2292,6 +2349,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2326,6 +2384,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2360,6 +2419,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2394,6 +2454,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2428,6 +2489,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2462,6 +2524,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2496,6 +2559,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2530,6 +2594,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2564,6 +2629,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2598,6 +2664,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2632,6 +2699,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2666,6 +2734,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2700,6 +2769,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2734,6 +2804,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2768,6 +2839,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2802,6 +2874,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2836,6 +2909,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2870,6 +2944,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2904,6 +2979,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2938,6 +3014,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -2972,6 +3049,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3006,6 +3084,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3040,6 +3119,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3074,6 +3154,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3108,6 +3189,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3142,6 +3224,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3176,6 +3259,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3210,6 +3294,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3244,6 +3329,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3278,6 +3364,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3312,6 +3399,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3346,6 +3434,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3380,6 +3469,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3414,6 +3504,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3448,6 +3539,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3482,6 +3574,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3516,6 +3609,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3550,6 +3644,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3584,6 +3679,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3618,6 +3714,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3652,6 +3749,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3686,6 +3784,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3720,6 +3819,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3754,6 +3854,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3788,6 +3889,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3822,6 +3924,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3856,6 +3959,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3890,6 +3994,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3924,6 +4029,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3958,6 +4064,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -3992,6 +4099,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4026,6 +4134,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4060,6 +4169,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4094,6 +4204,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4128,6 +4239,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4162,6 +4274,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4196,6 +4309,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4230,6 +4344,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4264,6 +4379,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4298,6 +4414,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4332,6 +4449,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4366,6 +4484,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4400,6 +4519,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4434,6 +4554,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4468,6 +4589,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4502,6 +4624,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4536,6 +4659,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4570,6 +4694,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4604,6 +4729,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4638,6 +4764,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4672,6 +4799,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4706,6 +4834,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4740,6 +4869,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4774,6 +4904,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4808,6 +4939,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4842,6 +4974,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4876,6 +5009,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4910,6 +5044,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4944,6 +5079,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -4978,6 +5114,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5012,6 +5149,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5046,6 +5184,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5080,6 +5219,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5114,6 +5254,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5148,6 +5289,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5182,6 +5324,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5216,6 +5359,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5250,6 +5394,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5284,6 +5429,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5318,6 +5464,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5352,6 +5499,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5386,6 +5534,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5420,6 +5569,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5454,6 +5604,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5488,6 +5639,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5522,6 +5674,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5556,6 +5709,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5590,6 +5744,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5624,6 +5779,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5658,6 +5814,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5692,6 +5849,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5726,6 +5884,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5758,6 +5917,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5790,6 +5950,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5822,6 +5983,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5854,6 +6016,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5886,6 +6049,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5918,6 +6082,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5950,6 +6115,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -5982,6 +6148,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -6014,6 +6181,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`
@@ -6046,6 +6214,7 @@ export type MotionComponents = {
      * * `whileHover`
      * * `onAnimationStart`
      * * `onAnimationComplete`
+     * * `onUpdate`
      * * `onHoverStart`
      * * `onHoverEnd`
      * * `layout`

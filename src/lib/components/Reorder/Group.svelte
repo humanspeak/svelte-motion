@@ -21,6 +21,7 @@
     import { setReorderContext, type ItemData } from './context'
     import { detectAxis } from './detectAxis'
     import { applyOrderSwap } from './order'
+    import type { MouseEventHandler, PointerEventHandler } from 'svelte/elements'
     import type { ReorderAxis, ReorderGroupProps } from './types'
 
     let {
@@ -147,22 +148,18 @@
      * (detail 0, e.g. keyboard) are left alone.
      * (Motion 14.1.1 `Reorder/Group.tsx`.)
      */
-    const handlePointerDownCapture = (event: PointerEvent) => {
+    const handlePointerDownCapture: PointerEventHandler<HTMLElement> = (event) => {
         hasReordered = false
-        if (typeof onpointerdowncapture === 'function') {
-            ;(onpointerdowncapture as (event: PointerEvent) => void)(event)
-        }
+        onpointerdowncapture?.(event)
     }
 
-    const handleClickCapture = (event: MouseEvent) => {
+    const handleClickCapture: MouseEventHandler<HTMLElement> = (event) => {
         if (hasReordered && event.detail) {
             hasReordered = false
             event.stopPropagation()
             event.preventDefault()
         }
-        if (typeof onclickcapture === 'function') {
-            ;(onclickcapture as (event: MouseEvent) => void)(event)
-        }
+        onclickcapture?.(event)
     }
 
     /**

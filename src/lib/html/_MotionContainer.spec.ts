@@ -1,6 +1,7 @@
 import { flushTimers } from '$lib/__tests__/flushTimers'
 import { animationControls } from '$lib/utils/animationControls.svelte'
 import { fireEvent, render } from '@testing-library/svelte'
+import { tick } from 'svelte'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Curried like the real API: animateMotionValue(name, value, target, transition)
@@ -1038,5 +1039,150 @@ describe('onUpdate', () => {
         const el = container.firstElementChild as HTMLElement
         expect(el.getAttribute('onupdate')).toBeNull()
         expect(el.getAttribute('onUpdate')).toBeNull()
+    })
+})
+
+/**
+ * Mount vs update of layout measuring (MeasureLayout parity, plan 006).
+ *
+ * Upstream mounts `MeasureLayout` with the element while `layout`, `layoutId`
+ * or `drag` is set (framer-motion `motion/index.tsx` @ v14.2.0, 205-219):
+ * `componentDidMount` only runs `root.didUpdate()` once any snapshot has been
+ * taken (`MeasureLayout.tsx` 51-53); every later commit is an update that
+ * `willUpdate()`s (`getSnapshotBeforeUpdate`, 68-98).
+ */
+describe('layout mount vs update', () => {
+    let willUpdateSpy: ReturnType<typeof vi.spyOn>
+
+    beforeEach(async () => {
+        // jsdom has no ResizeObserver; the layout observers need one to exist.
+        vi.stubGlobal(
+            'ResizeObserver',
+            class {
+                observe() {}
+                unobserve() {}
+                disconnect() {}
+            }
+        )
+        const { MotionDomProjectionAdapter } = await import('$lib/utils/motionDomProjection')
+        willUpdateSpy = vi.spyOn(MotionDomProjectionAdapter.prototype, 'willUpdate')
+    })
+
+    afterEach(() => {
+        willUpdateSpy.mockRestore()
+    })
+
+    it('treats a class change while the enter animation is starting as an update', async () => {
+        const result = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                layout: true,
+                class: 'narrow',
+                initial: { x: 0 },
+                animate: { x: 40 }
+            }
+        })
+        // Mounted, but the enter's requestAnimationFrame hasn't run: still
+        // entering, not `ready`.
+        await tick()
+        willUpdateSpy.mockClear()
+
+        await result.rerender({
+            tag: 'div',
+            layout: true,
+            class: 'wide',
+            initial: { x: 0 },
+            animate: { x: 40 }
+        })
+
+        expect(willUpdateSpy).toHaveBeenCalled()
+        await flushTimers()
+    })
+
+    it('does not willUpdate when layout is turned back on', async () => {
+        const result = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', layout: true }
+        })
+        await flushTimers()
+        await result.rerender({ tag: 'div', layout: false })
+        await flushTimers()
+        willUpdateSpy.mockClear()
+
+        await result.rerender({ tag: 'div', layout: true })
+        await flushTimers()
+
+        expect(willUpdateSpy).not.toHaveBeenCalled()
+    })
+
+    it('still willUpdates a later change after layout is turned back on', async () => {
+        const result = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', layout: true, class: 'a' }
+        })
+        await flushTimers()
+        await result.rerender({ tag: 'div', layout: false, class: 'a' })
+        await flushTimers()
+        await result.rerender({ tag: 'div', layout: true, class: 'a' })
+        await flushTimers()
+        willUpdateSpy.mockClear()
+
+        await result.rerender({ tag: 'div', layout: true, class: 'b' })
+
+        expect(willUpdateSpy).toHaveBeenCalledTimes(1)
+        await flushTimers()
+    })
+
+    it('does not willUpdate a grouped layoutId node when its layoutId is turned back on', async () => {
+        const { default: Harness } = await import('./__tests__/LayoutIdToggleHarness.svelte')
+        const result = render(Harness, { props: { on: true } })
+        await flushTimers()
+        await result.rerender({ on: false })
+        await flushTimers()
+        willUpdateSpy.mockClear()
+
+        await result.rerender({ on: true })
+        await flushTimers()
+
+        expect(willUpdateSpy).not.toHaveBeenCalled()
+    })
+
+    it('still willUpdates a grouped layoutId node on a later change', async () => {
+        const { default: Harness } = await import('./__tests__/LayoutIdToggleHarness.svelte')
+        const result = render(Harness, { props: { on: true, className: 'a' } })
+        await flushTimers()
+        willUpdateSpy.mockClear()
+
+        await result.rerender({ on: true, className: 'b' })
+
+        expect(willUpdateSpy).toHaveBeenCalledTimes(1)
+        await flushTimers()
+    })
+
+    it('runs root.didUpdate() on mount once a snapshot has been taken', async () => {
+        const { visualElementStore } = await import('motion-dom')
+        const first = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', layout: true, class: 'a' }
+        })
+        await flushTimers()
+        // An update anywhere takes a snapshot (MeasureLayout.tsx 90).
+        await first.rerender({ tag: 'div', layout: true, class: 'b' })
+        await flushTimers()
+        await flushTimers()
+
+        const firstEl = first.container.firstElementChild as HTMLElement
+        const root = (
+            visualElementStore.get(firstEl) as unknown as {
+                projection: { root: { didUpdate: () => void } }
+            }
+        ).projection.root
+        const didUpdateSpy = vi.spyOn(root, 'didUpdate')
+
+        render(MotionContainer as unknown as any, {
+            props: { tag: 'div', layout: true }
+        })
+        await flushTimers()
+        await flushTimers()
+
+        expect(didUpdateSpy).toHaveBeenCalled()
+        didUpdateSpy.mockRestore()
     })
 })
