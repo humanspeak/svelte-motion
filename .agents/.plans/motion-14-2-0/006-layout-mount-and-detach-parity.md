@@ -26,6 +26,34 @@
 > 607 passed / 2 skipped / 0 failed). Keep all of it. Work only **Step 5 (findings 9-11)** below, red tests first.
 > The "don't change the post-finish inline overwrite" bullet above is replaced by finding 10.
 >
+> **Revision 3 2026-10-14 (maintainer)**: finding 13 added: a reactive layout commit landing after the frameloop
+> painted one unprojected frame. It now flushes the frame steps the way upstream's `update()` does. Finding 10's
+> target is corrected after the upstream fixture check: upstream DROPS a foreign inline transform in one frame
+> (`applyProjectionStyles` writes `'none'`, `create-projection-node.ts` 2050-2055), so the box neither stays at
+> +40 nor slides. Match that exactly, add an `animate(el, { y })` supported-path case, and don't touch
+> `e2e/projection/nested-ancestor` without the maintainer.
+>
+> **Revision 4 2026-10-15 (maintainer)**: finding 14 added: declarative `animate={{ transform: '…' }}` on a
+> `layout` element follows finding 10's rule (`upstreamKeptTransform`) but has no test. Work only finding 14.
+>
+> **Revision 5 2026-10-15 (maintainer)**: finding 15 added: the `layout-user-transform` tester page can't be driven
+> by hand (every button toggles width 100↔300 with no reload or wait, so repeat presses stack layout animations on
+> half-finished slides and verdicts go FAIL for scenarios that never ran). Work only finding 15.
+>
+> **Revision 6 2026-10-15 (maintainer)**: finding 16 added: after a mid-slide widen, upstream leaves boxes 2 and 5
+> 40px down once their slides end; ours drops them back to their rows. Work only finding 16.
+>
+> **Revision 7 2026-10-16 (maintainer)**: finding 16 dropped (a measurement artifact of the guard's fixture,
+> see item 16). Finding 17 added: check whether a commit with no layout change ends a finished projection the
+> way a React re-render does. Work only finding 17.
+>
+> **Revision 8 2026-10-16 (maintainer)**: finding 18 added: in the sign-off browser, a reload of
+> `layout-hydration` finishes the projection within 1ms of starting it. Work it after finding 17.
+>
+> **Revision 9 2026-10-16 (maintainer)**: finding 17 fixed (executor). Finding 18 closed as matching upstream: a
+> same-size `resize` the sign-off browser fires before the first frame finishes the animation, as in React.
+> Finding 19 added: the hydration tester page reports such a load as "not judged". Work only finding 19.
+>
 > **Never use `git stash`** (the stash is shared by every worktree of this repo).
 >
 > **Workspace**: `/Users/jasonkummerl/Github/svelte-motion-1420`, branch `feat/motion-14.2.0`.
@@ -244,6 +272,124 @@ can't make red after an honest attempt is reported "not reproduced" with what yo
 12. Changeset: extend `.changeset/layout-mount-parity.md` (patch) with one line each for 10 and 11 if fixed.
 13. Verify: Step 4 in full again (targeted `--repeat-each=5`, area, unit, check, `trunk fmt` / `trunk check`,
     full e2e). Report exact counts, every red/green excerpt, `git diff --stat`, and upstream line refs.
+
+14. **Declarative `transform` string on a `layout` element (test-only unless red).** Finding 10 keeps a
+    VisualElement's `transform` string as the read base (`upstreamKeptTransform`, `motionDomProjection.ts` ~248,
+    used ~1476), but every test drives it imperatively (`animate(el, …)` / page-written inline). Nothing covers
+    `<motion.div layout animate={{ transform: 'translateY(40px)' }}>`.
+    - **Upstream first**: on the React fixture server you used for finding 10, record painted frames for the same
+      shape (`<motion.div layout animate={{ transform: 'translateY(40px)' }}>`, wait for it to finish, then
+      widen; also widen mid-animation). Add no files to `~/Github/motion`; if confirming needs a new fixture
+      there, STOP and ask. Cite the source lines that explain what you see (`build-styles` handling of the
+      `transform` key, `has-transform.ts`, `resetTransform` 999-1031, `applyProjectionStyles` 2050-2076).
+    - **Tests**: a fifth box on `layout-user-transform` (`#user-declarative`) with its own TesterPanel verdict
+      rows, plus e2e cases in `layout-user-transform.spec.ts` (paint-sampled via `_paintedFrames.ts`, after
+      finish and mid-animation, matching the upstream frames), plus a unit test in `motionDomProjection.spec.ts`
+      for the read base when the VisualElement's `transform` string comes from a declarative animation.
+    - **Prove they bite**: temporarily make `upstreamKeptTransform` return `undefined`, record the red output,
+      restore it. If a case can't be made red, say so. If the current code does NOT match upstream for this
+      shape, record it red and STOP with options before fixing.
+    - Also fix the stale step 2 text on that page ("Both boxes… Neither jumps…") so it names the boxes it
+      means. Don't change existing assertions or existing e2e files other than adding cases.
+    - Verify: targeted `layout-user-transform` `--repeat-each=5`, `pnpm test:only`, `pnpm check`,
+      `trunk fmt` / `trunk check`, and the area run (`e2e/independent-transforms`, `e2e/layout`,
+      `e2e/projection`). Report exact counts.
+
+15. **Make `layout-user-transform` drivable by a human (page-only; no library change).**
+    - **One button = one complete scenario.** Replace the tester buttons with three scenario buttons: "Widen
+      mid-slide (boxes 1, 2)", "Widen after finish (boxes 2-5)", "Widen the declarative box mid-slide (box 5)".
+      Each one reloads the page with a query (e.g. `?scenario=after-finish`), waits the right time itself
+      (showing a countdown such as "Waiting for the slides to finish… 3s"), widens once, samples, and shows the
+      verdict. Pressing any button again just starts that scenario fresh from a reload. While a scenario runs,
+      the buttons are disabled. No button ever toggles the width back.
+    - **Only judge what ran.** Verdict rows for scenarios that didn't run show "not run" (not FAIL, not stale
+      PASS). If the precondition doesn't hold when the widen fires (e.g. box 5 already stopped), say so
+      ("precondition missed: reload") instead of FAIL.
+    - **Label the boxes on the page**: a short caption beside each box (1: page WAAPI animation, 2: Motion
+      `animate(el, { transform })`, 3: page-written inline transform, 4: Motion `y`, 5: `animate={{ transform }}`),
+      and, for the running scenario, dim the boxes it doesn't judge. Each scenario's "Expected" text says, box by
+      box, what you see. Fix the stale "both rows below" status text.
+    - **Keep the Playwright surface unchanged.** `window.widenAndSample` / `widenAndSampleTops` and everything the
+      spec uses must behave exactly as now under `@isPlaywright=true` (no auto-run, no reload, no dimming). The
+      TesterPanel stays hidden there. Existing e2e must pass without edits; add one e2e case that loads each
+      `?scenario=` URL in tester mode and waits for its PASS.
+    - **Repeat-press check, report only.** On the same React fixture as finding 14, record painted frames for
+      "widen mid-slide, then narrow back 300ms later" (boxes 2 and 5 shapes), run the same on our page via
+      `widenAndSampleTops`, and report whether they match. Don't add it to the page or fix anything; if they
+      differ, STOP after the page work and report the frames.
+    - Verify: targeted `layout-user-transform` `--repeat-each=5`, `pnpm check`, `trunk fmt` / `trunk check`.
+      Check the tester page yourself at 1920 wide: each button, pressed twice in a row, ends with its rows PASS.
+
+16. **Dropped (revision 7).** The guard's React fixture (port 4212) re-rendered its whole App every 100ms for a
+    countdown, and those re-renders kept boxes 2 and 5 at +40. Without them, React Motion 14.2.0 drops them to
+    their rows when the slide ends, exactly like ours, and finding 14's mid-slide assertions stand (executor
+    measurement; guard re-ran it: +40 with the countdown, 0 without, at 4.5s and 6s). Box 1 holds +40 on both.
+
+17. **A commit with no layout change ends a finished projection (check; fix only if red).** Upstream, a
+    finished layout animation keeps `target`, so every later render writes `none` via the projecting path
+    (`create-projection-node.ts` 2042-2075; `completeAnimation` 1791-1805 leaves it). A React re-render whose
+    layout didn't change runs `didUpdate` → `finishAnimation` (615-617, 2445-2448), which clears `target`, and
+    the element's own transform renders again (with one re-render at 3000ms, boxes 2 and 5 end at +40, and box
+    4's inline value turns into `translateY(40px)`).
+    - **Check**: in ours, does a Svelte commit on a `layout` element that doesn't move it (e.g. a style-prop
+      change such as a colour, or a `layoutDependency`-free prop change) run the `willUpdate` → `didUpdate`
+      pair the way a React re-render does, so the same thing happens? Use the executor's variant fixture
+      `/tmp/sm-react-f16` (`?countdown=0&rerenderAt=3000`) as the upstream reference, and record painted frames
+      on both.
+    - **If it differs**: red e2e first (a new box or page state on `layout-user-transform` that changes a
+      non-layout prop once after the layout animation ends; assert the end offset matches upstream), a unit
+      test at the bug's level if one fits, then the fix, citing lines. Don't regress findings 10, 14 or 15.
+    - **If it matches**: add the e2e case anyway as coverage and report it as green.
+    - Verify: targeted `layout-user-transform` `--repeat-each=5`, the area run (`e2e/independent-transforms`,
+      `e2e/layout`, `e2e/projection`), `pnpm test:only`, `pnpm check`, `trunk fmt` / `trunk check`. Report
+      exact counts and the red/green excerpts.
+
+18. **Hydration widen is finished instantly when the app starts before the first frame (library; red first).**
+    The maintainer's sign-off browser (T3 Code in-app, Electron 44 / Chrome 152, 1280×800 at 2x) fails
+    `layout-hydration` on every reload: both rows FAIL with "first widths 300, 300, …". Headless Chromium passes
+    (18 reloads), and so do a fresh tab, a client-side navigation and an iframe load in the same browser.
+    Guard trace from a `<head>` probe, injected by a local proxy on 4217 in front of 4199 (no repo change;
+    `/tmp/sm-proxy/proxy.mjs`). Times are performance.now() in ms, values are `#hydrate-mount`'s inline transform:
+
+    | Load | Projection starts | Ends | First rAF frames |
+    | --- | --- | --- | --- |
+    | Navigate (PASS) | 108: `translate3d(-100px…) scale(0.333…)` | animates over 1s | 31, 50, 66 (before hydration), then 109, 112, … |
+    | Reload (FAIL) | 55: `translate3d(-100px…) scale(0.333…)` | 56: `none` (under 1ms later) | 55, then 59: width 300 |
+
+    On the reload, the app hydrates before the first frame and the projection is finished within a millisecond,
+    before it ever ticks. That matches upstream's rule for a `didUpdate` with no layout change on a node whose
+    animation hasn't started (`create-projection-node.ts` @ v14.2.0, 610-617 → `finishAnimation` 2445-2448).
+    So the suspicion is that ours runs a second, no-change update cycle right after the widen commit.
+    - **Find the second cycle**: what calls `willUpdate`/`didUpdate` (or `finishAnimation`/`root.didUpdate`)
+      after the widen commit on this page, before the first frame? Candidates: the adapter mount effect's
+      `didMount()` ordering, the observer path, the `isTester` / `verdicts` state flush, or the second box's
+      `$effect` flush. Cite our file:line. Check what upstream does for the same React shape (hydrate, an
+      effect widens, one more parent re-render before the first frame) on a fixture; add no files to
+      `~/Github/motion`.
+    - **Red first**: make the race deterministic in a test (e.g. a unit test that hydrates and flushes
+      before any frame, or an e2e that holds `requestAnimationFrame` until hydration finishes via
+      `page.addInitScript`). The red must show the projection finished before its first tick.
+    - **Fix** to match upstream, citing lines. Don't regress findings 1-15 or 17.
+    - Verify: targeted `layout-hydration` and `layout-user-transform` `--repeat-each=5`, the area run
+      (`e2e/independent-transforms`, `e2e/layout`, `e2e/projection`), `pnpm test:only`, `pnpm check`,
+      `trunk fmt` / `trunk check`. Report exact counts and the red/green excerpts. The guard re-checks it in
+      the sign-off browser.
+
+19. **`layout-hydration` page: don't judge a load where the browser resized before the first frame (page-only).**
+    Finding 18 closed as matching upstream. In the sign-off browser a `resize` (same size: 1467×1210 before and
+    after) fires at ~86ms on reload, before Motion's first `frame.read` stores `innerWidth` (root resize
+    listener, `create-projection-node.ts` @ v14.2.0 482-508; `finishAnimation` 505-508). That finishes the
+    animation the same way React Motion 14.2.0 does (executor's `/tmp/sm-react-f18` fixture; guard probe on
+    4217 logged `resize` at 86, inline `none` at 87). Maintainer decision: match React; fix the page only.
+    - Record `resize` events from page start until the verdict is in (as early as the page script can).
+      If one fired before the first painted frame, each row shows "not judged: the browser sent a resize
+      before the first frame (Motion finishes layout animations on resize, same as React)" with a neutral
+      chip, not FAIL. Keep the PASS/FAIL logic for every other load.
+    - Add one sentence to the page's checks text explaining this. The Playwright surface is unchanged and the
+      TesterPanel stays hidden under `@isPlaywright=true`. Existing e2e must pass without edits; add an e2e
+      case that dispatches a `resize` before the first frame in tester mode (e.g. `page.addInitScript`) and
+      expects "not judged", and one without it that expects PASS.
+    - Verify: targeted `layout-hydration` `--repeat-each=5`, `pnpm check`, `trunk fmt` / `trunk check`.
 
 ## Done criteria
 

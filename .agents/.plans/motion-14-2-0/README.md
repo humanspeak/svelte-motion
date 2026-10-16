@@ -15,7 +15,7 @@ All three plans ship on one branch, `feat/motion-14.2.0` off `origin/main`, and 
 | [003](003-reorder-click-after-drag.md) | Port Reorder click-after-drag guard (#2682, 14.1.1) | P2 | S | — (ship after 001) | DONE (`3c51ee6b`, guard-verified) |
 | [004](004-on-update-prop.md) | `onUpdate(latest)` prop, forwarded to motion-dom (keeps transforms on the main thread) | P1 | S–M | 001 | DONE (`735071af`, guard-verified) |
 | [005](005-no-layout-update-on-mount.md) | `layout` elements stay accelerated: no mount-time `willUpdate()`, compositor-proof measurements | P1 | M | 001 | DONE (`3ab94f92`, guard-verified) |
-| [006](006-layout-mount-and-detach-parity.md) | Tighten 005 to upstream parity: feature-mount detection, `didUpdate` on mount, detach only Motion's group; cleanups | P1 | M | 003, 004, 005 | IN PROGRESS (revision 2: findings 9-11) |
+| [006](006-layout-mount-and-detach-parity.md) | Tighten 005 to upstream parity: feature-mount detection, `didUpdate` on mount, detach only Motion's group; cleanups | P1 | M | 003, 004, 005 | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason) | SUPERSEDED (by)
 
@@ -47,6 +47,9 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason) 
   The run left three items: a detach-scope unit test that passes vacuously, the post-finish inline overwrite
   (we measure without a foreign inline transform; upstream `resetTransform` keeps it), and a possible snap for a
   layout change during hydration. The maintainer wants all three fixed in this build: 006 revision 2, findings 9-11.
+- 2026-10-16 (006 done): revisions 3-9 closed findings 9-19 (16 dropped as a fixture artifact, 18 matches upstream).
+  Maintainer signed off every 006 page; layout-user-transform checked side by side against a React Motion 14.2.0 twin.
+  Unit 1182 passed, `pnpm check` 0 errors, `trunk check` clean.
 
 ## Dependency notes
 
