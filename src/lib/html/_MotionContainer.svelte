@@ -28,9 +28,10 @@
     import {
         animateTarget,
         calcBoxDelta,
-        cancelFrame,
         createDelta,
-        frame,
+        frameData,
+        frameSteps,
+        time,
         isDeltaZero,
         isMotionValue,
         styleEffect,
@@ -178,6 +179,7 @@
         transition: transitionProp,
         onAnimationStart: onAnimationStartProp,
         onAnimationComplete: onAnimationCompleteProp,
+        onUpdate: onUpdateProp,
         transformTemplate: transformTemplateProp,
         style: styleProp,
         class: classProp,
@@ -600,6 +602,15 @@
             // template off the props, so the VE composes templated transforms
             // natively — the job `applyMotionStyleEffect` used to do.
             transformTemplate: transformTemplateProp,
+            // Forwarded only, never invoked here: motion-dom subscribes it
+            // through `propEventHandlers` and fires it on `preRender` with
+            // `latestValues` whenever a bound value changes. Its presence also
+            // makes `canAccelerateTransform` keep transforms off the
+            // compositor, and adding it later demotes a running transform
+            // group in `VisualElement.update` (motion-dom
+            // `render/VisualElement.ts`, `animation/waapi/transforms/
+            // TransformAnimation.ts` @ v14.2.0).
+            onUpdate: onUpdateProp,
             transformPagePoint: effectiveTransformPagePoint,
             exit: exitProp,
             layoutId: scopedLayoutId
@@ -786,7 +797,8 @@
                 layoutIdRegistry.snapshot(
                     scopedLayoutId,
                     new DOMRect(rect.left, rect.top, rect.width, rect.height),
-                    mergedTransition ?? {}
+                    mergedTransition ?? {},
+                    target
                 )
             }
         }
@@ -2123,6 +2135,17 @@
             })
         })
         motionDomProjection.mount(mountTarget)
+        // `MeasureLayout` mounts with the element (see
+        // `createMeasureLayoutMountTracker`): run its `componentDidMount`
+        // here, with the DOM as first rendered, and record the layout
+        // dependencies it was rendered with.
+        untrack(() => {
+            if (!measureLayoutMounted) return
+            const deps = trackLayoutProjectionDependencies()
+            layoutMountTracker.markMounted(mountTarget, deps)
+            layoutIdMountTracker.markMounted(mountTarget, deps)
+            motionDomProjection.didMount()
+        })
         return () => {
             motionDomProjection.unmount()
         }
@@ -2271,6 +2294,71 @@
     })
 
     let explicitLayoutSnapshot: RectLike | null = null
+    // Upstream renders `MeasureLayout` while `drag`, `layout` or `layoutId`
+    // enables it (framer-motion motion/index.tsx:205-219, feature props in
+    // motion/features/definitions.ts:17,23). It mounts with the element —
+    // there is no `isLoaded` gate upstream, so a commit during the enter
+    // frames is already an update — and turning every enabling prop off
+    // unmounts it, so turning one back on mounts it again. Mount runs
+    // `componentDidMount` (MeasureLayout.tsx:39-65: `root.didUpdate()` once a
+    // snapshot exists, never `willUpdate()`); every later commit runs
+    // `getSnapshotBeforeUpdate` → `willUpdate()` (68-98). A mount-time
+    // willUpdate demotes Motion 14.2's compositor transforms and snapshots the
+    // entry animation's first frame as if it were a layout change.
+    const measureLayoutMounted = $derived(
+        (hasLayoutFeatures && !!(layoutProp || scopedLayoutId)) || (hasDragFeatures && !!dragProp)
+    )
+    /**
+     * Track one pre-update effect's view of `MeasureLayout`'s lifecycle.
+     *
+     * Each effect owns its tracker, so the two pre-update effects never
+     * consume each other's mount pass.
+     *
+     * `MeasureLayout` mounts with the element. Here that is the adapter mount
+     * effect (`markMounted`), which runs in the flush that creates or
+     * hydrates the element, with the DOM still as first rendered. A pre-update
+     * effect only sees the new element on its next run, in a LATER flush,
+     * and that flush may also carry a layout change: a parent `onMount` /
+     * `$effect` that resizes the element on first run (hydrated or client
+     * mounted). Upstream that change is a new commit after
+     * `componentDidMount`, so `getSnapshotBeforeUpdate` → `willUpdate()`
+     * animates it (framer-motion `MeasureLayout.tsx` @ v14.2.0, 39-65 then
+     * 68-98). So that first run is an update exactly when the layout
+     * dependencies changed since the mount; otherwise it is still the mount
+     * and must not `willUpdate()` (a mount-time `willUpdate()` demotes Motion
+     * 14.2's compositor transforms, plan 005).
+     *
+     * Turning the enabling props back on with the same element never passes
+     * through the adapter mount, so that run is the mount (off → on).
+     *
+     * @returns `markMounted(element, deps)` for the adapter mount effect, and
+     *     `classify(current, deps)` for the pre-update effect, which returns
+     *     `'mount'` on the run where `MeasureLayout` mounts (off → on),
+     *     `'mounted'` on the first run after an adapter mount with no layout
+     *     change since (nothing to do), and `'update'` otherwise.
+     */
+    const createMeasureLayoutMountTracker = () => {
+        let seenOn: HTMLElement | null = null
+        let adapterMount: { element: HTMLElement; deps: unknown[] } | null = null
+        return {
+            markMounted(mounted: HTMLElement, deps: unknown[]) {
+                adapterMount = { element: mounted, deps }
+            },
+            classify(current: HTMLElement | null, deps: unknown[]): 'mount' | 'mounted' | 'update' {
+                if (current === seenOn) return 'update'
+                seenOn = current
+                if (current === null) return 'update'
+                const atMount = adapterMount?.element === current ? adapterMount : null
+                adapterMount = null
+                if (!atMount) return 'mount'
+                const changed =
+                    atMount.deps.length !== deps.length ||
+                    deps.some((dep, i) => !Object.is(dep, atMount.deps[i]))
+                return changed ? 'update' : 'mounted'
+            }
+        }
+    }
+    const layoutMountTracker = createMeasureLayoutMountTracker()
     let lastRect: RectLike | null = null
     let observerRestartRect: RectLike | null = null
     let observerRestartElement: HTMLElement | null = null
@@ -2282,7 +2370,7 @@
     // tracked layout dependency) and the DOM self-attribute observer (its
     // `attributeFilter` includes `class`). The observer commits first on its
     // microtask; `commitObservedLayout` bumps this serial whenever it commits a
-    // changed rect, and `runReactiveCommit` (running later on frame.postRender)
+    // changed rect, and `runReactiveCommit` (running later, on motion-dom's microtask)
     // uses the advance to detect that its own snapshot's change was already
     // committed — so it skips the duplicate re-commit that would otherwise
     // restart the FLIP from origin and double-fire `onProjectionUpdate`.
@@ -2323,12 +2411,22 @@
     }
 
     $effect.pre(() => {
-        const shouldProject = element && layoutProp && isLoaded === 'ready' && hasLayoutFeatures
+        const mountedOn = element && measureLayoutMounted ? element : null
         // Track common layout-affecting props so Svelte-owned updates can
         // snapshot before the DOM patch, matching upstream MeasureLayout.
-        trackLayoutProjectionDependencies()
+        const deps = trackLayoutProjectionDependencies()
 
-        if (!shouldProject) {
+        // Mount pass: not an update (MeasureLayout.tsx componentDidMount).
+        // This effect owns the mount's root update for both trackers (the
+        // adapter mount effect runs it for a new element).
+        const pass = layoutMountTracker.classify(mountedOn, deps)
+        if (pass !== 'update') {
+            explicitLayoutSnapshot = null
+            if (pass === 'mount') motionDomProjection?.didMount()
+            return
+        }
+
+        if (!(mountedOn && layoutProp)) {
             explicitLayoutSnapshot = null
             return
         }
@@ -2345,13 +2443,26 @@
     // which motion-dom's styleEffect batches onto the frameloop's render
     // phase. Measuring then (or on upstream's microtask flush) reads the
     // OLD layout, sees no change, and skips the animation — a visible snap.
-    // Defer the measure + commit to frame.postRender — after the frameloop's
-    // style writes, still pre-paint — and drive the animation through the
-    // same explicit-snapshot commit the observer path uses.
+    // So the measure + commit runs on a microtask AFTER flushing the
+    // frameloop's update / preRender / render steps itself, which lands those
+    // batched style writes first. That is upstream's own manual flush
+    // (`update()`, motion-dom create-projection-node.ts @ v14.2.0, 829-845,
+    // reached from `didUpdate()` → `microtask.read(scheduleUpdate)`, 847-852):
+    // it runs in the same task as the commit, whatever frame phase that is.
+    // A plain `queueMicrotask`, not motion-dom's `microtask` batcher: the
+    // commit calls `root.didUpdate()`, which schedules onto that batcher, and
+    // a job scheduled while the batcher is processing waits for its next wake
+    // (it doesn't keep itself alive), so the update pass would stall.
+    // Deferring to `frame.postRender` instead only works while this frame's
+    // frameloop is still to come; a commit landing after it (e.g. a flush
+    // started from a frameloop callback such as `onAnimationStart`) waited a
+    // whole frame and painted the new layout once, unprojected.
+    // The animation runs through the same explicit-snapshot commit the
+    // observer path uses.
     let reactiveCommitPrevious: RectLike | null = null
     // Snapshot of `observerCommitSerial` taken when this reactive commit was
     // scheduled. If the observer path commits a changed rect before the
-    // postRender callback runs, the serial advances past this captured value.
+    // deferred commit runs, the serial advances past this captured value.
     let reactiveCommitSerialAtSchedule = 0
 
     /**
@@ -2373,12 +2484,41 @@
         return true
     }
 
+    /**
+     * Process the frameloop's update, preRender and render steps now, as
+     * upstream `update()` does before it measures (motion-dom
+     * create-projection-node.ts @ v14.2.0, 829-845). Skipped while the
+     * frameloop is already processing.
+     */
+    const flushFrameSteps = () => {
+        if (frameData.isProcessing) return
+        const now = time.now()
+        frameData.delta = Math.min(Math.max(now - frameData.timestamp, 0), 1000 / 60)
+        frameData.timestamp = now
+        frameData.isProcessing = true
+        try {
+            frameSteps.update.process(frameData)
+            frameSteps.preRender.process(frameData)
+            frameSteps.render.process(frameData)
+        } finally {
+            frameData.isProcessing = false
+        }
+    }
+
+    let reactiveCommitQueued = false
+    const scheduledReactiveCommit = () => {
+        reactiveCommitQueued = false
+        if (!reactiveCommitPrevious) return
+        flushFrameSteps()
+        runReactiveCommit()
+    }
+
     const runReactiveCommit = () => {
         const prev = reactiveCommitPrevious
         reactiveCommitPrevious = null
         if (!(element && prev)) return
         // A PROPER ANCESTOR mid size-corrected FLIP (`runBoxSizeAnimation`)
-        // re-slots this child every frame. This deferred (postRender) commit
+        // re-slots this child every frame. This deferred (microtask) commit
         // runs AFTER the ancestor set `data-layout-size-animation`, so it can
         // see it — and it runs after the size-correction seed already reset the
         // child's cache. Committing a FLIP here (e.g. from the `.state` label's
@@ -2437,7 +2577,7 @@
     }
 
     $effect(() => {
-        const shouldProject = element && layoutProp && isLoaded === 'ready' && hasLayoutFeatures
+        const shouldProject = element && layoutProp && hasLayoutFeatures
         trackLayoutProjectionDependencies()
 
         if (!shouldProject || !motionDomProjectionUpdatePending) return
@@ -2450,7 +2590,7 @@
         }
         // Keep the OLDEST pending snapshot: with several reactive updates
         // before the frame, that is what is still visually on screen.
-        // (Re-scheduling an already-queued callback is a frameloop no-op.)
+        // (`reactiveCommitQueued` keeps it to one queued microtask.)
         // Capture the observer serial alongside the oldest snapshot so a
         // subsequent observer commit (which runs on its microtask, after this
         // synchronous effect) advances the serial past this captured value.
@@ -2458,7 +2598,10 @@
             reactiveCommitPrevious = previous
             reactiveCommitSerialAtSchedule = observerCommitSerial
         }
-        frame.postRender(runReactiveCommit)
+        if (!reactiveCommitQueued) {
+            reactiveCommitQueued = true
+            queueMicrotask(scheduledReactiveCommit)
+        }
     })
 
     // Grouped `layoutId`-only nodes (plan 007 Step 4b-c). Upstream mounts
@@ -2476,19 +2619,24 @@
     // spread), so the update pass — flushed on motion-dom's microtask like
     // upstream's — runs before the next frame is drawn.
     let layoutIdGroupUpdatePending = false
+    // Own tracker (see `createMeasureLayoutMountTracker`) for the same
+    // `MeasureLayout` lifecycle as the `layout` effect above.
+    const layoutIdMountTracker = createMeasureLayoutMountTracker()
     const shouldFanOutLayoutIdUpdate = () =>
         !!(
             element &&
             !layoutProp &&
             scopedLayoutId &&
             layoutGroupContext?.group &&
-            isLoaded === 'ready' &&
             hasLayoutFeatures
         )
     $effect.pre(() => {
+        const mountedOn = element && measureLayoutMounted ? element : null
         const shouldFanOut = shouldFanOutLayoutIdUpdate()
-        trackLayoutProjectionDependencies()
-        if (!shouldFanOut) return
+        const deps = trackLayoutProjectionDependencies()
+        // Mount pass: not an update (MeasureLayout.tsx componentDidMount).
+        const pass = layoutIdMountTracker.classify(mountedOn, deps)
+        if (pass !== 'update' || !(mountedOn && shouldFanOut)) return
         motionDomProjection?.willUpdate()
         layoutIdGroupUpdatePending = true
     })
@@ -2504,7 +2652,7 @@
     $effect(() => {
         return () => {
             reactiveCommitPrevious = null
-            cancelFrame(runReactiveCommit)
+            // A queued microtask finds nothing pending and returns.
         }
     })
 
@@ -2905,7 +3053,9 @@
         ))
             return
 
-        const prev = layoutIdRegistry.consume(scopedLayoutId)
+        // Never its own entry: re-enabling `layoutId` keeps this element the
+        // lead of its own stack upstream, so it doesn't animate.
+        const prev = layoutIdRegistry.consume(scopedLayoutId, element)
         if (!prev) return // First appearance, no animation needed
         if (motionDomProjection && layoutProp) return
 

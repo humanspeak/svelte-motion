@@ -3,6 +3,8 @@ import {
     HTMLVisualElement,
     copyBoxInto,
     createBox,
+    hasTransform,
+    transformPropOrder,
     visualElementStore,
     type IProjectionNode,
     type LayoutUpdateData,
@@ -173,6 +175,116 @@ const animationTypeForLayout = (layout: LayoutOption): AnimationType =>
     typeof layout === 'string' && animationTypes.has(layout as AnimationType)
         ? (layout as AnimationType)
         : 'both'
+
+/**
+ * Whether any layout update or unmount has run yet, across every adapter.
+ *
+ * Upstream's module-level `hasTakenAnySnapshot` (framer-motion
+ * `motion/features/layout/MeasureLayout.tsx` @ v14.2.0, 23-31): set in
+ * `getSnapshotBeforeUpdate` and `componentWillUnmount`, read in
+ * `componentDidMount`. Until it is set, a mounting node has nothing to join,
+ * so its root update is skipped.
+ */
+let hasTakenAnySnapshot = false
+
+/**
+ * Whether Motion's own transform animation for this VisualElement is running
+ * on the compositor.
+ *
+ * Motion 14.2 groups an element's independent transforms (`x`, `y`, `scale`,
+ * `rotate`, …) into one accelerated WAAPI `transform` animation. While it
+ * runs there, each grouped value's `animation.liveValue()` (public
+ * `MotionValueAnimation` type) returns the value the compositor is showing;
+ * on the main thread, or when idle, it returns `undefined`. Independent
+ * transforms only reach the compositor through that group, so this is the
+ * public-API equivalent of upstream's `transformGroups.get(instance)` check
+ * (motion-dom `create-projection-node.ts` @ v14.2.0, 123-124).
+ *
+ * @param visualElement - The element's VisualElement.
+ * @returns `true` while any of its transform values runs on the compositor.
+ */
+const hasAcceleratedMotionTransform = (visualElement: VisualElement): boolean => {
+    for (const key of transformPropOrder) {
+        const animation = visualElement.getValue(key)?.animation
+        if (animation?.liveValue?.() !== undefined) return true
+    }
+    return false
+}
+
+/**
+ * The `transform` string Motion renders for this element that upstream
+ * would keep for a layout read, or `undefined`.
+ *
+ * A VisualElement can carry a whole `transform` string as a value of its own
+ * (`animate(el, { transform })` animates the component's VisualElement —
+ * motion `animate/subject.ts` @ v14.2.0, 143-157 — and a declarative
+ * `transform` target does the same). It is rendered inline, and it isn't one
+ * of the independent transforms `hasTransform(latestValues)` looks at, so
+ * upstream's `resetTransform()` leaves it applied for both the "before" and
+ * "after" reads unless the node has a non-zero projection delta, independent
+ * transforms or a changed `transformTemplate` (motion-dom
+ * `create-projection-node.ts` @ v14.2.0, 999-1031; the template is
+ * `visualElement.getProps().transformTemplate`, 666-669). The width change's
+ * projection then replaces it inline (`applyProjectionStyles`, 2066-2076,
+ * `'none'` once idle, 2050-2055), so the element drops into its row in one
+ * frame with no vertical delta.
+ *
+ * svelte-motion re-renders that value after every style patch, so keeping it
+ * for the "before" read gives both reads the same box, like upstream. A
+ * transform the page wrote straight to `el.style` is different: Svelte's
+ * `style` attribute patch drops it, so the "after" read never sees it, and
+ * the "before" read strips it to match.
+ *
+ * Unlike upstream, this ignores the projection delta: upstream only measures
+ * at update boundaries, but svelte-motion's layout observers also re-read the
+ * element while its projection runs, and those reads must reproduce the box
+ * the update measured, or the projection's own style write would look like a
+ * 40px layout move and start a second animation.
+ *
+ * @param projection - The element's projection node.
+ * @param visualElement - The element's VisualElement.
+ * @returns The transform to keep, or `undefined` to strip to the base.
+ */
+const upstreamKeptTransform = (
+    projection: IProjectionNode<HTMLElement>,
+    visualElement: VisualElement
+): string | undefined => {
+    const value = projection.latestValues.transform
+    if (typeof value !== 'string' || value === '' || value === 'none') return undefined
+    if (hasTransform(projection.latestValues)) return undefined
+    const transformTemplate = visualElement.getProps().transformTemplate
+    const templateValue = transformTemplate
+        ? transformTemplate(projection.latestValues, '')
+        : undefined
+    if (templateValue !== projection.prevTransformTemplateValue) return undefined
+    return value
+}
+
+/**
+ * Collect the script-created WAAPI `transform` effects targeting an element,
+ * without changing anything (the read half of a detach).
+ *
+ * CSS animations and transitions (recognised by `animationName` /
+ * `transitionProperty`, so this works where the `CSSAnimation` /
+ * `CSSTransition` globals are absent) are never collected: they stay part of
+ * the measured layout. Each animation's keyframes are read once.
+ *
+ * @param el - Element about to be measured.
+ * @param into - Receives `[el, effect]` for every collected effect.
+ */
+const collectTransformEffects = (
+    el: HTMLElement,
+    into: Array<[HTMLElement, KeyframeEffect]>
+): void => {
+    if (typeof el.getAnimations !== 'function') return
+    for (const animation of el.getAnimations()) {
+        if ('animationName' in animation || 'transitionProperty' in animation) continue
+        const effect = animation.effect as KeyframeEffect | null
+        if (!effect || effect.target !== el || typeof effect.getKeyframes !== 'function') continue
+        if (!effect.getKeyframes().some((keyframe) => 'transform' in keyframe)) continue
+        into.push([el, effect])
+    }
+}
 
 /**
  * Svelte lifecycle adapter for motion-dom's upstream projection node system.
@@ -368,6 +480,9 @@ export class MotionDomProjectionAdapter {
     unmount(): void {
         if (!this.element) return
         const element = this.element
+        // MeasureLayout.componentWillUnmount (148), which only exists for
+        // nodes that measure layout.
+        if (this.layout || this.layoutId) hasTakenAnySnapshot = true
         this.projection.scheduleCheckAfterUnmount()
         // Upstream MeasureLayout.componentWillUnmount order: schedule the
         // unmount check, THEN leave the group — `remove` snapshots every
@@ -415,6 +530,8 @@ export class MotionDomProjectionAdapter {
      * ```
      */
     willUpdate(): void {
+        // MeasureLayout.getSnapshotBeforeUpdate (90).
+        hasTakenAnySnapshot = true
         // `layoutId`-only nodes snapshot too — upstream mounts MeasureLayout
         // for `layout || layoutId`, and a grouped layoutId node's willUpdate
         // is what fans out to its group (plan 007 Step 4b-c).
@@ -423,7 +540,42 @@ export class MotionDomProjectionAdapter {
     }
 
     /**
+     * Run upstream `MeasureLayout.componentDidMount`'s root update.
+     *
+     * Once any snapshot has been taken anywhere, a mounting node flushes the
+     * root update (`if (hasTakenAnySnapshot) projection.root.didUpdate()`,
+     * MeasureLayout.tsx @ v14.2.0, 51-53), so it joins an update pass already
+     * in progress and the cached layout is refreshed. Never `willUpdate()`s:
+     * a mount isn't a layout update.
+     *
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * // Layout measuring just mounted (or was turned back on).
+     * adapter.didMount()
+     * ```
+     */
+    didMount(): void {
+        if (!this.element || !hasTakenAnySnapshot) return
+        this.projection.root?.didUpdate()
+        this.refreshCachedLayout()
+    }
+
+    /**
      * Commit an upstream layout update after Svelte has patched the DOM.
+     *
+     * Like a React commit, it schedules the root update on the microtask
+     * batcher's read step (`didUpdate` → `microtask.read(scheduleUpdate)`,
+     * motion-dom `create-projection-node.ts` @ v14.2.0, 847-852) and then a
+     * VisualElement render on its render step (`scheduleRenderMicrotask()`,
+     * framer-motion `use-visual-element.ts` @ v14.2.0, 157-158). The render
+     * must come after the update: when nothing moved, the update's
+     * `finishAnimation` clears a finished projection's target (615-617,
+     * 2445-2448), and only a render after that lets the element's own
+     * transform show again (`applyProjectionStyles`, 2042-2055). Svelte's
+     * per-commit render (`_MotionContainer`) runs before this deferred
+     * commit, so it can't be the one.
      *
      * @returns Nothing.
      *
@@ -435,6 +587,7 @@ export class MotionDomProjectionAdapter {
     didUpdate(): void {
         if (!this.element || !(this.layout || this.layoutId)) return
         this.projection.root?.didUpdate()
+        this.visualElement.scheduleRenderMicrotask()
         this.refreshCachedLayout()
     }
 
@@ -1275,32 +1428,79 @@ export class MotionDomProjectionAdapter {
      * transforms cascade down); restore runs in reverse — same ordering as
      * the retired legacy node's measure().
      *
+     * The base is the user-authored `style` transform, or else the
+     * VisualElement's own `transform` string when upstream's
+     * `resetTransform()` would keep it (`upstreamKeptTransform`), or else
+     * `'none'`.
+     *
      * Elements whose inline transform already equals their base exactly (an
      * idle element with a user-authored transform, or one motion has settled
      * back to base) are skipped, avoiding a no-op double style write. The
      * `'' → 'none'` write is NOT skipped: an inline `none` overrides a
      * stylesheet-authored transform during the read, and that stripping is
      * part of the measurement contract.
+     *
+     * Motion 14.2 runs x/y/scale/rotate as one WAAPI `transform` animation, and
+     * a WAAPI animation overrides the inline base transform written here, so
+     * the read would include the in-flight value. Upstream only measures
+     * inside a real update, after `willUpdate()` demotes Motion's own group
+     * (`demoteTransforms`, create-projection-node.ts @ v14.2.0, 123-124, 707,
+     * 713, 1007); svelte-motion also measures speculatively (layout
+     * observers), where demoting would move every observed element off the
+     * compositor. So the transform effects of an element whose OWN Motion
+     * transforms are on the compositor (`hasAcceleratedMotionTransform`) are
+     * detached instead: clearing `effect.target` removes the effect without
+     * touching its timing, and restoring it before the next frame keeps
+     * `currentTime` and `playState`, so nothing is painted detached. Any other
+     * transform animation (a page's own `el.animate()`, a finished
+     * `animate(el, { transform })`) stays applied, as it does upstream.
+     *
+     * Every element's animations are collected first, then every write
+     * happens, so a chain of N elements costs one style recalculation rather
+     * than one per element. Never `await` between stripping and restoring.
+     *
+     * @returns Restores every inline transform and detached effect.
      */
     private stripToBaseTransforms(): () => void {
+        const adapters: MotionDomProjectionAdapter[] = []
+        for (const node of this.projection.path) {
+            const ancestor = MotionDomProjectionAdapter.adapters.get(node)
+            if (ancestor?.element) adapters.push(ancestor)
+        }
+        if (this.element) adapters.push(this)
+
+        // Reads: collect before any write so they share one style recalc.
+        const detached: Array<[HTMLElement, KeyframeEffect]> = []
+        for (const adapter of adapters) {
+            if (hasAcceleratedMotionTransform(adapter.visualElement)) {
+                collectTransformEffects(adapter.element!, detached)
+            }
+        }
+
+        // Writes.
+        for (const [, effect] of detached) effect.target = null
         const restoreList: Array<{ el: HTMLElement; prev: string }> = []
-        const strip = (adapter: MotionDomProjectionAdapter) => {
-            const el = adapter.element
-            if (!el) return
+        for (const adapter of adapters) {
+            const el = adapter.element!
             const prev = el.style.transform
-            const base = adapter.getBaseTransform?.() ?? 'none'
-            if (prev === base) return
+            const userBase = adapter.getBaseTransform?.()
+            const base =
+                (userBase && userBase !== 'none' ? userBase : undefined) ??
+                upstreamKeptTransform(adapter.projection, adapter.visualElement) ??
+                userBase ??
+                'none'
+            if (prev === base) continue
             restoreList.push({ el, prev })
             el.style.transform = base
         }
-        for (const node of this.projection.path) {
-            const ancestor = MotionDomProjectionAdapter.adapters.get(node)
-            if (ancestor) strip(ancestor)
-        }
-        strip(this)
+
         return () => {
             for (let i = restoreList.length - 1; i >= 0; i--) {
                 restoreList[i].el.style.transform = restoreList[i].prev
+            }
+            for (let i = detached.length - 1; i >= 0; i--) {
+                const [el, effect] = detached[i]
+                effect.target = el
             }
         }
     }

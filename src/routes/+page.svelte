@@ -404,6 +404,79 @@
             </ul>
         </div>
         <div>
+            <h2 class="mb-3 text-xl font-medium">Independent transforms (Motion 14.2)</h2>
+            <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/basic') + searchParams}
+                    >
+                        Accelerated independent transforms (parity)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-idle') + searchParams}
+                    >
+                        Layout elements stay accelerated at rest
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-measure') +
+                            searchParams}
+                    >
+                        Accelerated x + layout width change
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-mount-ready') +
+                            searchParams}
+                    >
+                        Layout changes during the enter frames
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-toggle') + searchParams}
+                    >
+                        Re-enabling layout / layoutId is a mount
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-user-transform') +
+                            searchParams}
+                    >
+                        Layout keeps user transform animations
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-hydration') +
+                            searchParams}
+                    >
+                        Layout change right after hydration
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/on-update') + searchParams}
+                    >
+                        onUpdate prop (main thread + latest values)
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div>
             <h2 class="mb-3 text-xl font-medium">Reorder</h2>
             <ul class="list-disc space-y-2 pl-5">
                 <li>
@@ -484,6 +557,14 @@
                         href={resolve('/tests/reorder/page-scroll') + searchParams}
                     >
                         Reorder with Window Scroll (below the fold)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/click-after-drag') + searchParams}
+                    >
+                        Reorder click after drag (#2682)
                     </a>
                 </li>
             </ul>

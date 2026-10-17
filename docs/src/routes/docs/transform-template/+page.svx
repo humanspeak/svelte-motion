@@ -82,6 +82,15 @@ type TransformTemplate = (
 When `x` changes, the generated transform and the templated transform update
 together.
 
+## Hardware acceleration
+
+Since Motion 14.2, transform shortcuts like `x`, `scale`, and `rotate` run as
+one [hardware-accelerated animation](https://github.com/motiondivision/motion/blob/main/CHANGELOG.md#1420-2026-10-13)
+per element. A `transformTemplate` keeps that element's transforms on the main
+thread instead, because the template has to run every frame. Adding a template
+while an accelerated animation is playing moves it to the main thread without
+a jump.
+
 ## API Reference
 
 ### `transformTemplate`

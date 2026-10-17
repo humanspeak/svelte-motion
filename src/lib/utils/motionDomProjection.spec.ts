@@ -1,11 +1,13 @@
 import {
+    animateVisualElement,
     frame,
     measurePageBox,
     measureViewportBox,
+    motionValue,
     nodeGroup,
     visualElementStore
 } from 'motion-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MotionDomProjectionAdapter, layoutMeasureStats } from './motionDomProjection.js'
 import { createMotionVisualElement } from './visualElementCore.js'
 
@@ -224,6 +226,106 @@ describe('MotionDomProjectionAdapter.measurePageRect', () => {
         adapter.unmount()
     })
 
+    it("keeps the VisualElement's own transform string for the read, like upstream resetTransform", () => {
+        // A finished `animate(el, { transform: 'translateY(40px)' })` leaves
+        // the value on the component's VisualElement, which renders it inline.
+        // No independent transforms, no projection delta, no template:
+        // upstream `resetTransform()` keeps it (motion-dom
+        // create-projection-node.ts @ v14.2.0, 1020-1029), so the read
+        // includes it.
+        const transformsDuringRead: string[] = []
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
+            transformsDuringRead.push(element.style.transform)
+            const shifted = element.style.transform === 'translateY(40px)'
+            return new DOMRect(10, shifted ? 140 : 100, 100, 50)
+        })
+        adapter.mount(element)
+        adapter.visualElement.latestValues.transform = 'translateY(40px)'
+        element.style.transform = 'translateY(40px)'
+        transformsDuringRead.length = 0
+
+        const rect = adapter.measurePageRect('measure')
+
+        expect(transformsDuringRead.length).toBeGreaterThan(0)
+        expect(transformsDuringRead.every((t) => t === 'translateY(40px)')).toBe(true)
+        expect(rect!.top).toBe(140)
+        adapter.unmount()
+    })
+
+    it('keeps a transform string a declarative animation left on the VisualElement for the read', async () => {
+        // `<motion.div layout animate={{ transform: 'translateY(40px)' }}>`:
+        // the declarative target runs through the VisualElement's animation
+        // path (`animateVisualElement`), which leaves `transform` in
+        // `latestValues` and renders it inline as-is (motion-dom
+        // `render/html/utils/build-styles.ts` @ v14.2.0, 30-47 and 52). It's
+        // not an independent transform (`has-transform.ts`, 16-27), so
+        // upstream `resetTransform()` keeps it for the read
+        // (`create-projection-node.ts`, 999-1031).
+        const transformsDuringRead: string[] = []
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
+            transformsDuringRead.push(element.style.transform)
+            const shifted = element.style.transform === 'translateY(40px)'
+            return new DOMRect(10, shifted ? 140 : 100, 100, 50)
+        })
+        adapter.mount(element)
+        await animateVisualElement(adapter.visualElement, {
+            transform: 'translateY(40px)',
+            transition: { duration: 0 }
+        })
+        await new Promise<void>((resolve) => frame.postRender(() => resolve()))
+        expect(adapter.visualElement.latestValues.transform).toBe('translateY(40px)')
+        expect(element.style.transform).toBe('translateY(40px)')
+        transformsDuringRead.length = 0
+
+        const rect = adapter.measurePageRect('measure')
+
+        expect(transformsDuringRead.length).toBeGreaterThan(0)
+        expect(transformsDuringRead.every((t) => t === 'translateY(40px)')).toBe(true)
+        expect(rect!.top).toBe(140)
+        expect(element.style.transform).toBe('translateY(40px)')
+        adapter.unmount()
+    })
+
+    it('strips a transform the page wrote inline itself', () => {
+        // Svelte's next `style` patch drops it, so the "after" read never sees
+        // it; the read strips it so both reads agree.
+        const transformsDuringRead: string[] = []
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
+            transformsDuringRead.push(element.style.transform)
+            return new DOMRect(10, 100, 100, 50)
+        })
+        adapter.mount(element)
+        element.style.transform = 'translateY(40px)'
+        transformsDuringRead.length = 0
+
+        adapter.measurePageRect('measure')
+
+        expect(transformsDuringRead.length).toBeGreaterThan(0)
+        expect(transformsDuringRead.every((t) => t === 'none')).toBe(true)
+        expect(element.style.transform).toBe('translateY(40px)')
+        adapter.unmount()
+    })
+
+    it('strips the transform string too when the element has independent transforms', () => {
+        // `hasTransform(latestValues)`: upstream resets to `'none'`.
+        const transformsDuringRead: string[] = []
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
+            transformsDuringRead.push(element.style.transform)
+            return new DOMRect(10, 100, 100, 50)
+        })
+        adapter.mount(element)
+        adapter.visualElement.latestValues.transform = 'translateY(40px)'
+        adapter.visualElement.latestValues.y = 40
+        element.style.transform = 'translateY(40px) translateY(40px)'
+        transformsDuringRead.length = 0
+
+        adapter.measurePageRect('measure')
+
+        expect(transformsDuringRead.length).toBeGreaterThan(0)
+        expect(transformsDuringRead.every((t) => t === 'none')).toBe(true)
+        adapter.unmount()
+    })
+
     it('does not double-strip: latestValues gesture offsets must not be subtracted from the physically stripped box', () => {
         // Reorder.Item routes its live drag offset through style x/y
         // MotionValues, which upstream mirrors into
@@ -328,6 +430,335 @@ describe('MotionDomProjectionAdapter.measurePageRect', () => {
         expect(element.style.transform).toBe('translate(50px, 40px)')
         expect(adapter.projection.isAnimationBlocked).toBe(false)
         expect(adapter.projection.currentAnimation).toBeUndefined()
+        adapter.unmount()
+    })
+})
+
+/**
+ * Compositor-proof measurements (plan 005 Step 4).
+ *
+ * Motion 14.2 runs x/y/scale/rotate as one WAAPI `transform` animation, which
+ * overrides the inline base transform the measurement writes. The measurement
+ * detaches those animations' effects (`effect.target = null`) for the
+ * synchronous read and reattaches them afterwards, without demoting.
+ */
+describe('MotionDomProjectionAdapter.measurePageRect with WAAPI transform animations', () => {
+    let element: HTMLElement
+    let adapter: MotionDomProjectionAdapter
+
+    /** Minimal stand-in for a script-created WAAPI animation. */
+    const stubAnimation = (keyframes: Keyframe[], extra: Record<string, unknown> = {}) => {
+        const effect = {
+            target: element as Element | null,
+            getKeyframes: () => keyframes
+        }
+        return { effect, ...extra }
+    }
+
+    /** Give `node` an `x` value whose animation reports a compositor value. */
+    const markMotionTransformAccelerated = (node: MotionDomProjectionAdapter) => {
+        const x = motionValue(0)
+        node.visualElement.addValue('x', x)
+        // `stop` because unmounting the VisualElement stops its values.
+        ;(x as unknown as { animation: unknown }).animation = {
+            liveValue: () => 87,
+            stop: () => {}
+        }
+    }
+
+    const stubAnimations = (animations: Array<ReturnType<typeof stubAnimation>>) => {
+        ;(element as unknown as { getAnimations: () => unknown[] }).getAnimations = () => animations
+    }
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        document.documentElement.scrollLeft = 0
+        element = document.createElement('div')
+        document.body.appendChild(element)
+        adapter = new MotionDomProjectionAdapter()
+        adapter.updateOptions({ layout: true })
+    })
+
+    it('detaches a transform animation for the read and reattaches it afterwards', () => {
+        const transform = stubAnimation([
+            { transform: 'translateX(0px)' },
+            { transform: 'translateX(200px)' }
+        ])
+        stubAnimations([transform])
+        // The animation is Motion's own: `x` runs on the compositor, which the
+        // public `MotionValueAnimation.liveValue()` reports.
+        markMotionTransformAccelerated(adapter)
+        const targetsDuringRead: Array<Element | null> = []
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
+            targetsDuringRead.push(transform.effect.target)
+            // The in-flight x would add 87px if the animation stayed attached.
+            return new DOMRect(transform.effect.target ? 97 : 10, 100, 100, 50)
+        })
+        adapter.mount(element)
+        targetsDuringRead.length = 0
+
+        const rect = adapter.measurePageRect('measure')
+
+        expect(targetsDuringRead.length).toBeGreaterThan(0)
+        expect(targetsDuringRead.every((target) => target === null)).toBe(true)
+        expect(rect!.left).toBe(10)
+        expect(transform.effect.target).toBe(element)
+        adapter.unmount()
+    })
+
+    it('never detaches non-transform animations or CSS animations/transitions', () => {
+        const opacity = stubAnimation([{ opacity: 0 }, { opacity: 1 }])
+        const cssAnimation = stubAnimation([{ transform: 'scale(1)' }, { transform: 'scale(2)' }], {
+            animationName: 'pulse'
+        })
+        const cssTransition = stubAnimation([{ transform: 'none' }, { transform: 'scale(2)' }], {
+            transitionProperty: 'transform'
+        })
+        // Motion's own transform effect, next to the three that must stay. The
+        // element's `x` runs on the compositor, so the read does collect
+        // effects: the three above stay attached because they're filtered,
+        // not because nothing was collected.
+        const motionTransform = stubAnimation([
+            { transform: 'translateX(0px)' },
+            { transform: 'translateX(200px)' }
+        ])
+        stubAnimations([opacity, cssAnimation, cssTransition, motionTransform])
+        markMotionTransformAccelerated(adapter)
+        const targetsDuringRead: Array<Array<Element | null>> = []
+        const motionTargetsDuringRead: Array<Element | null> = []
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
+            targetsDuringRead.push([
+                opacity.effect.target,
+                cssAnimation.effect.target,
+                cssTransition.effect.target
+            ])
+            motionTargetsDuringRead.push(motionTransform.effect.target)
+            return new DOMRect(10, 100, 100, 50)
+        })
+        adapter.mount(element)
+        targetsDuringRead.length = 0
+        motionTargetsDuringRead.length = 0
+
+        adapter.measurePageRect('measure')
+
+        expect(targetsDuringRead.length).toBeGreaterThan(0)
+        for (const targets of targetsDuringRead) {
+            expect(targets).toEqual([element, element, element])
+        }
+        expect(motionTargetsDuringRead.every((target) => target === null)).toBe(true)
+        adapter.unmount()
+    })
+
+    it("keeps a transform animation that isn't Motion's own attached for the read", () => {
+        // A page's own `el.animate([{ transform }])`: nothing on the
+        // VisualElement animates a transform. Upstream only demotes Motion's
+        // transform group (`transformGroups.get(instance)?.demote()`,
+        // create-projection-node.ts @ v14.2.0 123-124), so this stays applied.
+        const user = stubAnimation([{ transform: 'translateY(40px)' }])
+        stubAnimations([user])
+        const targetsDuringRead: Array<Element | null> = []
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
+            targetsDuringRead.push(user.effect.target)
+            return new DOMRect(10, user.effect.target ? 140 : 100, 100, 50)
+        })
+        adapter.mount(element)
+        targetsDuringRead.length = 0
+
+        const rect = adapter.measurePageRect('measure')
+
+        expect(targetsDuringRead.length).toBeGreaterThan(0)
+        expect(targetsDuringRead.every((target) => target === element)).toBe(true)
+        expect(rect!.top).toBe(140)
+        adapter.unmount()
+    })
+
+    it('reads every element of an ancestor chain before writing any inline transform', () => {
+        // Three nested adapters, each with an accelerated Motion transform and
+        // an inline transform the read has to strip. Interleaving a read
+        // (`getAnimations()`) with each element's inline write forces one style
+        // recalc per element; reading all first costs one.
+        const events: string[] = []
+        const chain: Array<{ el: HTMLElement; adapter: MotionDomProjectionAdapter }> = []
+        let parent: MotionDomProjectionAdapter | null = null
+        for (const id of ['outer', 'middle', 'inner']) {
+            const el = document.createElement('div')
+            el.id = id
+            ;(chain.at(-1)?.el ?? document.body).appendChild(el)
+            const node: MotionDomProjectionAdapter = new MotionDomProjectionAdapter({ parent })
+            node.updateOptions({ layout: true })
+            markMotionTransformAccelerated(node)
+            const animation = stubAnimation([{ transform: 'translateX(20px)' }])
+            animation.effect.target = el
+            el.getAnimations = () => {
+                events.push(`read:${id}`)
+                return [animation] as unknown as Animation[]
+            }
+            node.mount(el)
+            el.style.transform = 'translateX(5px)'
+            const style = el.style
+            let value = style.transform
+            Object.defineProperty(style, 'transform', {
+                configurable: true,
+                get: () => value,
+                set: (next: string) => {
+                    events.push(`write:${id}`)
+                    value = next
+                }
+            })
+            chain.push({ el, adapter: node })
+            parent = node
+        }
+        events.length = 0
+
+        chain.at(-1)!.adapter.measurePageRect('measure')
+
+        const firstWrite = events.findIndex((event) => event.startsWith('write:'))
+        const lastRead = events.findLastIndex((event) => event.startsWith('read:'))
+        expect(events.filter((event) => event.startsWith('read:'))).toEqual([
+            'read:outer',
+            'read:middle',
+            'read:inner'
+        ])
+        expect(lastRead, events.join(' ')).toBeLessThan(firstWrite)
+        for (const { adapter } of [...chain].reverse()) adapter.unmount()
+    })
+
+    it('measures normally when the element has no getAnimations', () => {
+        ;(element as unknown as { getAnimations: unknown }).getAnimations = undefined
+        setScrollAndRect(element, 0, 100)
+        adapter.mount(element)
+
+        const rect = adapter.measurePageRect('measure')
+
+        expect(rect).toMatchObject({ left: 10, top: 100, width: 100, height: 50 })
+        adapter.unmount()
+    })
+})
+
+/**
+ * `didMount` mirrors upstream `MeasureLayout.componentDidMount`'s
+ * `if (hasTakenAnySnapshot) projection.root.didUpdate()` (framer-motion
+ * `motion/features/layout/MeasureLayout.tsx` @ v14.2.0, 51-53). The flag is
+ * module-level, like upstream's, so each case imports a fresh module.
+ */
+describe('MotionDomProjectionAdapter.didMount', () => {
+    const freshAdapter = async () => {
+        const { MotionDomProjectionAdapter: Adapter } = await import('./motionDomProjection.js')
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        const adapter = new Adapter()
+        adapter.updateOptions({ layout: true })
+        return { Adapter, adapter, element }
+    }
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        vi.resetModules()
+    })
+
+    // motion-dom (and so the shared projection root) isn't re-imported by
+    // `resetModules`; drop each case's spies so call counts don't carry over.
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('skips the root update until a snapshot has been taken', async () => {
+        const { adapter, element } = await freshAdapter()
+        adapter.mount(element)
+        const didUpdate = vi.spyOn(adapter.projection.root!, 'didUpdate')
+
+        adapter.didMount()
+
+        expect(didUpdate).not.toHaveBeenCalled()
+        adapter.unmount()
+    })
+
+    it('runs the root update on mount once any adapter has taken a snapshot', async () => {
+        const { Adapter, adapter, element } = await freshAdapter()
+        adapter.mount(element)
+        adapter.willUpdate()
+
+        const mounting = new Adapter()
+        mounting.updateOptions({ layout: true })
+        const other = document.createElement('div')
+        document.body.appendChild(other)
+        mounting.mount(other)
+        const didUpdate = vi.spyOn(mounting.projection.root!, 'didUpdate')
+        const willUpdate = vi.spyOn(mounting.projection, 'willUpdate')
+
+        mounting.didMount()
+
+        expect(didUpdate).toHaveBeenCalledTimes(1)
+        expect(willUpdate).not.toHaveBeenCalled()
+        mounting.unmount()
+        adapter.unmount()
+    })
+
+    it('counts a layout node unmounting as a snapshot', async () => {
+        const { Adapter, adapter, element } = await freshAdapter()
+        adapter.mount(element)
+        adapter.unmount()
+
+        const mounting = new Adapter()
+        mounting.updateOptions({ layout: true })
+        mounting.mount(element)
+        const didUpdate = vi.spyOn(mounting.projection.root!, 'didUpdate')
+
+        mounting.didMount()
+
+        expect(didUpdate).toHaveBeenCalledTimes(1)
+        mounting.unmount()
+    })
+
+    it('is a no-op before mount', async () => {
+        const { adapter } = await freshAdapter()
+        expect(() => adapter.didMount()).not.toThrow()
+    })
+})
+
+/**
+ * `didUpdate` is the Svelte side of a React commit. Upstream every commit
+ * schedules the root update on the microtask batcher's read step
+ * (`didUpdate` → `microtask.read(scheduleUpdate)`, motion-dom
+ * `create-projection-node.ts` @ v14.2.0, 847-852) and a VisualElement render
+ * on its render step (`scheduleRenderMicrotask()`, framer-motion
+ * `use-visual-element.ts` @ v14.2.0, 157-158). The render runs after the
+ * update, so it sees what the update did: a commit that moved nothing has
+ * `finishAnimation` clear the finished projection's target (615-617,
+ * 2445-2448), and that render lets the element's own transform show again
+ * (`applyProjectionStyles`, 2042-2055).
+ */
+describe('MotionDomProjectionAdapter.didUpdate', () => {
+    beforeEach(() => {
+        vi.useRealTimers()
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+        document.body.innerHTML = ''
+    })
+
+    it('renders the VisualElement after the root update it schedules', async () => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        const adapter = new MotionDomProjectionAdapter()
+        adapter.updateOptions({ layout: true })
+        adapter.mount(element)
+        // `update()` is the root's flush (847-852); `IProjectionNode` doesn't type it.
+        const root = adapter.projection.root as unknown as { update: () => void }
+        const update = vi.spyOn(root, 'update')
+        const render = vi.spyOn(adapter.visualElement, 'render')
+
+        adapter.willUpdate()
+        adapter.didUpdate()
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        expect(update).toHaveBeenCalledTimes(1)
+        expect(render).toHaveBeenCalled()
+        expect(render.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+            update.mock.invocationCallOrder[0]
+        )
         adapter.unmount()
     })
 })

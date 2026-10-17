@@ -2,6 +2,7 @@ import { MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
 import { render, screen } from '@testing-library/svelte'
 import { visualElementStore } from 'motion-dom'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import ClickAfterDragHarness from './__tests__/ClickAfterDragHarness.svelte'
 import DetectedAxisHarness from './__tests__/DetectedAxisHarness.svelte'
 import ItemOutsideGroup from './__tests__/ItemOutsideGroup.svelte'
 import ReorderHarness from './__tests__/ReorderHarness.svelte'
@@ -22,22 +23,26 @@ const flushFrame = async (ms = 1) => {
 
 const dispatchMousePointer = (
     target: EventTarget,
-    type: 'pointerdown' | 'pointermove' | 'pointercancel',
+    type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel',
     {
         clientX,
         clientY,
         pageX = clientX,
         pageY = clientY,
-        pointerId
+        pointerId,
+        bubbles = false
     }: {
         clientX: number
         clientY: number
         pageX?: number
         pageY?: number
         pointerId: number
+        /** Let the event bubble, e.g. a press on an item's child button. */
+        bubbles?: boolean
     }
 ) => {
     const event = new PointerEvent(type, {
+        bubbles,
         clientX,
         clientY,
         pointerId,
@@ -56,7 +61,7 @@ const dispatchMousePointer = (
     })
     target.dispatchEvent(event)
 
-    if (type === 'pointercancel') {
+    if (type === 'pointercancel' || type === 'pointerup') {
         activePointers.delete(pointerId)
     } else {
         activePointers.set(pointerId, { clientX, clientY })
@@ -567,5 +572,133 @@ describe('Reorder.Group / Reorder.Item', () => {
         expect(() => render(ItemOutsideGroup)).toThrow(
             'Reorder.Item must be a child of Reorder.Group'
         )
+    })
+})
+
+/**
+ * Port of upstream's "Reorder click after drag" cases
+ * (`Reorder/__tests__/index.test.tsx` @ v14.2.0, Motion 14.1.1 #2682).
+ * jsdom has no layout, so item slots come from a mocked
+ * `getBoundingClientRect`: 100x50 rows stacked by DOM index.
+ */
+describe('Reorder click after drag', () => {
+    let nextPointerId = 100
+
+    const setup = async () => {
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+            this: HTMLElement
+        ) {
+            const id = this.dataset.testid
+            if (id !== 'a' && id !== 'b') return new DOMRect()
+            const index = Array.from(this.parentElement?.children ?? []).indexOf(this)
+            return new DOMRect(0, index * 50, 100, 50)
+        })
+
+        const handlers = {
+            onReorder: vi.fn(),
+            onGroupClick: vi.fn(),
+            onItemClick: vi.fn(),
+            onChildClick: vi.fn()
+        }
+        render(ClickAfterDragHarness, { props: handlers })
+        await screen.findByTestId('a')
+        await vi.advanceTimersByTimeAsync(1000)
+        return handlers
+    }
+
+    /** Press `trigger` (default: the item), move by (dx, dy), release. */
+    const dragBy = async (element: HTMLElement, dx: number, dy: number, trigger = element) => {
+        const pointerId = nextPointerId++
+        dispatchMousePointer(trigger, 'pointerdown', {
+            clientX: 50,
+            clientY: 25,
+            pointerId,
+            bubbles: true
+        })
+        dispatchMousePointer(window, 'pointermove', {
+            clientX: 50 + dx,
+            clientY: 25 + dy,
+            pointerId
+        })
+        await flushFrame()
+        dispatchMousePointer(window, 'pointerup', {
+            clientX: 50 + dx,
+            clientY: 25 + dy,
+            pointerId
+        })
+    }
+
+    /** A pointer-generated click, which browsers fire straight after pointerup. */
+    const click = (element: HTMLElement) => {
+        element.dispatchEvent(
+            new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 })
+        )
+    }
+
+    it.each(['a', 'a-child', 'group'])(
+        "doesn't click %s on the release that ends a reordering drag",
+        async (target) => {
+            const { onReorder, ...clicks } = await setup()
+
+            // Press where the click will land, so it's a child of the press
+            const item = screen.getByTestId('a')
+            const trigger = target === 'group' ? item : screen.getByTestId(target)
+            await dragBy(item, 0, 100, trigger)
+            expect(onReorder).toHaveBeenCalledWith(['b', 'a'])
+
+            click(screen.getByTestId(target))
+            expect(clicks.onItemClick).not.toHaveBeenCalled()
+            expect(clicks.onChildClick).not.toHaveBeenCalled()
+            expect(clicks.onGroupClick).not.toHaveBeenCalled()
+        }
+    )
+
+    it("clicks after a drag that doesn't reorder", async () => {
+        const { onReorder, onItemClick, onGroupClick } = await setup()
+
+        await dragBy(screen.getByTestId('a'), 100, 0)
+        expect(onReorder).not.toHaveBeenCalled()
+
+        click(screen.getByTestId('a'))
+        expect(onItemClick).toHaveBeenCalledOnce()
+        expect(onGroupClick).toHaveBeenCalledOnce()
+    })
+
+    it('clicks as normal once the drag has ended', async () => {
+        const { onReorder, onItemClick } = await setup()
+
+        await dragBy(screen.getByTestId('a'), 0, 100)
+        expect(onReorder).toHaveBeenCalledOnce()
+        // onDragEnd runs a frame after release and clears the guard
+        await flushFrame(32)
+
+        click(screen.getByTestId('a'))
+        expect(onItemClick).toHaveBeenCalledOnce()
+    })
+
+    it('clicks as normal on the next press', async () => {
+        const { onReorder, onItemClick } = await setup()
+
+        await dragBy(screen.getByTestId('a'), 0, 100)
+        expect(onReorder).toHaveBeenCalledOnce()
+
+        const b = screen.getByTestId('b')
+        const pointerId = nextPointerId++
+        dispatchMousePointer(b, 'pointerdown', { clientX: 50, clientY: 25, pointerId })
+        dispatchMousePointer(window, 'pointerup', { clientX: 50, clientY: 25, pointerId })
+
+        click(b)
+        expect(onItemClick).toHaveBeenCalledOnce()
+    })
+
+    it('fires clicks with no pointer press behind them', async () => {
+        const { onReorder, onChildClick } = await setup()
+
+        await dragBy(screen.getByTestId('a'), 0, 100)
+        expect(onReorder).toHaveBeenCalledOnce()
+
+        // e.g. Enter on a focused button
+        screen.getByTestId('a-child').click()
+        expect(onChildClick).toHaveBeenCalledOnce()
     })
 })

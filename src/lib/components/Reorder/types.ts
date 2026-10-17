@@ -1,5 +1,5 @@
 import type { HTMLElementProps } from '$lib/types'
-import type { SvelteHTMLElements } from 'svelte/elements'
+import type { MouseEventHandler, PointerEventHandler, SvelteHTMLElements } from 'svelte/elements'
 
 /** Element tags a Reorder component can render as, via the `as` prop. */
 export type ReorderElementTag = keyof SvelteHTMLElements
@@ -30,6 +30,16 @@ export type ReorderGroupProps<V> = HTMLElementProps & {
      * a sibling. Assign the result back to the state driving `values`.
      */
     onReorder: (newOrder: V[]) => void
+    /**
+     * Capture-phase `pointerdown` listener on the group element. Runs after
+     * the group resets its post-drag click guard.
+     */
+    onpointerdowncapture?: PointerEventHandler<HTMLElement> | null
+    /**
+     * Capture-phase `click` listener on the group element. Runs after the
+     * group swallows the click that follows a reorder.
+     */
+    onclickcapture?: MouseEventHandler<HTMLElement> | null
 }
 
 /**

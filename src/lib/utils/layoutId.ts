@@ -6,17 +6,24 @@ import type { AnimationOptions } from 'motion'
 type LayoutIdEntry = {
     rect: DOMRect
     transition?: AnimationOptions
+    /** The element that wrote the entry, when it said so. */
+    owner?: object
 }
 
 /**
  * Registry that stores last-known rect + transition for each layoutId.
  *
- * - `snapshot(id, rect, transition)` — called when an element with a layoutId unmounts.
- * - `consume(id)` — called by a newly mounted element. Returns and **deletes** the entry (one-shot).
+ * - `snapshot(id, rect, transition, owner)` — called when an element with a layoutId unmounts
+ *   (or its `layoutId` turns off). `owner` is the element writing the entry.
+ * - `consume(id, consumer)` — called by a newly mounted element. Returns and **deletes** the
+ *   entry (one-shot). An element never consumes its own entry: when its `layoutId` turns back
+ *   on it is still the lead of its own shared-layout stack upstream, so nothing animates
+ *   (framer-motion `MeasureLayout.tsx` @ v14.2.0, 47-49 / 154-155). Its stale entry is
+ *   dropped, so a later arrival doesn't animate from it either.
  */
 export type LayoutIdRegistry = {
-    snapshot(id: string, rect: DOMRect, transition?: AnimationOptions): void
-    consume(id: string): LayoutIdEntry | undefined
+    snapshot(id: string, rect: DOMRect, transition?: AnimationOptions, owner?: object): void
+    consume(id: string, consumer?: object): LayoutIdEntry | undefined
 }
 
 /**
@@ -36,17 +43,19 @@ const entries = new Map<string, LayoutIdEntry>()
  *
  * @example
  * ```ts
- * layoutIdRegistry.snapshot('hero', element.getBoundingClientRect())
- * const entry = layoutIdRegistry.consume('hero') // returns and deletes
+ * layoutIdRegistry.snapshot('hero', element.getBoundingClientRect(), {}, element)
+ * const entry = layoutIdRegistry.consume('hero', otherElement) // returns and deletes
  * ```
  */
 export const layoutIdRegistry: LayoutIdRegistry = {
-    snapshot(id, rect, transition) {
-        entries.set(id, { rect, transition })
+    snapshot(id, rect, transition, owner) {
+        entries.set(id, { rect, transition, owner })
     },
-    consume(id) {
+    consume(id, consumer) {
         const entry = entries.get(id)
-        if (entry) entries.delete(id)
+        if (!entry) return undefined
+        entries.delete(id)
+        if (consumer !== undefined && entry.owner === consumer) return undefined
         return entry
     }
 }

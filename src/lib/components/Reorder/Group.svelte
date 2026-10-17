@@ -21,6 +21,7 @@
     import { setReorderContext, type ItemData } from './context'
     import { detectAxis } from './detectAxis'
     import { applyOrderSwap } from './order'
+    import type { MouseEventHandler, PointerEventHandler } from 'svelte/elements'
     import type { ReorderAxis, ReorderGroupProps } from './types'
 
     let {
@@ -30,6 +31,8 @@
         values,
         onReorder,
         style,
+        onpointerdowncapture,
+        onclickcapture,
         ref = $bindable(),
         ...rest
     }: ReorderGroupProps<V> = $props()
@@ -72,6 +75,12 @@
      */
     let isReordering = false
 
+    /**
+     * Set when a drag reorders the list; makes the group swallow the click
+     * that follows the release (see `handleClickCapture`).
+     */
+    let hasReordered = false
+
     setReorderContext<V>({
         get axis() {
             return axis
@@ -96,10 +105,14 @@
 
             if (order !== newOrder) {
                 isReordering = true
+                hasReordered = true
                 onReorder(applyOrderSwap(values, order, newOrder))
             }
         },
-        getGroupElement: () => ref ?? null
+        getGroupElement: () => ref ?? null,
+        clearReordered: () => {
+            hasReordered = false
+        }
     })
 
     $effect(() => {
@@ -124,6 +137,32 @@
     })
 
     /**
+     * A release that ends a reordering drag isn't a click. Browsers only
+     * click an element holding both the press and release targets, so
+     * whether it was clicked depended on which nodes Svelte's keyed each
+     * moved, and so on drag direction (#2682): Chrome drops the click if the
+     * dragged item's node moved, and clicks the item and group if a sibling's
+     * node moved instead. Swallow it here, above every item, either way. The
+     * flag is cleared when the drag ends, a frame after the release's click,
+     * or on the next press. Clicks with no pointer press behind them
+     * (detail 0, e.g. keyboard) are left alone.
+     * (Motion 14.1.1 `Reorder/Group.tsx`.)
+     */
+    const handlePointerDownCapture: PointerEventHandler<HTMLElement> = (event) => {
+        hasReordered = false
+        onpointerdowncapture?.(event)
+    }
+
+    const handleClickCapture: MouseEventHandler<HTMLElement> = (event) => {
+        if (hasReordered && event.detail) {
+            hasReordered = false
+            event.stopPropagation()
+            event.preventDefault()
+        }
+        onclickcapture?.(event)
+    }
+
+    /**
      * Browser scroll anchoring reacts to items moving and adjusts the
      * scroll position, which corrupts drag position math mid-gesture —
      * disable it on the container (upstream `Group.tsx` `groupStyle`).
@@ -139,6 +178,8 @@
     bind:ref
     tag={as}
     {...rest}
+    onpointerdowncapture={handlePointerDownCapture}
+    onclickcapture={handleClickCapture}
     style={groupStyle}
     data-reorder-axis={axis}
     {motionValueChild}

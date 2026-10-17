@@ -84,6 +84,8 @@
     }
 
     const handleDragEnd = (event: PointerEvent, info: DragInfo) => {
+        // Runs a frame after release, so after the release's click
+        context.clearReordered()
         resetAutoScrollState()
         onDragEnd?.(event, info)
     }

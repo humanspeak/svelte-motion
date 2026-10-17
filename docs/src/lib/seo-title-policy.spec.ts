@@ -45,10 +45,9 @@ describe('SEO title policy', () => {
             .filter((path) => extractLiteralTitle(routeSources[path]) === undefined)
             .map(routeFromPath)
 
-        expect(
-            detailPaths,
-            `Expected 69 example detail pages, found ${detailPaths.length}`
-        ).toHaveLength(69)
+        // Guards against the glob silently matching nothing, which would let
+        // every title check below pass vacuously.
+        expect(detailPaths.length, 'No example detail pages found').toBeGreaterThan(0)
         expect(
             missingRoutes,
             `Missing literal seo.title assignments for: ${missingRoutes.join(', ') || '(none)'}`

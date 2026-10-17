@@ -58,6 +58,7 @@ const generateComponentDocs = (tag: string, isVoid: boolean): string => {
         'whileHover',
         'onAnimationStart',
         'onAnimationComplete',
+        'onUpdate',
         'onHoverStart',
         'onHoverEnd',
         'layout'
