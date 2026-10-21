@@ -889,6 +889,7 @@ describe('_MotionContainer', () => {
         const group = await controlledOwnedGroup()
         await group.update({ present: false })
         group.result.unmount()
+        await tick()
         expect(group.onExitComplete).toHaveBeenCalledTimes(1)
         await group.complete('owned-fast')
         await group.complete('owned-slow')
