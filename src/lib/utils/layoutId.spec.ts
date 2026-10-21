@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { layoutIdRegistry } from './layoutId'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { __layoutIdRegistrySize, holdLayoutIdHandoffs, layoutIdRegistry } from './layoutId'
 
 /**
  * The `layoutId` handoff registry (plan 006).
@@ -37,5 +37,68 @@ describe('layoutIdRegistry', () => {
         layoutIdRegistry.snapshot('anonymous', rect)
 
         expect(layoutIdRegistry.consume('anonymous')?.rect).toBe(rect)
+    })
+})
+
+/**
+ * Unconsumed entries are released after the handoff window, so unique
+ * `layoutId`s don't keep detached elements alive forever. Upstream frees empty
+ * shared stacks at the end of the update pass, not on unmount, because "a
+ * replacement with the same layoutId mounting in the same commit resumes from
+ * it" (motion-dom `create-projection-node.ts` `clearAllSnapshots` @ v14.5.0,
+ * #3940; framer-motion `shared-layout-unmount-leak.test.tsx`).
+ */
+describe('layoutIdRegistry release', () => {
+    const rect = new DOMRect(10, 20, 100, 50)
+
+    beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'performance', 'setTimeout'] })
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
+    it('released when unconsumed', () => {
+        const departing = document.createElement('div')
+        const other = document.createElement('div')
+        layoutIdRegistry.snapshot('leak-a', rect, {}, departing)
+
+        vi.advanceTimersByTime(200)
+
+        expect(layoutIdRegistry.consume('leak-a', other)).toBeUndefined()
+    })
+
+    it('size stays bounded', () => {
+        for (let i = 0; i < 50; i++) {
+            layoutIdRegistry.snapshot(`unique-${i}`, rect, {}, document.createElement('div'))
+        }
+
+        vi.advanceTimersByTime(200)
+
+        expect(__layoutIdRegistrySize()).toBe(0)
+    })
+
+    it('same-window handoff still works', () => {
+        const departing = document.createElement('div')
+        const other = document.createElement('div')
+        layoutIdRegistry.snapshot('swap', rect, {}, departing)
+
+        vi.advanceTimersByTime(50)
+
+        expect(layoutIdRegistry.consume('swap', other)?.rect).toBe(rect)
+    })
+
+    it('hold defers release', () => {
+        const before = __layoutIdRegistrySize()
+        const release = holdLayoutIdHandoffs()
+        layoutIdRegistry.snapshot('held', rect, {}, document.createElement('div'))
+
+        vi.advanceTimersByTime(1000)
+        expect(__layoutIdRegistrySize()).toBe(before + 1)
+
+        release()
+        vi.advanceTimersByTime(200)
+        expect(__layoutIdRegistrySize()).toBe(0)
     })
 })

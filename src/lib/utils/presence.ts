@@ -1,5 +1,6 @@
 import type { AnimatePresenceMode, MotionExit, MotionTransition } from '$lib/types'
 import { mergeTransitions } from '$lib/utils/animation'
+import { holdLayoutIdHandoffs } from '$lib/utils/layoutId'
 import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import { readTransformValue, transformProps, type PresenceContextProps } from 'motion-dom'
@@ -979,6 +980,8 @@ export const createAnimatePresenceContext = (context: {
     }
     // Track number of in-flight exit animations to invoke onExitComplete once
     let inFlightExits = 0
+    // One layoutId handoff hold per in-flight exit (see layoutId.ts `holdLayoutIdHandoffs`).
+    const layoutIdHolds: Array<() => void> = []
 
     type ActiveExit = {
         clone: HTMLElement
@@ -1078,6 +1081,8 @@ export const createAnimatePresenceContext = (context: {
             enterBlocked = true
         }
         inFlightExits += 1
+        // Keep departing layoutId snapshots alive until the exit ends (see layoutId.ts).
+        layoutIdHolds.push(holdLayoutIdHandoffs())
     }
 
     /**
@@ -1102,6 +1107,7 @@ export const createAnimatePresenceContext = (context: {
      */
     const finishExit = () => {
         if (disposed) return
+        layoutIdHolds.pop()?.()
         inFlightExits -= 1
         if (inFlightExits === 0) {
             context.forceRender?.()
@@ -1154,6 +1160,7 @@ export const createAnimatePresenceContext = (context: {
      * blocked by `mode='wait'` are still released once nothing is exiting.
      */
     const cancelExit = () => {
+        layoutIdHolds.pop()?.()
         inFlightExits -= 1
         if (inFlightExits === 0 && mode === 'wait' && enterBlocked) {
             enterBlocked = false
@@ -1713,6 +1720,7 @@ export const createAnimatePresenceContext = (context: {
         exitedKeys.clear()
         enterUnblockedCallbacks.clear()
         customSubscribers.clear()
+        for (const release of layoutIdHolds.splice(0)) release()
         inFlightExits = 0
         enterBlocked = false
     }
