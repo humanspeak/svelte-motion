@@ -16,6 +16,8 @@ add labels; the maintainer does at PR time.
 
 ## Execution order & status
 
+**Integrated gate 2026-10-21 on `feat/motion-14.5.0` (`3da14de4`)**: `pnpm build` ok, `pnpm check` 0 errors, unit 1217/1217, full e2e 636 passed / 2 skipped / 0 failed. Awaiting maintainer sign-off on the live demos.
+
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
 | [000](000-playwright-port-override.md) | `PW_PORT` overrides Playwright's port (default 4198) so lanes can run e2e in parallel | P1 | S | — | DONE (guard-verified: PW_PORT=4201 keyframes spec passed) |
@@ -25,8 +27,8 @@ add labels; the maintainer does at PR time.
 | [004](004-layout-id-registry-release.md) | Release unconsumed `layoutId` snapshots after the handoff window (#3940) | P2 | S | 000, 002 | DONE (`0231a6bc`; guard-verified red→green) |
 | [005](005-pop-layout-presence-child.md) | `popLayout` pops PresenceChild-held content (#2503) | P2 | M | 001, 002 | DONE (`a664e16f`; guard-verified: unit 57/57, owned-pop-layout e2e 3/3) |
 | [006](006-spike-adopt-upstream-drag.md) | SPIKE: drive `drag` with motion-dom's `VisualElementDragControls` (go/no-go report) | P2 | M (time-boxed) | 001 | TODO |
-| [007](007-scope-motion.md) | `useScopeMotion` attachment + `scopeMotion` re-export, docs, examples | P2 | M | 001 | DONE on `lane/1450-apis` (pending commit hash in merge) |
-| [008](008-vanilla-drag-export.md) | Expose vanilla `drag()` with a double-drag guard | P3 | S-M | 001 (after 007) | TODO |
+| [007](007-scope-motion.md) | `useScopeMotion` attachment + `scopeMotion` re-export, docs, examples | P2 | M | 001 | DONE (`e20a8aa9`; guard-verified unit 27/27) |
+| [008](008-vanilla-drag-export.md) | Expose vanilla `drag()` with a double-drag guard | P3 | S-M | 001 (after 007) | DONE (`3da14de4`; guard-verified unit 26/26) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason) | SUPERSEDED (by)
 
