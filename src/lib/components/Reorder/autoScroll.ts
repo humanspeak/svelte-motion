@@ -89,8 +89,23 @@ const findScrollableAncestor = (element: Element | null, axis: 'x' | 'y'): HTMLE
 }
 
 /**
+ * Speed ramps up towards the edge and is capped at maxSpeed once the
+ * pointer reaches or passes it.
+ *
+ * Port of framer-motion `Reorder/utils/auto-scroll.ts` @ v14.5.0.
+ *
+ * @param distanceFromEdge - Pointer distance inside the edge, in px; negative once past it.
+ * @returns Scroll speed in px per frame, from 0 up to `maxSpeed`.
+ */
+const scrollSpeed = (distanceFromEdge: number): number => {
+    const intensity = Math.min(1, 1 - distanceFromEdge / threshold)
+    return maxSpeed * intensity * intensity
+}
+
+/**
  * Quadratic ease into `maxSpeed` as the pointer approaches the edge:
- * zero at `threshold` px away, full speed at the edge itself.
+ * zero at `threshold` px away, full speed at the edge, and capped at
+ * `maxSpeed` once the pointer is past the edge.
  */
 const getScrollAmount = (
     pointerPosition: number,
@@ -109,11 +124,9 @@ const getScrollAmount = (
     const distanceFromEnd = end - pointerPosition
 
     if (distanceFromStart < threshold) {
-        const intensity = 1 - distanceFromStart / threshold
-        return { amount: -maxSpeed * intensity * intensity, edge: 'start' }
+        return { amount: -scrollSpeed(distanceFromStart), edge: 'start' }
     } else if (distanceFromEnd < threshold) {
-        const intensity = 1 - distanceFromEnd / threshold
-        return { amount: maxSpeed * intensity * intensity, edge: 'end' }
+        return { amount: scrollSpeed(distanceFromEnd), edge: 'end' }
     }
 
     return { amount: 0, edge: null }
