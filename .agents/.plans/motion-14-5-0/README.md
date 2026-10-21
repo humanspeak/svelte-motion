@@ -26,7 +26,7 @@ add labels; the maintainer does at PR time.
 | [003](003-reorder-auto-scroll-speed-cap.md) | Cap Reorder auto-scroll speed past the edge | P2 | S | 000 | DONE (`2d7d1703`; guard-verified red→green) |
 | [004](004-layout-id-registry-release.md) | Release unconsumed `layoutId` snapshots after the handoff window (#3940) | P2 | S | 000, 002 | DONE (`0231a6bc`; guard-verified red→green) |
 | [005](005-pop-layout-presence-child.md) | `popLayout` pops PresenceChild-held content (#2503) | P2 | M | 001, 002 | DONE (`a664e16f`; guard-verified: unit 57/57, owned-pop-layout e2e 3/3) |
-| [006](006-spike-adopt-upstream-drag.md) | SPIKE: drive `drag` with motion-dom's `VisualElementDragControls` (go/no-go report) | P2 | M (time-boxed) | 001 | TODO |
+| [006](006-spike-adopt-upstream-drag.md) | SPIKE: drive `drag` with motion-dom's `VisualElementDragControls` (go/no-go report) | P2 | M (time-boxed) | 001 | DONE: **GO-WITH-CONDITIONS** (see `006-spike-report.md`; branch `spike/upstream-drag`, not merged) |
 | [007](007-scope-motion.md) | `useScopeMotion` attachment + `scopeMotion` re-export, docs, examples | P2 | M | 001 | DONE (`e20a8aa9`; guard-verified unit 27/27) |
 | [008](008-vanilla-drag-export.md) | Expose vanilla `drag()` with a double-drag guard | P3 | S-M | 001 (after 007) | DONE (`3da14de4`; guard-verified unit 26/26) |
 
