@@ -225,6 +225,9 @@ describe('ExitAnimationFeature', () => {
         // then register and keep the unregister as the feature's unmount.
         expect(onExitComplete).toHaveBeenCalledTimes(1)
         expect(register).toHaveBeenCalledTimes(1)
+        // Upstream `exit.ts:81` @ v14.5.0 (#2503): the node rides along so
+        // popLayout can find the outermost motion element.
+        expect((register.mock.calls[0] as unknown[])[1]).toBe(ve)
         expect(typeof register.mock.results[0].value).toBe('function')
 
         ve.unmount()

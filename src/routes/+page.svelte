@@ -804,6 +804,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/owned-pop-layout') + searchParams}
+                    >
+                        popLayout with an owned child (siblings reflow immediately)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/animate-presence/boundary-teardown') + searchParams}
                     >
                         Boundary teardown and navigation

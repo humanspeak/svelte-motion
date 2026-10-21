@@ -256,7 +256,9 @@ export class ExitAnimationFeature extends Feature<unknown> {
     mount(): void {
         const { register, onExitComplete } = this.node.presenceContext ?? {}
         if (onExitComplete) onExitComplete(this.id)
-        if (register) this.unmount = register(this.id)
+        // framer-motion motion/features/animation/exit.ts:81 @ v14.5.0 (#2503):
+        // pass the node so popLayout can find the outermost motion element.
+        if (register) this.unmount = register(this.id, this.node)
     }
 
     /**

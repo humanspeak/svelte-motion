@@ -1,3 +1,8 @@
+<script lang="ts" module>
+    // Unique per popped element across every PresenceChild on the page.
+    let popIdCounter = 0
+</script>
+
 <script lang="ts">
     import { onDestroy, type Snippet } from 'svelte'
     import { createPresenceExitRegistry } from '$lib/utils/presenceExitRegistry'
@@ -5,6 +10,8 @@
     import {
         getAnimatePresenceContext,
         getPresenceDepth,
+        measurePopLayoutSnapshot,
+        resolvePopLayoutStyles,
         setPresenceChildContext,
         setPresenceDepth
     } from '$lib/utils/presence'
@@ -72,6 +79,53 @@
 
     function noopSafeToRemove() {}
 
+    let removePop: () => void = () => {}
+
+    /**
+     * `mode="popLayout"`: take the held content out of the layout flow while it
+     * exits, so siblings reflow immediately. Port of framer-motion
+     * `components/AnimatePresence/PopChild.tsx` @ v14.5.0 (#2503): PresenceChild
+     * has no ref to its snippet content, so the element is the outermost motion
+     * element registered with this wrapper.
+     *
+     * Must run before the DOM update that starts the exit, while the element is
+     * still in flow (upstream measures in `getSnapshotBeforeUpdate`). Like
+     * upstream, the pop is a `[data-motion-pop-id]` rule in an injected
+     * stylesheet rather than inline styles, so the element's own `style` is
+     * left untouched and cleanup is just deleting the rule. MotionConfig has no
+     * `nonce` in svelte-motion, so none is set on the `<style>`.
+     */
+    function applyPop(): void {
+        removePop()
+        const element = exitRegistry.getPopElement()
+        if (!element) return
+        const snapshot = measurePopLayoutSnapshot(element, getComputedStyle(element))
+        if (!snapshot.width || !snapshot.height) return
+
+        const id = `svelte-motion-pop-${++popIdCounter}`
+        const declarations = Object.entries(
+            // Only plain string declarations (position, width, height, edges).
+            resolvePopLayoutStyles(snapshot) as Record<string, string>
+        )
+            .map(([property, value]) => `${property}: ${value} !important;`)
+            .join(' ')
+        const rule = `[data-motion-pop-id="${id}"] { ${declarations} }`
+
+        element.dataset.motionPopId = id
+        // The element's own document, so this works in another window/iframe.
+        const doc = element.ownerDocument
+        const style = doc.createElement('style')
+        doc.head.appendChild(style)
+        if (style.sheet) style.sheet.insertRule(rule)
+        else style.textContent = rule
+
+        removePop = () => {
+            removePop = () => {}
+            if (element.dataset.motionPopId === id) element.removeAttribute('data-motion-pop-id')
+            style.remove()
+        }
+    }
+
     function cancelWaitEnterBlock(): void {
         waitEnterVersion += 1
         unsubscribeEnterUnblocked?.()
@@ -121,6 +175,7 @@
         const self: () => void = () => {
             if (currentSafeToRemove !== self || phase !== 'holding') return
             exitRegistry.cancel()
+            removePop()
             phase = 'completed'
             currentSafeToRemove = noopSafeToRemove
             animatePresence?.notifyExitComplete()
@@ -170,6 +225,8 @@
             currentSafeToRemove = noopSafeToRemove
         } else if (prevPresent && !current && currentPhase === 'idle') {
             cancelWaitEnterBlock()
+            // Before the DOM update, so the element is measured in flow.
+            if (animatePresence?.mode === 'popLayout') applyPop()
             phase = 'holding'
             currentSafeToRemove = mintSafeToRemove()
             completeDescendant = exitRegistry.begin(currentSafeToRemove)
@@ -180,6 +237,7 @@
             // that captured it.
             cancelWaitEnterBlock()
             exitRegistry.cancel()
+            removePop()
             phase = 'idle'
             currentSafeToRemove = noopSafeToRemove
             animatePresence?.notifyExitComplete()
@@ -208,6 +266,7 @@
     onDestroy(() => {
         cancelWaitEnterBlock()
         exitRegistry.cancel()
+        removePop()
         // Settle a pending exit when the wrapper itself unmounts mid-hold
         // (an outer conditional removed us before the consumer called
         // safeToRemove). Without this the parent AnimatePresence's
