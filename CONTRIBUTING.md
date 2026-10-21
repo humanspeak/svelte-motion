@@ -40,11 +40,12 @@ Run commands in this order. Each step prepares what the next one needs.
 
 ### Focused development
 
-| Purpose                 | Command                                                                    |
-| ----------------------- | -------------------------------------------------------------------------- |
-| One root unit file      | `pnpm exec vitest run <path>`                                              |
-| Format and lint changes | `trunk fmt <files>` then `trunk check <files>`                             |
-| Root SSR/hydration      | `pnpm exec playwright test e2e/text/exact-text.spec.ts --project=chromium` |
+| Purpose                    | Command                                                                    |
+| -------------------------- | -------------------------------------------------------------------------- |
+| One root unit file         | `pnpm exec vitest run <path>`                                              |
+| Format and lint changes    | `trunk fmt <files>` then `trunk check <files>`                             |
+| Root SSR/hydration         | `pnpm exec playwright test e2e/text/exact-text.spec.ts --project=chromium` |
+| e2e in a parallel worktree | `PW_PORT=4201 pnpm exec playwright test <path>`                            |
 
 ### Full verification
 

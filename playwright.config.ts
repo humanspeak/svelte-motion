@@ -1,6 +1,10 @@
 import { chromium, defineConfig, devices } from '@playwright/test'
 import { resolveChromiumLaunchOptions } from './scripts/chromium-launch-options'
 
+// Default 4198 keeps sibling repos (which share vite's 4173) from killing each
+// other's servers. Parallel worktrees of this repo set PW_PORT to a free port.
+const port = Number(process.env.PW_PORT) || 4198
+
 export default defineConfig({
     testDir: './e2e',
     // Run tests sequentially to avoid dispatchEvent race conditions
@@ -18,15 +22,16 @@ export default defineConfig({
         // shared by every repo on the machine, so concurrent e2e sessions
         // in sibling projects reuse-then-kill each other's servers
         // mid-run (reuseExistingServer can't tell whose server it is).
-        command: 'npm run build && npm run preview -- --port 4198',
-        port: 4198,
+        command: `npm run build && npm run preview -- --port ${port} --strictPort`,
+        port,
         timeout: 120000,
         // Do not reuse an existing server by default. reuseExistingServer
-        // short-circuits the rebuild in `command`: a stale preview on 4198
-        // would silently validate the suite against OLD code, so a reverted
-        // fix can appear to pass — exactly when trustworthy results matter
-        // most. Instead, if 4198 is occupied the run fails fast with an
-        // "already used" error rather than rebuilding; kill the stale server
+        // short-circuits the rebuild in `command`: a stale preview on the
+        // configured port (4198 by default) would silently validate the
+        // suite against OLD code, so a reverted fix can appear to pass —
+        // exactly when trustworthy results matter most. Instead, if the
+        // configured port (4198 by default) is occupied the run fails fast
+        // with an "already used" error rather than rebuilding; kill the stale server
         // (`pkill -f "vite preview"`). Set PW_REUSE_SERVER=1 to reuse a
         // server you know is current and skip the rebuild.
         reuseExistingServer: !!process.env.PW_REUSE_SERVER,
@@ -34,7 +39,7 @@ export default defineConfig({
         stderr: 'pipe'
     },
     use: {
-        baseURL: 'http://localhost:4198',
+        baseURL: `http://localhost:${port}`,
         trace: 'on-first-retry',
         screenshot: 'on',
         // Force fresh context per test to prevent state leakage
