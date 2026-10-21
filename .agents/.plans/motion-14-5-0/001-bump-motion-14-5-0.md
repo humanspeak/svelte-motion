@@ -5,6 +5,12 @@
 > Do not improvise. When done, update this plan's status row in `.agents/.plans/motion-14-5-0/README.md`,
 > unless a reviewer dispatched you and told you they maintain the index.
 >
+> **Revision 2026-10-21 (guard, after executor STOP at Step 3)**: (1) `pnpm check` after the bump also errors in
+> `src/lib/utils/arc.spec.ts` (its `arc().animateVisualElement(...)` calls, lines 26/85/86). That file is in scope
+> and Step 4 rewrites those calls, so treat errors in `arc.ts` **or** `arc.spec.ts` as expected at Step 3. (2) npm has
+> no `motion-utils@14.5.0`: `motion-dom@14.5.0` depends on exactly `motion-utils@14.1.1`. The Step 3 expectation is
+> "exactly one motion-utils version, `14.1.1`". The STOP condition (more than one version) is unchanged.
+>
 > **Never use `git stash`** (the stash is shared by every worktree of this repo).
 >
 > **Drift check (run first)**: `git diff --stat f2b5d766..HEAD -- package.json pnpm-lock.yaml src/lib/utils/arc.ts src/lib/utils/arc.spec.ts src/lib/index.spec.ts src/lib/html/_MotionContainer.svelte src/routes/+page.svelte src/routes/tests/arc src/routes/tests/motion docs/src/routes/docs/arc .changeset e2e/motion`
@@ -237,10 +243,10 @@ Edit `package.json`: `"motion": "14.5.0"`, `"motion-dom": "14.5.0"` (exact, no c
 
 **Verify**:
 - `pnpm why motion-dom | grep -oE "motion-dom@[0-9]+\.[0-9]+\.[0-9]+" | sort -u` → exactly `motion-dom@14.5.0`
-- `pnpm why motion-utils | grep -oE "motion-utils@[0-9]+\.[0-9]+\.[0-9]+" | sort -u` → exactly `motion-utils@14.5.0`
+- `pnpm why motion-utils | grep -oE "motion-utils@[0-9]+\.[0-9]+\.[0-9]+" | sort -u` → exactly `motion-utils@14.1.1` (see revision note)
 - `pnpm exec vitest run src/lib/__tests__/motionDependencies.spec.ts` → pass
-- `pnpm check` → **expect at least one error** in `src/lib/utils/arc.ts` (calling the possibly-undefined
-  `path.animateVisualElement`). Any error in another file: STOP and report it.
+- `pnpm check` → **expect at least one error** in `src/lib/utils/arc.ts` and `src/lib/utils/arc.spec.ts` (calling the possibly-undefined
+  `animateVisualElement`). Any error in another file: STOP and report it.
 
 ### Step 4: Move the `arc()` guard onto `animateValues` (red unit test first)
 
@@ -376,7 +382,7 @@ changesets).
 
 - Port 4198 is occupied before a Playwright run.
 - `pnpm why` shows more than one motion-dom or motion-utils version.
-- After the bump, `pnpm check` reports errors outside `src/lib/utils/arc.ts`.
+- After the bump, `pnpm check` reports errors outside `src/lib/utils/arc.ts` / `arc.spec.ts`.
 - `upstreamArc(...).animateValues` is undefined at 14.5.0.
 - A unit test outside arc fails after the bump.
 - Any full-suite e2e failure: report it, do not fix it.
