@@ -1421,9 +1421,14 @@
         // for accelerated channels: `bindToMotionValue` builds a NativeAnimation
         // and returns early for them (`VisualElement.mjs:262-281`). So after a
         // WAAPI-accelerated animation is interrupted, `MotionValue.stop()` writes
-        // the sampled freeze value onto the MotionValue
-        // (`NativeAnimationExtended.updateMotionValue`) while `latestValues` still
-        // holds the from-state. Reading the MotionValues here keeps the
+        // the sampled freeze value onto the MotionValue while `latestValues`
+        // still holds the from-state. Two paths do that write: opacity-style
+        // accelerated values go through `NativeAnimationExtended.updateMotionValue`,
+        // and grouped independent transforms (Motion 14.2+) go through
+        // motion-dom's `TransformAnimation`, whose `stop()` syncs the MotionValue
+        // and, from 14.3.1, commits the inline transform synchronously when the
+        // group's last animation is released
+        // (`animation/waapi/transforms/TransformAnimation.ts`). Reading the MotionValues here keeps the
         // declarative rewrite consistent with the real store, so a benign
         // reactive change cannot snap a frozen channel back (measured: an
         // interrupted controls start froze translateX at 15.936px, then an
@@ -3209,15 +3214,24 @@
                 node.scheduleRenderMicrotask()
             },
             // Upstream's shape exactly (`animation-controls.ts`): stop each
-            // MotionValue. No snapshot bookkeeping — `MotionValue.stop()` routes
-            // into `NativeAnimation.stop()`, which calls
-            // `NativeAnimationExtended.updateMotionValue()`
-            // (NativeAnimationExtended.mjs:54-84). That samples a renderless
-            // JSAnimation twice at wall-clock elapsed time to recover BOTH value
-            // and velocity, writes the sampled value to inline style so it
-            // survives the post-`cancel()` gap, and calls `setWithVelocity` — so
-            // an interrupted accelerated channel freezes exactly where it is and
-            // any follow-up animation inherits its velocity.
+            // MotionValue. No snapshot bookkeeping — two accelerated paths
+            // freeze an interrupted channel where it is:
+            // - opacity-style values: `MotionValue.stop()` routes into
+            //   `NativeAnimation.stop()`, which calls
+            //   `NativeAnimationExtended.updateMotionValue()`
+            //   (NativeAnimationExtended.mjs:54-84). That samples a renderless
+            //   JSAnimation twice at wall-clock elapsed time to recover BOTH
+            //   value and velocity, writes the sampled value to inline style so
+            //   it survives the post-`cancel()` gap, and calls
+            //   `setWithVelocity`.
+            // - grouped independent transforms (Motion 14.2+): motion-dom's
+            //   `TransformAnimation.stop()` syncs the MotionValue (value and
+            //   velocity) from the running WAAPI group before stopping; from
+            //   14.3.1 releasing the group's last animation commits the inline
+            //   transform synchronously
+            //   (`animation/waapi/transforms/TransformAnimation.ts`
+            //   `release()`/`end()`).
+            // Either way any follow-up animation inherits the velocity.
             stop: () => {
                 node.values.forEach((value) => value.stop())
             }

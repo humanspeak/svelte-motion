@@ -166,7 +166,7 @@ describe('public API: index.ts', () => {
     it('re-exports arc() path factory from motion-dom', () => {
         expect(typeof arc).toBe('function')
         const path = arc({ strength: 1 })
-        expect(typeof path.animateVisualElement).toBe('function')
+        expect(typeof path.animateValues).toBe('function')
         expect(typeof path.interpolateProjection).toBe('function')
     })
 
