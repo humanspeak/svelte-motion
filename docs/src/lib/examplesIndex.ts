@@ -36,6 +36,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'Layout animations on plain elements with animateLayout — a switch knob, a shared tab underline, and a shuffled grid, no motion components.'
     },
+    'scope-motion': {
+        title: 'useScopeMotion',
+        description:
+            'Motion 14.5 scopes in Svelte with useScopeMotion — a staggered list that re-runs on a breakpoint, and a reset button that cancels every animation and restores inline styles.'
+    },
     'animate-presence': {
         title: 'AnimatePresence',
         description: 'Interactive AnimatePresence animation example using Svelte Motion.'

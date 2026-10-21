@@ -420,6 +420,27 @@
             </ul>
         </div>
         <div>
+            <h2 class="mb-3 text-xl font-medium">scopeMotion (Motion 14.5)</h2>
+            <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/scope-motion/basic') + searchParams}
+                    >
+                        useScopeMotion Basic (default transition, gestures, stop / cancel / refresh)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/scope-motion/media') + searchParams}
+                    >
+                        useScopeMotion Media (matchMedia breakpoints refresh the scope)
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div>
             <h2 class="mb-3 text-xl font-medium">Independent transforms (Motion 14.2)</h2>
             <ul class="list-disc space-y-2 pl-5">
                 <li>

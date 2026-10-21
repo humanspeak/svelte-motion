@@ -36,9 +36,11 @@ import {
     progress,
     propEffect,
     resize,
+    scopeMotion,
     scroll,
     stagger,
     stringifyStyleObject,
+    toMediaQuery,
     transform,
     useAnimate,
     useAnimationFrame,
@@ -48,6 +50,7 @@ import {
     usePresence,
     usePresenceData,
     useReducedMotion,
+    useScopeMotion,
     useSpring,
     useTime,
     useTransform,
@@ -75,6 +78,12 @@ describe('public API: index.ts', () => {
     it('re-exports animate and hover from motion', () => {
         expect(typeof animate).toBe('function')
         expect(typeof hover).toBe('function')
+    })
+
+    it('re-exports Motion 14.5 scopeMotion, toMediaQuery and the useScopeMotion attachment', () => {
+        expect(typeof scopeMotion).toBe('function')
+        expect(typeof toMediaQuery).toBe('function')
+        expect(typeof useScopeMotion).toBe('function')
     })
 
     it('re-exports the Motion 13.2 effect registry primitives', () => {

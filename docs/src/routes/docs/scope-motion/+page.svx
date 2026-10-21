@@ -1,0 +1,226 @@
+---
+title: scopeMotion
+description: Collect animations, gestures and scroll/view listeners in a scope with useScopeMotion and scopeMotion — a root for selectors, a default transition, media conditions, and one call to stop or cancel everything
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte'
+  import CancelReset from '$lib/examples/scope-motion/demos/CancelReset.svelte'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'scopeMotion | Docs | Svelte Motion'
+      seo.description = 'Collect animations, gestures and listeners in a Motion 14.5 scope with the useScopeMotion attachment: scoped selectors, a default transition, media conditions, and stop or cancel in one call.'
+      seo.ogTitle = 'scopeMotion'
+      seo.ogTagline = 'Collect animations and gestures, then stop or cancel them together'
+      seo.ogFeatures = ['useScopeMotion Attachment', 'Default Transition', 'Media Conditions', 'cancel() Restores Styles']
+      seo.ogSlug = 'docs-scope-motion'
+  }
+</script>
+
+# scopeMotion
+
+A **scope** collects everything started inside it — `animate()` animations, `scroll()` and `inView()` listeners, `hover()` and `press()` gestures, `resize()` observers, `delay()` timers, and `animateLayout()` / `animateView()` builders. Selectors resolve inside the scope's root element, every `animate()` gets the scope's default transition, setup can be limited to media conditions, and everything can be stopped or reverted in one call.
+
+`useScopeMotion` ties a scope to an element's lifecycle as a Svelte attachment. `scopeMotion` is the vanilla function underneath.
+
+## Usage
+
+Create the attachment with a setup function and put it on the root element with `{@attach}`. Setup runs when the element mounts; the scope is cancelled when it unmounts.
+
+```svelte
+<script lang="ts">
+    import { animate, hover, stagger, useScopeMotion } from '@humanspeak/svelte-motion'
+
+    const scope = useScopeMotion(
+        () => {
+            // 'li' resolves inside the <ul>, not the whole document.
+            animate('li', { opacity: [0, 1], x: [-20, 0] }, { delay: stagger(0.05) })
+
+            hover('li', (element) => {
+                animate(element, { scale: 1.05 })
+                return () => animate(element, { scale: 1 })
+            })
+        },
+        { transition: { type: 'spring', visualDuration: 0.4 } }
+    )
+</script>
+
+<ul {@attach scope}>
+    <li>One</li>
+    <li>Two</li>
+    <li>Three</li>
+</ul>
+```
+
+<Example>
+  <CancelReset />
+</Example>
+
+`scope.current` is the live `MotionScope` while the element is attached (`null` before mount and after unmount). Use it from event handlers:
+
+```svelte
+<button onclick={() => scope.current?.cancel()}>Reset</button>
+```
+
+Setup may return a cleanup function. It runs when the scope is stopped, cancelled or refreshed.
+
+### Re-running on dependencies
+
+Pass a `deps` getter to re-run the scope when reactive values change. It is read inside the attachment, so Svelte tracks every value it reads; a change cancels the old scope and runs setup again.
+
+```ts
+let distance = $state(100)
+
+const scope = useScopeMotion(() => animate('li', { x: distance }), {
+    deps: () => distance
+})
+```
+
+Anything read inside setup itself is **untracked**: reading `$state` there does not make the scope re-run. List it in `deps` when you want that.
+
+## Vanilla scopeMotion
+
+Outside a component, or when you manage the lifecycle yourself, call `scopeMotion` directly. An optional root element or selector comes first:
+
+```ts
+import { animate, scopeMotion } from '@humanspeak/svelte-motion'
+
+const scope = scopeMotion(
+    '.list',
+    ({ media }) => {
+        animate('li', { x: media.desktop ? 100 : 0 })
+    },
+    { transition: { duration: 0.5 }, matchMedia: { desktop: '>=800' } }
+)
+
+// Later
+scope.cancel()
+```
+
+Without a root, selectors resolve against the document as usual. `useScopeMotion` is `scopeMotion(node, setup, options)` with cancel on detach.
+
+## Default transition
+
+`transition` in the options is the default for every `animate()` call made in the scope. A transition passed to an individual call still wins.
+
+```ts
+useScopeMotion(
+    () => {
+        animate('li', { x: 100 }) // 0.4s linear, from the scope
+        animate('.badge', { scale: 1.2 }, { type: 'spring' }) // its own transition
+    },
+    { transition: { duration: 0.4, ease: 'linear' } }
+)
+```
+
+## Media conditions
+
+`matchMedia` limits setup to matching media. When a condition changes, the scope is cancelled and setup runs again if the conditions still match.
+
+- A **string** is one condition: setup runs only while it matches.
+- An **object** names several conditions: setup runs when **any** of them match, and `scope.media` reports each one.
+
+```ts
+useScopeMotion(
+    ({ media }) => {
+        animate('.box', { x: media.desktop ? 200 : 50 })
+    },
+    { matchMedia: { desktop: '>=800', mobile: '<800' } }
+)
+```
+
+Conditions accept full media queries (anything containing `(` passes through unchanged) or shorthands. Each space-separated token must match:
+
+| Shorthand | Media query |
+|-----------|-------------|
+| `>=800`, `<1200px`, `> 40em` | `(width >= 800px)`, `(width < 1200px)`, `(width > 40em)` — unitless widths are px |
+| `reducedMotion` | `(prefers-reduced-motion: reduce)` |
+| `motion` | `(prefers-reduced-motion: no-preference)` |
+| `dark` | `(prefers-color-scheme: dark)` |
+| `light` | `(prefers-color-scheme: light)` |
+| `hover` | `(hover: hover) and (pointer: fine)` |
+| `touch` | `(pointer: coarse)` |
+| `portrait` | `(orientation: portrait)` |
+| `landscape` | `(orientation: landscape)` |
+| `!token` | Negates a token, e.g. `>=800 !touch` |
+
+`toMediaQuery(condition)` is exported too, if you want the expanded query.
+
+## run, bind and ignore
+
+Work started **outside** setup — in an event handler or after an `await` — is not collected unless you run it in the scope:
+
+| Method | Description |
+|--------|-------------|
+| `run(callback)` | Runs `callback` in the scope and returns its result |
+| `bind(callback)` | Returns a function that runs `callback` in the scope, e.g. as an event handler |
+| `ignore(callback)` | Runs `callback` outside any scope, so what it starts survives `stop()` and `cancel()` |
+
+```svelte
+<button onclick={() => scope.current?.run(() => animate('li', { rotate: 360 }))}>Spin</button>
+```
+
+Read `scope.current` when the handler runs, as above: it is a plain property, not reactive state, and it is `null` until the element mounts.
+
+Callbacks passed to `inView()`, `scroll()`, `hover()`, `press()` and `delay()` inside setup are bound for you, so animations they start later are collected too.
+
+## stop vs cancel
+
+| Method | Stops animations and listeners | Restores inline styles | Runs setup again |
+|--------|:---:|:---:|:---:|
+| `stop()` | yes | no — elements stay where they are | no |
+| `cancel()` | yes | yes — the `style` attribute is put back | no |
+| `refresh()` | yes | yes | yes, if the media conditions match |
+
+`scope.state` is `'active'`, `'stopped'` or `'cancelled'`, so async work can check whether its scope is gone before animating. Unmounting the element calls `cancel()`.
+
+## Nested scopes
+
+A scope created inside another scope's setup is cancelled together with its parent:
+
+```ts
+useScopeMotion(() => {
+    inView('section', (section) => {
+        const inner = scopeMotion(section, () => animate('p', { opacity: 1 }))
+        return () => inner.stop()
+    })
+})
+```
+
+## Caveats
+
+1. **Prefer plain elements.** `cancel()` (including the one on unmount) restores the `style` attribute of every element animated in the scope. `motion.*` components manage their own style, so scope plain elements rather than motion components.
+2. **Use vanilla APIs in setup.** Call `animate`, `inView`, `scroll`, `hover`, `press` and friends inside setup — not `use*` hooks like `useAnimate` or `useInView`, which need component initialization.
+3. **Browser only.** Setup runs when the attachment runs, which is in the browser, never during SSR.
+
+## API
+
+```ts
+useScopeMotion(setup, options?)
+scopeMotion(setup?, options?)
+scopeMotion(root, setup?, options?)
+```
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `transition` | `AnimationOptions` | Default transition for every `animate()` in the scope |
+| `matchMedia` | `string \| Record<string, string>` | Run setup only while these conditions match |
+| `deps` | `() => unknown` | `useScopeMotion` only: reactive values that re-run the scope |
+
+| `MotionScope` member | Description |
+|----------------------|-------------|
+| `state` | `'active' \| 'stopped' \| 'cancelled'` |
+| `media` | Whether each named condition matched when setup last ran |
+| `run` / `bind` / `ignore` | Run work in, bound to, or outside the scope |
+| `stop()` / `cancel()` / `refresh()` | Stop, revert, or revert and re-run |
+
+## Related
+
+- [useAnimate](/docs/use-animate) — a scoped `animate` function bound to an element
+- [animateLayout](/docs/animate-layout) — layout animations for plain elements, collected by scopes
+
+---
+
+Based on [Motion's scopeMotion](https://github.com/motiondivision/motion/blob/v14.5.0/packages/motion-dom/src/scope/index.ts) API (added in Motion 14.5).
