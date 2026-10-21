@@ -39,6 +39,10 @@ export {
     transform
 } from 'motion'
 
+// Motion 14.4's vanilla drag(), wrapped to skip elements a motion.* component already drags.
+export { drag } from '$lib/utils/vanillaDrag'
+export type { DragOptions } from 'motion-dom'
+
 // `animate` and the element effects re-typed to accept both raw and
 // Svelte-augmented motion values (runtime passthrough to motion's
 // implementations — no behavior change, only widened types).

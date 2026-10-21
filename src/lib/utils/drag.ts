@@ -384,7 +384,18 @@ const addPixelOffset = (
     return `calc(${value} + ${offset}px)`
 }
 
+/**
+ * Elements whose drag gesture is currently attached by `attachDrag` (a
+ * `motion.*` component with a `drag` prop). The vanilla `drag()` wrapper
+ * (`$lib/utils/vanillaDrag`) reads it to avoid attaching a second drag
+ * controller to the same element.
+ *
+ * @internal
+ */
+export const svelteMotionDragElements = new WeakSet<Element>()
+
 export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDragCleanup => {
+    svelteMotionDragElements.add(el)
     const EL_ID = el.getAttribute('data-testid') || el.id || el.tagName
     pwLog('[drag] attach', {
         el: EL_ID,
@@ -1716,6 +1727,7 @@ export const attachDrag = (el: HTMLElement, opts: AttachDragOptions): AttachDrag
         detachRelease?.()
         stopConstraintResizeObserver?.()
         el.removeEventListener('pointerdown', onPointerDown)
+        svelteMotionDragElements.delete(el)
     }
 
     return Object.assign(teardown, { adjustOrigin, updateOptions })

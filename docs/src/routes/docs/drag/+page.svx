@@ -217,6 +217,81 @@ The `info` object passed to drag callbacks contains:
 | `offset` | `{ x, y }` | Cumulative transform offset since drag start |
 | `velocity` | `{ x, y }` | Current velocity in px/s |
 
+## Vanilla drag()
+
+`drag()` makes plain elements draggable without a motion component (Motion 14.4). It takes an element, a list of elements or a CSS selector, and returns a function that removes the gesture:
+
+```svelte
+<script lang="ts">
+    import { drag } from '@humanspeak/svelte-motion'
+
+    let track = $state<HTMLElement | null>(null)
+    let knob = $state<HTMLElement | null>(null)
+
+    $effect(() => {
+        if (!knob || !track) return
+        return drag(knob, { axis: 'x', constraints: track })
+    })
+</script>
+
+<div bind:this={track}>
+    <div bind:this={knob}></div>
+</div>
+```
+
+While attached, `drag()` sets `user-select: none`, `touch-action` (`none`, or `pan-y`/`pan-x` with an `axis`) and `draggable="false"` on the element. The cleanup function restores them.
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `axis` | `'x' \| 'y'` | both axes | Restrict dragging to one axis |
+| `constraints` | `{ top?, left?, right?, bottom? } \| Element` | — | Pixel bounds relative to the origin, or an element to stay within |
+| `elastic` | `number \| { top?, left?, right?, bottom? }` | `0.35` | How far, from `0` to `1`, the element can move outside its constraints |
+| `momentum` | `boolean` | `true` | Carry the release velocity into an inertia animation |
+| `transition` | `InertiaOptions` | — | Options for the inertia animation on release |
+| `snapToOrigin` | `boolean \| 'x' \| 'y'` | `false` | Animate back to the origin on release |
+| `directionLock` | `boolean` | `false` | Lock to the first axis the pointer moves along |
+| `propagation` | `boolean` | `false` | Let drags start on draggable parents too |
+| `onStart` / `onMove` / `onEnd` | `(event, info) => void` | — | Drag lifecycle callbacks, with the same `info` as [DragInfo](#draginfo) |
+| `onDirectionLock` | `(axis: 'x' \| 'y') => void` | — | Fires when `directionLock` picks an axis |
+| `onTransitionEnd` | `() => void` | — | Fires when the release animation settles |
+| `onMeasureConstraints` | `(constraints) => constraints \| void` | — | Called when element constraints are measured; return a box to override them |
+
+### With animate() and animateLayout()
+
+The element's `x` and `y` are motion values shared with [`animate()`](/docs/use-animate) and [`animateLayout()`](/docs/animate-layout). An element moved by `animate()` keeps its offset when a drag starts, and you can animate it again after a drag:
+
+```ts
+await animate(knob, { x: 120 })
+const stop = drag(knob) // the drag continues from x: 120
+
+// later, spring it home
+animate(knob, { x: 0 }, { type: 'spring' })
+```
+
+### In a scope
+
+Called inside a [`useScopeMotion`](/docs/scope-motion) or `scopeMotion` setup, a selector resolves within the scope's root, callbacks run in the scope, and the gesture is removed when the scope stops:
+
+```svelte
+<script lang="ts">
+    import { drag, useScopeMotion } from '@humanspeak/svelte-motion'
+
+    const scope = useScopeMotion(() => {
+        drag('.handle', { axis: 'y' })
+    })
+</script>
+
+<ul {@attach scope}>
+    <li class="handle">Only handles inside this list are draggable</li>
+</ul>
+```
+
+### motion components
+
+Don't pass a motion component that already has a `drag` prop to `drag()`. Two drag gestures on one element would both move it, so `drag()` skips those elements and logs a warning in development. Use the component's drag props instead. The check only sees a component's drag once the component is ready (`data-is-loaded="ready"`), so call `drag()` on motion components after mount, not during their first render.
+
 ## Props
 
 ### Drag
@@ -264,6 +339,7 @@ The `info` object passed to drag callbacks contains:
 - [Motion Component](/docs) — Full API reference
 - [Variants](/docs/variants) — Define reusable animation states
 - [AnimatePresence](/docs/animate-presence) — Exit animations on unmount
+- [Vanilla drag() example](/examples/vanilla-drag) — A slider knob built on `drag()`
 
 ---
 

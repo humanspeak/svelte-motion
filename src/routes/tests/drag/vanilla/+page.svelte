@@ -1,0 +1,349 @@
+<script lang="ts">
+    import { animate, drag, motion, type DragInfo } from '$lib'
+    import { onMount } from 'svelte'
+    import TesterPanel, { type TesterStep } from '../../layout/_parity/TesterPanel.svelte'
+
+    /**
+     * Motion 14.4's vanilla `drag()` on plain elements, re-exported by
+     * svelte-motion with a guard against double drag.
+     *
+     * - `axis`: `drag(el, { axis: 'x', constraints: { left: 0, right: 200 } })`.
+     * - `handoff`: `animate(el, { x: 120 })` first, then `drag(el)`. The drag
+     *   continues from 120 because both share the element's `x` motion value
+     *   (upstream `74578076e`).
+     * - `container`: `drag(el, { constraints: containerEl })`.
+     * - `guard`: a `motion.div drag="x"` also passed to `drag()` once it reports
+     *   `data-is-loaded="ready"`. The wrapper skips it, so a 100px drag moves it
+     *   ~100px, not 200px.
+     *
+     * The `data-testid`s are what `e2e/drag/vanilla.spec.ts` drives; keep them
+     * stable.
+     */
+    type Id = 'axis' | 'handoff' | 'container' | 'guard'
+
+    let axisEl = $state<HTMLElement | null>(null)
+    let handoffEl = $state<HTMLElement | null>(null)
+    let containerBox = $state<HTMLElement | null>(null)
+    let containerEl = $state<HTMLElement | null>(null)
+    let guardEl = $state<HTMLElement | null>(null)
+
+    let handoffReady = $state(false)
+    let guardAttached = $state(false)
+    let guardSkipped = $state(false)
+
+    /** The element's current translateX, read from its computed transform. */
+    const readX = (el: HTMLElement | null) =>
+        el ? new DOMMatrixReadOnly(getComputedStyle(el).transform).m41 : 0
+
+    // ---- Tester verdicts (never shown under `@isPlaywright=true`) ----
+    let isTester = $state(false)
+    let verdicts = $state<Partial<Record<Id, { ok: boolean; detail: string }>>>({})
+    let handoffMinX = Infinity
+    let guardOffset = 0
+
+    const settle = (run: () => void) => setTimeout(run, 900)
+
+    onMount(() => {
+        isTester = !window.location.search.includes('@isPlaywright=true')
+        const stops: VoidFunction[] = []
+        let disposed = false
+
+        if (axisEl) {
+            const el = axisEl
+            stops.push(
+                drag(el, {
+                    axis: 'x',
+                    constraints: { left: 0, right: 200 },
+                    onEnd: () =>
+                        settle(() => {
+                            const x = readX(el)
+                            verdicts.axis = {
+                                ok: x >= -2 && x <= 202,
+                                detail: `x = ${x.toFixed(0)}`
+                            }
+                        })
+                })
+            )
+        }
+
+        if (handoffEl) {
+            const el = handoffEl
+            void animate(el, { x: 120 }, { duration: 0.1 }).then(() => {
+                if (disposed) return
+                stops.push(
+                    drag(el, {
+                        onStart: () => (handoffMinX = Infinity),
+                        onMove: () => (handoffMinX = Math.min(handoffMinX, readX(el))),
+                        onEnd: () => {
+                            const minX = handoffMinX
+                            verdicts.handoff = {
+                                ok: minX >= 100,
+                                detail: `lowest x while dragging = ${minX.toFixed(0)}`
+                            }
+                        }
+                    })
+                )
+                handoffReady = true
+            })
+        }
+
+        if (containerBox && containerEl) {
+            const el = containerBox
+            const bounds = containerEl
+            stops.push(
+                drag(el, {
+                    constraints: bounds,
+                    onEnd: () =>
+                        settle(() => {
+                            const r = el.getBoundingClientRect()
+                            const c = bounds.getBoundingClientRect()
+                            const ok =
+                                r.left >= c.left - 2 &&
+                                r.right <= c.right + 2 &&
+                                r.top >= c.top - 2 &&
+                                r.bottom <= c.bottom + 2
+                            verdicts.container = { ok, detail: ok ? 'inside' : 'escaped' }
+                        })
+                })
+            )
+        }
+
+        // The guard can only see a motion.* drag once it is attached, which
+        // happens when the element reports data-is-loaded="ready".
+        const waitForGuard = setInterval(() => {
+            if (!guardEl || guardEl.getAttribute('data-is-loaded') !== 'ready') return
+            clearInterval(waitForGuard)
+            stops.push(drag(guardEl, { axis: 'x' }))
+            guardSkipped = !guardEl.hasAttribute('draggable')
+            guardAttached = true
+        }, 50)
+
+        return () => {
+            disposed = true
+            clearInterval(waitForGuard)
+            stops.forEach((stop) => stop())
+        }
+    })
+
+    const steps: TesterStep[] = [
+        {
+            text: 'Drag the "axis" box far to the right, then up and down.',
+            expected:
+                'It only moves horizontally and stops at 200px from where it started. The chip reads PASS.'
+        },
+        {
+            text: 'Drag the "handoff" box a little to the right.',
+            expected:
+                'It was already moved 120px by animate(). The drag continues from there instead of jumping back to the left edge. The chip reads PASS.'
+        },
+        {
+            text: 'Drag the "container" box hard toward any edge.',
+            expected: 'It never leaves the dashed container. The chip reads PASS.'
+        },
+        {
+            text: 'Drag the "guard" box (a motion.div with drag="x") about 100px to the right.',
+            expected:
+                'It follows the pointer 1:1 (it does not run ahead at double speed). The chip reads PASS, and the status line says drag() skipped it.'
+        }
+    ]
+</script>
+
+<svelte:head>
+    <title>drag() — vanilla drag on plain elements</title>
+</svelte:head>
+
+{#snippet verdict(id: Id)}
+    {#if isTester && verdicts[id]}
+        <span class="verdict" class:ok={verdicts[id]!.ok} data-tester-verdict={id}>
+            {verdicts[id]!.ok ? 'PASS' : 'FAIL'} · {verdicts[id]!.detail}
+        </span>
+    {/if}
+{/snippet}
+
+<main class="page">
+    <header>
+        <p class="kicker">drag() · Motion 14.4</p>
+        <h1>Vanilla drag on plain elements.</h1>
+    </header>
+
+    <div class="grid">
+        <section class="card">
+            <h2>axis · <code>{"{ axis: 'x', constraints: { left: 0, right: 200 } }"}</code></h2>
+            <div class="track">
+                <div class="box" bind:this={axisEl} data-testid="vanilla-axis">axis</div>
+            </div>
+            {@render verdict('axis')}
+        </section>
+
+        <section class="card">
+            <h2>handoff · <code>animate(x: 120)</code> then <code>drag()</code></h2>
+            <div class="track">
+                <div
+                    class="box"
+                    bind:this={handoffEl}
+                    data-testid="vanilla-handoff"
+                    data-ready={handoffReady}
+                >
+                    handoff
+                </div>
+            </div>
+            {@render verdict('handoff')}
+        </section>
+
+        <section class="card">
+            <h2>container · <code>{'{ constraints: containerEl }'}</code></h2>
+            <div class="container" bind:this={containerEl} data-testid="vanilla-container">
+                <div class="box" bind:this={containerBox} data-testid="vanilla-container-box">
+                    box
+                </div>
+            </div>
+            {@render verdict('container')}
+        </section>
+
+        <section class="card">
+            <h2>guard · <code>motion.div drag="x"</code> + <code>drag()</code></h2>
+            <div class="track">
+                <motion.div
+                    drag="x"
+                    dragMomentum={false}
+                    bind:ref={guardEl}
+                    data-testid="vanilla-guard"
+                    style="display:grid;place-items:center;width:60px;height:60px;border-radius:12px;background:#f472b6;color:#0f1115;font-size:12px;font-weight:600;cursor:grab;"
+                    onDrag={(_event: PointerEvent, info: DragInfo) => (guardOffset = info.offset.x)}
+                    onDragEnd={() =>
+                        setTimeout(() => {
+                            const x = readX(guardEl)
+                            verdicts.guard = {
+                                ok: Math.abs(x - guardOffset) < 20,
+                                detail: `moved ${x.toFixed(0)}px for a ${guardOffset.toFixed(0)}px drag`
+                            }
+                        }, 100)}
+                >
+                    guard
+                </motion.div>
+            </div>
+            <p
+                class="status"
+                data-testid="vanilla-guard-status"
+                data-attached={guardAttached}
+                data-skipped={guardSkipped}
+            >
+                {guardAttached
+                    ? guardSkipped
+                        ? 'drag() skipped it (motion.* already drags it)'
+                        : 'drag() attached a second controller'
+                    : 'waiting for data-is-loaded="ready"…'}
+            </p>
+            {@render verdict('guard')}
+        </section>
+    </div>
+</main>
+
+<TesterPanel
+    eyebrow="drag() (Motion 14.4)"
+    title="Plain elements drag; motion.* drag isn't doubled"
+    status="Expected to pass on this build: all four chips read PASS."
+    {steps}
+>
+    {#snippet checks()}
+        <p>
+            <code>drag()</code> makes a plain element draggable without a component. Its
+            <code>x</code>/<code>y</code> are shared with <code>animate()</code>, so a drag picks up
+            where an animation left off. svelte-motion skips elements that already drag through a
+            <code>motion.*</code> component, so they don't get two controllers.
+        </p>
+    {/snippet}
+</TesterPanel>
+
+<style>
+    .page {
+        min-height: 100vh;
+        padding: 24px 48px;
+        background: #0f1115;
+        color: #e5e7eb;
+        font-family: system-ui, sans-serif;
+    }
+
+    .kicker {
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0.6;
+    }
+
+    h1 {
+        margin: 4px 0 16px;
+        font-size: 22px;
+    }
+
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(2, 480px);
+        gap: 16px;
+    }
+
+    .card {
+        display: grid;
+        align-content: start;
+        gap: 10px;
+        padding: 16px;
+        border-radius: 16px;
+        background: #1a1d24;
+    }
+
+    h2 {
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .track {
+        height: 80px;
+        padding: 10px 0;
+    }
+
+    .container {
+        position: relative;
+        width: 300px;
+        height: 160px;
+        border: 2px dashed #6366f1;
+        border-radius: 12px;
+    }
+
+    .container .box {
+        position: absolute;
+        top: 50px;
+        left: 110px;
+    }
+
+    .box {
+        display: grid;
+        place-items: center;
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        background: #60a5fa;
+        color: #0f1115;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: grab;
+    }
+
+    .status {
+        font-family: monospace;
+        font-size: 12px;
+        opacity: 0.7;
+    }
+
+    .verdict {
+        justify-self: start;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #7f1d1d;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .verdict.ok {
+        background: #14532d;
+    }
+</style>

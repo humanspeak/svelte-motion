@@ -18,6 +18,8 @@ import {
     delay,
     distance,
     distance2D,
+    drag,
+    type DragOptions,
     easeIn,
     easeInOut,
     easeOut,
@@ -78,6 +80,12 @@ describe('public API: index.ts', () => {
     it('re-exports animate and hover from motion', () => {
         expect(typeof animate).toBe('function')
         expect(typeof hover).toBe('function')
+    })
+
+    it('exports the vanilla drag() gesture and its DragOptions type', () => {
+        const options: DragOptions = { axis: 'x', constraints: { left: 0, right: 200 } }
+        expect(typeof drag).toBe('function')
+        expect(options.axis).toBe('x')
     })
 
     it('re-exports Motion 14.5 scopeMotion, toMediaQuery and the useScopeMotion attachment', () => {
