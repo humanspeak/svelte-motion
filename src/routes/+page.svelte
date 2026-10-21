@@ -117,6 +117,22 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/arc/use-animate') + searchParams}
+                    >
+                        arc() — via useAnimate() on a plain element (Motion 14.5)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/layout-enabled-after-mount') + searchParams}
+                    >
+                        layout enabled after mount (Motion 14.5)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/transform-template/stop') + searchParams}
                     >
                         transformTemplate — controls.stop() freeze (#402)
