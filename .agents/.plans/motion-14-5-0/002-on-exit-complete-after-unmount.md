@@ -5,6 +5,13 @@
 > When done, update this plan's row in `.agents/.plans/motion-14-5-0/README.md`, unless a reviewer dispatched you
 > and told you they maintain the index.
 >
+> **Revision 2026-10-21 (maintainer decision, after executor STOP at Step 3)**: two existing tests assert a
+> synchronous `onExitComplete`: `src/lib/utils/presence.spec.ts:281` (clone path, waits two microtasks) and
+> `src/lib/html/_MotionContainer.spec.ts:888` (asserts right after `unmount()`). The maintainer ruled both **stale**:
+> upstream defers the callback on every path, so the clone path firing one `tick()` later matches upstream. Add
+> `await tick()` before each affected assertion, keep every call-count assertion ("exactly once") unchanged, and
+> change nothing else in those tests. Both spec files are now in scope for that edit only.
+>
 > **Never use `git stash`.**
 >
 > **Drift check (run first)**: `git diff --stat f2b5d766..HEAD -- src/lib/utils/presence.ts src/lib/components/PresenceChild.svelte src/lib/components/AnimatePresence.svelte src/lib/components/__tests__ src/lib/utils/usePresence.spec.ts`
