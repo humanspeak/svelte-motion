@@ -1,4 +1,5 @@
 import type { DragControls } from '$lib/types'
+import type { VisualElementDragControls } from 'motion-dom'
 
 /**
  * Creates imperative drag controls for programmatically starting and stopping drags.
@@ -33,17 +34,26 @@ export const createDragControls = (): DragControls => {
     let target: HTMLElement | null = null
     let starter: ((e: PointerEvent, snap?: boolean) => void) | null = null
     let cancelInertia: (() => void) | null = null
+    // SPIKE 006: upstream `DragControls.componentControls`. Populated only by the
+    // upstream drag feature (`USE_UPSTREAM_DRAG`); empty on the legacy path.
+    const componentControls = new Set<VisualElementDragControls>()
 
     const controls: DragControls = {
         start(event, options) {
+            if (componentControls.size) {
+                componentControls.forEach((c) => c.start(event, options))
+                return
+            }
             if (!target || !starter) return
             const snap = options?.snapToCursor ?? false
             starter(event, snap)
         },
         cancel() {
+            if (componentControls.size) return componentControls.forEach((c) => c.cancel())
             cancelInertia?.()
         },
         stop() {
+            if (componentControls.size) return componentControls.forEach((c) => c.stop())
             cancelInertia?.()
         },
         subscribe(el: HTMLElement) {
@@ -63,6 +73,19 @@ export const createDragControls = (): DragControls => {
         target = el
         starter = s
         cancelInertia = c ?? null
+    }
+
+    // SPIKE 006: upstream `DragControls.subscribe(controls)`, kept off the
+    // public `subscribe(el)` signature.
+    ;(
+        controls as unknown as {
+            _subscribeControls?: (c: VisualElementDragControls) => () => void
+        }
+    )._subscribeControls = (c) => {
+        componentControls.add(c)
+        return () => {
+            componentControls.delete(c)
+        }
     }
 
     return controls

@@ -24,6 +24,7 @@ import {
     Feature,
     HTMLVisualElement,
     SVGVisualElement,
+    VisualElementDragControls,
     createAnimationState,
     getFeatureDefinitions,
     isAnimationControls,
@@ -45,6 +46,7 @@ import {
     type ScrapeMotionValuesFromProps,
     type VisualElement
 } from 'motion-dom'
+import { USE_UPSTREAM_DRAG } from './dragImpl'
 
 /**
  * Variant labels inherited from the nearest motion ancestor.
@@ -277,6 +279,92 @@ export class ExitAnimationFeature extends Feature<unknown> {
  */
 export const isExitFeatureEnabled = (props: MotionNodeOptions): boolean => !!props.exit
 
+/**
+ * SPIKE 006: the drag feature, driving `drag` with motion-dom's
+ * `VisualElementDragControls`.
+ *
+ * Port of `framer-motion/src/gestures/drag/index.ts` (v14.5.0). Only registered
+ * when {@link USE_UPSTREAM_DRAG} is on.
+ *
+ * Svelte deviation: the feature can be instantiated by a props-sync pass before
+ * the VisualElement has an instance, in which case `addListeners()` has no
+ * element to bind. Listener attachment is retried on the next `update()`.
+ */
+export class DragGestureFeature extends Feature<HTMLElement> {
+    controls: VisualElementDragControls
+    private removeGroupControls: () => void = () => {}
+    private removeListeners: (() => void) | null = null
+
+    /**
+     * @param node VisualElement this feature is attached to.
+     */
+    constructor(node: VisualElement<HTMLElement>) {
+        super(node)
+        this.controls = new VisualElementDragControls(node)
+    }
+
+    private subscribeControls(): void {
+        const { dragControls } = this.node.getProps() as {
+            dragControls?: { _subscribeControls?: (c: VisualElementDragControls) => () => void }
+        }
+        if (dragControls && typeof dragControls._subscribeControls === 'function') {
+            this.removeGroupControls = dragControls._subscribeControls(this.controls)
+        }
+    }
+
+    private attachListeners(): void {
+        if (this.removeListeners || !this.node.current) return
+        this.removeListeners = this.controls.addListeners() ?? null
+    }
+
+    /**
+     * Subscribe to `dragControls` and attach the pointerdown listener.
+     *
+     * @returns Nothing.
+     */
+    mount(): void {
+        this.subscribeControls()
+        this.attachListeners()
+    }
+
+    /**
+     * Re-subscribe on a `dragControls` identity change.
+     *
+     * @returns Nothing.
+     */
+    update(): void {
+        this.attachListeners()
+        const { dragControls } = this.node.getProps() as { dragControls?: unknown }
+        const { dragControls: prev } = (this.node.prevProps ?? {}) as { dragControls?: unknown }
+        if (dragControls !== prev) {
+            this.removeGroupControls()
+            this.removeGroupControls = () => {}
+            this.subscribeControls()
+        }
+    }
+
+    /**
+     * Detach listeners; end the pan session unless a drag is live.
+     *
+     * @returns Nothing.
+     */
+    unmount(): void {
+        this.removeGroupControls()
+        this.removeListeners?.()
+        this.removeListeners = null
+        if (!this.controls.isDragging) this.controls.endPanSession()
+    }
+}
+
+/**
+ * Whether the drag feature applies (upstream `definitions.ts`: `drag`, `dragControls`).
+ *
+ * @param props Motion node props.
+ * @returns `true` when `drag` or `dragControls` is set.
+ */
+export const isDragFeatureEnabled = (props: MotionNodeOptions): boolean =>
+    !!(props.drag || (props as { dragControls?: unknown }).dragControls)
+
 let featuresRegistered = false
 
 /**
@@ -307,7 +395,15 @@ export const registerMotionFeatures = (): void => {
         exit: {
             isEnabled: isExitFeatureEnabled,
             Feature: ExitAnimationFeature as never
-        }
+        },
+        ...(USE_UPSTREAM_DRAG
+            ? {
+                  drag: {
+                      isEnabled: isDragFeatureEnabled,
+                      Feature: DragGestureFeature as never
+                  }
+              }
+            : {})
     })
 }
 

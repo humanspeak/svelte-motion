@@ -98,6 +98,8 @@ export interface MotionDomProjectionUpdateOptions {
     transition?: Transition
     /** Inline style props passed through to the visual element. */
     style?: unknown
+    /** SPIKE 006: upstream projection option set for draggable elements. */
+    alwaysMeasureLayout?: boolean
 }
 
 const createVisualState = () => ({
@@ -402,6 +404,7 @@ export class MotionDomProjectionAdapter {
             layout: options.layout,
             layoutId: options.layoutId,
             layoutScroll: options.layoutScroll,
+            alwaysMeasureLayout: options.alwaysMeasureLayout,
             animationType: animationTypeForLayout(options.layout),
             transition: options.transition,
             visualElement: this.visualElement
