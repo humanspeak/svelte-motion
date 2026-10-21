@@ -39,6 +39,7 @@ import {
     type AnyResolvedKeyframe,
     type HTMLRenderState,
     type MotionNodeOptions,
+    type PanInfo,
     type PresenceContextProps,
     type ReducedMotionConfig,
     type ResolvedValues,
@@ -300,7 +301,35 @@ export class DragGestureFeature extends Feature<HTMLElement> {
      */
     constructor(node: VisualElement<HTMLElement>) {
         super(node)
-        this.controls = new VisualElementDragControls(node)
+        // Svelte-side extension: mirror the legacy `data-svelte-motion-drag-active`
+        // marker (set at drag start, cleared from `cancel()`, which every end
+        // path runs through). The container's layout path and several e2e specs
+        // observe it; the controller itself has no public drag-start event.
+        const markActive = (active: boolean) => {
+            const el = node.current
+            if (!el) return
+            if (active) {
+                el.dataset.svelteMotionDragActive = 'true'
+                // Legacy drag.ts dispatches this at drag start (e2e observers).
+                el.dispatchEvent(new CustomEvent('svelte-motion:drag-start'))
+            } else delete el.dataset.svelteMotionDragActive
+        }
+        this.controls = new VisualElementDragControls(node, () => {
+            const props = node.getProps()
+            return {
+                ...props,
+                onDragStart: (event: PointerEvent, info: PanInfo) => {
+                    markActive(true)
+                    props.onDragStart?.(event, info)
+                }
+            }
+        })
+        const controls = this.controls
+        const cancel = () => VisualElementDragControls.prototype.cancel.call(controls)
+        controls.cancel = () => {
+            cancel()
+            markActive(false)
+        }
     }
 
     private subscribeControls(): void {
@@ -340,6 +369,23 @@ export class DragGestureFeature extends Feature<HTMLElement> {
             this.removeGroupControls()
             this.removeGroupControls = () => {}
             this.subscribeControls()
+        }
+        // Svelte deviation: React re-measures (and so re-fires the projection
+        // 'measure' event the controller resolves ref constraints from) on
+        // every commit via MeasureLayout. A `dragConstraints` ref bound after
+        // mount would otherwise never be measured or observed here.
+        const { dragConstraints } = this.node.getProps()
+        const { dragConstraints: prevConstraints } = (this.node.prevProps ?? {}) as {
+            dragConstraints?: unknown
+        }
+        const projection = this.node.projection as
+            | {
+                  layout?: { layoutBox: unknown }
+                  notifyListeners: (name: string, ...args: unknown[]) => void
+              }
+            | undefined
+        if (dragConstraints !== prevConstraints && projection?.layout) {
+            projection.notifyListeners('measure', projection.layout.layoutBox)
         }
     }
 

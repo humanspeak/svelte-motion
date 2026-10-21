@@ -49,11 +49,25 @@ export const createDragControls = (): DragControls => {
             starter(event, snap)
         },
         cancel() {
-            if (componentControls.size) return componentControls.forEach((c) => c.cancel())
+            // Svelte-side extension (drag/controls-cancel-inertia): upstream's
+            // cancel()/stop() do not stop a post-release glide; this library's
+            // do. Stop the axis animations only when no drag is live, so a
+            // mid-drag stop() still starts upstream's momentum.
+            if (componentControls.size)
+                return componentControls.forEach((c) => {
+                    const wasDragging = c.isDragging
+                    c.cancel()
+                    if (!wasDragging) c.stopAnimation()
+                })
             cancelInertia?.()
         },
         stop() {
-            if (componentControls.size) return componentControls.forEach((c) => c.stop())
+            if (componentControls.size)
+                return componentControls.forEach((c) => {
+                    const wasDragging = c.isDragging
+                    c.stop()
+                    if (!wasDragging) c.stopAnimation()
+                })
             cancelInertia?.()
         },
         subscribe(el: HTMLElement) {
