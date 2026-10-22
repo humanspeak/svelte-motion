@@ -245,6 +245,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/pan-window-scroll') + searchParams}
+                    >
+                        Pan: window scroll during a held pan
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/rapid-tap') + searchParams}
                     >
                         Rapid Tap (spring runaway guard)
