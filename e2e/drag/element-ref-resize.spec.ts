@@ -138,10 +138,14 @@ test.describe('drag/element-ref-resize', () => {
     }) => {
         // A (the first constraint element) is the one Motion observes
         // (VisualElementDragControls.ts:722-740 @ v14.5.0). Its resize runs
-        // `scalePositionWithinConstraints` (:605-683) even mid-drag: the held
-        // card is remapped by its progress within the old bounds, before any
-        // further pointer move. Later moves clamp to the new bounds
-        // (`updateAxis` → `applyConstraints`, :338-356).
+        // `scalePositionWithinConstraints` (:605-683) even mid-drag, which
+        // remaps the card by its progress within the old bounds, but only for
+        // one frame. The drag's PanSession schedules `updatePoint` keep-alive
+        // (`frame.update(this.updatePoint, true)`, PanSession.ts:243,297;
+        // keep-alive semantics in frameloop/render-step.ts:46-50), so on the
+        // next frame the stationary held pointer is re-applied and clamped to
+        // the freshly resolved bounds (`updateAxis`, :338-356). The steady
+        // state, before any further move, is the card at the new right edge.
         await page.goto('/tests/drag/element-ref-resize?@isPlaywright=true')
         await page.getByTestId('live-reset').click()
         const card = page.getByTestId('live-card')
@@ -156,15 +160,13 @@ test.describe('drag/element-ref-resize', () => {
         await page.mouse.move(start.x + 240, start.y + 40, { steps: 12 })
         await expect.poll(async () => (await card.boundingBox())!.x - start.x).toBeGreaterThan(190)
         await expect(card).toHaveAttribute('data-dragging', 'true')
-        const held = (await card.boundingBox())!
         // Change only A's geometry (DOM-only), leaving the pointer stationary.
         await page.getByTestId('live-a').evaluate((element) => {
             element.style.width = '200px'
         })
         const bounds = (await page.getByTestId('live-a').boundingBox())!
         expect(bounds.width).toBe(oldBounds.width - 200)
-        const progress = (held.x - oldBounds.x) / (oldBounds.width - start.width)
-        const expectedX = bounds.x + progress * (bounds.width - start.width)
+        const expectedX = bounds.x + bounds.width - start.width
         await expect
             .poll(async () => Math.abs((await card.boundingBox())!.x - expectedX))
             .toBeLessThanOrEqual(0.5)
