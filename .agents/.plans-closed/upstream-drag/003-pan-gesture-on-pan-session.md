@@ -15,6 +15,56 @@
 > ~line 745: "Drag: vanilla drag() on plain elements (+ motion.* guard)" → "(+ motion.* moves once)". Plan 002
 > removed the vanilla `drag()` guard (Motion's `drag` is now re-exported unwrapped). This plan already edits that file.
 
+> **Revision 2 (2026-10-22, guard, after the executor's Step 1 STOP)**: two of this plan's premises were wrong and
+> are corrected here.
+>
+> 1. **There is no pan window-scroll bug.** Upstream `PanGesture` never passes an `element` to `PanSession`
+>    (`packages/framer-motion/src/gestures/pan/index.ts:24-33` @ v14.5.0), so pan has no scroll listeners. Ours
+>    never sets `trackScrollFrom` either, and both build `info.point` from `pageX`/`pageY`. The "thrown away"
+>    adjustment exists in upstream too (`PanSession.ts:228-257`); it only matters for drag, which plan 001 already
+>    moved to upstream.
+>    - Step 1's page and spec stay as a **characterization pin**: they must pass both before and after the refactor.
+>      They are not a red test, and the test commit becomes `test(pan): pin page-coordinate points across window
+>      scroll`.
+>    - Drop "Red window-scroll pan spec now passes" from Done criteria. Drop "fixes the window-scroll bug" from the
+>      changeset text.
+>    - The migration is still worth doing: it deletes ~900 lines of hand-ported code and adopts upstream's handler
+>      scheduling and `updateHandlers`.
+> 2. **Drag and pan co-attach, as upstream does.** Upstream enables `pan` from `onPan`/`onPanStart`/
+>    `onPanSessionStart`/`onPanEnd` regardless of `drag` (`packages/framer-motion/src/motion/features/definitions.ts:21`
+>    @ v14.5.0), so `<motion.div drag onPan>` runs both gestures. Under "Always update upstream", Step 3 enables
+>    `PanGestureFeature` per upstream's definition and does not skip it when `drag` is set.
+>    - Add an e2e case (on the Step 1 page or an existing pan page) showing that a `motion.div` with `drag` and
+>      `onPan` moves and also fires `onPan`.
+>    - Mention the co-attach in the changeset.
+>    - The STOP condition "drag must not co-attach pan" is replaced by "a drag spec regresses". Any drag/reorder
+>      spec that breaks because pan now co-attaches is a STOP to report, not something to patch around.
+>
+> **Revision 3 (2026-10-22, guard, after the Step 4 gate)**: three additions before close-out.
+>
+> - **Flake fix in `e2e/drag/element-ref-resize.spec.ts:136`.** Plan 001 rewrote this test, and it fails about 4 in
+>   10 runs at HEAD, always with the same 31.38 px miss. Cause: `held` is captured as soon as
+>   `card.x - start.x > 190`, while the card is still catching up to the pointer, so `progress` is computed from a
+>   moving position. Fix it as a wait only:
+>   - before reading `held`, poll until the card's x is stable across two reads one rAF apart (or within 0.5 px of
+>     the pointer-implied offset);
+>   - keep every assertion and tolerance unchanged.
+>   **Superseded by the executor's frame trace (Revision 3a):** `held` is stable. The progress remap from
+>   `scalePositionWithinConstraints` lasts one frame, then `PanSession`'s keep-alive `updatePoint`
+>   (`PanSession.ts:243,297`, `render-step.ts:46-50` @ v14.5.0) re-applies the held pointer and clamps it to the new
+>   bounds (`VisualElementDragControls.ts:338-356`). Change the assertion so it targets upstream's steady state: card
+>   at the new right edge, `expectedX = bounds.x + bounds.width - start.width`. Keep the 0.5 px tolerance. Update the
+>   test's comment to cite this, and keep the remaining steps.
+> - **Delete the orphaned `src/lib/utils/baseTarget.ts` and its spec.** `whilePan` was the last caller. Update the
+>   comments that point at it (`_MotionContainer.svelte:~318`, `_MotionContainer.spec.ts:~651`) if they name the
+>   file rather than upstream's `baseTarget`.
+> - **Unit tests for the new functions** in `src/lib/utils/visualElementCore.spec.ts`, matching the existing
+>   `DragGestureFeature` cases:
+>   - `isPanFeatureEnabled` for each `onPan*` prop, with and without `drag`;
+>   - `PanGestureFeature`: mount attaches the listener (and retries in `update()`), `update()` calls
+>     `session.updateHandlers`, and unmount ends the session;
+>   - `getContextWindow`.
+
 ## Status
 
 - **Priority**: P2
