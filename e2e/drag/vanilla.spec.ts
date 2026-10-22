@@ -82,16 +82,20 @@ test.describe('drag/vanilla', () => {
         expect(y).toBeGreaterThan(20)
     })
 
-    test('guard: drag() skips a motion.div that already drags (no double movement)', async ({
+    // Upstream drag() has no "already dragged by a component" guard
+    // (motion-dom src/gestures/drag/index.ts @ v14.5.0): it attaches a second
+    // controller to the motion.div. Motion's global drag lock (setDragLock) and
+    // the shared x motion value still keep the element moving once.
+    test('motion-plus-drag: a motion.div drag="x" also passed to drag() moves once', async ({
         page
     }) => {
         await page.goto(URL)
-        const status = page.getByTestId('vanilla-guard-status')
+        const status = page.getByTestId('vanilla-motion-plus-drag-status')
         await expect(status).toHaveAttribute('data-attached', 'true')
-        await expect(status).toHaveAttribute('data-skipped', 'true')
 
-        const el = page.getByTestId('vanilla-guard')
-        await expect(el).not.toHaveAttribute('draggable', 'false')
+        const el = page.getByTestId('vanilla-motion-plus-drag')
+        // Upstream drag styles (from both controllers) set this.
+        await expect(el).toHaveAttribute('draggable', 'false')
 
         await dragBy(page, el, 100, 0)
         await page.waitForTimeout(500)

@@ -6,10 +6,11 @@
  * long lists can be traversed in a single gesture.
  *
  * Port of framer-motion `Reorder/utils/auto-scroll.ts` with one
- * deliberate difference: our `DragInfo.point` carries CLIENT
- * coordinates (see `drag.ts`, which reads `clientX`/`clientY`), while
- * upstream's gesture point is page coordinates — so the upstream
- * `window.scrollX/Y` subtraction is omitted here.
+ * deliberate difference in the input: `Item.svelte` passes the pointer
+ * event's CLIENT coordinate (`event.clientX`/`clientY`), while upstream's
+ * `Reorder.Item` passes the gesture's page point (`info.point`) and
+ * subtracts `window.scrollX/Y` here. Client = page - scroll, so the
+ * subtraction is omitted.
  */
 
 import type { DragPoint } from '$lib/types'

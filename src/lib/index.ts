@@ -19,12 +19,13 @@ export { motion } from '$lib/motion'
 export { Reorder } from '$lib/reorder'
 
 // Re-export core animation functions plus the vanilla (component-free)
-// layer — element effects, the frameloop scheduler, generators, global
-// config — straight from motion.
+// layer — element effects, gestures (including Motion 14.4's `drag()`), the
+// frameloop scheduler, generators, global config — straight from motion.
 export {
     MotionGlobalConfig,
     cancelFrame,
     delay,
+    drag,
     frame,
     frameData,
     hover,
@@ -39,8 +40,6 @@ export {
     transform
 } from 'motion'
 
-// Motion 14.4's vanilla drag(), wrapped to skip elements a motion.* component already drags.
-export { drag } from '$lib/utils/vanillaDrag'
 export type { DragOptions } from 'motion-dom'
 
 // `animate` and the element effects re-typed to accept both raw and

@@ -300,7 +300,7 @@ Called inside a [`useScopeMotion`](/docs/scope-motion) or `scopeMotion` setup, a
 
 ### motion components
 
-Don't pass a motion component that already has a `drag` prop to `drag()`. Two drag gestures on one element would both move it, so `drag()` skips those elements and logs a warning in development. Use the component's drag props instead. The check only sees a component's drag once the component is ready (`data-is-loaded="ready"`), so call `drag()` on motion components after mount, not during their first render.
+A motion component that already has a `drag` prop doesn't need `drag()`; use its drag props instead. As in Motion, `drag()` doesn't check for this. If you pass such an element anyway, `drag()` attaches a second drag gesture, and the element still moves only once: Motion's drag lock lets one gesture at a time take the pointer, and both gestures share the element's `x` and `y`.
 
 ## Props
 

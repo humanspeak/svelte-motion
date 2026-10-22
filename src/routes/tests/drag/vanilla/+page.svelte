@@ -4,32 +4,33 @@
     import TesterPanel, { type TesterStep } from '../../layout/_parity/TesterPanel.svelte'
 
     /**
-     * Motion 14.4's vanilla `drag()` on plain elements, re-exported by
-     * svelte-motion with a guard against double drag.
+     * Motion 14.4's vanilla `drag()` on plain elements, re-exported unwrapped
+     * from Motion.
      *
      * - `axis`: `drag(el, { axis: 'x', constraints: { left: 0, right: 200 } })`.
      * - `handoff`: `animate(el, { x: 120 })` first, then `drag(el)`. The drag
      *   continues from 120 because both share the element's `x` motion value
      *   (upstream `74578076e`).
      * - `container`: `drag(el, { constraints: containerEl })`.
-     * - `guard`: a `motion.div drag="x"` also passed to `drag()` once it reports
-     *   `data-is-loaded="ready"`. The wrapper skips it, so a 100px drag moves it
+     * - `motion-plus-drag`: a `motion.div drag="x"` that is also passed to
+     *   `drag()` once it reports `data-is-loaded="ready"` moves once. Upstream's
+     *   `drag()` has no guard; it attaches a second controller, but Motion's
+     *   global drag lock and the shared `x` motion value keep a 100px drag at
      *   ~100px, not 200px.
      *
      * The `data-testid`s are what `e2e/drag/vanilla.spec.ts` drives; keep them
      * stable.
      */
-    type Id = 'axis' | 'handoff' | 'container' | 'guard'
+    type Id = 'axis' | 'handoff' | 'container' | 'motion-plus-drag'
 
     let axisEl = $state<HTMLElement | null>(null)
     let handoffEl = $state<HTMLElement | null>(null)
     let containerBox = $state<HTMLElement | null>(null)
     let containerEl = $state<HTMLElement | null>(null)
-    let guardEl = $state<HTMLElement | null>(null)
+    let motionPlusDragEl = $state<HTMLElement | null>(null)
 
     let handoffReady = $state(false)
-    let guardAttached = $state(false)
-    let guardSkipped = $state(false)
+    let motionPlusDragAttached = $state(false)
 
     /** The element's current translateX, read from its computed transform. */
     const readX = (el: HTMLElement | null) =>
@@ -39,7 +40,7 @@
     let isTester = $state(false)
     let verdicts = $state<Partial<Record<Id, { ok: boolean; detail: string }>>>({})
     let handoffMinX = Infinity
-    let guardOffset = 0
+    let motionPlusDragOffset = 0
 
     const settle = (run: () => void) => setTimeout(run, 900)
 
@@ -108,19 +109,20 @@
             )
         }
 
-        // The guard can only see a motion.* drag once it is attached, which
-        // happens when the element reports data-is-loaded="ready".
-        const waitForGuard = setInterval(() => {
-            if (!guardEl || guardEl.getAttribute('data-is-loaded') !== 'ready') return
-            clearInterval(waitForGuard)
-            stops.push(drag(guardEl, { axis: 'x' }))
-            guardSkipped = !guardEl.hasAttribute('draggable')
-            guardAttached = true
+        // Attach once the motion.div reports data-is-loaded="ready", so drag()
+        // reuses the component's mounted projection node (upstream
+        // acquireProjectionNode) instead of creating an imperative one.
+        const waitForMotionPlusDrag = setInterval(() => {
+            const el = motionPlusDragEl
+            if (!el || el.getAttribute('data-is-loaded') !== 'ready') return
+            clearInterval(waitForMotionPlusDrag)
+            stops.push(drag(el, { axis: 'x' }))
+            motionPlusDragAttached = true
         }, 50)
 
         return () => {
             disposed = true
-            clearInterval(waitForGuard)
+            clearInterval(waitForMotionPlusDrag)
             stops.forEach((stop) => stop())
         }
     })
@@ -141,9 +143,9 @@
             expected: 'It never leaves the dashed container. The chip reads PASS.'
         },
         {
-            text: 'Drag the "guard" box (a motion.div with drag="x") about 100px to the right.',
+            text: 'Drag the "motion + drag()" box (a motion.div with drag="x", also passed to drag()) about 100px to the right.',
             expected:
-                'It follows the pointer 1:1 (it does not run ahead at double speed). The chip reads PASS, and the status line says drag() skipped it.'
+                'It follows the pointer 1:1 (it does not run ahead at double speed). The chip reads PASS.'
         }
     ]
 </script>
@@ -201,47 +203,45 @@
         </section>
 
         <section class="card">
-            <h2>guard · <code>motion.div drag="x"</code> + <code>drag()</code></h2>
+            <h2>motion-plus-drag · <code>motion.div drag="x"</code> + <code>drag()</code></h2>
             <div class="track">
                 <motion.div
                     drag="x"
                     dragMomentum={false}
-                    bind:ref={guardEl}
-                    data-testid="vanilla-guard"
+                    bind:ref={motionPlusDragEl}
+                    data-testid="vanilla-motion-plus-drag"
                     style="display:grid;place-items:center;width:60px;height:60px;border-radius:12px;background:#f472b6;color:#0f1115;font-size:12px;font-weight:600;cursor:grab;"
-                    onDrag={(_event: PointerEvent, info: DragInfo) => (guardOffset = info.offset.x)}
+                    onDrag={(_event: PointerEvent, info: DragInfo) =>
+                        (motionPlusDragOffset = info.offset.x)}
                     onDragEnd={() =>
                         setTimeout(() => {
-                            const x = readX(guardEl)
-                            verdicts.guard = {
-                                ok: Math.abs(x - guardOffset) < 20,
-                                detail: `moved ${x.toFixed(0)}px for a ${guardOffset.toFixed(0)}px drag`
+                            const x = readX(motionPlusDragEl)
+                            verdicts['motion-plus-drag'] = {
+                                ok: Math.abs(x - motionPlusDragOffset) < 20,
+                                detail: `moved ${x.toFixed(0)}px for a ${motionPlusDragOffset.toFixed(0)}px drag`
                             }
                         }, 100)}
                 >
-                    guard
+                    motion + drag()
                 </motion.div>
             </div>
             <p
                 class="status"
-                data-testid="vanilla-guard-status"
-                data-attached={guardAttached}
-                data-skipped={guardSkipped}
+                data-testid="vanilla-motion-plus-drag-status"
+                data-attached={motionPlusDragAttached}
             >
-                {guardAttached
-                    ? guardSkipped
-                        ? 'drag() skipped it (motion.* already drags it)'
-                        : 'drag() attached a second controller'
+                {motionPlusDragAttached
+                    ? 'drag() attached alongside the motion.div drag'
                     : 'waiting for data-is-loaded="ready"…'}
             </p>
-            {@render verdict('guard')}
+            {@render verdict('motion-plus-drag')}
         </section>
     </div>
 </main>
 
 <TesterPanel
     eyebrow="drag() (Motion 14.4)"
-    title="Plain elements drag; motion.* drag isn't doubled"
+    title="Plain elements drag; motion.* + drag() moves once"
     status="Expected to pass on this build: all four chips read PASS."
     {steps}
 >
@@ -249,8 +249,9 @@
         <p>
             <code>drag()</code> makes a plain element draggable without a component. Its
             <code>x</code>/<code>y</code> are shared with <code>animate()</code>, so a drag picks up
-            where an animation left off. svelte-motion skips elements that already drag through a
-            <code>motion.*</code> component, so they don't get two controllers.
+            where an animation left off. Like Motion, svelte-motion doesn't guard against an element
+            that already drags through a <code>motion.*</code> component: <code>drag()</code>
+            attaches, and the drag lock plus the shared <code>x</code> keep it moving once.
         </p>
     {/snippet}
 </TesterPanel>

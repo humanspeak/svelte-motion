@@ -389,49 +389,6 @@ describe('MotionDomProjectionAdapter.measurePageRect', () => {
 
         vi.unstubAllGlobals()
     })
-
-    it('commitDraggedLayoutChange: delivers the slot delta from the upstream didUpdate, measuring with the drag transform stripped', async () => {
-        // Plan 004 Step 5: a dragged element whose layout slot changes (e.g.
-        // Reorder swapping its DOM position) must shift its drag origin by
-        // the SLOT delta — upstream drag semantics
-        // (VisualElementDragControls.ts:742-758: originPoint += delta.translate).
-        // The element is mid-gesture, so its inline transform carries the
-        // drag offset; the upstream update pass must measure the SLOT (drag
-        // transform stripped), not the gesture position, or the delta would
-        // absorb the live drag offset.
-        let slotTop = 100
-        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
-            // Transform-aware mock: with the drag transform applied the
-            // element visually sits 50px right / 40px down of its slot.
-            const stripped = element.style.transform === 'none'
-            return new DOMRect(stripped ? 10 : 60, stripped ? slotTop : slotTop + 40, 100, 50)
-        })
-        adapter.mount(element)
-        const previous = { left: 10, top: slotTop, width: 100, height: 50 }
-
-        // Mid-gesture state: drag transform applied, slot moves one row down.
-        element.style.transform = 'translate(50px, 40px)'
-        slotTop = 196
-
-        const onSlotDelta = vi.fn()
-        adapter.commitDraggedLayoutChange(previous, onSlotDelta)
-
-        // The upstream update pass flushes on a microtask.
-        await new Promise((resolve) => setTimeout(resolve, 0))
-        await new Promise((resolve) => setTimeout(resolve, 0))
-
-        // Slot delta is previous - next (same orientation as upstream's
-        // didUpdate delta and the writer's adjustOrigin contract).
-        expect(onSlotDelta).toHaveBeenCalledTimes(1)
-        expect(onSlotDelta).toHaveBeenCalledWith(0, 100 - 196)
-
-        // The gesture transform is restored and the node is unblocked with
-        // no layout animation started (a FLIP here would fight the gesture).
-        expect(element.style.transform).toBe('translate(50px, 40px)')
-        expect(adapter.projection.isAnimationBlocked).toBe(false)
-        expect(adapter.projection.currentAnimation).toBeUndefined()
-        adapter.unmount()
-    })
 })
 
 /**

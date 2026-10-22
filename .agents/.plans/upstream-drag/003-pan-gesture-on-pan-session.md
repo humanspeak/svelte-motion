@@ -11,6 +11,10 @@
 > no importer other than `_MotionContainer.svelte`: `grep -rln "utils/pan'" src/lib | grep -v spec` → only
 > `src/lib/html/_MotionContainer.svelte`. Otherwise STOP.
 
+> **Revision (2026-10-22, guard, after plan 002)**: also fix the stale index label at `src/routes/+page.svelte`
+> ~line 745: "Drag: vanilla drag() on plain elements (+ motion.* guard)" → "(+ motion.* moves once)". Plan 002
+> removed the vanilla `drag()` guard (Motion's `drag` is now re-exported unwrapped). This plan already edits that file.
+
 ## Status
 
 - **Priority**: P2

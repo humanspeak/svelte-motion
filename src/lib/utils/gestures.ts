@@ -24,8 +24,9 @@ import { addDomEvent, frame, hover, press, type VisualElement } from 'motion-dom
 /*
  * Drag suppression is NOT handled here any more.
  *
- * `drag.ts` holds motion-dom's global drag lock for the duration of a drag
- * SESSION (`setDragLock`, released at pointer-up), and the recognizers this
+ * motion-dom's `VisualElementDragControls` holds the global drag lock from
+ * the drag's start until pointer-up (`setDragLock` in its pan `onStart`,
+ * released by `cancel()` on session end), and the recognizers this
  * module wraps consult that lock themselves before they ever call back:
  * `hover()` filters on `isValidHover` → `!(touch || isDragActive())`
  * (`motion-dom/dist/es/gestures/hover.mjs:4-6`) and `press()` on

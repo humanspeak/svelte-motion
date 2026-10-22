@@ -21,6 +21,29 @@
 > The guard is proven by the ~100 px (not ~200 px) movement and by `data-skipped`, not by the attribute. Step 3's
 > gate must show 0 unit failures and 0 e2e failures.
 >
+> **Revision 2 (2026-10-22, guard, after the first 002 run)**: remove the vanilla `drag()` guard entirely. The
+> first run found the guard no longer protects anything. With the guard forced off, a `motion.div drag="x"` that is
+> also passed to `drag()` still moves exactly 100 px, not 200. Upstream's global drag lock and the shared `x` motion
+> value prevent a double move. Upstream's own `drag()` (`packages/motion-dom/src/gestures/drag/index.ts` @ v14.5.0)
+> has no such guard. Under the maintainer's standing rule "Always update upstream", svelte-motion re-exports
+> Motion's `drag` unwrapped. This supersedes Step 1's "re-point the guard":
+>
+> - `git rm src/lib/utils/vanillaDrag.ts src/lib/utils/vanillaDrag.spec.ts`. In `src/lib/index.ts`, export `drag`
+>   straight from `motion` (match how the neighbouring upstream re-exports are written), and fix the comment at line ~42.
+> - `src/routes/tests/drag/vanilla/+page.svelte`: rewrite the `guard` case as `motion-plus-drag`, "a `motion.div
+>   drag="x"` that is also passed to `drag()` moves once". Drop `guardSkipped`/`data-skipped` and the "skipped"
+>   status text. Keep `data-attached`, the human-tester step and the movement verdict (moved ≈ drag offset). Update
+>   the header JSDoc (lines ~8-15) and the line ~111 comment.
+> - `e2e/drag/vanilla.spec.ts` case (d): drop the `data-skipped` assertion. Keep the `draggable="false"` assertion
+>   and the ~100 px (not ~200 px) movement assertion; cite upstream `drag()` and the drag lock.
+> - `docs/src/routes/docs/drag/+page.svx` ~line 303: replace the "drag() skips those elements" sentence with
+>   upstream's behavior, which is that it attaches and the element still moves once.
+> - `.changeset/vanilla-drag.md` is unreleased (it ships with this same 2.5.0): drop its "skipped, with a dev warning"
+>   sentence.
+> - Stale comments that name the deleted `drag.ts` are in scope now: `src/lib/utils/gestures.ts:27`,
+>   `src/lib/utils/gestures.spec.ts:92` and `src/lib/components/Reorder/autoScroll.ts:9`. Fix the `autoScroll.ts`
+>   claim about `DragInfo.point` coordinates to match what `Item.svelte` really passes.
+>
 > 001 also already removed `_MotionContainer.svelte`'s `commitDraggedLayoutChange` wrapper and its three call sites.
 > Step 2 therefore only removes `MotionDomProjectionAdapter.commitDraggedLayoutChange` and the spike comment next to
 > it in `motionDomProjection.ts`.
@@ -58,7 +81,7 @@ dragged-layout commit path.
 
 ## Scope
 
-**In scope**: `e2e/drag/vanilla.spec.ts` (case d's attribute assertion only); delete `src/lib/utils/{drag,dragInertia,dragMath,dragParams}.ts` and their `*.spec.ts`; change
+**In scope**: everything Revision 2 lists, `src/lib/utils/motionDomProjection.spec.ts`; delete `src/lib/utils/{drag,dragInertia,dragMath,dragParams}.ts` and their `*.spec.ts`; change
 `src/lib/utils/vanillaDrag.ts` (+ its spec), `src/lib/html/_MotionContainer.svelte` (dead dragged-layout path),
 `src/lib/utils/motionDomProjection.ts` (`commitDraggedLayoutChange` only), and anything else the typecheck shows
 still importing the deleted files.
