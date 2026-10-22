@@ -92,7 +92,7 @@
                     }))}
                     onPan={handlePan}
                     onPanEnd={handlePanEnd}
-                    whilePan={{ cursor: 'grabbing' }}
+                    whileTap={{ cursor: 'grabbing' }}
                     role="dialog"
                     aria-label="Demo sheet — pull down or flick to dismiss"
                 >

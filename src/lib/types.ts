@@ -605,8 +605,6 @@ export type MotionProps = {
     whileFocus?: MotionWhileFocus
     /** Drag interaction animation */
     whileDrag?: MotionWhileDrag
-    /** Pan interaction animation — applied while a pan gesture is active */
-    whilePan?: MotionWhileDrag
     /** In-view interaction animation - animates when element enters viewport */
     whileInView?: MotionWhileInView
     /** IntersectionObserver options for `whileInView` (once / root / margin / amount) */

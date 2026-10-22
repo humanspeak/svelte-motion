@@ -64,7 +64,7 @@ Fires immediately on `pointerdown`, before any movement threshold is met. Use it
 
 ### `onPanStart`
 
-Fires the first frame after the pointer offset crosses the **distance threshold** (3px by default — matches framer-motion). This is your "the user committed to a gesture" signal. Use it to apply `whilePan` styling, set a `dragging` flag, etc.
+Fires the first frame after the pointer offset crosses the **distance threshold** (3px by default — matches framer-motion). This is your "the user committed to a gesture" signal. Use it to set a `dragging` flag, toggle a class, etc.
 
 ### `onPan`
 
@@ -74,18 +74,9 @@ Fires once per render frame (throttled — a 1000Hz mouse won't drown your handl
 
 Fires on `pointerup` / `pointercancel`, but **only if `onPanStart` ever fired**. If the user clicked without moving, `onPanEnd` does not fire — only `onPanSessionStart` / `onPanSessionEnd` (not currently exposed). That makes `onPanEnd` the right place to commit a release decision: did they pass the dismiss threshold? Snap or close?
 
-## `whilePan`
+## Styling while panning
 
-Variant-style keyframes that apply while a pan gesture is active (after threshold). Same shape as `whileHover` / `whileTap` / `whileDrag`:
-
-```svelte
-<motion.div
-    onPan={(_e, info) => (translateY = info.offset.y)}
-    whilePan={{ scale: 1.02 }}
-/>
-```
-
-The keyframes apply on `onPanStart` and revert on `onPanEnd`.
+Motion has no `whilePan` prop. Use `whileTap` for press-time styles (for example `whileTap={{ cursor: 'grabbing' }}`), or toggle state from `onPanStart` / `onPanEnd`.
 
 ## Pan vs Drag — when to use which
 

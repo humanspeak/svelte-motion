@@ -229,14 +229,6 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/motion/pan-authored-transforms') + searchParams}
-                    >
-                        Pan: whilePan over authored transforms
-                    </a>
-                </li>
-                <li>
-                    <a
-                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/transform-page-point/pan') + searchParams}
                     >
                         MotionConfig transformPagePoint — pan
@@ -750,7 +742,7 @@
                         class="text-blue-300 hover:underline"
                         href={resolve('/tests/drag/vanilla') + searchParams}
                     >
-                        Drag: vanilla drag() on plain elements (+ motion.* guard)
+                        Drag: vanilla drag() on plain elements (+ motion.* moves once)
                     </a>
                 </li>
                 <li>
