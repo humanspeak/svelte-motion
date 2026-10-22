@@ -4,12 +4,15 @@ import type { VisualElementDragControls } from 'motion-dom'
 /**
  * Creates imperative drag controls for programmatically starting and stopping drags.
  *
- * Use this factory to create a controls object that can trigger a drag from external
- * events (e.g., a button press or keyboard shortcut). Pass the controls to a motion
- * element via the `dragControls` prop, then call `controls.start(event)` to initiate
- * the drag as if the user had pressed down on the element.
+ * Port of framer-motion's `DragControls` (`gestures/drag/use-drag-controls.ts` @ v14.5.0):
+ * a set of the `VisualElementDragControls` of every `motion` element that received these
+ * controls via its `dragControls` prop. `start`, `cancel` and `stop` fan out to every
+ * subscribed element.
  *
- * @returns {DragControls} An object with `start`, `cancel`, `stop`, and `subscribe` methods.
+ * Pass the controls to one or more motion elements via the `dragControls` prop, then call
+ * `controls.start(event)` to initiate the drag as if the user had pressed down on them.
+ *
+ * @returns {DragControls} An object with `start`, `cancel`, `stop`, and the internal `subscribe` method.
  * @see https://motion.dev/docs/react-motion-component#dragging
  *
  * @example
@@ -31,76 +34,23 @@ import type { VisualElementDragControls } from 'motion-dom'
  * ```
  */
 export const createDragControls = (): DragControls => {
-    let target: HTMLElement | null = null
-    let starter: ((e: PointerEvent, snap?: boolean) => void) | null = null
-    let cancelInertia: (() => void) | null = null
-    // SPIKE 006: upstream `DragControls.componentControls`. Populated only by the
-    // upstream drag feature (`USE_UPSTREAM_DRAG`); empty on the legacy path.
     const componentControls = new Set<VisualElementDragControls>()
 
-    const controls: DragControls = {
-        start(event, options) {
-            if (componentControls.size) {
-                componentControls.forEach((c) => c.start(event, options))
-                return
+    return {
+        subscribe(controls) {
+            componentControls.add(controls)
+            return () => {
+                componentControls.delete(controls)
             }
-            if (!target || !starter) return
-            const snap = options?.snapToCursor ?? false
-            starter(event, snap)
+        },
+        start(event, options) {
+            componentControls.forEach((controls) => controls.start(event, options))
         },
         cancel() {
-            // Svelte-side extension (drag/controls-cancel-inertia): upstream's
-            // cancel()/stop() do not stop a post-release glide; this library's
-            // do. Stop the axis animations only when no drag is live, so a
-            // mid-drag stop() still starts upstream's momentum.
-            if (componentControls.size)
-                return componentControls.forEach((c) => {
-                    const wasDragging = c.isDragging
-                    c.cancel()
-                    if (!wasDragging) c.stopAnimation()
-                })
-            cancelInertia?.()
+            componentControls.forEach((controls) => controls.cancel())
         },
         stop() {
-            if (componentControls.size)
-                return componentControls.forEach((c) => {
-                    const wasDragging = c.isDragging
-                    c.stop()
-                    if (!wasDragging) c.stopAnimation()
-                })
-            cancelInertia?.()
-        },
-        subscribe(el: HTMLElement) {
-            target = el
+            componentControls.forEach((controls) => controls.stop())
         }
     }
-    // Internal hook used by attachDrag to wire controls to the element
-    ;(
-        controls as unknown as {
-            _bind?: (
-                el: HTMLElement,
-                s: (e: PointerEvent, snap?: boolean) => void,
-                c?: () => void
-            ) => void
-        }
-    )._bind = (el, s, c) => {
-        target = el
-        starter = s
-        cancelInertia = c ?? null
-    }
-
-    // SPIKE 006: upstream `DragControls.subscribe(controls)`, kept off the
-    // public `subscribe(el)` signature.
-    ;(
-        controls as unknown as {
-            _subscribeControls?: (c: VisualElementDragControls) => () => void
-        }
-    )._subscribeControls = (c) => {
-        componentControls.add(c)
-        return () => {
-            componentControls.delete(c)
-        }
-    }
-
-    return controls
 }

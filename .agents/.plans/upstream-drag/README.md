@@ -13,7 +13,7 @@ touch 4198, never `git stash`.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| [001](001-adopt-upstream-drag-controller.md) | Drive `drag` with `VisualElementDragControls`; adopt upstream on all 8 divergences; rewrite pinning specs | P1 | L | — | TODO |
+| [001](001-adopt-upstream-drag-controller.md) | Drive `drag` with `VisualElementDragControls`; adopt upstream on all 8 divergences; rewrite pinning specs | P1 | L | — | DONE (2026-10-22, guard PASS with 2 known-red items handed to 002) |
 | [002](002-retire-legacy-drag.md) | Delete `drag.ts`/`dragInertia`/`dragMath`/`dragParams` (+ specs); vanilla guard → `elementDragControls` | P1 | M | 001 | TODO |
 | [003](003-pan-gesture-on-pan-session.md) | Pan gesture on `PanSession`; delete `pan.ts`; remove `whilePan` | P2 | M | 002 | TODO |
 

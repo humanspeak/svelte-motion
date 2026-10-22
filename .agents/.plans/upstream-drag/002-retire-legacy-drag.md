@@ -9,6 +9,21 @@
 >
 > **Drift check (run first)**: confirm plan 001 is committed: `grep -n "attachDrag" src/lib/html/_MotionContainer.svelte`
 > → no matches, and `git log --oneline -5` shows its commits. Otherwise STOP.
+>
+> **Revision (2026-10-22, guard, after plan 001 landed)**: 001 left two known-red items that this plan owns:
+>
+> - 5 unit tests in `src/lib/utils/drag.spec.ts` (they drive the removed `_bind` hook). Step 2 deletes that file.
+> - `e2e/drag/vanilla.spec.ts` "guard: drag() skips a motion.div that already drags".
+>
+> The vanilla case fails for two reasons. Step 1 fixes the stale `svelteMotionDragElements` guard. The case also
+> asserts `not.toHaveAttribute('draggable', 'false')` (line ~94), which contradicts upstream's default drag styles
+> that 001 adopted: a `motion.div` with `drag` now carries `draggable="false"` itself. Step 1 replaces that assertion.
+> The guard is proven by the ~100 px (not ~200 px) movement and by `data-skipped`, not by the attribute. Step 3's
+> gate must show 0 unit failures and 0 e2e failures.
+>
+> 001 also already removed `_MotionContainer.svelte`'s `commitDraggedLayoutChange` wrapper and its three call sites.
+> Step 2 therefore only removes `MotionDomProjectionAdapter.commitDraggedLayoutChange` and the spike comment next to
+> it in `motionDomProjection.ts`.
 
 ## Status
 
@@ -43,7 +58,7 @@ dragged-layout commit path.
 
 ## Scope
 
-**In scope**: delete `src/lib/utils/{drag,dragInertia,dragMath,dragParams}.ts` and their `*.spec.ts`; change
+**In scope**: `e2e/drag/vanilla.spec.ts` (case d's attribute assertion only); delete `src/lib/utils/{drag,dragInertia,dragMath,dragParams}.ts` and their `*.spec.ts`; change
 `src/lib/utils/vanillaDrag.ts` (+ its spec), `src/lib/html/_MotionContainer.svelte` (dead dragged-layout path),
 `src/lib/utils/motionDomProjection.ts` (`commitDraggedLayoutChange` only), and anything else the typecheck shows
 still importing the deleted files.
@@ -63,7 +78,9 @@ In `vanillaDrag.ts`, replace the `svelteMotionDragElements` check with an upstre
 "already dragged by `motion.*`" when `visualElementStore.get(element)` has a registered drag controller,
 `elementDragControls.has(visualElement)` (both exported from `motion-dom`). This also removes the timing limit
 documented in its JSDoc ("before the element is ready"). Update that JSDoc and the unit spec, which should now
-seed the guard by mounting a VisualElement with `drag`, or by setting `elementDragControls` directly.
+seed the guard by mounting a VisualElement with `drag`, or by setting `elementDragControls` directly. In
+`e2e/drag/vanilla.spec.ts` case (d), drop the `not.toHaveAttribute('draggable', 'false')` line (see Revision). If a
+replacement is needed, assert `draggable="false"` is present, since the `motion.div`'s own upstream controller sets it.
 
 **Verify**: `pnpm exec vitest run src/lib/utils/vanillaDrag.spec.ts` → pass; `PW_PORT=<lane> pnpm exec playwright test e2e/drag/vanilla.spec.ts` → pass (case d still moves ~100 px, not 200).
 

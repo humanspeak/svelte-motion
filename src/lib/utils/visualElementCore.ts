@@ -20,6 +20,7 @@
  * renders. Plans 002–005 move each existing writer onto it.
  */
 
+import type { DragControls } from '$lib/types'
 import {
     Feature,
     HTMLVisualElement,
@@ -39,7 +40,6 @@ import {
     type AnyResolvedKeyframe,
     type HTMLRenderState,
     type MotionNodeOptions,
-    type PanInfo,
     type PresenceContextProps,
     type ReducedMotionConfig,
     type ResolvedValues,
@@ -47,7 +47,6 @@ import {
     type ScrapeMotionValuesFromProps,
     type VisualElement
 } from 'motion-dom'
-import { USE_UPSTREAM_DRAG } from './dragImpl'
 
 /**
  * Variant labels inherited from the nearest motion ancestor.
@@ -281,15 +280,26 @@ export class ExitAnimationFeature extends Feature<unknown> {
 export const isExitFeatureEnabled = (props: MotionNodeOptions): boolean => !!props.exit
 
 /**
- * SPIKE 006: the drag feature, driving `drag` with motion-dom's
- * `VisualElementDragControls`.
+ * The drag feature: drives `drag` with motion-dom's `VisualElementDragControls`.
  *
- * Port of `framer-motion/src/gestures/drag/index.ts` (v14.5.0). Only registered
- * when {@link USE_UPSTREAM_DRAG} is on.
+ * Port of `framer-motion/src/gestures/drag/index.ts` (v14.5.0). Registered by
+ * {@link registerMotionFeatures}; enabled by {@link isDragFeatureEnabled}.
  *
- * Svelte deviation: the feature can be instantiated by a props-sync pass before
- * the VisualElement has an instance, in which case `addListeners()` has no
- * element to bind. Listener attachment is retried on the next `update()`.
+ * Two documented Svelte deviations (re-check both on each Motion bump):
+ *
+ * 1. The feature can be instantiated by a props-sync pass before the
+ *    VisualElement has an instance, in which case `addListeners()` has no
+ *    element to bind. Listener attachment is retried on the next `update()`.
+ * 2. React re-measures on every commit via `MeasureLayout`, which re-fires the
+ *    projection `'measure'` event the controller resolves ref constraints from.
+ *    Here, a `dragConstraints` change re-fires `'measure'` explicitly.
+ *
+ * @example
+ * ```ts
+ * setFeatureDefinitions({
+ *     drag: { isEnabled: isDragFeatureEnabled, Feature: DragGestureFeature }
+ * })
+ * ```
  */
 export class DragGestureFeature extends Feature<HTMLElement> {
     controls: VisualElementDragControls
@@ -301,46 +311,27 @@ export class DragGestureFeature extends Feature<HTMLElement> {
      */
     constructor(node: VisualElement<HTMLElement>) {
         super(node)
-        // Svelte-side extension: mirror the legacy `data-svelte-motion-drag-active`
-        // marker (set at drag start, cleared from `cancel()`, which every end
-        // path runs through). The container's layout path and several e2e specs
-        // observe it; the controller itself has no public drag-start event.
-        const markActive = (active: boolean) => {
-            const el = node.current
-            if (!el) return
-            if (active) {
-                el.dataset.svelteMotionDragActive = 'true'
-                // Legacy drag.ts dispatches this at drag start (e2e observers).
-                el.dispatchEvent(new CustomEvent('svelte-motion:drag-start'))
-            } else delete el.dataset.svelteMotionDragActive
-        }
-        this.controls = new VisualElementDragControls(node, () => {
-            const props = node.getProps()
-            return {
-                ...props,
-                onDragStart: (event: PointerEvent, info: PanInfo) => {
-                    markActive(true)
-                    props.onDragStart?.(event, info)
-                }
-            }
-        })
-        const controls = this.controls
-        const cancel = () => VisualElementDragControls.prototype.cancel.call(controls)
-        controls.cancel = () => {
-            cancel()
-            markActive(false)
-        }
+        this.controls = new VisualElementDragControls(node)
     }
 
+    /**
+     * Subscribe this feature's controller to the `dragControls` prop, if any.
+     *
+     * @returns Nothing.
+     */
     private subscribeControls(): void {
-        const { dragControls } = this.node.getProps() as {
-            dragControls?: { _subscribeControls?: (c: VisualElementDragControls) => () => void }
-        }
-        if (dragControls && typeof dragControls._subscribeControls === 'function') {
-            this.removeGroupControls = dragControls._subscribeControls(this.controls)
+        const { dragControls } = this.node.getProps() as { dragControls?: DragControls }
+        if (dragControls) {
+            this.removeGroupControls = dragControls.subscribe(this.controls)
         }
     }
 
+    /**
+     * Attach the controller's pointerdown listener once the element exists
+     * (Svelte deviation 1).
+     *
+     * @returns Nothing.
+     */
     private attachListeners(): void {
         if (this.removeListeners || !this.node.current) return
         this.removeListeners = this.controls.addListeners() ?? null
@@ -357,11 +348,13 @@ export class DragGestureFeature extends Feature<HTMLElement> {
     }
 
     /**
-     * Re-subscribe on a `dragControls` identity change.
+     * Re-subscribe on a `dragControls` identity change, retry listener
+     * attachment, and re-measure when `dragConstraints` changes.
      *
      * @returns Nothing.
      */
     update(): void {
+        // Svelte deviation 1: retry when the instance wasn't ready at mount.
         this.attachListeners()
         const { dragControls } = this.node.getProps() as { dragControls?: unknown }
         const { dragControls: prev } = (this.node.prevProps ?? {}) as { dragControls?: unknown }
@@ -370,7 +363,7 @@ export class DragGestureFeature extends Feature<HTMLElement> {
             this.removeGroupControls = () => {}
             this.subscribeControls()
         }
-        // Svelte deviation: React re-measures (and so re-fires the projection
+        // Svelte deviation 2: React re-measures (and so re-fires the projection
         // 'measure' event the controller resolves ref constraints from) on
         // every commit via MeasureLayout. A `dragConstraints` ref bound after
         // mount would otherwise never be measured or observed here.
@@ -442,14 +435,10 @@ export const registerMotionFeatures = (): void => {
             isEnabled: isExitFeatureEnabled,
             Feature: ExitAnimationFeature as never
         },
-        ...(USE_UPSTREAM_DRAG
-            ? {
-                  drag: {
-                      isEnabled: isDragFeatureEnabled,
-                      Feature: DragGestureFeature as never
-                  }
-              }
-            : {})
+        drag: {
+            isEnabled: isDragFeatureEnabled,
+            Feature: DragGestureFeature as never
+        }
     })
 }
 

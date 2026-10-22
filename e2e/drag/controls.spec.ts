@@ -26,19 +26,26 @@ const installControlObservers = async (handle: Locator, target: Locator) => {
             )
         })
     })
-    await target.evaluate((node) => {
-        node.setAttribute('data-playwright-drag-start-count', '0')
-        node.addEventListener('svelte-motion:drag-start', () => {
-            const count = Number(node.getAttribute('data-playwright-drag-start-count') ?? 0)
-            node.setAttribute('data-playwright-drag-start-count', String(count + 1))
-        })
-    })
+    // Drag starts are counted by the fixture page from `onDragStart`, which is
+    // Motion's only drag-start signal (no DOM marker or event;
+    // `VisualElementDragControls.start` fires `onDragStart` from `frame.update`,
+    // VisualElementDragControls.ts:191-193 @ v14.5.0).
+    await expect(target).toHaveAttribute('data-drag-start-count', '0')
 }
 
 const readPointerDown = async (handle: Locator): Promise<PointerDownSnapshot> => {
     const value = await handle.getAttribute('data-playwright-pointerdown')
     if (!value) throw new Error('no pointerdown snapshot')
     return JSON.parse(value) as PointerDownSnapshot
+}
+
+const waitForAnimationFrame = async (page: Page) => {
+    await page.evaluate(
+        () =>
+            new Promise<void>((resolve) => {
+                requestAnimationFrame(() => resolve())
+            })
+    )
 }
 
 const waitForAnimationFrames = async (page: Page) => {
@@ -120,7 +127,7 @@ test.describe('drag/controls', () => {
             button: 0,
             buttons: 1
         })
-        expect(await el.getAttribute('data-playwright-drag-start-count')).toBe('0')
+        await expect(el).toHaveAttribute('data-drag-start-count', '0')
         expect(e.x - s.x).toBe(-0.0078125)
         expect(e.y - s.y).toBe(0)
         // The threshold-only snap must not jump across the page.
@@ -131,14 +138,14 @@ test.describe('drag/controls', () => {
         await page.mouse.move(handleCenter.x, handleCenter.y)
         await page.mouse.down()
         await page.mouse.move(handleCenter.x + 20, handleCenter.y, { steps: 5 })
-        await expect(el).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+        await expect(el).toHaveAttribute('data-dragging', 'true')
         const active = await el.boundingBox()
         if (!active) throw new Error('no active')
-        expect(await el.getAttribute('data-playwright-drag-start-count')).toBe('1')
+        await expect(el).toHaveAttribute('data-drag-start-count', '1')
         expect(active.x - e.x).toBeCloseTo(20, 0)
         expect(Math.abs(active.y - e.y)).toBeLessThan(2)
         await page.mouse.up()
-        await expect(el).not.toHaveAttribute('data-svelte-motion-drag-active', 'true')
+        await expect(el).toHaveAttribute('data-dragging', 'false')
     })
 
     test('snapToCursor does not creep across repeated drags with initial coordinates', async ({
@@ -205,16 +212,20 @@ test.describe('drag/controls', () => {
             await page.mouse.move(start.x, start.y)
             await page.mouse.down()
             const pointerDown = await readPointerDown(handle)
+            // Motion 14.5 snaps in the pan session's `onSessionStart`, which
+            // writes the axis MotionValues; the VisualElement paints them on the
+            // next frame (VisualElementDragControls.ts:121-124 @ v14.5.0).
+            await waitForAnimationFrame(page)
             const snapped = await el.boundingBox()
             if (!snapped) throw new Error('no snapped')
             await page.mouse.move(pointerEnd.x, pointerEnd.y, { steps: 5 })
             await page.waitForTimeout(50)
-            await expect(el).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+            await expect(el).toHaveAttribute('data-dragging', 'true')
             const active = await el.boundingBox()
             if (!active) throw new Error('no active')
             await page.mouse.up()
             await page.waitForTimeout(100)
-            await expect(el).not.toHaveAttribute('data-svelte-motion-drag-active', 'true')
+            await expect(el).toHaveAttribute('data-dragging', 'false')
             const end = await el.boundingBox()
             if (!end) throw new Error('no end')
             sessions.push({ before, handle: h, pointerDown, snapped, active, end })
@@ -295,6 +306,6 @@ test.describe('drag/controls', () => {
                 ).toBeLessThanOrEqual(2)
             }
         }
-        expect(await el.getAttribute('data-playwright-drag-start-count')).toBe('3')
+        await expect(el).toHaveAttribute('data-drag-start-count', '3')
     })
 })

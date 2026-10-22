@@ -98,7 +98,7 @@ export interface MotionDomProjectionUpdateOptions {
     transition?: Transition
     /** Inline style props passed through to the visual element. */
     style?: unknown
-    /** SPIKE 006: upstream projection option set for draggable elements. */
+    /** Upstream projection option (`use-visual-element.ts`): `true` for draggable elements. */
     alwaysMeasureLayout?: boolean
 }
 

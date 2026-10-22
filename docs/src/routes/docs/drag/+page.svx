@@ -217,6 +217,16 @@ The `info` object passed to drag callbacks contains:
 | `offset` | `{ x, y }` | Cumulative transform offset since drag start |
 | `velocity` | `{ x, y }` | Current velocity in px/s |
 
+## Behavior
+
+`drag` runs on Motion's own drag controller, so these details match Motion:
+
+- **Default styles.** A draggable element gets `user-select: none`, `draggable="false"` and a `touch-action` for its axis: `none` for `drag`, `pan-y` for `drag="x"` and `pan-x` for `drag="y"`. They're set inline, so they win over the same properties in your CSS classes or `style`. Set `dragListener={false}` to opt out.
+- **Pointer cancel.** A `pointercancel` (for example, the browser taking over a touch for scrolling) ends the drag like a `pointerup`. `onDragEnd` fires with the release velocity and momentum still runs.
+- **Re-grabbing outside the constraints.** If you catch an element while it's outside its constraints, it moves back toward the edge as you drag, then follows the pointer at the `dragElastic` rate.
+- **Element constraints.** Resizing the window, the element or the constraint element moves the element to the same relative position within the new constraints. Only the first constraint element is watched for resizes. If you swap `dragConstraints` to a different element, the new bounds apply, but resizing only the new element won't reposition anything.
+- **Drag controls.** Every element that receives the same `dragControls` is driven by `start`, `cancel` and `stop`. `stop()` ends a live drag with momentum and `cancel()` ends it without. Neither does anything once the drag is over, so neither stops an animation that's already running after release.
+
 ## Vanilla drag()
 
 `drag()` makes plain elements draggable without a motion component (Motion 14.4). It takes an element, a list of elements or a CSS selector, and returns a function that removes the gesture:

@@ -1,7 +1,7 @@
 import type { MotionValueChild } from '$lib/utils/motionValueChild'
 import type { MotionStyle, MotionStyleValue, TransformTemplate } from '$lib/utils/style'
 import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
-import type { ResolvedValues } from 'motion-dom'
+import type { DragControlOptions, ResolvedValues, VisualElementDragControls } from 'motion-dom'
 import type { Snippet } from 'svelte'
 
 /**
@@ -514,18 +514,44 @@ export type DragTransition = {
     min?: number
     max?: number
 }
+/**
+ * Imperative drag controls returned by `createDragControls`.
+ *
+ * Mirrors framer-motion's `DragControls` (`gestures/drag/use-drag-controls.ts` @ v14.5.0):
+ * every `motion` element that receives these controls via `dragControls` subscribes its
+ * drag controller, and `start`/`cancel`/`stop` fan out to all of them.
+ *
+ * @example
+ * ```ts
+ * const controls = createDragControls()
+ * controls.start(pointerEvent, { snapToCursor: true })
+ * ```
+ */
 export type DragControls = {
-    /** Imperatively start a drag from any pointer event. */
-    start: (
-        event: PointerEvent,
-        options?: { snapToCursor?: boolean; distanceThreshold?: number }
-    ) => void
-    /** Cancel an active drag without momentum. */
+    /**
+     * Start a drag gesture on every subscribed element.
+     *
+     * @param event The pointer event that starts the drag.
+     * @param options `snapToCursor` centres the element on the pointer;
+     *     `distanceThreshold` sets how far the pointer must travel before the drag starts.
+     */
+    start: (event: PointerEvent, options?: DragControlOptions) => void
+    /** Cancel the active drag gesture on every subscribed element (no momentum). */
     cancel: () => void
-    /** Stop current drag and any momentum animation. */
+    /**
+     * Stop the active drag gesture on every subscribed element (momentum applies).
+     * A no-op when no drag is live, as in Motion.
+     */
     stop: () => void
-    /** Subscribe the controls to a target element. */
-    subscribe: (el: HTMLElement) => void
+    /**
+     * Subscribe an element's internal drag controller. Called by `motion.*`
+     * elements that receive these controls.
+     *
+     * @internal
+     * @param controls The element's `VisualElementDragControls`.
+     * @returns A function that unsubscribes the controller.
+     */
+    subscribe: (controls: VisualElementDragControls) => () => void
 }
 
 /**

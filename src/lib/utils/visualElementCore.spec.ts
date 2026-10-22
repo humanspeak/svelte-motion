@@ -1,6 +1,7 @@
 import {
     HTMLVisualElement,
     SVGVisualElement,
+    VisualElementDragControls,
     getFeatureDefinitions,
     motionValue,
     scrapeHTMLMotionValuesFromProps,
@@ -8,12 +9,15 @@ import {
     type MotionNodeOptions
 } from 'motion-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createDragControls } from './dragControls.js'
 import { MotionDomProjectionAdapter } from './motionDomProjection.js'
 import {
+    DragGestureFeature,
     ExitAnimationFeature,
     createMotionVisualElement,
     createRenderState,
     isAnimationFeatureEnabled,
+    isDragFeatureEnabled,
     isExitFeatureEnabled,
     makeLatestValues,
     registerMotionFeatures
@@ -444,6 +448,91 @@ describe('ExitAnimationFeature', () => {
         expect(definitions.exit).toBeDefined()
         expect(definitions.exit!.Feature).toBe(ExitAnimationFeature)
         expect(definitions.exit!.isEnabled({ exit: {} })).toBe(true)
+    })
+})
+
+describe('DragGestureFeature', () => {
+    // Port of framer-motion `gestures/drag/index.ts` @ v14.5.0. The controller's
+    // `addListeners()` needs a projection node; stub it so this exercises only
+    // the feature's lifecycle (subscribe, re-subscribe, teardown).
+    const mountWithDrag = (props: Record<string, unknown>) => {
+        const removeListeners = vi.fn()
+        const addListeners = vi
+            .spyOn(VisualElementDragControls.prototype, 'addListeners')
+            .mockReturnValue(removeListeners)
+        const element = document.createElement('div')
+        const ve = createMotionVisualElement({ props })
+        ve.mount(element)
+        ve.updateFeatures()
+        const feature = (ve as unknown as { features: Record<string, unknown> }).features
+            .drag as DragGestureFeature
+        return { element, ve, feature, addListeners, removeListeners }
+    }
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('is enabled by `drag` or `dragControls` and registered under `drag`', () => {
+        expect(isDragFeatureEnabled({})).toBe(false)
+        expect(isDragFeatureEnabled({ drag: 'x' })).toBe(true)
+        expect(isDragFeatureEnabled({ dragControls: createDragControls() })).toBe(true)
+        registerMotionFeatures()
+        expect(getFeatureDefinitions().drag!.Feature).toBe(DragGestureFeature)
+    })
+
+    it('subscribes its controller to `dragControls` and attaches listeners on mount', () => {
+        const dragControls = createDragControls()
+        const subscribe = vi.spyOn(dragControls, 'subscribe')
+        const { element, ve, feature, addListeners } = mountWithDrag({
+            drag: 'x',
+            dragControls
+        })
+
+        expect(feature).toBeInstanceOf(DragGestureFeature)
+        expect(subscribe).toHaveBeenCalledExactlyOnceWith(feature.controls)
+        expect(addListeners).toHaveBeenCalledOnce()
+
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    it('re-subscribes when the `dragControls` identity changes', () => {
+        const first = createDragControls()
+        const second = createDragControls()
+        const firstUnsubscribe = vi.fn()
+        vi.spyOn(first, 'subscribe').mockReturnValue(firstUnsubscribe)
+        const secondSubscribe = vi.spyOn(second, 'subscribe')
+        const { element, ve, feature } = mountWithDrag({ drag: true, dragControls: first })
+
+        ve.update({ drag: true, dragControls: second }, null)
+        ve.updateFeatures()
+
+        expect(firstUnsubscribe).toHaveBeenCalledOnce()
+        expect(secondSubscribe).toHaveBeenCalledExactlyOnceWith(feature.controls)
+
+        // Same identity on a later update: no churn.
+        ve.update({ drag: true, dragControls: second }, null)
+        ve.updateFeatures()
+        expect(secondSubscribe).toHaveBeenCalledOnce()
+
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    it('unsubscribes, removes listeners and ends the pan session on unmount', () => {
+        const dragControls = createDragControls()
+        const unsubscribe = vi.fn()
+        vi.spyOn(dragControls, 'subscribe').mockReturnValue(unsubscribe)
+        const endPanSession = vi.spyOn(VisualElementDragControls.prototype, 'endPanSession')
+        const { element, ve, removeListeners } = mountWithDrag({ drag: 'y', dragControls })
+
+        ve.unmount()
+
+        expect(unsubscribe).toHaveBeenCalledOnce()
+        expect(removeListeners).toHaveBeenCalledOnce()
+        expect(endPanSession).toHaveBeenCalledOnce()
+        visualElementStore.delete(element)
     })
 })
 

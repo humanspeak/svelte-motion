@@ -15,8 +15,6 @@
         MotionProps,
         AnimationControlsDefinition,
         AnimationControlsSubscriber,
-        DragAxis,
-        DragInfo,
         MotionOnPan,
         MotionOnPanEnd,
         MotionOnPanSessionStart,
@@ -34,7 +32,6 @@
         frameSteps,
         time,
         isDeltaZero,
-        isMotionValue,
         styleEffect,
         animateVisualElement,
         isControllingVariants,
@@ -46,7 +43,6 @@
         type AnyResolvedKeyframe,
         type MotionNodeOptions,
         type PresenceContextProps,
-        type MotionValue,
         type TargetAndTransition,
         type Transition
     } from 'motion-dom'
@@ -93,8 +89,6 @@
         setPresenceDepth
     } from '$lib/utils/presence'
     import { getInitialKeyframes } from '$lib/utils/initial'
-    import { attachDrag, type AttachDragCleanup, type AttachDragOptions } from '$lib/utils/drag'
-    import { USE_UPSTREAM_DRAG } from '$lib/utils/dragImpl'
     import { attachPan, type AttachPanCleanup } from '$lib/utils/pan'
     import { boxFromRect, MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
     import {
@@ -322,17 +316,6 @@
     // projection adapter measures, which would be mistaken for the
     // user's base.
     const userBaseTransform = $derived(extractTransform(styleProp))
-    const getStyleTransformValues = () => {
-        if (!styleProp || typeof styleProp !== 'object' || Array.isArray(styleProp)) return {}
-
-        const values: Record<string, string | number> = {}
-        for (const [key, source] of Object.entries(styleProp)) {
-            if (!transformProps.has(key)) continue
-            const value = isMotionValue(source) ? source.get() : source
-            if (typeof value === 'string' || typeof value === 'number') values[key] = value
-        }
-        return values
-    }
     // Every gesture writer that used to live here is gone. Hover/tap/focus/inView
     // flip `setActive` (plan 003) and drag writes the node's axis values
     // (drag-single-writer 001), so `latestValues` is the single source for every
@@ -600,10 +583,10 @@
             onDragStart: onDragStartProp,
             onDrag: onDragProp,
             onDragEnd: onDragEndProp,
-            // SPIKE 006: the props motion-dom's `VisualElementDragControls` reads.
-            // Gated on the flag (and the LazyMotion drag bundle) so the legacy
-            // path's VisualElement props are byte-identical to before.
-            ...(USE_UPSTREAM_DRAG && hasDragFeatures
+            // The props motion-dom's `VisualElementDragControls` reads (via the
+            // `drag` feature, `DragGestureFeature`). Gated on the LazyMotion drag
+            // bundle: `domAnimation`/`domMin` users get no drag.
+            ...(hasDragFeatures
                 ? {
                       drag: dragProp,
                       // svelte-motion and upstream accept the same shapes: a
@@ -1173,6 +1156,14 @@
         setVisualElementParent(visualElement)
     }
 
+    /**
+     * Whether this element's drag gesture is live. Reads the `drag` feature's
+     * `VisualElementDragControls` (registered in motion-dom's
+     * `elementDragControls` map when it attaches its listeners).
+     */
+    const isDragActive = (): boolean =>
+        !!(visualElement && elementDragControls.get(visualElement)?.isDragging)
+
     const motionDomProjectionParent =
         typeof window !== 'undefined' ? getMotionDomProjectionParent() : null
     const motionDomProjection =
@@ -1232,13 +1223,13 @@
     // variant keys. Mirrors framer-motion's `whileHover` etc. surface
     // (#349).
     const resolvedWhileTap = $derived(resolveWhile(whileTapProp, variantsProp, effectiveCustom))
-    const resolvedWhileDrag = $derived(resolveWhile(whileDragProp, variantsProp, effectiveCustom))
     const resolvedWhilePan = $derived(resolveWhile(whilePanProp, variantsProp, effectiveCustom))
     // `resolvedWhileHover` / `resolvedWhileFocus` / `resolvedWhileInView` are
     // gone with plan 003: the animationState resolves variant LABELS against
-    // `variants` itself, so pre-resolving them here was redundant. `whileTap`,
-    // `whileDrag` and `whilePan` keep theirs — tap's `tabindex` affordance reads
-    // it, and drag/pan still animate their own targets until plan 005.
+    // `variants` itself, so pre-resolving them here was redundant. `whileTap`
+    // and `whilePan` keep theirs — tap's `tabindex` affordance reads it, and pan
+    // still animates its own target. `whileDrag` goes through the
+    // animationState (`VisualElementDragControls` sets it active).
 
     // Extract keyframes from resolved initial, handling initial={false}
     const initialKeyframes = $derived(
@@ -1412,26 +1403,26 @@
     //   2. the `pathLength` mounting `visibility:hidden` hold.
     // (A third hold, drag's `liveGestureTransform` splice, is gone with the
     // single-writer swap — the VisualElement composes the live drag transform.)
-    // SPIKE 006: upstream `use-visual-element.ts` projection option
+    // Upstream `use-visual-element.ts` projection option
     // (`alwaysMeasureLayout: Boolean(drag) || isRefObject(dragConstraints)`).
     const upstreamAlwaysMeasureLayout = $derived(
-        USE_UPSTREAM_DRAG && hasDragFeatures
+        hasDragFeatures
             ? Boolean(dragProp) ||
                   (!!dragConstraintsProp &&
                       typeof dragConstraintsProp === 'object' &&
                       'current' in dragConstraintsProp)
             : undefined
     )
-    // SPIKE 006: upstream's default drag styles (framer-motion
-    // `render/html/use-props.ts:59-73`). Prepended so the user's `style` wins.
+    // Upstream's default drag styles (framer-motion `render/html/use-props.ts:58-73`
+    // @ v14.5.0). Upstream assigns them AFTER copying the user's `style`, so they
+    // win over it (and, being inline, over class CSS too). Appended to match.
     const upstreamDragDefaultStyle = $derived(
-        USE_UPSTREAM_DRAG && hasDragFeatures && dragProp && dragListenerProp !== false
-            ? `user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:${dragProp === true ? 'none' : `pan-${dragProp === 'x' ? 'y' : 'x'}`};`
+        hasDragFeatures && dragProp && dragListenerProp !== false
+            ? `user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:${dragProp === true ? 'none' : `pan-${dragProp === 'x' ? 'y' : 'x'}`}`
             : ''
     )
     const inlineStyleBaseWithHolds = $derived(
-        upstreamDragDefaultStyle +
-            `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleProp};visibility:hidden` : serializedStyleProp}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`
+        `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleProp};visibility:hidden` : serializedStyleProp}${upstreamDragDefaultStyle ? `;${upstreamDragDefaultStyle}` : ''}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`
     )
 
     /**
@@ -1609,109 +1600,6 @@
         })(),
         style: renderedInlineStyle,
         class: classProp
-    })
-
-    // Drag wiring
-    //
-    // We attach drag only when the element is in the 'ready' state to avoid fighting
-    // with enter animations or initial keyframe application.
-    //
-    // Debug tips:
-    // - If drags "do nothing", verify that `drag` prop is truthy and that CSS isn't
-    //   overwriting transforms (check computed style for `transform`).
-    // - If second drags "jump", ensure `attachDrag` syncs the internal `applied` origin
-    //   after any non-zero duration settle animation.
-    let teardownDrag: AttachDragCleanup | null = null
-
-    const resolveDragOptions = (): AttachDragOptions => {
-        const currentDragProp = dragProp
-        const axis: DragAxis =
-            currentDragProp === true || currentDragProp === 'x' || currentDragProp === 'y'
-                ? currentDragProp
-                : !!currentDragProp
-        const styleValues = collectMotionStyleValues(styleProp)
-        const boundMotionValues: { x?: MotionValue<number>; y?: MotionValue<number> } = {}
-        if (styleValues?.x) boundMotionValues.x = styleValues.x as MotionValue<number>
-        if (styleValues?.y) boundMotionValues.y = styleValues.y as MotionValue<number>
-
-        return {
-            axis,
-            constraints: dragConstraintsProp,
-            elastic: dragElasticProp,
-            momentum: dragMomentumProp,
-            transition: dragTransitionProp,
-            directionLock: !!dragDirectionLockProp,
-            listener: dragListenerProp !== false,
-            controls: dragControlsProp,
-            whileDrag: resolvedWhileDrag,
-            mergedTransition: mergedTransition ?? {},
-            callbacks: {
-                onStart: onDragStartProp as (e: PointerEvent, info: DragInfo) => void,
-                onMove: onDragProp as (e: PointerEvent, info: DragInfo) => void,
-                onEnd: onDragEndProp as (e: PointerEvent, info: DragInfo) => void,
-                onDirectionLock: onDirectionLockProp as (axis: 'x' | 'y') => void,
-                onTransitionEnd: () => onDragTransitionEndProp?.()
-            },
-            baselineSources: {
-                initial: initialKeyframes ?? {},
-                animate: (resolvedAnimate ?? {}) as Record<string, unknown>
-            },
-            getBaseTransformValues: getStyleTransformValues,
-            getBaseTransform: () => userBaseTransform,
-            transformTemplate: transformTemplateProp,
-            transformPagePoint: effectiveTransformPagePoint,
-            propagation: !!dragPropagationProp,
-            snapToOrigin: dragSnapToOriginProp,
-            boundMotionValues:
-                boundMotionValues.x || boundMotionValues.y ? boundMotionValues : undefined
-        }
-    }
-
-    $effect(() => {
-        if (USE_UPSTREAM_DRAG) return
-        if (!(element && isLoaded === 'ready' && hasDragFeatures)) return
-        const dragTarget = element
-        const currentDragProp = untrack(() => dragProp)
-        // Only attach if drag enabled
-        if (!currentDragProp) return
-        // Clean up previous
-        teardownDrag?.()
-
-        // If constraints are provided via an element ref but it's not yet bound (null),
-        // defer attaching drag until the ref exists to avoid an unconstrained first drag.
-        if (untrack(() => dragConstraintsProp) === null) return
-
-        const opts = untrack(resolveDragOptions)
-        const controls = opts.controls
-
-        // MotionValue.get() is Svelte-reactive. Keep attach-time measurement reads
-        // out of this lifetime effect so drag writes cannot tear down the live session.
-        teardownDrag = untrack(() => attachDrag(dragTarget, opts))
-
-        // If controls passed, subscribe element
-        if (controls && controls.subscribe) {
-            try {
-                controls.subscribe(element)
-            } catch {
-                // ignore
-            }
-        }
-
-        return () => {
-            teardownDrag?.()
-            teardownDrag = null
-        }
-    })
-
-    // Axis detection and consumer prop updates can happen while the pointer is
-    // still pressed. Update the live session in place: tearing down here removes
-    // its window listeners, and a replacement session cannot resume without a
-    // second pointerdown.
-    $effect(() => {
-        if (USE_UPSTREAM_DRAG) return
-        const nextOptions = resolveDragOptions()
-        // Track option inputs, but not imperative reads of the live drag state.
-        if (nextOptions.axis) untrack(() => teardownDrag?.updateOptions(nextOptions))
     })
 
     /**
@@ -2297,9 +2185,7 @@
         // compares it with `prevPresenceContext` to detect exit and re-entry.
         const nextPresenceContext = buildPresenceContext()
         untrack(() => {
-            const activeDragCommit = USE_UPSTREAM_DRAG
-                ? !!elementDragControls.get(visualElement)?.isDragging
-                : element?.dataset.svelteMotionDragActive === 'true' && teardownDrag
+            const activeDragCommit = isDragActive()
             if (activeDragCommit) {
                 // React's MeasureLayout commit calls projection.didUpdate(),
                 // which synchronously flushes Motion's update lane. An active
@@ -2325,11 +2211,6 @@
             // (use-visual-element.ts:148); the frameloop variant can sit unflushed
             // when nothing else is animating, which left `renderState` stale.
             visualElement.scheduleRenderMicrotask()
-            // Drag controls read current props on every React commit. Refresh
-            // our long-lived adapter here too, even when the gesture-specific
-            // values themselves kept the same identity (for example a ref
-            // constraint whose parent changed size).
-            if (teardownDrag) teardownDrag.updateOptions(resolveDragOptions())
             if (activeDragCommit) motionDomProjection?.projection.root?.didUpdate()
             // Only once the mount/enter effect has run the first pass — it owns
             // the enter ordering and the wait-mode gate.
@@ -2520,25 +2401,6 @@
     let reactiveCommitSerialAtSchedule = 0
 
     /**
-     * Route a live dragged element's slot change through upstream-style drag
-     * compensation instead of starting a FLIP animation.
-     *
-     * Both the observer and reactive layout paths can discover the same DOM
-     * change. Their existing `lastRect`/serial arbitration decides which path
-     * consumes it; sharing this branch ensures either winner shifts the live
-     * drag origin and MotionValues in exactly the same way.
-     */
-    const commitDraggedLayoutChange = (previous: RectLike): boolean => {
-        if (!(element?.dataset.svelteMotionDragActive === 'true' && teardownDrag)) return false
-
-        const activeDrag = teardownDrag
-        motionDomProjection?.commitDraggedLayoutChange(previous, (dx, dy) => {
-            activeDrag.adjustOrigin(dx, dy)
-        })
-        return true
-    }
-
-    /**
      * Process the frameloop's update, preRender and render steps now, as
      * upstream `update()` does before it measures (motion-dom
      * create-projection-node.ts @ v14.2.0, 829-845). Skipped while the
@@ -2604,12 +2466,12 @@
         emitProjectionUpdate(prev, next)
         if (hasRectChanged(prev, next)) {
             lastRect = next
-            if (!commitDraggedLayoutChange(prev)) {
-                // A Svelte-owned prop change is this component re-rendering:
-                // upstream re-renders (and so snapshots) every descendant,
-                // including ones in a separate LayoutGroup (Step 4b-d).
-                motionDomProjection?.commitObservedLayoutChange(prev, { ownSubtreeChanged: true })
-            }
+            // A Svelte-owned prop change is this component re-rendering:
+            // upstream re-renders (and so snapshots) every descendant,
+            // including ones in a separate LayoutGroup (Step 4b-d). A live
+            // drag compensates in its own projection `didUpdate` listener
+            // (`VisualElementDragControls.addListeners`).
+            motionDomProjection?.commitObservedLayoutChange(prev, { ownSubtreeChanged: true })
             return
         }
         // No delta from THIS path's snapshot: leave `lastRect` alone. The
@@ -2818,9 +2680,7 @@
         ) {
             observerCommitSerial += 1
             emitProjectionUpdate(previousBeforeObserverRestart, lastRect)
-            if (!commitDraggedLayoutChange(previousBeforeObserverRestart)) {
-                motionDomProjection?.commitObservedLayoutChange(previousBeforeObserverRestart)
-            }
+            motionDomProjection?.commitObservedLayoutChange(previousBeforeObserverRestart)
         }
         setCompositorHints(observedElement, true)
 
@@ -2903,19 +2763,12 @@
                 // legacy node emitted from its commit for all of them).
                 emitProjectionUpdate(previous, next)
                 // A live drag whose layout slot just moved (e.g. Reorder
-                // swapped the dragged item's DOM position): a FLIP here
-                // would fight the gesture, so instead the motion-dom
-                // node's `didUpdate` delta shifts the drag origin
-                // (upstream: VisualElementDragControls.ts:742-758) — the
-                // element stays pinned under the cursor and
-                // `dragSnapToOrigin` settles into the NEW slot on
-                // release. The paint goes through the buildTransform
-                // writer via `adjustOrigin`. The delta lands within the
-                // upstream microtask flush — before the next pointermove
-                // task — so the gesture transform is compensated before
-                // Reorder's checkReorder can see the uncompensated
-                // element and double-fire the swap.
-                if (commitDraggedLayoutChange(previous)) return
+                // swapped the dragged item's DOM position) needs no special
+                // branch: the drag controller blocks the node's layout
+                // animation while dragging and shifts its origin from the
+                // projection `didUpdate` delta (motion-dom
+                // `VisualElementDragControls.addListeners` @ v14.5.0), so the
+                // element stays pinned under the cursor.
 
                 const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
                 const hasSizeCorrectionTarget = !!element!.querySelector(
@@ -2990,7 +2843,7 @@
             // keyed reorder moves the dragged element. Consume its fresh slot
             // immediately so the upstream delta compensates the drag before
             // paint; waiting another frame exposes the uncompensated DOM move.
-            if (rafId && element?.dataset.svelteMotionDragActive !== 'true') return
+            if (rafId && !isDragActive()) return
             commitObservedLayout()
             if (rafId) return
             rafId = requestAnimationFrame(() => {
@@ -3031,7 +2884,7 @@
         const siblingLayoutObserver =
             dragProp && siblingLayoutParent && typeof MutationObserver !== 'undefined'
                 ? new MutationObserver((mutations) => {
-                      if (element?.dataset.svelteMotionDragActive !== 'true') return
+                      if (!isDragActive()) return
                       const hasExternalMutation = mutations.some((mutation) => {
                           const target = mutation.target
                           return target instanceof Element && !element?.contains(target)

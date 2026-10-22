@@ -49,6 +49,8 @@
     let liveB: HTMLDivElement | null = $state(null)
     let liveTarget: 'A' | 'B' | 'numeric' = $state('A')
     let liveReset = $state(0)
+    // Mirrors onDragStart/onDragEnd for the e2e drag-start signal.
+    let liveDragging = $state(false)
     let countdown = $state(0)
     let switchCompleted = $state(false)
     let switchTimer: ReturnType<typeof setInterval> | undefined
@@ -76,6 +78,7 @@
         cancelSwitch()
         liveTarget = 'A'
         resizeLiveB(originalWidth)
+        liveDragging = false
         liveReset += 1
     }
     const scheduleSwitch = () => {
@@ -388,6 +391,9 @@
                                     dragConstraints={liveConstraints ?? undefined}
                                     dragMomentum={false}
                                     dragElastic={0}
+                                    onDragStart={() => (liveDragging = true)}
+                                    onDragEnd={() => (liveDragging = false)}
+                                    data-dragging={liveDragging}
                                     data-testid="live-card"
                                     style="position:absolute;left:40px;top:40px;width:80px;height:80px;background:#c4b5fd;border-radius:8px;cursor:grab;user-select:none;display:grid;place-items:center;color:#462476;font-weight:700;font-size:12px;"
                                 >

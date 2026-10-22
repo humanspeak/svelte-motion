@@ -1,6 +1,6 @@
 import { MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
 import { render, screen } from '@testing-library/svelte'
-import { visualElementStore } from 'motion-dom'
+import { elementDragControls, visualElementStore } from 'motion-dom'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import ClickAfterDragHarness from './__tests__/ClickAfterDragHarness.svelte'
 import DetectedAxisHarness from './__tests__/DetectedAxisHarness.svelte'
@@ -176,7 +176,8 @@ describe('Reorder.Group / Reorder.Item', () => {
             pointerId: 22
         })
         await flushFrame()
-        expect(item.dataset.svelteMotionDragActive).toBe('true')
+        // The drag controller's live state (Motion has no drag-active DOM marker).
+        expect(elementDragControls.get(visualElement!)?.isDragging).toBe(true)
         expect(visualElement?.getValue('x')?.get()).toBe(50)
         expect(visualElement?.getValue('y')?.get()).toBe(50)
 
@@ -350,10 +351,6 @@ describe('Reorder.Group / Reorder.Item', () => {
 
     it('rebases an active drag when a keyed reorder moves its layout slot', async () => {
         const onReorder = vi.fn()
-        const draggedCommit = vi.spyOn(
-            MotionDomProjectionAdapter.prototype,
-            'commitDraggedLayoutChange'
-        )
         vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
             this: HTMLElement
         ) {
@@ -387,7 +384,7 @@ describe('Reorder.Group / Reorder.Item', () => {
         await flushFrame()
 
         const visualElement = visualElementStore.get(item)
-        expect(item.dataset.svelteMotionDragActive).toBe('true')
+        expect(elementDragControls.get(visualElement!)?.isDragging).toBe(true)
         expect(visualElement?.getValue('x')?.get()).toBe(-70)
 
         await result.rerender({
@@ -399,15 +396,11 @@ describe('Reorder.Group / Reorder.Item', () => {
         await vi.advanceTimersByTimeAsync(1000)
         onReorder.mockClear()
 
-        expect(draggedCommit).toHaveBeenCalledTimes(1)
-        expect(draggedCommit).toHaveBeenCalledWith(
-            { left: 300, top: 0, width: 100, height: 100 },
-            expect.any(Function)
-        )
-
-        // The keyed DOM move shifts item 0's slot 100px left. Upstream drag
-        // projection adds previous - next (+100) to both the live value and
-        // gesture origin, keeping a stationary pointer pinned at +30.
+        // The keyed DOM move shifts item 0's slot 100px left. Motion's drag
+        // controller adds the projection `didUpdate` delta (previous - next,
+        // +100) to both the live value and the gesture origin, keeping a
+        // stationary pointer pinned at +30 (motion-dom
+        // `gestures/drag/VisualElementDragControls.ts:768-786` @ v14.5.0).
         expect(visualElement?.getValue('x')?.get()).toBe(30)
         dispatchMousePointer(window, 'pointermove', {
             clientX: 430,
