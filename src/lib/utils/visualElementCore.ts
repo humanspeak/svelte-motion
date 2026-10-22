@@ -24,9 +24,12 @@ import type { DragControls } from '$lib/types'
 import {
     Feature,
     HTMLVisualElement,
+    PanSession,
     SVGVisualElement,
     VisualElementDragControls,
+    addPointerEvent,
     createAnimationState,
+    frame,
     getFeatureDefinitions,
     isAnimationControls,
     isControllingVariants,
@@ -40,6 +43,8 @@ import {
     type AnyResolvedKeyframe,
     type HTMLRenderState,
     type MotionNodeOptions,
+    type PanHandler,
+    type PanInfo,
     type PresenceContextProps,
     type ReducedMotionConfig,
     type ResolvedValues,
@@ -404,6 +409,183 @@ export class DragGestureFeature extends Feature<HTMLElement> {
 export const isDragFeatureEnabled = (props: MotionNodeOptions): boolean =>
     !!(props.drag || (props as { dragControls?: unknown }).dragControls)
 
+/** A public pan callback (`onPan`, `onPanStart`, `onPanSessionStart`, `onPanEnd`). */
+type PanEventHandler = (event: PointerEvent, info: PanInfo) => void
+
+/** `PanSession`'s `transformPagePoint` option type. */
+type PanTransformPagePoint = NonNullable<
+    ConstructorParameters<typeof PanSession>[2]
+>['transformPagePoint']
+
+/** The pan callbacks `PanGestureFeature` reads off the VisualElement props. */
+interface PanGestureProps {
+    onPanSessionStart?: PanEventHandler
+    onPanStart?: PanEventHandler
+    onPan?: PanEventHandler
+    onPanEnd?: PanEventHandler
+}
+
+/**
+ * Defer a pan callback to Motion's `update` step.
+ *
+ * Port of `framer-motion/src/gestures/pan/index.ts:12-17` (v14.5.0).
+ * `PanSession` only ever delivers pointer events, but types its handlers with
+ * `Event`, hence the narrowing cast.
+ *
+ * @param handler The user's callback, if any.
+ * @returns A session handler that schedules `handler` with `frame.update`.
+ */
+const asyncPanHandler =
+    (handler?: PanEventHandler): PanHandler =>
+    (event, info) => {
+        if (handler) {
+            frame.update(() => handler(event as PointerEvent, info), false, true)
+        }
+    }
+
+/**
+ * Resolve the window a VisualElement's element lives in.
+ *
+ * Port of `framer-motion/src/utils/get-context-window.ts` (v14.5.0).
+ *
+ * @param node The VisualElement.
+ * @returns The element's `defaultView`, or `null` before mount.
+ *
+ * @example
+ * ```ts
+ * getContextWindow(visualElement) // → the element's window once mounted
+ * ```
+ */
+export const getContextWindow = ({
+    current
+}: VisualElement<Element>): (Window & typeof globalThis) | null =>
+    current ? current.ownerDocument.defaultView : null
+
+/**
+ * The pan feature: reports `onPanSessionStart`/`onPanStart`/`onPan`/`onPanEnd`
+ * from motion-dom's `PanSession`.
+ *
+ * Port of `framer-motion/src/gestures/pan/index.ts` (v14.5.0). Registered by
+ * {@link registerMotionFeatures}; enabled by {@link isPanFeatureEnabled}. Like
+ * upstream it runs alongside the drag feature when both are enabled.
+ *
+ * One documented Svelte deviation (re-check on each Motion bump): the feature
+ * can be instantiated by a props-sync pass before the VisualElement has an
+ * instance, so the pointerdown listener is attached on the first `mount()` or
+ * `update()` that sees `node.current` (same as {@link DragGestureFeature}).
+ *
+ * @example
+ * ```ts
+ * setFeatureDefinitions({
+ *     pan: { isEnabled: isPanFeatureEnabled, Feature: PanGestureFeature }
+ * })
+ * ```
+ */
+export class PanGestureFeature extends Feature<Element> {
+    private session?: PanSession
+    private removePointerDownListener: (() => void) | null = null
+
+    /**
+     * Start a pan session for a pointerdown on the element.
+     *
+     * @param pointerDownEvent The originating pointerdown.
+     * @returns Nothing.
+     */
+    onPointerDown(pointerDownEvent: PointerEvent): void {
+        this.session = new PanSession(pointerDownEvent, this.createPanHandlers(), {
+            // motion-dom types the getter's return as `any`.
+            transformPagePoint: this.node.getTransformPagePoint() as PanTransformPagePoint,
+            contextWindow: getContextWindow(this.node)
+        })
+    }
+
+    /**
+     * Build the session handlers from the node's current props.
+     *
+     * Start/move callbacks run on `frame.update`; `onPanEnd` on
+     * `frame.postRender` (upstream `pan/index.ts:35-50`).
+     *
+     * @returns The `PanSession` handler set.
+     */
+    createPanHandlers(): {
+        onSessionStart: PanHandler
+        onStart: PanHandler
+        onMove: PanHandler
+        onEnd: PanHandler
+    } {
+        const { onPanSessionStart, onPanStart, onPan, onPanEnd } =
+            this.node.getProps() as PanGestureProps
+
+        return {
+            onSessionStart: asyncPanHandler(onPanSessionStart),
+            onStart: asyncPanHandler(onPanStart),
+            onMove: asyncPanHandler(onPan),
+            onEnd: (event, info) => {
+                delete this.session
+                if (onPanEnd) {
+                    frame.postRender(() => onPanEnd(event as PointerEvent, info))
+                }
+            }
+        }
+    }
+
+    /**
+     * Attach the pointerdown listener once the element exists (Svelte deviation).
+     *
+     * @returns Nothing.
+     */
+    private attachListener(): void {
+        if (this.removePointerDownListener || !this.node.current) return
+        this.removePointerDownListener = addPointerEvent(
+            this.node.current,
+            'pointerdown',
+            (event: PointerEvent) => this.onPointerDown(event)
+        )
+    }
+
+    /**
+     * Attach the pointerdown listener.
+     *
+     * @returns Nothing.
+     */
+    mount(): void {
+        this.attachListener()
+    }
+
+    /**
+     * Retry listener attachment and hot-swap the live session's handlers.
+     *
+     * @returns Nothing.
+     */
+    update(): void {
+        this.attachListener()
+        this.session && this.session.updateHandlers(this.createPanHandlers())
+    }
+
+    /**
+     * Detach the listener and end any live session.
+     *
+     * @returns Nothing.
+     */
+    unmount(): void {
+        this.removePointerDownListener?.()
+        this.removePointerDownListener = null
+        this.session && this.session.end()
+    }
+}
+
+/**
+ * Whether the pan feature applies (upstream `definitions.ts:21`: `onPan`,
+ * `onPanStart`, `onPanSessionStart`, `onPanEnd`).
+ *
+ * @param props Motion node props.
+ * @returns `true` when any pan callback is set.
+ */
+export const isPanFeatureEnabled = (props: MotionNodeOptions): boolean => {
+    const { onPan, onPanStart, onPanSessionStart, onPanEnd } = props as PanGestureProps
+    return !!(onPan || onPanStart || onPanSessionStart || onPanEnd)
+}
+
 let featuresRegistered = false
 
 /**
@@ -438,6 +620,10 @@ export const registerMotionFeatures = (): void => {
         drag: {
             isEnabled: isDragFeatureEnabled,
             Feature: DragGestureFeature as never
+        },
+        pan: {
+            isEnabled: isPanFeatureEnabled,
+            Feature: PanGestureFeature as never
         }
     })
 }

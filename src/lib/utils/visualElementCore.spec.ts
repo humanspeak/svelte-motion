@@ -1,5 +1,6 @@
 import {
     HTMLVisualElement,
+    PanSession,
     SVGVisualElement,
     VisualElementDragControls,
     getFeatureDefinitions,
@@ -14,11 +15,14 @@ import { MotionDomProjectionAdapter } from './motionDomProjection.js'
 import {
     DragGestureFeature,
     ExitAnimationFeature,
+    PanGestureFeature,
     createMotionVisualElement,
     createRenderState,
+    getContextWindow,
     isAnimationFeatureEnabled,
     isDragFeatureEnabled,
     isExitFeatureEnabled,
+    isPanFeatureEnabled,
     makeLatestValues,
     registerMotionFeatures
 } from './visualElementCore.js'
@@ -532,6 +536,165 @@ describe('DragGestureFeature', () => {
         expect(unsubscribe).toHaveBeenCalledOnce()
         expect(removeListeners).toHaveBeenCalledOnce()
         expect(endPanSession).toHaveBeenCalledOnce()
+        visualElementStore.delete(element)
+    })
+})
+
+describe('isPanFeatureEnabled', () => {
+    // Upstream `motion/features/definitions.ts:21` @ v14.5.0: any `onPan*`
+    // callback enables pan, regardless of `drag` (the two gestures co-attach).
+    const noop = () => {}
+    it.each(['onPan', 'onPanStart', 'onPanSessionStart', 'onPanEnd'])(
+        'is enabled by `%s`, with and without `drag`',
+        (key) => {
+            expect(isPanFeatureEnabled({ [key]: noop })).toBe(true)
+            expect(isPanFeatureEnabled({ [key]: noop, drag: 'x' })).toBe(true)
+        }
+    )
+
+    it('is disabled without a pan callback, even with `drag`', () => {
+        expect(isPanFeatureEnabled({})).toBe(false)
+        expect(isPanFeatureEnabled({ drag: true })).toBe(false)
+    })
+
+    it('is registered under `pan`', () => {
+        registerMotionFeatures()
+        expect(getFeatureDefinitions().pan!.Feature).toBe(PanGestureFeature)
+        expect(getFeatureDefinitions().pan!.isEnabled).toBe(isPanFeatureEnabled)
+    })
+})
+
+describe('getContextWindow', () => {
+    it('returns null before mount and the element window after', () => {
+        const element = document.createElement('div')
+        const ve = createMotionVisualElement({ props: {} })
+        expect(getContextWindow(ve as never)).toBeNull()
+        ve.mount(element)
+        expect(getContextWindow(ve as never)).toBe(element.ownerDocument.defaultView)
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+})
+
+describe('PanGestureFeature', () => {
+    // Port of framer-motion `gestures/pan/index.ts` @ v14.5.0.
+    const pointerDown = (element: Element) =>
+        element.dispatchEvent(
+            new PointerEvent('pointerdown', {
+                bubbles: true,
+                isPrimary: true,
+                pointerType: 'mouse',
+                button: 0,
+                clientX: 10,
+                clientY: 10
+            })
+        )
+    const featureOf = (ve: unknown) =>
+        (ve as { features: Record<string, unknown> }).features.pan as PanGestureFeature
+    /** The feature's private live session (upstream keeps it private too). */
+    const sessionOf = (feature: PanGestureFeature) =>
+        (feature as unknown as { session?: PanSession }).session
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('attaches the pointerdown listener on mount and starts a session', () => {
+        const onPanSessionStart = vi.fn()
+        const element = document.createElement('div')
+        const ve = createMotionVisualElement({ props: { onPanSessionStart } })
+        ve.mount(element)
+        ve.updateFeatures()
+        const feature = featureOf(ve)
+
+        expect(feature).toBeInstanceOf(PanGestureFeature)
+        expect(sessionOf(feature)).toBeUndefined()
+        pointerDown(element)
+        expect(sessionOf(feature)).toBeInstanceOf(PanSession)
+
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    it('retries attaching in update() when mounted before the element existed', () => {
+        const element = document.createElement('div')
+        const ve = createMotionVisualElement({ props: { onPan: vi.fn() } })
+        // Feature instantiated and mounted while `node.current` is still null.
+        ve.updateFeatures()
+        const feature = featureOf(ve)
+        expect(feature).toBeInstanceOf(PanGestureFeature)
+
+        ve.mount(element)
+        pointerDown(element)
+        expect(sessionOf(feature)).toBeUndefined()
+
+        ve.updateFeatures()
+        pointerDown(element)
+        expect(sessionOf(feature)).toBeInstanceOf(PanSession)
+
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    it('hot-swaps the live session handlers on update()', () => {
+        const updateHandlers = vi.spyOn(PanSession.prototype, 'updateHandlers')
+        const element = document.createElement('div')
+        const ve = createMotionVisualElement({ props: { onPan: vi.fn() } })
+        ve.mount(element)
+        ve.updateFeatures()
+
+        // No live session yet: nothing to swap.
+        ve.updateFeatures()
+        expect(updateHandlers).not.toHaveBeenCalled()
+
+        pointerDown(element)
+        ve.update({ onPan: vi.fn(), onPanEnd: vi.fn() }, null)
+        ve.updateFeatures()
+        expect(updateHandlers).toHaveBeenCalledOnce()
+        expect(Object.keys(updateHandlers.mock.calls[0][0]).sort()).toEqual([
+            'onEnd',
+            'onMove',
+            'onSessionStart',
+            'onStart'
+        ])
+
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    it('removes the listener and ends the live session on unmount', () => {
+        const end = vi.spyOn(PanSession.prototype, 'end')
+        const element = document.createElement('div')
+        const ve = createMotionVisualElement({ props: { onPan: vi.fn() } })
+        ve.mount(element)
+        ve.updateFeatures()
+        const feature = featureOf(ve)
+        pointerDown(element)
+        expect(sessionOf(feature)).toBeInstanceOf(PanSession)
+
+        ve.unmount()
+        expect(end).toHaveBeenCalledOnce()
+
+        // Listener gone: a later pointerdown starts nothing.
+        const sessionBefore = sessionOf(feature)
+        pointerDown(element)
+        expect(sessionOf(feature)).toBe(sessionBefore)
+        visualElementStore.delete(element)
+    })
+
+    it('delivers onPanSessionStart on the frame loop, not synchronously', async () => {
+        const onPanSessionStart = vi.fn()
+        const element = document.createElement('div')
+        const ve = createMotionVisualElement({ props: { onPanSessionStart } })
+        ve.mount(element)
+        ve.updateFeatures()
+
+        pointerDown(element)
+        expect(onPanSessionStart).not.toHaveBeenCalled()
+        await vi.waitFor(() => expect(onPanSessionStart).toHaveBeenCalledOnce())
+        expect(onPanSessionStart.mock.calls[0][0]).toBeInstanceOf(PointerEvent)
+
+        ve.unmount()
         visualElementStore.delete(element)
     })
 })
