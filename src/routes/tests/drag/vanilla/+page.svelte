@@ -42,7 +42,28 @@
     let handoffMinX = Infinity
     let motionPlusDragOffset = 0
 
-    const settle = (run: () => void) => setTimeout(run, 900)
+    /**
+     * Runs `run` once `el` has come to rest: its box unchanged for 10 frames,
+     * or after 5s. A release past an elastic edge can take over a second to
+     * spring back, so a fixed delay would judge it mid-return.
+     */
+    const settle = (el: HTMLElement, run: () => void) => {
+        const start = performance.now()
+        let last: DOMRect | null = null
+        let still = 0
+        const tick = () => {
+            const rect = el.getBoundingClientRect()
+            const moved =
+                !last ||
+                Math.abs(rect.left - last.left) > 0.1 ||
+                Math.abs(rect.top - last.top) > 0.1
+            still = moved ? 0 : still + 1
+            last = rect
+            if (still >= 10 || performance.now() - start > 5000) run()
+            else requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+    }
 
     onMount(() => {
         isTester = !window.location.search.includes('@isPlaywright=true')
@@ -56,7 +77,7 @@
                     axis: 'x',
                     constraints: { left: 0, right: 200 },
                     onEnd: () =>
-                        settle(() => {
+                        settle(el, () => {
                             const x = readX(el)
                             verdicts.axis = {
                                 ok: x >= -2 && x <= 202,
@@ -95,7 +116,7 @@
                 drag(el, {
                     constraints: bounds,
                     onEnd: () =>
-                        settle(() => {
+                        settle(el, () => {
                             const r = el.getBoundingClientRect()
                             const c = bounds.getBoundingClientRect()
                             const ok =

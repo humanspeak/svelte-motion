@@ -106,3 +106,40 @@ test.describe('drag/vanilla', () => {
         expect(x).toBeLessThan(140)
     })
 })
+
+test.describe('drag/vanilla tester verdicts', () => {
+    // Room to the right of the container for a long overshoot.
+    test.use({ viewport: { width: 1920, height: 1080 } })
+
+    // Elastic drag lets the box past the container edge; after a slow release
+    // it springs back for longer than a fixed timer, so the verdict must wait
+    // for the box to come to rest instead of reading it mid-return.
+    test('container: a slow drag past the edge reads PASS once it springs back', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/vanilla')
+        const el = page.getByTestId('vanilla-container-box')
+        await expect(el).toHaveAttribute('draggable', 'false')
+
+        // Release while still moving outward, ~300px past the edge: the
+        // return takes over a second.
+        await el.scrollIntoViewIfNeeded()
+        const box = await el.boundingBox()
+        if (!box) throw new Error('no bounding box')
+        const cx = box.x + box.width / 2
+        const cy = box.y + box.height / 2
+        await page.mouse.move(cx, cy)
+        await page.mouse.down()
+        // Paced like a hand (one move per frame), so release keeps velocity.
+        for (let i = 1; i <= 45; i += 1) {
+            await page.mouse.move(cx + i * 30, cy)
+            await page.waitForTimeout(16)
+        }
+        await page.mouse.up()
+
+        await expect(page.locator('[data-tester-verdict="container"]')).toHaveText(
+            'PASS · inside',
+            { timeout: 4000 }
+        )
+    })
+})
