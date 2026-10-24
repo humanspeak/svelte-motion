@@ -1,5 +1,6 @@
 <script lang="ts">
     import { animate, drag, motion, type DragInfo } from '$lib'
+    import { visualElementStore } from 'motion-dom'
     import { onMount } from 'svelte'
     import TesterPanel, { type TesterStep } from '../../layout/_parity/TesterPanel.svelte'
 
@@ -13,7 +14,7 @@
      *   (upstream `74578076e`).
      * - `container`: `drag(el, { constraints: containerEl })`.
      * - `motion-plus-drag`: a `motion.div drag="x"` that is also passed to
-     *   `drag()` once it reports `data-is-loaded="ready"` moves once. Upstream's
+     *   `drag()` once its projection node is mounted moves once. Upstream's
      *   `drag()` has no guard; it attaches a second controller, but Motion's
      *   global drag lock and the shared `x` motion value keep a 100px drag at
      *   ~100px, not 200px.
@@ -41,6 +42,7 @@
     let verdicts = $state<Partial<Record<Id, { ok: boolean; detail: string }>>>({})
     let handoffMinX = Infinity
     let motionPlusDragOffset = 0
+    let motionPlusDragStartX = 0
 
     /**
      * Runs `run` once `el` has come to rest: its box unchanged for 10 frames,
@@ -130,12 +132,14 @@
             )
         }
 
-        // Attach once the motion.div reports data-is-loaded="ready", so drag()
-        // reuses the component's mounted projection node (upstream
-        // acquireProjectionNode) instead of creating an imperative one.
+        // Attach once the motion.div's projection node is mounted, so drag()
+        // reuses it instead of creating an imperative one: the same check as
+        // upstream acquireProjectionNode (motion-dom
+        // `layout/LayoutAnimationBuilder.ts:186-196` @ v14.5.0). Unlike
+        // `data-is-loaded`, it works outside `@isPlaywright` too.
         const waitForMotionPlusDrag = setInterval(() => {
             const el = motionPlusDragEl
-            if (!el || el.getAttribute('data-is-loaded') !== 'ready') return
+            if (!el || !visualElementStore.get(el)?.projection?.instance) return
             clearInterval(waitForMotionPlusDrag)
             stops.push(drag(el, { axis: 'x' }))
             motionPlusDragAttached = true
@@ -232,14 +236,15 @@
                     bind:ref={motionPlusDragEl}
                     data-testid="vanilla-motion-plus-drag"
                     style="display:grid;place-items:center;width:60px;height:60px;border-radius:12px;background:#f472b6;color:#0f1115;font-size:12px;font-weight:600;cursor:grab;"
+                    onDragStart={() => (motionPlusDragStartX = readX(motionPlusDragEl))}
                     onDrag={(_event: PointerEvent, info: DragInfo) =>
                         (motionPlusDragOffset = info.offset.x)}
                     onDragEnd={() =>
                         setTimeout(() => {
-                            const x = readX(motionPlusDragEl)
+                            const moved = readX(motionPlusDragEl) - motionPlusDragStartX
                             verdicts['motion-plus-drag'] = {
-                                ok: Math.abs(x - motionPlusDragOffset) < 20,
-                                detail: `moved ${x.toFixed(0)}px for a ${motionPlusDragOffset.toFixed(0)}px drag`
+                                ok: Math.abs(moved - motionPlusDragOffset) < 20,
+                                detail: `moved ${moved.toFixed(0)}px for a ${motionPlusDragOffset.toFixed(0)}px drag`
                             }
                         }, 100)}
                 >
@@ -253,7 +258,7 @@
             >
                 {motionPlusDragAttached
                     ? 'drag() attached alongside the motion.div drag'
-                    : 'waiting for data-is-loaded="ready"…'}
+                    : 'waiting for the projection node to mount…'}
             </p>
             {@render verdict('motion-plus-drag')}
         </section>

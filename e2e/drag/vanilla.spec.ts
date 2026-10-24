@@ -142,4 +142,26 @@ test.describe('drag/vanilla tester verdicts', () => {
             { timeout: 4000 }
         )
     })
+
+    // data-is-loaded only renders under @isPlaywright, so the tester page must
+    // wait on Motion's own readiness signal to attach drag() at all.
+    test('motion-plus-drag: drag() attaches for testers, and repeat drags read PASS', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/vanilla')
+        const el = page.getByTestId('vanilla-motion-plus-drag')
+        await expect(page.getByTestId('vanilla-motion-plus-drag-status')).toHaveAttribute(
+            'data-attached',
+            'true'
+        )
+        const chip = page.locator('[data-tester-verdict="motion-plus-drag"]')
+
+        await dragBy(page, el, 40, 0)
+        await expect(chip).toContainText('for a 40px drag')
+        await expect(chip).toHaveText(/^PASS/)
+        // The second verdict judges this drag only, not the running total.
+        await dragBy(page, el, 50, 0)
+        await expect(chip).toContainText('for a 50px drag')
+        await expect(chip).toHaveText(/^PASS/)
+    })
 })
