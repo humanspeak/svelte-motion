@@ -103,4 +103,68 @@ test.describe('scope-motion/basic', () => {
         await expect(page.getByTestId('state')).toHaveText('active')
         await settled(page)
     })
+
+    test('after stop, refresh and cancel start from the frozen position (upstream)', async ({
+        page
+    }) => {
+        // motion-dom `scope/index.ts:184-191` @ v14.5.0: stop() keeps the
+        // styles and forgets the snapshot, so nothing can restore 0 later.
+        await page.getByTestId('refresh').click()
+        await expect
+            .poll(() => readTranslateX(page, ITEM), { timeout: 2000, intervals: [10] })
+            .toBeGreaterThan(5)
+        await page.getByTestId('stop').click()
+        const frozen = await readTranslateX(page, ITEM)
+        expect(frozen).toBeLessThan(99.5)
+
+        const sampling = sampleTransformSeries(page, [ITEM], 700)
+        await page.getByTestId('refresh').click()
+        const samples = await sampling
+        expect(Math.min(...samples.map((sample) => sample.tx))).toBeGreaterThan(frozen - 0.5)
+        await settled(page)
+
+        await page.getByTestId('cancel').click()
+        await expect(page.getByTestId('state')).toHaveText('cancelled')
+        expect(await readTranslateX(page, ITEM)).toBeCloseTo(frozen, 0)
+    })
+})
+
+test.describe('scope-motion/basic tester guide', () => {
+    const verdict = (page: Page) => page.locator('[data-tester-verdict="transition"]')
+
+    test.beforeEach(async ({ page }) => {
+        await page.goto('/tests/scope-motion/basic')
+        await expect(page.getByTestId('state')).toHaveText('active')
+        await settled(page)
+    })
+
+    test('walks Cancel before Stop, since Stop forgets the start position', async ({ page }) => {
+        const steps = page.locator('.tester-panel ol > li')
+        const texts = await steps.allInnerTexts()
+        const cancelAt = texts.findIndex((text) => text.includes('Press "Cancel"'))
+        const stopAt = texts.findIndex((text) => text.includes('"Stop"'))
+        expect(cancelAt).toBeGreaterThan(-1)
+        expect(stopAt).toBeGreaterThan(cancelAt)
+        expect(texts[stopAt]).toContain('frozen')
+    })
+
+    test('the meter reads a glide that starts from a stopped position as linear', async ({
+        page
+    }) => {
+        await page.getByTestId('refresh').click()
+        await page.waitForTimeout(200)
+        await page.getByTestId('stop').click()
+        await expect(page.getByTestId('state')).toHaveText('stopped')
+
+        await page.getByTestId('refresh').click()
+        await expect(verdict(page)).toHaveText(/^LINEAR · from \d+px/, { timeout: 2000 })
+    })
+
+    test('the meter reports no glide when Stop landed at the target', async ({ page }) => {
+        await page.getByTestId('stop').click()
+        await expect(page.getByTestId('state')).toHaveText('stopped')
+
+        await page.getByTestId('refresh').click()
+        await expect(verdict(page)).toContainText('ALREADY AT 100', { timeout: 2000 })
+    })
 })

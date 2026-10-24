@@ -16,6 +16,9 @@
      *   They are collected by the scope, so after `cancel` they stop firing.
      * - `stop` freezes everything where it is; `cancel` also restores the
      *   `li`s' inline style (no transform); `refresh` cancels and re-runs setup.
+     * - Upstream `stop()` keeps the styles AND forgets the snapshot
+     *   (motion-dom `scope/index.ts:184-191` @ v14.5.0), so after a Stop,
+     *   Cancel and Refresh start from the frozen spot until the page reloads.
      *
      * The `data-testid`s are what `e2e/scope-motion/basic.spec.ts` drives;
      * keep them stable.
@@ -59,7 +62,9 @@
     }
 
     // ---- Transition meter (tester only; never under `@isPlaywright=true`) ----
-    type Verdict = { mid: number; max: number; ok: boolean }
+    type Verdict =
+        | { kind: 'glide'; from: number; progress: number; max: number; ok: boolean }
+        | { kind: 'at-target'; from: number }
     let isTester = $state(false)
     let verdict = $state<Verdict | null>(null)
 
@@ -76,8 +81,10 @@
 
     /**
      * Samples the first item for 700ms after a refresh. A linear 0.4s tween
-     * sits near 50px at 200ms and never passes 100px; the default spring
-     * would already be at (or past) 100px by then.
+     * is about half-way to 100px at 200ms and never passes it; the default
+     * spring would already be at (or past) 100px by then. Progress is
+     * measured from wherever the glide starts, which after a Stop is the
+     * frozen spot rather than 0.
      */
     const watch = () => {
         if (!isTester) return
@@ -90,16 +97,25 @@
                 requestAnimationFrame(sample)
                 return
             }
-            const moving = samples.find((s) => s.x > 0.5)
+            const from = samples[0].x
+            const span = 100 - from
+            if (span < 1) {
+                verdict = { kind: 'at-target', from: Math.round(from) }
+                return
+            }
+            const moving = samples.find((s) => s.x > from + 0.5)
             const t0 = moving?.t ?? 0
             const near = samples.reduce((best, s) =>
                 Math.abs(s.t - t0 - 200) < Math.abs(best.t - t0 - 200) ? s : best
             )
+            const progress = (near.x - from) / span
             const max = Math.max(...samples.map((s) => s.x))
             verdict = {
-                mid: Math.round(near.x),
+                kind: 'glide',
+                from: Math.round(from),
+                progress: Math.round(progress * 100),
                 max: Math.round(max * 10) / 10,
-                ok: near.x > 30 && near.x < 70 && max <= 101
+                ok: progress > 0.3 && progress < 0.7 && max <= 101
             }
         }
         requestAnimationFrame(sample)
@@ -114,7 +130,7 @@
         {
             text: 'Press "Refresh".',
             expected:
-                'The items jump back and glide again. The chip reads LINEAR with about 50px at 200ms and a max of 100.',
+                'The items jump back and glide again. The chip reads LINEAR from 0px, about 50% of the way at 200ms, with a max of 100.',
             action: { label: 'Refresh', run: refresh }
         },
         {
@@ -123,15 +139,22 @@
                 'It shows a "hovered" tag while the pointer is over it and a "pressed" tag once pressed.'
         },
         {
-            text: 'Press "Refresh", then quickly press "Stop".',
-            expected: 'The items freeze part-way. State reads "stopped".',
-            action: { label: 'Refresh + Stop', run: () => (refresh(), setTimeout(stop, 200)) }
-        },
-        {
             text: 'Press "Cancel", then hover and press the items again.',
             expected:
                 'The items snap back to the start (their inline style is restored). State reads "cancelled". Hover and press no longer add tags.',
             action: { label: 'Cancel', run: cancel }
+        },
+        {
+            text: 'Press "Refresh", then quickly press "Stop".',
+            expected:
+                'The items glide again and freeze part-way. State reads "stopped". The frozen spot is now their start: Stop keeps the styles and forgets where they began (upstream Motion).',
+            action: { label: 'Refresh + Stop', run: () => (refresh(), setTimeout(stop, 200)) }
+        },
+        {
+            text: 'Press "Refresh" again.',
+            expected:
+                'The glide starts from where the items froze, not from 0, and the chip reads LINEAR from that spot. "Cancel" would leave them there too. Use "Reset page" to start over.',
+            action: { label: 'Refresh', run: refresh }
         }
     ]
 </script>
@@ -175,9 +198,16 @@
             state: <span data-testid="state">{scopeState}</span> · setup runs:
             <span data-testid="runs">{runs}</span>
             {#if isTester && verdict}
-                <span class="verdict" class:ok={verdict.ok} data-tester-verdict="transition">
-                    {verdict.ok ? 'LINEAR' : 'NOT LINEAR'} · {verdict.mid}px at 200ms · max {verdict.max}
-                </span>
+                {#if verdict.kind === 'at-target'}
+                    <span class="verdict ok" data-tester-verdict="transition">
+                        ALREADY AT 100 · Stop froze it at the end, so there is nothing to glide
+                    </span>
+                {:else}
+                    <span class="verdict" class:ok={verdict.ok} data-tester-verdict="transition">
+                        {verdict.ok ? 'LINEAR' : 'NOT LINEAR'} · from {verdict.from}px · {verdict.progress}%
+                        at 200ms · max {verdict.max}
+                    </span>
+                {/if}
             {/if}
         </p>
     </section>
@@ -186,7 +216,7 @@
 <TesterPanel
     eyebrow="useScopeMotion (Motion 14.5)"
     title="Default transition, gestures, stop / cancel / refresh"
-    status="Expected to pass on this build: linear glide, tags while hovering/pressing, and no tags after Cancel."
+    status="Expected to pass on this build: linear glide, tags while hovering/pressing, no tags after Cancel, and after a Stop the next glide starts from the frozen spot."
     {steps}
 >
     {#snippet checks()}
