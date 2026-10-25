@@ -1,13 +1,12 @@
 <script lang="ts">
     /**
-     * Regression for `controls.stop()` / `controls.cancel()` not actually
-     * stopping the in-flight inertia animation after a release.
+     * `controls.stop()` after release, matching Motion.
      *
-     * Setup: a small draggable card with constraints. Drag past the
-     * boundary so elastic engages, release with momentum, then click the
-     * Stop button mid-spring. The card should freeze at whatever position
-     * it had when stop() was called — not finish its snap-back to the
-     * constraint edge.
+     * Setup: a small draggable card with constraints. Drag past the boundary
+     * so elastic engages, release, then click the Stop button mid-spring.
+     * Motion's `DragControls.stop()` is a no-op when no drag is live
+     * (`VisualElementDragControls.stop()` returns early), so the card keeps
+     * springing back and settles at the constraint edge.
      */
     import { motion, createDragControls } from '$lib'
     import { onMount } from 'svelte'
@@ -21,7 +20,7 @@
     const controls = createDragControls()
     const stop = () => {
         controls.stop()
-        status = `stopped at ${Math.round(x)}px`
+        status = `stop() called at ${Math.round(x)}px`
     }
     const dragTransition = $derived(
         data.slow

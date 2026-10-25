@@ -16,7 +16,18 @@ const readTranslate = (page: Page, testId: string) =>
         return { x: matrix.m41, y: matrix.m42, scale: Math.hypot(matrix.a, matrix.b) }
     }, testId)
 
-const expectAuthoredCardFixture = async (card: Locator) => {
+/**
+ * Fixture check: the card's authored size, plus the drag defaults upstream
+ * writes inline. Motion 14.5 `useHTMLProps` (framer-motion
+ * `render/html/use-props.ts:58-73` @ v14.5.0) sets `user-select: none` and
+ * `touch-action` from the drag axis (`true` → `none`, `"x"` → `pan-y`,
+ * `"y"` → `pan-x`) after the user's style, so they beat the page's class CSS
+ * (`touch-action: none` on every card).
+ */
+const expectAuthoredCardFixture = async (
+    card: Locator,
+    touchAction: 'none' | 'pan-x' | 'pan-y'
+) => {
     const actual = await card.evaluate((element) => {
         const { width, height } = element.getBoundingClientRect()
         const style = getComputedStyle(element)
@@ -32,7 +43,7 @@ const expectAuthoredCardFixture = async (card: Locator) => {
         width: 118,
         height: 84,
         userSelect: 'none',
-        touchAction: 'none'
+        touchAction
     })
 }
 
@@ -41,7 +52,8 @@ test.describe('drag/axis-handoff', () => {
         await page.goto(URL)
         const card = page.getByTestId('foreign-x-card')
         await card.waitFor({ state: 'visible' })
-        await expectAuthoredCardFixture(card)
+        // drag="x" → inline `touch-action: pan-y` (use-props.ts:69-72 @ v14.5.0).
+        await expectAuthoredCardFixture(card, 'pan-y')
 
         // Start a 6s linear animation to x: 520, then grab it mid-flight.
         await page.getByTestId('start-foreign').click()
@@ -88,7 +100,8 @@ test.describe('drag/axis-handoff', () => {
         await page.goto(URL)
         const card = page.getByTestId('whiledrag-axis-card')
         await card.waitFor({ state: 'visible' })
-        await expectAuthoredCardFixture(card)
+        // drag={true} → inline `touch-action: none` (use-props.ts:69-72 @ v14.5.0).
+        await expectAuthoredCardFixture(card, 'none')
 
         const box = await card.boundingBox()
         if (!box) throw new Error('no bbox')
@@ -148,7 +161,8 @@ test.describe('drag/axis-handoff', () => {
         const card = page.getByTestId('foreign-retarget-card')
         await card.waitFor({ state: 'visible' })
         await card.scrollIntoViewIfNeeded()
-        await expectAuthoredCardFixture(card)
+        // drag="x" → inline `touch-action: pan-y` (use-props.ts:69-72 @ v14.5.0).
+        await expectAuthoredCardFixture(card, 'pan-y')
 
         const box = await card.boundingBox()
         if (!box) throw new Error('no bbox')
@@ -166,12 +180,11 @@ test.describe('drag/axis-handoff', () => {
         const gliding = await readTranslate(page, 'foreign-retarget-card')
         await page.getByTestId('retarget').click()
 
-        // The release's cleanup only ran from natural completion or our own
-        // `stopInertia`, so a foreign takeover left `stopInertia` armed and
-        // pointing at the dead release. Cancelling the (already finished) drag
-        // then runs that stale closure — `value.stop()` on an axis the gesture no
-        // longer owns — freezing whoever took it over. THIS is the observable
-        // "cleanup did not run".
+        // Cancelling the (already finished) drag must not touch the axis the
+        // retarget now owns. Motion 14.5's `cancel()` only ends the pan session,
+        // releases the drag lock and clears `whileDrag`; it never stops an axis
+        // animation (VisualElementDragControls.ts:307-327 @ v14.5.0), so the
+        // retarget keeps running.
         await page.waitForTimeout(150)
         const beforeCancel = await readTranslate(page, 'foreign-retarget-card')
         await page.getByTestId('cancel-inertia').click()
@@ -219,7 +232,11 @@ test.describe('drag/axis-handoff', () => {
         let dragged = beforeSecondDrag
         try {
             await page.mouse.move(secondDragPoint.x - 60, secondDragPoint.y, { steps: 6 })
-            await expect(card).toHaveAttribute('data-svelte-motion-drag-active', 'true')
+            // Drag-start signal: the fixture mirrors `onDragStart`/`onDragEnd` into
+            // `data-dragging` (Motion has no drag-active DOM marker;
+            // `VisualElementDragControls.start` fires `onDragStart` from
+            // `frame.update`, VisualElementDragControls.ts:191-193 @ v14.5.0).
+            await expect(card).toHaveAttribute('data-dragging', 'true')
             await expect
                 .poll(
                     async () => {

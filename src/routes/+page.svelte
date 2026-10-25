@@ -117,6 +117,22 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/arc/use-animate') + searchParams}
+                    >
+                        arc() — via useAnimate() on a plain element (Motion 14.5)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/layout-enabled-after-mount') + searchParams}
+                    >
+                        layout enabled after mount (Motion 14.5)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/transform-template/stop') + searchParams}
                     >
                         transformTemplate — controls.stop() freeze (#402)
@@ -213,17 +229,17 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/motion/pan-authored-transforms') + searchParams}
+                        href={resolve('/tests/transform-page-point/pan') + searchParams}
                     >
-                        Pan: whilePan over authored transforms
+                        MotionConfig transformPagePoint — pan
                     </a>
                 </li>
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
-                        href={resolve('/tests/transform-page-point/pan') + searchParams}
+                        href={resolve('/tests/motion/pan-window-scroll') + searchParams}
                     >
-                        MotionConfig transformPagePoint — pan
+                        Pan: window scroll during a held pan
                     </a>
                 </li>
                 <li>
@@ -399,6 +415,27 @@
                         href={resolve('/tests/animate-layout/shared') + searchParams}
                     >
                         animateLayout Shared Underline (data-layout-id handoff)
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div>
+            <h2 class="mb-3 text-xl font-medium">scopeMotion (Motion 14.5)</h2>
+            <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/scope-motion/basic') + searchParams}
+                    >
+                        useScopeMotion Basic (default transition, gestures, stop / cancel / refresh)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/scope-motion/media') + searchParams}
+                    >
+                        useScopeMotion Media (matchMedia breakpoints refresh the scope)
                     </a>
                 </li>
             </ul>
@@ -703,6 +740,30 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/vanilla') + searchParams}
+                    >
+                        Drag: vanilla drag() on plain elements (+ motion.* moves once)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/window-scroll-hold') + searchParams}
+                    >
+                        Drag: window scroll during a held drag
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/css-variable-origin') + searchParams}
+                    >
+                        Drag: start from a var() / % motion value
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/mobile-drawer') + searchParams}
                     >
                         Drag Close Drawer (mobile drawer)
@@ -783,6 +844,14 @@
                         href={resolve('/tests/animate-presence/owned-child') + searchParams}
                     >
                         Clone vs owned child (real-node exit)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/owned-pop-layout') + searchParams}
+                    >
+                        popLayout with an owned child (siblings reflow immediately)
                     </a>
                 </li>
                 <li>

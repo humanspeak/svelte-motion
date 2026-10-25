@@ -14,13 +14,7 @@
     import type {
         MotionProps,
         AnimationControlsDefinition,
-        AnimationControlsSubscriber,
-        DragAxis,
-        DragInfo,
-        MotionOnPan,
-        MotionOnPanEnd,
-        MotionOnPanSessionStart,
-        MotionOnPanStart
+        AnimationControlsSubscriber
     } from '$lib/types'
     import { isNotEmpty } from '$lib/utils/objects'
     import { sleep } from '$lib/utils/testing'
@@ -29,11 +23,11 @@
         animateTarget,
         calcBoxDelta,
         createDelta,
+        elementDragControls,
         frameData,
         frameSteps,
         time,
         isDeltaZero,
-        isMotionValue,
         styleEffect,
         animateVisualElement,
         isControllingVariants,
@@ -45,15 +39,14 @@
         type AnyResolvedKeyframe,
         type MotionNodeOptions,
         type PresenceContextProps,
-        type MotionValue,
         type TargetAndTransition,
         type Transition
     } from 'motion-dom'
     import { isPlaywrightEnv, pwLog } from '$lib/utils/log'
     import { onDestroy, untrack, type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants'
-    // `animateWithLifecycle` is gone from this file with whilePan's swap onto
-    // `animateTarget` — the container no longer animates an ELEMENT anywhere.
+    // The container never animates an ELEMENT directly: every writer goes
+    // through the VisualElement (`animationState` or `animateTarget`).
     import { mergeTransitions } from '$lib/utils/animation'
     import { isAnimationControls } from '$lib/utils/animationControls.svelte'
     import {
@@ -92,8 +85,6 @@
         setPresenceDepth
     } from '$lib/utils/presence'
     import { getInitialKeyframes } from '$lib/utils/initial'
-    import { attachDrag, type AttachDragCleanup, type AttachDragOptions } from '$lib/utils/drag'
-    import { attachPan, type AttachPanCleanup } from '$lib/utils/pan'
     import { boxFromRect, MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
     import {
         getMotionDomProjectionParent,
@@ -103,7 +94,6 @@
         getVisualElementParent,
         setVisualElementParent
     } from '$lib/components/visualElementTree.context'
-    import { resolveBaseTarget } from '$lib/utils/baseTarget'
     import { createMotionVisualElement, makeLatestValues } from '$lib/utils/visualElementCore'
     import {
         resolveInitial,
@@ -189,7 +179,6 @@
         whileInView: whileInViewProp,
         viewport: viewportProp,
         whileDrag: whileDragProp,
-        whilePan: whilePanProp,
         onPanSessionStart: onPanSessionStartProp,
         onPanStart: onPanStartProp,
         onPan: onPanProp,
@@ -320,17 +309,6 @@
     // projection adapter measures, which would be mistaken for the
     // user's base.
     const userBaseTransform = $derived(extractTransform(styleProp))
-    const getStyleTransformValues = () => {
-        if (!styleProp || typeof styleProp !== 'object' || Array.isArray(styleProp)) return {}
-
-        const values: Record<string, string | number> = {}
-        for (const [key, source] of Object.entries(styleProp)) {
-            if (!transformProps.has(key)) continue
-            const value = isMotionValue(source) ? source.get() : source
-            if (typeof value === 'string' || typeof value === 'number') values[key] = value
-        }
-        return values
-    }
     // Every gesture writer that used to live here is gone. Hover/tap/focus/inView
     // flip `setActive` (plan 003) and drag writes the node's axis values
     // (drag-single-writer 001), so `latestValues` is the single source for every
@@ -598,6 +576,39 @@
             onDragStart: onDragStartProp,
             onDrag: onDragProp,
             onDragEnd: onDragEndProp,
+            // The callbacks motion-dom's `PanSession` reports through (via the
+            // `pan` feature, `PanGestureFeature`). Their presence enables the
+            // feature, as upstream's `definitions.ts` does, alongside `drag`
+            // when both are set. Gated on the LazyMotion gesture bundle.
+            ...(hasGestureFeatures
+                ? {
+                      onPanSessionStart: onPanSessionStartProp,
+                      onPanStart: onPanStartProp,
+                      onPan: onPanProp,
+                      onPanEnd: onPanEndProp
+                  }
+                : {}),
+            // The props motion-dom's `VisualElementDragControls` reads (via the
+            // `drag` feature, `DragGestureFeature`). Gated on the LazyMotion drag
+            // bundle: `domAnimation`/`domMin` users get no drag.
+            ...(hasDragFeatures
+                ? {
+                      drag: dragProp,
+                      // svelte-motion and upstream accept the same shapes: a
+                      // bounding box, an Element, or a `{ current }` ref.
+                      dragConstraints: dragConstraintsProp ?? undefined,
+                      dragElastic: dragElasticProp,
+                      dragMomentum: dragMomentumProp,
+                      dragTransition: dragTransitionProp,
+                      dragDirectionLock: dragDirectionLockProp,
+                      dragPropagation: dragPropagationProp,
+                      dragSnapToOrigin: dragSnapToOriginProp,
+                      dragListener: dragListenerProp,
+                      dragControls: dragControlsProp,
+                      onDirectionLock: onDirectionLockProp,
+                      onDragTransitionEnd: onDragTransitionEndProp
+                  }
+                : {}),
             // `buildHTMLStyles(state, latestValues, transformTemplate)` reads the
             // template off the props, so the VE composes templated transforms
             // natively — the job `applyMotionStyleEffect` used to do.
@@ -1150,6 +1161,14 @@
         setVisualElementParent(visualElement)
     }
 
+    /**
+     * Whether this element's drag gesture is live. Reads the `drag` feature's
+     * `VisualElementDragControls` (registered in motion-dom's
+     * `elementDragControls` map when it attaches its listeners).
+     */
+    const isDragActive = (): boolean =>
+        !!(visualElement && elementDragControls.get(visualElement)?.isDragging)
+
     const motionDomProjectionParent =
         typeof window !== 'undefined' ? getMotionDomProjectionParent() : null
     const motionDomProjection =
@@ -1209,13 +1228,12 @@
     // variant keys. Mirrors framer-motion's `whileHover` etc. surface
     // (#349).
     const resolvedWhileTap = $derived(resolveWhile(whileTapProp, variantsProp, effectiveCustom))
-    const resolvedWhileDrag = $derived(resolveWhile(whileDragProp, variantsProp, effectiveCustom))
-    const resolvedWhilePan = $derived(resolveWhile(whilePanProp, variantsProp, effectiveCustom))
     // `resolvedWhileHover` / `resolvedWhileFocus` / `resolvedWhileInView` are
     // gone with plan 003: the animationState resolves variant LABELS against
-    // `variants` itself, so pre-resolving them here was redundant. `whileTap`,
-    // `whileDrag` and `whilePan` keep theirs — tap's `tabindex` affordance reads
-    // it, and drag/pan still animate their own targets until plan 005.
+    // `variants` itself, so pre-resolving them here was redundant. `whileTap`
+    // keeps its own because tap's `tabindex` affordance reads it. `whileDrag`
+    // goes through the animationState (`VisualElementDragControls` sets it
+    // active).
 
     // Extract keyframes from resolved initial, handling initial={false}
     const initialKeyframes = $derived(
@@ -1389,8 +1407,26 @@
     //   2. the `pathLength` mounting `visibility:hidden` hold.
     // (A third hold, drag's `liveGestureTransform` splice, is gone with the
     // single-writer swap — the VisualElement composes the live drag transform.)
+    // Upstream `use-visual-element.ts` projection option
+    // (`alwaysMeasureLayout: Boolean(drag) || isRefObject(dragConstraints)`).
+    const upstreamAlwaysMeasureLayout = $derived(
+        hasDragFeatures
+            ? Boolean(dragProp) ||
+                  (!!dragConstraintsProp &&
+                      typeof dragConstraintsProp === 'object' &&
+                      'current' in dragConstraintsProp)
+            : undefined
+    )
+    // Upstream's default drag styles (framer-motion `render/html/use-props.ts:58-73`
+    // @ v14.5.0). Upstream assigns them AFTER copying the user's `style`, so they
+    // win over it (and, being inline, over class CSS too). Appended to match.
+    const upstreamDragDefaultStyle = $derived(
+        hasDragFeatures && dragProp && dragListenerProp !== false
+            ? `user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:${dragProp === true ? 'none' : `pan-${dragProp === 'x' ? 'y' : 'x'}`}`
+            : ''
+    )
     const inlineStyleBaseWithHolds = $derived(
-        `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleProp};visibility:hidden` : serializedStyleProp}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`
+        `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleProp};visibility:hidden` : serializedStyleProp}${upstreamDragDefaultStyle ? `;${upstreamDragDefaultStyle}` : ''}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`
     )
 
     /**
@@ -1421,9 +1457,14 @@
         // for accelerated channels: `bindToMotionValue` builds a NativeAnimation
         // and returns early for them (`VisualElement.mjs:262-281`). So after a
         // WAAPI-accelerated animation is interrupted, `MotionValue.stop()` writes
-        // the sampled freeze value onto the MotionValue
-        // (`NativeAnimationExtended.updateMotionValue`) while `latestValues` still
-        // holds the from-state. Reading the MotionValues here keeps the
+        // the sampled freeze value onto the MotionValue while `latestValues`
+        // still holds the from-state. Two paths do that write: opacity-style
+        // accelerated values go through `NativeAnimationExtended.updateMotionValue`,
+        // and grouped independent transforms (Motion 14.2+) go through
+        // motion-dom's `TransformAnimation`, whose `stop()` syncs the MotionValue
+        // and, from 14.3.1, commits the inline transform synchronously when the
+        // group's last animation is released
+        // (`animation/waapi/transforms/TransformAnimation.ts`). Reading the MotionValues here keeps the
         // declarative rewrite consistent with the real store, so a benign
         // reactive change cannot snap a frozen channel back (measured: an
         // interrupted controls start froze translateX at 15.936px, then an
@@ -1531,6 +1572,9 @@
             undefined) === undefined
             ? { tabindex: 0 }
             : {}),
+        ...(upstreamDragDefaultStyle && (rest as Record<string, unknown>)?.draggable === undefined
+            ? { draggable: 'false' }
+            : {}),
         ...(isPlaywright
             ? {
                   'data-playwright': isPlaywright,
@@ -1560,293 +1604,6 @@
         })(),
         style: renderedInlineStyle,
         class: classProp
-    })
-
-    // Drag wiring
-    //
-    // We attach drag only when the element is in the 'ready' state to avoid fighting
-    // with enter animations or initial keyframe application.
-    //
-    // Debug tips:
-    // - If drags "do nothing", verify that `drag` prop is truthy and that CSS isn't
-    //   overwriting transforms (check computed style for `transform`).
-    // - If second drags "jump", ensure `attachDrag` syncs the internal `applied` origin
-    //   after any non-zero duration settle animation.
-    let teardownDrag: AttachDragCleanup | null = null
-
-    const resolveDragOptions = (): AttachDragOptions => {
-        const currentDragProp = dragProp
-        const axis: DragAxis =
-            currentDragProp === true || currentDragProp === 'x' || currentDragProp === 'y'
-                ? currentDragProp
-                : !!currentDragProp
-        const styleValues = collectMotionStyleValues(styleProp)
-        const boundMotionValues: { x?: MotionValue<number>; y?: MotionValue<number> } = {}
-        if (styleValues?.x) boundMotionValues.x = styleValues.x as MotionValue<number>
-        if (styleValues?.y) boundMotionValues.y = styleValues.y as MotionValue<number>
-
-        return {
-            axis,
-            constraints: dragConstraintsProp,
-            elastic: dragElasticProp,
-            momentum: dragMomentumProp,
-            transition: dragTransitionProp,
-            directionLock: !!dragDirectionLockProp,
-            listener: dragListenerProp !== false,
-            controls: dragControlsProp,
-            whileDrag: resolvedWhileDrag,
-            mergedTransition: mergedTransition ?? {},
-            callbacks: {
-                onStart: onDragStartProp as (e: PointerEvent, info: DragInfo) => void,
-                onMove: onDragProp as (e: PointerEvent, info: DragInfo) => void,
-                onEnd: onDragEndProp as (e: PointerEvent, info: DragInfo) => void,
-                onDirectionLock: onDirectionLockProp as (axis: 'x' | 'y') => void,
-                onTransitionEnd: () => onDragTransitionEndProp?.()
-            },
-            baselineSources: {
-                initial: initialKeyframes ?? {},
-                animate: (resolvedAnimate ?? {}) as Record<string, unknown>
-            },
-            getBaseTransformValues: getStyleTransformValues,
-            getBaseTransform: () => userBaseTransform,
-            transformTemplate: transformTemplateProp,
-            transformPagePoint: effectiveTransformPagePoint,
-            propagation: !!dragPropagationProp,
-            snapToOrigin: dragSnapToOriginProp,
-            boundMotionValues:
-                boundMotionValues.x || boundMotionValues.y ? boundMotionValues : undefined
-        }
-    }
-
-    $effect(() => {
-        if (!(element && isLoaded === 'ready' && hasDragFeatures)) return
-        const dragTarget = element
-        const currentDragProp = untrack(() => dragProp)
-        // Only attach if drag enabled
-        if (!currentDragProp) return
-        // Clean up previous
-        teardownDrag?.()
-
-        // If constraints are provided via an element ref but it's not yet bound (null),
-        // defer attaching drag until the ref exists to avoid an unconstrained first drag.
-        if (untrack(() => dragConstraintsProp) === null) return
-
-        const opts = untrack(resolveDragOptions)
-        const controls = opts.controls
-
-        // MotionValue.get() is Svelte-reactive. Keep attach-time measurement reads
-        // out of this lifetime effect so drag writes cannot tear down the live session.
-        teardownDrag = untrack(() => attachDrag(dragTarget, opts))
-
-        // If controls passed, subscribe element
-        if (controls && controls.subscribe) {
-            try {
-                controls.subscribe(element)
-            } catch {
-                // ignore
-            }
-        }
-
-        return () => {
-            teardownDrag?.()
-            teardownDrag = null
-        }
-    })
-
-    // Axis detection and consumer prop updates can happen while the pointer is
-    // still pressed. Update the live session in place: tearing down here removes
-    // its window listeners, and a replacement session cannot resume without a
-    // second pointerdown.
-    $effect(() => {
-        const nextOptions = resolveDragOptions()
-        // Track option inputs, but not imperative reads of the live drag state.
-        if (nextOptions.axis) untrack(() => teardownDrag?.updateOptions(nextOptions))
-    })
-
-    /**
-     * Pan-gesture wiring. Active whenever any of `onPanSessionStart`,
-     * `onPanStart`, `onPan`, `onPanEnd`, or `whilePan` is set. Unlike
-     * `drag`, Pan has no constraints / momentum / origin-snap — it's a
-     * pure pointer offset+velocity reporter, useful for swipe-to-dismiss
-     * sheets, custom carousels, and any "tell me what the gesture is
-     * doing right now" interaction. Mirrors framer-motion's `PanGesture`
-     * (packages/framer-motion/src/gestures/pan/index.ts).
-     *
-     * Split into TWO effects:
-     *
-     * 1. `attach` — keyed on `element`, `isLoaded === 'ready'`, presence
-     *    of any pan handler/whilePan, and absence of `drag` (drag takes
-     *    precedence — upstream framer-motion routes drag THROUGH the pan
-     *    gesture internally, so co-attaching pan when drag is on would
-     *    fight transforms). Creates / tears down the underlying
-     *    `attachPan` lifetime once per element-bound interval.
-     *
-     * 2. `swap` — keyed on the user's handler/whilePan props. Calls
-     *    `teardownPan.update(next)` to hot-swap the live handler set
-     *    without destroying the in-flight `PanSession`. Without this
-     *    split, every parent re-render that produces a fresh inline
-     *    arrow handler would tear down the live gesture mid-pan —
-     *    pointer listeners removed, no `onPanEnd` ever fires, whilePan
-     *    keyframes leak.
-     */
-    let teardownPan: AttachPanCleanup | null = null
-    /**
-     * The pre-pan target for every key `whilePan` took over, captured at
-     * pan-start and replayed at pan-end.
-     *
-     * `whilePan` is a svelte-motion EXTENSION: upstream has `onPan*` callbacks
-     * but no pan variant type, so `variantPriorityOrder` has no slot for it and
-     * it cannot ride `animationState.setActive` without forking motion-dom's
-     * fixed type list. It therefore animates the node's MotionValues directly via
-     * `animateTarget` — single-writer compliant and velocity-continuous — with
-     * the restore driven by the node's OWN base target
-     * (`resolveBaseTarget`/`readValue`), which is what the animationState would use
-     * for a removed key. Consequence of being outside the resolver: priority
-     * against whileHover/whileTap is by construction (pan owns the pointer
-     * session), not resolver-enforced. If upstream ever adds a pan type, this
-     * becomes a `setActive` call and this map goes away.
-     */
-    let whilePanRestore: Record<string, unknown> | null = null
-
-    /** Restore the local whilePan extension without emitting a public pan lifecycle event. */
-    const restoreWhilePan = () => {
-        if (whilePanRestore && visualElement) {
-            animateTarget(visualElement, whilePanRestore as TargetAndTransition, {
-                transitionOverride: mergedTransition as Transition | undefined
-            })
-        }
-        whilePanRestore = null
-    }
-
-    /**
-     * Boolean presence-check for "is any pan surface active?". Derived
-     * so the attach effect below tracks the *boolean value*, not the
-     * individual handler/whilePan reference identities. A consumer
-     * passing `onPan={(e, i) => ...}` (inline arrow — fresh ref every
-     * render) used to re-trigger the attach effect on every parent
-     * render; with this derived in place, the attach effect only
-     * re-runs when overall presence flips (none → some, some → none).
-     * Per-ref changes flow through the hot-swap effect instead.
-     */
-    const hasAnyPanHandler = $derived(
-        !!onPanProp ||
-            !!onPanStartProp ||
-            !!onPanEndProp ||
-            !!onPanSessionStartProp ||
-            !!resolvedWhilePan
-    )
-
-    const buildPanHandlers = (): {
-        onSessionStart?: MotionOnPanSessionStart
-        onStart: NonNullable<MotionOnPanStart>
-        onMove?: MotionOnPan
-        onEnd: NonNullable<MotionOnPanEnd>
-    } => ({
-        onSessionStart: onPanSessionStartProp,
-        onStart: (event, info) => {
-            if (resolvedWhilePan && visualElement) {
-                const definition = resolvedWhilePan as Record<string, unknown>
-                // Capture what each key reverts to BEFORE animating, from the
-                // node itself: `resolveBaseTarget` is the same source the
-                // animationState uses when a key drops out of a target
-                // (props.initial → props.style → the value read at creation).
-                // `readValue` is the fallback for a key whilePan INTRODUCES —
-                // motion-dom's own instance reader, which hydrates `baseTarget`
-                // as a side effect. Deliberately NOT a computed-style snapshot:
-                // that reads whatever is on screen, including an in-flight
-                // animation's mid-frame value.
-                const restore: Record<string, unknown> = {}
-                for (const key of Object.keys(definition)) {
-                    if (key === 'transition') continue
-                    const base = resolveBaseTarget(visualElement, key)
-                    restore[key] =
-                        base ?? visualElement.readValue(key, definition[key] as AnyResolvedKeyframe)
-                }
-                whilePanRestore = restore
-                // `animateTarget` destructures `transition` out of the definition
-                // itself, so the nested-transition form needs no pre-split.
-                animateTarget(visualElement, definition as TargetAndTransition, {
-                    transitionOverride: definition.transition
-                        ? undefined
-                        : (mergedTransition as Transition | undefined)
-                })
-            }
-            onPanStartProp?.(event, info)
-        },
-        onMove: onPanProp,
-        onEnd: (event, info) => {
-            restoreWhilePan()
-            onPanEndProp?.(event, info)
-        }
-    })
-
-    $effect(() => {
-        if (isPlaywright) {
-            pwLog('[motion] pan attach effect run', {
-                hasAnyPanHandler,
-                isLoaded
-            })
-        }
-        if (!element || !hasGestureFeatures) return
-        // Defer attachment until the element has settled out of the enter
-        // animation phase — matches the gate every other gesture effect
-        // in this file uses (drag, whileTap, whileHover, whileFocus,
-        // whileInView). Without this, a pointerdown during the
-        // initial / mounting phase would attach pan listeners against an
-        // element whose enter animation hasn't committed its baseline.
-        if (isLoaded !== 'ready') return
-        // Drag takes precedence — upstream framer-motion's drag gesture is
-        // implemented ON TOP of Pan, not alongside it. Co-attaching here
-        // would create two competing pointer pipelines fighting for the
-        // same transforms.
-        if (dragProp) return
-        if (!hasAnyPanHandler) return
-
-        // `untrack` so the reactive reads inside `buildPanHandlers`
-        // (onPan*Prop, resolvedWhilePan, initialKeyframes, resolvedAnimate,
-        // mergedTransition) don't register as dependencies of this attach
-        // effect. Otherwise every parent re-render that passes a fresh
-        // inline arrow handler would re-run this effect and call
-        // `teardownPan?.()`, killing the live PanSession mid-gesture.
-        // Handler-ref changes flow exclusively through the hot-swap
-        // effect below, which calls `teardownPan.update(next)` — that's
-        // the path that keeps an in-flight gesture alive across re-renders.
-        teardownPan = attachPan(
-            element,
-            untrack(() => buildPanHandlers()),
-            untrack(() => ({
-                transformPagePoint: effectiveTransformPagePoint
-            }))
-        )
-
-        return () => {
-            teardownPan?.()
-            teardownPan = null
-            restoreWhilePan()
-        }
-    })
-
-    /**
-     * Hot-swap effect — propagates handler / whilePan changes onto the
-     * existing PanSession via `teardownPan.update(next)`. Tracked
-     * separately from the attach effect so a fresh inline-arrow handler
-     * reference does NOT trigger teardown + re-attach. Without this
-     * split, every parent re-render mid-gesture would silently kill the
-     * live pan session.
-     */
-    $effect(() => {
-        // Track every prop the handler set depends on so this effect
-        // re-runs when any of them change.
-        void onPanSessionStartProp
-        void onPanStartProp
-        void onPanProp
-        void onPanEndProp
-        void resolvedWhilePan
-        void effectiveTransformPagePoint
-        if (!teardownPan) return
-        teardownPan.update(buildPanHandlers(), {
-            transformPagePoint: effectiveTransformPagePoint
-        })
     })
 
     /**
@@ -2104,7 +1861,8 @@
             layoutId: scopedLayoutId,
             layoutScroll: layoutScrollProp,
             transition: mergedTransition as never,
-            style: styleProp
+            style: styleProp,
+            alwaysMeasureLayout: upstreamAlwaysMeasureLayout
         })
     })
 
@@ -2131,7 +1889,8 @@
                 layoutId: scopedLayoutId,
                 layoutScroll: layoutScrollProp,
                 transition: mergedTransition as never,
-                style: styleProp
+                style: styleProp,
+                alwaysMeasureLayout: upstreamAlwaysMeasureLayout
             })
         })
         motionDomProjection.mount(mountTarget)
@@ -2244,8 +2003,7 @@
         // compares it with `prevPresenceContext` to detect exit and re-entry.
         const nextPresenceContext = buildPresenceContext()
         untrack(() => {
-            const activeDragCommit =
-                element?.dataset.svelteMotionDragActive === 'true' && teardownDrag
+            const activeDragCommit = isDragActive()
             if (activeDragCommit) {
                 // React's MeasureLayout commit calls projection.didUpdate(),
                 // which synchronously flushes Motion's update lane. An active
@@ -2271,11 +2029,6 @@
             // (use-visual-element.ts:148); the frameloop variant can sit unflushed
             // when nothing else is animating, which left `renderState` stale.
             visualElement.scheduleRenderMicrotask()
-            // Drag controls read current props on every React commit. Refresh
-            // our long-lived adapter here too, even when the gesture-specific
-            // values themselves kept the same identity (for example a ref
-            // constraint whose parent changed size).
-            if (teardownDrag) teardownDrag.updateOptions(resolveDragOptions())
             if (activeDragCommit) motionDomProjection?.projection.root?.didUpdate()
             // Only once the mount/enter effect has run the first pass — it owns
             // the enter ordering and the wait-mode gate.
@@ -2466,25 +2219,6 @@
     let reactiveCommitSerialAtSchedule = 0
 
     /**
-     * Route a live dragged element's slot change through upstream-style drag
-     * compensation instead of starting a FLIP animation.
-     *
-     * Both the observer and reactive layout paths can discover the same DOM
-     * change. Their existing `lastRect`/serial arbitration decides which path
-     * consumes it; sharing this branch ensures either winner shifts the live
-     * drag origin and MotionValues in exactly the same way.
-     */
-    const commitDraggedLayoutChange = (previous: RectLike): boolean => {
-        if (!(element?.dataset.svelteMotionDragActive === 'true' && teardownDrag)) return false
-
-        const activeDrag = teardownDrag
-        motionDomProjection?.commitDraggedLayoutChange(previous, (dx, dy) => {
-            activeDrag.adjustOrigin(dx, dy)
-        })
-        return true
-    }
-
-    /**
      * Process the frameloop's update, preRender and render steps now, as
      * upstream `update()` does before it measures (motion-dom
      * create-projection-node.ts @ v14.2.0, 829-845). Skipped while the
@@ -2550,12 +2284,12 @@
         emitProjectionUpdate(prev, next)
         if (hasRectChanged(prev, next)) {
             lastRect = next
-            if (!commitDraggedLayoutChange(prev)) {
-                // A Svelte-owned prop change is this component re-rendering:
-                // upstream re-renders (and so snapshots) every descendant,
-                // including ones in a separate LayoutGroup (Step 4b-d).
-                motionDomProjection?.commitObservedLayoutChange(prev, { ownSubtreeChanged: true })
-            }
+            // A Svelte-owned prop change is this component re-rendering:
+            // upstream re-renders (and so snapshots) every descendant,
+            // including ones in a separate LayoutGroup (Step 4b-d). A live
+            // drag compensates in its own projection `didUpdate` listener
+            // (`VisualElementDragControls.addListeners`).
+            motionDomProjection?.commitObservedLayoutChange(prev, { ownSubtreeChanged: true })
             return
         }
         // No delta from THIS path's snapshot: leave `lastRect` alone. The
@@ -2764,9 +2498,7 @@
         ) {
             observerCommitSerial += 1
             emitProjectionUpdate(previousBeforeObserverRestart, lastRect)
-            if (!commitDraggedLayoutChange(previousBeforeObserverRestart)) {
-                motionDomProjection?.commitObservedLayoutChange(previousBeforeObserverRestart)
-            }
+            motionDomProjection?.commitObservedLayoutChange(previousBeforeObserverRestart)
         }
         setCompositorHints(observedElement, true)
 
@@ -2849,19 +2581,12 @@
                 // legacy node emitted from its commit for all of them).
                 emitProjectionUpdate(previous, next)
                 // A live drag whose layout slot just moved (e.g. Reorder
-                // swapped the dragged item's DOM position): a FLIP here
-                // would fight the gesture, so instead the motion-dom
-                // node's `didUpdate` delta shifts the drag origin
-                // (upstream: VisualElementDragControls.ts:742-758) — the
-                // element stays pinned under the cursor and
-                // `dragSnapToOrigin` settles into the NEW slot on
-                // release. The paint goes through the buildTransform
-                // writer via `adjustOrigin`. The delta lands within the
-                // upstream microtask flush — before the next pointermove
-                // task — so the gesture transform is compensated before
-                // Reorder's checkReorder can see the uncompensated
-                // element and double-fire the swap.
-                if (commitDraggedLayoutChange(previous)) return
+                // swapped the dragged item's DOM position) needs no special
+                // branch: the drag controller blocks the node's layout
+                // animation while dragging and shifts its origin from the
+                // projection `didUpdate` delta (motion-dom
+                // `VisualElementDragControls.addListeners` @ v14.5.0), so the
+                // element stays pinned under the cursor.
 
                 const transforms = computeFlipTransforms(previous, next, flipLayoutMode)
                 const hasSizeCorrectionTarget = !!element!.querySelector(
@@ -2936,7 +2661,7 @@
             // keyed reorder moves the dragged element. Consume its fresh slot
             // immediately so the upstream delta compensates the drag before
             // paint; waiting another frame exposes the uncompensated DOM move.
-            if (rafId && element?.dataset.svelteMotionDragActive !== 'true') return
+            if (rafId && !isDragActive()) return
             commitObservedLayout()
             if (rafId) return
             rafId = requestAnimationFrame(() => {
@@ -2977,7 +2702,7 @@
         const siblingLayoutObserver =
             dragProp && siblingLayoutParent && typeof MutationObserver !== 'undefined'
                 ? new MutationObserver((mutations) => {
-                      if (element?.dataset.svelteMotionDragActive !== 'true') return
+                      if (!isDragActive()) return
                       const hasExternalMutation = mutations.some((mutation) => {
                           const target = mutation.target
                           return target instanceof Element && !element?.contains(target)
@@ -3209,15 +2934,24 @@
                 node.scheduleRenderMicrotask()
             },
             // Upstream's shape exactly (`animation-controls.ts`): stop each
-            // MotionValue. No snapshot bookkeeping — `MotionValue.stop()` routes
-            // into `NativeAnimation.stop()`, which calls
-            // `NativeAnimationExtended.updateMotionValue()`
-            // (NativeAnimationExtended.mjs:54-84). That samples a renderless
-            // JSAnimation twice at wall-clock elapsed time to recover BOTH value
-            // and velocity, writes the sampled value to inline style so it
-            // survives the post-`cancel()` gap, and calls `setWithVelocity` — so
-            // an interrupted accelerated channel freezes exactly where it is and
-            // any follow-up animation inherits its velocity.
+            // MotionValue. No snapshot bookkeeping — two accelerated paths
+            // freeze an interrupted channel where it is:
+            // - opacity-style values: `MotionValue.stop()` routes into
+            //   `NativeAnimation.stop()`, which calls
+            //   `NativeAnimationExtended.updateMotionValue()`
+            //   (NativeAnimationExtended.mjs:54-84). That samples a renderless
+            //   JSAnimation twice at wall-clock elapsed time to recover BOTH
+            //   value and velocity, writes the sampled value to inline style so
+            //   it survives the post-`cancel()` gap, and calls
+            //   `setWithVelocity`.
+            // - grouped independent transforms (Motion 14.2+): motion-dom's
+            //   `TransformAnimation.stop()` syncs the MotionValue (value and
+            //   velocity) from the running WAAPI group before stopping; from
+            //   14.3.1 releasing the group's last animation commits the inline
+            //   transform synchronously
+            //   (`animation/waapi/transforms/TransformAnimation.ts`
+            //   `release()`/`end()`).
+            // Either way any follow-up animation inherits the velocity.
             stop: () => {
                 node.values.forEach((value) => value.stop())
             }

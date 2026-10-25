@@ -617,26 +617,47 @@ test.describe('MotionConfig transformPagePoint drag', () => {
         await expect
             .poll(() => page.getByTestId('board').evaluate((element) => element.offsetWidth))
             .toBe(620)
-        await advance(page, 32)
+        // The remap runs off the board's ResizeObserver, which fires on real
+        // browser rendering, then schedules work on the fake frame loop. Keep
+        // advancing the fake clock until the card lands. Read the rect through
+        // the DOM: `captureSnapshot` records a labelled snapshot.
+        await expect
+            .poll(
+                async () => {
+                    await advance(page, 16)
+                    return page
+                        .getByTestId('target')
+                        .evaluate((element) => element.getBoundingClientRect().left)
+                },
+                { timeout: 5000 }
+            )
+            .toBe(570)
+        // Motion 14.5 remaps a resting card by its progress within the old
+        // constraints when the ref constraint resizes
+        // (`scalePositionWithinConstraints`, motion-dom
+        // `gestures/drag/VisualElementDragControls.ts:605-683` @ v14.5.0). The
+        // card rests on the old max (246 of [-174, 246], progress 1); growing
+        // the board by 120 px moves max to 366, so the card lands on 366 — the
+        // new right edge — and its rect moves 120 * 0.5 (stage scale) = 60 px.
         const preRegrab = await snapshot(page, 'pre-regrab')
         expect(preRegrab).toMatchObject({
             rects: {
                 target: {
-                    x: 510,
+                    x: 570,
                     y: 315,
                     top: 315,
-                    right: 550,
+                    right: 610,
                     bottom: 355,
-                    left: 510,
+                    left: 570,
                     width: 40,
                     height: 40
                 }
             },
             layout: { boardOffsetWidth: 620 },
-            boundValues: { x: 246, y: 0 }
+            boundValues: { x: 366, y: 0 }
         })
         start = await center(page.getByTestId('target'))
-        expect(start).toEqual({ x: 530, y: 335 })
+        expect(start).toEqual({ x: 590, y: 335 })
         await page.mouse.move(start.x, start.y)
         await page.mouse.down()
         await advance(page, 16)
@@ -645,7 +666,8 @@ test.describe('MotionConfig transformPagePoint drag', () => {
         await page.mouse.up()
         await advance(page, 20)
         const resizeTrace = await gestures(page)
-        expect(resizeTrace.slice(-3).map(({ info }) => info.point.x)).toEqual([60, 60, 60])
+        // The re-grab starts from the remapped card: (590 - 500) * 2 = 180.
+        expect(resizeTrace.slice(-3).map(({ info }) => info.point.x)).toEqual([180, 180, 180])
         expect((await snapshot(page, 'resized')).boundValues).toMatchObject({ x: -174, y: 0 })
     })
 

@@ -98,6 +98,8 @@ export interface MotionDomProjectionUpdateOptions {
     transition?: Transition
     /** Inline style props passed through to the visual element. */
     style?: unknown
+    /** Upstream projection option (`use-visual-element.ts`): `true` for draggable elements. */
+    alwaysMeasureLayout?: boolean
 }
 
 const createVisualState = () => ({
@@ -402,6 +404,7 @@ export class MotionDomProjectionAdapter {
             layout: options.layout,
             layoutId: options.layoutId,
             layoutScroll: options.layoutScroll,
+            alwaysMeasureLayout: options.alwaysMeasureLayout,
             animationType: animationTypeForLayout(options.layout),
             transition: options.transition,
             visualElement: this.visualElement
@@ -958,74 +961,6 @@ export class MotionDomProjectionAdapter {
             }
         }
         return { left, top, width: rect.width, height: rect.height }
-    }
-
-    /**
-     * Commit a dragged element's observed layout (slot) change and deliver
-     * the slot delta instead of running a layout animation.
-     *
-     * Mirrors upstream drag semantics: `VisualElementDragControls` blocks the
-     * dragged node's layout animation (`isAnimationBlocked`,
-     * VisualElementDragControls.ts:139/293) and its `didUpdate` listener
-     * shifts the gesture origin by `delta[axis].translate`
-     * (VisualElementDragControls.ts:742-758). The delta orientation is
-     * `snapshot - layout` (previous - next).
-     *
-     * The element is mid-gesture, so its inline transform carries the live
-     * drag offset. Upstream strips it during the update pass via
-     * `resetTransform` + `latestValues`; this bridge writes drag transforms
-     * outside `latestValues` (the buildTransform writer), so the adapter
-     * strips to base transforms itself for the duration of the pass and
-     * restores in the `didUpdate` listener — the whole pass flushes on a
-     * microtask, before paint, so the stripped state is never rendered.
-     *
-     * @param previousRect Pre-change slot rect (page space, stripped).
-     * @param onSlotDelta Called with the (dx, dy) slot delta when the layout
-     * actually changed; the caller routes it to the drag writer's
-     * `adjustOrigin`.
-     * @returns Nothing.
-     *
-     * @example
-     * ```ts
-     * adapter.commitDraggedLayoutChange(previous, (dx, dy) =>
-     *     drag.adjustOrigin(dx, dy)
-     * )
-     * ```
-     */
-    commitDraggedLayoutChange(
-        previousRect: RectLike,
-        onSlotDelta: (dx: number, dy: number) => void
-    ): void {
-        if (!this.element || !this.layout) return
-
-        const restore = this.stripToBaseTransforms()
-
-        let finished = false
-        const finish = () => {
-            if (finished) return
-            finished = true
-            off()
-            this.projection.isAnimationBlocked = false
-            restore()
-        }
-        const off = this.projection.addEventListener(
-            'didUpdate',
-            ({ delta, hasLayoutChanged }: LayoutUpdateData) => {
-                finish()
-                if (hasLayoutChanged) {
-                    onSlotDelta(delta.x.translate, delta.y.translate)
-                }
-            }
-        )
-
-        this.projection.isAnimationBlocked = true
-        this.commitObservedLayoutChange(previousRect)
-
-        // Safety net: `didUpdate` fires within the upstream microtask flush;
-        // if the pass bails (e.g. update blocked), never leave the element
-        // stripped or the node animation-blocked. Double-nested so it runs
-        // after motion-dom's own microtask.
-        queueMicrotask(() => queueMicrotask(finish))
     }
 
     /**

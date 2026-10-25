@@ -4,6 +4,8 @@
     const slug = (item: string) => item.split(' ')[1].toLowerCase()
 
     let items = $state(['🍅 Tomato', '🥒 Cucumber', '🧀 Cheese', '🥬 Lettuce'])
+    // The held item, mirrored from onDragStart/onDragEnd for e2e frame sampling.
+    let dragging = $state<string | null>(null)
 </script>
 
 <div class="page">
@@ -21,6 +23,9 @@
             <Reorder.Item
                 value={item}
                 data-testid={`item-${slug(item)}`}
+                data-dragging={dragging === item}
+                onDragStart={() => (dragging = item)}
+                onDragEnd={() => (dragging = null)}
                 style="display: flex; align-items: center; height: 44px; padding: 0 16px; margin-bottom: 10px; background: white; color: #0f1115; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.25); cursor: grab; user-select: none; -webkit-user-select: none;"
             >
                 {item}

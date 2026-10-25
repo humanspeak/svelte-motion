@@ -87,3 +87,53 @@ describe('autoScrollIfNeeded', () => {
         expect(scroller.scrollTop).toBe(scrolled)
     })
 })
+
+/**
+ * Speed values match upstream framer-motion
+ * `Reorder/utils/__tests__/auto-scroll.test.ts` @ v14.5.0.
+ */
+describe('scroll speed', () => {
+    /**
+     * Same 200 px viewport as `makeScrollableList`, but a tall
+     * `scrollHeight` so the forward-scroll limit never interferes, and a
+     * starting `scrollTop` so start-edge scrolling isn't clamped at 0.
+     */
+    const makeTallScrollableList = () => {
+        const { scroller, group } = makeScrollableList()
+        Object.defineProperty(scroller, 'scrollHeight', { value: 5000, configurable: true })
+        scroller.scrollTop = 1000
+        return { scroller, group }
+    }
+
+    beforeEach(() => {
+        document.body.innerHTML = ''
+    })
+
+    afterEach(() => {
+        resetAutoScrollState()
+    })
+
+    it('eases in near the end edge (25 px away)', () => {
+        const { scroller, group } = makeTallScrollableList()
+        autoScrollIfNeeded(group, 175, 'y', 5)
+        expect(scroller.scrollTop - 1000).toBeCloseTo(6.25)
+    })
+
+    it('approaches maxSpeed close to the end edge (2 px away)', () => {
+        const { scroller, group } = makeTallScrollableList()
+        autoScrollIfNeeded(group, 198, 'y', 5)
+        expect(scroller.scrollTop - 1000).toBeCloseTo(23.04, 2)
+    })
+
+    it('caps at maxSpeed when the pointer is past the end edge', () => {
+        const { scroller, group } = makeTallScrollableList()
+        autoScrollIfNeeded(group, 400, 'y', 5)
+        expect(scroller.scrollTop - 1000).toBe(25)
+    })
+
+    it('caps at maxSpeed when the pointer is past the start edge', () => {
+        const { scroller, group } = makeTallScrollableList()
+        autoScrollIfNeeded(group, -100, 'y', -5)
+        expect(1000 - scroller.scrollTop).toBe(25)
+    })
+})

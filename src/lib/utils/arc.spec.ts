@@ -1,29 +1,30 @@
 import { arc } from '$lib/utils/arc'
-import { createDelta, motionValue, type MotionValue, type VisualElement } from 'motion-dom'
+import { createDelta, motionValue, type MotionValue } from 'motion-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+type GetValue = (key: string) => MotionValue | undefined
+
 /**
- * Minimal VisualElement stand-in: just the surface upstream `arc()` and the
- * wrapper read (`getValue`, `latestValues`).
+ * Minimal `getValue` stand-in for `MotionPath.animateValues`: looks keys up
+ * in a `Map<string, MotionValue>`. motion-dom's VisualElement callback already
+ * falls back to `latestValues` (`visual-element-target.ts:64-70`), so the
+ * wrapper only ever reads through `getValue`.
  */
-const fakeVisualElement = (current: Record<string, unknown> = {}) => {
-    const values = new Map<string, MotionValue<unknown>>()
+const fakeGetValue = (current: Record<string, unknown> = {}): GetValue => {
+    const values = new Map<string, MotionValue>()
     for (const [key, value] of Object.entries(current)) {
-        values.set(key, motionValue<unknown>(value))
+        values.set(key, motionValue<unknown>(value) as MotionValue)
     }
-    return {
-        latestValues: { ...current },
-        getValue: (key: string) => values.get(key)
-    } as unknown as VisualElement
+    return (key) => values.get(key)
 }
 
 const run = (
     target: Record<string, unknown>,
     current: Record<string, unknown> = {},
-    visualElement: VisualElement = fakeVisualElement(current)
+    getValue: GetValue = fakeGetValue(current)
 ) => {
     const animations: never[] = []
-    arc().animateVisualElement(visualElement, target as never, { duration: 0.1 }, 0, animations)
+    arc().animateValues!(getValue, target, { duration: 0.1 }, 0, animations)
     return { target, animations }
 }
 
@@ -67,23 +68,26 @@ describe('arc() wrapper — numeric-endpoint guard', () => {
         expect(String(warn.mock.calls[0][0])).toMatch(/arc\(\) requires numeric x\/y/)
     })
 
-    it('also guards a px string reachable only via latestValues', () => {
-        // No MotionValue registered — upstream falls back to latestValues.
-        const ve = {
-            latestValues: { x: '0px' },
-            getValue: () => undefined
-        } as unknown as VisualElement
-        const { target, animations } = run({ x: 100 }, {}, ve)
+    it('guards a px string current value from getValue', () => {
+        // The VisualElement callback resolves latestValues before the wrapper
+        // sees it, so a px string surfaces as the MotionValue's reading.
+        const getValue: GetValue = (key) =>
+            key === 'x' ? (motionValue<unknown>('0px') as MotionValue) : undefined
+        const { target, animations } = run({ x: 100 }, {}, getValue)
         expect('x' in target).toBe(true)
         expect(animations.length).toBe(0)
         expect(warn).toHaveBeenCalledTimes(1)
     })
 
+    it('does not expose the deprecated animateVisualElement hook', () => {
+        expect('animateVisualElement' in arc()).toBe(false)
+    })
+
     it('warns once per arc() instance, not once per animation', () => {
         const path = arc()
-        const ve = fakeVisualElement({ x: 0 })
-        path.animateVisualElement(ve, { x: '10px' }, undefined, 0, [])
-        path.animateVisualElement(ve, { x: '20px' }, undefined, 0, [])
+        const getValue = fakeGetValue({ x: 0 })
+        path.animateValues!(getValue, { x: '10px' }, undefined, 0, [])
+        path.animateValues!(getValue, { x: '20px' }, undefined, 0, [])
         expect(warn).toHaveBeenCalledTimes(1)
     })
 

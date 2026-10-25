@@ -1,19 +1,27 @@
 /**
  * `arc()` — curved motion paths for `transition.path`.
  *
- * Thin wrapper over upstream motion-dom's `arc()` (Motion 13). The curve
- * geometry, `pathRotation` channel, and layout projection hook are upstream's,
+ * Thin wrapper over upstream motion-dom's `arc()`. The curve geometry,
+ * `pathRotation` channel, and layout projection hook are upstream's,
  * untouched; this module only adds an endpoint guard upstream lacks.
  *
- * Upstream `arc.animateVisualElement` reads the current and target `x`/`y`
- * and does bezier arithmetic on them as raw numbers. A unit-bearing value —
- * `'100px'`, `'50%'`, `'var(--x)'` — is legal for `x`/`y` everywhere else in
- * the API but turns that arithmetic into `NaN`, so the element renders an
- * invalid transform mid-flight and snaps to the target on completion. Rather
- * than fork the math to parse units (and diverge from upstream), the wrapper
- * detects non-numeric endpoints, warns once in dev, and leaves `x`/`y` to the
- * normal straight-line keyframe loop — the element still arrives, just not on
- * a curve.
+ * From Motion 14.3.1, upstream `arc()` implements only the
+ * `MotionPath.animateValues` keyframe hook (motion-dom
+ * `animation/utils/arc.ts`); `animateVisualElement` is deprecated and gone.
+ * motion-dom calls `animateValues` for VisualElements
+ * (`interfaces/visual-element-target.ts`) AND for plain elements animated
+ * with `animate()` / `useAnimate()` (`animate/effects.ts`), so the guard
+ * below covers both.
+ *
+ * Upstream `arc.animateValues` reads the current and target `x`/`y` and does
+ * bezier arithmetic on them as raw numbers (it casts them to `number` with no
+ * unit check). A unit-bearing value — `'100px'`, `'50%'`, `'var(--x)'` — is
+ * legal for `x`/`y` everywhere else in the API but turns that arithmetic into
+ * `NaN`, so the element renders an invalid transform mid-flight and snaps to
+ * the target on completion. Rather than fork the math to parse units (and
+ * diverge from upstream), the wrapper detects non-numeric endpoints, warns
+ * once in dev, and leaves `x`/`y` to the normal straight-line keyframe loop —
+ * the element still arrives, just not on a curve.
  *
  * Release note (post-1.x follow-up): revisit the numerics here once upstream
  * decides how `arc()` should treat unit-bearing endpoints — either adopt their
@@ -51,6 +59,10 @@ const isNumericKeyframe = (value: unknown): boolean => {
  * straight line instead of rendering `NaN` transforms. A one-time
  * `console.warn` explains the fallback in development builds.
  *
+ * The guard runs in the path's `animateValues` hook, so it applies to
+ * `motion.*` elements and to plain elements animated with `animate()` or
+ * `useAnimate()` alike.
+ *
  * Reuse the returned path (create it in `<script>`, not inline in the
  * template) so its auto-direction continuity state survives re-renders.
  *
@@ -70,21 +82,23 @@ const isNumericKeyframe = (value: unknown): boolean => {
  */
 export const arc = (options: ArcOptions = {}): MotionPath => {
     const path = upstreamArc(options)
+    // Motion 14.3.1+ (`animation/utils/arc.ts`): upstream implements only
+    // `animateValues`, which motion-dom calls for VisualElements AND for
+    // elements animated with `animate()` / `useAnimate()`. Called on `path`
+    // (not extracted) so it keeps its receiver.
     let warned = false
 
     return {
         ...path,
-        animateVisualElement(visualElement, target, transition, delay, animations) {
+        animateValues(getValue, target, transition, delay, animations) {
             if (!('x' in target || 'y' in target)) return
 
-            const endpointsNumeric = AXES.every((key) => {
-                const raw = (target as Record<string, unknown>)[key]
-                // No default: `getValue(key, default)` would create the value.
-                // Mirror upstream's read order (MotionValue, then latestValues).
-                const current: unknown =
-                    visualElement.getValue(key)?.get() ?? visualElement.latestValues[key]
-                return isNumericKeyframe(raw) && isFiniteOrAbsent(current)
-            })
+            // `getValue` already resolves a VisualElement's `latestValues`
+            // fallback (motion-dom `visual-element-target.ts`), so reading the
+            // MotionValue matches what upstream's bezier will consume.
+            const endpointsNumeric = AXES.every(
+                (key) => isNumericKeyframe(target[key]) && isFiniteOrAbsent(getValue(key)?.get())
+            )
 
             if (!endpointsNumeric) {
                 if (DEV && !warned) {
@@ -95,12 +109,12 @@ export const arc = (options: ArcOptions = {}): MotionPath => {
                             'will animate along a straight line instead of the arc.'
                     )
                 }
-                // Leave `x`/`y` on `target` so animateTarget's keyframe loop
-                // animates them normally.
+                // Leave `x`/`y` on `target` so the normal keyframe loop
+                // animates them.
                 return
             }
 
-            path.animateVisualElement(visualElement, target, transition, delay, animations)
+            path.animateValues!(getValue, target, transition, delay, animations)
         }
     }
 }

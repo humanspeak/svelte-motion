@@ -8,9 +8,8 @@
  *
  * The baseline helpers (`computeHoverBaseline`, `splitHoverDefinition`) and the
  * unused readers (`isHoverCapable`, `readTransformScale`, `parseUnitValue`) went
- * with drag-single-writer 004: their last callers were `whileDrag` (now
- * `setActive('whileDrag')`) and `whilePan` (now `animateTarget` restoring from
- * the node's own base target), so nothing hand-computes a restore baseline any
+ * with drag-single-writer 004: their last caller was `whileDrag` (now
+ * `setActive('whileDrag')`), so nothing hand-computes a restore baseline any
  * more.
  *
  * `readTransformChannels` survives because it answers a different question — the

@@ -134,7 +134,7 @@
     }))}
     onPan={isTop ? handlePan : undefined}
     onPanEnd={isTop ? handlePanEnd : undefined}
-    whilePan={isTop ? { cursor: 'grabbing' } : undefined}
+    whileTap={isTop ? { cursor: 'grabbing' } : undefined}
     role="article"
     aria-label={isTop ? `${card.name} — pan to like or nope` : `${card.name} — behind`}
 >

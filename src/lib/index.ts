@@ -19,12 +19,13 @@ export { motion } from '$lib/motion'
 export { Reorder } from '$lib/reorder'
 
 // Re-export core animation functions plus the vanilla (component-free)
-// layer — element effects, the frameloop scheduler, generators, global
-// config — straight from motion.
+// layer — element effects, gestures (including Motion 14.4's `drag()`), the
+// frameloop scheduler, generators, global config — straight from motion.
 export {
     MotionGlobalConfig,
     cancelFrame,
     delay,
+    drag,
     frame,
     frameData,
     hover,
@@ -38,6 +39,8 @@ export {
     stagger,
     transform
 } from 'motion'
+
+export type { DragOptions } from 'motion-dom'
 
 // `animate` and the element effects re-typed to accept both raw and
 // Svelte-augmented motion values (runtime passthrough to motion's
@@ -91,6 +94,15 @@ export {
 
 // Re-export utility functions
 export { clamp, distance, distance2D, interpolate, mix, pipe, progress, wrap } from 'motion'
+
+// Motion 14.5 scopes: collect the animations, scroll/inView listeners,
+// gestures, resize observers and delays started inside a scope so they can be
+// stopped or cancelled together. `useScopeMotion` binds a scope to an element's
+// lifecycle as a Svelte attachment.
+export { useScopeMotion } from '$lib/utils/scopeMotion.svelte'
+export type { MotionScopeAttachment, UseScopeMotionOptions } from '$lib/utils/scopeMotion.svelte'
+export { scopeMotion, toMediaQuery } from 'motion'
+export type { MediaConditions, MotionScope, ScopeOptions, ScopeSetup, ScopeState } from 'motion-dom'
 
 // Curved motion paths for `transition.path` (upstream Motion 13 `arc()`),
 // wrapped with a numeric-endpoint guard — see `$lib/utils/arc`.

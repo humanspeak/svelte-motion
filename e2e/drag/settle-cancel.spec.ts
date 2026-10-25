@@ -125,10 +125,9 @@ test.describe('drag/settle-cancel', () => {
     })
 
     test('slow no-momentum settle follows rightward movement after re-grab', async ({ page }) => {
-        // Regression from manual review: catch the slow boundary-settle card,
-        // move the pointer back to the right, and the card should keep moving
-        // with the pointer. It must not stall under the pointer or jump left
-        // while the second drag is active.
+        // Catch the slow boundary-settle card outside its constraint, move the
+        // pointer back to the right: the card keeps moving with the pointer
+        // (it must not stall), at Motion's elastic rate from the edge.
         await page.goto('/tests/drag/settle-cancel?slow=true&@isPlaywright=true')
         const card = page.getByTestId('settle-card')
         await card.waitFor({ state: 'visible' })
@@ -166,9 +165,19 @@ test.describe('drag/settle-cancel', () => {
         const movedFartherRightTranslate = await readTranslateX(page, '[data-testid="settle-card"]')
         await page.mouse.up()
 
-        expect(movedRightTranslate).toBeGreaterThanOrEqual(grabbedTranslate - 4)
-        expect(movedRightTranslate).toBeGreaterThan(grabbedTranslate + 10)
-        expect(movedFartherRightTranslate).toBeGreaterThanOrEqual(movedRightTranslate - 4)
+        // Motion 14.5 re-applies the constraints from the boundary on every
+        // move: `next = originPoint + offset`, then `applyConstraints` mixes it
+        // from the +120 edge by `dragElastic` (0.5 here)
+        // (`VisualElementDragControls.updateAxis`, motion-dom
+        // `gestures/drag/VisualElementDragControls.ts:338-356`, and
+        // `utils/constraints.ts` `applyConstraints` @ v14.5.0). A card caught
+        // outside the constraint therefore jumps back toward the edge on the
+        // first move, then keeps following the pointer at the elastic rate.
+        const elastic = (offset: number) => 120 + 0.5 * (grabbedTranslate + offset - 120)
+        expect(grabbedTranslate).toBeGreaterThan(130)
+        expect(Math.abs(movedRightTranslate - elastic(70))).toBeLessThanOrEqual(1)
+        expect(Math.abs(movedFartherRightTranslate - elastic(120))).toBeLessThanOrEqual(1)
+        // Still follows rightward movement while held.
         expect(movedFartherRightTranslate).toBeGreaterThan(movedRightTranslate + 6)
     })
 

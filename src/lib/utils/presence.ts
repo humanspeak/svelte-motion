@@ -1,9 +1,10 @@
 import type { AnimatePresenceMode, MotionExit, MotionTransition } from '$lib/types'
 import { mergeTransitions } from '$lib/utils/animation'
+import { holdLayoutIdHandoffs } from '$lib/utils/layoutId'
 import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import { readTransformValue, transformProps, type PresenceContextProps } from 'motion-dom'
-import { getContext, setContext } from 'svelte'
+import { getContext, setContext, tick } from 'svelte'
 import { createSubscriber } from 'svelte/reactivity'
 
 /**
@@ -979,6 +980,8 @@ export const createAnimatePresenceContext = (context: {
     }
     // Track number of in-flight exit animations to invoke onExitComplete once
     let inFlightExits = 0
+    // One layoutId handoff hold per in-flight exit (see layoutId.ts `holdLayoutIdHandoffs`).
+    const layoutIdHolds: Array<() => void> = []
 
     type ActiveExit = {
         clone: HTMLElement
@@ -1078,13 +1081,16 @@ export const createAnimatePresenceContext = (context: {
             enterBlocked = true
         }
         inFlightExits += 1
+        // Keep departing layoutId snapshots alive until the exit ends (see layoutId.ts).
+        layoutIdHolds.push(holdLayoutIdHandoffs())
     }
 
     /**
      * Mark an exit as finished.
      *
      * Decrements the `inFlightExits` counter. When the count reaches zero,
-     * fires the consumer's `onExitComplete` callback and, in `mode='wait'`,
+     * schedules the consumer's `onExitComplete` callback for after the next
+     * flush (see {@link scheduleExitComplete}) and, in `mode='wait'`,
      * lowers `enterBlocked` plus notifies any deferred-enter callbacks
      * registered via {@link onEnterUnblocked}.
      *
@@ -1096,20 +1102,52 @@ export const createAnimatePresenceContext = (context: {
      * ```ts
      * startExit()
      * // ... exit work ...
-     * finishExit() // fires onExitComplete if the last exit, unblocks waiters
+     * finishExit() // schedules onExitComplete if the last exit, unblocks waiters
      * ```
      */
     const finishExit = () => {
         if (disposed) return
+        layoutIdHolds.pop()?.()
         inFlightExits -= 1
         if (inFlightExits === 0) {
             context.forceRender?.()
-            context.onExitComplete?.()
+            scheduleExitComplete()
             if (mode === 'wait' && enterBlocked) {
                 enterBlocked = false
                 notifyEnterUnblocked()
             }
         }
+    }
+
+    // A scheduled `onExitComplete` that has not fired yet. Guards against a
+    // second schedule for the same cycle (upstream's `pendingExitComplete` ref).
+    let pendingExitComplete = false
+
+    /**
+     * Fire the consumer's `onExitComplete` after Svelte has flushed the state
+     * change that removes the exiting children, so the callback sees them
+     * unmounted and after their own `onDestroy` cleanups (framer-motion #2538).
+     *
+     * Upstream only stores the callback when every exit completes and fires it
+     * from the cleanup of an effect keyed on the rendered children, "so it runs
+     * in the commit that removes them (or when we unmount)"; `forceRender` and
+     * the children re-diff stay synchronous (framer-motion
+     * AnimatePresence/index.tsx @ v14.5.0, lines 101-117 and 236-251). Here
+     * `PresenceChild` flips its phase before `notifyExitComplete`, so `tick()`
+     * resolves after the held subtree's `{#if}` teardown. Once scheduled, the
+     * call runs even if this context is disposed in between, matching
+     * upstream's "or when we unmount".
+     *
+     * @returns void
+     */
+    const scheduleExitComplete = () => {
+        const onExitComplete = context.onExitComplete
+        if (!onExitComplete || pendingExitComplete) return
+        pendingExitComplete = true
+        void tick().then(() => {
+            pendingExitComplete = false
+            onExitComplete()
+        })
     }
 
     /**
@@ -1122,6 +1160,7 @@ export const createAnimatePresenceContext = (context: {
      * blocked by `mode='wait'` are still released once nothing is exiting.
      */
     const cancelExit = () => {
+        layoutIdHolds.pop()?.()
         inFlightExits -= 1
         if (inFlightExits === 0 && mode === 'wait' && enterBlocked) {
             enterBlocked = false
@@ -1681,6 +1720,7 @@ export const createAnimatePresenceContext = (context: {
         exitedKeys.clear()
         enterUnblockedCallbacks.clear()
         customSubscribers.clear()
+        for (const release of layoutIdHolds.splice(0)) release()
         inFlightExits = 0
         enterBlocked = false
     }

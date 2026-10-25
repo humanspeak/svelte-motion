@@ -217,6 +217,91 @@ The `info` object passed to drag callbacks contains:
 | `offset` | `{ x, y }` | Cumulative transform offset since drag start |
 | `velocity` | `{ x, y }` | Current velocity in px/s |
 
+## Behavior
+
+`drag` runs on Motion's own drag controller, so these details match Motion:
+
+- **Default styles.** A draggable element gets `user-select: none`, `draggable="false"` and a `touch-action` for its axis: `none` for `drag`, `pan-y` for `drag="x"` and `pan-x` for `drag="y"`. They're set inline, so they win over the same properties in your CSS classes or `style`. Set `dragListener={false}` to opt out.
+- **Pointer cancel.** A `pointercancel` (for example, the browser taking over a touch for scrolling) ends the drag like a `pointerup`. `onDragEnd` fires with the release velocity and momentum still runs.
+- **Re-grabbing outside the constraints.** If you catch an element while it's outside its constraints, it moves back toward the edge as you drag, then follows the pointer at the `dragElastic` rate.
+- **Element constraints.** Resizing the window, the element or the constraint element moves the element to the same relative position within the new constraints. Only the first constraint element is watched for resizes. If you swap `dragConstraints` to a different element, the new bounds apply, but resizing only the new element won't reposition anything.
+- **Drag controls.** Every element that receives the same `dragControls` is driven by `start`, `cancel` and `stop`. `stop()` ends a live drag with momentum and `cancel()` ends it without. Neither does anything once the drag is over, so neither stops an animation that's already running after release.
+
+## Vanilla drag()
+
+`drag()` makes plain elements draggable without a motion component (Motion 14.4). It takes an element, a list of elements or a CSS selector, and returns a function that removes the gesture:
+
+```svelte
+<script lang="ts">
+    import { drag } from '@humanspeak/svelte-motion'
+
+    let track = $state<HTMLElement | null>(null)
+    let knob = $state<HTMLElement | null>(null)
+
+    $effect(() => {
+        if (!knob || !track) return
+        return drag(knob, { axis: 'x', constraints: track })
+    })
+</script>
+
+<div bind:this={track}>
+    <div bind:this={knob}></div>
+</div>
+```
+
+While attached, `drag()` sets `user-select: none`, `touch-action` (`none`, or `pan-y`/`pan-x` with an `axis`) and `draggable="false"` on the element. The cleanup function restores them.
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `axis` | `'x' \| 'y'` | both axes | Restrict dragging to one axis |
+| `constraints` | `{ top?, left?, right?, bottom? } \| Element` | — | Pixel bounds relative to the origin, or an element to stay within |
+| `elastic` | `number \| { top?, left?, right?, bottom? }` | `0.35` | How far, from `0` to `1`, the element can move outside its constraints |
+| `momentum` | `boolean` | `true` | Carry the release velocity into an inertia animation |
+| `transition` | `InertiaOptions` | — | Options for the inertia animation on release |
+| `snapToOrigin` | `boolean \| 'x' \| 'y'` | `false` | Animate back to the origin on release |
+| `directionLock` | `boolean` | `false` | Lock to the first axis the pointer moves along |
+| `propagation` | `boolean` | `false` | Let drags start on draggable parents too |
+| `onStart` / `onMove` / `onEnd` | `(event, info) => void` | — | Drag lifecycle callbacks, with the same `info` as [DragInfo](#draginfo) |
+| `onDirectionLock` | `(axis: 'x' \| 'y') => void` | — | Fires when `directionLock` picks an axis |
+| `onTransitionEnd` | `() => void` | — | Fires when the release animation settles |
+| `onMeasureConstraints` | `(constraints) => constraints \| void` | — | Called when element constraints are measured; return a box to override them |
+
+### With animate() and animateLayout()
+
+The element's `x` and `y` are motion values shared with [`animate()`](/docs/use-animate) and [`animateLayout()`](/docs/animate-layout). An element moved by `animate()` keeps its offset when a drag starts, and you can animate it again after a drag:
+
+```ts
+await animate(knob, { x: 120 })
+const stop = drag(knob) // the drag continues from x: 120
+
+// later, spring it home
+animate(knob, { x: 0 }, { type: 'spring' })
+```
+
+### In a scope
+
+Called inside a [`useScopeMotion`](/docs/scope-motion) or `scopeMotion` setup, a selector resolves within the scope's root, callbacks run in the scope, and the gesture is removed when the scope stops:
+
+```svelte
+<script lang="ts">
+    import { drag, useScopeMotion } from '@humanspeak/svelte-motion'
+
+    const scope = useScopeMotion(() => {
+        drag('.handle', { axis: 'y' })
+    })
+</script>
+
+<ul {@attach scope}>
+    <li class="handle">Only handles inside this list are draggable</li>
+</ul>
+```
+
+### motion components
+
+A motion component that already has a `drag` prop doesn't need `drag()`; use its drag props instead. As in Motion, `drag()` doesn't check for this. If you pass such an element anyway, `drag()` attaches a second drag gesture, and the element still moves only once: Motion's drag lock lets one gesture at a time take the pointer, and both gestures share the element's `x` and `y`.
+
 ## Props
 
 ### Drag
@@ -264,6 +349,7 @@ The `info` object passed to drag callbacks contains:
 - [Motion Component](/docs) — Full API reference
 - [Variants](/docs/variants) — Define reusable animation states
 - [AnimatePresence](/docs/animate-presence) — Exit animations on unmount
+- [Vanilla drag() example](/examples/vanilla-drag) — A slider knob built on `drag()`
 
 ---
 

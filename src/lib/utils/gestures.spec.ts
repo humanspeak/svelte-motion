@@ -89,9 +89,10 @@ describe('attachHoverGesture', () => {
 
     it('ignores hover while a drag holds the global lock', () => {
         const { node, setActive } = makeNode({ whileHover: { scale: 1.1 } })
-        // Suppression is the LOCK's job now: `drag.ts` holds it for the pointer
-        // session and motion-dom's own `hover()` filters on `isDragActive()`
-        // before it ever calls back (`gestures/hover.mjs` `isValidHover`). This
+        // Suppression is the LOCK's job now: motion-dom's
+        // `VisualElementDragControls` holds it until pointer-up, and motion-dom's
+        // own `hover()` filters on `isDragActive()` before it ever calls back
+        // (`gestures/hover.mjs` `isValidHover`). This
         // asserts the same behaviour the retired dataset guard did, through the
         // mechanism that actually ships.
         const releaseLock = setDragLock(true)

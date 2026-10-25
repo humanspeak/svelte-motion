@@ -29,6 +29,8 @@
     let retargetX = $state<number | null>(null)
     let axisTransitionEnds = $state(0)
     let retargetTransitionEnds = $state(0)
+    // Mirrors onDragStart/onDragEnd for the e2e drag-start signal.
+    let retargetDragging = $state(false)
 </script>
 
 <svelte:head>
@@ -103,12 +105,15 @@
                 class="card card-c"
                 data-testid="foreign-retarget-card"
                 data-transition-ends={retargetTransitionEnds}
+                data-dragging={retargetDragging}
                 drag="x"
                 dragMomentum
                 dragControls={retargetControls}
                 dragTransition={{ power: 0.5, timeConstant: 900, restDelta: 0.5, restSpeed: 4 }}
                 animate={retargetX === null ? {} : { x: retargetX }}
                 transition={{ duration: 0.9, ease: 'linear' }}
+                onDragStart={() => (retargetDragging = true)}
+                onDragEnd={() => (retargetDragging = false)}
                 onDragTransitionEnd={() => (retargetTransitionEnds += 1)}
             >
                 foreign retarget

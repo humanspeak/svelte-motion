@@ -18,6 +18,8 @@ import {
     delay,
     distance,
     distance2D,
+    drag,
+    type DragOptions,
     easeIn,
     easeInOut,
     easeOut,
@@ -36,9 +38,11 @@ import {
     progress,
     propEffect,
     resize,
+    scopeMotion,
     scroll,
     stagger,
     stringifyStyleObject,
+    toMediaQuery,
     transform,
     useAnimate,
     useAnimationFrame,
@@ -48,6 +52,7 @@ import {
     usePresence,
     usePresenceData,
     useReducedMotion,
+    useScopeMotion,
     useSpring,
     useTime,
     useTransform,
@@ -75,6 +80,18 @@ describe('public API: index.ts', () => {
     it('re-exports animate and hover from motion', () => {
         expect(typeof animate).toBe('function')
         expect(typeof hover).toBe('function')
+    })
+
+    it('exports the vanilla drag() gesture and its DragOptions type', () => {
+        const options: DragOptions = { axis: 'x', constraints: { left: 0, right: 200 } }
+        expect(typeof drag).toBe('function')
+        expect(options.axis).toBe('x')
+    })
+
+    it('re-exports Motion 14.5 scopeMotion, toMediaQuery and the useScopeMotion attachment', () => {
+        expect(typeof scopeMotion).toBe('function')
+        expect(typeof toMediaQuery).toBe('function')
+        expect(typeof useScopeMotion).toBe('function')
     })
 
     it('re-exports the Motion 13.2 effect registry primitives', () => {
@@ -166,7 +183,7 @@ describe('public API: index.ts', () => {
     it('re-exports arc() path factory from motion-dom', () => {
         expect(typeof arc).toBe('function')
         const path = arc({ strength: 1 })
-        expect(typeof path.animateVisualElement).toBe('function')
+        expect(typeof path.animateValues).toBe('function')
         expect(typeof path.interpolateProjection).toBe('function')
     })
 

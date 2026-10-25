@@ -1,5 +1,5 @@
 import { animate } from 'motion'
-import { getContext, setContext } from 'svelte'
+import { getContext, setContext, tick } from 'svelte'
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import {
     containsStatefulCloneContent,
@@ -286,6 +286,7 @@ describe('presence context', () => {
         // Allow animate().finished microtask to resolve
         await Promise.resolve()
         await Promise.resolve()
+        await tick()
         expect(onExitComplete).toHaveBeenCalled()
     })
 

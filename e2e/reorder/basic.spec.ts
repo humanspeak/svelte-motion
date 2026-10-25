@@ -127,7 +127,11 @@ test('keeps a held item pinned during upward swaps after earlier reversals', asy
             if (!running) return
             setTimeout(() => {
                 const item = document.querySelector<HTMLElement>('[data-testid="item-lettuce"]')
-                if (!running || item?.dataset.svelteMotionDragActive !== 'true') return
+                // Held-item signal: the fixture mirrors onDragStart/onDragEnd
+                // into data-dragging (Motion has no drag-active DOM marker;
+                // `onDragStart` fires from `frame.update`, motion-dom
+                // VisualElementDragControls.ts:191-193 @ v14.5.0).
+                if (!running || item?.dataset.dragging !== 'true') return
                 samples.push({
                     drift: item.getBoundingClientRect().top + halfHeight - pointerY,
                     order: document.querySelector('[data-testid="order"]')!.textContent

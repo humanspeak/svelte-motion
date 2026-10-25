@@ -1,7 +1,7 @@
 <!--
 @component
 Sign-off tour for the drag-single-writer batch (#449 follow-up): drag,
-momentum, whileDrag, whilePan and layout all write through the one
+momentum, whileDrag and layout all write through the one
 VisualElement per component. Each section states what it exercises, what
 PASS looks like, and what a FAILURE would look like.
 -->
@@ -12,9 +12,6 @@ PASS looks like, and what a FAILURE would look like.
     const glideY = useMotionValue(0)
     let glideReadout = $state('0')
     $effect(() => glideY.on('change', (v) => (glideReadout = v.toFixed(1))))
-
-    // §5 whilePan target
-    let panCount = $state(0)
 </script>
 
 <div class="min-h-screen bg-[#0b0d12] px-6 py-10 text-slate-200">
@@ -27,8 +24,7 @@ PASS looks like, and what a FAILURE would look like.
             <h1 class="mt-2 text-4xl font-black text-white">Drag Through the VisualElement</h1>
             <p class="mt-4 max-w-3xl text-lg leading-relaxed">
                 Drag was the last writer outside the VisualElement. Now its pointer writes, momentum
-                physics, <code>whileDrag</code>, <code>whilePan</code> and the layoutId FLIP all
-                flow through
+                physics, <code>whileDrag</code> and the layoutId FLIP all flow through
                 <strong class="text-orange-300">the same node as every other animation</strong> — which
                 is what makes §1 below possible at all. No transform-animating writer exists outside the
                 VisualElement anywhere in the library.
@@ -202,40 +198,7 @@ PASS looks like, and what a FAILURE would look like.
 
         <!-- ═══════════════ 5 ═══════════════ -->
         <section class="rounded-2xl border border-slate-700 bg-slate-900/60 p-8">
-            <h2 class="text-3xl font-black text-white">5 · whilePan through the same node</h2>
-            <p class="mt-2 text-slate-400">
-                <strong class="text-slate-200">Exercises:</strong> <code>whilePan</code> (our
-                extension — upstream has no pan variant) animates the VisualElement's values via
-                <code>animateTarget</code> and restores from the node's own
-                <code>baseTarget</code>. Pan anywhere on the pad (it doesn't move — pan is the
-                gesture, not the displacement).
-            </p>
-            <div class="mt-6 flex justify-center">
-                <motion.div
-                    whilePan={{ scale: 0.97, opacity: 0.7 }}
-                    onPanEnd={() => panCount++}
-                    class="flex h-32 w-full max-w-2xl cursor-crosshair items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-700 text-lg font-bold select-none"
-                    data-testid="pan-pad"
-                >
-                    PAN ACROSS ME — completed pans: {panCount}
-                </motion.div>
-            </div>
-            <div class="mt-5 grid gap-3 md:grid-cols-2">
-                <p class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm">
-                    <strong class="text-emerald-400">PASS:</strong> the pad dims and shrinks slightly
-                    for the duration of the pan and restores cleanly on release, every time; the counter
-                    ticks per completed pan.
-                </p>
-                <p class="rounded-lg border border-rose-500/40 bg-rose-500/10 p-3 text-sm">
-                    <strong class="text-rose-400">FAIL:</strong> the pad sticks dim after release, or
-                    restore snaps instead of animating.
-                </p>
-            </div>
-        </section>
-
-        <!-- ═══════════════ 6 ═══════════════ -->
-        <section class="rounded-2xl border border-slate-700 bg-slate-900/60 p-8">
-            <h2 class="text-3xl font-black text-white">6 · Drag inside layout animations</h2>
+            <h2 class="text-3xl font-black text-white">5 · Drag inside layout animations</h2>
             <p class="mt-2 text-slate-400">
                 <strong class="text-slate-200">Exercises:</strong> the projection interplay the batch
                 had to keep intact — drag + layoutId FLIP now share one writer (the legacy hand-rolled
