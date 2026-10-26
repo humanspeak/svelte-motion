@@ -20,6 +20,8 @@ type LayoutIdEntry = {
  *   on it is still the lead of its own shared-layout stack upstream, so nothing animates
  *   (framer-motion `MeasureLayout.tsx` @ v14.2.0, 47-49 / 154-155). Its stale entry is
  *   dropped, so a later arrival doesn't animate from it either.
+ * - `has(id)` — whether an unconsumed entry for `id` is in its handoff window, without
+ *   consuming it. A mounting element uses it to tell it is taking over a `layoutId`.
  *
  * Entries live through a handoff window: two animation frames and at least
  * {@link HANDOFF_MS} after the snapshot, extended while any `AnimatePresence` has an exit in
@@ -32,6 +34,13 @@ type LayoutIdEntry = {
 export type LayoutIdRegistry = {
     snapshot(id: string, rect: DOMRect, transition?: AnimationOptions, owner?: object): void
     consume(id: string, consumer?: object): LayoutIdEntry | undefined
+    /**
+     * Whether an unconsumed snapshot for `id` is in its handoff window. Does not consume it.
+     *
+     * @param id - The (scoped) layoutId to look up.
+     * @returns `true` while an entry for `id` is waiting to be consumed.
+     */
+    has(id: string): boolean
 }
 
 /**
@@ -130,6 +139,7 @@ export const holdLayoutIdHandoffs = (): (() => void) => {
  * ```
  */
 export const layoutIdRegistry: LayoutIdRegistry = {
+    has: (id) => entries.has(id),
     snapshot(id, rect, transition, owner) {
         entries.set(id, { rect, transition, owner })
         scheduleRelease(id)
