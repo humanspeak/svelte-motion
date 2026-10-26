@@ -22,7 +22,7 @@ description: "Run a callback on every animation frame for smooth, time-based ani
 
 # useAnimationFrame
 
-`useAnimationFrame` runs a callback once every animation frame, providing direct access to the browser's animation loop.
+`useAnimationFrame` runs a callback once every animation frame on Motion's frameloop, the same loop that drives Motion's own animations.
 
 ```svelte
 <script>
@@ -43,7 +43,7 @@ description: "Run a callback on every animation frame for smooth, time-based ani
 
 ## Usage
 
-The callback receives a `DOMHighResTimeStamp` representing the time elapsed since the time origin, in milliseconds.
+The callback receives `(time, delta)`, both in milliseconds. `time` counts from the loop's first frame (not the page's `performance.now()`), and `delta` is the time since the previous frame. It runs in Motion's `update` step, batched with Motion's own per-frame work.
 
 ```svelte
 <script lang="ts">
@@ -77,9 +77,11 @@ The callback receives a `DOMHighResTimeStamp` representing the time elapsed sinc
 
 `useAnimationFrame` provides a simple way to create time-based animations by:
 
-1. Starting a `requestAnimationFrame` loop when called
-2. Calling your callback with the current timestamp on each frame
+1. Scheduling your callback on Motion's frameloop (its `update` step) when called
+2. Calling your callback with `(time, delta)` on each frame: the milliseconds since the loop started and since the previous frame
 3. Returning a cleanup function that stops the animation loop
+
+Because it runs on Motion's frameloop, `processFrame()` and `MotionGlobalConfig.useManualTiming` drive it too.
 
 ### With $effect
 
@@ -105,8 +107,8 @@ For Svelte 5, wrap `useAnimationFrame` in a `$effect` and return its cleanup fun
 
 `useAnimationFrame` is optimized for performance:
 
-- **Native timing**: Uses `requestAnimationFrame` which runs at the optimal frame rate (typically 60 FPS)
-- **Automatic cleanup**: Cancels animation frames when the effect is destroyed
+- **Batched timing**: Runs on Motion's frameloop, once per display frame, in the same batch as Motion's own animations
+- **Automatic cleanup**: Removes the callback from the frameloop when the effect is destroyed
 - **SSR-safe**: Returns a no-op function in server-side rendering environments
 
 ## Common patterns
@@ -164,9 +166,10 @@ For Svelte 5, wrap `useAnimationFrame` in a `$effect` and return its cleanup fun
 
 ### Parameters
 
-The callback function receives one argument:
+The callback function receives two arguments:
 
-- **time** `number` - The total milliseconds since the animation started (DOMHighResTimeStamp)
+- **time** `number` - Milliseconds since the loop's first frame (not the page's `performance.now()`)
+- **delta** `number` - Milliseconds elapsed since the previous frame
 
 ### Returns
 
