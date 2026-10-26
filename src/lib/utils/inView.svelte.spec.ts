@@ -128,6 +128,71 @@ describe('useInView', () => {
         expect(io.instances().length).toBe(1)
     })
 
+    // Ported from Motion 14.6.0 `use-in-view.test.tsx` (#2579): the observed
+    // element can be attached, swapped or removed after mount.
+    describe('when the observed element changes after mount', () => {
+        it('observes an element attached after mount', () => {
+            let el = $state<HTMLElement | undefined>(undefined)
+            const { result: state } = inRoot(() => useInView(() => el))
+            flushSync()
+            expect(io.instances().length).toBe(0)
+
+            const div = document.createElement('div')
+            el = div
+            flushSync()
+            expect(io.instances().some((obs) => obs.elements.includes(div))).toBe(true)
+
+            io.fireOn(div, true)
+            expect(state.current).toBe(true)
+        })
+
+        it('resets to false and stops observing when the element is removed', () => {
+            const div = document.createElement('div')
+            let el = $state<HTMLElement | undefined>(div)
+            const { result: state } = inRoot(() => useInView(() => el))
+            flushSync()
+            io.fireOn(div, true)
+            expect(state.current).toBe(true)
+
+            el = undefined
+            flushSync()
+            expect(state.current).toBe(false)
+            expect(io.instances()[0].disconnect).toHaveBeenCalled()
+            expect(io.instances().some((obs) => obs.elements.includes(div))).toBe(false)
+        })
+
+        it('resets to false when the observed element is swapped', () => {
+            const a = document.createElement('div')
+            const b = document.createElement('div')
+            let el = $state<HTMLElement | undefined>(a)
+            const { result: state } = inRoot(() => useInView(() => el))
+            flushSync()
+            io.fireOn(a, true)
+            expect(state.current).toBe(true)
+
+            el = b
+            flushSync()
+            expect(state.current).toBe(false)
+            expect(io.instances().some((obs) => obs.elements.includes(b))).toBe(true)
+
+            io.fireOn(b, true)
+            expect(state.current).toBe(true)
+        })
+
+        it('once: stays true when the element is removed', () => {
+            const div = document.createElement('div')
+            let el = $state<HTMLElement | undefined>(div)
+            const { result: state } = inRoot(() => useInView(() => el, { once: true }))
+            flushSync()
+            io.fireOn(div, true)
+            expect(state.current).toBe(true)
+
+            el = undefined
+            flushSync()
+            expect(state.current).toBe(true)
+        })
+    })
+
     it('falls back to static state when IntersectionObserver is unavailable', () => {
         vi.stubGlobal('IntersectionObserver', undefined)
         const { result: state } = inRoot(() =>
