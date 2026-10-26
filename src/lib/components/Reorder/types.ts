@@ -26,10 +26,15 @@ export type ReorderGroupProps<V> = HTMLElementProps & {
      */
     values: V[]
     /**
-     * Fires with the new value order when a drag carries an item past
-     * a sibling. Assign the result back to the state driving `values`.
+     * A callback to fire with the new value order. Assign the result back
+     * to the state driving `values`.
+     *
+     * The second argument is the value of the item that moved. Its old and
+     * new positions are `values.indexOf(moved)` and `newOrder.indexOf(moved)`.
+     * This fires for each step of a drag, not once when it ends, so these
+     * describe that step's move.
      */
-    onReorder: (newOrder: V[]) => void
+    onReorder: (newOrder: V[], moved: V) => void
     /**
      * Capture-phase `pointerdown` listener on the group element. Runs after
      * the group resets its post-drag click guard.

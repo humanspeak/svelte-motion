@@ -20,7 +20,7 @@
         itemSizeAnimation?: boolean
         groupStyle?: string
         onDrag?: (event: PointerEvent, info: DragInfo) => void
-        onReorder?: (next: number[]) => void
+        onReorder?: (next: number[], moved: number) => void
     } = $props()
 </script>
 

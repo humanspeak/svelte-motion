@@ -12,12 +12,12 @@
      * @prop as - Element to render. Defaults to `'ul'`.
      * @prop axis - Axis to reorder along. Detected from item layout when omitted.
      * @prop values - The current order of item values.
-     * @prop onReorder - Receives the new order after a swap.
+     * @prop onReorder - Receives the new order and the moved item's value after a swap.
      */
     import MotionContainer from '$lib/html/_MotionContainer.svelte'
     import type { Box } from '$lib/utils/projection'
     import { isMotionValueChild } from '$lib/utils/motionValueChild'
-    import { checkReorder } from './checkReorder'
+    import { checkReorder, moveItem } from './checkReorder'
     import { setReorderContext, type ItemData } from './context'
     import { detectAxis } from './detectAxis'
     import { applyOrderSwap } from './order'
@@ -62,6 +62,23 @@
             return layout ? [{ value, layout }] : []
         })
 
+    /**
+     * Write the measured items' new order back into their slots in `values`,
+     * leaving unmeasured values in place, and fire `onReorder` only if
+     * something moved (Motion 14.6.0 `Reorder/Group.tsx` `commit`).
+     *
+     * @returns Whether `onReorder` was called.
+     */
+    const commit = (order: ItemData<V>[], newOrder: ItemData<V>[], moved: V): boolean => {
+        const newValues = applyOrderSwap(values, order, newOrder)
+        if (!newValues.some((value, index) => value !== values[index])) return false
+        onReorder(newValues, moved)
+        return true
+    }
+
+    const isRTL = (): boolean =>
+        ref?.ownerDocument.defaultView?.getComputedStyle(ref).direction === 'rtl'
+
     const updateDetectedAxis = (): void => {
         if (axisOverride === undefined) {
             detectedAxis = detectAxis(getMeasuredOrder().map(({ layout }) => layout))
@@ -97,22 +114,64 @@
             if (isReordering) return
 
             const order = getMeasuredOrder()
-            const direction =
-                ref?.ownerDocument.defaultView?.getComputedStyle(ref).direction === 'rtl'
-                    ? 'rtl'
-                    : 'ltr'
+            const direction = isRTL() ? 'rtl' : 'ltr'
             const newOrder = checkReorder(order, value, offset, velocity, axis, direction)
 
             if (order !== newOrder) {
                 isReordering = true
                 hasReordered = true
-                onReorder(applyOrderSwap(values, order, newOrder))
+                commit(order, newOrder, value)
             }
         },
         getGroupElement: () => ref ?? null,
         clearReordered: () => {
             hasReordered = false
-        }
+        },
+        // Motion 14.6.0 `Reorder/Group.tsx` `onKeyDown`, line for line, except
+        // that the grab snapshot is a copy (`values` may be mutated in place)
+        // and it reports whether it committed a new order.
+        onKeyDown: (event, item, from, grab) => {
+            const { key, currentTarget } = event
+            if (
+                event.defaultPrevented ||
+                event.target !== currentTarget ||
+                event.altKey ||
+                event.ctrlKey ||
+                event.metaKey
+            ) {
+                return false
+            }
+            const order = getMeasuredOrder()
+            const keyIndex = ['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'].indexOf(key)
+            const isX = keyIndex % 2
+            let committed = false
+            if (key === ' ') {
+                if (!event.repeat) grab(currentTarget, from ? undefined : [...values])
+            } else if (!from) {
+                return false
+            } else if (key === 'Escape') {
+                // Values added since the grab keep their slots.
+                const kept = from.flatMap((value) => order.filter((data) => data.value === value))
+                committed = commit(
+                    order,
+                    order.map((data) => (from.includes(data.value) ? kept.shift()! : data)),
+                    item
+                )
+                grab(currentTarget)
+            } else if (keyIndex < 0 || (axis !== 'xy' && axis !== (isX ? 'x' : 'y'))) {
+                return false
+            } else {
+                const index = order.findIndex(({ value }) => value === item)
+                const target = index + (keyIndex > 1 !== !!(isX && isRTL()) ? 1 : -1)
+                if (index > -1 && order[target]) {
+                    committed = commit(order, moveItem(order, index, target), item)
+                }
+            }
+            event.preventDefault()
+            return committed
+        },
+        // Track identity and contents so in-place $state mutations count too.
+        trackOrder: () => values.forEach(() => {})
     })
 
     $effect(() => {

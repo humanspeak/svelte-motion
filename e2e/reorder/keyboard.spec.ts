@@ -1,0 +1,283 @@
+import { expect, test, type Page } from '@playwright/test'
+
+/**
+ * #2658 (Motion 14.6.0): Space grabs the focused Reorder.Item, arrows move
+ * it, Space drops it and Escape cancels. The grab has to survive Svelte's
+ * keyed each moving the node, which can blur it, and has to end when focus
+ * really leaves. Only a real browser checks either: jsdom doesn't blur an
+ * element when it's moved.
+ *
+ * Port of upstream `tests/react/issue-2658.spec.ts`; the last two tests are
+ * Svelte-specific additions.
+ */
+const order = (page: Page) => page.locator('#order').textContent()
+const focused = (page: Page) => page.evaluate(() => document.activeElement?.id)
+/**
+ * Grabbed items show their whileDrag opacity, read after it has rendered.
+ */
+const grabbed = (page: Page) =>
+    page.evaluate(async () => {
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+        return Array.from(document.querySelectorAll('li'))
+            .filter((element) => getComputedStyle(element).opacity === '0.5')
+            .map((element) => element.id)
+            .join(',')
+    })
+const scrollY = (page: Page) => page.evaluate(() => window.scrollY)
+const press = (page: Page, key: string) => page.keyboard.press(key)
+
+/**
+ * Open the test page and wait for hydration (the page reads its query
+ * params on mount, then marks the order readout ready).
+ */
+const open = async (page: Page, query = '') => {
+    await page.goto(`/tests/reorder/keyboard?@isPlaywright=true${query}`)
+    await page.locator('#order[data-ready]').waitFor()
+}
+
+test.describe('reorder/keyboard (#2658)', () => {
+    test('arrows scroll until Space grabs, then move until Space drops', async ({ page }) => {
+        await open(page)
+        await page.focus('#before')
+        await press(page, 'Tab')
+        expect(await focused(page)).toBe('a')
+
+        // Not grabbed: the arrow is the page's
+        await press(page, 'ArrowDown')
+        expect(await order(page)).toBe('a,b,c,d')
+        await expect.poll(() => scrollY(page)).toBeGreaterThan(0)
+        // Svelte port addition: Chromium's smooth keyboard scroll keeps
+        // running after `scrollTo(0, 0)` and drifts the page back down, so
+        // let it finish before resetting (otherwise the final check races it).
+        await expect
+            .poll(async () => {
+                const before = await scrollY(page)
+                await page.waitForTimeout(100)
+                return (await scrollY(page)) === before
+            })
+            .toBe(true)
+        await page.evaluate(() => window.scrollTo(0, 0))
+
+        await press(page, 'Space')
+        await expect.poll(() => grabbed(page)).toBe('a')
+
+        await press(page, 'ArrowDown')
+        expect(await order(page)).toBe('b,a,c,d')
+        expect(await focused(page)).toBe('a')
+        await expect.poll(() => grabbed(page)).toBe('a')
+
+        await press(page, 'ArrowDown')
+        await press(page, 'ArrowDown')
+        expect(await order(page)).toBe('b,c,d,a')
+        expect(await focused(page)).toBe('a')
+        await expect.poll(() => grabbed(page)).toBe('a')
+
+        // Past the end
+        await press(page, 'ArrowDown')
+        expect(await order(page)).toBe('b,c,d,a')
+
+        await press(page, 'ArrowUp')
+        expect(await order(page)).toBe('b,c,a,d')
+        expect(await focused(page)).toBe('a')
+
+        // Across the axis
+        await press(page, 'ArrowRight')
+        expect(await order(page)).toBe('b,c,a,d')
+
+        await press(page, 'Space')
+        await expect.poll(() => grabbed(page)).toBe('')
+        await press(page, 'ArrowUp')
+        expect(await order(page)).toBe('b,c,a,d')
+
+        // Neither Space nor the moving arrows scrolled the page
+        await page.waitForTimeout(200)
+        expect(await scrollY(page)).toBe(0)
+    })
+
+    test("Enter doesn't grab", async ({ page }) => {
+        await open(page)
+        await page.focus('#b')
+        await press(page, 'Enter')
+        await expect.poll(() => grabbed(page)).toBe('')
+        await press(page, 'ArrowUp')
+        expect(await order(page)).toBe('a,b,c,d')
+    })
+
+    test('Escape restores the order from the grab', async ({ page }) => {
+        await open(page)
+        await page.focus('#b')
+        await press(page, 'Space')
+        await press(page, 'ArrowDown')
+        await press(page, 'ArrowDown')
+        expect(await order(page)).toBe('a,c,d,b')
+
+        await press(page, 'Escape')
+        expect(await order(page)).toBe('a,b,c,d')
+        await expect.poll(() => grabbed(page)).toBe('')
+        expect(await focused(page)).toBe('b')
+
+        await press(page, 'ArrowDown')
+        expect(await order(page)).toBe('a,b,c,d')
+    })
+
+    test('the grab and focus survive a held key', async ({ page }) => {
+        await open(page)
+        await page.focus('#d')
+        await press(page, 'Space')
+        for (let i = 0; i < 3; i++) {
+            await page.keyboard.down('ArrowUp')
+        }
+        await page.keyboard.up('ArrowUp')
+        expect(await order(page)).toBe('d,a,b,c')
+        expect(await focused(page)).toBe('d')
+        await expect.poll(() => grabbed(page)).toBe('d')
+    })
+
+    test('moving an item up keeps focus and the grab', async ({ page }) => {
+        // Svelte's keyed each moves a different node depending on direction
+        await open(page)
+        await page.focus('#c')
+        await press(page, 'Space')
+        await press(page, 'ArrowUp')
+        expect(await order(page)).toBe('a,c,b,d')
+        expect(await focused(page)).toBe('c')
+        await expect.poll(() => grabbed(page)).toBe('c')
+        await press(page, 'ArrowUp')
+        expect(await order(page)).toBe('c,a,b,d')
+    })
+
+    test('a reorder in a transition keeps focus and the grab', async ({ page }) => {
+        await open(page, '&transition')
+        await page.focus('#b')
+        await press(page, 'Space')
+        await press(page, 'ArrowDown')
+        await expect.poll(() => order(page)).toBe('a,c,b,d')
+        await press(page, 'ArrowUp')
+        await expect.poll(() => order(page)).toBe('a,b,c,d')
+        await press(page, 'ArrowUp')
+        await expect.poll(() => order(page)).toBe('b,a,c,d')
+        expect(await focused(page)).toBe('b')
+        await expect.poll(() => grabbed(page)).toBe('b')
+
+        await press(page, 'Escape')
+        await expect.poll(() => order(page)).toBe('a,b,c,d')
+        await expect.poll(() => grabbed(page)).toBe('')
+    })
+
+    test('Tab away drops, keeping the order', async ({ page }) => {
+        await open(page)
+        await page.focus('#a')
+        await press(page, 'Space')
+        await press(page, 'ArrowDown')
+        await press(page, 'Tab')
+        expect(await focused(page)).toBe('a-input')
+        await expect.poll(() => grabbed(page)).toBe('')
+        expect(await order(page)).toBe('b,a,c,d')
+
+        await press(page, 'Shift+Tab')
+        expect(await focused(page)).toBe('a')
+        await press(page, 'ArrowDown')
+        expect(await order(page)).toBe('b,a,c,d')
+    })
+
+    test('clicking elsewhere drops, keeping the order', async ({ page }) => {
+        await open(page)
+        await page.focus('#a')
+        await press(page, 'Space')
+        await press(page, 'ArrowDown')
+        await page.mouse.click(400, 600)
+        expect(await focused(page)).not.toBe('a')
+        await expect.poll(() => grabbed(page)).toBe('')
+        expect(await order(page)).toBe('b,a,c,d')
+    })
+
+    test('whileDrag applies while grabbed', async ({ page }) => {
+        await open(page)
+        const opacity = () => page.$eval('#a', (element) => getComputedStyle(element).opacity)
+        await page.focus('#a')
+        expect(await opacity()).toBe('1')
+
+        await press(page, 'Space')
+        await expect.poll(opacity).toBe('0.5')
+        await press(page, 'ArrowDown')
+        await page.waitForTimeout(100)
+        expect(await opacity()).toBe('0.5')
+
+        await press(page, 'Space')
+        await expect.poll(opacity).toBe('1')
+
+        await press(page, 'Space')
+        await expect.poll(opacity).toBe('0.5')
+        await page.focus('#before')
+        await expect.poll(opacity).toBe('1')
+    })
+
+    test("keys inside an item don't grab or reorder", async ({ page }) => {
+        await open(page)
+        await page.focus('#a-input')
+        await press(page, 'Space')
+        await press(page, 'Enter')
+        await press(page, 'ArrowDown')
+        await press(page, 'ArrowRight')
+        await expect.poll(() => grabbed(page)).toBe('')
+        expect(await order(page)).toBe('a,b,c,d')
+        expect(await page.$eval('#a-input', (input: HTMLInputElement) => input.value)).toBe(' ')
+    })
+
+    test('x axis and RTL', async ({ page }) => {
+        await open(page, '&axis=x')
+        await page.focus('#a')
+        await press(page, 'Space')
+        await press(page, 'ArrowRight')
+        expect(await order(page)).toBe('b,a,c,d')
+        expect(await focused(page)).toBe('a')
+
+        await open(page, '&axis=x&rtl')
+        await page.focus('#a')
+        await press(page, 'Space')
+        await press(page, 'ArrowLeft')
+        expect(await order(page)).toBe('b,a,c,d')
+        expect(await focused(page)).toBe('a')
+    })
+
+    test('the reorder layout-animates', async ({ page }) => {
+        await open(page, '&layout')
+        await page.focus('#a')
+        await press(page, 'Space')
+        const before = await page.locator('#a').boundingBox()
+        await press(page, 'ArrowDown')
+        await page.waitForTimeout(500)
+        const mid = await page.locator('#a').boundingBox()
+        // 50px per slot (40px + 10px gap); halfway through a 1s linear move
+        expect(mid!.y - before!.y).toBeGreaterThan(10)
+        expect(mid!.y - before!.y).toBeLessThan(40)
+        expect(await focused(page)).toBe('a')
+        await expect.poll(() => grabbed(page)).toBe('a')
+    })
+
+    // Svelte-specific (not in upstream): Svelte doesn't restore focus after
+    // a keyed-each move, so the item refocuses itself once `values` changes.
+
+    test('Escape that restores a moved item keeps focus', async ({ page }) => {
+        await open(page)
+        await page.focus('#b')
+        await press(page, 'Space')
+        await press(page, 'ArrowDown')
+        expect(await order(page)).toBe('a,c,b,d')
+
+        await press(page, 'Escape')
+        expect(await order(page)).toBe('a,b,c,d')
+        expect(await focused(page)).toBe('b')
+        await expect.poll(() => grabbed(page)).toBe('')
+    })
+
+    test('a deferred reorder keeps focus and the grab', async ({ page }) => {
+        await open(page, '&deferred')
+        await page.focus('#b')
+        await press(page, 'Space')
+        await press(page, 'ArrowDown')
+        await expect.poll(() => order(page)).toBe('a,c,b,d')
+        expect(await focused(page)).toBe('b')
+        await expect.poll(() => grabbed(page)).toBe('b')
+    })
+})
