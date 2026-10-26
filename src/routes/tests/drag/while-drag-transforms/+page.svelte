@@ -6,9 +6,91 @@
      * @component
      */
     import { motion } from '$lib'
+    import { onMount } from 'svelte'
+    import TesterPanel, { type TesterStep } from '../../layout/_parity/TesterPanel.svelte'
 
     let inserted = $state(false)
     let stackBounds: HTMLElement | null = $state(null)
+
+    // ---- Live verdict for the cross-axis case (tester only) ----
+    //
+    // Motion 14.6 (#2255, upstream 9632e2c3d) compensates layout changes only
+    // on drag axes, so the x-only card follows its layout on y with no
+    // translateY. After the insert, sample the card's computed translateY
+    // (m42) every frame while it is held and for 500ms after release.
+
+    /** How long after release translateY is still watched, in ms. */
+    const SETTLE_MS = 500
+
+    let worstY = $state(0)
+    let sampled = $state(false)
+
+    const verdict = $derived(
+        !inserted || !sampled ? 'waiting' : worstY <= 0.5 ? 'follows' : 'stale'
+    )
+
+    onMount(() => {
+        if (window.location.search.includes('@isPlaywright=true')) return
+
+        let dragging = false
+        let releasedAt = -Infinity
+        const onDown = (event: PointerEvent) => {
+            const card = document.querySelector('[data-testid="cross-axis-card"]')
+            if (card && event.target instanceof Node && card.contains(event.target)) {
+                dragging = true
+            }
+        }
+        const onUp = () => {
+            if (!dragging) return
+            dragging = false
+            releasedAt = performance.now()
+        }
+
+        let raf = 0
+        const sample = () => {
+            raf = requestAnimationFrame(sample)
+            if (!inserted) return
+            if (!dragging && performance.now() - releasedAt > SETTLE_MS) return
+            const card = document.querySelector<HTMLElement>('[data-testid="cross-axis-card"]')
+            if (!card) return
+            const m42 = new DOMMatrixReadOnly(getComputedStyle(card).transform).m42
+            sampled = true
+            worstY = Math.max(worstY, Math.abs(m42))
+        }
+        raf = requestAnimationFrame(sample)
+        window.addEventListener('pointerdown', onDown, true)
+        window.addEventListener('pointerup', onUp, true)
+        window.addEventListener('pointercancel', onUp, true)
+        return () => {
+            cancelAnimationFrame(raf)
+            window.removeEventListener('pointerdown', onDown, true)
+            window.removeEventListener('pointerup', onUp, true)
+            window.removeEventListener('pointercancel', onUp, true)
+        }
+    })
+
+    const steps: TesterStep[] = [
+        {
+            text: 'Press and hold the cross-axis card ("drag x · follows its layout on y"), drag it right a little and keep holding.',
+            expected: 'It moves on x only.'
+        },
+        {
+            text: 'While holding, press "Insert content above" (keyboard Tab + Enter, or the "Do it" button here, which calls the button\'s click()).',
+            expected:
+                "The card drops down with its slot by the inserted block's height, in one step, and stays under the same x offset.",
+            action: {
+                run: () =>
+                    document
+                        .querySelector<HTMLButtonElement>('[data-testid="insert-above"]')
+                        ?.click()
+            }
+        },
+        {
+            text: 'Release.',
+            expected:
+                'The card stays where its layout put it. No jump back up and no slow drift on y. The chip reads FOLLOWS LAYOUT ✓. Press "Reset page" to try again.'
+        }
+    ]
 </script>
 
 <svelte:head>
@@ -18,8 +100,8 @@
 <main>
     <h1>whileDrag transform composition</h1>
     <p>
-        Hold each card while dragging. Rotation, 3D transforms, and cross-axis layout pinning should
-        remain composed with the live drag translation.
+        Hold each card while dragging. Rotation, 3D transforms, and cross-axis layout following
+        should remain composed with the live drag translation.
     </p>
 
     <section>
@@ -39,7 +121,7 @@
     </section>
 
     <section>
-        <h2>Cross-axis layout pinning</h2>
+        <h2>Cross-axis layout</h2>
         <button
             type="button"
             data-testid="insert-above"
@@ -59,7 +141,7 @@
                 dragMomentum={false}
                 layout
             >
-                drag x · stay pinned on y
+                drag x · follows its layout on y
             </motion.div>
         </div>
     </section>
@@ -151,7 +233,55 @@
     </section>
 </main>
 
+<TesterPanel
+    eyebrow="Motion 14.6.0 · #2255"
+    title="An x-only drag follows its layout on y"
+    status="Passes on this build (Motion 14.6.0)."
+    {steps}
+>
+    {#snippet summary()}
+        {#if verdict === 'follows'}
+            <span class="verdict ok">FOLLOWS LAYOUT ✓</span>
+        {:else if verdict === 'stale'}
+            <span class="verdict bad">STALE Y ✗ {worstY.toFixed(1)}px</span>
+        {:else}
+            <span class="verdict na">WAITING</span>
+        {/if}
+    {/snippet}
+    {#snippet checks()}
+        <p>
+            The "Cross-axis layout" card drags on x only. When content is inserted above it
+            mid-drag, its slot moves down. Since Motion 14.6 the drag only compensates the axes it
+            drags, so the card moves down with its slot instead of being held in place by a
+            <code>translateY</code>.
+        </p>
+        <p>
+            Before 14.6 the card stayed put during the drag and was left with a stale
+            <code>translateY</code> after release, because nothing ever animates a non-drag axis back.
+        </p>
+    {/snippet}
+</TesterPanel>
+
 <style>
+    .verdict {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+    .verdict.ok {
+        background: #dcfce7;
+        color: #166534;
+    }
+    .verdict.bad {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    .verdict.na {
+        background: #f1f5f9;
+        color: #475569;
+    }
     :global(body) {
         margin: 0;
         background: #07100f;
