@@ -456,7 +456,7 @@ describe('ExitAnimationFeature', () => {
 })
 
 describe('DragGestureFeature', () => {
-    // Port of framer-motion `gestures/drag/index.ts` @ v14.5.0. The controller's
+    // Port of framer-motion `gestures/drag/index.ts` @ v14.6.0. The controller's
     // `addListeners()` needs a projection node; stub it so this exercises only
     // the feature's lifecycle (subscribe, re-subscribe, teardown).
     const mountWithDrag = (props: Record<string, unknown>) => {
