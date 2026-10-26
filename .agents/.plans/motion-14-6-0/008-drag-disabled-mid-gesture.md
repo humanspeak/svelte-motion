@@ -13,9 +13,15 @@
 > `dragAxes` argument from 14.6.0. Before starting, confirm `grep -n '"motion-dom": "14.6.0"' package.json` prints
 > a line. If not, STOP.
 >
-> **Drift check (run first)**: `git diff --stat 45a24c6e..HEAD -- src/lib/utils/visualElementCore.ts src/lib/utils/visualElementCore.spec.ts src/routes/tests/drag e2e/drag src/routes/+page.svelte`
-> Expected: only plan 001's changes, if any (none touch these paths). On any other change, compare the "Current
-> state" excerpts with the live code; on a mismatch, STOP.
+> **Revision 2026-10-26 (pre-flight)**: re-baselined to `b5e7e907`, the `feat/motion-14.6.0` tip after every other plan
+> merged. Plan 001 legitimately rewrote `e2e/drag/while-drag-transforms.spec.ts` (the cross-axis test, now "an x-only
+> drag follows its layout on y", #2255) and its page (new tester panel), and plans 001/005/006/009 added links to
+> `src/routes/+page.svelte`. Keep all of that; add your link next to the drag links.
+>
+> **Drift check (run first)**: `git diff --stat b5e7e907..HEAD -- src/lib/utils/visualElementCore.ts src/lib/utils/visualElementCore.spec.ts src/routes/tests/drag e2e/drag src/routes/+page.svelte`
+> Expected: no output. Also confirm `git diff --stat 45a24c6e..b5e7e907 -- src/lib/utils/visualElementCore.ts src/lib/utils/visualElementCore.spec.ts`
+> prints nothing (no plan touched those files). On a mismatch, compare the "Current state" excerpts with the live
+> code; on a mismatch there, STOP.
 
 ## Status
 
@@ -25,7 +31,7 @@
 - **Depends on**: 001 (needs `stop(…, dragAxes)` from motion-dom 14.6.0)
 - **Wave**: 2
 - **Category**: bug (upstream parity)
-- **Planned at**: commit `45a24c6e` (`origin/main`, v2.5.0, Motion 14.5.0), 2026-10-26
+- **Planned at**: commit `45a24c6e` (`origin/main`, v2.5.0, Motion 14.5.0), 2026-10-26; re-baselined to `b5e7e907` (feat/motion-14.6.0, Motion 14.6.0) at dispatch
 
 ## Why this matters
 
