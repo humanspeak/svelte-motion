@@ -996,6 +996,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/takeover-initial') + searchParams}
+                    >
+                        layoutId — a takeover doesn't replay its initial entrance (#2362)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout/scroll') + searchParams}
                     >
                         layoutScroll — single container
