@@ -456,7 +456,7 @@ describe('ExitAnimationFeature', () => {
 })
 
 describe('DragGestureFeature', () => {
-    // Port of framer-motion `gestures/drag/index.ts` @ v14.5.0. The controller's
+    // Port of framer-motion `gestures/drag/index.ts` @ v14.6.0. The controller's
     // `addListeners()` needs a projection node; stub it so this exercises only
     // the feature's lifecycle (subscribe, re-subscribe, teardown).
     const mountWithDrag = (props: Record<string, unknown>) => {
@@ -519,6 +519,35 @@ describe('DragGestureFeature', () => {
         ve.update({ drag: true, dragControls: second }, null)
         ve.updateFeatures()
         expect(secondSubscribe).toHaveBeenCalledOnce()
+
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    // Upstream #2248 (`b0060fd42`, Motion 14.6.0): turning `drag` off mid-gesture
+    // (e.g. from `onDrag`) ends the gesture as if released, on the axes it was
+    // dragging. The feature stays mounted when disabled, so `update()` still runs.
+    it('ends the gesture with the previous drag axes when drag turns off', () => {
+        const { element, ve, feature } = mountWithDrag({ drag: 'y' })
+        const stop = vi.spyOn(feature.controls, 'stop')
+
+        ve.update({ drag: false }, null)
+        ve.updateFeatures()
+
+        expect(stop).toHaveBeenCalledExactlyOnceWith(undefined, undefined, 'y')
+
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    it('does not end the gesture when drag stays on across an update', () => {
+        const { element, ve, feature } = mountWithDrag({ drag: 'y' })
+        const stop = vi.spyOn(feature.controls, 'stop')
+
+        ve.update({ drag: 'y' }, null)
+        ve.updateFeatures()
+
+        expect(stop).not.toHaveBeenCalled()
 
         ve.unmount()
         visualElementStore.delete(element)
