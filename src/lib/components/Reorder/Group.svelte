@@ -12,7 +12,7 @@
      * @prop as - Element to render. Defaults to `'ul'`.
      * @prop axis - Axis to reorder along. Detected from item layout when omitted.
      * @prop values - The current order of item values.
-     * @prop onReorder - Receives the new order after a swap.
+     * @prop onReorder - Receives the new order and the moved item's value after a swap.
      */
     import MotionContainer from '$lib/html/_MotionContainer.svelte'
     import type { Box } from '$lib/utils/projection'
@@ -62,6 +62,16 @@
             return layout ? [{ value, layout }] : []
         })
 
+    /**
+     * Write the measured items' new order back into their slots in `values`,
+     * leaving unmeasured values in place, and fire `onReorder` only if
+     * something moved (Motion 14.6.0 `Reorder/Group.tsx` `commit`).
+     */
+    const commit = (order: ItemData<V>[], newOrder: ItemData<V>[], moved: V): void => {
+        const newValues = applyOrderSwap(values, order, newOrder)
+        if (newValues.some((value, index) => value !== values[index])) onReorder(newValues, moved)
+    }
+
     const updateDetectedAxis = (): void => {
         if (axisOverride === undefined) {
             detectedAxis = detectAxis(getMeasuredOrder().map(({ layout }) => layout))
@@ -106,7 +116,7 @@
             if (order !== newOrder) {
                 isReordering = true
                 hasReordered = true
-                onReorder(applyOrderSwap(values, order, newOrder))
+                commit(order, newOrder, value)
             }
         },
         getGroupElement: () => ref ?? null,

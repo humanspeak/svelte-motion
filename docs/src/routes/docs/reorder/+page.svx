@@ -197,9 +197,11 @@ Items are motion components underneath — every [drag prop](/docs/drag) (`while
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `values` | `V[]` | — | The current order of item values (required) |
-| `onReorder` | `(newOrder: V[]) => void` | — | Fires with the new order after a swap (required) |
+| `onReorder` | `(newOrder: V[], moved: V) => void` | — | Fires with the new order and the moved item's value after each swap (required) |
 | `axis` | `'x' \| 'y' \| 'xy'` | detected | Override the detected reorder axis; use `'xy'` for wrapped layouts |
 | `as` | `string` | `'ul'` | The HTML element to render |
+
+The moved item's old and new positions are `values.indexOf(moved)` and `newOrder.indexOf(moved)`. `onReorder` fires for each step of a drag, not once when it ends, so these positions describe that step.
 
 All other motion props are forwarded to the underlying motion element.
 
