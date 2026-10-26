@@ -9,6 +9,13 @@
 > **Port rule**: this lane's Playwright port is **4205** (`PW_PORT=4205`). Never use or kill port 4198. Never set
 > `PW_REUSE_SERVER`.
 >
+> **Revision 2026-10-26** (operator-approved, after the first run stopped at Step 2): Svelte 5 shows a signal's
+> pre-update value inside an effect cleanup, so `createBooleanSnapshot`'s `if (value === current) return` read the
+> stale `false` and skipped the reset when an enter and an element swap landed in the same update. Step 2 now
+> also fixes the shared helper, and `src/lib/utils/booleanSnapshot.svelte.ts` plus a new
+> `booleanSnapshot.svelte.spec.ts` are in scope. The Step 1 tests stay as written (no `flushSync()` between enter
+> and the swap; that same-update case is the bug).
+>
 > **Drift check (run first)**: `git diff --stat 45a24c6e..HEAD -- src/lib/utils/inView.svelte.ts src/lib/utils/inView.svelte.spec.ts docs/src/routes/docs/use-in-view src/routes/tests/inView e2e/utilities/in-view.spec.ts src/routes/+page.svelte`
 > Expected: no output. On any change, compare the "Current state" excerpts with the live code; on a mismatch, STOP.
 
@@ -132,6 +139,7 @@ the observed element is swapped", "once: stays true and stops observing when the
 **In scope**:
 
 - `src/lib/utils/inView.svelte.ts`, `src/lib/utils/inView.svelte.spec.ts`
+- `src/lib/utils/booleanSnapshot.svelte.ts`, `src/lib/utils/booleanSnapshot.svelte.spec.ts` (create; see the revision note)
 - `src/routes/tests/inView/element-after-mount/+page.svelte` (create), `e2e/utilities/in-view-element-after-mount.spec.ts` (create)
 - `src/routes/+page.svelte` (one link, next to the existing inView link)
 - `docs/src/routes/docs/use-in-view/+page.svx` (example uses `$state`; one note)
@@ -201,8 +209,34 @@ Update the hook's JSDoc: change the example to `let ref = $state<HTMLElement>()`
 getter that reads `$state` (as with `bind:this` on a `$state` variable) to have swaps and removals tracked; a plain
 `let` is resolved once it hydrates but later changes aren't seen."
 
-**Verify**: `pnpm exec vitest run src/lib/utils/inView.svelte.spec.ts` → all pass, including the existing
-"disconnects the observer on unmount" and "latches on first enter when once: true".
+Fix the shared helper too. In `booleanSnapshot.svelte.ts` keep a plain mirror of the value for the same-value
+check, so the check never reads `$state` (an effect cleanup sees the pre-update value of `$state`):
+
+```ts
+    let current = $state(initial)
+    // Same-value check against a plain copy: inside an effect cleanup Svelte
+    // shows `$state` as it was before the current update, so comparing with
+    // `current` there can skip a real change.
+    let latest = initial
+    // …
+    const set = (value: boolean) => {
+        if (value === latest) return
+        latest = value
+        current = value
+        for (const sub of subscribers) sub(value)
+    }
+```
+
+`subscribe`'s initial `run(current)` stays as is. Create `booleanSnapshot.svelte.spec.ts` with: same-value `set`
+is a no-op (subscriber not called); `set(true)` then, in the same update, an effect cleanup calling `set(false)`
+leaves `current === false` and notifies subscribers with `false` (red against the old helper: write it first and
+confirm it fails before changing the helper). Update the helper's JSDoc line on same-value writes to mention the
+plain mirror.
+
+**Verify**: `pnpm exec vitest run src/lib/utils/booleanSnapshot.svelte.spec.ts src/lib/utils/inView.svelte.spec.ts`
+→ all pass, including the existing "disconnects the observer on unmount" and "latches on first enter when
+once: true". Then `pnpm exec vitest run src/lib/utils/reducedMotion src/lib/utils/reducedMotionConfig` (the
+helper's other users) → all pass.
 
 ### Step 3: E2E page and spec
 
