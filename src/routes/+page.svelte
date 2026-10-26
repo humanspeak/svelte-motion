@@ -604,6 +604,14 @@
                         Reorder click after drag (#2682)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/wrap-axis-x') + searchParams}
+                    >
+                        Reorder wrapping axis="x" group, no stray translateY (#2255)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
@@ -975,6 +983,14 @@
                         href={resolve('/tests/layout-id/shift-swap') + searchParams}
                     >
                         layoutId — same-update shift + swap starts from the painted position
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/scale-handoff') + searchParams}
+                    >
+                        layoutId — shared element animating scale never overshoots (#2284)
                     </a>
                 </li>
                 <li>
