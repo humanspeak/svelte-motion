@@ -193,6 +193,10 @@ export type InViewState = BooleanSnapshot
  * deferred — if the element isn't ready, the hook polls on
  * `requestAnimationFrame` until it is.
  *
+ * Pass a getter that reads `$state` (as with `bind:this` on a `$state`
+ * variable) to have swaps and removals tracked; a plain `let` is resolved
+ * once it hydrates but later changes aren't seen.
+ *
  * Lifecycle: the IntersectionObserver is bound to the surrounding reactive
  * scope via `$effect`. The observer attaches at mount and detaches at
  * unmount, regardless of how many consumers are reading `.current` or
@@ -213,7 +217,7 @@ export type InViewState = BooleanSnapshot
  * <script>
  *   import { useInView } from '@humanspeak/svelte-motion'
  *
- *   let ref
+ *   let ref = $state<HTMLElement>()
  *   const inView = useInView(() => ref, { once: true })
  *
  *   $effect(() => {
@@ -270,7 +274,17 @@ export const useInView = (target: ElementOrGetter, options: UseInViewOptions = {
             )
     })
 
-    $effect(() => attachable.subscribe())
+    // Motion 14.6.0 `use-in-view.ts` (#2579): when the observed element is
+    // attached, swapped or removed, re-observe and reset to false, as the new
+    // element (if any) hasn't been seen yet. With a `$state` ref the effect
+    // re-runs on each change, because `subscribe()` resolves the getter here.
+    $effect(() => {
+        const release = attachable.subscribe()
+        return () => {
+            release()
+            if (!latched) set(false)
+        }
+    })
 
     return state
 }
