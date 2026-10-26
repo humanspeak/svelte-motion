@@ -1,5 +1,8 @@
+import { frameData } from 'motion-dom'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { autoScrollIfNeeded, resetAutoScrollState, selectAutoScrollAxis } from './autoScroll'
+
+const originalFrameDelta = frameData.delta
 
 describe('selectAutoScrollAxis', () => {
     it('preserves a one-dimensional group axis', () => {
@@ -35,10 +38,13 @@ const makeScrollableList = () => {
 describe('autoScrollIfNeeded', () => {
     beforeEach(() => {
         document.body.innerHTML = ''
+        // autoScrollIfNeeded runs from onDrag, inside a frame. Default to 60fps.
+        frameData.delta = 1000 / 60
     })
 
     afterEach(() => {
         resetAutoScrollState()
+        frameData.delta = originalFrameDelta
     })
 
     it('does nothing without a scrollable ancestor', () => {
@@ -90,7 +96,9 @@ describe('autoScrollIfNeeded', () => {
 
 /**
  * Speed values match upstream framer-motion
- * `Reorder/utils/__tests__/auto-scroll.test.ts` @ v14.5.0.
+ * `Reorder/utils/__tests__/auto-scroll.test.ts` @ v14.6.0. Speeds are in
+ * px per millisecond, scaled by the frame's `frameData.delta`, so at the
+ * default 60fps delta the per-frame distances match the old 25 px cap.
  */
 describe('scroll speed', () => {
     /**
@@ -107,10 +115,13 @@ describe('scroll speed', () => {
 
     beforeEach(() => {
         document.body.innerHTML = ''
+        // autoScrollIfNeeded runs from onDrag, inside a frame. Default to 60fps.
+        frameData.delta = 1000 / 60
     })
 
     afterEach(() => {
         resetAutoScrollState()
+        frameData.delta = originalFrameDelta
     })
 
     it('eases in near the end edge (25 px away)', () => {
@@ -135,5 +146,41 @@ describe('scroll speed', () => {
         const { scroller, group } = makeTallScrollableList()
         autoScrollIfNeeded(group, -100, 'y', -5)
         expect(1000 - scroller.scrollTop).toBe(25)
+    })
+
+    /**
+     * Simulate holding the pointer 10 px inside the bottom edge for one
+     * second at the given frame rate, returning the total distance scrolled.
+     *
+     * @param fps - Simulated display refresh rate.
+     * @returns Total px scrolled over `fps` frames.
+     */
+    const scrollForOneSecond = (fps: number): number => {
+        const { scroller, group } = makeTallScrollableList()
+        resetAutoScrollState()
+        frameData.delta = 1000 / fps
+        for (let i = 0; i < fps; i++) {
+            autoScrollIfNeeded(group, 190, 'y', 1)
+        }
+        return scroller.scrollTop - 1000
+    }
+
+    it("scroll speed is independent of the display's refresh rate", () => {
+        const at60 = scrollForOneSecond(60)
+        expect(at60).toBeCloseTo(960)
+        expect(scrollForOneSecond(120)).toBeCloseTo(at60)
+        expect(scrollForOneSecond(30)).toBeCloseTo(at60)
+        expect(scrollForOneSecond(240)).toBeCloseTo(at60)
+    })
+
+    it("an extra mid-frame update doesn't scroll the frame's distance twice", () => {
+        // A synchronous projection flush runs onDrag again a few ms into the
+        // frame, and the following frame's delta is the remainder.
+        const { scroller, group } = makeTallScrollableList()
+        frameData.delta = 4
+        autoScrollIfNeeded(group, 400, 'y', 5)
+        frameData.delta = 1000 / 60 - 4
+        autoScrollIfNeeded(group, 400, 'y', 5)
+        expect(scroller.scrollTop - 1000).toBeCloseTo(25)
     })
 })
