@@ -46,6 +46,16 @@ test.describe('reorder/keyboard (#2658)', () => {
         await press(page, 'ArrowDown')
         expect(await order(page)).toBe('a,b,c,d')
         await expect.poll(() => scrollY(page)).toBeGreaterThan(0)
+        // Svelte port addition: Chromium's smooth keyboard scroll keeps
+        // running after `scrollTo(0, 0)` and drifts the page back down, so
+        // let it finish before resetting (otherwise the final check races it).
+        await expect
+            .poll(async () => {
+                const before = await scrollY(page)
+                await page.waitForTimeout(100)
+                return (await scrollY(page)) === before
+            })
+            .toBe(true)
         await page.evaluate(() => window.scrollTo(0, 0))
 
         await press(page, 'Space')
