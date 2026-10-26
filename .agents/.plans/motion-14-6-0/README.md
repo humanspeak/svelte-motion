@@ -36,7 +36,7 @@ PR's `minor` label, which the maintainer adds. Executors never change `"version"
 | [005](005-use-in-view-element-changes.md) | `useInView` resets when its element is removed or swapped | 1 | P2 | S | — | `inView.svelte.ts` + spec, `tests/inView/element-after-mount`, docs `use-in-view` | DONE (guard PASS) |
 | [006](006-layout-id-takeover-skips-initial.md) | A `layoutId` takeover doesn't replay `initial` (#2362) | 1 | P2 | M | — | `_MotionContainer.svelte` (init block), `layoutId.ts` + spec, `tests/layout-id/takeover-initial` | DONE (guard PASS) |
 | [007](007-use-animation-frame-frameloop.md) | `useAnimationFrame` on Motion's frameloop with `(time, delta)` | 1 | P3 | S | — | `animationFrame.ts` + spec, docs `use-animation-frame` | DONE (guard PASS) |
-| [008](008-drag-disabled-mid-gesture.md) | Turning `drag` off mid-gesture ends it (#2248) | 2 | P2 | S | 001 | `visualElementCore.ts` + spec, `tests/drag/disable-from-ondrag` | TODO |
+| [008](008-drag-disabled-mid-gesture.md) | Turning `drag` off mid-gesture ends it (#2248) | 2 | P2 | S | 001 | `visualElementCore.ts` + spec, `tests/drag/disable-from-ondrag` | DONE (guard PASS; eye test pending) |
 | [009](009-reorder-keyboard.md) | Keyboard reordering (Space / arrows / Escape) | 2 | P1 | L | 003 | `Reorder/{context.ts,Group.svelte,Item.svelte}`, keyboard specs, `tests/reorder/keyboard`, docs + example | DONE (guard PASS; eye test pending) |
 | [010](010-step-frames-test-helper.md) | `stepFrames` / `withManualFrames` test helpers on `processFrame` | 2 | P3 | S | 001 | `utils/__tests__/frames.ts` + spec, `effects.spec.ts` | DONE (guard PASS) |
 
