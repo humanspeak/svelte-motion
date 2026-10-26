@@ -1,29 +1,45 @@
+import { cancelFrame, frame, type FrameData } from 'motion-dom'
+
 /**
- * Runs a callback on every animation frame with the current timestamp.
+ * Callback for {@link useAnimationFrame}.
  *
- * This is a Svelte-based animation loop utility that mirrors Framer Motion's
- * `useAnimationFrame` hook. The callback receives a DOMHighResTimeStamp
- * representing the time elapsed since the time origin.
+ * @param time Milliseconds since the loop's first frame.
+ * @param delta Milliseconds elapsed since the previous frame.
+ */
+export type FrameCallback = (time: number, delta: number) => void
+
+/**
+ * Runs a callback once per frame on Motion's frameloop.
  *
- * - The callback is invoked once per frame via `requestAnimationFrame`.
- * - The animation loop automatically starts when called in a `$effect` and stops on cleanup.
- * - SSR-safe: Does nothing when `window` is unavailable.
+ * Mirrors framer-motion's `useAnimationFrame` (`utils/use-animation-frame.ts`
+ * @ v14.6.0). The callback receives `(time, delta)`: `time` is the number of
+ * milliseconds since the loop's first frame (not the page's
+ * `performance.now()`), and `delta` is the milliseconds elapsed since the
+ * previous frame.
  *
- * @param {(time: number) => void} callback Function to run each frame, receives DOMHighResTimeStamp
+ * - The callback runs in Motion's `update` step, batched with Motion's own
+ *   per-frame work, so it is also driven by `processFrame()` and
+ *   `MotionGlobalConfig.useManualTiming`.
+ * - Call it inside `$effect` and return its cleanup to stop the loop when the
+ *   effect is torn down.
+ * - SSR-safe: does nothing when `window` is unavailable.
+ *
+ * @param callback Function to run each frame with `(time, delta)` in milliseconds.
+ * @returns A cleanup function that stops the loop.
  * @see https://motion.dev/docs/react-use-animation-frame
  *
  * @example
  * ```svelte
  * <script>
- *   import { useAnimationFrame } from 'svelte-motion'
+ *   import { useAnimationFrame } from '@humanspeak/svelte-motion'
  *
  *   let ref
  *
  *   $effect(() => {
- *     return useAnimationFrame((t) => {
+ *     return useAnimationFrame((time, delta) => {
  *       if (!ref) return
- *       const rotate = Math.sin(t / 10000) * 200
- *       const y = (1 + Math.sin(t / 1000)) * -50
+ *       const rotate = Math.sin(time / 10000) * 200
+ *       const y = (1 + Math.sin(time / 1000)) * -50
  *       ref.style.transform = `translateY(${y}px) rotateX(${rotate}deg) rotateY(${rotate}deg)`
  *     })
  *   })
@@ -32,26 +48,16 @@
  * <div bind:this={ref}>Animated content</div>
  * ```
  */
-export const useAnimationFrame = (callback: (time: DOMHighResTimeStamp) => void): (() => void) => {
+export const useAnimationFrame = (callback: FrameCallback): (() => void) => {
     // SSR guard
     if (typeof window === 'undefined') return () => {}
 
-    let rafId: number | undefined
-    let isActive = true
-
-    const loop = (time: DOMHighResTimeStamp) => {
-        callback(time)
-        if (isActive) {
-            rafId = requestAnimationFrame(loop)
-        }
+    let start = 0
+    const provideTimeSinceStart = ({ timestamp, delta }: FrameData) => {
+        if (!start) start = timestamp
+        callback(timestamp - start, delta)
     }
 
-    rafId = requestAnimationFrame(loop)
-
-    return () => {
-        isActive = false
-        if (rafId !== undefined) {
-            cancelAnimationFrame(rafId)
-        }
-    }
+    frame.update(provideTimeSinceStart, true)
+    return () => cancelFrame(provideTimeSinceStart)
 }
