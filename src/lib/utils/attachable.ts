@@ -1,5 +1,5 @@
-import { cancelMicrotask, microtask } from 'motion-dom'
 import { resolveElement, type ElementOrGetter } from './dom.js'
+import { scheduleRefRetry } from './refRetry.js'
 
 /**
  * Reference set of DOM `ElementOrGetter` inputs keyed by name.
@@ -39,11 +39,12 @@ export type AttachableConfig<R extends AttachableRefs> = {
 
 export type Attachable = {
     /**
-     * Register a subscriber. Triggers `onAttach` on the first subscriber,
-     * polls on `requestAnimationFrame` until refs resolve. Returns a release
-     * function that cleans up when the last subscriber leaves.
+     * Register a subscriber. Triggers `onAttach` on the first subscriber;
+     * while refs are unresolved it retries on the next microtask, then on
+     * animation frames. Returns a release function that cleans up when the
+     * last subscriber leaves.
      *
-     * Callers must eventually unsubscribe; the rAF poll loop continues until
+     * Callers must eventually unsubscribe; the retry loop continues until
      * either every ref resolves or the last subscriber releases.
      */
     subscribe: () => () => void
@@ -52,7 +53,7 @@ export type Attachable = {
 /**
  * Builds a subscriber-refcounted DOM-attachment primitive. Both `useScroll`
  * and `useInView` use this to defer observer setup until a subscriber arrives,
- * poll for `bind:this` element resolution, and tear down on the last
+ * retry `bind:this` element resolution, and tear down on the last
  * unsubscribe.
  *
  * @param config Attachment configuration: refs to resolve, an `onAttach`
@@ -79,7 +80,8 @@ export const createAttachable = <R extends AttachableRefs>(
     config: AttachableConfig<R>
 ): Attachable => {
     let cleanup: VoidFunction | undefined
-    let pollScheduled = false
+    let cancelRetry: (() => void) | undefined
+    let retryAttempt = 0
     let subscriberCount = 0
     // When stop() runs synchronously inside onAttach, cleanup hasn't been
     // assigned yet. Defer the teardown so the just-returned disposer still
@@ -87,20 +89,14 @@ export const createAttachable = <R extends AttachableRefs>(
     let attaching = false
     let stopRequestedDuringAttach = false
 
-    const pollTick = () => {
-        pollScheduled = false
-        tryAttach()
-    }
-
     const cancelPoll = () => {
-        if (pollScheduled) {
-            cancelMicrotask(pollTick)
-            pollScheduled = false
-        }
+        cancelRetry?.()
+        cancelRetry = undefined
     }
 
     const stop = () => {
         cancelPoll()
+        retryAttempt = 0
         if (attaching) {
             stopRequestedDuringAttach = true
             return
@@ -124,15 +120,21 @@ export const createAttachable = <R extends AttachableRefs>(
             els[key] = el
         }
         if (needsPoll) {
-            // Microtask schedule (matches useScroll's pattern) — one frame
-            // faster than rAF for refs that hydrate the same tick.
-            if (!pollScheduled) {
-                pollScheduled = true
-                microtask.read(pollTick)
+            // Retry on our own scheduler, never motion-dom's shared batcher:
+            // re-scheduling that batcher from inside its own job stalls it
+            // page-wide (see `refRetry.ts`). The first retry is a plain
+            // microtask (refs that hydrate the same tick attach before the
+            // next frame); later retries wait an animation frame.
+            if (!cancelRetry) {
+                cancelRetry = scheduleRefRetry(() => {
+                    cancelRetry = undefined
+                    tryAttach()
+                }, retryAttempt++)
             }
             return
         }
 
+        retryAttempt = 0
         attaching = true
         let result: VoidFunction | void
         try {
