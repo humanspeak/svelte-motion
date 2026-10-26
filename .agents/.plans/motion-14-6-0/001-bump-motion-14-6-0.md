@@ -17,6 +17,10 @@
 > `translateY` 0). The maintainer ruled the test stale. Step 6 now includes rewriting it (see "Step 6a"); the
 > spec and its page are in scope for that change only.
 >
+> **Revision 2026-10-26 (2)**: the maintainer will review the rewritten cross-axis case by eye, so Step 6a also
+> adds a guided `TesterPanel` with a live verdict to `/tests/drag/while-drag-transforms` (hidden under
+> `@isPlaywright`, so the specs measure the same DOM).
+>
 > **Drift check (run first)**: `git diff --stat 45a24c6e..HEAD -- package.json pnpm-lock.yaml src/lib/index.ts src/lib/index.spec.ts src/lib/utils/transform.svelte.spec.ts docs/src/routes/docs/vanilla-values src/routes/tests/reorder src/routes/tests/layout-id e2e/reorder e2e/layout-id src/routes/+page.svelte .changeset`
 > Expected: no output (the batch's own `.agents/.plans/motion-14-6-0/` commit is not in that path list).
 > If any listed file changed, compare the "Current state" excerpts below with the live code; on a mismatch, STOP.
@@ -306,6 +310,22 @@ In `e2e/drag/while-drag-transforms.spec.ts`, rename the test to
 Leave the file's other tests untouched. In the page, change the card's text to `drag x · follows its layout on y`,
 the section heading to `Cross-axis layout`, and the intro sentence's "cross-axis layout pinning" to
 "cross-axis layout following".
+
+Then add a guided panel for the human eye test, copying the pattern in
+`src/routes/tests/use-transform/scroll-accelerate/+page.svelte` (import `TesterPanel` and `TesterStep` from
+`../../layout/_parity/TesterPanel.svelte`; it renders nothing under `?@isPlaywright=true`). Eyebrow
+`Motion 14.6.0 · #2255`, title `An x-only drag follows its layout on y`. Steps (each with `expected`):
+1. "Press and hold the cross-axis card, drag it right a little and keep holding" → "It moves on x only."
+2. "While holding, press **Insert content above** (keyboard Tab + Enter, or the panel's *Do it* button, which
+   calls the button's `click()`)" → "The card drops down with its slot by the inserted block's height, in one
+   step, and stays under the same x offset."
+3. "Release" → "The card stays where its layout put it. No jump back up and no slow drift on y."
+Plus a Reset step or button that reloads the page (`location.reload()`). A live verdict for the summary bar,
+computed only when not under Playwright: while the card is dragged, sample its computed transform each frame
+(`requestAnimationFrame`); show `FOLLOWS LAYOUT ✓` when, after the insert, translateY (`m42`) stays within 0.5 px of
+0 during the drag and for 500 ms after release, and `STALE Y ✗` with the worst `m42` seen otherwise; `WAITING` before
+the insert happens. Reuse the scroll-accelerate page's `.verdict` chip styles. The panel must not change the
+fixture's layout under Playwright.
 
 **Verify**: `PW_PORT=4201 pnpm exec playwright test e2e/drag/while-drag-transforms.spec.ts` → all pass, then
 `PW_PORT=4201 pnpm exec playwright test e2e/reorder e2e/layout-id e2e/drag` → all pass.
