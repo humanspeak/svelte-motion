@@ -184,6 +184,33 @@ Items are motion components underneath — every [drag prop](/docs/drag) (`while
 
 `dragSnapToOrigin` is managed by Reorder itself — the "origin" an item snaps back to is its current slot, which updates as the order changes.
 
+## Keyboard
+
+Every `Reorder.Item` can be reordered from the keyboard, with no opt-in (Motion 14.6.0):
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Focus an item (items render `tabindex={0}`) |
+| `Space` | Grab the focused item, or drop it if it's grabbed |
+| Arrow keys | Move the grabbed item one place along the group's axis: Up/Down for `y`, Left/Right for `x`, all four for `xy`. Left and Right swap in RTL |
+| `Escape` | Restore the order from when the item was grabbed, then drop it |
+
+- Enter isn't handled, so it keeps its tap meaning (`onTap`, `whileTap`).
+- Arrows with Alt, Ctrl or Meta held, and keys pressed inside an item's children (an `<input>`, say), are ignored. When nothing is grabbed, arrows scroll the page as usual.
+- Moving focus away (Tab, or clicking elsewhere) drops the item and keeps the current order.
+- Grabbing activates the item's `whileDrag` state, so style the grabbed look with `whileDrag`. `onDragStart` and `onDragEnd` don't fire for keyboard grabs.
+- Each move calls `onReorder` with the new order and the moved item, like a drag step. Escape calls it only if the order actually changed.
+
+To turn keyboard reordering off for an item, call `preventDefault()` in its `onkeydown`:
+
+```svelte
+<Reorder.Item value={item} onkeydown={(event) => event.preventDefault()}>
+    {item}
+</Reorder.Item>
+```
+
+`tabindex={-1}` only removes the item's Tab stop: a click or `focus()` still focuses it, and Space then grabs it.
+
 ## Notes
 
 - One-dimensional reordering moves values only while the pointer moves — a swap fires when the dragged item's edge crosses the midpoint of its neighbor.

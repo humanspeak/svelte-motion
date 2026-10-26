@@ -9,6 +9,7 @@
         Grid3x3,
         GripVertical,
         Hand,
+        Keyboard,
         Languages,
         Layers,
         MoveHorizontal,
@@ -23,6 +24,7 @@
     import ReorderDefault from '$lib/examples/reorder/demos/Default.svelte'
     import ReorderAutoAxisRtl from '$lib/examples/reorder/demos/AutoAxisRtl.svelte'
     import ReorderGrid from '$lib/examples/reorder/demos/Grid.svelte'
+    import ReorderKeyboard from '$lib/examples/reorder/demos/Keyboard.svelte'
     import ReorderScrollable from '$lib/examples/reorder/demos/Scrollable.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
@@ -92,6 +94,18 @@
             notes: scrollableNotes,
             barCells: [{ k: 'pattern', v: 'auto-scroll' }],
             sourceUrl: `${SOURCE_URL}reorder/demos/Scrollable.svelte`
+        },
+        {
+            figId: 'FIG-005',
+            tag: 'KEYBOARD',
+            title: { prefix: 'reorder from the ', accent: 'keyboard', end: '.' },
+            description:
+                'No pointer needed. Tab to an item, press Space to grab it, move it with the arrow keys and press Space again to drop it. Escape puts the list back the way it was when you grabbed.',
+            snippet: keyboardSection,
+            codeSnippet: keyboardCode,
+            notes: keyboardNotes,
+            barCells: [{ k: 'keys', v: 'space · arrows · esc' }],
+            sourceUrl: `${SOURCE_URL}reorder/demos/Keyboard.svelte`
         }
     ]
 </script>
@@ -249,6 +263,45 @@
                 'reorder-scrollable',
                 'Scrollable.svelte'
             )
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#snippet keyboardSection()}
+    <ReorderKeyboard />
+{/snippet}
+{#snippet keyboardNotes()}
+    <ul>
+        <li>
+            <Keyboard />
+            <span>
+                Always on: every <code>Reorder.Item</code> is focusable (<code
+                    >tabindex={'{0}'}</code
+                >). Space grabs and drops, arrows along the group's axis move, Escape restores the
+                order from the grab. Enter is left for taps.
+            </span>
+        </li>
+        <li>
+            <Hand />
+            <span>
+                A grabbed item gets its <code>whileDrag</code> state, so the lifted look you style for
+                pointer drags shows for keyboard grabs too.
+            </span>
+        </li>
+        <li>
+            <MoveVertical />
+            <span>
+                Each move calls <code>onReorder</code> like a drag does, and the moved item keeps focus
+                and its grab while the list re-renders around it.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet keyboardCode()}
+    <CodeReferenceV2
+        samples={[
+            demoCodeSample('reorder/demos/Keyboard.svelte', 'reorder-keyboard', 'Keyboard.svelte')
         ]}
         columns={1}
     />
