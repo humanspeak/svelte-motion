@@ -1032,20 +1032,23 @@ const stepBody = (name, key = 'run') => {
         .join('\n')
 }
 
+function lookupScript() {
+    const section = workflow()
+        .split('            - id: pr\n')[1]
+        .split('            - id: check\n')[0]
+    assert.ok(section)
+    return section
+        .split('                  script: |\n')[1]
+        .split('\n')
+        .map((line) => (line.trim() ? line.slice(22) : ''))
+        .join('\n')
+}
+
 test(
     'provenance actual lookup uses original trigger SHA and merged PR labels despite a newer prepared SHA',
     { skip: policy.event !== 'push' },
     async () => {
-        const text = workflow()
-        const section = text
-            .split('            - id: pr\n')[1]
-            .split('            - id: check\n')[0]
-        assert.ok(section)
-        const script = section
-            .split('                  script: |\n')[1]
-            .split('\n')
-            .map((line) => (line.trim() ? line.slice(22) : ''))
-            .join('\n')
+        const script = lookupScript()
         for (const labels of [['major', 'minor'], ['minor'], ['skip-publish'], []]) {
             const outputs = {},
                 calls = []
@@ -1084,6 +1087,88 @@ test(
             assert.equal(outputs.has_major, String(labels.includes('major')))
             assert.equal(outputs.has_minor, String(labels.includes('minor')))
             assert.equal(outputs.has_skip_label, String(labels.includes('skip-publish')))
+        }
+    }
+)
+
+test(
+    'provenance actual lookup retries a lagging commit index, then falls back to the squash subject PR',
+    { skip: policy.event !== 'push' },
+    async () => {
+        const script = lookupScript()
+        const merged = (fields) => ({
+            // eslint-disable-next-line camelcase -- Fixture preserves required GitHub API wire fields.
+            merged_at: 'fixture-time',
+            number: 7,
+            title: 'squashed PR',
+            // eslint-disable-next-line camelcase -- Fixture preserves required GitHub API wire fields.
+            html_url: 'fixture PR',
+            labels: [{ name: 'minor' }],
+            ...fields
+        })
+        const run = async ({ indexed, message, pull }) => {
+            const outputs = {},
+                lookups = [],
+                gets = [],
+                waits = []
+            await runInNewContext(`(async () => {${script}\n})()`, {
+                context: {
+                    sha,
+                    repo: { owner: 'fixture', repo: 'fixture' },
+                    // eslint-disable-next-line camelcase -- Fixture preserves required GitHub API wire fields.
+                    payload: { head_commit: { message } }
+                },
+                github: {
+                    rest: {
+                        repos: {
+                            listPullRequestsAssociatedWithCommit: async (args) => {
+                                lookups.push(args)
+                                return { data: lookups.length >= indexed ? [merged({})] : [] }
+                            }
+                        },
+                        pulls: {
+                            get: async (args) => {
+                                gets.push(args)
+                                return { data: pull }
+                            }
+                        }
+                    }
+                },
+                setTimeout: (resolve, delay) => (waits.push(delay), resolve()),
+                core: { info: () => undefined, setOutput: (key, value) => (outputs[key] = value) }
+            })
+            return { outputs, lookups, gets, waits }
+        }
+
+        // Index catches up on the third lookup: no fallback needed.
+        let result = await run({ indexed: 3, message: 'feat: x (#7)' })
+        assert.equal(result.lookups.length, 3)
+        assert.deepEqual(result.waits, [2000, 4000])
+        assert.equal(result.gets.length, 0)
+        assert.equal(result.outputs.found, 'true')
+        assert.equal(result.outputs.has_minor, 'true')
+
+        // Index never catches up: the subject's PR is used only when it merged as this SHA.
+        // eslint-disable-next-line camelcase -- Fixture preserves required GitHub API wire fields.
+        const pull = merged({ merge_commit_sha: sha })
+        result = await run({ indexed: Infinity, message: 'feat: x (#7)\n\nbody (#9)', pull })
+        assert.equal(result.lookups.length, 5)
+        assert.deepEqual(result.waits, [2000, 4000, 8000, 16000])
+        assert.equal(result.gets.length, 1)
+        assert.equal(result.gets[0].pull_number, 7)
+        assert.equal(result.outputs.found, 'true')
+        assert.equal(result.outputs.number, '7')
+
+        for (const [message, other] of [
+            // eslint-disable-next-line camelcase -- Fixture preserves required GitHub API wire fields.
+            ['feat: x (#7)', merged({ merge_commit_sha: 'other-sha' })],
+            // eslint-disable-next-line camelcase -- Fixture preserves required GitHub API wire fields.
+            ['feat: x (#7)', merged({ merged_at: null, merge_commit_sha: sha })],
+            ['direct push to main', pull]
+        ]) {
+            result = await run({ indexed: Infinity, message, pull: other })
+            assert.equal(result.outputs.found, undefined)
+            assert.equal(result.gets.length, message.endsWith('(#7)') ? 1 : 0)
         }
     }
 )
