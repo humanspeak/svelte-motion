@@ -1143,6 +1143,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/inView/element-after-mount') + searchParams}
+                    >
+                        useInView: element rendered after mount
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/use-presence') + searchParams}
                     >
                         usePresence

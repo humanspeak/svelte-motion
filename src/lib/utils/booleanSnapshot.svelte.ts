@@ -23,7 +23,10 @@ export type BooleanSnapshot = {
  * keeping `set` internal (it's not on the returned state object).
  *
  * Same-value writes via `set` are no-ops — saves a fanout call and
- * means callers don't need their own change-detection guard.
+ * means callers don't need their own change-detection guard. The check
+ * compares against a plain mirror of the value, not the `$state` cell, so
+ * it stays correct inside an effect cleanup (where Svelte shows `$state`
+ * as it was before the current update).
  *
  * @param initial Starting value for the `current` cell.
  * @returns A `[state, set]` tuple where `state` is the publicly-shared
@@ -41,6 +44,10 @@ export const createBooleanSnapshot = (
     initial: boolean
 ): [BooleanSnapshot, (value: boolean) => void] => {
     let current = $state(initial)
+    // Same-value check against a plain copy: inside an effect cleanup Svelte
+    // shows `$state` as it was before the current update, so comparing with
+    // `current` there can skip a real change.
+    let latest = initial
     const subscribers = new SvelteSet<(value: boolean) => void>()
 
     const state: BooleanSnapshot = {
@@ -57,7 +64,8 @@ export const createBooleanSnapshot = (
     }
 
     const set = (value: boolean) => {
-        if (value === current) return
+        if (value === latest) return
+        latest = value
         current = value
         for (const sub of subscribers) sub(value)
     }
