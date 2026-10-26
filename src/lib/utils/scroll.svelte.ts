@@ -1,7 +1,5 @@
 import { scroll } from 'motion'
 import {
-    cancelMicrotask,
-    microtask,
     motionValue,
     supportsScrollTimeline,
     supportsViewTimeline,
@@ -10,6 +8,7 @@ import {
 } from 'motion-dom'
 import { augmentMotionValue, type AugmentedMotionValue } from './augmentMotionValue.svelte.js'
 import { isRefPending, resolveElement, type ElementOrGetter } from './dom.js'
+import { scheduleRefRetry } from './refRetry.js'
 import { offsetToViewTimelineRange } from './viewTimelineRange.js'
 
 /**
@@ -96,16 +95,30 @@ export type UseScrollReturn = {
 /**
  * Build the AccelerateConfig for a progress motion value driven by a native
  * scroll-timeline / view-timeline animation. Mirrors framer-motion's
- * `makeAccelerateConfig` 1:1: the `factory` defers `scroll()` until refs
- * hydrate via `microtask.read`, then attaches the animation; the `times` /
- * `keyframes` / `ease` / `duration` describe the 0→1 linear mapping.
+ * `makeAccelerateConfig`: the `factory` defers `scroll()` until refs hydrate,
+ * then attaches the animation; the `times` / `keyframes` / `ease` /
+ * `duration` describe the 0→1 linear mapping.
+ *
+ * Deliberate divergence from upstream (`framer-motion`
+ * `src/value/use-scroll.ts:47-55` @ v14.6.0): upstream re-schedules its
+ * `start` read on the `microtask` batcher from inside that same job, which leaves
+ * motion-dom's shared batcher stalled (`motion-dom/src/frameloop/batcher.ts`
+ * processBatch / wake / schedule). Here the retry goes through
+ * `scheduleRefRetry`: the first attempt is a plain microtask (same "defer
+ * until `bind:this` settles" timing), later attempts wait an animation frame.
+ *
+ * @param axis Which axis the progress value tracks.
+ * @param options The `useScroll` options supplying container / target / offset.
+ * @returns The `AccelerateConfig` to assign to the progress motion value.
  */
 const makeAccelerateConfig = (axis: 'x' | 'y', options: UseScrollOptions): AccelerateConfig => ({
     factory: (animation: AnimationPlaybackControls) => {
         let cleanup: VoidFunction | undefined
+        let cancelRetry: (() => void) | undefined
+        let attempt = 0
         const start = () => {
             if (isRefPending(options.container) || isRefPending(options.target)) {
-                microtask.read(start)
+                cancelRetry = scheduleRefRetry(start, attempt++)
                 return
             }
             cleanup = scroll(animation, {
@@ -115,9 +128,9 @@ const makeAccelerateConfig = (axis: 'x' | 'y', options: UseScrollOptions): Accel
                 target: resolveElement(options.target)
             })
         }
-        microtask.read(start)
+        cancelRetry = scheduleRefRetry(start, attempt++)
         return () => {
-            cancelMicrotask(start)
+            cancelRetry?.()
             cleanup?.()
         }
     },
@@ -150,9 +163,9 @@ const makeAccelerateConfig = (axis: 'x' | 'y', options: UseScrollOptions): Accel
  * `container` and `target` accept either an `HTMLElement` directly or a
  * getter `() => HTMLElement | undefined`. The getter form is the right
  * choice with `bind:this`. Element resolution is deferred to a microtask
- * (matches React framer-motion 1:1, faster than rAF polling), so a getter
- * that hasn't hydrated yet is retried as soon as Svelte's mount tick
- * settles it.
+ * (same timing as React framer-motion), so a getter that hydrates in Svelte's
+ * mount tick attaches before the next frame; a getter that is still
+ * unresolved is retried on animation frames.
  *
  * Lifecycle: the underlying `scroll()` observer and any accelerate factory
  * attach at mount via `$effect` and detach at unmount, regardless of how
@@ -204,9 +217,11 @@ export const useScroll = (options: UseScrollOptions = {}): UseScrollReturn => {
     }
 
     let cleanup: VoidFunction | undefined
+    let cancelRetry: (() => void) | undefined
+    let attempt = 0
     const start = () => {
         if (isRefPending(options.container) || isRefPending(options.target)) {
-            microtask.read(start)
+            cancelRetry = scheduleRefRetry(start, attempt++)
             return
         }
         cleanup = scroll(
@@ -226,9 +241,9 @@ export const useScroll = (options: UseScrollOptions = {}): UseScrollReturn => {
     }
 
     $effect(() => {
-        microtask.read(start)
+        cancelRetry = scheduleRefRetry(start, attempt++)
         return () => {
-            cancelMicrotask(start)
+            cancelRetry?.()
             cleanup?.()
             scrollX.destroy()
             scrollY.destroy()
