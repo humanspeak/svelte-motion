@@ -13,6 +13,11 @@
 > starts `animate()` before the first `stepFrames()`, which is exactly the case upstream's `withManualFrames` exists
 > for; without it the animation's start time comes from the real clock and the ≈50 check is nondeterministic.
 >
+> **Revision 2026-10-26 (2)** (maintainer-approved, after the first run stopped at Step 4): `pnpm build` copies every
+> `__tests__` folder into `dist/` (already true for the existing helpers); `package.json` `files` excludes
+> `dist/**/__tests__/**` and `*.spec.*` from the tarball. The "not packaged" check now inspects the tarball
+> (`npm pack --dry-run`) instead of `dist/`.
+>
 > **Drift check (run first)**: `git diff --stat 45a24c6e..HEAD -- src/lib/utils/__tests__ src/lib/utils/effects.spec.ts`
 > Expected: no output. On any change, compare the "Current state" excerpts with the live code; on a mismatch, STOP.
 
@@ -114,7 +119,7 @@ uses the given timestamp as-is when `useManualTiming` is on. In svelte-motion im
 | Unit tests | `pnpm test:only` | all pass |
 | Typecheck | `pnpm check` | 0 errors |
 | Lint/format | `trunk fmt <files>` then `trunk check <files>` | no new issues |
-| Package | `pnpm build` | exit 0 (and the helpers are not in `dist/`) |
+| Package | `pnpm build` | exit 0 (and the helpers are not in the `npm pack` tarball) |
 
 ## Scope
 
@@ -180,8 +185,7 @@ before.
 ### Step 4: Gate
 
 **Verify**: `pnpm check` (0 errors), `pnpm test:only` (all pass), `pnpm build` (exit 0) and
-`ls dist/utils/__tests__ 2>/dev/null | grep frames` → no output (helpers not packaged; if `__tests__` is packaged,
-STOP and report), `trunk check` on the changed files (clean), `git status` shows only in-scope files.
+`npm pack --dry-run --json | python3 -c "import json,sys; print([f['path'] for f in json.load(sys.stdin)[0]['files'] if '__tests__' in f['path'] or 'frames' in f['path'] or '.spec.' in f['path']])"` → `[]` (helpers not in the published tarball; if any appear, STOP and report), `trunk check` on the changed files (clean), `git status` shows only in-scope files.
 
 ## Test plan
 
@@ -193,14 +197,14 @@ STOP and report), `trunk check` on the changed files (clean), `git status` shows
 
 - [ ] `src/lib/utils/__tests__/frames.ts` exports `stepFrames` and `withManualFrames`; `frames.spec.ts` passes
 - [ ] `grep -n "frameSteps\." src/lib/utils/effects.spec.ts` → no matches
-- [ ] `pnpm check` 0 errors; `pnpm test:only` passes; `pnpm build` exits 0; helpers absent from `dist/`
+- [ ] `pnpm check` 0 errors; `pnpm test:only` passes; `pnpm build` exits 0; helpers absent from the `npm pack` tarball
 - [ ] Report lists further specs that could move to `stepFrames`
 
 ## STOP conditions
 
 - `package.json` is not on motion-dom 14.6.0, or `processFrame` isn't exported by it.
 - Step 2 case 3 is off by more than a frame.
-- `__tests__` files appear in `dist/`.
+- `__tests__`, `frames` or `.spec.` files appear in the `npm pack --dry-run` tarball.
 
 ## Maintenance notes
 
