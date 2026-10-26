@@ -604,6 +604,14 @@
                         Reorder click after drag (#2682)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/keyboard') + searchParams}
+                    >
+                        Reorder keyboard (Space / arrows / Escape, #2658)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
