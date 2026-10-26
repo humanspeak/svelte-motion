@@ -108,19 +108,42 @@ jobs:
         steps:
             # Push payloads carry no PR context, so recover the merged PR (for
             # skip-publish/major/minor labels and release notes) from the commit.
+            # The commit→PR index lags the merge by a few seconds (run
+            # 40172783013 found nothing 6s after #505 merged), so retry with
+            # backoff, then fall back to the "(#N)" in the squash subject. The
+            # fallback only accepts a PR whose merge commit is this exact SHA.
             - id: pr
               if: github.event_name == 'push'
               uses: actions/github-script@v9 # zizmor: ignore[unpinned-uses]
               with:
                   script: |
                       const { owner, repo } = context.repo
-                      const { data: prs } =
-                          await github.rest.repos.listPullRequestsAssociatedWithCommit({
-                              owner,
-                              repo,
-                              commit_sha: context.sha
-                          })
-                      const pr = prs.find((candidate) => candidate.merged_at)
+                      const delays = [2000, 4000, 8000, 16000]
+                      let pr
+                      for (let attempt = 0; !pr; attempt++) {
+                          const { data: prs } =
+                              await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                                  owner,
+                                  repo,
+                                  commit_sha: context.sha
+                              })
+                          pr = prs.find((candidate) => candidate.merged_at)
+                          if (pr || attempt >= delays.length) break
+                          core.info(`No merged PR for ${context.sha} yet; retrying`)
+                          await new Promise((resolve) => setTimeout(resolve, delays[attempt]))
+                      }
+                      if (!pr) {
+                          const subject = (context.payload.head_commit?.message ?? '').split('\n')[0]
+                          const number = subject.match(/\(#(\d+)\)$/)?.[1]
+                          if (number) {
+                              const { data } = await github.rest.pulls.get({
+                                  owner,
+                                  repo,
+                                  pull_number: Number(number)
+                              })
+                              if (data.merged_at && data.merge_commit_sha === context.sha) pr = data
+                          }
+                      }
                       if (!pr) {
                           core.info(`No merged PR associated with ${context.sha}`)
                           return
