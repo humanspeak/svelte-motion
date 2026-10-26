@@ -10,6 +10,13 @@
 > **Port rule**: this lane's Playwright port is **4201**. Prefix every Playwright command with `PW_PORT=4201`.
 > Port 4198 belongs to the maintainer; never use or kill it. Never set `PW_REUSE_SERVER`.
 >
+> **Revision 2026-10-26** (maintainer-approved after the first run stopped at Step 6):
+> `e2e/drag/while-drag-transforms.spec.ts:30` ("keeps an x-only drag pinned on y when its layout slot moves")
+> asserted 14.5's behavior. Upstream #2255 (`9632e2c3d`) compensates only drag axes, so an x-only `layout` card
+> now follows its layout on y (it moved 88 px when the 72 px block plus margin was inserted, with
+> `translateY` 0). The maintainer ruled the test stale. Step 6 now includes rewriting it (see "Step 6a"); the
+> spec and its page are in scope for that change only.
+>
 > **Drift check (run first)**: `git diff --stat 45a24c6e..HEAD -- package.json pnpm-lock.yaml src/lib/index.ts src/lib/index.spec.ts src/lib/utils/transform.svelte.spec.ts docs/src/routes/docs/vanilla-values src/routes/tests/reorder src/routes/tests/layout-id e2e/reorder e2e/layout-id src/routes/+page.svelte .changeset`
 > Expected: no output (the batch's own `.agents/.plans/motion-14-6-0/` commit is not in that path list).
 > If any listed file changed, compare the "Current state" excerpts below with the live code; on a mismatch, STOP.
@@ -167,7 +174,9 @@ Read any of these with `git -C ~/Github/motion show v14.6.0:<path>`.
 - `src/routes/+page.svelte` (two links)
 - `docs/src/routes/docs/vanilla-values/+page.svx` (the `## Scheduler, generators, config` section)
 - `.changeset/motion-14-6-0.md` (create)
-- e2e spec files **only after the maintainer approves each change in Step 7**
+- `e2e/drag/while-drag-transforms.spec.ts` (the one test in Step 6a) and
+  `src/routes/tests/drag/while-drag-transforms/+page.svelte` (that card's label and the section heading/intro text)
+- other e2e spec files **only after the maintainer approves each change in Step 7**
 
 **Out of scope**:
 
@@ -282,6 +291,24 @@ test name and assertion (likely sources: the `immediate` re-run change in `rende
 - `PW_PORT=4201 pnpm exec playwright test e2e/reorder/wrap-axis-x.spec.ts e2e/layout-id/scale-handoff.spec.ts` → all pass
 - `pnpm exec vitest run src/lib/utils/transform.svelte.spec.ts` → all pass
 - `PW_PORT=4201 pnpm exec playwright test e2e/reorder e2e/layout-id e2e/drag` → all pass
+
+### Step 6a: Update the stale cross-axis drag test (maintainer-approved)
+
+In `e2e/drag/while-drag-transforms.spec.ts`, rename the test to
+`"an x-only drag follows its layout on y when its slot moves (#2255)"` and assert upstream's behavior, citing
+`9632e2c3d` and `layout-compensation.test.tsx` in a comment:
+- Mid-drag, after clicking `insert-above`, sample 8 frames: every sample's `box.y - before.y` is within 2 px of
+  the inserted content's height plus its margin (read both from the DOM: `inserted-content`'s
+  `getBoundingClientRect().height` plus its computed `margin-top` + `margin-bottom`; do not hard-code 88). The
+  card's computed transform has `m42` (translateY) within 0.5 of `0` on every sample.
+- The x drag still applies: `m41` (translateX) is > 20 on the last sample.
+- After `page.mouse.up()` and 500 ms, `m42` is still within 0.5 of `0` (no stale translateY).
+Leave the file's other tests untouched. In the page, change the card's text to `drag x · follows its layout on y`,
+the section heading to `Cross-axis layout`, and the intro sentence's "cross-axis layout pinning" to
+"cross-axis layout following".
+
+**Verify**: `PW_PORT=4201 pnpm exec playwright test e2e/drag/while-drag-transforms.spec.ts` → all pass, then
+`PW_PORT=4201 pnpm exec playwright test e2e/reorder e2e/layout-id e2e/drag` → all pass.
 
 ### Step 7: Full e2e triage (STOP-and-review gate)
 
