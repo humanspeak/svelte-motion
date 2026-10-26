@@ -35,6 +35,7 @@ import {
     pipe,
     PresenceChild,
     press,
+    processFrame,
     progress,
     propEffect,
     resize,
@@ -92,6 +93,10 @@ describe('public API: index.ts', () => {
         expect(typeof scopeMotion).toBe('function')
         expect(typeof toMediaQuery).toBe('function')
         expect(typeof useScopeMotion).toBe('function')
+    })
+
+    it('re-exports Motion 14.6 processFrame', () => {
+        expect(typeof processFrame).toBe('function')
     })
 
     it('re-exports the Motion 13.2 effect registry primitives', () => {

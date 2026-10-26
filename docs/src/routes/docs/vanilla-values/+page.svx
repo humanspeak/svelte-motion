@@ -118,6 +118,7 @@ import {
     cancelFrame,
     frame,            // frameloop scheduler: frame.read / frame.update / frame.render
     MotionGlobalConfig, // e.g. skipAnimations for tests
+    processFrame,     // process a frame now, e.g. from an XRSession loop
     scrollInfo,
     spring            // spring generator for WAAPI / custom drivers
 } from '@humanspeak/svelte-motion'
@@ -126,6 +127,33 @@ frame.render(() => {
     // runs on Motion's render step this frame
 })
 ```
+
+### Driving frames yourself
+
+`processFrame()` (Motion 14.6) runs every frameloop step (`setup`, `read`, `resolveKeyframes`, `preUpdate`, `update`, `preRender`, `render`, `postRender`) right now, instead of waiting for the next `requestAnimationFrame`. Use it when something other than `requestAnimationFrame` drives your frames, like an `XRSession` during an immersive WebXR session. Wherever `requestAnimationFrame` does fire, Motion keeps processing frames from it too. Calls made inside a frame are ignored.
+
+`@humanspeak/svelte-motion/three` writes to meshes on `frame.preRender`, so a WebXR `renderer.setAnimationLoop` callback can call `processFrame()` before rendering to keep Motion in step:
+
+```ts
+renderer.setAnimationLoop(() => {
+    processFrame()
+    renderer.render(scene, camera)
+})
+```
+
+For a timeline you control (tests, video export), turn on manual timing and pass each frame's time in milliseconds:
+
+```ts
+MotionGlobalConfig.useManualTiming = true
+
+for (let ms = 0; ms <= 1000; ms += 1000 / 60) {
+    processFrame(ms)
+}
+```
+
+Without manual timing, the frame delta is clamped to 1–40 ms, like the `requestAnimationFrame` loop.
+
+Animations Motion normally hands to the browser (WAAPI), like `opacity` or `transform` on an HTML or SVG element, follow the browser's clock. While `useManualTiming` is on, Motion runs those in JS instead, so they follow your timestamps. The exceptions are view transitions, optimized appear animations, and colours only the browser can mix (like `oklch()`), which jump to their end.
 
 Plus the `steps`, `mirrorEasing`, and `reverseEasing` easing helpers alongside the existing easing exports.
 
