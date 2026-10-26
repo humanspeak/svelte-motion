@@ -132,7 +132,11 @@
                 onDragEnd={id === 0 ? handleDrag(0) : undefined}
                 onDrag={id === 1 ? handleDrag(1) : undefined}
             >
-                <motion.div data-testid="child-{id}" class="child" layout />
+                <motion.div
+                    data-testid="child-{id}"
+                    layout
+                    style={{ width: 40, height: 40, background: 'blue' }}
+                />
                 <p>{id === 0 ? 'onDragEnd' : 'onDrag'}</p>
             </motion.div>
         </div>
@@ -189,12 +193,6 @@
         position: fixed;
         inset: 0;
         background: rgba(0, 0, 0, 0.5);
-    }
-
-    .child {
-        width: 40px;
-        height: 40px;
-        background: blue;
     }
 
     .verdict {
