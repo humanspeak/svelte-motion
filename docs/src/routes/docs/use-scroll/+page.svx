@@ -50,7 +50,7 @@ description: "Create scroll-linked animations like progress indicators and paral
 </script>
 ```
 
-`useScroll` returns four motion values augmented with a `$state`-backed `.current` getter and a Svelte readable `.subscribe` shim:
+`useScroll` returns six motion values augmented with a `$state`-backed `.current` getter and a Svelte readable `.subscribe` shim:
 
 | Value | Description |
 |-------|-------------|
@@ -58,6 +58,8 @@ description: "Create scroll-linked animations like progress indicators and paral
 | `scrollY` | Vertical scroll position in pixels |
 | `scrollXProgress` | Horizontal scroll progress between `0` and `1` |
 | `scrollYProgress` | Vertical scroll progress between `0` and `1` |
+| `scrollXLength` | Maximum horizontal scroll offset in pixels |
+| `scrollYLength` | Maximum vertical scroll offset in pixels |
 
 Read them with `scrollY.current` in templates and `$derived` / `$effect`, with `scrollY.get()` in imperative code, or with `$scrollY` for store-style consumers. They compose with `useTransform`, `useSpring`, and every other motion-value-aware hook.
 
@@ -103,6 +105,29 @@ Track the scroll position of a specific scrollable element by passing it as the 
 
 <div>Scroll progress: {scrollYProgress.current}</div>
 ```
+
+### Distance from the end
+
+`scrollXLength` and `scrollYLength` hold each axis's maximum scroll offset, and they update when the container or its content resizes. Subtract the current position to get the distance left to scroll:
+
+```svelte
+<script>
+  import { useScroll } from '@humanspeak/svelte-motion'
+
+  let containerEl = $state()
+
+  const { scrollY, scrollYLength } = useScroll({ container: () => containerEl })
+  const remaining = $derived(scrollYLength.current - scrollY.current)
+</script>
+
+<div bind:this={containerEl} style="overflow-y: scroll; height: 300px;">
+  <!-- tall content -->
+</div>
+
+<div>{Math.round(remaining)}px left</div>
+```
+
+The lengths always update in JavaScript; only the progress values can run on a native scroll timeline.
 
 ### Element position
 
@@ -197,12 +222,14 @@ useScroll(options?: UseScrollOptions): {
   scrollY: AugmentedMotionValue<number>
   scrollXProgress: AugmentedMotionValue<number>
   scrollYProgress: AugmentedMotionValue<number>
+  scrollXLength: AugmentedMotionValue<number>
+  scrollYLength: AugmentedMotionValue<number>
 }
 ```
 
 ### Returns
 
-An object with four `AugmentedMotionValue<number>`s — real motion-dom `MotionValue`s with `.current` getter, `.subscribe` shim, and all standard motion-value methods (`get`, `getVelocity`, `on`, etc.).
+An object with six `AugmentedMotionValue<number>`s — real motion-dom `MotionValue`s with `.current` getter, `.subscribe` shim, and all standard motion-value methods (`get`, `getVelocity`, `on`, etc.).
 
 ## See also
 
