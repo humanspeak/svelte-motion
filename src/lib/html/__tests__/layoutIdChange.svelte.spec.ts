@@ -41,6 +41,30 @@ const resetRegistry = (...ids: string[]) => {
     for (const id of ids) layoutIdRegistry.consume(id)
 }
 
+/**
+ * JSDOM has no layout, so `getBoundingClientRect` reads each element's box
+ * from `boxes`, keyed by its `data-box` attribute or else its id. motion-dom
+ * discards a zero-size snapshot (`updateSnapshot`), so an element without a
+ * box would never have one to resume from.
+ */
+const mockBoxes = (boxes: Record<string, [number, number, number, number]>) =>
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+        this: HTMLElement
+    ) {
+        const [x, y, width, height] = boxes[this.dataset.box ?? this.id] ?? [0, 0, 0, 0]
+        return {
+            x,
+            y,
+            left: x,
+            top: y,
+            width,
+            height,
+            right: x + width,
+            bottom: y + height,
+            toJSON() {}
+        }
+    })
+
 /** JSDOM has no ResizeObserver; `layout` elements observe their own size. */
 const stubResizeObserver = () =>
     vi.stubGlobal(
@@ -56,6 +80,7 @@ describe('changing layoutId after mount (#1411)', () => {
     beforeEach(() => {
         vi.useRealTimers()
         stubResizeObserver()
+        mockBoxes({ a: [0, 50, 100, 100], b: [300, 50, 100, 100], x: [0, 0, 100, 50] })
         resetRegistry(
             'initial',
             'shared',
@@ -249,7 +274,11 @@ describe('changing layoutId after mount (#1411)', () => {
         await update(items(to))
 
         expect(next.getStack()?.lead === next).toBe(true)
-        expect(next.resumeFrom === prev).toBe(true)
+        // Upstream reads `resumeFrom` synchronously after the commit. Here the
+        // update pass has already run by the time `rerender` resolves, and it
+        // clears `resumeFrom` (`clearSnapshot`); the layout animation it
+        // started from `prev` keeps it as `resumingFrom`.
+        expect((next.resumeFrom ?? next.resumingFrom) === prev).toBe(true)
 
         await frames(1)
         expect(element('a').style.visibility).not.toBe('hidden')
@@ -280,22 +309,7 @@ describe("changing an open card's layoutId (#1411)", () => {
         vi.useRealTimers()
         stubResizeObserver()
         resetRegistry('one', 'two', 'x')
-        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
-            this: HTMLElement
-        ) {
-            const [x, y, width, height] = boxes[this.dataset.box ?? ''] ?? [0, 0, 0, 0]
-            return {
-                x,
-                y,
-                left: x,
-                top: y,
-                width,
-                height,
-                right: x + width,
-                bottom: y + height,
-                toJSON() {}
-            }
-        })
+        mockBoxes(boxes)
     })
     afterEach(() => {
         vi.restoreAllMocks()
