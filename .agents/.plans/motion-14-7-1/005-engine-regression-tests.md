@@ -521,3 +521,13 @@ The false→frame→true restart only animated from about 359.7° to 360° on th
 3. If the count is still 0 with a clean `[0, 360]` restart, STOP. Report whether upstream puts the same remounted
    loop on the compositor (cite the code path), and why ours doesn't. That would be a real divergence for a
    separate fix. Don't drop the precondition.
+
+### A3: restart the remounted loop after mount (refines A2)
+
+A remounted `[0, 360]` loop cannot satisfy the precondition, on our side or upstream's. A takeover mounts with
+`initial: false` (`motion/index.tsx:114-122` @v14.7.1). The start state comes from the last keyframe
+(`use-visual-state.ts:87-92,112`). The first-render animation is blocked (`animation-state.ts:370-376`).
+Restart the loop after mount instead: the remounted element starts with a static `animate` (`rotateY: 0`). One frame
+after it mounts, `animate` switches to the `[0, 360]` infinite loop. That is an ordinary `animate` change, which the
+mount block doesn't affect. The precondition (count is 1 after 1300 ms) and `expectUndistorted` stay. If the count is
+still 0 after this change, STOP and report it as a divergence.
