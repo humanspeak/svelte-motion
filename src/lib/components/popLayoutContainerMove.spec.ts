@@ -139,6 +139,39 @@ describe('AnimatePresence popLayout when popping moves the container', () => {
         expect(log).toEqual([...Array(6).fill('read'), ...Array(3).fill('write')])
     })
 
+    /**
+     * Upstream measures first and pops second: the projection snapshot
+     * (`getSnapshotBeforeUpdate` → `willUpdate`) sees the in-flow box, and the
+     * pop rule only goes in during `useInsertionEffect`. Popping first would
+     * make the layout animation start from the popped, displaced box.
+     */
+    it("takes the element's layout snapshot before the pop rule goes in", async () => {
+        mockRects(() => ({ left: 0, top: 0 }) as DOMRect)
+        const { visualElementStore } = await import('motion-dom')
+        const { rerender, getByTestId, unmount } = render(PopLayoutMoveHarness, {
+            props: { present: true, layout: true }
+        })
+        await drain()
+
+        const element = getByTestId('item')
+        const projection = visualElementStore.get(element)?.projection
+        expect(projection).toBeDefined()
+        const poppedAtSnapshot: boolean[] = []
+        const willUpdate = projection!.willUpdate.bind(projection)
+        projection!.willUpdate = (...args: Parameters<typeof willUpdate>) => {
+            poppedAtSnapshot.push(!!element.dataset.motionPopId || !!getPopRule())
+            return willUpdate(...args)
+        }
+
+        await rerender({ present: false, layout: true })
+        await drain()
+
+        expect(element.dataset.motionPopId).toBeDefined()
+        expect(poppedAtSnapshot.length).toBeGreaterThan(0)
+        expect(poppedAtSnapshot[0]).toBe(false)
+        unmount()
+    })
+
     it('appends the pop style to root when given', async () => {
         mockRects(() => ({ left: 0, top: 0 }) as DOMRect)
         const root = document.createElement('div')

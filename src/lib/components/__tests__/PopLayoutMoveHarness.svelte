@@ -11,12 +11,14 @@
         present,
         count = 1,
         anchorY,
-        root
+        root,
+        layout = false
     }: {
         present: boolean
         count?: number
         anchorY?: 'top' | 'bottom'
         root?: HTMLElement | ShadowRoot
+        layout?: boolean
     } = $props()
 </script>
 
@@ -25,6 +27,7 @@
         {#snippet child()}
             <motion.div
                 data-testid="item"
+                {layout}
                 style="width:50px;height:50px"
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.5 }}
