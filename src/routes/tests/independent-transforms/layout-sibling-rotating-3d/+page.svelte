@@ -31,7 +31,11 @@
      * Svelte deviation: upstream's "unmounting" case relies on React Strict
      * Mode's remount. Svelte has none, so the pack sits in `{#key packKey}`
      * and `window.remount()` unmounts the `layoutId="pack"` element and mounts
-     * a new one.
+     * a new one. The new element takes over the `layoutId`, so it mounts as if
+     * `initial={false}` (framer-motion `motion/index.tsx:114-122` @ `v14.7.1`;
+     * ours is `layoutIdTakeover`) and sits at its target without looping.
+     * `window.spin()` therefore restarts the loop when it is already on: it
+     * turns `isSpinning` off, waits a frame, and turns it back on.
      */
     type Recorded = { transform: string; count: number }
     type FrameWindow = Window & {
@@ -71,8 +75,17 @@
             })
         })
 
+    /** Starts the loop, or restarts it (off for a frame, then on) if already on. */
     const spin = () => {
-        isSpinning = true
+        if (!isSpinning) {
+            isSpinning = true
+            return
+        }
+        isSpinning = false
+        requestAnimationFrame(() => {
+            isSpinning = true
+            watch()
+        })
     }
 
     const remount = () => {
@@ -130,9 +143,12 @@
                 'The card keeps the same shape and size every loop; it never stretches, shrinks or slides.'
         },
         {
-            text: 'Click "Remount".',
+            text: 'Click "Remount", then "Spin".',
             expected: 'The card restarts its loop in place, undistorted.',
-            action: { label: 'Remount', run: remount }
+            action: {
+                label: 'Remount, then spin',
+                run: () => (remount(), requestAnimationFrame(spin))
+            }
         }
     ]
 </script>
@@ -218,8 +234,8 @@
             later loop was scaled or shifted.
         </p>
         <p>
-            For 1 s after each hover change or remount, the verdict checks every painted frame's
-            inline transform for <code>scale</code> or a non-zero <code>translate3d</code>.
+            For 1 s after each hover change, remount or re-spin, the verdict checks every painted
+            frame's inline transform for <code>scale</code> or a non-zero <code>translate3d</code>.
         </p>
     {/snippet}
 </TesterPanel>

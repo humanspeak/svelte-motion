@@ -19,7 +19,10 @@ import { expect, test, type Page } from '@playwright/test'
  *
  * Svelte deviation: upstream's "unmounting" case relies on React Strict
  * Mode's remount. Here `window.remount()` re-keys the `layoutId="pack"`
- * element, which goes through svelte-motion's own `layoutId` takeover.
+ * element, which goes through svelte-motion's own `layoutId` takeover. A
+ * takeover mounts as if `initial={false}` (framer-motion
+ * `motion/index.tsx:114-122` @ `v14.7.1`), so the test re-triggers the spin
+ * on the new element before checking it.
  */
 
 type Recorded = { transform: string; count: number }
@@ -114,7 +117,11 @@ test.describe('layout measurements of a looping 3D rotation', () => {
             const pack = document.getElementById('pack')
             return pack !== null && pack !== old
         }, old)
-        await page.waitForTimeout(300)
+        // The new element took over the layoutId, so it mounted as if
+        // `initial={false}` and sits at its target: restart its loop.
+        await page.evaluate(() => (window as unknown as FrameWindow).spin())
+        await page.waitForTimeout(1300)
+        expect(await countPack(page)).toBe(1)
         await expectUndistorted(page, before)
     })
 
