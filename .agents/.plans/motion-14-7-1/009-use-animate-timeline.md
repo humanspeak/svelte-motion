@@ -615,3 +615,16 @@ Report the results.
   `MOTION_EXPORTS_NOT_REEXPORTED`, that plan must remove the name from the allowlist in the same change, or the
   tripwire's stale-entry assertion fails. Dispatchers merging those lanes after this one: check for it.
 - Deferred: a runtime `Timeline` export (upstream has none) and GSAP-style scrub/pinning helpers.
+
+## Amendments (operator-approved 2026-10-27)
+
+### A4: Step 2 case 1 checks that `add` grew the timeline
+
+In `src/lib/utils/animate.spec.ts`, directly after the `tl.add(...)` at about `:245`, add
+`expect(tl.duration).toBeCloseTo(0.4)`. This mirrors upstream `timeline.test.ts:27` @v14.7.1, and stops the test
+going green when `add` does nothing.
+
+### A5: Phase A's allowed `pnpm check` errors
+
+Phase A's allowed svelte-check errors also include the `scope.reduceMotion` / `scope.skipAnimations` fields (until
+Step 7) and `tl.reverse`.
