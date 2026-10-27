@@ -531,3 +531,14 @@ Restart the loop after mount instead: the remounted element starts with a static
 after it mounts, `animate` switches to the `[0, 360]` infinite loop. That is an ordinary `animate` change, which the
 mount block doesn't affect. The precondition (count is 1 after 1300 ms) and `expectUndistorted` stay. If the count is
 still 0 after this change, STOP and report it as a divergence.
+
+### A4: the remount case follows upstream's spec (no compositor precondition)
+
+With the restart in A3 the loop runs, but only on the main thread. A takeover's shared layout animation takes
+on the pack's infinite transition (`create-projection-node.ts:581-584,613-627` @v14.7.1). The node then stays
+`isProjecting()` (`:1451-1457`), and `canAccelerateTransform` refuses while projecting
+(`TransformAnimation.ts:204`). Upstream's "unmounting doesn't distort it" never asserts compositor placement:
+only `spin()` checks the count, and that test doesn't call it. Follow upstream. The remount test drops the
+`countTransformAnimations === 1` precondition and keeps the A3 restart plus `expectUndistorted`. Attach
+the count, and any loop that wraps early (for example near 3deg at 2.5 s on a 4 s loop), as `test.info().annotations`
+evidence. In Phase B, report whether the early wrap persists.
