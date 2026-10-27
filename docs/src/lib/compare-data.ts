@@ -222,7 +222,16 @@ export const competitors: Competitor[] = [
                 us: 'arc() on transition.path',
                 them: 'MotionPathPlugin (any SVG path)'
             },
-            { name: 'Timelines with scrub / labels / nesting', us: false, them: 'Best-in-class' },
+            {
+                name: 'Timelines with labels / nesting / reverse',
+                us: 'animate() Timeline (labels, offsets, nesting, playTo)',
+                them: 'Best-in-class'
+            },
+            {
+                name: 'Timeline scrubbing',
+                us: 'Partial (set progress / time; scroll-linked via useScroll)',
+                them: 'Best-in-class (ScrollTrigger scrub)'
+            },
             { name: 'Declarative motion.<tag> components', us: '~170 tags', them: false },
             { name: 'AnimatePresence exit animations', us: true, them: false },
             {
@@ -277,7 +286,7 @@ export const competitors: Competitor[] = [
         ],
         consUs: [
             ...shared.consUs,
-            'Timeline orchestration is shallower than GSAP — no scrub / label / nested timeline equivalents'
+            'Timelines cover labels, nesting and reverse, but scrub and ScrollTrigger-style pinning are still GSAP territory'
         ],
         consThem: [
             'Imperative API — you own DOM refs, lifecycle, and gesture state machines',
