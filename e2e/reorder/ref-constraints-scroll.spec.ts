@@ -129,6 +129,8 @@ test('issue #2024: ref constraints&layoutScroll - drag again after reordering in
  * `'measure'` event ("Svelte deviation 2" in `visualElementCore.ts`) after the
  * group has scrolled. The item must still follow the pointer, which proves
  * that re-measure path and motion-dom's scroll-keyed re-measure agree.
+ * `window.__constraintsChanges` (counted by the page's `Item.svelte`) guards
+ * that the rebind actually changed the items' prop.
  */
 test('issue #2024: deviation 2 re-measure while scrolled still follows the pointer', async ({
     page
@@ -138,10 +140,18 @@ test('issue #2024: deviation 2 re-measure while scrolled still follows the point
     await page.waitForTimeout(200)
 
     await scrollTo(page, 'group', 200)
+    const changes = () =>
+        page.evaluate(
+            () => (window as unknown as { __constraintsChanges?: number }).__constraintsChanges ?? 0
+        )
+    const changesBefore = await changes()
     await page.evaluate(() =>
         (window as unknown as { rebindConstraints: () => Promise<void> }).rebindConstraints()
     )
     await page.waitForTimeout(200)
+    // Guard: the rebind reached the items' `dragConstraints` prop (element →
+    // undefined → element), so deviation 2 really re-fired 'measure'.
+    expect(await changes()).toBeGreaterThanOrEqual(changesBefore + 2)
 
     const { dy, up, release } = await drag(page, 5, 20)
     const dyUp = await up()
