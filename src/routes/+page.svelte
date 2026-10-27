@@ -317,6 +317,30 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/transition-out/mount') + searchParams}
+                    >
+                        transition.out — mount (#1725)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/transition-out/gestures') + searchParams}
+                    >
+                        transition.out — gestures (#1725)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/optimized-appear/initial-out') + searchParams}
+                    >
+                        Optimized appear — initial transition.out (#1725)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/armed-buttons/archive') + searchParams}
                     >
                         Armed buttons — archive confirm
