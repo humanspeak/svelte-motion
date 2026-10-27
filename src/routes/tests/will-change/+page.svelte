@@ -80,11 +80,12 @@
         </article>
 
         <article>
-            <h2>Accelerated color animation</h2>
+            <h2>Color animation (main thread)</h2>
             <p class="expectation">
-                Motion 12.43+ accelerates <code>backgroundColor</code>, so animating it flips
-                will-change to <code>transform</code>. The hint stays latched after the first
-                animation, matching upstream.
+                Since Motion 14.7, <code>backgroundColor</code> animates in JavaScript on the main
+                thread, so it is not an accelerated value and will-change stays <code>auto</code>.
+                (WAAPI mixes colours in sRGB and Motion in linear space, so interrupting a WAAPI
+                colour animation jumped.)
             </p>
             <p class="readout" data-testid="color-value">value: {colorWillChange.current}</p>
             <div class="track">
