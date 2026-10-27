@@ -881,6 +881,15 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/pop-layout-container-move') +
+                            searchParams}
+                    >
+                        popLayout when popping moves the container (#2348)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/animate-presence/boundary-teardown') + searchParams}
                     >
                         Boundary teardown and navigation
