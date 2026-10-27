@@ -33,9 +33,9 @@
      * and `window.remount()` unmounts the `layoutId="pack"` element and mounts
      * a new one. The new element takes over the `layoutId`, so it mounts as if
      * `initial={false}` (framer-motion `motion/index.tsx:114-122` @ `v14.7.1`;
-     * ours is `layoutIdTakeover`) and sits at its target without looping.
-     * `window.spin()` therefore restarts the loop when it is already on: it
-     * turns `isSpinning` off, waits a frame, and turns it back on.
+     * ours is `layoutIdTakeover`) and would sit at its target without looping.
+     * A remounted pack (`packKey > 0`) therefore restarts its loop from 0 with
+     * explicit keyframes, `rotateY: [0, 360]`, and the same infinite transition.
      */
     type Recorded = { transform: string; count: number }
     type FrameWindow = Window & {
@@ -75,18 +75,14 @@
             })
         })
 
-    /** Starts the loop, or restarts it (off for a frame, then on) if already on. */
     const spin = () => {
-        if (!isSpinning) {
-            isSpinning = true
-            return
-        }
-        isSpinning = false
-        requestAnimationFrame(() => {
-            isSpinning = true
-            watch()
-        })
+        isSpinning = true
     }
+
+    /** A remounted pack restarts its loop from 0 (see the header comment). */
+    const packAnimate = $derived(
+        isSpinning ? { rotateY: packKey > 0 ? [0, 360] : 360 } : { rotateY: 0 }
+    )
 
     const remount = () => {
         packKey += 1
@@ -143,12 +139,9 @@
                 'The card keeps the same shape and size every loop; it never stretches, shrinks or slides.'
         },
         {
-            text: 'Click "Remount", then "Spin".',
-            expected: 'The card restarts its loop in place, undistorted.',
-            action: {
-                label: 'Remount, then spin',
-                run: () => (remount(), requestAnimationFrame(spin))
-            }
+            text: 'Click "Remount".',
+            expected: 'The card restarts its loop from the start, in place and undistorted.',
+            action: { label: 'Remount', run: remount }
         }
     ]
 </script>
@@ -181,7 +174,7 @@
                         transformStyle: 'preserve-3d'
                     }}
                     initial={{ rotateY: 0 }}
-                    animate={{ rotateY: isSpinning ? 360 : 0 }}
+                    animate={packAnimate}
                     transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
                 />
             {/key}
@@ -234,8 +227,8 @@
             later loop was scaled or shifted.
         </p>
         <p>
-            For 1 s after each hover change, remount or re-spin, the verdict checks every painted
-            frame's inline transform for <code>scale</code> or a non-zero <code>translate3d</code>.
+            For 1 s after each hover change or remount, the verdict checks every painted frame's
+            inline transform for <code>scale</code> or a non-zero <code>translate3d</code>.
         </p>
     {/snippet}
 </TesterPanel>
