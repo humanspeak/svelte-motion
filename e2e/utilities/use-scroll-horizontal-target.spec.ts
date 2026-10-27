@@ -57,6 +57,13 @@ for (const axis of ['', 'x']) {
  * scrollLeft 1408 -> 1792, and is 0.5 at 1600. The container's own progress
  * there is 1600 / 9472 ≈ 0.17.
  */
+test('reporter stays on the JS scroll() path', async ({ page }) => {
+    // The reporter's vw offset must not map to a native ViewTimeline either.
+    await page.setViewportSize({ width: 1280, height: 720 })
+    await page.goto(REPORTER_URL)
+    await expect(page.getByTestId('accelerated')).toHaveText('false')
+})
+
 test('Issue #2546 reporter: each indicator tracks its own item', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 })
     await page.goto(REPORTER_URL)

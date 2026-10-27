@@ -12,6 +12,9 @@
     const axis = page.url.searchParams.get('axis') === 'x' ? ('x' as const) : undefined
 
     let containerEl = $state<HTMLElement>()
+    // One flag per ring; the readout proves the vw offset stays off
+    // ViewTimeline, so the JS `scroll()` path (#2546) is what's under test.
+    let accelerated = $state<boolean[]>(Array.from({ length: 12 }, () => false))
 
     const steps: TesterStep[] = [
         {
@@ -26,7 +29,10 @@
     <title>useScroll horizontal target reporter (#2546)</title>
 </svelte:head>
 
-<header style="height: 10vh;">header</header>
+<header style="height: 10vh;">
+    header · accelerated:
+    <span data-testid="accelerated">{String(accelerated.some(Boolean))}</span>
+</header>
 <main
     bind:this={containerEl}
     id="container"
@@ -36,7 +42,12 @@
 >
     <div style="display: flex; flex-flow: row nowrap;">
         {#each Array.from({ length: 12 }, (_, i) => i) as i (i)}
-            <Indicator index={i} container={() => containerEl} {axis} />
+            <Indicator
+                index={i}
+                container={() => containerEl}
+                {axis}
+                onAccelerated={(v) => (accelerated[i] = v)}
+            />
         {/each}
     </div>
 </main>

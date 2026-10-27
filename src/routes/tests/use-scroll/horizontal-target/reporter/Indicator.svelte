@@ -8,9 +8,11 @@
         index: number
         /** Optional explicit axis (`?axis=x`). */
         axis?: 'x'
+        /** Reports whether this ring's scrollXProgress runs on a native timeline. */
+        onAccelerated?: (accelerated: boolean) => void
     }
 
-    let { container, index, axis }: Props = $props()
+    let { container, index, axis, onAccelerated }: Props = $props()
 
     let el = $state<HTMLElement>()
 
@@ -24,6 +26,8 @@
         offset: ['70vw 100vw', '0px 0px'],
         ...(axis ? { axis } : {})
     })
+    // svelte-ignore state_referenced_locally
+    onAccelerated?.(!!scrollXProgress.accelerate)
 </script>
 
 <section style="width: 70vw; flex-shrink: 0;">
