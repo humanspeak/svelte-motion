@@ -381,8 +381,15 @@ export class MotionDomProjectionAdapter {
      * ```
      */
     updateOptions(options: MotionDomProjectionUpdateOptions): void {
+        // Once mounted, the node's layoutId is moved only by `switchLayoutId`
+        // (#1411): upstream `MeasureLayout` re-syncs options by spreading
+        // `projection.options` and never passes `layoutId` (`layoutOptions`,
+        // MeasureLayout.tsx:43-52 @ v14.7.1), and `setOptions` alone doesn't
+        // move a node between shared-layout stacks. Before mount the id still
+        // flows in, so `mount()` registers the node with it.
+        const layoutId = this.element ? this.projection.options.layoutId : options.layoutId
         this.layout = options.layout
-        this.layoutId = options.layoutId
+        this.layoutId = layoutId
         this.transition = options.transition
 
         // An injected VisualElement's props are the owning component's contract
@@ -402,7 +409,7 @@ export class MotionDomProjectionAdapter {
         )
         this.projection.setOptions({
             layout: options.layout,
-            layoutId: options.layoutId,
+            layoutId,
             layoutScroll: options.layoutScroll,
             alwaysMeasureLayout: options.alwaysMeasureLayout,
             animationType: animationTypeForLayout(options.layout),
@@ -410,6 +417,121 @@ export class MotionDomProjectionAdapter {
             visualElement: this.visualElement
         })
         this.syncGroupMembership()
+    }
+
+    /** Whether the adapter is currently mounted to an element. */
+    get isMounted(): boolean {
+        return this.element !== null
+    }
+
+    /**
+     * Whether the takeover returned by the latest {@link switchLayoutId} found
+     * the new stack's lead still on screen, so it hid that lead and kept this
+     * node's own snapshot (an instant takeover, nothing to animate from).
+     * Reset by every `switchLayoutId` call, set when its takeover runs.
+     */
+    lastSwitchTookOver = false
+
+    /**
+     * Move a mounted node to its new `layoutId`'s shared-layout stack, as an
+     * unmount and remount would (#1411).
+     *
+     * Line-for-line port of framer-motion `switchLayoutId`
+     * (`MeasureLayout.tsx:59-106 @ v14.7.1`). Call it after `willUpdate()` for
+     * an update, or on its own when the node gains an id as `MeasureLayout`
+     * mounts. Run the returned takeover once every node in the update has had
+     * the chance to change its `layoutId`.
+     *
+     * @param layoutId The node's new (scoped) layoutId, or `undefined` to leave
+     *     shared layout.
+     * @returns A takeover to run after every switch in this update, or
+     *     `undefined` when the node left shared layout.
+     *
+     * @example
+     * ```ts
+     * adapter.willUpdate()
+     * const takeOver = adapter.switchLayoutId('group-highlight')
+     * // ...after the DOM update, once every node has switched:
+     * adapter.commitLayoutIdChange(takeOver)
+     * ```
+     */
+    switchLayoutId(layoutId: string | undefined): (() => void) | undefined {
+        // Stacks hold untyped nodes (`IProjectionNode<unknown>`).
+        const projection = this.projection as unknown as IProjectionNode
+        this.lastSwitchTookOver = false
+        const { snapshot } = projection
+        const stack = projection.getStack()
+        stack?.remove(projection)
+        // If this node led the old stack (so remove() made it the prevLead of
+        // the new lead), the new lead animates from this node's snapshot,
+        // which it now holds. Unlike a node that unmounts, this one stays
+        // mounted, so unlink them: the new lead mustn't read this node's
+        // snapshot after it changes, or stop or share its animation.
+        const lead = stack?.lead
+        if (stack?.prevLead === projection && lead!.resumeFrom === projection)
+            lead!.resumeFrom = lead!.currentAnimation = projection.resumingFrom = undefined
+        projection.options.layoutId = layoutId
+        this.layoutId = layoutId
+        this.syncGroupMembership()
+
+        // A node that followed another no longer does, so clear the styles
+        // that hid it.
+        if (!layoutId) {
+            projection.needsShow = true
+            return
+        }
+        projection.root!.registerSharedNode(layoutId, projection)
+        // Upstream follows every switch with `setOptions({ ...projection.options,
+        // ...layoutOptions(props) })` (MeasureLayout.tsx:141-145, 175-178 @
+        // v14.7.1), whose `addLayoutListener()` gives a node that mounted with
+        // neither `layout` nor `layoutId` its layout-animation handler. The
+        // container's own `setOptions` may have run before this switch.
+        projection.setOptions({ ...projection.options })
+
+        // Like a mounting node, this one animates from the lead it replaces.
+        // But if that lead is still on screen with this layoutId (e.g. an open
+        // card moving to another thumbnail), this node is already on screen
+        // too, so it takes over instantly: it keeps its own snapshot, and the
+        // lead is hidden, as at the end of a crossfade. A lead that left the
+        // stack in this update (e.g. layoutId={selected ? "x" : undefined}) is
+        // animated from, as is one that's exiting.
+        return () => {
+            const { resumeFrom } = projection
+            if (
+                resumeFrom?.isPresent !== false &&
+                projection.getStack()!.members.includes(resumeFrom!)
+            ) {
+                resumeFrom!.hide()
+                projection.resumeFrom = undefined
+                projection.snapshot = snapshot
+                this.lastSwitchTookOver = true
+            }
+        }
+    }
+
+    /**
+     * Close a `layoutId` change after Svelte has patched the DOM: run the
+     * takeover from {@link switchLayoutId}, then the root update.
+     *
+     * Upstream `MeasureLayout.componentDidUpdate` (206-211 @ v14.7.1). Unlike
+     * {@link didUpdate} it runs even when the node no longer has
+     * `layout`/`layoutId`: upstream keeps `MeasureLayout` rendered for the
+     * update that removes the id (`motion/index.tsx` @ v14.7.1).
+     *
+     * @param takeOver The takeover returned by `switchLayoutId`, if any.
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * adapter.commitLayoutIdChange(takeOver)
+     * ```
+     */
+    commitLayoutIdChange(takeOver?: () => void): void {
+        if (!this.element) return
+        takeOver?.()
+        this.projection.root?.didUpdate()
+        this.visualElement.scheduleRenderMicrotask()
+        this.refreshCachedLayout()
     }
 
     /**
