@@ -454,6 +454,42 @@ describe('ExitAnimationFeature', () => {
     })
 })
 
+describe('animation state (motion-dom)', () => {
+    it("doesn't re-animate animate's labels when a type with no prop is deactivated (#1831)", () => {
+        // Port of framer-motion animation-state.test.ts "Deactivating a type
+        // with no prop doesn't re-animate variants" @ v14.7.1 (a280595ea).
+        const element = document.createElement('div')
+        const ve = createMotionVisualElement({
+            props: { animate: ['a', 'b'], variants: { a: { x: 1 }, b: { opacity: 1 } } }
+        })
+        ve.mount(element)
+        ve.updateFeatures()
+        const state = ve.animationState!
+        // svelte-motion's AnimationFeature.mount()/update() never call
+        // animateChanges() (visualElementCore.ts:94-136), so run the initial
+        // pass here with a no-op animator, mirroring upstream's first
+        // state.update(). Otherwise setActive('whileDrag', true) would be the
+        // first animateChanges and animate every label on any version.
+        state.setAnimateFunction(() => () => Promise.resolve())
+        void state.animateChanges()
+        const mockAnimate = () => {
+            const mocked = vi.fn()
+            state.setAnimateFunction(() => (animations: { animation: unknown }[]) => {
+                mocked(animations.map(({ animation }) => animation))
+            })
+            return mocked
+        }
+        let animate = mockAnimate()
+        void state.setActive('whileDrag', true)
+        expect(animate).not.toHaveBeenCalled()
+        animate = mockAnimate()
+        void state.setActive('whileDrag', false)
+        expect(animate).not.toHaveBeenCalled()
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+})
+
 describe('DragGestureFeature', () => {
     // Port of framer-motion `gestures/drag/index.ts` @ v14.6.0. The controller's
     // `addListeners()` needs a projection node; stub it so this exercises only

@@ -620,6 +620,14 @@
                         Reorder keyboard (Space / arrows / Escape, #2658)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/ref-constraints-scroll') + searchParams}
+                    >
+                        Reorder: ref dragConstraints in a scrolled layoutScroll group (#2024)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
@@ -783,6 +791,30 @@
                         href={resolve('/tests/drag/disable-from-ondrag') + searchParams}
                     >
                         Drag: turn drag off from onDrag (#2248)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/flick-from-standstill') + searchParams}
+                    >
+                        Drag: fast flick from a standstill keeps its velocity (#1747)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/ref-constraints-shift') + searchParams}
+                    >
+                        Drag: ref constraints hold when the page moves both boxes
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/release-animate-variants') + searchParams}
+                    >
+                        Drag: release doesn't fire onAnimationComplete per animate label (#1831)
                     </a>
                 </li>
                 <li>
