@@ -23,10 +23,16 @@ import { expect, test, type Page } from '@playwright/test'
  * takeover mounts as if `initial={false}` (framer-motion
  * `motion/index.tsx:114-122` @ `v14.7.1`), which blocks a loop declared at
  * mount, so the remounted pack mounts with a static `rotateY: 0` and starts
- * its `[0, 360]` loop one frame later.
+ * its `[0, 360]` loop one frame later. Like upstream's "unmounting" test, it
+ * doesn't assert the remounted loop is on the compositor: the takeover's
+ * shared layout animation takes on the pack's infinite transition
+ * (motion-dom `create-projection-node.ts:581-584,613-627` @ `v14.7.1`), so the
+ * node stays `isProjecting()` and `canAccelerateTransform` keeps the loop on
+ * the main thread (`TransformAnimation.ts:204`). The count and any early loop
+ * wrap are attached as evidence.
  */
 
-type Recorded = { transform: string; count: number }
+type Recorded = { t: number; transform: string; count: number }
 type Stats = { reads: number; silentReads: number }
 type FrameWindow = Window & {
     spin: () => void
@@ -119,9 +125,36 @@ test.describe('layout measurements of a looping 3D rotation', () => {
             return pack !== null && pack !== old
         }, old)
         // The new element mounts at `rotateY: 0` and one frame later its
-        // `animate` switches to the `[0, 360]` loop.
+        // `animate` switches to the `[0, 360]` loop. Record it for 2.6 s from
+        // here (evidence: a 4 s loop shouldn't wrap before ~4 s).
+        const loop = page.evaluate(() =>
+            (window as unknown as FrameWindow).recordTransforms('pack', 2600)
+        )
         await page.waitForTimeout(1300)
-        expect(await countPack(page)).toBe(1)
+        test.info().annotations.push({
+            type: 'remounted pack countTransformAnimations at 1300 ms (evidence, not asserted)',
+            description: String(await countPack(page))
+        })
+        const frames = await loop
+        const rotateY = (transform: string) =>
+            Number(/rotateY\((-?[\d.]+)deg\)/.exec(transform)?.[1] ?? NaN)
+        const wraps: string[] = []
+        for (let i = 1; i < frames.length; i++) {
+            const previous = rotateY(frames[i - 1].transform)
+            const current = rotateY(frames[i].transform)
+            if (current < previous - 1) {
+                wraps.push(
+                    `${(frames[i].t - frames[0].t).toFixed(0)} ms: ${previous}deg -> ${current}deg`
+                )
+            }
+        }
+        const last = frames[frames.length - 1]
+        test.info().annotations.push({
+            type: 'remounted loop wraps within 2.6 s (evidence; none expected on a 4 s loop)',
+            description: wraps.length
+                ? wraps.join('; ')
+                : `none (rotateY ${rotateY(last.transform)}deg at ${(last.t - frames[0].t).toFixed(0)} ms)`
+        })
         await expectUndistorted(page, before)
     })
 

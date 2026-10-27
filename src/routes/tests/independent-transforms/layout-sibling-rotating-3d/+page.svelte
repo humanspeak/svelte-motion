@@ -40,7 +40,7 @@
      * one frame after it mounts, switches to the `rotateY: [0, 360]` loop with
      * the same infinite transition: an ordinary `animate` change.
      */
-    type Recorded = { transform: string; count: number }
+    type Recorded = { t: number; transform: string; count: number }
     type FrameWindow = Window & {
         spin: () => void
         remount: () => void
@@ -68,6 +68,7 @@
                 const el = document.getElementById(id)
                 if (el) {
                     recorded.push({
+                        t: document.timeline.currentTime as number,
                         transform: el.style.transform,
                         count: countTransformAnimations(id)
                     })
