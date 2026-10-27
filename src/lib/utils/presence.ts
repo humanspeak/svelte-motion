@@ -3,7 +3,12 @@ import { mergeTransitions } from '$lib/utils/animation'
 import { holdLayoutIdHandoffs } from '$lib/utils/layoutId'
 import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
-import { readTransformValue, transformProps, type PresenceContextProps } from 'motion-dom'
+import {
+    microtask,
+    readTransformValue,
+    transformProps,
+    type PresenceContextProps
+} from 'motion-dom'
 import { getContext, setContext, tick } from 'svelte'
 import { createSubscriber } from 'svelte/reactivity'
 
@@ -377,6 +382,12 @@ export type PopLayoutSnapshot = {
     bottom: number
     /** Resolved text direction used by horizontal anchoring. */
     direction: string
+    /**
+     * Position in the space the element scrolls in, in its offsetParent's
+     * coordinate space (upstream `measurePoint`). Compared after the pop to
+     * detect the container moving.
+     */
+    point: [number, number]
 }
 
 type ScrollSnapshot = {
@@ -430,18 +441,71 @@ export const containsStatefulCloneContent = (element: Element): boolean =>
     element.matches(statefulCloneContentSelector) ||
     element.querySelector(statefulCloneContentSelector) !== null
 
-const readNumericStyle = (value: string, fallback: number): number => {
+const readNumericStyle = (value: string, fallback: () => number): number => {
     const parsed = parseFloat(value)
-    return Number.isFinite(parsed) ? parsed : fallback
+    return Number.isFinite(parsed) ? parsed : fallback()
+}
+
+/**
+ * How much an element's transforms, and its ancestors', scale it on screen.
+ * Port of upstream `PopChild` `measureScale` @ v14.7.1.
+ *
+ * @param element The element to measure; `null` reads as unscaled.
+ * @returns The `[x, y]` on-screen scale, `1` where it can't be measured.
+ */
+export const measurePopLayoutScale = (element?: HTMLElement | null): [number, number] => {
+    const { width, height } = element?.getBoundingClientRect() || ({} as DOMRect)
+    // Upstream's arithmetic: an unmeasurable ratio (NaN) reads as unscaled.
+    return [
+        width / (element?.offsetWidth as number) || 1,
+        height / (element?.offsetHeight as number) || 1
+    ]
+}
+
+/**
+ * The element's position in the space it scrolls in, as the projection
+ * system measures it: its viewport position, plus its scroll containers'
+ * scroll (across shadow roots), plus the window's. Like the projection's
+ * scroll roots, a fixed ancestor stops the walk: it doesn't scroll with
+ * anything above it, so a fixed container is measured relative to the
+ * viewport. So a scroll position clamped by content shrinking reads as the
+ * element moving only if it doesn't scroll with that content.
+ *
+ * Scroll offsets are in their container's coordinate space, so are scaled
+ * onto the screen, and the result is returned in the offsetParent's
+ * coordinate space, which the pop offsets are in. Port of upstream
+ * `PopChild` `measurePoint` @ v14.7.1 (#2348).
+ *
+ * @param element The element to measure.
+ * @returns The `[left, top]` point in the offsetParent's coordinate space.
+ */
+export const measurePopLayoutPoint = (element: HTMLElement): [number, number] => {
+    const view = element.ownerDocument.defaultView ?? window
+    let { left, top } = element.getBoundingClientRect()
+    let node: HTMLElement | null | undefined = element
+    while (
+        (node = (node.parentElement || (node.parentNode as ShadowRoot | null)?.host) as
+            HTMLElement | null | undefined)
+    ) {
+        const { scrollLeft, scrollTop } = node
+        if (scrollLeft || scrollTop) {
+            const [x, y] = measurePopLayoutScale(node)
+            left += scrollLeft * x
+            top += scrollTop * y
+        }
+        if (view.getComputedStyle(node).position === 'fixed') break
+    }
+    const [x, y] = measurePopLayoutScale(element.offsetParent as HTMLElement | null)
+    return [left / x, top / y]
 }
 
 /**
  * Measure an element for `mode="popLayout"` using upstream Motion's coordinate
- * model: offsets are captured relative to `offsetParent`, not the viewport.
- * Ancestor scroll is intentionally not subtracted here because upstream
- * `PopChild` snapshots raw `offsetTop`/`offsetLeft`; any Svelte clone fallback
- * that breaks that containing-block relationship must compensate at the clone
- * application layer instead.
+ * model: offsets are the raw `offsetTop` / `offsetLeft` against
+ * `offsetParent`, as upstream `PopChild` snapshots them, not viewport
+ * coordinates. `point` is the element's position in the space it scrolls in
+ * ({@link measurePopLayoutPoint}); measured again after the pop, it is what
+ * detects the container moving ({@link schedulePopLayoutCorrection}).
  *
  * @param element The exiting element to measure while it is still in layout.
  * @param computedStyle The computed style for the exiting element.
@@ -454,9 +518,16 @@ export const measurePopLayoutSnapshot = (
     const parent = element.offsetParent
     const parentWidth = isHTMLElement(parent) ? parent.offsetWidth || 0 : 0
     const parentHeight = isHTMLElement(parent) ? parent.offsetHeight || 0 : 0
-    const rect = element.getBoundingClientRect()
-    const width = readNumericStyle(computedStyle.width, element.offsetWidth || rect.width)
-    const height = readNumericStyle(computedStyle.height, element.offsetHeight || rect.height)
+    // Only read the rect when the computed size isn't a length: every
+    // element's reads must stay ahead of every correction's writes.
+    const width = readNumericStyle(
+        computedStyle.width,
+        () => element.offsetWidth || element.getBoundingClientRect().width
+    )
+    const height = readNumericStyle(
+        computedStyle.height,
+        () => element.offsetHeight || element.getBoundingClientRect().height
+    )
     const top = element.offsetTop
     const left = element.offsetLeft
 
@@ -467,8 +538,53 @@ export const measurePopLayoutSnapshot = (
         left,
         right: parentWidth - width - left,
         bottom: parentHeight - height - top,
-        direction: computedStyle.direction || 'ltr'
+        direction: computedStyle.direction || 'ltr',
+        point: measurePopLayoutPoint(element)
     }
+}
+
+/**
+ * Offset a popped element back when popping it moved the container it is
+ * pinned to (#2348): a bottom-anchored or centred container shrinks around
+ * its remaining children, and the element, pinned to its edges, moves with
+ * it. Port of upstream `PopChild` @ v14.7.1.
+ *
+ * Runs on motion-dom's `microtask` frameloop, so once the whole update is in
+ * the DOM and before paint. Upstream: "Every popped element is measured in
+ * its first step, then corrected at the start of the read step: before the
+ * projection system, which schedules its layout measurement there from layout
+ * effects, so layout animations see the corrected position." The projection
+ * queues its update with `microtask.read` from `didUpdate`, after this is
+ * scheduled in the same flush.
+ *
+ * @param element The popped node to measure after the update (the owned
+ *     element, or the exit clone, which sits in the element's slot).
+ * @param snapshot The pre-pop snapshot. Its offsets are corrected in place,
+ *     so pass a copy if the caller keeps it.
+ * @param isActive Whether the pop is still applied when the correction runs.
+ * @param reapply Re-applies the pop with the corrected snapshot.
+ */
+export const schedulePopLayoutCorrection = (
+    element: HTMLElement,
+    snapshot: PopLayoutSnapshot,
+    isActive: () => boolean,
+    reapply: (snapshot: PopLayoutSnapshot) => void
+): void => {
+    let dx = 0
+    let dy = 0
+    microtask.setup(() => {
+        const [x, y] = measurePopLayoutPoint(element)
+        dx = snapshot.point[0] - x
+        dy = snapshot.point[1] - y
+    })
+    microtask.read(() => {
+        if (!isActive() || (!dx && !dy)) return
+        snapshot.left += dx
+        snapshot.right -= dx
+        snapshot.top += dy
+        snapshot.bottom -= dy
+        reapply(snapshot)
+    })
 }
 
 /**
@@ -1051,10 +1167,14 @@ export const createAnimatePresenceContext = (context: {
         if (disposed) return
         for (const child of children.values()) {
             if (!child.element.isConnected) continue
-            child.lastStyleSnapshot = snapshotComputedStyle(
-                getComputedStyle(child.element),
-                child.element
-            )
+            const style = getComputedStyle(child.element)
+            child.lastStyleSnapshot = snapshotComputedStyle(style, child.element)
+            // A resting child moves when its siblings change (a toast list
+            // growing), so its pop position has to follow, or the #2348
+            // correction would also undo those earlier moves.
+            if (mode === 'popLayout') {
+                child.lastPopLayoutSnapshot = measurePopLayoutSnapshot(child.element, style)
+            }
         }
     }
     const scheduleSnapshotRefresh = () => {
@@ -1518,9 +1638,13 @@ export const createAnimatePresenceContext = (context: {
         clone.style.right = ''
         clone.style.top = ''
         clone.style.bottom = ''
-        if (popLayoutSnapshot) {
-            const { anchorX, anchorY } = getPopLayoutOptions()
-            const popStyles = resolvePopLayoutStyles(popLayoutSnapshot, anchorX, anchorY)
+        const { anchorX, anchorY } = getPopLayoutOptions()
+        const applyPopStyles = (snapshot: PopLayoutSnapshot) => {
+            const popStyles = resolvePopLayoutStyles(snapshot, anchorX, anchorY)
+            clone.style.left = ''
+            clone.style.right = ''
+            clone.style.top = ''
+            clone.style.bottom = ''
             if (popStyles.position) clone.style.position = popStyles.position
             if (popStyles.width) clone.style.width = popStyles.width
             if (popStyles.height) clone.style.height = popStyles.height
@@ -1528,6 +1652,9 @@ export const createAnimatePresenceContext = (context: {
             if (popStyles.right) clone.style.right = popStyles.right
             if (popStyles.top) clone.style.top = popStyles.top
             if (popStyles.bottom) clone.style.bottom = popStyles.bottom
+        }
+        if (popLayoutSnapshot) {
+            applyPopStyles(popLayoutSnapshot)
         } else {
             clone.style.position = 'absolute'
             clone.style.top = `${rect.top - parentRect!.top + (positioningParent.scrollTop ?? 0)}px`
@@ -1591,6 +1718,17 @@ export const createAnimatePresenceContext = (context: {
         slotParent.insertBefore(clone, slotAnchor?.parentElement === slotParent ? slotAnchor : null)
         const activeExit: ActiveExit = { clone, child, placeholder, cancelled: false }
         activeExits.set(key, activeExit)
+        if (popLayoutSnapshot) {
+            // The "before" point is the element's; the "after" one is the
+            // clone's, in the same slot and offsetParent. Corrected on a copy
+            // so the stored snapshot keeps describing the element.
+            schedulePopLayoutCorrection(
+                clone,
+                { ...popLayoutSnapshot, point: [...popLayoutSnapshot.point] },
+                () => clone.isConnected && !activeExit.cancelled && !disposed,
+                applyPopStyles
+            )
+        }
         const releaseActiveExit = () => {
             if (activeExits.get(key) === activeExit) activeExits.delete(key)
         }

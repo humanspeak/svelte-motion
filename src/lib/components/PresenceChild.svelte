@@ -12,6 +12,7 @@
         getPresenceDepth,
         measurePopLayoutSnapshot,
         resolvePopLayoutStyles,
+        schedulePopLayoutCorrection,
         setPresenceChildContext,
         setPresenceDepth
     } from '$lib/utils/presence'
@@ -84,16 +85,20 @@
     /**
      * `mode="popLayout"`: take the held content out of the layout flow while it
      * exits, so siblings reflow immediately. Port of framer-motion
-     * `components/AnimatePresence/PopChild.tsx` @ v14.5.0 (#2503): PresenceChild
-     * has no ref to its snippet content, so the element is the outermost motion
-     * element registered with this wrapper.
+     * `components/AnimatePresence/PopChild.tsx` @ v14.7.1 (#2503, #2348):
+     * PresenceChild has no ref to its snippet content, so the element is the
+     * outermost motion element registered with this wrapper.
      *
      * Must run before the DOM update that starts the exit, while the element is
      * still in flow (upstream measures in `getSnapshotBeforeUpdate`). Like
      * upstream, the pop is a `[data-motion-pop-id]` rule in an injected
      * stylesheet rather than inline styles, so the element's own `style` is
-     * left untouched and cleanup is just deleting the rule. MotionConfig has no
-     * `nonce` in svelte-motion, so none is set on the `<style>`.
+     * left untouched and cleanup is just deleting the rule. Popping the element
+     * can move the container it is pinned to, so once the whole update is in
+     * the DOM the element is measured again and the rule offset back by however
+     * far it moved (`schedulePopLayoutCorrection`, on motion-dom's microtask
+     * frameloop, which runs after Svelte's synchronous flush). MotionConfig has
+     * no `nonce` in svelte-motion, so none is set on the `<style>`.
      */
     function applyPop(): void {
         removePop()
@@ -107,29 +112,70 @@
             anchorY: 'top'
         }
         const id = `svelte-motion-pop-${++popIdCounter}`
-        const declarations = Object.entries(
-            // Only plain string declarations (position, width, height, edges).
-            resolvePopLayoutStyles(snapshot, anchorX, anchorY) as Record<string, string>
-        )
-            .map(([property, value]) => `${property}: ${value} !important;`)
-            .join(' ')
-        const rule = `[data-motion-pop-id="${id}"] { ${declarations} }`
+        // Reads the (mutable) snapshot, so a correction rebuilds it.
+        const buildRule = () => {
+            const declarations = Object.entries(
+                // Only plain string declarations (position, width, height, edges).
+                resolvePopLayoutStyles(snapshot, anchorX, anchorY) as Record<string, string>
+            )
+                .map(([property, value]) => `${property}: ${value} !important;`)
+                .join(' ')
+            return `[data-motion-pop-id="${id}"] { ${declarations} }`
+        }
 
-        element.dataset.motionPopId = id
         // The element's own document, so this works in another window/iframe.
         const doc = element.ownerDocument
         const style = doc.createElement('style')
         const parent = root ?? doc.head
-        parent.appendChild(style)
-        if (style.sheet) style.sheet.insertRule(rule)
-        else style.textContent = rule
+        const insertRule = () => {
+            if (style.sheet) style.sheet.insertRule(buildRule())
+            else style.textContent = buildRule()
+        }
+
+        // Upstream measures in `getSnapshotBeforeUpdate` and pops in
+        // `useInsertionEffect` (PopChild.tsx @ v14.7.1, lines 87-111 and
+        // 181-200), so the projection's own `getSnapshotBeforeUpdate` →
+        // `willUpdate` still sees the in-flow box. Here the descendants' layout
+        // snapshots run in their own `$effect.pre`s after this one, so the pop
+        // waits for this component's post-update `$effect` (same flush, before
+        // the microtask frameloop measures and corrects it).
+        pendingPop = () => {
+            element.dataset.motionPopId = id
+            parent.appendChild(style)
+            insertRule()
+            // Scheduled from the insertion, like upstream's
+            // `useInsertionEffect` (lines 215-236), so it measures the popped
+            // element even if the pop lands in a later flush.
+            schedulePopLayoutCorrection(
+                element,
+                snapshot,
+                // Removed since: the element is present again, or gone.
+                () => style.isConnected && element.dataset.motionPopId === id,
+                () => {
+                    if (style.sheet?.cssRules.length) style.sheet.deleteRule(0)
+                    insertRule()
+                }
+            )
+        }
+        popVersion += 1
 
         removePop = () => {
             removePop = () => {}
+            pendingPop = null
             if (element.dataset.motionPopId === id) element.removeAttribute('data-motion-pop-id')
             style.remove()
         }
     }
+
+    // The deferred half of `applyPop`, see there.
+    let pendingPop: (() => void) | null = null
+    let popVersion = $state(0)
+    $effect(() => {
+        void popVersion
+        const pop = pendingPop
+        pendingPop = null
+        pop?.()
+    })
 
     function cancelWaitEnterBlock(): void {
         waitEnterVersion += 1
