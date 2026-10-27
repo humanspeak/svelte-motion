@@ -6,11 +6,11 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Hand, Heart, Move, Zap } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import PanDefault from '$lib/examples/pan/demos/Default.svelte'
-    import PanSwipeCards from '$lib/examples/pan/demos/SwipeCards.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import PanDefault from '#lib/examples/pan/demos/Default.svelte'
+    import PanSwipeCards from '#lib/examples/pan/demos/SwipeCards.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

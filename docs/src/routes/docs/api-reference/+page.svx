@@ -4,7 +4,7 @@ description: Exported TypeScript types, motion re-exports, SSR behavior, and oth
 ---
 
 <script>
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

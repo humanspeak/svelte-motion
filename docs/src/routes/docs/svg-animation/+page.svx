@@ -4,10 +4,10 @@ description: 'Bind MotionValues to SVG attributes, draw paths, and commit exact 
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import SvgAnimationExample from '$lib/examples/svg-animation/demos/Default.svelte';
-  import SignalDock from '$lib/examples/svg-animation/demos/SignalDock.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import SvgAnimationExample from '#lib/examples/svg-animation/demos/Default.svelte';
+  import SignalDock from '#lib/examples/svg-animation/demos/SignalDock.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

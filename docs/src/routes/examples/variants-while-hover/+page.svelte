@@ -6,11 +6,11 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Code2, KeyRound, Layers, Repeat2 } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import InlineForm from '$lib/examples/variants-while-hover/demos/InlineForm.svelte'
-    import VariantKey from '$lib/examples/variants-while-hover/demos/VariantKey.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import InlineForm from '#lib/examples/variants-while-hover/demos/InlineForm.svelte'
+    import VariantKey from '#lib/examples/variants-while-hover/demos/VariantKey.svelte'
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
     if (breadcrumbs) {

@@ -1,10 +1,10 @@
 <script lang="ts">
     import { BrutIndexV2 } from '@humanspeak/docs-kit'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import { listExamples } from '$lib/examplesIndex'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import { listExamples } from '#lib/examplesIndex.js'
     import posthog from 'posthog-js'
-    import { browser } from '$app/environment'
+    import { browser } from '$app/env'
 
     $effect(() => {
         if (browser) posthog.capture('examples_index_viewed')

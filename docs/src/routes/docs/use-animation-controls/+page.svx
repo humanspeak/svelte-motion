@@ -4,9 +4,9 @@ description: 'Legacy imperative controls for coordinating one or more motion com
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import UseAnimationControlsExample from '$lib/examples/use-animation-controls/demos/Default.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import UseAnimationControlsExample from '#lib/examples/use-animation-controls/demos/Default.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

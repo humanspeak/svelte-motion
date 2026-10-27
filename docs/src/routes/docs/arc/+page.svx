@@ -4,9 +4,9 @@ description: 'Curved motion paths for x/y animations — keyframes, layout, and 
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte'
-  import Default from '$lib/examples/arc/demos/Default.svelte'
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte'
+  import Default from '#lib/examples/arc/demos/Default.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

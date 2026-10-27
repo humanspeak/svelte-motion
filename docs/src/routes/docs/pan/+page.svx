@@ -4,9 +4,9 @@ description: Pan gesture primitive — pointer offset/velocity reporting without
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import PanExample from '$lib/examples/pan/demos/Default.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import PanExample from '#lib/examples/pan/demos/Default.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

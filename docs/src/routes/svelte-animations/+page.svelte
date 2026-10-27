@@ -1,13 +1,13 @@
 <script lang="ts">
     import { HeaderV2, FooterV2, getBreadcrumbContext, getSeoContext } from '@humanspeak/docs-kit'
-    import { docsConfig } from '$lib/docs-config'
-    import { headerNav } from '$lib/docsNav'
-    import favicon from '$lib/assets/logo.svg'
+    import { docsConfig } from '#lib/docs-config.js'
+    import { headerNav } from '#lib/docsNav.js'
+    import favicon from '#lib/assets/logo.svg'
     import rootPkg from '../../../../package.json'
     import '@fontsource-variable/inter/index.css'
     import '@fontsource-variable/jetbrains-mono/index.css'
     import posthog from 'posthog-js'
-    import { browser } from '$app/environment'
+    import { browser } from '$app/env'
 
     const PKG_VERSION = rootPkg.version
 

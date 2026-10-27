@@ -4,7 +4,7 @@ description: Pointer-driven animations on motion components via whileHover, whil
 ---
 
 <script>
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

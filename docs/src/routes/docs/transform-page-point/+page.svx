@@ -4,7 +4,7 @@ description: Correct drag and pan coordinates when motion elements live inside s
 ---
 
 <script>
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

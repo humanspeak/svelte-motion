@@ -12,7 +12,7 @@ readingTime: 7
 ---
 
 <script lang="ts">
-    import { docsConfig } from '$lib/docs-config'
+    import { docsConfig } from '#lib/docs-config.js'
     import { BlogPostV2, type BlogPostMeta } from '@humanspeak/docs-kit/blog'
 
     const post: BlogPostMeta = {

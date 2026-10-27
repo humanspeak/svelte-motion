@@ -15,12 +15,12 @@
         Square,
         Zap
     } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import AnimateLayoutSharedUnderlineTabs from '$lib/examples/animate-layout/demos/SharedUnderlineTabs.svelte'
-    import AnimateLayoutShuffleGrid from '$lib/examples/animate-layout/demos/ShuffleGrid.svelte'
-    import AnimateLayoutToggleSwitch from '$lib/examples/animate-layout/demos/ToggleSwitch.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import AnimateLayoutSharedUnderlineTabs from '#lib/examples/animate-layout/demos/SharedUnderlineTabs.svelte'
+    import AnimateLayoutShuffleGrid from '#lib/examples/animate-layout/demos/ShuffleGrid.svelte'
+    import AnimateLayoutToggleSwitch from '#lib/examples/animate-layout/demos/ToggleSwitch.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

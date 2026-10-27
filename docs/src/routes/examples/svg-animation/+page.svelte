@@ -6,11 +6,11 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Gauge, Route, Signal, Sparkles, Wand } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import SvgAnimationDefault from '$lib/examples/svg-animation/demos/Default.svelte'
-    import SignalDock from '$lib/examples/svg-animation/demos/SignalDock.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import SvgAnimationDefault from '#lib/examples/svg-animation/demos/Default.svelte'
+    import SignalDock from '#lib/examples/svg-animation/demos/SignalDock.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

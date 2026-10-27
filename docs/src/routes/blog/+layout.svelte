@@ -1,7 +1,7 @@
 <script lang="ts">
-    import favicon from '$lib/assets/logo.svg'
-    import { docsConfig } from '$lib/docs-config'
-    import { buildBlogBreadcrumbs, headerNav } from '$lib/docsNav'
+    import favicon from '#lib/assets/logo.svg'
+    import { docsConfig } from '#lib/docs-config.js'
+    import { buildBlogBreadcrumbs, headerNav } from '#lib/docsNav.js'
     import { enhanceCodeBlocks } from '@humanspeak/docs-kit'
     import { BlogLayoutV2 } from '@humanspeak/docs-kit/blog'
     import '@fontsource-variable/inter/index.css'

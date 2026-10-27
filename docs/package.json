@@ -3,6 +3,10 @@
     "version": "0.0.1",
     "private": true,
     "type": "module",
+    "imports": {
+        "#lib": "./src/lib/index.js",
+        "#lib/*": "./src/lib/*"
+    },
     "scripts": {
         "build": "tsx ./scripts/fetch-github-stats.ts && node ./scripts/generate-registry.mjs && vite build && node ./scripts/check-favicon.mjs",
         "build:indexnow": "tsx ./scripts/fetch-github-stats.ts && node ./scripts/generate-registry.mjs && vite build --mode indexnow && node ./scripts/check-favicon.mjs",
@@ -28,7 +32,7 @@
     "dependencies": {
         "@fontsource-variable/inter": "^5.3.0",
         "@fontsource-variable/jetbrains-mono": "^5.3.0",
-        "@humanspeak/docs-kit": "github:humanspeak/docs-kit#2026.9.10",
+        "@humanspeak/docs-kit": "github:humanspeak/docs-kit#1432451ec0b28c887bb00dc120a8c290bd6efabd",
         "@humanspeak/svelte-markdown": "^1.8.7",
         "@humanspeak/svelte-motion": "workspace:*",
         "@humanspeak/svelte-scoped-props": "^0.1.5",
@@ -42,9 +46,9 @@
     "devDependencies": {
         "@eslint/compat": "^2.1.0",
         "@eslint/js": "^10.0.1",
-        "@sveltejs/adapter-auto": "^7.0.1",
-        "@sveltejs/adapter-cloudflare": "^7.2.9",
-        "@sveltejs/kit": "^2.70.3",
+        "@sveltejs/adapter-auto": "^8.0.0",
+        "@sveltejs/adapter-cloudflare": "^8.0.1",
+        "@sveltejs/kit": "^3.1.0",
         "@sveltejs/vite-plugin-svelte": "^7.3.0",
         "@tailwindcss/typography": "^0.5.20",
         "@tailwindcss/vite": "^4.3.3",
@@ -65,7 +69,7 @@
         "prettier-plugin-svelte": "^4.1.1",
         "prettier-plugin-tailwindcss": "^0.8.1",
         "shiki": "^4.4.3",
-        "svelte": "^5.56.10",
+        "svelte": "^5.57.1",
         "svelte-check": "^4.7.6",
         "tailwind-merge": "^3.6.0",
         "tailwind-variants": "^3.3.1",

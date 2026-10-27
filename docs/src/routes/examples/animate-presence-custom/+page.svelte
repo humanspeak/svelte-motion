@@ -6,11 +6,11 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { ArrowLeftRight, Layers, SquareStack } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import AnimatePresenceCustomDefault from '$lib/examples/animate-presence-custom/demos/Default.svelte'
-    import AnimatePresenceCustomUsePresenceData from '$lib/examples/animate-presence-custom/demos/UsePresenceData.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import AnimatePresenceCustomDefault from '#lib/examples/animate-presence-custom/demos/Default.svelte'
+    import AnimatePresenceCustomUsePresenceData from '#lib/examples/animate-presence-custom/demos/UsePresenceData.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

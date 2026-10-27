@@ -6,11 +6,11 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Clock, Crosshair, Layers, MoveRight, Repeat, Sparkles } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import KeyframesDefault from '$lib/examples/keyframes/demos/Default.svelte'
-    import KeyframesWildcard from '$lib/examples/keyframes/demos/Wildcard.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import KeyframesDefault from '#lib/examples/keyframes/demos/Default.svelte'
+    import KeyframesWildcard from '#lib/examples/keyframes/demos/Wildcard.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

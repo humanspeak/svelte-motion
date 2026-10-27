@@ -4,7 +4,7 @@ description: "Create a spring-animated motion value with physics-based motion."
 ---
 
 <script>
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

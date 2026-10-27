@@ -4,9 +4,9 @@ description: Animate between two DOM states with the browser View Transitions AP
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte'
-  import ViewExample from '$lib/examples/ViewExample.svelte'
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte'
+  import ViewExample from '#lib/examples/ViewExample.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {
