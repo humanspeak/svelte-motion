@@ -10,16 +10,22 @@
 > **Port rule**: this lane's Playwright port is **4221**. Prefix every Playwright command with `PW_PORT=4221`.
 > Port 4198 belongs to the maintainer; never use or kill it. Never set `PW_REUSE_SERVER`.
 >
-> **Requires plan 001 (Motion 14.7.1 pins) and plan 008 merged into `feat/motion-14.7.1`.** Before starting,
-> confirm all three print a line, otherwise STOP:
+> **Requires plans 001 (Motion 14.7.1 pins), 006 and 007 (the layoutid lane) and 008, all merged into
+> `feat/motion-14.7.1`.** 006 edits `_MotionContainer.svelte` right next to this plan's cleanup call, so this lane
+> must start from a `feat/motion-14.7.1` that already has it. Before starting, confirm all five print a line,
+> otherwise STOP:
 > `grep -n '"motion-dom": "14.7.1"' package.json`,
 > `test -f src/routes/tests/animate-presence/pop-layout-container-move/+page.svelte && echo 008-page`,
-> `grep -n '50% 50% !important' src/routes/tests/animate-presence/pop-layout-container-move/+page.svelte`.
+> `grep -n '50% 50% !important' src/routes/tests/animate-presence/pop-layout-container-move/+page.svelte`,
+> `grep -n "switchLayoutId" src/lib/html/_MotionContainer.svelte` (006 merged),
+> `grep -n "layoutRoot?: boolean" src/lib/types.ts` (007 merged).
 >
 > **Drift check (run first)**:
 > `git diff --stat ba910033..HEAD -- src/lib/utils/layout.ts src/lib/utils/layout.spec.ts src/lib/html/_MotionContainer.svelte src/lib/html/_MotionContainer.spec.ts src/routes/tests/layout`
 > Expected: plans 004, 006, 007, 008 and 010 of this batch will have changed `_MotionContainer.svelte` in their own
-> regions (see the batch README "Shared hotspots"); that is fine. For `layout.ts`, `layout.spec.ts`, and the
+> regions (see the batch README "Shared hotspots"); that is fine. 006's edits sit at about planned-at lines
+> 2776-2809, directly after the cleanup quoted below, so after 006 the cleanup's line numbers will have moved:
+> locate it by content (`grep -n "setCompositorHints" src/lib/html/_MotionContainer.svelte`). For `layout.ts`, `layout.spec.ts`, and the
 > `_MotionContainer.svelte` lines quoted below (the `setCompositorHints` import, its two call sites, and the
 > `_MotionContainer.spec.ts` assertions), compare the "Current state" excerpts with the live code. Line numbers
 > may have shifted; the code must match. On a content mismatch, STOP.
@@ -31,8 +37,10 @@
 - **Risk**: LOW-MED. The library change only removes two inline writes. The risk is that a painted-frame e2e
   spec was quietly relying on `will-change: transform` layer promotion (sub-pixel snapping) or on the `0 0`
   origin. The gate runs every layout-related e2e directory to catch that.
-- **Depends on**: 001 (the e2e baseline is the 14.7.1 suite), 008 (Step 5 removes a pin from 008's page).
-- **Wave**: 4 (after Phase B of the batch, on top of `feat/motion-14.7.1` with 001 and 008 merged)
+- **Depends on**: 001 (the e2e baseline is the 14.7.1 suite), 006 and 007 (006 edits `_MotionContainer.svelte`
+  :2776-2809, next to this plan's cleanup at :2767-2771; 007 follows 006 in the same lane and plumbs the same
+  options), 008 (Step 5 removes a pin from 008's page).
+- **Wave**: 4 (after Phase B of the batch, on top of `feat/motion-14.7.1` with 001, 006, 007 and 008 merged)
 - **Category**: bug (upstream parity)
 - **Planned at**: commit `ba910033` (`feat/motion-14.7.1`, Motion 14.7.1 pins, plan 001 merged), 2026-10-27
 - **Found by**: plan 008's executor, who pinned `transform-origin: 50% 50% !important` on its test page to work
@@ -259,7 +267,9 @@ default. This plan removes both writes, matching upstream.
 - `src/lib/utils/layout.spec.ts` — the `setCompositorHints: toggles styles` case (lines 300-306) and its import
   (line 9).
 - `src/lib/html/_MotionContainer.svelte` — **only** the `setCompositorHints` import (line 65), the setup call
-  (line 2524), and the cleanup call (lines 2769-2771).
+  (line 2524), and the cleanup call (lines 2769-2771). These are planned-at line numbers; after 006 and 007 merge
+  they will have moved, so find all three with `grep -n "setCompositorHints" src/lib/html/_MotionContainer.svelte`.
+  Do not touch 006's handoff-rect effect that follows the cleanup.
 - `src/lib/html/_MotionContainer.spec.ts` — the assertions at lines 526-529 and 545-548, plus one new `it` in
   the same `describe`.
 - `src/routes/tests/layout/transform-origin-at-rest/+page.svelte` (create)
@@ -287,7 +297,9 @@ default. This plan removes both writes, matching upstream.
 ## Git workflow
 
 - Lane branch `lane/1471-origin` in `../svelte-motion-1471-origin`, created by the dispatcher by hand from
-  `feat/motion-14.7.1` after Phase B (001 and 008 merged). `isolation: 'worktree'` forks `origin/main`, which does
+  `feat/motion-14.7.1` **after the layoutid lane (006, 007) and 008 have merged into it** (001 is already
+  there). Do not cut it earlier: 006 rewrites the `_MotionContainer.svelte` lines right after this plan's cleanup
+  call, and an earlier cut would make the two merges conflict. `isolation: 'worktree'` forks `origin/main`, which does
   not have this batch; do not use it.
 - Conventional commits, one per step, for example
   `test(layout): layout elements at rest keep the default transform-origin`,
@@ -334,10 +346,10 @@ browser the projection already writes `50% 50% 0` there); record what you saw.
 
 1. Create `src/routes/tests/layout/transform-origin-at-rest/+page.svelte`. Four fixtures, each a 200×120 box in
    its own `<section>`, with stable `data-testid`s, `transition={{ duration: 0.8, ease: 'linear' }}`:
-   - **fresh**: `<motion.div layout data-testid="fresh-box" animate={{ scale: freshScaled ? 0.5 : 1 }}>`.
+   - **fresh**: `<motion.div layout data-testid="fresh-box" animate={{ scale: freshScaled ? 0.4 : 1 }}>`.
      Button `data-testid="scale-fresh"` toggles `freshScaled`. The box never has a layout change.
    - **settled**: a flex track (`display: flex; justify-content: {settledEnd ? 'flex-end' : 'flex-start'}`, 600px
-     wide) holding `<motion.div layout data-testid="settled-box" animate={{ scale: settledScaled ? 0.5 : 1 }}>`.
+     wide) holding `<motion.div layout data-testid="settled-box" animate={{ scale: settledScaled ? 0.4 : 1 }}>`.
      Button `move-settled` toggles `settledEnd` (a layout animation); button `scale-settled` toggles
      `settledScaled`. This is the brief's "has done a layout animation, then animates `scale`" case.
    - **pop**: `<AnimatePresence mode="popLayout">` with one `layout` item that exits with
@@ -366,61 +378,105 @@ browser the projection already writes `50% 50% 0` there); record what you saw.
    - Component JSDoc at the top of the `<script>` explaining what the page shows, with the upstream citation.
 2. Add a link to it in `src/routes/+page.svelte`'s layout list, after the `/tests/layout/relative-children`
    entry, same markup: `layout — transform-origin stays at the centre at rest`.
-3. Create `e2e/layout/transform-origin-at-rest.spec.ts`. Use a helper that measures painted frames from inside
-   the page, so the click and the first sample happen in the same task:
+3. Create `e2e/layout/transform-origin-at-rest.spec.ts`. The project does not accept sampled rects alone as proof
+   of what was painted: every scale case must hit-test the page with `document.elementFromPoint` once per frame, at
+   two probe points fixed before the animation starts, and keep the rect readout as supporting evidence. Run the
+   probe from inside the page, so the click and the first frame are in the same task. Each probe runs in a
+   `requestAnimationFrame` callback that is queued after the click, so it runs after motion-dom's frameloop has
+   written that frame's styles, and `elementFromPoint` forces style and layout for exactly the frame that is about
+   to paint.
+   - **centre probe**: the resting centre of the box. With a centre origin it stays inside the box at every scale,
+     so it must hit the box on **every** frame. With a `0 0` origin and `scale: 0.4` the box shrinks into the
+     top-left quadrant, and the centre stops hitting once scale drops below 0.5.
+   - **corner probe**: 4px in from the resting top-left corner. With a `0 0` origin it always hits. With a centre
+     origin it stops hitting once the box is smaller than about `1 − 8/120 ≈ 0.93` of its height. So it must
+     **miss** on every frame where the width ratio is below 0.6.
    ```ts
-   /** Per-frame centre drift of `testId` for `ms` after `trigger` is clicked, measured in rAF. */
-   const sampleCentreDrift = (page: Page, testId: string, trigger: string, ms = 900) =>
+   type FrameProbe = {
+       frames: number
+       centreMisses: number // frames where the resting centre did not hit the box (must be 0)
+       cornerHitsWhileSmall: number // frames with widthRatio < 0.6 where the corner still hit the box (must be 0)
+       smallFrames: number // frames with widthRatio < 0.6 (must be > 0, proves the scale ran)
+       maxDrift: number // rect evidence: largest centre drift in px
+       minWidthRatio: number // rect evidence
+   }
+
+   /** Hit-tests and measures `selector` once per frame for `ms` after `trigger` is clicked. */
+   const probeFrames = (page: Page, selector: string, trigger: string, ms = 900) =>
        page.evaluate(
-           ([testId, trigger, ms]) =>
-               new Promise<{ maxDrift: number; minWidthRatio: number; frames: number }>((resolve) => {
-                   const query = () => document.querySelector<HTMLElement>(`[data-testid="${testId}"]`)
+           ([selector, trigger, ms]) =>
+               new Promise<FrameProbe>((resolve) => {
+                   const query = () => document.querySelector<HTMLElement>(selector)
                    const rest = query()!.getBoundingClientRect()
                    const cx = rest.left + rest.width / 2
                    const cy = rest.top + rest.height / 2
-                   let maxDrift = 0, minWidthRatio = 1, frames = 0
+                   const kx = rest.left + 4
+                   const ky = rest.top + 4
+                   const out: FrameProbe = { frames: 0, centreMisses: 0, cornerHitsWhileSmall: 0, smallFrames: 0, maxDrift: 0, minWidthRatio: 1 }
                    const start = performance.now()
                    const tick = () => {
                        const el = query()
                        if (el) {
+                           // Exiting clones carry inline `pointer-events: none` (presence.ts:1505), which
+                           // hides them from hit-testing. It does not change what is painted, so the
+                           // probe turns it off before testing.
+                           if (el.style.pointerEvents === 'none') el.style.pointerEvents = 'auto'
+                           const hits = (x: number, y: number) => {
+                               const hit = document.elementFromPoint(x, y)
+                               return !!hit && (hit === el || el.contains(hit))
+                           }
                            const r = el.getBoundingClientRect()
-                           maxDrift = Math.max(maxDrift, Math.hypot(r.left + r.width / 2 - cx, r.top + r.height / 2 - cy))
-                           minWidthRatio = Math.min(minWidthRatio, r.width / rest.width)
-                           frames++
+                           const ratio = r.width / rest.width
+                           out.frames++
+                           if (!hits(cx, cy)) out.centreMisses++
+                           if (ratio < 0.6) {
+                               out.smallFrames++
+                               if (hits(kx, ky)) out.cornerHitsWhileSmall++
+                           }
+                           out.maxDrift = Math.max(out.maxDrift, Math.hypot(r.left + r.width / 2 - cx, r.top + r.height / 2 - cy))
+                           out.minWidthRatio = Math.min(out.minWidthRatio, ratio)
                        }
                        if (performance.now() - start < ms) requestAnimationFrame(tick)
-                       else resolve({ maxDrift, minWidthRatio, frames })
+                       else resolve(out)
                    }
                    document.querySelector<HTMLElement>(`[data-testid="${trigger}"]`)!.click()
                    requestAnimationFrame(tick)
                }),
-           [testId, trigger, ms] as const
+           [selector, trigger, ms] as const
        )
    ```
-   For the pop fixture on the clone path, the queried element must be the exiting clone: query
-   `[data-testid="pop-box"][data-clone="true"]` once it exists, falling back to `[data-testid="pop-box"]` (pass
-   the selector, not just the test id, if that is simpler). Cases (each `goto(…?@isPlaywright=true…)`, wait for
-   `window.MotionIsMounted === true`, then 300 ms for observers to settle):
-   - `fresh layout box scales about its centre` — `maxDrift ≤ 1`, `minWidthRatio < 0.7` (proves the scale ran),
-     `frames > 10`.
-   - `settled layout box scales about its centre after a layout animation` — click `move-settled`, wait 1200 ms,
-     then sample `scale-settled`. Same thresholds. **Guard** (expected to pass on the current code; see Current
-     state).
-   - `popLayout exit with scale shrinks about its centre (owned)` and `(clone)` — `?path=owned` / `?path=clone`,
-     sample `pop-box` after `exit-pop`. `maxDrift ≤ 1`, `minWidthRatio < 0.7`. The pop does not move the box
-     (it is first in its container, nothing above it changes), so any drift is the origin.
-   - `fixed child of a layout element is positioned against the viewport` — the child's rect is
-     `{ left: 0, top: 0 }` within 0.5px.
-   - `layout element at rest has no inline top-left origin or will-change` — for `fresh-box`:
-     `el.style.transformOrigin` does not match `/^0(px)? 0(px)?/` and `el.style.willChange !== 'transform'`.
-   Comment each threshold. Under the current code the scale cases drift by about a quarter of the box
-   (`(1 − 0.5) × hypot(200, 120) / 2 ≈ 58px` at full scale-down).
+   Keep the fixtures clear of overlap (nothing else, including the fixed-child square, may cover a probe point;
+   give each section enough margin). For the pop fixture on the clone path, pass the selector
+   `[data-testid="pop-box"][data-clone="true"]`; on the owned path, `[data-testid="pop-box"]`. Take the resting
+   rect from the live element before the click, which is the same box the clone is inserted at. Cases (each
+   `goto(…?@isPlaywright=true…)`, wait for `window.MotionIsMounted === true`, then 300 ms for observers to
+   settle). There are **six**:
+   1. `fresh layout box scales about its centre`: `centreMisses === 0`, `cornerHitsWhileSmall === 0`,
+      `smallFrames > 3`, `frames > 10`; rect evidence `maxDrift ≤ 1`, `minWidthRatio < 0.6`.
+   2. `settled layout box scales about its centre after a layout animation`: click `move-settled`, wait 1200 ms,
+      then probe `scale-settled`. Same assertions. **Guard** (expected to pass on the current code; see Current
+      state).
+   3. `popLayout exit with scale shrinks about its centre (owned)` and
+   4. `(clone)`: `?path=owned` / `?path=clone`, probe after `exit-pop`. Same assertions as case 1. The pop does not
+      move the box (it is first in its container and nothing above it changes), so a miss can only come from the
+      origin.
+   5. `fixed child of a layout element is positioned against the viewport`: the child's rect is
+      `{ left: 0, top: 0 }` within 0.5px, **and** `document.elementFromPoint(5, 5)` is the child.
+   6. `layout element at rest has no inline top-left origin or will-change`: for `fresh-box`,
+      `el.style.transformOrigin` does not match `/^0(px)? 0(px)?/` and `el.style.willChange !== 'transform'`.
+   Comment each threshold in the spec. On the current code the scale cases miss the centre on every frame below
+   scale 0.5, hit the corner on every small frame, and drift by up to
+   `(1 − 0.4) × hypot(100, 60) ≈ 70px`.
+   If `elementFromPoint` turns out unreliable for a case (for example, it returns a parent because of a stacking
+   quirk you cannot remove from the page), switch that case to a CDP screencast check
+   (`page.context().newCDPSession(page)`, `Page.startScreencast`, decode each frame and test the pixel colour at the
+   two probe points), and say so in your report. Do not drop the per-frame check.
 
-**Verify**: `PW_PORT=4221 pnpm exec playwright test e2e/layout/transform-origin-at-rest.spec.ts` → the fresh,
-both pop, fixed-child and inline-style cases FAIL (drift tens of px; fixed child at the host's corner, about
-`(40, ~y)`; `'0px 0px'` / `'transform'`); the settled case passes. If the fresh case or either pop case passes,
-STOP and report. If the settled case fails, record the drift and continue (it means an observer restart wrote
-`0 0` back after the layout animation; Step 3 fixes that too).
+**Verify**: `PW_PORT=4221 pnpm exec playwright test e2e/layout/transform-origin-at-rest.spec.ts` → cases 1, 3, 4,
+5 and 6 FAIL (`centreMisses` and `cornerHitsWhileSmall` above 0, drift tens of px; the fixed child at the host's
+corner, about `(40, ~y)`; `'0px 0px'` / `'transform'`); case 2 passes. If case 1, 3 or 4 passes, STOP and report.
+If case 2 fails, record the numbers and continue (it means an observer restart wrote `0 0` back after the layout
+animation; Step 3 fixes that too).
 
 ### Step 3: The fix — stop writing the hints
 
@@ -445,16 +501,26 @@ STOP and report. If the settled case fails, record the drift and continue (it me
 - `pnpm build` → exit 0, then `PW_PORT=4221 pnpm exec playwright test e2e/layout/transform-origin-at-rest.spec.ts`
   → all pass.
 
-### Step 4: Regression sweep of layout-adjacent e2e
+### Step 4: Full e2e suite
 
-Run, in one command, every directory that exercises `layout`:
-`PW_PORT=4221 pnpm exec playwright test e2e/layout e2e/layout-id e2e/projection e2e/animate-presence e2e/animate-layout e2e/reorder e2e/independent-transforms e2e/motion/layout-align-toggle.spec.ts e2e/motion/layout-class-toggle.spec.ts e2e/motion/layout-enabled-after-mount.spec.ts e2e/motion/layout-grandparent-toggle.spec.ts e2e/utilities/will-change.spec.ts`
-→ all pass. Re-run a failing spec alone once before treating it as a failure, and say that you re-ran it. For a
-real failure, compare against the same spec on `feat/motion-14.7.1` (build there in a separate worktree or with
-`git worktree add` at that SHA, never `git stash`) to decide whether this plan caused it.
+`layout` is used by pages all over the suite (`e2e/drag` while-drag-transforms, release-before-frame and
+disable-from-ondrag; `e2e/lazy-motion`; `e2e/motion/aspect-ratio.test.ts`; `e2e/random`; and every layout,
+layout-id, projection, presence, reorder and animate-layout spec), so run the whole suite, alone (no other lane
+running Playwright at the same time):
 
-**Verify**: the command above → all pass (or only failures that also fail on `feat/motion-14.7.1`, listed in the
-report).
+`pnpm build && PW_PORT=4221 pnpm test:e2e`
+
+For every failure:
+1. Re-run that spec alone once: `PW_PORT=4221 pnpm exec playwright test <spec>`. Say in your report that you did.
+2. If it still fails, classify it against a 14.7.1 baseline: create a separate worktree at the lane's base commit
+   (`git worktree add ../svelte-motion-1471-origin-base <base SHA>`, where the base SHA is `git merge-base HEAD
+   feat/motion-14.7.1`), run `pnpm install --frozen-lockfile` there, and run the same spec with `PW_PORT=4222`.
+   Never `git stash`. Remove that worktree when you are done (`git worktree remove`).
+3. Report each failure as **caused by 013** (fails here, passes on the base) or **pre-existing** (fails on both),
+   with the assertion text.
+
+**Verify**: the suite → all pass, or only failures classified pre-existing, listed in the report. Any failure
+caused by 013 is a STOP (see STOP conditions); do not loosen it.
 
 ### Step 5: Remove plan 008's pin
 
@@ -467,7 +533,7 @@ fixture's own `transform-origin: 0 0`).
 - `grep -n "50% 50% !important\|setCompositorHints" src/routes/tests/animate-presence/pop-layout-container-move/+page.svelte`
   → no output.
 - `pnpm build` → exit 0, then `PW_PORT=4221 pnpm exec playwright test e2e/animate-presence/pop-layout-container-move.spec.ts`
-  → all pass (same count as before the edit; record the count from Step 4).
+  → all pass (the same number of passing cases as this spec had in Step 4).
 
 ### Step 6: Changeset
 
@@ -478,24 +544,27 @@ Create `.changeset/layout-transform-origin-at-rest.md`:
 '@humanspeak/svelte-motion': patch
 ---
 
-Elements with `layout` no longer get an inline `transform-origin: 0 0` and `will-change: transform` while they are at rest, matching Motion. A `scale` or `rotate` on a `layout` element, such as an `AnimatePresence` `popLayout` exit or a `whileHover` scale, now pivots on the element's centre instead of its top-left corner, and `position: fixed` children of a `layout` element are positioned against the viewport again.
+Elements with `layout` no longer get an inline `transform-origin: 0 0` and `will-change: transform` while they are at rest, matching Motion. A `scale` or `rotate` on a `layout` element, such as an `AnimatePresence` `popLayout` exit or a `whileHover` scale, now pivots on the element's centre instead of its top-left corner, and `position: fixed` children of a `layout` element are positioned against the viewport again. A `willChange` or `transformOrigin` you set in the inline `style` of a `layout` element is no longer overwritten when layout is set up, or cleared when the element unmounts or `layout` is turned off.
 ```
 
 **Verify**: `ls .changeset/layout-transform-origin-at-rest.md` → the file exists.
 
 ### Step 7: Gate
 
-**Verify**, in order: `pnpm check` (0 errors), `pnpm test:only` (all pass), `pnpm build` (exit 0), the Step 4
-e2e command (all pass), `trunk fmt` then `trunk check` on every changed file (no new issues), `git status` shows
+**Verify**, in order: `pnpm check` (0 errors), `pnpm test:only` (all pass), `pnpm build` (exit 0),
+`PW_PORT=4221 pnpm exec playwright test e2e/layout e2e/animate-presence` (all pass; the full suite already ran in
+Step 4, and this re-checks the two directories this plan touches after Steps 5-6), `trunk fmt` then `trunk check` on every changed file (no new issues), `git status` shows
 only in-scope files.
 
 ## Test plan
 
-- Red-first anchors: the two `_MotionContainer.spec.ts` cases from Step 1 (fail on the mount assertion), and the
-  fresh, owned pop, clone pop, fixed-child and inline-style e2e cases from Step 2. All pass after Step 3.
-- Guards: the settled e2e case (projection already writes `50% 50% 0` after a layout animation), the Step 1
+- Red-first anchors: the two `_MotionContainer.spec.ts` cases from Step 1 (fail on the mount assertion), and e2e
+  cases 1, 3, 4, 5 and 6 from Step 2 (fresh, owned pop, clone pop, fixed-child, inline style). The scale cases
+  are proven per painted frame with `elementFromPoint` at the resting centre and the top-left corner; the rect
+  drift is supporting evidence only. All pass after Step 3.
+- Guards: e2e case 2 (settled) (projection already writes `50% 50% 0` after a layout animation), the Step 1
   after-change origin assertion, the existing `layout.spec.ts` size-correction cases (520-570), and every spec in
-  the Step 4 sweep, in particular `e2e/animate-presence/layout-button.spec.ts`, `grid-exit.spec.ts`,
+  the Step 4 full suite, in particular `e2e/animate-presence/layout-button.spec.ts`, `grid-exit.spec.ts`,
   `owned-pop-layout.spec.ts`, `pop-layout-container-move.spec.ts`, `e2e/layout-id/scale-handoff.spec.ts`, and
   `e2e/utilities/will-change.spec.ts` (the VisualElement's own will-change latch must be untouched).
 - Structural models: `_MotionContainer.spec.ts` "applies FLIP (translate + scale) …" for the unit case;
@@ -506,20 +575,23 @@ only in-scope files.
 
 - [ ] `grep -rn "setCompositorHints" src` → no output
 - [ ] `grep -n "50% 50% !important" src/routes/tests/animate-presence/pop-layout-container-move/+page.svelte` → no output
-- [ ] Step 1 unit cases pass; `e2e/layout/transform-origin-at-rest.spec.ts` (7 cases) passes; the Step 4 sweep passes
+- [ ] Step 1 unit cases pass; `e2e/layout/transform-origin-at-rest.spec.ts` (6 cases) passes
+- [ ] `grep -c "elementFromPoint" e2e/layout/transform-origin-at-rest.spec.ts` → at least 1 (the per-frame probe is used, not rects alone)
+- [ ] Step 4 full e2e suite passes, or only failures classified pre-existing against the 14.7.1 base (listed in the report)
 - [ ] `pnpm check` 0 errors; `pnpm test:only` passes; `pnpm build` exits 0; `trunk check` clean on changed files
 - [ ] The page is linked from `src/routes/+page.svelte`; `.changeset/layout-transform-origin-at-rest.md` exists
 - [ ] No files outside the in-scope list are modified (`git status`)
 
 ## STOP conditions
 
-- Any of the three pre-start checks prints nothing (001 or 008 not merged into `feat/motion-14.7.1`).
+- Any of the five pre-start checks prints nothing (001, 006, 007 or 008 not merged into `feat/motion-14.7.1`).
 - The drift check shows `layout.ts`, `layout.spec.ts`, or the quoted `_MotionContainer.svelte` /
   `_MotionContainer.spec.ts` lines no longer match.
 - Step 1 or Step 2 red cases pass before Step 3.
+- A Step 4 failure is classified "caused by 013" and is not a pixel/sub-pixel case covered by the next item.
 - After Step 3 the fresh or pop e2e case still drifts (> 1px): something else writes the origin. Find the writer
   with `grep -rn "transformOrigin" src/lib` and report it; do not add a new reset.
-- A Step 4 spec fails on this lane, passes on `feat/motion-14.7.1`, and the failure is about painted pixels or
+- A Step 4 spec fails on this lane, passes on the 14.7.1 base, and the failure is about painted pixels or
   sub-pixel positions (e.g. a layout animation that now jitters by < 1px without `will-change`). Report the spec
   and the measured numbers instead of putting `will-change` back or loosening thresholds; the maintainer decides.
 - The fix appears to need a change in `presence.ts`, `motionDomProjection.ts`, or any other region of
