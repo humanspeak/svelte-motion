@@ -1322,7 +1322,17 @@
         createOptimizedAppearData(
             initialKeyframes as Record<string, unknown> | undefined,
             animateKeyframes,
-            mergedTransition
+            mergedTransition,
+            // Upstream reads initial's `transition.out` from the FIRST label of a
+            // list (motion-dom animation-state.ts `resolveInitial`), while
+            // `initialKeyframes` merges the list (last label wins). `null` = the
+            // first label has no transition: don't fall back to the merged one.
+            Array.isArray(effectiveInitialProp)
+                ? ((
+                      (resolveInitial(effectiveInitialProp[0], variantsProp, effectiveCustom) ||
+                          undefined) as { transition?: AnimationOptions } | undefined
+                  )?.transition ?? null)
+                : undefined
         )
     )
     // Upstream never WAAPI-accelerates `transform` while a `transformTemplate`

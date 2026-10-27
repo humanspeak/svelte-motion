@@ -1,0 +1,131 @@
+---
+title: 'transition.out'
+description: 'Choose the transition a value uses when it leaves a state, including a mount-only delay from initial.'
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte';
+  import TransitionOutExample from '$lib/examples/transition-out/demos/Default.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'transition.out | Docs | Svelte Motion'
+      seo.description = 'Use transition.out to set the transition a value uses when it leaves a state, such as hover end, or to delay only the mount animation from initial.'
+      seo.ogTitle = 'transition.out'
+      seo.ogTagline = 'The way out, on your terms'
+      seo.ogFeatures = ['Hover End', 'Mount-only Delay', 'Variants', 'Motion Parity']
+      seo.ogSlug = 'docs-transition-out'
+  }
+</script>
+
+# transition.out
+
+Normally the state being **entered** picks the transition. When hover ends, the
+element returns to `animate` with `animate`'s transition. `transition.out` lets
+a state set the transition its values use when they **leave** it for a
+lower-priority state instead.
+
+```svelte
+<motion.div
+  initial={{ scale: 0, transition: { out: { delay: 0.6 } } }}
+  animate={{ scale: 1 }}
+  whileHover={{ scale: 1.2, transition: { duration: 0.15, out: true } }}
+/>
+```
+
+<Example isSmall exampleUrl="/examples/transition-out">
+  <TransitionOutExample />
+</Example>
+
+## `out: true`
+
+`out: true` reuses the state's own transition on the way out, so hover end is
+as quick as hover start:
+
+```svelte
+<motion.div
+  animate={{ opacity: 0.5, transition: { duration: 1 } }}
+  whileHover={{ opacity: 1, transition: { duration: 0.1, out: true } }}
+/>
+```
+
+## An `out` transition
+
+An object is a separate transition for leaving:
+
+```svelte
+<motion.div
+  whileHover={{
+    scale: 1.2,
+    transition: { type: 'spring', out: { duration: 0.4, ease: 'easeOut' } }
+  }}
+/>
+```
+
+## `out` on `initial`
+
+On `initial`, `out` is the transition of the mount animation only. It is used
+once: later changes to `animate`, and returns from hover or tap, use their own
+transitions. A mount delay no longer delays every hover end.
+
+```svelte
+<motion.div
+  initial={{ opacity: 0, transition: { out: { delay: 1 } } }}
+  animate={{ opacity: 1 }}
+/>
+```
+
+Variant children inherit their parent's `initial` label, so they use the same
+`out`. Values that `initial` doesn't change on mount aren't affected.
+
+## Value-specific transitions
+
+Like any transition, `out` can hold per-value overrides:
+
+```svelte
+<motion.div
+  whileHover={{
+    opacity: 1,
+    x: 10,
+    transition: { out: { delay: 0.5, opacity: { duration: 0 } } }
+  }}
+/>
+```
+
+## Lists of labels
+
+With a list of variant labels, the last label that sets `out` applies to all of
+the list's values, including values from labels without an `out`.
+
+## Setting only `out`
+
+`out` is not a transition of its own. `transition: { out: { … } }` alone keeps
+the value's default transition on the way **in** (a spring for `x`, `scale`
+and friends), and only changes the way out.
+
+## Exit
+
+`exit` always uses `exit`'s own transition. An element that exits while hovered
+doesn't leave with hover's `out`.
+
+## SSR
+
+The [optimized appear](/docs/optimized-appear) animation follows the same rule
+as the mount animation: `initial`'s `transition.out` when set, otherwise
+`animate`'s own transition, otherwise the `transition` prop. The server-started
+animation and the hydrated runtime agree, so nothing jumps on hydration.
+
+## API Reference
+
+```ts
+type ValueTransition = {
+  // ...
+  out?: boolean | Transition
+}
+```
+
+`initial` and `animate` objects accept an inline `transition` (and
+`transitionEnd`) in their types.
+
+Based on Motion's `transition.out` (Motion 14.7, #1725).

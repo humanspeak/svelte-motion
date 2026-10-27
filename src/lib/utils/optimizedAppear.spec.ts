@@ -250,3 +250,92 @@ describe('optimizedAppear', () => {
         expect(script).not.toContain('const key=k(p.id,a.name),ready=')
     })
 })
+
+/**
+ * Upstream #1725 (`ad11115e9`, `1a451de16`): the generator builds the appear
+ * animation from initial's `transition.out` when it's set, otherwise from
+ * animate's own transition, the rule the runtime's mount animation follows.
+ */
+describe('createOptimizedAppearData mount transition (#1725)', () => {
+    const optionsOf = (entries: ReturnType<typeof createOptimizedAppearData>, name: string) =>
+        entries.find((e) => e.name === name)!.options
+
+    it("uses initial's transition.out when set", () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0, transition: { out: { duration: 2.4, ease: 'linear' } } },
+            { opacity: 1 },
+            { duration: 0.6, ease: 'linear' }
+        )
+        const options = optionsOf(entries, 'opacity')
+        expect(options.duration).toBe(2400)
+        expect(options.easing).toBe('linear')
+    })
+
+    it("out: true reuses initial's own transition", () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0, transition: { out: true, duration: 1.2 } },
+            { opacity: 1 },
+            { duration: 0.6 }
+        )
+        expect(optionsOf(entries, 'opacity').duration).toBe(1200)
+    })
+
+    it('resolves value-specific keys inside the out transition', () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0, y: 10, transition: { out: { duration: 1, opacity: { duration: 2 } } } },
+            { opacity: 1, y: 0 },
+            { duration: 0.3 }
+        )
+        expect(optionsOf(entries, 'opacity').duration).toBe(2000)
+        expect(optionsOf(entries, 'transform').duration).toBe(1000)
+    })
+
+    it("falls back to animate's own transition", () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0 },
+            { opacity: 1, transition: { duration: 2 } },
+            { duration: 0.6 }
+        )
+        expect(optionsOf(entries, 'opacity').duration).toBe(2000)
+    })
+
+    it("animate's transition merges the prop only with inherit: true", () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0 },
+            { opacity: 1, transition: { inherit: true, delay: 0.5 } },
+            { duration: 0.8 }
+        )
+        const options = optionsOf(entries, 'opacity')
+        expect(options.duration).toBe(800)
+        expect(options.delay).toBe(500)
+    })
+
+    it("an initial transition without out doesn't time the mount", () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0, transition: { duration: 5 } },
+            { opacity: 1 },
+            { duration: 0.6 }
+        )
+        expect(optionsOf(entries, 'opacity').duration).toBe(600)
+    })
+
+    it('the 4th argument overrides where out is read from', () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0, transition: { out: { duration: 9 } } },
+            { opacity: 1 },
+            { duration: 0.6 },
+            { out: { duration: 1.5 } }
+        )
+        expect(optionsOf(entries, 'opacity').duration).toBe(1500)
+    })
+
+    it('a null 4th argument means the first label has no transition', () => {
+        const entries = createOptimizedAppearData(
+            { opacity: 0, transition: { out: { duration: 9 } } },
+            { opacity: 1 },
+            { duration: 0.6 },
+            null
+        )
+        expect(optionsOf(entries, 'opacity').duration).toBe(600)
+    })
+})

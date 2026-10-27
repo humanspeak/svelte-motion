@@ -234,6 +234,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Scaled Drag Board',
         description: 'A zoomable constrained board whose draggable tile stays under the pointer.'
     },
+    'transition-out': {
+        title: 'transition.out',
+        description:
+            'Choose the transition a value uses when it leaves a state, with a mount-only delay from initial.'
+    },
     'use-animate': {
         title: 'useAnimate',
         description: 'Interactive useAnimate animation example using Svelte Motion.'
