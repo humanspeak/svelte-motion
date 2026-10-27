@@ -31,7 +31,10 @@ test.describe('transition.out on initial (#1725)', () => {
 
         await expect
             .poll(async () => (await read(card)).scale, {
-                timeout: Math.max(0, 2500 - (Date.now() - appearedAt))
+                timeout: Math.max(0, 2500 - (Date.now() - appearedAt)),
+                // Sample densely: the default back-off (100/250/500/1000 ms)
+                // skips most of the window after the 1.5 s delay ends.
+                intervals: [50]
             })
             .toBeCloseTo(1, 2)
 
