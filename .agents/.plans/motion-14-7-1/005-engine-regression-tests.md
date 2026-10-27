@@ -504,3 +504,20 @@ port is needed, out of scope here). STOP and report the spec, the assertion, and
 - `@slow` marks the 11 s #1207 spec; `pnpm exec playwright test --grep-invert @slow` skips it locally.
 - A reviewer should check that tolerances match upstream exactly (`tolerance = 2.5`, `3 × neighbours + 0.3`,
   `< 0.8`, `< 10` px) and that no recorder samples on a timer.
+
+## Amendments (operator-approved 2026-10-27)
+
+### A2: the remount restarts its loop from 0 (replaces the re-trigger in Step 2.3)
+
+The false→frame→true restart only animated from about 359.7° to 360° on the main thread, and
+`countTransformAnimations('pack')` was 0. Instead:
+
+1. The remounted `layoutId="pack"` element restarts its loop from 0 with explicit keyframes
+   (`animate={{ rotateY: [0, 360] }}` with the same infinite transition, or the equivalent per remount key). This
+   way the loop restarts even though a takeover mounts as if `initial={false}` (`motion/index.tsx:114-122`
+   @v14.7.1).
+2. Keep the precondition: after the remount, wait 1300 ms, then `countTransformAnimations('pack') === 1`, then
+   `expectUndistorted`.
+3. If the count is still 0 with a clean `[0, 360]` restart, STOP. Report whether upstream puts the same remounted
+   loop on the compositor (cite the code path), and why ours doesn't. That would be a real divergence for a
+   separate fix. Don't drop the precondition.
