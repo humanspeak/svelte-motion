@@ -116,4 +116,57 @@ describe('_MotionContainer SSR styles', () => {
         expect(el.getAttribute('data-framer-appear-id')).toMatch(/^svelte-motion-/)
         expect(container.innerHTML).toContain('MotionHasOptimisedAnimation')
     })
+
+    // Upstream #1725 (`1a451de16`): the appear animation follows initial's
+    // `transition.out` when set, otherwise animate's own transition.
+    it("the appear script uses initial's transition.out", () => {
+        const { container } = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                initial: { opacity: 0, transition: { out: { duration: 2.4, ease: 'linear' } } },
+                animate: { opacity: 1 },
+                transition: { duration: 0.6, ease: 'linear' }
+            }
+        })
+        expect(container.innerHTML).toContain('"duration":2400')
+        expect(container.innerHTML).not.toContain('"duration":600')
+    })
+
+    // Upstream motion-dom animation-state.ts `resolveInitial` reads `out` from
+    // the FIRST label of a list.
+    it('with a list of initial labels, out comes from the first label', () => {
+        const { container } = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                variants: {
+                    a: { opacity: 0, transition: { out: { duration: 1.5 } } },
+                    b: { scale: 0.5, transition: { out: { duration: 9 } } },
+                    shown: { opacity: 1, scale: 1 }
+                },
+                initial: ['a', 'b'],
+                animate: 'shown',
+                transition: { duration: 0.6 }
+            }
+        })
+        expect(container.innerHTML).toContain('"duration":1500')
+        expect(container.innerHTML).not.toContain('"duration":9000')
+    })
+
+    it("when the first initial label has no transition, a later label's out is ignored", () => {
+        const { container } = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                variants: {
+                    a: { opacity: 0 },
+                    b: { scale: 0.5, transition: { out: { duration: 9 } } },
+                    shown: { opacity: 1, scale: 1, transition: { duration: 1.2 } }
+                },
+                initial: ['a', 'b'],
+                animate: 'shown',
+                transition: { duration: 0.6 }
+            }
+        })
+        expect(container.innerHTML).toContain('"duration":1200')
+        expect(container.innerHTML).not.toContain('"duration":9000')
+    })
 })
