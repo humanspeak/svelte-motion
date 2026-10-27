@@ -243,6 +243,8 @@ describe('utils/animate - useAnimate', () => {
 
             const tl = animate([[a, 100, { duration: 0.2 }]])
             tl.add([b, 50, { duration: 0.2 }])
+            // Upstream timeline.test.ts:27 @ v14.7.1: the added segment extends the timeline.
+            expect(tl.duration).toBeCloseTo(0.4)
             await sleep(0)
 
             expect(scope.animations).toContain(tl)
