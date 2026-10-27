@@ -47,9 +47,9 @@
         tl?.add(['.c', { x: 200 }, { duration: 1, ease: 'linear' }], 'mid+0.5')
         addedC = true
     })
-    const playToMid = run(() => tl?.playTo('mid'))
-    const play = run(() => tl?.play())
-    const reverse = run(() => tl?.reverse())
+    const playToMid = run(() => void tl?.playTo('mid'))
+    const play = run(() => void tl?.play())
+    const reverse = run(() => void tl?.reverse())
 
     // ---- Live verdict (tester only) ----
     //

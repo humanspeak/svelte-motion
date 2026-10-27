@@ -4,6 +4,7 @@ import { MOTION_EXPORTS_NOT_REEXPORTED } from './__tests__/motionExportAllowlist
 import {
     animate,
     AnimatePresence,
+    type AnimationSequence,
     anticipate,
     arc,
     backIn,
@@ -33,6 +34,8 @@ import {
     type MotionConfigProps,
     type MotionTransformPoint,
     MotionValueState,
+    type NestedSequence,
+    type ObjectTarget,
     pipe,
     PresenceChild,
     press,
@@ -42,8 +45,15 @@ import {
     resize,
     scopeMotion,
     scroll,
+    type Segment,
+    type SequenceInfo,
+    type SequenceOptions,
     stagger,
     stringifyStyleObject,
+    type Timeline,
+    type TimelineCallback,
+    type TimelineItem,
+    type TimelineOptions,
     toMediaQuery,
     transform,
     useAnimate,
@@ -233,3 +243,30 @@ describe('public API: index.ts', () => {
         expect(mapper(200)).toBe(1)
     })
 })
+
+/**
+ * Compile-only: `animate` and the scoped animate from `useAnimate()` return
+ * Motion 14.7's `Timeline`, and the timeline and sequence types are exported.
+ */
+function timelineTypeAssertions() {
+    const tl: Timeline = animate([['.a', { opacity: 1 }], 'mid'], { autoplay: false })
+    const item: TimelineItem = ['.b', { opacity: 0 }]
+    tl.add(item, 'mid+0.5')
+    const onCross: TimelineCallback = (direction) => void direction
+    tl.call(onCross, 1)
+    const nested: NestedSequence = { sequence: [['.c', { x: 10 }]], at: 0.5 }
+    const sequence: AnimationSequence = [nested, 'end']
+    const segment: Segment = sequence[0]
+    const options: Omit<TimelineOptions, 'scope'> = { onReverseComplete: () => {} }
+    const sequenceOptions: SequenceOptions = { duration: 1, reduceMotion: true }
+    const info: SequenceInfo = { duration: 1 }
+    const target: ObjectTarget<{ n: number }> = { n: 1 }
+    const [, scoped] = useAnimate()
+    const fromValue: Timeline = scoped(0, 100)
+    // @ts-expect-error the scope comes from useAnimate(), not per call
+    scoped([['.a', { opacity: 1 }]], { scope: undefined })
+    void [segment, options, sequenceOptions, info, target, fromValue]
+}
+
+// Compile-time only: referenced so the checker keeps it, and lint sees a use.
+void timelineTypeAssertions

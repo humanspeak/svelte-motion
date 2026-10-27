@@ -4,7 +4,7 @@ import { motionValue } from 'motion'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import UseAnimateConfigHarness from '../components/__tests__/UseAnimateConfigHarness.svelte'
 import UseAnimateSkipHarness from '../components/__tests__/UseAnimateSkipHarness.svelte'
-import { animate, createEffect } from '../index.js'
+import { animate, createEffect, type Timeline } from '../index.js'
 import { type AnimationScope, useAnimate } from './animate.svelte.js'
 import type { SvelteMotionAnimate } from './animateValue.js'
 
@@ -371,6 +371,10 @@ function typeAssertions() {
 
     // Call signatures are shared with the module-level `animate`.
     scopedAnimate('.box', { opacity: 0.5 }, { duration: 0.1 })
+
+    // Motion 14.7: every call returns a mutable Timeline.
+    const tl: Timeline = scopedAnimate('.box', { opacity: 0.5 })
+    tl.add(['.box', { opacity: 1 }])
 
     const effect = createEffect<{ claimed: true }>(() => () => {}, {
         test: (s): s is { claimed: true } => Boolean((s as { claimed?: true })?.claimed),
