@@ -11,7 +11,8 @@
     // motion#3857 case: partial input range must hold its end values.
     const partialOpacity = useTransform(scrollYProgress, [0.25, 0.5], [0.2, 1])
 
-    // Direct, first-hop transforms: accelerated.
+    // Direct, first-hop transforms. Both carry the accelerate config; opacity runs as a native
+    // ScrollTimeline animation, backgroundColor in JS since Motion 14.7 (not in acceleratedValues).
     const directOpacity = useTransform(scrollYProgress, [0, 0.5, 1], [1, 0.5, 0])
     const directBackground = useTransform(scrollYProgress, [0, 1], ['#ff0000', '#0000ff'])
 
