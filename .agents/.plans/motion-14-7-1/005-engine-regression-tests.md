@@ -283,7 +283,14 @@ judge motion. Declare the `window` additions in each page with a local type
    - "a sibling's layout update doesn't distort it": `spin`, `page.hover('#button')`, `expectUndistorted`.
    - "remounting doesn't distort it" (Svelte port of "unmounting doesn't distort it"): goto without `later`, wait for
      `#pack`, 1300 ms, assert `countTransformAnimations('pack')` is `1`, call `remount()`, wait until a new `#pack`
-     element exists (`page.waitForFunction` comparing against a handle taken before), 300 ms, `expectUndistorted`.
+     element exists (`page.waitForFunction` comparing against a handle taken before), then re-trigger the spin on
+     the new element, 1300 ms, assert `countTransformAnimations('pack')` is `1`, `expectUndistorted`.
+     Amendment (operator-approved 2026-10-27): Motion 14.7.1 mounts a `layoutId` takeover as if `initial={false}`
+     (`packages/framer-motion/src/motion/index.tsx:114-122` @v14.7.1; ours `layoutIdTakeover`), so the new element
+     starts at its target and does not loop until the spin is re-triggered. `window.spin()` must restart the loop
+     on the remounted element: if `isSpinning` is already `true`, set it to `false`, wait a frame, then `true`.
+     The tester panel's step 3 becomes "Click **Remount**, then **Spin**" → "The card restarts its loop in place,
+     undistorted."
    - "a child's layout update doesn't distort the child": `spin` on the ancestor page, `rerender()`, record
      `child` for 1000 ms and expect every `transform` in `['', 'none']`, then `expectUndistorted`.
    In each test also attach the path probes to the test output (`test.info().annotations.push(...)`): the number of
