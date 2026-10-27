@@ -8,10 +8,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  * view-timeline acceleration when supported, and to motion's `scroll()` for
  * absolute pixel offsets. These tests cover:
  *
- * - The basic public shape — four augmented MotionValues, `.current` /
+ * - The basic public shape — six augmented MotionValues, `.current` /
  *   `.subscribe` semantics, SSR fallback.
  * - The JS `scroll()` callback path — what motion is called with, and that
- *   its callback writes into the four MVs.
+ *   its callback writes into the six MVs.
  * - The microtask-defer ref resolution — when a `bind:this` getter starts
  *   unresolved, attachment waits until it hydrates.
  * - The `accelerate` config attachment — when the browser supports
@@ -25,8 +25,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 type ScrollCallback = (
     progress: number,
     info: {
-        x: { current: number; progress: number }
-        y: { current: number; progress: number }
+        x: { current: number; progress: number; scrollLength: number }
+        y: { current: number; progress: number; scrollLength: number }
     }
 ) => void
 type ScrollOpts = Record<string, unknown> | undefined
@@ -89,17 +89,28 @@ describe('utils/scroll - useScroll', () => {
 
     // -------- basic public shape --------
 
-    it('returns four MotionValues with initial 0', () => {
+    it('returns six MotionValues with initial 0', () => {
         inRoot(() => {
-            const { scrollX, scrollY, scrollXProgress, scrollYProgress } = useScroll()
+            const {
+                scrollX,
+                scrollY,
+                scrollXProgress,
+                scrollYProgress,
+                scrollXLength,
+                scrollYLength
+            } = useScroll()
             expect(isMotionValue(scrollX)).toBe(true)
             expect(isMotionValue(scrollY)).toBe(true)
             expect(isMotionValue(scrollXProgress)).toBe(true)
             expect(isMotionValue(scrollYProgress)).toBe(true)
+            expect(isMotionValue(scrollXLength)).toBe(true)
+            expect(isMotionValue(scrollYLength)).toBe(true)
             expect(scrollX.current).toBe(0)
             expect(scrollY.current).toBe(0)
             expect(scrollXProgress.current).toBe(0)
             expect(scrollYProgress.current).toBe(0)
+            expect(scrollXLength.current).toBe(0)
+            expect(scrollYLength.current).toBe(0)
         })
     })
 
@@ -151,13 +162,41 @@ describe('utils/scroll - useScroll', () => {
         await drainMicrotasks()
         const [cb] = scrollMock.mock.calls[0]
         cb(0.5, {
-            x: { current: 100, progress: 0.5 },
-            y: { current: 250, progress: 0.25 }
+            x: { current: 100, progress: 0.5, scrollLength: 0 },
+            y: { current: 250, progress: 0.25, scrollLength: 0 }
         })
         expect(ctx.scrollX.current).toBe(100)
         expect(ctx.scrollXProgress.current).toBe(0.5)
         expect(ctx.scrollY.current).toBe(250)
         expect(ctx.scrollYProgress.current).toBe(0.25)
+    })
+
+    it('writes x/y scrollLength into scrollXLength / scrollYLength', async () => {
+        const ctx = inRoot(() => useScroll())
+        flushSync()
+        await drainMicrotasks()
+        const [cb] = scrollMock.mock.calls[0]
+        cb(0.5, {
+            x: { current: 100, progress: 0.5, scrollLength: 600 },
+            y: { current: 250, progress: 0.25, scrollLength: 2500 }
+        })
+        expect(ctx.scrollXLength.current).toBe(600)
+        expect(ctx.scrollYLength.current).toBe(2500)
+        // Distance from the end (Motion #2189).
+        expect(ctx.scrollYLength.get() - ctx.scrollY.get()).toBe(2250)
+    })
+
+    it('destroys the length values on unmount', () => {
+        let ctx: ReturnType<typeof useScroll> | undefined
+        const root = $effect.root(() => {
+            ctx = useScroll()
+        })
+        flushSync()
+        const destroyX = vi.spyOn(ctx!.scrollXLength, 'destroy')
+        const destroyY = vi.spyOn(ctx!.scrollYLength, 'destroy')
+        root()
+        expect(destroyX).toHaveBeenCalledTimes(1)
+        expect(destroyY).toHaveBeenCalledTimes(1)
     })
 
     it('disposes the scroll() observer on unmount', async () => {
@@ -263,6 +302,15 @@ describe('utils/scroll - useScroll', () => {
         expect(ctx.scrollYProgress.accelerate).toBeUndefined()
     })
 
+    it('never accelerates the length values', () => {
+        // Motion 14.7.1 use-scroll.ts gives only the *Progress values an accelerate config.
+        supportsScrollTimelineMock.mockReturnValue(true)
+        const ctx = inRoot(() => useScroll())
+        expect(ctx.scrollYProgress.accelerate).toBeDefined()
+        expect(ctx.scrollXLength.accelerate).toBeUndefined()
+        expect(ctx.scrollYLength.accelerate).toBeUndefined()
+    })
+
     // Offsets that Motion 13.4.7's `offsetToViewTimelineRange` maps to a native range.
     it.each([
         ['cover strings', ['start end', 'end start']],
@@ -315,12 +363,17 @@ describe('utils/scroll - useScroll', () => {
 
     it('SSR fallback: returns motion values with no observer when window is undefined', () => {
         vi.stubGlobal('window', undefined)
-        const { scrollX, scrollY, scrollXProgress, scrollYProgress } = useScroll()
+        const { scrollX, scrollY, scrollXProgress, scrollYProgress, scrollXLength, scrollYLength } =
+            useScroll()
         expect(isMotionValue(scrollX)).toBe(true)
         expect(scrollX.current).toBe(0)
         expect(scrollY.current).toBe(0)
         expect(scrollXProgress.current).toBe(0)
         expect(scrollYProgress.current).toBe(0)
+        expect(isMotionValue(scrollXLength)).toBe(true)
+        expect(isMotionValue(scrollYLength)).toBe(true)
+        expect(scrollXLength.current).toBe(0)
+        expect(scrollYLength.current).toBe(0)
         // No subscriptions, no scroll() invocation.
         expect(scrollMock).not.toHaveBeenCalled()
     })
