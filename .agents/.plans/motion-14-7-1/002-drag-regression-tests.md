@@ -485,3 +485,17 @@ files. Report the results.
   `playwright.config.ts` needs them revisited.
 - Deferred: motion-dom's own unit tests for `PanSession` and `ref-constraints-scroll`. Upstream covers them, and
   ours would test the dependency, not our code.
+
+## Amendments (operator-approved 2026-10-27)
+
+### A1 (Step 2): prove the rebind reaches the items
+
+`Item.svelte` counts changes to its `constraints` prop on `window` (for example `window.__constraintsChanges`). The
+deviation-2 spec asserts that the count went up by at least 2 after `rebindConstraints()`. No `src/lib` changes.
+Confirm the assertion passes on 14.6.0: it is a guard, not a red test.
+
+### A2 (Step 7): first exercise of `:123`
+
+If "drag again after reordering" (`e2e/reorder/ref-constraints-scroll.spec.ts`) goes green in Phase B, note in the
+report that its final dy check (`:123`) is exercised for the first time. On 14.6.0 the test fails earlier, at the
+reorder check (`:117`).
