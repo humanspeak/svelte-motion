@@ -5,12 +5,13 @@
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
-    import { Box, Hand, Package } from '@lucide/svelte'
+    import { Box, Hand, ListOrdered, Package } from '@lucide/svelte'
     import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import LazyMotionDefault from '$lib/examples/lazy-motion/demos/Default.svelte'
     import LazyMotionFeatureBundles from '$lib/examples/lazy-motion/demos/FeatureBundles.svelte'
+    import LazyMotionReorder from '$lib/examples/lazy-motion/demos/LazyReorder.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
@@ -58,6 +59,18 @@
             notes: bundleNotes,
             barCells: [{ k: 'split', v: 'min / animation / max' }],
             sourceUrl: `${SOURCE_URL}lazy-motion/demos/FeatureBundles.svelte`
+        },
+        {
+            figId: 'FIG-003',
+            tag: 'REORDER',
+            title: { prefix: 'reorder ', accent: 'from the m entry', end: '.' },
+            description:
+                'Import `Reorder` from `@humanspeak/svelte-motion/m` and it renders `m` components, so it takes drag and layout from `<LazyMotion features={domMax} strict>` without tripping strict mode.',
+            snippet: reorderSection,
+            codeSnippet: reorderCode,
+            notes: reorderNotes,
+            barCells: [{ k: 'entry', v: '@humanspeak/svelte-motion/m' }],
+            sourceUrl: `${SOURCE_URL}lazy-motion/demos/LazyReorder.svelte`
         }
     ]
 </script>
@@ -125,6 +138,41 @@
                 'lazy-motion/demos/FeatureBundles.svelte',
                 'lazy-motion-feature-bundles',
                 'FeatureBundles.svelte'
+            )
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#snippet reorderSection()}
+    <LazyMotionReorder />
+{/snippet}
+{#snippet reorderNotes()}
+    <ul>
+        <li>
+            <ListOrdered />
+            <span>
+                The main <code>Reorder</code> renders <code>motion</code> components, which always
+                have every feature. Inside <code>&lt;LazyMotion strict&gt;</code> it warns once in development
+                and points here.
+            </span>
+        </li>
+        <li>
+            <Package />
+            <span>
+                Reordering needs drag and layout, so give the <code>m</code> entry's
+                <code>Reorder</code> the <code>domMax</code> bundle.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet reorderCode()}
+    <CodeReferenceV2
+        samples={[
+            demoCodeSample(
+                'lazy-motion/demos/LazyReorder.svelte',
+                'lazy-motion-reorder',
+                'LazyReorder.svelte'
             )
         ]}
         columns={1}
