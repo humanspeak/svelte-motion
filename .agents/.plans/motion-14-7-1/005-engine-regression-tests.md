@@ -283,7 +283,14 @@ judge motion. Declare the `window` additions in each page with a local type
    - "a sibling's layout update doesn't distort it": `spin`, `page.hover('#button')`, `expectUndistorted`.
    - "remounting doesn't distort it" (Svelte port of "unmounting doesn't distort it"): goto without `later`, wait for
      `#pack`, 1300 ms, assert `countTransformAnimations('pack')` is `1`, call `remount()`, wait until a new `#pack`
-     element exists (`page.waitForFunction` comparing against a handle taken before), 300 ms, `expectUndistorted`.
+     element exists (`page.waitForFunction` comparing against a handle taken before), then re-trigger the spin on
+     the new element, 1300 ms, assert `countTransformAnimations('pack')` is `1`, `expectUndistorted`.
+     Amendment (operator-approved 2026-10-27): Motion 14.7.1 mounts a `layoutId` takeover as if `initial={false}`
+     (`packages/framer-motion/src/motion/index.tsx:114-122` @v14.7.1; ours `layoutIdTakeover`), so the new element
+     starts at its target and does not loop until the spin is re-triggered. `window.spin()` must restart the loop
+     on the remounted element: if `isSpinning` is already `true`, set it to `false`, wait a frame, then `true`.
+     The tester panel's step 3 becomes "Click **Remount**, then **Spin**" → "The card restarts its loop in place,
+     undistorted."
    - "a child's layout update doesn't distort the child": `spin` on the ancestor page, `rerender()`, record
      `child` for 1000 ms and expect every `transform` in `['', 'none']`, then `expectUndistorted`.
    In each test also attach the path probes to the test output (`test.info().annotations.push(...)`): the number of
@@ -497,3 +504,41 @@ port is needed, out of scope here). STOP and report the spec, the assertion, and
 - `@slow` marks the 11 s #1207 spec; `pnpm exec playwright test --grep-invert @slow` skips it locally.
 - A reviewer should check that tolerances match upstream exactly (`tolerance = 2.5`, `3 × neighbours + 0.3`,
   `< 0.8`, `< 10` px) and that no recorder samples on a timer.
+
+## Amendments (operator-approved 2026-10-27)
+
+### A2: the remount restarts its loop from 0 (replaces the re-trigger in Step 2.3)
+
+The false→frame→true restart only animated from about 359.7° to 360° on the main thread, and
+`countTransformAnimations('pack')` was 0. Instead:
+
+1. The remounted `layoutId="pack"` element restarts its loop from 0 with explicit keyframes
+   (`animate={{ rotateY: [0, 360] }}` with the same infinite transition, or the equivalent per remount key). This
+   way the loop restarts even though a takeover mounts as if `initial={false}` (`motion/index.tsx:114-122`
+   @v14.7.1).
+2. Keep the precondition: after the remount, wait 1300 ms, then `countTransformAnimations('pack') === 1`, then
+   `expectUndistorted`.
+3. If the count is still 0 with a clean `[0, 360]` restart, STOP. Report whether upstream puts the same remounted
+   loop on the compositor (cite the code path), and why ours doesn't. That would be a real divergence for a
+   separate fix. Don't drop the precondition.
+
+### A3: restart the remounted loop after mount (refines A2)
+
+A remounted `[0, 360]` loop cannot satisfy the precondition, on our side or upstream's. A takeover mounts with
+`initial: false` (`motion/index.tsx:114-122` @v14.7.1). The start state comes from the last keyframe
+(`use-visual-state.ts:87-92,112`). The first-render animation is blocked (`animation-state.ts:370-376`).
+Restart the loop after mount instead: the remounted element starts with a static `animate` (`rotateY: 0`). One frame
+after it mounts, `animate` switches to the `[0, 360]` infinite loop. That is an ordinary `animate` change, which the
+mount block doesn't affect. The precondition (count is 1 after 1300 ms) and `expectUndistorted` stay. If the count is
+still 0 after this change, STOP and report it as a divergence.
+
+### A4: the remount case follows upstream's spec (no compositor precondition)
+
+With the restart in A3 the loop runs, but only on the main thread. A takeover's shared layout animation takes
+on the pack's infinite transition (`create-projection-node.ts:581-584,613-627` @v14.7.1). The node then stays
+`isProjecting()` (`:1451-1457`), and `canAccelerateTransform` refuses while projecting
+(`TransformAnimation.ts:204`). Upstream's "unmounting doesn't distort it" never asserts compositor placement:
+only `spin()` checks the count, and that test doesn't call it. Follow upstream. The remount test drops the
+`countTransformAnimations === 1` precondition and keeps the A3 restart plus `expectUndistorted`. Attach
+the count, and any loop that wraps early (for example near 3deg at 2.5 s on a 4 s loop), as `test.info().annotations`
+evidence. In Phase B, report whether the early wrap persists.

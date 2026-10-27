@@ -309,6 +309,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/waapi-color-interrupt') + searchParams}
+                    >
+                        Interrupted backgroundColor animation
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/optimized-appear') + searchParams}
                     >
                         Optimized appear animations
@@ -501,6 +509,32 @@
                             searchParams}
                     >
                         Layout change right after hydration
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-sibling-rotating-3d') +
+                            searchParams}
+                    >
+                        Looping rotation vs a sibling's layout update (#4022)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-ancestor-rotating-3d') +
+                            searchParams}
+                    >
+                        Rotating ancestor vs a child's layout update (#4022)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/speed-change') + searchParams}
+                    >
+                        Changing an accelerated animation's speed
                     </a>
                 </li>
                 <li>
@@ -1120,6 +1154,14 @@
                         href={resolve('/tests/layout/relative-children') + searchParams}
                     >
                         LayoutGroup — relative children follow a re-laid-out parent
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/overdamped-spring') + searchParams}
+                    >
+                        Slow overdamped spring layout animation (#1207)
                     </a>
                 </li>
             </ul>
