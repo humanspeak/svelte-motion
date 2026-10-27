@@ -102,10 +102,14 @@
         const snapshot = measurePopLayoutSnapshot(element, getComputedStyle(element))
         if (!snapshot.width || !snapshot.height) return
 
+        const { anchorX, anchorY, root } = animatePresence?.getPopLayoutOptions() ?? {
+            anchorX: 'left',
+            anchorY: 'top'
+        }
         const id = `svelte-motion-pop-${++popIdCounter}`
         const declarations = Object.entries(
             // Only plain string declarations (position, width, height, edges).
-            resolvePopLayoutStyles(snapshot) as Record<string, string>
+            resolvePopLayoutStyles(snapshot, anchorX, anchorY) as Record<string, string>
         )
             .map(([property, value]) => `${property}: ${value} !important;`)
             .join(' ')
@@ -115,7 +119,8 @@
         // The element's own document, so this works in another window/iframe.
         const doc = element.ownerDocument
         const style = doc.createElement('style')
-        doc.head.appendChild(style)
+        const parent = root ?? doc.head
+        parent.appendChild(style)
         if (style.sheet) style.sheet.insertRule(rule)
         else style.textContent = rule
 

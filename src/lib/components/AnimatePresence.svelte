@@ -6,7 +6,9 @@
     import {
         createAnimatePresenceContext,
         setAnimatePresenceContext,
-        setPresenceDepth
+        setPresenceDepth,
+        type PopLayoutAnchorX,
+        type PopLayoutAnchorY
     } from '$lib/utils/presence'
     import { pwLog } from '$lib/utils/log'
 
@@ -29,12 +31,24 @@
      * @prop custom Data forwarded to exiting dynamic variants.
      * @prop mode Controls enter/exit coordination: 'sync' (default), 'wait', or 'popLayout'.
      * @prop onExitComplete Optional callback invoked once all exits complete.
+     * @prop anchorX Set whether to anchor the x position of the exiting element
+     *     to the left or right when using `mode="popLayout"`. Use `'right'` for
+     *     elements originally positioned with `right: 0`. Defaults to `'left'`.
+     * @prop anchorY Set whether to anchor the y position of the exiting element
+     *     to the top or bottom when using `mode="popLayout"`. Use `'bottom'` for
+     *     elements originally positioned with `bottom: 0`. Defaults to `'top'`.
+     * @prop root Root element to use when injecting styles, used when
+     *     `mode="popLayout"`. Defaults to the head of the document the element
+     *     is rendered in, but can be overridden, e.g. for use in shadow DOM.
      */
     type SharedProps = {
         custom?: unknown
         initial?: boolean
         mode?: AnimatePresenceMode
         onExitComplete?: () => void
+        anchorX?: PopLayoutAnchorX
+        anchorY?: PopLayoutAnchorY
+        root?: HTMLElement | ShadowRoot
     }
 
     type Props = SharedProps &
@@ -60,7 +74,10 @@
         custom,
         initial = true,
         mode = 'sync',
-        onExitComplete
+        onExitComplete,
+        anchorX = 'left',
+        anchorY = 'top',
+        root
     }: Props = $props()
 
     pwLog('[AnimatePresence] mounting', {
@@ -75,7 +92,10 @@
         // Upstream re-renders the surrounding LayoutGroup once every exit
         // completes, so its members animate into the freed space.
         forceRender: getLayoutGroupContext()?.forceRender,
-        custom
+        custom,
+        // A getter, so the latest props are read at pop time (upstream passes
+        // them to every PopChild on each render).
+        getPopLayoutOptions: () => ({ anchorX, anchorY, root })
     })
     setAnimatePresenceContext(context)
     onDestroy(context.dispose)

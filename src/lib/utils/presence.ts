@@ -395,6 +395,22 @@ export type PopLayoutAnchorX = 'left' | 'right'
  */
 export type PopLayoutAnchorY = 'top' | 'bottom'
 
+/**
+ * How `mode="popLayout"` pins an exiting element, from the
+ * `<AnimatePresence anchorX anchorY root>` props.
+ */
+export type PopLayoutOptions = {
+    /** The horizontal edge the popped element is pinned by. */
+    anchorX: PopLayoutAnchorX
+    /** The vertical edge the popped element is pinned by. */
+    anchorY: PopLayoutAnchorY
+    /**
+     * Where the pop `<style>` is appended. Defaults to the head of the
+     * element's own document; pass a shadow root to use it in shadow DOM.
+     */
+    root?: HTMLElement | ShadowRoot
+}
+
 const isHTMLElement = (element: Element | null): element is HTMLElement =>
     element instanceof HTMLElement
 
@@ -585,6 +601,12 @@ export type AnimatePresenceContext = {
     initial: boolean
     /** Animation coordination mode: 'sync', 'wait', or 'popLayout'. */
     mode: AnimatePresenceMode
+    /**
+     * Read the latest `anchorX` / `anchorY` / `root` for `mode="popLayout"`.
+     *
+     * @returns The boundary's pop options, read at pop time.
+     */
+    getPopLayoutOptions: () => PopLayoutOptions
     /** Latest data passed via `<AnimatePresence custom>`. */
     readonly custom: unknown
     /** Read the latest data passed via `<AnimatePresence custom>`. */
@@ -712,6 +734,15 @@ export const createAnimatePresenceContext = (context: {
     forceRender?: () => void
     custom?: unknown
     getCustom?: () => unknown
+    /** Horizontal `popLayout` anchor, when no `getPopLayoutOptions` is given. */
+    anchorX?: PopLayoutAnchorX
+    /** Vertical `popLayout` anchor, when no `getPopLayoutOptions` is given. */
+    anchorY?: PopLayoutAnchorY
+    /**
+     * Reads the latest `popLayout` options at pop time (upstream passes them
+     * to every `PopChild` on each render). Wins over `anchorX` / `anchorY`.
+     */
+    getPopLayoutOptions?: () => PopLayoutOptions
 }): AnimatePresenceContext => {
     let disposed = false
     // Default initial to true (animate on first mount) unless explicitly false
@@ -726,6 +757,11 @@ export const createAnimatePresenceContext = (context: {
         return () => customSubscribers.delete(update)
     })
     const getCustom = (): unknown => context.getCustom?.() ?? latestCustom
+    const getPopLayoutOptions = (): PopLayoutOptions =>
+        context.getPopLayoutOptions?.() ?? {
+            anchorX: context.anchorX ?? 'left',
+            anchorY: context.anchorY ?? 'top'
+        }
     const setCustom = (custom: unknown): void => {
         if (Object.is(latestCustom, custom)) return
         latestCustom = custom
@@ -1483,7 +1519,8 @@ export const createAnimatePresenceContext = (context: {
         clone.style.top = ''
         clone.style.bottom = ''
         if (popLayoutSnapshot) {
-            const popStyles = resolvePopLayoutStyles(popLayoutSnapshot)
+            const { anchorX, anchorY } = getPopLayoutOptions()
+            const popStyles = resolvePopLayoutStyles(popLayoutSnapshot, anchorX, anchorY)
             if (popStyles.position) clone.style.position = popStyles.position
             if (popStyles.width) clone.style.width = popStyles.width
             if (popStyles.height) clone.style.height = popStyles.height
@@ -1728,6 +1765,7 @@ export const createAnimatePresenceContext = (context: {
     return {
         initial,
         mode,
+        getPopLayoutOptions,
         get custom() {
             trackCustom()
             return getCustom()
