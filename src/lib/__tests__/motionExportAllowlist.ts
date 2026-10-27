@@ -328,5 +328,8 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'hasWarned',
     'invariant',
     'warning',
-    'warnOnce'
+    'warnOnce',
+
+    // new in Motion 14.7.1 — not yet reviewed for re-export
+    'buildTransformer'
 ])
