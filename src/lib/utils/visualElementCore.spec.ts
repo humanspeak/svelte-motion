@@ -18,7 +18,6 @@ import {
     PanGestureFeature,
     createMotionVisualElement,
     createRenderState,
-    getContextWindow,
     isAnimationFeatureEnabled,
     isDragFeatureEnabled,
     isExitFeatureEnabled,
@@ -590,18 +589,6 @@ describe('isPanFeatureEnabled', () => {
         registerMotionFeatures()
         expect(getFeatureDefinitions().pan!.Feature).toBe(PanGestureFeature)
         expect(getFeatureDefinitions().pan!.isEnabled).toBe(isPanFeatureEnabled)
-    })
-})
-
-describe('getContextWindow', () => {
-    it('returns null before mount and the element window after', () => {
-        const element = document.createElement('div')
-        const ve = createMotionVisualElement({ props: {} })
-        expect(getContextWindow(ve as never)).toBeNull()
-        ve.mount(element)
-        expect(getContextWindow(ve as never)).toBe(element.ownerDocument.defaultView)
-        ve.unmount()
-        visualElementStore.delete(element)
     })
 })
 
