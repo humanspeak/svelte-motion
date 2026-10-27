@@ -14,7 +14,16 @@
     let containerEl = $state<HTMLElement>()
     // One flag per ring; the readout proves the vw offset stays off
     // ViewTimeline, so the JS `scroll()` path (#2546) is what's under test.
-    let accelerated = $state<boolean[]>(Array.from({ length: 12 }, () => false))
+    // Flags start undefined so a ring whose callback never fired can't pass
+    // as "false".
+    let accelerated = $state<(boolean | undefined)[]>(Array.from({ length: 12 }, () => undefined))
+    const acceleratedSummary = $derived(
+        accelerated.some((v) => v === true)
+            ? 'true'
+            : accelerated.every((v) => v === false)
+              ? 'false'
+              : 'pending'
+    )
 
     const steps: TesterStep[] = [
         {
@@ -31,7 +40,8 @@
 
 <header style="height: 10vh;">
     header · accelerated:
-    <span data-testid="accelerated">{String(accelerated.some(Boolean))}</span>
+    <span data-testid="accelerated">{acceleratedSummary}</span>
+    <span data-testid="accelerated-flags" hidden>{JSON.stringify(accelerated)}</span>
 </header>
 <main
     bind:this={containerEl}

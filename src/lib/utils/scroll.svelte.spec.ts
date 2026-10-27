@@ -167,6 +167,33 @@ describe('utils/scroll - useScroll', () => {
         expect((opts as { container?: HTMLElement }).container).toBe(container)
     })
 
+    it('forwards trackContentSize to the accelerated (ViewTimeline) scroll() call', async () => {
+        supportsViewTimelineMock.mockReturnValue(true)
+        const container = document.createElement('div')
+        const target = document.createElement('div')
+        const ctx = inRoot(() =>
+            useScroll({
+                container,
+                target,
+                offset: ['start end', 'end start'],
+                trackContentSize: true
+            })
+        )
+        const factory = ctx.scrollYProgress.accelerate?.factory
+        expect(factory).toBeDefined()
+        const animation = {} as Parameters<NonNullable<typeof factory>>[0]
+        const detach = factory!(animation)
+        cleanups.push(() => detach?.())
+        flushSync()
+        await drainMicrotasks()
+        const call = scrollMock.mock.calls.find(([cb]) => cb === (animation as unknown))
+        expect(call).toBeDefined()
+        const opts = call![1] as { trackContentSize?: boolean; axis?: string; target?: Element }
+        expect(opts.trackContentSize).toBe(true)
+        expect(opts.axis).toBe('y')
+        expect(opts.target).toBe(target)
+    })
+
     it('trackContentSize leaves the accelerate decision alone', () => {
         // Upstream canAccelerateScroll looks only at target / offset.
         supportsScrollTimelineMock.mockReturnValue(true)

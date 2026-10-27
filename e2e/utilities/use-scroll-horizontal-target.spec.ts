@@ -50,6 +50,18 @@ for (const axis of ['', 'x']) {
     })
 }
 
+test('reporter stays on the JS scroll() path', async ({ page }) => {
+    // The reporter's vw offset must not map to a native ViewTimeline either.
+    // Flags start undefined, so all twelve reading exactly false proves every
+    // ring's onAccelerated callback fired.
+    await page.setViewportSize({ width: 1280, height: 720 })
+    await page.goto(REPORTER_URL)
+    await expect(page.getByTestId('accelerated-flags')).toHaveText(
+        JSON.stringify(Array.from({ length: 12 }, () => false))
+    )
+    await expect(page.getByTestId('accelerated')).toHaveText('false')
+})
+
 /**
  * The reporter's page: twelve 70vw items in a fixed, full-width horizontal
  * scroller, each with an offset equivalent to ["end end", "start start"]. At a
@@ -57,13 +69,6 @@ for (const axis of ['', 'x']) {
  * scrollLeft 1408 -> 1792, and is 0.5 at 1600. The container's own progress
  * there is 1600 / 9472 ≈ 0.17.
  */
-test('reporter stays on the JS scroll() path', async ({ page }) => {
-    // The reporter's vw offset must not map to a native ViewTimeline either.
-    await page.setViewportSize({ width: 1280, height: 720 })
-    await page.goto(REPORTER_URL)
-    await expect(page.getByTestId('accelerated')).toHaveText('false')
-})
-
 test('Issue #2546 reporter: each indicator tracks its own item', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 })
     await page.goto(REPORTER_URL)
