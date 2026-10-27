@@ -172,7 +172,7 @@ Map a single source to many output ranges in one call. Returns an object of moti
 
 ### Scroll acceleration
 
-When the source is a `useScroll` progress value and the browser supports native scroll timelines, the mapped value runs on the compositor thread instead of updating in JavaScript. This applies to the first hop only, with `clamp` left on, and input stops that ascend within `0`-`1`. Chained transforms, `clamp: false`, function transformers, and other ranges fall back to JavaScript. The value must be bound to `opacity`, `filter`, `clipPath`, `transform`, or `backgroundColor`.
+When the source is a `useScroll` progress value and the browser supports native scroll timelines, the mapped value runs on the compositor thread instead of updating in JavaScript. This applies to the first hop only, with `clamp` left on, and input stops that ascend within `0`-`1`. Chained transforms, `clamp: false`, function transformers, and other ranges fall back to JavaScript. The value must be bound to `opacity`, `filter`, `clipPath` or `transform`. Other values, such as `backgroundColor`, still follow the scroll but update in JavaScript.
 
 ```svelte
 <script>

@@ -8,6 +8,9 @@ const valueText = (page: Page, testId: string) => async () =>
 const computedWillChange = (page: Page, testId: string) => async () =>
     page.getByTestId(testId).evaluate((el) => getComputedStyle(el).willChange)
 
+const computedBackground = (page: Page, testId: string) => async () =>
+    page.getByTestId(testId).evaluate((el) => getComputedStyle(el).backgroundColor)
+
 const waitForMotionReady = async (page: Page, testId: string) => {
     await expect(page.getByTestId(testId)).toHaveAttribute('data-is-loaded', 'ready')
 }
@@ -33,22 +36,31 @@ test.describe('useWillChange (#327)', () => {
         await expect.poll(computedWillChange(page, 'transform-box')).toBe('transform')
     })
 
-    test('flips will-change for an accelerated backgroundColor animation', async ({ page }) => {
+    test('leaves will-change at "auto" for a backgroundColor animation (Motion 14.7)', async ({
+        page
+    }) => {
+        // Upstream f9e080f21 took backgroundColor out of motion-dom's
+        // acceleratedValues (motion-dom/src/animation/waapi/utils/accelerated-values.ts
+        // @v14.7.1): colours animate in JS on the main thread, so they never
+        // promote the element.
         await page.goto(URL)
         await waitForMotionReady(page, 'color-box')
 
         await expect.poll(valueText(page, 'color-value')).toBe('value: auto')
+        await expect.poll(computedWillChange(page, 'color-box')).toBe('auto')
 
-        // Motion 12.43+ accelerates backgroundColor, so it promotes the element.
+        // The colour really animates to its #f0abfc target...
         await page.getByTestId('recolor').click()
-        await expect.poll(computedWillChange(page, 'color-box')).toBe('transform')
-        await expect.poll(valueText(page, 'color-value')).toBe('value: transform')
+        await expect.poll(computedBackground(page, 'color-box')).toBe('rgb(240, 171, 252)')
+        // ...without touching will-change.
+        await expect.poll(computedWillChange(page, 'color-box')).toBe('auto')
+        await expect.poll(valueText(page, 'color-value')).toBe('value: auto')
 
-        // The upstream will-change value is a one-way latch: resetting the color
-        // does not demote the element after the accelerated animation ran.
+        // Back to #67e8f9: still no promotion.
         await page.getByTestId('recolor').click()
-        await expect.poll(computedWillChange(page, 'color-box')).toBe('transform')
-        await expect.poll(valueText(page, 'color-value')).toBe('value: transform')
+        await expect.poll(computedBackground(page, 'color-box')).toBe('rgb(103, 232, 249)')
+        await expect.poll(computedWillChange(page, 'color-box')).toBe('auto')
+        await expect.poll(valueText(page, 'color-value')).toBe('value: auto')
     })
 
     test('flips will-change via imperative animation controls', async ({ page }) => {

@@ -43,15 +43,22 @@ describe('utils/willChange - useWillChange', () => {
         })
     })
 
-    it('flips to "transform" for accelerated values', () => {
+    it('flips to "transform" for accelerated values (opacity)', () => {
         inRoot(() => {
             const wc = useWillChange()
             wc.add('opacity')
             expect(wc.get()).toBe('transform')
+        })
+    })
 
-            const backgroundColor = useWillChange()
-            backgroundColor.add('backgroundColor')
-            expect(backgroundColor.get()).toBe('transform')
+    it('leaves backgroundColor at "auto": it runs on the main thread since Motion 14.7', () => {
+        // Upstream f9e080f21 removed backgroundColor from motion-dom's
+        // acceleratedValues (WAAPI mixes colours in sRGB, Motion in linear
+        // space, so an interrupted WAAPI colour jumped).
+        inRoot(() => {
+            const wc = useWillChange()
+            wc.add('backgroundColor')
+            expect(wc.get()).toBe('auto')
         })
     })
 
