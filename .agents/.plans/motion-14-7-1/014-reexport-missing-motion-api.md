@@ -216,8 +216,8 @@ repeats the basis above it, it says "″".
 | --- | --- | --- |
 | `animateMini` | `framer-motion/src/animation/animators/waapi/animate-style.ts:30 (curated: framer-motion/src/dom.ts:11)` | Hand-curated named export (framer-motion/src/dom.ts:11); documented as `import { animate } from "motion/mini"` (motion.dev/docs/animate, motion.dev/docs/spring) |
 | `createScopedAnimate` | `framer-motion/src/animation/animate/index.ts:34 (curated: framer-motion/src/dom.ts:4)` | Hand-curated named export next to `animate` in framer-motion/src/dom.ts:4; backs React `useAnimate` (framer-motion/src/animation/hooks/use-animate.ts:9) |
-| `inertia` | `motion-dom/src/animation/generators/inertia.ts:8` | Generator family of `spring` (documented at motion.dev/docs/spring and already re-exported); `type: "inertia"` documented at motion.dev/docs/animate#type; used by React `useFollowValue` (framer-motion/src/value/use-follow-value.ts:19) |
-| `keyframes` | `motion-dom/src/animation/generators/keyframes.ts:27` | Generator family of `spring`/`inertia` (the tween generator, `type: "keyframes"`); used by React `useTransform` (framer-motion/src/value/use-transform.ts:240) |
+| `inertia` | `motion-dom/src/animation/generators/inertia.ts:8` | Generator family of `spring` (documented at motion.dev/docs/spring and already re-exported); `type: "inertia"` documented at motion.dev/docs/animate#type; the engine resolves `type: "inertia"` to it (motion-dom/src/animation/JSAnimation.ts:13 `import { inertia } from "./generators/inertia"`) |
+| `keyframes` | `motion-dom/src/animation/generators/keyframes.ts:27` | Generator family of `spring`/`inertia` (the tween generator, `type: "keyframes"`); the engine's default tween generator (motion-dom/src/animation/JSAnimation.ts:14 `import { keyframes as keyframesGenerator } from "./generators/keyframes"`) |
 | `resolveElements` | `motion-dom/src/utils/resolve-elements.ts:30` | Documented: motion.dev/docs/resolve-elements (`import { resolveElements } from "motion"`) |
 
 #### (d) needs a Svelte adaptation (follow-up) — 3
@@ -267,7 +267,7 @@ repeats the basis above it, it says "″".
 | `variantProps` | `motion-dom/src/render/utils/variant-props.ts:13` | ″ (same as above) |
 | `VisualElement` | `motion-dom/src/render/VisualElement.ts:90` | ″ (same as above) |
 | `visualElementStore` | `motion-dom/src/render/store.ts:3` | ″ (same as above) |
-| `addScaleCorrector` | `motion-dom/src/render/utils/is-forced-motion-value.ts:8` | Projection engine behind React `layout`/`layoutId`/`LayoutGroup` (framer-motion/src/motion/features/layout, components/LayoutGroup/index.tsx:10); ours: layout props, `LayoutGroup`, `animateLayout` |
+| `addScaleCorrector` | `motion-dom/src/projection/styles/scale-correction.ts:6` | Projection engine behind React `layout`/`layoutId`/`LayoutGroup` (framer-motion/src/motion/features/layout, components/LayoutGroup/index.tsx:10); ours: layout props, `LayoutGroup`, `animateLayout` |
 | `applyAxisDelta` | `motion-dom/src/projection/geometry/delta-apply.ts:35` | ″ (same as above) |
 | `applyBoxDelta` | `motion-dom/src/projection/geometry/delta-apply.ts:62` | ″ (same as above) |
 | `applyPointDelta` | `motion-dom/src/projection/geometry/delta-apply.ts:18` | ″ (same as above) |
@@ -324,7 +324,7 @@ repeats the basis above it, it says "″".
 | `removeBoxTransforms` | `motion-dom/src/projection/geometry/delta-remove.ts:103` | ″ (same as above) |
 | `removePointDelta` | `motion-dom/src/projection/geometry/delta-remove.ts:10` | ″ (same as above) |
 | `rootProjectionNode` | `motion-dom/src/projection/node/root.ts:3` | ″ (same as above) |
-| `scaleCorrectors` | `motion-dom/src/render/utils/is-forced-motion-value.ts:8` | ″ (same as above) |
+| `scaleCorrectors` | `motion-dom/src/projection/styles/scale-correction.ts:4` | ″ (same as above) |
 | `scalePoint` | `motion-dom/src/projection/geometry/delta-apply.ts:9` | ″ (same as above) |
 | `transformAxis` | `motion-dom/src/projection/geometry/delta-apply.ts:164` | ″ (same as above) |
 | `transformBox` | `motion-dom/src/projection/geometry/delta-apply.ts:190` | ″ (same as above) |
@@ -447,8 +447,8 @@ repeats the basis above it, it says "″".
 | `vh` | `motion-dom/src/value/types/numbers/units.ts:14` | ″ (same as above) |
 | `vw` | `motion-dom/src/value/types/numbers/units.ts:15` | ″ (same as above) |
 | `collectMotionValues` | `motion-dom/src/value/index.ts:76` | Motion-value plumbing: undocumented; `export *` only |
-| `resolveMotionValue` | `motion-dom/src/value/utils/resolve-motion-value.ts:8` | ″ (same as above) |
-| `SubscriptionManager` | `motion-utils/src/subscription-manager.ts:5` | ″ (same as above) |
+| `resolveMotionValue` | `motion-dom/src/value/utils/resolve-motion-value.ts:8` | Hand-curated for the React entry only (framer-motion/src/index.ts:57 `export { resolveMotionValue } from "motion-dom"`), not in `dom.ts`; undocumented on motion.dev; it unwraps a motion value inside React's `useVisualState` (framer-motion/src/motion/utils/use-visual-state.ts:19). Stays out |
+| `SubscriptionManager` | `motion-utils/src/subscription-manager.ts:5` | Motion-value plumbing: undocumented; `export *` only |
 | `convertOffsetToTimes` | `motion-dom/src/animation/keyframes/offsets/time.ts:1` | WAAPI easing conversion internal; the documented easing functions are already re-exported |
 | `cubicBezierAsString` | `motion-dom/src/animation/waapi/easing/cubic-bezier.ts:3` | ″ (same as above) |
 | `defaultEasing` | `motion-dom/src/animation/generators/keyframes.ts:20` | ″ (same as above) |
@@ -607,7 +607,8 @@ The docs build rewrites the tracked `docs/static/r/animated-tabs.json`; restore 
 
 ### Step 0: Preconditions
 
-1. `git log --oneline -40 | grep -c "tripwire for unreviewed motion exports"` → `1` (009 is merged). If `0`, STOP.
+1. `git log --oneline --grep="tripwire for unreviewed motion exports" | wc -l` → `1` or more (009 is merged; no
+   `-40` limit, because in wave 4 009's commit is far back). If `0`, STOP.
 2. `grep -n '"motion": "14.7.1"' package.json` prints a line; `pnpm install --frozen-lockfile` exits 0.
 3. `pnpm exec vitest run src/lib/index.spec.ts` → all pass (the tripwire is green before you start).
 4. Confirm the allowlist matches this plan's audit:
@@ -913,12 +914,19 @@ in `onMount`, like `src/routes/tests/useAnimate/+page.svelte`. Four sections, ev
    `resolveElements('li', { current: scopeUl, animations: [] }).length`.
 
 Add a guided TesterPanel (exemplar `src/routes/tests/drag/disable-from-ondrag/+page.svelte` +
-`src/routes/tests/layout/_parity/TesterPanel.svelte`), hidden under `?@isPlaywright=true`. Steps and live
-verdicts:
-- "Run scoped → only card A's dots slide".
-- "Fling → ball overshoots toward the wall and settles at 240".
-- "Mini → box fades to 25% (Web Animations)".
-- "Counts read 5 / 2".
+`src/routes/tests/layout/_parity/TesterPanel.svelte`), hidden under `?@isPlaywright=true`. Compute verdicts only
+when `isTester` is true: `isTester = !window.location.search.includes('@isPlaywright=true')`, set in `onMount`
+(the pattern plan 013 uses, after `src/routes/tests/animate-presence/owned-pop-layout/+page.svelte`). TesterPanel
+already renders nothing under Playwright. Steps, with each chip's expected value:
+- "Run scoped → only card A's dots slide". Chip `SCOPED · A 100 / B 0` when every `dot-a-*` translateX is 100
+  (±1) and every `dot-b-*` is 0 about 600 ms after the click; otherwise `LEAKED · A <n> / B <n>`.
+- "Fling → ball overshoots toward the wall and settles at 240". Chip `SETTLED · 240` when `x.get()` rounds to
+  240 once the animation's promise resolves; otherwise `OFF · <value>`.
+- "Mini → box fades to 25% (Web Animations)". Chip `WAAPI · 0.25` when `getAnimations().length > 0` right
+  after the call and the computed opacity is 0.25 (±0.02) after it finishes; otherwise
+  `NO-WAAPI` / `OFF · <opacity>`.
+- "Counts read 5 / 2". Chip `COUNTS · 5 / 2` when `resolve-doc` is 5 and `resolve-scoped` is 2; otherwise
+  `COUNTS · <doc> / <scoped>`.
 
 Create `e2e/utilities/motion-reexports.spec.ts`. Load `/tests/motion-reexports?@isPlaywright=true` and wait for
 `data-hydrated="true"`. Read translateX with `getComputedStyle(el).transform` through `new DOMMatrix(…).m41`,
@@ -1025,7 +1033,9 @@ In this order, all from the lane root:
 3. `pnpm check` → 0 errors.
 4. `pnpm test:only` → all pass.
 5. `pnpm --filter @humanspeak/svelte-motion-consumer-vite6 test` → exit 0.
-6. `pnpm --dir docs build`, then `pnpm --dir docs check` → 0 errors (restore `animated-tabs.json` afterwards).
+6. `pnpm --dir docs build`, then `pnpm --dir docs check` → 0 errors, then `pnpm --dir docs test` → all pass
+   (includes `docs/src/lib/seo-title-policy.spec.ts` for the two new example routes). Restore
+   `animated-tabs.json` afterwards.
 7. `PW_PORT=4222 pnpm exec playwright test e2e/utilities` → all pass (re-run a failing spec alone once).
 8. `git diff --check` clean; `git status` shows only in-scope files.
 
