@@ -137,6 +137,34 @@ describe('utils/scroll - useScroll scrollXLength/scrollYLength (#2189)', () => {
         expect(values.scrollYProgress.get()).toBe(0.25)
     })
 
+    // Amendment A1: upstream spreads `...options` into scroll(), so
+    // `trackContentSize` reaches scrollInfo()'s per-frame dimension check.
+    it('trackContentSize: updates after a content-only resize, with no scroll event', async () => {
+        const container = append(document.createElement('div'))
+        mock(container, containerSize)
+
+        const values = await mount({ container, trackContentSize: true })
+        expect(values.scrollYLength.get()).toBe(2500)
+
+        // Content grows; no resize or scroll event is dispatched.
+        mock(container, { scrollHeight: 3500 })
+        await vi.waitFor(() => expect(values.scrollYLength.get()).toBe(3000), { timeout: 500 })
+    })
+
+    it('without trackContentSize a content-only resize waits for the next scroll', async () => {
+        const container = append(document.createElement('div'))
+        mock(container, containerSize)
+
+        const values = await mount({ container })
+        mock(container, { scrollHeight: 3500 })
+        await nextFrames()
+        await nextFrames()
+        expect(values.scrollYLength.get()).toBe(2500)
+
+        container.dispatchEvent(new Event('scroll'))
+        await vi.waitFor(() => expect(values.scrollYLength.get()).toBe(3000), { timeout: 500 })
+    })
+
     it('is set alongside accelerated progress values', async () => {
         supportsFlags.scrollTimeline = true
         const container = append(document.createElement('div'))

@@ -125,8 +125,9 @@
         <li>
             <Gauge />
             <span>
-                The lengths are recomputed when the container resizes, and on the next scroll, so
-                the readout stays right without measuring the DOM yourself.
+                The lengths are recomputed when the container resizes and on the next scroll, or on
+                any content size change with <code>trackContentSize: true</code>, so the readout
+                stays right without measuring the DOM yourself.
             </span>
         </li>
         <li>

@@ -108,7 +108,7 @@ Track the scroll position of a specific scrollable element by passing it as the 
 
 ### Distance from the end
 
-`scrollXLength` and `scrollYLength` hold each axis's maximum scroll offset, and they update when the container resizes, and on the next scroll. Subtract the current position to get the distance left to scroll:
+`scrollXLength` and `scrollYLength` hold each axis's maximum scroll offset, and they update when the container resizes and on the next scroll, or on any content size change with `trackContentSize: true`. Subtract the current position to get the distance left to scroll:
 
 ```svelte
 <script>
@@ -211,6 +211,7 @@ A native view timeline follows the target's nearest scrolling ancestor. If your 
 | `target` | `HTMLElement` | Target element to track position of within the container. |
 | `offset` | `string[]` | Array of scroll offsets defining when tracking starts and ends. |
 | `axis` | `'x' \| 'y'` | Which axis to use for the single-axis progress callback. Defaults to `'y'`. |
+| `trackContentSize` | `boolean` | Check the container's `scrollWidth` / `scrollHeight` every frame and recalculate when the content size changes, without waiting for a scroll or container resize. Defaults to `false`. |
 
 ## API Reference
 

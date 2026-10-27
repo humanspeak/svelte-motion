@@ -156,6 +156,26 @@ describe('utils/scroll - useScroll', () => {
         expect((opts as { axis?: string }).axis).toBe('x')
     })
 
+    it('forwards trackContentSize to scroll()', async () => {
+        const container = document.createElement('div')
+        inRoot(() => useScroll({ container, trackContentSize: true }))
+        flushSync()
+        await drainMicrotasks()
+        expect(scrollMock).toHaveBeenCalledTimes(1)
+        const [, opts] = scrollMock.mock.calls[0]
+        expect((opts as { trackContentSize?: boolean }).trackContentSize).toBe(true)
+        expect((opts as { container?: HTMLElement }).container).toBe(container)
+    })
+
+    it('trackContentSize leaves the accelerate decision alone', () => {
+        // Upstream canAccelerateScroll looks only at target / offset.
+        supportsScrollTimelineMock.mockReturnValue(true)
+        const ctx = inRoot(() => useScroll({ trackContentSize: true }))
+        expect(ctx.scrollXProgress.accelerate).toBeDefined()
+        expect(ctx.scrollYProgress.accelerate).toBeDefined()
+        expect(ctx.scrollYLength.accelerate).toBeUndefined()
+    })
+
     it('writes scroll().info into the four motion values', async () => {
         const ctx = inRoot(() => useScroll())
         flushSync()

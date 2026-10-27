@@ -78,6 +78,32 @@ export type UseScrollOptions = {
     offset?: ScrollOffset
     /** Which axis to use for the single-axis `progress` value supplied to `scroll()`. */
     axis?: 'x' | 'y'
+    /**
+     * When true, enables per-frame checking of scrollWidth/scrollHeight
+     * to detect content size changes and recalculate scroll progress.
+     *
+     * @default false
+     */
+    trackContentSize?: boolean
+}
+
+/**
+ * The `scroll()` options other than the element refs, forwarded as-is like
+ * upstream's `...options` spread (framer-motion `use-scroll.ts:63-64, 96, 138`
+ * @ v14.7.1). `offset` is cast because our {@link ScrollOffset} is looser
+ * than motion's.
+ *
+ * @param options The `useScroll` options.
+ * @returns The options to spread into `scroll()`, without `container` / `target`.
+ */
+const forwardedScrollOptions = (options: UseScrollOptions) => {
+    const forwarded: Omit<UseScrollOptions, 'offset'> & { offset?: never } = {
+        ...options,
+        offset: options.offset as never
+    }
+    delete forwarded.container
+    delete forwarded.target
+    return forwarded
 }
 
 /**
@@ -129,7 +155,7 @@ const makeAccelerateConfig = (axis: 'x' | 'y', options: UseScrollOptions): Accel
                 return
             }
             cleanup = scroll(animation, {
-                offset: options.offset as never,
+                ...forwardedScrollOptions(options),
                 axis,
                 container: resolveElement(options.container),
                 target: resolveElement(options.target)
@@ -266,10 +292,9 @@ export const useScroll = (options: UseScrollOptions = {}): UseScrollReturn => {
                 scrollYLength.set(info.y.scrollLength)
             },
             {
+                ...forwardedScrollOptions(options),
                 container: resolveElement(options.container),
-                target: resolveElement(options.target),
-                offset: options.offset as never,
-                axis: options.axis
+                target: resolveElement(options.target)
             }
         )
     }
