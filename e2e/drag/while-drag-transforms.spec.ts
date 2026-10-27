@@ -27,8 +27,18 @@ test.describe('drag/whileDrag transform composition', () => {
         }
     })
 
-    test('keeps an x-only drag pinned on y when its layout slot moves', async ({ page }) => {
+    // Motion 14.6 (#2255, upstream commit 9632e2c3d, covered upstream by
+    // packages/framer-motion/src/gestures/drag/__tests__/layout-compensation.test.tsx):
+    // a layout change mid-drag is compensated only on the axes the gesture
+    // drags. A non-drag axis follows its layout, as it does when the element
+    // isn't being dragged, so nothing is left to snap back on release.
+    test('an x-only drag follows its layout on y when its slot moves (#2255)', async ({ page }) => {
         const card = page.getByTestId('cross-axis-card')
+        const readMatrix = () =>
+            card.evaluate((element) => {
+                const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform)
+                return { m41: matrix.m41, m42: matrix.m42 }
+            })
         await beginHorizontalDrag(page, card)
 
         try {
@@ -38,17 +48,39 @@ test.describe('drag/whileDrag transform composition', () => {
             await page
                 .getByTestId('insert-above')
                 .evaluate((button: HTMLButtonElement) => button.click())
-            const ySamples = await sampleFrames(page, async () => {
+            const shift = await page.getByTestId('inserted-content').evaluate((element) => {
+                const style = getComputedStyle(element)
+                return (
+                    element.getBoundingClientRect().height +
+                    Number.parseFloat(style.marginTop) +
+                    Number.parseFloat(style.marginBottom)
+                )
+            })
+            const samples = await sampleFrames(page, async () => {
                 const box = await card.boundingBox()
                 if (!box) throw new Error('missing post-insertion card bounds')
-                return box.y
+                return { dy: box.y - before.y, ...(await readMatrix()) }
             })
 
-            const maxDrift = Math.max(...ySamples.map((y) => Math.abs(y - before.y)))
-            expect(maxDrift).toBeLessThanOrEqual(2)
+            for (const sample of samples) {
+                expect(
+                    Math.abs(sample.dy - shift),
+                    `samples: ${JSON.stringify(samples)}`
+                ).toBeLessThanOrEqual(2)
+                expect(
+                    Math.abs(sample.m42),
+                    `samples: ${JSON.stringify(samples)}`
+                ).toBeLessThanOrEqual(0.5)
+            }
+            // The x drag still applies
+            expect(samples[samples.length - 1].m41).toBeGreaterThan(20)
         } finally {
             await page.mouse.up()
         }
+
+        // No stale translateY after release
+        await page.waitForTimeout(500)
+        expect(Math.abs((await readMatrix()).m42)).toBeLessThanOrEqual(0.5)
     })
 
     test('keeps a whileDrag override composed with an authored style channel', async ({ page }) => {

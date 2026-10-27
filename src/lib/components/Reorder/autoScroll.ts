@@ -14,10 +14,12 @@
  */
 
 import type { DragPoint } from '$lib/types'
+import { frameData } from 'motion-dom'
 import type { ReorderAxis } from './types'
 
 const threshold = 50
-const maxSpeed = 25
+// Pixels per millisecond (25px per frame at 60fps)
+const maxSpeed = 1.5
 
 const overflowStyles = new Set(['auto', 'scroll'])
 
@@ -91,22 +93,26 @@ const findScrollableAncestor = (element: Element | null, axis: 'x' | 'y'): HTMLE
 
 /**
  * Speed ramps up towards the edge and is capped at maxSpeed once the
- * pointer reaches or passes it.
+ * pointer reaches or passes it. This runs from `onDrag`, within a frame,
+ * so it scales by the frame's elapsed time (`frameData.delta`) to scroll
+ * at the same speed whatever the display's refresh rate.
  *
- * Port of framer-motion `Reorder/utils/auto-scroll.ts` @ v14.5.0.
+ * Port of framer-motion `Reorder/utils/auto-scroll.ts` @ v14.6.0
+ * (commit `2984e9d60`, #3955).
  *
  * @param distanceFromEdge - Pointer distance inside the edge, in px; negative once past it.
- * @returns Scroll speed in px per frame, from 0 up to `maxSpeed`.
+ * @returns Scroll distance for this frame, in px, from 0 up to `maxSpeed × frameData.delta`.
  */
 const scrollSpeed = (distanceFromEdge: number): number => {
     const intensity = Math.min(1, 1 - distanceFromEdge / threshold)
-    return maxSpeed * intensity * intensity
+    return maxSpeed * intensity * intensity * frameData.delta
 }
 
 /**
  * Quadratic ease into `maxSpeed` as the pointer approaches the edge:
  * zero at `threshold` px away, full speed at the edge, and capped at
- * `maxSpeed` once the pointer is past the edge.
+ * `maxSpeed × frameData.delta` px for this frame once the pointer is
+ * past the edge.
  */
 const getScrollAmount = (
     pointerPosition: number,

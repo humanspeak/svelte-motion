@@ -36,6 +36,7 @@
         scrapeSVGMotionValuesFromProps,
         transformProps,
         visualElementStore,
+        rootProjectionNode,
         type AnyResolvedKeyframe,
         type MotionNodeOptions,
         type PresenceContextProps,
@@ -988,13 +989,33 @@
     // AnimatePresence initial={false} only applies on first render - check shouldAnimateEnter(key)
     const parentInitialFalse = getInitialFalseContext()
     const presenceSkipEnter = context ? !context.shouldAnimateEnter(presenceKey) : false
-    const effectiveInitialProp = presenceSkipEnter
-        ? false
-        : initialProp !== undefined
-          ? initialProp
-          : parentInitialFalse && variantsProp
+    /**
+     * Motion 14.6.0 (`framer-motion/src/motion/index.tsx`, #2362): an element
+     * that mounts with the layoutId of one that's already on screen takes over
+     * from it with a shared layout animation, so visually it has already
+     * entered. Mount it as if `initial={false}`. Only when it has an
+     * `initial`: without one there's no entrance to skip, and `initial={false}`
+     * would make its animate values its base values.
+     *
+     * Svelte can destroy the departing element before this one's script runs
+     * (its rect is then in the layoutId registry) or after (it is still its
+     * shared-layout stack's lead), so check both. Evaluated once, at init.
+     */
+    const layoutIdTakeover = untrack(() => {
+        if (!scopedLayoutId || initialProp === undefined || initialProp === false) return false
+        return (
+            layoutIdRegistry.has(scopedLayoutId) ||
+            !!rootProjectionNode.current?.sharedNodes.get(scopedLayoutId)?.lead
+        )
+    })
+    const effectiveInitialProp =
+        presenceSkipEnter || layoutIdTakeover
             ? false
-            : undefined
+            : initialProp !== undefined
+              ? initialProp
+              : parentInitialFalse && variantsProp
+                ? false
+                : undefined
 
     pwLog('[motion] mount', {
         presenceSkipEnter,
@@ -1003,7 +1024,7 @@
         animateProp
     })
 
-    if (initialProp === false) {
+    if (initialProp === false || layoutIdTakeover) {
         setInitialFalseContext(true)
     }
 

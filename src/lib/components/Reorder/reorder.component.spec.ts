@@ -217,7 +217,7 @@ describe('Reorder.Group / Reorder.Item', () => {
         })
         await flushFrame()
         expect(onReorder).toHaveBeenCalledOnce()
-        expect(onReorder).toHaveBeenLastCalledWith([1, 0, 2])
+        expect(onReorder).toHaveBeenLastCalledWith([1, 0, 2], 0)
 
         // `values` hasn't changed (pending or rejected): the same swap must
         // not be proposed again (Motion 13.4.5 `Reorder/Group.tsx`).
@@ -253,6 +253,45 @@ describe('Reorder.Group / Reorder.Item', () => {
             clientX: 170,
             clientY: 10,
             pointerId: 23
+        })
+        await flushFrame()
+    })
+
+    it('passes the moved item as the second argument to onReorder', async () => {
+        const onReorder = vi.fn()
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+            this: HTMLElement
+        ) {
+            if (!this.dataset.testid?.startsWith('item-')) return new DOMRect()
+            const index = Array.from(this.parentElement?.children ?? []).indexOf(this)
+            return new DOMRect(index * 100, 0, 100, 100)
+        })
+
+        render(ReorderHarness, {
+            props: { axis: 'x', values: [0, 1, 2], onReorder }
+        })
+        const item = await screen.findByTestId('item-2')
+        await vi.advanceTimersByTimeAsync(1000)
+
+        // Drag item 2 left past item 1's midpoint (Motion 14.6.0
+        // `Reorder/Group.tsx` `onReorder(newOrder, moved)`).
+        dispatchMousePointer(item, 'pointerdown', {
+            clientX: 210,
+            clientY: 10,
+            pointerId: 24
+        })
+        dispatchMousePointer(window, 'pointermove', {
+            clientX: 150,
+            clientY: 10,
+            pointerId: 24
+        })
+        await flushFrame()
+        expect(onReorder.mock.lastCall).toEqual([[0, 2, 1], 2])
+
+        dispatchMousePointer(window, 'pointercancel', {
+            clientX: 150,
+            clientY: 10,
+            pointerId: 24
         })
         await flushFrame()
     })
@@ -431,7 +470,7 @@ describe('Reorder.Group / Reorder.Item', () => {
         await flushFrame()
         expect(visualElement?.getValue('x')?.get()).toBe(-51)
         expect(onReorder).toHaveBeenCalledOnce()
-        expect(onReorder).toHaveBeenCalledWith([1, 2, 0])
+        expect(onReorder).toHaveBeenCalledWith([1, 2, 0], 0)
 
         dispatchMousePointer(window, 'pointercancel', {
             clientX: 430,

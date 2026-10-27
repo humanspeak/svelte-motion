@@ -101,4 +101,24 @@ describe('layoutIdRegistry release', () => {
         vi.advanceTimersByTime(200)
         expect(__layoutIdRegistrySize()).toBe(0)
     })
+
+    it('has reports an entry without consuming it', () => {
+        const departing = document.createElement('div')
+        const other = document.createElement('div')
+        layoutIdRegistry.snapshot('peek', rect, {}, departing)
+
+        expect(layoutIdRegistry.has('peek')).toBe(true)
+        expect(layoutIdRegistry.has('peek')).toBe(true)
+        expect(layoutIdRegistry.consume('peek', other)?.rect).toBe(rect)
+        expect(layoutIdRegistry.has('peek')).toBe(false)
+    })
+
+    it('has is false after the release window', () => {
+        layoutIdRegistry.snapshot('peek-stale', rect, {}, document.createElement('div'))
+        expect(layoutIdRegistry.has('peek-stale')).toBe(true)
+
+        vi.advanceTimersByTime(200)
+
+        expect(layoutIdRegistry.has('peek-stale')).toBe(false)
+    })
 })

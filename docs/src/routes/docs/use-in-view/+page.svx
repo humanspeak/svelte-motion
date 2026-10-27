@@ -25,10 +25,10 @@ description: 'Track whether an element is in the viewport via a $state-backed { 
 `useInView` returns a `$state`-backed `{ current }` object reporting whether an element is in the viewport. It uses the same `IntersectionObserver` infrastructure as the `whileInView` motion prop, so it's a good fit for non-animation side effects: analytics impressions, lazy data loads, one-shot reveals, and scroll-driven UI.
 
 ```svelte
-<script>
+<script lang="ts">
     import { useInView } from '@humanspeak/svelte-motion'
 
-    let ref
+    let ref = $state<HTMLElement>()
     const inView = useInView(() => ref)
 </script>
 
@@ -44,6 +44,9 @@ description: 'Track whether an element is in the viewport via a $state-backed { 
 Svelte 5 `bind:this`, because the element binding isn't available until after
 mount &mdash; the hook resolves it lazily and polls on `requestAnimationFrame`
 until it appears.
+Pass a getter that reads `$state` (as with `bind:this` on a `$state` variable)
+to have swaps and removals tracked; a plain `let` is resolved once it hydrates
+but later changes aren't seen.
 
 <Example isSmall exampleUrl="/examples/use-in-view">
   <UseInViewExample />

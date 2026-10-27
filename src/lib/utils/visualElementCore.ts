@@ -287,7 +287,7 @@ export const isExitFeatureEnabled = (props: MotionNodeOptions): boolean => !!pro
 /**
  * The drag feature: drives `drag` with motion-dom's `VisualElementDragControls`.
  *
- * Port of `framer-motion/src/gestures/drag/index.ts` (v14.5.0). Registered by
+ * Port of `framer-motion/src/gestures/drag/index.ts` (v14.6.0). Registered by
  * {@link registerMotionFeatures}; enabled by {@link isDragFeatureEnabled}.
  *
  * Two documented Svelte deviations (re-check both on each Motion bump):
@@ -354,20 +354,36 @@ export class DragGestureFeature extends Feature<HTMLElement> {
 
     /**
      * Re-subscribe on a `dragControls` identity change, retry listener
-     * attachment, and re-measure when `dragConstraints` changes.
+     * attachment, end a live gesture when `drag` turns off, and re-measure
+     * when `dragConstraints` changes.
      *
      * @returns Nothing.
      */
     update(): void {
         // Svelte deviation 1: retry when the instance wasn't ready at mount.
         this.attachListeners()
-        const { dragControls } = this.node.getProps() as { dragControls?: unknown }
-        const { dragControls: prev } = (this.node.prevProps ?? {}) as { dragControls?: unknown }
+        const { dragControls, drag } = this.node.getProps() as {
+            dragControls?: unknown
+            drag?: MotionNodeOptions['drag']
+        }
+        const { dragControls: prev, drag: prevDrag } = (this.node.prevProps ?? {}) as {
+            dragControls?: unknown
+            drag?: MotionNodeOptions['drag']
+        }
         if (dragControls !== prev) {
             this.removeGroupControls()
             this.removeGroupControls = () => {}
             this.subscribeControls()
         }
+        /**
+         * If drag is disabled mid-gesture, for instance from onDrag, end the
+         * gesture as if released. This must happen before this render's
+         * layout change is processed, otherwise the element is still
+         * animation-blocked, so it jumps to its new layout and keeps that
+         * jump as a drag offset, which release wouldn't animate away as
+         * drag is now disabled.
+         */
+        if (prevDrag && !drag) this.controls.stop(undefined, undefined, prevDrag)
         // Svelte deviation 2: React re-measures (and so re-fires the projection
         // 'measure' event the controller resolves ref constraints from) on
         // every commit via MeasureLayout. A `dragConstraints` ref bound after

@@ -243,6 +243,33 @@ describe('utils/transform - useTransform', () => {
         await nextFrame()
         expect(ctx.stepB.current).toBeCloseTo(100)
     })
+
+    // Port of upstream Motion #2280
+    // (packages/framer-motion/src/value/__tests__/issue-2280.test.tsx at
+    // v14.6.0). Fixed in motion-dom's render-step.ts: a callback scheduled
+    // with `immediate` during a step re-runs if it already ran in that step
+    // (commits 83c7d1785, e27a93e7e, a77e7fc21, 0af864e70, d555095ca).
+    it('#2280: a combined transform sees chained transform updates', async () => {
+        const seen: number[][] = []
+        const ctx = inRoot(() => {
+            const a = useMotionValue(0)
+            const aHalf = useTransform(a, (v: number) => v / 2)
+            const aQuarter = useTransform(aHalf, (h: number) => h / 2)
+            const result = useTransform([a, aQuarter], ([av, q]: number[]) => {
+                seen.push([av, q])
+                return av + q
+            })
+            return { a, aQuarter, result }
+        })
+        await nextFrame()
+
+        ctx.a.set(100)
+        await nextFrame()
+
+        expect(ctx.aQuarter.get()).toBe(25)
+        expect(ctx.result.get()).toBe(125)
+        expect(seen[seen.length - 1]).toEqual([100, 25])
+    })
 })
 
 describe('useTransform accelerate propagation', () => {

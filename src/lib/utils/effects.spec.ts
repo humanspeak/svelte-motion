@@ -1,5 +1,5 @@
 import { createEffect as createEffectCore } from 'motion'
-import { frameData, frameSteps } from 'motion-dom'
+import { processFrame } from 'motion-dom'
 import { describe, expect, it } from 'vitest'
 import {
     animate,
@@ -108,17 +108,9 @@ void typeAssertions
  * attributes before 13.5.1; `attrX`/`attrY` still write attributes.
  */
 describe('utils/effects - svgEffect routing (Motion 13.5.1)', () => {
-    // jsdom has no requestAnimationFrame when motion-dom loads, so its frameloop
-    // never self-schedules; drive one batch by hand.
+    // Drive one frame with Motion's `processFrame` (jsdom never starts the rAF loop).
     const flushFrames = () => {
-        frameSteps.setup.process(frameData)
-        frameSteps.read.process(frameData)
-        frameSteps.resolveKeyframes.process(frameData)
-        frameSteps.preUpdate.process(frameData)
-        frameSteps.update.process(frameData)
-        frameSteps.preRender.process(frameData)
-        frameSteps.render.process(frameData)
-        frameSteps.postRender.process(frameData)
+        processFrame()
     }
 
     it('writes scaleX as a CSS transform, not an attribute', () => {

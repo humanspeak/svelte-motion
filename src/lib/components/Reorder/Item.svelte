@@ -7,13 +7,16 @@
      * snaps back to its (possibly new) slot on release, and reports
      * its live drag offset to the group each frame so the order can
      * update mid-gesture. While dragging, the item floats above its
-     * siblings via a transform-driven `zIndex`.
+     * siblings via a transform-driven `zIndex`. Keyboard reorderable
+     * (Motion 14.6.0): Space grabs and drops, arrows move, Escape restores.
      *
      * @prop as - Element to render. Defaults to `'li'`.
      * @prop value - The entry in the group's `values` this item represents.
      * @prop layout - Layout animation mode. Defaults to `true`; pass `'position'` to skip size projection.
      */
-    import { isMotionValue } from 'motion-dom'
+    import { isMotionValue, visualElementStore } from 'motion-dom'
+    import { untrack } from 'svelte'
+    import type { FocusEventHandler, KeyboardEventHandler } from 'svelte/elements'
     import MotionContainer from '$lib/html/_MotionContainer.svelte'
     import type { DragInfo, LayoutMeasurePayload } from '$lib/types'
     import { useMotionValue } from '$lib/utils/motionValue.svelte'
@@ -31,6 +34,8 @@
         as = 'li',
         onDrag,
         onDragEnd,
+        onkeydown,
+        onblur,
         layout = true,
         ref = $bindable(),
         ...rest
@@ -94,6 +99,60 @@
         return () => context.unregisterItem(value)
     })
 
+    // Typed here: `HTMLElementProps` only declares an `unknown` index signature.
+    const userKeyDown = $derived(onkeydown as KeyboardEventHandler<HTMLElement> | null | undefined)
+    const userBlur = $derived(onblur as FocusEventHandler<HTMLElement> | null | undefined)
+
+    /** The values when this item was grabbed by keyboard, or `undefined`. */
+    let grabbedFrom = $state<V[] | undefined>(undefined)
+
+    /**
+     * Set when a keyboard move committed a new order, cleared once the item
+     * has refocused itself (or on the next keydown). Plain `let`: read and
+     * written from handlers and an untracked effect body only.
+     */
+    let pendingRefocus = false
+
+    const grab = (element: HTMLElement, from?: V[]) => {
+        grabbedFrom = from
+        // Fire-and-forget like upstream: the animation settles on its own.
+        void visualElementStore.get(element)?.animationState?.setActive('whileDrag', !!from)
+    }
+
+    const handleKeyDown: KeyboardEventHandler<HTMLElement> = (event) => {
+        // A consumer that rejected the previous proposal mustn't leave it stuck.
+        pendingRefocus = false
+        userKeyDown?.(event)
+        const wasGrabbed = !!grabbedFrom
+        const committed = context.onKeyDown(event, value, grabbedFrom, grab)
+        if (wasGrabbed && committed) pendingRefocus = true
+    }
+
+    /**
+     * Svelte deviation from upstream `Item.tsx`: React disables its events
+     * while it commits and restores focus to the moved item, so upstream
+     * never sees the blur a move causes. Svelte's keyed each moves nodes with
+     * `insertBefore` and does neither, so after a keyboard move the item
+     * refocuses itself here once `values` has changed and been rendered
+     * (however late the consumer applies it), and ignores the move's blur.
+     */
+    $effect(() => {
+        context.trackOrder()
+        untrack(() => {
+            if (!pendingRefocus) return
+            pendingRefocus = false
+            if (ref && ref.ownerDocument.activeElement !== ref) ref.focus({ preventScroll: true })
+        })
+    })
+
+    const handleBlur: FocusEventHandler<HTMLElement> = (event) => {
+        // A move-blur: the node moved and focus fell to <body>.
+        if (pendingRefocus && event.relatedTarget === null) return
+        userBlur?.(event)
+        // Focus really left (Tab, a click elsewhere): drop, keeping the order.
+        if (grabbedFrom) grab(event.currentTarget)
+    }
+
     // `position: relative` (overridable) makes the floating `zIndex`
     // actually apply — z-index is ignored on statically positioned
     // elements, and an upward swap moves the dragged item EARLIER in
@@ -109,15 +168,19 @@
 </script>
 
 <!--
-    Prop order mirrors upstream Item.tsx: `drag` before the spread so a
-    consumer's `drag` prop can unlock both axes; everything after the
+    Prop order mirrors upstream Item.tsx: `drag` and `tabindex` before the
+    spread so a consumer's `drag` prop can unlock both axes and a
+    consumer's `tabindex={-1}` removes the Tab stop; everything after the
     spread is enforced by Reorder and wraps or overrides consumer props.
 -->
 <MotionContainer
     bind:ref
     tag={as}
     drag={itemDrag}
+    tabindex={0}
     {...rest}
+    onkeydown={handleKeyDown}
+    onblur={handleBlur}
     dragSnapToOrigin
     style={itemStyle}
     {layout}

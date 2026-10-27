@@ -31,6 +31,11 @@ export interface ItemData<V> {
  * - `clearReordered` replaces upstream's shared `hasReordered` ref
  *   (Motion 14.1.1, #2682): the group keeps the flag private and items
  *   only ever clear it.
+ * - `onKeyDown` returns whether it committed a new order, so the item knows
+ *   a keyed-each move (and the focus loss it can cause) is coming.
+ * - `trackOrder` exists because Svelte doesn't restore focus after a
+ *   keyed-each move the way React does: the item refocuses itself once
+ *   `values` changes.
  */
 export interface ReorderContextProps<V> {
     /** The group's reorder axis. Items drag-lock to this by default. */
@@ -53,6 +58,29 @@ export interface ReorderContextProps<V> {
     getGroupElement: () => HTMLElement | null
     /** Ends the reorder-click guard; called from Reorder.Item's onDragEnd, a frame after the release's click. */
     clearReordered: () => void
+    /**
+     * Handle a key on an item: Space grabs and drops, arrows along `axis`
+     * move the grabbed item one place (Left and Right swap in RTL) and
+     * Escape restores the order in `from`, the values when it was grabbed.
+     * Mirrors Motion 14.6.0 `Reorder/Group.tsx` `onKeyDown`.
+     *
+     * @param event - The item's keydown event.
+     * @param item - The item's value.
+     * @param from - The values when the item was grabbed, or `undefined` when it isn't.
+     * @param grab - Sets (with `from`) or clears (without) the item's grab.
+     * @returns Whether a new order was committed through `onReorder`.
+     */
+    onKeyDown: (
+        event: KeyboardEvent & { currentTarget: EventTarget & HTMLElement },
+        item: V,
+        from: V[] | undefined,
+        grab: (element: HTMLElement, from?: V[]) => void
+    ) => boolean
+    /**
+     * Read `values` (identity and contents) inside a reactive scope, so an
+     * item can refocus itself after the list it belongs to is re-rendered.
+     */
+    trackOrder: () => void
 }
 
 const REORDER_CONTEXT_KEY = Symbol('reorder-group')

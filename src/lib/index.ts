@@ -20,7 +20,9 @@ export { Reorder } from '$lib/reorder'
 
 // Re-export core animation functions plus the vanilla (component-free)
 // layer — element effects, gestures (including Motion 14.4's `drag()`), the
-// frameloop scheduler, generators, global config — straight from motion.
+// frameloop scheduler, `processFrame` (Motion 14.6) for driving the frameloop
+// from a loop other than `requestAnimationFrame`, generators, global config —
+// straight from motion.
 export {
     MotionGlobalConfig,
     cancelFrame,
@@ -32,6 +34,7 @@ export {
     inView,
     isMotionValue,
     press,
+    processFrame,
     resize,
     scroll,
     scrollInfo,

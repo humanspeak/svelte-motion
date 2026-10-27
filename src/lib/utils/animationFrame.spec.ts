@@ -1,96 +1,93 @@
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { frame, frameData, frameSteps } from 'motion-dom'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useAnimationFrame } from './animationFrame.js'
 
+/**
+ * jsdom has no `requestAnimationFrame` when motion-dom loads, so its frameloop
+ * never self-schedules. Process one frame by hand, running every step in order.
+ */
+const runFrame = (timestamp: number, delta: number) => {
+    frameData.timestamp = timestamp
+    frameData.delta = delta
+    frameData.isProcessing = true
+    for (const step of Object.values(frameSteps)) step.process(frameData)
+    frameData.isProcessing = false
+}
+
 describe('utils/animationFrame - useAnimationFrame', () => {
-    let rafCb: FrameRequestCallback | null = null
-    let rafId = 0
-    let rafMock: Mock
-    let cancelMock: Mock
-
-    beforeEach(() => {
-        rafCb = null
-        rafId = 0
-
-        rafMock = vi.fn((cb: FrameRequestCallback) => {
-            rafCb = cb
-            return ++rafId
-        })
-
-        cancelMock = vi.fn()
-
-        vi.stubGlobal('requestAnimationFrame', rafMock)
-        vi.stubGlobal('cancelAnimationFrame', cancelMock)
-    })
-
     afterEach(() => {
         vi.unstubAllGlobals()
         vi.restoreAllMocks()
     })
 
-    it('calls callback on each animation frame with timestamp', () => {
+    it('passes time since the first frame and the frame delta', () => {
         const callback = vi.fn()
         const cleanup = useAnimationFrame(callback)
 
-        // Should have requested first frame immediately
-        expect(rafMock).toHaveBeenCalledTimes(1)
         expect(callback).not.toHaveBeenCalled()
 
-        // Simulate first frame
-        expect(rafCb).toBeTruthy()
-        rafCb?.(100)
+        runFrame(1000, 16)
         expect(callback).toHaveBeenCalledTimes(1)
-        expect(callback).toHaveBeenCalledWith(100)
+        expect(callback).toHaveBeenLastCalledWith(0, 16)
 
-        // Should have requested next frame
-        expect(rafMock).toHaveBeenCalledTimes(2)
-
-        // Simulate second frame
-        rafCb?.(116.67)
+        runFrame(1016, 16)
         expect(callback).toHaveBeenCalledTimes(2)
-        expect(callback).toHaveBeenCalledWith(116.67)
+        expect(callback).toHaveBeenLastCalledWith(16, 16)
 
-        // Simulate third frame
-        rafCb?.(133.33)
+        runFrame(1050, 34)
         expect(callback).toHaveBeenCalledTimes(3)
-        expect(callback).toHaveBeenCalledWith(133.33)
+        expect(callback).toHaveBeenLastCalledWith(50, 34)
 
         cleanup()
     })
 
-    it('cancels animation frame when cleanup is called', () => {
-        const callback = vi.fn()
-        const cleanup = useAnimationFrame(callback)
+    it("schedules on Motion's update step", () => {
+        const order: string[] = []
+        const updateSpy = vi.fn(() => order.push('update'))
+        const renderSpy = vi.fn(() => order.push('render'))
 
-        // Should have scheduled frame
-        expect(rafMock).toHaveBeenCalledTimes(1)
-        const scheduledId = rafId
+        frame.update(updateSpy)
+        const cleanup = useAnimationFrame(() => order.push('animationFrame'))
+        frame.render(renderSpy)
 
-        // Cleanup should cancel the frame
+        runFrame(2000, 16)
+
+        expect(updateSpy).toHaveBeenCalledTimes(1)
+        expect(renderSpy).toHaveBeenCalledTimes(1)
+        expect(order).toEqual(['update', 'animationFrame', 'render'])
+
         cleanup()
-        expect(cancelMock).toHaveBeenCalledWith(scheduledId)
     })
 
-    it('allows already-scheduled frames to run after cleanup but does not schedule new frames', () => {
+    it('stops after cleanup', () => {
         const callback = vi.fn()
         const cleanup = useAnimationFrame(callback)
 
-        // Simulate frame
-        rafCb?.(100)
+        runFrame(3000, 16)
         expect(callback).toHaveBeenCalledTimes(1)
 
-        // Call cleanup
         cleanup()
 
-        // Clear the mock to track new calls
-        rafMock.mockClear()
+        runFrame(3016, 16)
+        runFrame(3032, 16)
+        expect(callback).toHaveBeenCalledTimes(1)
+    })
 
-        // Try to call frame callback again
-        rafCb?.(200)
+    it('cleanup inside the callback stops the loop', () => {
+        let calls = 0
+        let cleanup: () => void = () => {}
+        const callback = vi.fn(() => {
+            calls++
+            if (calls === 2) cleanup()
+        })
+        cleanup = useAnimationFrame(callback)
 
-        // Should still call the callback (since the function is already scheduled)
+        runFrame(4000, 16)
+        runFrame(4016, 16)
         expect(callback).toHaveBeenCalledTimes(2)
-        // but should not schedule new frames
-        expect(rafMock).not.toHaveBeenCalled()
+
+        runFrame(4032, 16)
+        expect(callback).toHaveBeenCalledTimes(2)
     })
 
     it('is SSR-safe (no window)', () => {
@@ -99,44 +96,18 @@ describe('utils/animationFrame - useAnimationFrame', () => {
         const callback = vi.fn()
 
         // In SSR, this should not throw and should return a noop cleanup
-        let cleanup: () => void
+        let cleanup: () => void = () => {}
         expect(() => {
             cleanup = useAnimationFrame(callback)
         }).not.toThrow()
 
-        // No frames should be requested in SSR
-        expect(rafMock).not.toHaveBeenCalled()
+        vi.unstubAllGlobals()
+
+        // Nothing was scheduled on the frameloop
+        runFrame(5000, 16)
         expect(callback).not.toHaveBeenCalled()
 
         // Cleanup should also not throw
-        expect(() => {
-            cleanup!()
-        }).not.toThrow()
-
-        vi.unstubAllGlobals()
-    })
-
-    it('allows callback to manipulate DOM elements', () => {
-        const element: HTMLDivElement | null = document.createElement('div')
-
-        const cleanup = useAnimationFrame((t) => {
-            if (!element) return
-            const rotate = Math.sin(t / 10000) * 200
-            const y = (1 + Math.sin(t / 1000)) * -50
-            element.style.transform = `translateY(${y}px) rotateX(${rotate}deg) rotateY(${rotate}deg)`
-        })
-
-        expect(element).toBeTruthy()
-        expect(element.style.transform).toBe('')
-
-        // Simulate frame
-        rafCb?.(1000)
-
-        // Transform should be set
-        expect(element.style.transform).toMatch(
-            /translateY\(.+px\) rotateX\(.+deg\) rotateY\(.+deg\)/
-        )
-
-        cleanup()
+        expect(() => cleanup()).not.toThrow()
     })
 })

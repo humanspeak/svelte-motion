@@ -604,6 +604,22 @@
                         Reorder click after drag (#2682)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/wrap-axis-x') + searchParams}
+                    >
+                        Reorder wrapping axis="x" group, no stray translateY (#2255)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/keyboard') + searchParams}
+                    >
+                        Reorder keyboard (Space / arrows / Escape, #2658)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
@@ -759,6 +775,14 @@
                         href={resolve('/tests/drag/css-variable-origin') + searchParams}
                     >
                         Drag: start from a var() / % motion value
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/disable-from-ondrag') + searchParams}
+                    >
+                        Drag: turn drag off from onDrag (#2248)
                     </a>
                 </li>
                 <li>
@@ -980,6 +1004,22 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/scale-handoff') + searchParams}
+                    >
+                        layoutId — shared element animating scale never overshoots (#2284)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/takeover-initial') + searchParams}
+                    >
+                        layoutId — a takeover doesn't replay its initial entrance (#2362)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout/scroll') + searchParams}
                     >
                         layoutScroll — single container
@@ -1122,6 +1162,14 @@
                         href={resolve('/tests/inView') + searchParams}
                     >
                         useInView
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/inView/element-after-mount') + searchParams}
+                    >
+                        useInView: element rendered after mount
                     </a>
                 </li>
                 <li>
