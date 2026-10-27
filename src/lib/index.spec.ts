@@ -1,5 +1,6 @@
 import { createEffect as createEffectCore, MotionValueState as MotionValueStateCore } from 'motion'
 import { describe, expect, it } from 'vitest'
+import { MOTION_EXPORTS_NOT_REEXPORTED } from './__tests__/motionExportAllowlist.js'
 import {
     animate,
     AnimatePresence,
@@ -61,6 +62,23 @@ import {
 } from './index.js'
 
 describe('public API: index.ts', () => {
+    it('re-exports or deliberately skips every runtime export of motion', async () => {
+        const motionExports = Object.keys(await import('motion')).sort()
+        const ours = (await import('./index.js')) as Record<string, unknown>
+        const unaccounted = motionExports.filter(
+            (name) => !(name in ours) && !MOTION_EXPORTS_NOT_REEXPORTED.has(name)
+        )
+        expect(unaccounted, 'motion exports that are neither re-exported nor allowlisted').toEqual(
+            []
+        )
+        const stale = [...MOTION_EXPORTS_NOT_REEXPORTED].filter(
+            (name) => !motionExports.includes(name) || name in ours
+        )
+        expect(
+            stale,
+            'allowlist entries motion no longer exports, or that we now re-export'
+        ).toEqual([])
+    })
     it('exports MotionConfig coordinate transform types', () => {
         const transformPagePoint: MotionTransformPoint = ({ x, y }) => ({ x: x * 2, y: y * 2 })
         const config: MotionConfigProps = { transformPagePoint }
