@@ -620,6 +620,14 @@
                         Reorder keyboard (Space / arrows / Escape, #2658)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/ref-constraints-scroll') + searchParams}
+                    >
+                        Reorder: ref dragConstraints in a scrolled layoutScroll group (#2024)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
