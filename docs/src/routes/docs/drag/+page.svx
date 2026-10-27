@@ -4,10 +4,10 @@ description: Make any element draggable with physics-based constraints, momentum
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte'
-  import DragExample from '$lib/examples/DragExample.svelte'
-  import DragConstraintsExample from '$lib/examples/DragConstraintsExample.svelte'
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte'
+  import DragExample from '#lib/examples/DragExample.svelte'
+  import DragConstraintsExample from '#lib/examples/DragConstraintsExample.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

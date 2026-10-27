@@ -4,9 +4,9 @@ description: Drop-in animated replacement for the shadcn Button component
 ---
 
 <script>
-  import { Button } from '$lib/shadcn/ui/button'
-  import ComponentSource from '$lib/components/general/ComponentSource.svelte'
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import { Button } from '#lib/shadcn/ui/button/index.js'
+  import ComponentSource from '#lib/components/general/ComponentSource.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
   import { Download, Heart, Star, Zap, Send, Settings, Trash2, ExternalLink } from '@lucide/svelte'
 
   const { data } = $props()

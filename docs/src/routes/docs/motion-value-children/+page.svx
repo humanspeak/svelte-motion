@@ -4,9 +4,9 @@ description: 'Render MotionValue<number | string> values as live text children.'
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import MotionValueChildrenExample from '$lib/examples/motion-value-children/demos/Default.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import MotionValueChildrenExample from '#lib/examples/motion-value-children/demos/Default.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

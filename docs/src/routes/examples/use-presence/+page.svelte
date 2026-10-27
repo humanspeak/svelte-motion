@@ -6,11 +6,11 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Layers, ScanEye, Timer } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import OwnedGroup from '$lib/examples/use-presence/demos/OwnedGroup.svelte'
-    import UsePresenceDefault from '$lib/examples/use-presence/demos/Default.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import OwnedGroup from '#lib/examples/use-presence/demos/OwnedGroup.svelte'
+    import UsePresenceDefault from '#lib/examples/use-presence/demos/Default.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

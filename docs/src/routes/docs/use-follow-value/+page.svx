@@ -4,9 +4,9 @@ description: Create a MotionValue that animates to its latest value using any tr
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import UseFollowValueExample from '$lib/examples/use-follow-value/demos/Default.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import UseFollowValueExample from '#lib/examples/use-follow-value/demos/Default.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

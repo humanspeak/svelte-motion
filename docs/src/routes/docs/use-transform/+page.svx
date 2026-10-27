@@ -4,9 +4,9 @@ description: "Create a MotionValue that maps another motion value across input/o
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import HTMLContent from '$lib/examples/html-content/demos/Default.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import HTMLContent from '#lib/examples/html-content/demos/Default.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

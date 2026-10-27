@@ -4,9 +4,9 @@ description: "A helper for creating CSS style strings with automatic unit handli
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import StyleStringExample from '$lib/examples/style-string/demos/Default.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import StyleStringExample from '#lib/examples/style-string/demos/Default.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

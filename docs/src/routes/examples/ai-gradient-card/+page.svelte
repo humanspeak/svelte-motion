@@ -6,10 +6,10 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Aperture, ExternalLink, RotateCw, Sparkles } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import AiGradientCardDefault from '$lib/examples/ai-gradient-card/demos/Default.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import AiGradientCardDefault from '#lib/examples/ai-gradient-card/demos/Default.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

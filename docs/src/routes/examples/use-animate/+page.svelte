@@ -6,10 +6,10 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Crosshair, ListOrdered, Wand2 } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import UseAnimateDefault from '$lib/examples/use-animate/demos/Default.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import UseAnimateDefault from '#lib/examples/use-animate/demos/Default.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

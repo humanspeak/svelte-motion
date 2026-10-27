@@ -6,11 +6,11 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Hand, MonitorSmartphone, RotateCcw, Timer, Undo2 } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import ScopeMotionBreakpointStagger from '$lib/examples/scope-motion/demos/BreakpointStagger.svelte'
-    import ScopeMotionCancelReset from '$lib/examples/scope-motion/demos/CancelReset.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import ScopeMotionBreakpointStagger from '#lib/examples/scope-motion/demos/BreakpointStagger.svelte'
+    import ScopeMotionCancelReset from '#lib/examples/scope-motion/demos/CancelReset.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

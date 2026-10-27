@@ -4,9 +4,9 @@ description: Collect animations, gestures and scroll/view listeners in a scope w
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte'
-  import CancelReset from '$lib/examples/scope-motion/demos/CancelReset.svelte'
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte'
+  import CancelReset from '#lib/examples/scope-motion/demos/CancelReset.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

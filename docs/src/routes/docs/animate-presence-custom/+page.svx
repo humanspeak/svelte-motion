@@ -4,9 +4,9 @@ description: 'Pass dynamic data from AnimatePresence into exiting variants.'
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import AnimatePresenceCustomExample from '$lib/examples/animate-presence-custom/demos/Default.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import AnimatePresenceCustomExample from '#lib/examples/animate-presence-custom/demos/Default.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

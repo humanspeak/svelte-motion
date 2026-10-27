@@ -1,4 +1,4 @@
-import { env } from '$env/dynamic/public'
+import { PUBLIC_POSTHOG_HOST, PUBLIC_POSTHOG_PROJECT_TOKEN } from '$app/env/public'
 import { PostHog } from 'posthog-node'
 
 let posthogClient: PostHog | null = null
@@ -9,13 +9,13 @@ let posthogClient: PostHog | null = null
  * @returns The configured client, or null when the token or host is missing.
  */
 export function getPostHogClient(): PostHog | null {
-    if (!env.PUBLIC_POSTHOG_PROJECT_TOKEN || !env.PUBLIC_POSTHOG_HOST) {
+    if (!PUBLIC_POSTHOG_PROJECT_TOKEN || !PUBLIC_POSTHOG_HOST) {
         return null
     }
 
     if (!posthogClient) {
-        posthogClient = new PostHog(env.PUBLIC_POSTHOG_PROJECT_TOKEN, {
-            host: env.PUBLIC_POSTHOG_HOST,
+        posthogClient = new PostHog(PUBLIC_POSTHOG_PROJECT_TOKEN, {
+            host: PUBLIC_POSTHOG_HOST,
             flushAt: 1,
             flushInterval: 0
         })

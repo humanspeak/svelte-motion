@@ -1,4 +1,4 @@
-import sitemapManifest from '$lib/sitemap-manifest.json'
+import sitemapManifest from '#lib/sitemap-manifest.json'
 
 /**
  * Metadata for one example page, keyed by slug in {@link EXAMPLES}.

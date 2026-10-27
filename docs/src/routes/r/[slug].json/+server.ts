@@ -1,5 +1,5 @@
-import { registryIndex, registryItems } from '$lib/generated/registry-data'
-import { getPostHogClient } from '$lib/server/posthog'
+import { registryIndex, registryItems } from '#lib/generated/registry-data.js'
+import { getPostHogClient } from '#lib/server/posthog.js'
 import { error, json } from '@sveltejs/kit'
 import type { RequestHandler } from './$types'
 

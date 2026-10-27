@@ -6,12 +6,12 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { ArrowLeftRight, Box, ShieldCheck, Sparkles, Waves } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import CloneVsOwned from '$lib/examples/animate-presence/demos/CloneVsOwned.svelte'
-    import AnimatePresenceDefault from '$lib/examples/animate-presence/demos/Default.svelte'
-    import OwnedChildMotion from '$lib/examples/animate-presence/demos/OwnedChildMotion.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import CloneVsOwned from '#lib/examples/animate-presence/demos/CloneVsOwned.svelte'
+    import AnimatePresenceDefault from '#lib/examples/animate-presence/demos/Default.svelte'
+    import OwnedChildMotion from '#lib/examples/animate-presence/demos/OwnedChildMotion.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

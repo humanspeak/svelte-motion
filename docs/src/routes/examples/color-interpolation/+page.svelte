@@ -6,10 +6,10 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Palette, Route, Sparkles } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import ColorInterpolationDefault from '$lib/examples/color-interpolation/demos/Default.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import ColorInterpolationDefault from '#lib/examples/color-interpolation/demos/Default.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

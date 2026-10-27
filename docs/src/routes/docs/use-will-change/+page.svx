@@ -4,9 +4,9 @@ description: 'Auto-managed CSS will-change that starts at auto and latches to tr
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import UseWillChangeExample from '$lib/examples/use-will-change/demos/Default.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import UseWillChangeExample from '#lib/examples/use-will-change/demos/Default.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

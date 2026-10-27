@@ -18,14 +18,14 @@
         ScrollText,
         Zap
     } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import ReorderDefault from '$lib/examples/reorder/demos/Default.svelte'
-    import ReorderAutoAxisRtl from '$lib/examples/reorder/demos/AutoAxisRtl.svelte'
-    import ReorderGrid from '$lib/examples/reorder/demos/Grid.svelte'
-    import ReorderKeyboard from '$lib/examples/reorder/demos/Keyboard.svelte'
-    import ReorderScrollable from '$lib/examples/reorder/demos/Scrollable.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import ReorderDefault from '#lib/examples/reorder/demos/Default.svelte'
+    import ReorderAutoAxisRtl from '#lib/examples/reorder/demos/AutoAxisRtl.svelte'
+    import ReorderGrid from '#lib/examples/reorder/demos/Grid.svelte'
+    import ReorderKeyboard from '#lib/examples/reorder/demos/Keyboard.svelte'
+    import ReorderScrollable from '#lib/examples/reorder/demos/Scrollable.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

@@ -4,9 +4,9 @@ description: "Create scroll-linked animations like progress indicators and paral
 ---
 
 <script>
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-  import Example from '$lib/components/general/Example.svelte'
-  import ScrollProgressExample from '$lib/examples/scroll-progress/demos/Default.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+  import Example from '#lib/components/general/Example.svelte'
+  import ScrollProgressExample from '#lib/examples/scroll-progress/demos/Default.svelte'
 
   const seo = getSeoContext()
   if (seo) {
