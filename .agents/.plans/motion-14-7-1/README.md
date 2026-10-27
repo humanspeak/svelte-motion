@@ -48,7 +48,8 @@ any port work and the gate. Tests that cannot go red on 14.6.0 are kept as guard
 - **Wave 3**: 007 (after 006, same lane); 011 (after 010, same lane — merge `feat/motion-14.7.1` into the lane first
   so it starts with 004, 006, 007 and 008 merged); 012 (after 007 and 008).
 - **Wave 4** (after Phase B, with 001 and 008 merged into `feat/motion-14.7.1`): 013, in its own lane off
-  `feat/motion-14.7.1`; 014 (after 009 merges), in its own lane.
+  `feat/motion-14.7.1`; 014 (after 009 merges), in its own lane (`exports`, merges back last after merging
+  `feat/motion-14.7.1` into the lane and re-running its gate).
 
 ## Status
 
@@ -67,6 +68,7 @@ any port work and the gate. Tests that cannot go red on 14.6.0 are kept as guard
 | [011](011-m-without-lazy-motion-features.md) | SPIKE: featureless `m` outside LazyMotion and while an async bundle loads; red `test.fail()` specs, prototypes A/B on a throwaway branch, report | 3 | P2 | M (spike) | 010 | on the lane: `__tests__/FeaturelessMProbe.svelte`, `featurelessM.spec.ts`, `tests/lazy-motion/featureless-m` + e2e, consumer-vite6 `FeaturelessSsr.svelte` + `verify.mjs`, report; prototypes in `src/lib` on the throwaway branch only | TODO |
 | [012](012-presence-exit-shared-layout-relegate.md) | SPIKE: exiting `layoutId` children take part in shared layout (relegate); prototypes on a throwaway branch + report | 3 | P1 | M (spike) | 006, 007, 008 | red `test.fail()` specs on the lane; prototypes on a throwaway branch (`presence.ts`, `PresenceChild.svelte`, projection adapter) | TODO |
 | [013](013-layout-transform-origin-at-rest.md) | `layout` elements at rest keep the default `transform-origin` (no `0 0`, no `will-change`); 008's pin removed | 4 | P2 | S | 001, 008 | `layout.ts` (`setCompositorHints`) + spec, `_MotionContainer.svelte` (import :65, :2524, cleanup :2769-2771) + spec (:526-548), `tests/layout/transform-origin-at-rest` + e2e, `+page.svelte` link, `tests/animate-presence/pop-layout-container-move` (pin only), changeset | TODO |
+| [014](014-reexport-missing-motion-api.md) | Re-export Motion's public API we still hide (`createScopedAnimate`, `animateMini`, `inertia`, `keyframes`, `resolveElements`) + types; allowlist bucketed | 4 | P2 | M | 009 | `index.ts` (two blocks), `index.spec.ts`, export allowlist, new `motionReexports.ts` + spec, `animateValue.ts` + spec, `animate.svelte.ts` (import only), `tests/motion-reexports` + e2e, `+page.svelte` link, consumer `verify-tree-shaking.mjs`, docs `create-scoped-animate` + `inertia` + examples, `api-reference`, `docsNav.ts`, `examplesIndex.ts`, changeset | TODO |
 
 Every plan adds its own `.changeset/*.md`, except 002 and 005: their fixes arrive with the bump, so 001's changeset lists them. Most plans add links to
 `src/routes/+page.svelte` (expected merge conflicts: keep all links).
@@ -87,6 +89,7 @@ Status values: TODO | IN PROGRESS | PHASE A RED | DONE | BLOCKED (reason) | REJE
 | animate | `lane/1471-animate` in `../svelte-motion-1471-animate` | 009 | 4219 |
 | lazy | `lane/1471-lazy` off `feat/motion-14.7.1` after 001 | 010 → 011 | 4220 |
 | origin | `lane/1471-origin` off `feat/motion-14.7.1` after 001 and 008 are merged | 013 | 4221 |
+| exports | `lane/1471-exports` off `feat/motion-14.7.1` after 009 is merged | 014 | 4222 |
 
 **Lane rules** (they override any per-plan wording):
 
@@ -119,19 +122,24 @@ Status values: TODO | IN PROGRESS | PHASE A RED | DONE | BLOCKED (reason) | REJE
   the `transform-origin: 50% 50% !important` pin and its comment.
 - **`tests/consumer-vite6/verify.mjs`**: 010 (SSR checks for `./m`) and 011 (featureless SSR) — same lane, serial.
 - **009's export tripwire** (`index.spec.ts` + allowlist): a later plan that re-exports a `motion` runtime name must
-  update the allowlist.
+  update the allowlist. 014 de-lists five names, regroups the rest by bucket (`[b]`/`[c]`/`[d]`) and adds
+  `MOTION_PUBLIC_REEXPORTS` / `MOTION_EXPORTS_PENDING_SVELTE_ADAPTATION`.
+- **`src/lib/index.ts`**: 009 (timeline types after `animate`), 010 (`m`/`Reorder`), 014 (two blocks after 009's).
+- **`tests/consumer-vite6/verify-tree-shaking.mjs`**: 010 and 014 (check 5 names + new check 6) — keep both.
 - **`src/lib/types.ts`**: 004 (`MotionInitial` :84, `MotionAnimate` :197-208) and 007 (layout props :720-786) —
   disjoint.
 - **`package.json`**: 001 (pins) and 010 (`exports`) — 010 depends on 001.
 - **`visualElementCore.spec.ts`**: 002 (new describe) and 001's optional Step 6 — skip 001 Step 6 if it conflicts.
-- **`docs/src/lib/docsNav.ts`**: 004 and 007 add entries — keep both.
+- **`docs/src/lib/docsNav.ts`**: 004, 007 and 014 add entries — keep all.
+- **`docs/src/lib/examplesIndex.ts`**: 007 and 014 add entries — keep both.
 - **`src/lib/html/_MotionContainer.ssr.spec.ts`**: 004 and 011 — serialized by the merge order (004 first). Note this
   spec is a jsdom client render; true server-render cases go in a separate `// @vitest-environment node` spec.
 
 ## Dependency notes
 
 - **013 → 001, 008**: its e2e baseline is the 14.7.1 suite, and it removes the pin that 008's page added.
-- **014 → 009**: it extends 009's export tripwire and allowlist.
+- **014 → 009**: it extends 009's export tripwire and allowlist, and types `createScopedAnimate` with 009's
+  `Timeline`-returning `SvelteMotionAnimate`.
 - **Phase B of 002/003/004/005/009 → 001**: the fixes, `transition.out` and `Timeline` ship in motion-dom/framer-motion
   14.7.1. 003's `scrollXLength` port works on 14.6.0 (framer-motion 14.6.0 already computes `scrollLength`); only its
   #2546 horizontal case waits.
