@@ -162,4 +162,17 @@ if (surface.code.includes(CONTAINER_MARKER) || hasTag(surface.code, 'div')) {
     )
 }
 
+// 6. The `./m` entry (#2232) bundles through the exports map and exports
+// exactly `m` and its LazyMotion-aware `Reorder`. Upstream's
+// `Reorder/__tests__/tree-shaking.test.ts` also asserts the `m` Reorder bundle
+// has none of the domMax canaries; that is not ported: svelte-motion's
+// feature bundles are boolean flags over code `_MotionContainer.svelte` always
+// imports (projection, drag and pan), so every feature is bundled regardless.
+const mEntry = await bundle(`export { m, Reorder } from '${PKG}/m'`)
+assert.deepEqual(
+    [...mEntry.exports].sort(),
+    ['Reorder', 'm'],
+    `the ./m entry should export exactly Reorder and m, got: ${mEntry.exports.join(', ')}`
+)
+
 console.log('Tree-shaking consumer checks passed.')
