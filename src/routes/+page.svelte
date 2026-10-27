@@ -788,6 +788,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/flick-from-standstill') + searchParams}
+                    >
+                        Drag: fast flick from a standstill keeps its velocity (#1747)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/mobile-drawer') + searchParams}
                     >
                         Drag Close Drawer (mobile drawer)
