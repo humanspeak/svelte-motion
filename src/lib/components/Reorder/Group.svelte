@@ -33,6 +33,7 @@
         style,
         onpointerdowncapture,
         onclickcapture,
+        __motionKind: kind = 'motion',
         ref = $bindable(),
         ...rest
     }: ReorderGroupProps<V> = $props()
@@ -101,6 +102,10 @@
     setReorderContext<V>({
         get axis() {
             return axis
+        },
+        // The group's kind is fixed by its entry (`$lib/reorder` or `$lib/m`).
+        get kind() {
+            return kind
         },
         registerItem: (value, layout) => {
             itemLayouts.set(value, layout)
@@ -233,10 +238,18 @@
     )
 </script>
 
+<!--
+    `__motionKind` / `ignoreStrict`: the `m` entry's group renders an `m`
+    component; the main one renders `motion` and, inside
+    `<LazyMotion strict>`, warns once instead of throwing (Motion 14.7.1
+    `Reorder/Group.tsx` `ignoreStrict`, #2094).
+-->
 <MotionContainer
     bind:ref
     tag={as}
     {...rest}
+    __motionKind={kind}
+    ignoreStrict={kind === 'motion'}
     onpointerdowncapture={handlePointerDownCapture}
     onclickcapture={handleClickCapture}
     style={groupStyle}

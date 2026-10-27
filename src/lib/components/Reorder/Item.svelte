@@ -188,6 +188,8 @@
     onDragEnd={handleDragEnd}
     onLayoutMeasure={(box: LayoutMeasurePayload) => context.registerItem(value, box)}
     {motionValueChild}
+    __motionKind={context.kind}
+    ignoreStrict={context.kind === 'motion'}
 >
     {@render childSnippet?.()}
 </MotionContainer>
