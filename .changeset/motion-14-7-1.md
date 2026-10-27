@@ -9,6 +9,6 @@ Update Motion and motion-dom to 14.7.1. What arrives with the update:
 - Changing the playback speed of an accelerated transform animation no longer flashes for a frame.
 - Slow overdamped springs no longer snap to their target part-way through (#1207), and reversed long springs finish at their start.
 - `drag`: a fast flick from a standstill keeps its release velocity instead of the inertia stopping dead (#1747, `749cc1360`).
-- `drag`: ref `dragConstraints` stay correct after a `layoutScroll` ancestor scrolls, so a `Reorder.Item` no longer jumps after its group is scrolled (#2024, `cc260d322`, `cc84e31ad`, `8e2a53308`, `a04f5e6ee`).
+- `drag`: ref `dragConstraints` stay correct after a `layoutScroll` ancestor scrolls, so a `Reorder.Item` no longer jumps after its group is scrolled (#2024, `cc260d322`, `cc84e31ad`, `8e2a53308`, `a04f5e6ee`, `6e56b3883`).
 - `drag`: releasing a drag fires `onAnimationComplete` once instead of once per `animate` variant (#1831, `a280595ea`).
 - `drag`: inertia starts exactly at the release point (`ca04dba9d`).
