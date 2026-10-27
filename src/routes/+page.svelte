@@ -1135,6 +1135,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/useAnimate/timeline') + searchParams}
+                    >
+                        useAnimate — timelines (Motion 14.7)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/animation-controls') + searchParams}
                     >
                         useAnimationControls
