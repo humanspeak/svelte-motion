@@ -18,6 +18,14 @@ PR's `minor` label, which the maintainer adds. Executors never change `"version"
 > **Dispatch 2026-10-26**: executor Opus 5.5 for every plan. 001's executor stops before Step 7 (full-suite triage);
 > the dispatcher runs Step 7 after the other wave-1 lanes finish Playwright.
 
+> **Final gate 2026-10-26** on `cb63ffff` (all ten plans merged), in CONTRIBUTING.md order: build, check (0 errors),
+> package, `pnpm test` (all pass, with coverage), Vite 6 consumer, docs build, docs check (0 errors), docs test (11),
+> docs geo-seo, docs Playwright (12 passed after installing the missing Firefox build into the shared cache), full
+> e2e on 4201 (677 passed, 2 skipped, 0 failed), `trunk check` on the 66 changed files (no new issues). The docs build
+> rewrites tracked `docs/static/r/animated-tabs.json` (pre-existing); it was restored, not committed.
+> **Remaining before the PR**: the maintainer's eye test of `/tests/drag/while-drag-transforms`,
+> `/tests/reorder/keyboard` and `/tests/drag/disable-from-ondrag`.
+
 ## Parallel waves
 
 - **Wave 0** (serial, minutes): create `feat/motion-14.6.0` from `origin/main` `45a24c6e` in `../svelte-motion-1460`
