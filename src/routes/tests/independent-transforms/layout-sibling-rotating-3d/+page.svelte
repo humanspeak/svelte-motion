@@ -1,7 +1,7 @@
 <script lang="ts">
     import { LayoutGroup, motion } from '$lib'
     import { layoutMeasureStats } from '$lib/utils/motionDomProjection'
-    import { onMount } from 'svelte'
+    import { onMount, tick } from 'svelte'
     import {
         countTransformAnimations,
         exposeCountTransformAnimations
@@ -34,8 +34,11 @@
      * a new one. The new element takes over the `layoutId`, so it mounts as if
      * `initial={false}` (framer-motion `motion/index.tsx:114-122` @ `v14.7.1`;
      * ours is `layoutIdTakeover`) and would sit at its target without looping.
-     * A remounted pack (`packKey > 0`) therefore restarts its loop from 0 with
-     * explicit keyframes, `rotateY: [0, 360]`, and the same infinite transition.
+     * That also blocks a looping `animate` declared at mount
+     * (`motion-dom` `render/utils/animation-state.ts:370-376`), so a remounted
+     * pack (`packKey > 0`) mounts with a static `animate` of `rotateY: 0` and,
+     * one frame after it mounts, switches to the `rotateY: [0, 360]` loop with
+     * the same infinite transition: an ordinary `animate` change.
      */
     type Recorded = { transform: string; count: number }
     type FrameWindow = Window & {
@@ -80,13 +83,21 @@
     }
 
     /** A remounted pack restarts its loop from 0 (see the header comment). */
+    let remountLooping = $state(false)
     const packAnimate = $derived(
-        isSpinning ? { rotateY: packKey > 0 ? [0, 360] : 360 } : { rotateY: 0 }
+        packKey > 0 ? { rotateY: remountLooping ? [0, 360] : 0 } : { rotateY: isSpinning ? 360 : 0 }
     )
 
+    /** Remounts the pack, then starts its loop one frame after the new element mounts. */
     const remount = () => {
+        remountLooping = false
         packKey += 1
-        watch()
+        void tick().then(() =>
+            requestAnimationFrame(() => {
+                remountLooping = true
+                watch()
+            })
+        )
     }
 
     // ---- Live verdict (tester only; never under `@isPlaywright=true`) ----
@@ -140,7 +151,8 @@
         },
         {
             text: 'Click "Remount".',
-            expected: 'The card restarts its loop from the start, in place and undistorted.',
+            expected:
+                'The card mounts at rest, then a frame later restarts its loop from the start, in place and undistorted.',
             action: { label: 'Remount', run: remount }
         }
     ]

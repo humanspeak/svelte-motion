@@ -21,8 +21,9 @@ import { expect, test, type Page } from '@playwright/test'
  * Mode's remount. Here `window.remount()` re-keys the `layoutId="pack"`
  * element, which goes through svelte-motion's own `layoutId` takeover. A
  * takeover mounts as if `initial={false}` (framer-motion
- * `motion/index.tsx:114-122` @ `v14.7.1`), so the remounted pack restarts
- * its loop from 0 with explicit keyframes (`rotateY: [0, 360]`).
+ * `motion/index.tsx:114-122` @ `v14.7.1`), which blocks a loop declared at
+ * mount, so the remounted pack mounts with a static `rotateY: 0` and starts
+ * its `[0, 360]` loop one frame later.
  */
 
 type Recorded = { transform: string; count: number }
@@ -117,7 +118,8 @@ test.describe('layout measurements of a looping 3D rotation', () => {
             const pack = document.getElementById('pack')
             return pack !== null && pack !== old
         }, old)
-        // The new element restarts its loop from 0 (`rotateY: [0, 360]`).
+        // The new element mounts at `rotateY: 0` and one frame later its
+        // `animate` switches to the `[0, 360]` loop.
         await page.waitForTimeout(1300)
         expect(await countPack(page)).toBe(1)
         await expectUndistorted(page, before)
