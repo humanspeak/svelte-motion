@@ -47,6 +47,8 @@ any port work and the gate. Tests that cannot go red on 14.6.0 are kept as guard
 - **Wave 2** (after 001 is merged into `feat/motion-14.7.1`): Phase B of 002, 003, 004, 005, 009; 006; 010.
 - **Wave 3**: 007 (after 006, same lane); 011 (after 010, same lane — merge `feat/motion-14.7.1` into the lane first
   so it starts with 004, 006, 007 and 008 merged); 012 (after 007 and 008).
+- **Wave 4** (after Phase B, with 001 and 008 merged into `feat/motion-14.7.1`): 013, in its own lane off
+  `feat/motion-14.7.1`; 014 (after 009 merges), in its own lane.
 
 ## Status
 
@@ -64,6 +66,7 @@ any port work and the gate. Tests that cannot go red on 14.6.0 are kept as guard
 | [010](010-lazy-motion-m-split-reorder.md) | `motion.*` has every feature, `m.*` defers to LazyMotion, strict works, Reorder `m` entry | 2 | P2 | L | 001 | new `motionKind.ts`, `m.ts`, `reorder.ts`, `Reorder/*`, `_MotionContainer.svelte` (7-9, 150-155, ~161, 246-250), `LazyMotion*`, `package.json` (`exports`), consumer-vite6 checks, lazy-motion pages/specs, docs `lazy-motion` + `reorder` | TODO |
 | [011](011-m-without-lazy-motion-features.md) | SPIKE: featureless `m` outside LazyMotion and while an async bundle loads; red `test.fail()` specs, prototypes A/B on a throwaway branch, report | 3 | P2 | M (spike) | 010 | on the lane: `__tests__/FeaturelessMProbe.svelte`, `featurelessM.spec.ts`, `tests/lazy-motion/featureless-m` + e2e, consumer-vite6 `FeaturelessSsr.svelte` + `verify.mjs`, report; prototypes in `src/lib` on the throwaway branch only | TODO |
 | [012](012-presence-exit-shared-layout-relegate.md) | SPIKE: exiting `layoutId` children take part in shared layout (relegate); prototypes on a throwaway branch + report | 3 | P1 | M (spike) | 006, 007, 008 | red `test.fail()` specs on the lane; prototypes on a throwaway branch (`presence.ts`, `PresenceChild.svelte`, projection adapter) | TODO |
+| [013](013-layout-transform-origin-at-rest.md) | `layout` elements at rest keep the default `transform-origin` (no `0 0`, no `will-change`); 008's pin removed | 4 | P2 | S | 001, 008 | `layout.ts` (`setCompositorHints`) + spec, `_MotionContainer.svelte` (import :65, :2524, cleanup :2769-2771) + spec (:526-548), `tests/layout/transform-origin-at-rest` + e2e, `+page.svelte` link, `tests/animate-presence/pop-layout-container-move` (pin only), changeset | TODO |
 
 Every plan adds its own `.changeset/*.md`, except 002 and 005: their fixes arrive with the bump, so 001's changeset lists them. Most plans add links to
 `src/routes/+page.svelte` (expected merge conflicts: keep all links).
@@ -83,6 +86,7 @@ Status values: TODO | IN PROGRESS | PHASE A RED | DONE | BLOCKED (reason) | REJE
 | presence | `lane/1471-presence` in `../svelte-motion-1471-presence` | 008 | 4218 |
 | animate | `lane/1471-animate` in `../svelte-motion-1471-animate` | 009 | 4219 |
 | lazy | `lane/1471-lazy` off `feat/motion-14.7.1` after 001 | 010 → 011 | 4220 |
+| origin | `lane/1471-origin` off `feat/motion-14.7.1` after 001 and 008 are merged | 013 | 4221 |
 
 **Lane rules** (they override any per-plan wording):
 
@@ -97,7 +101,7 @@ Status values: TODO | IN PROGRESS | PHASE A RED | DONE | BLOCKED (reason) | REJE
 - Lanes don't edit this README. The dispatcher updates the status table on `feat/motion-14.7.1`.
 - **Merge back** into `feat/motion-14.7.1` (merge, no squash) in this order: 001 (committed there directly); 008; 002, 003, 005, 009; 004; the
   layoutid lane (006, 007); the lazy lane's 010; then 011 and 012 (each merges `feat/motion-14.7.1` into its lane
-  before starting). After the last merge run the full gate once, in CONTRIBUTING.md's "Full verification" order:
+  before starting); then 013 (after 008) and 014 (after 009), each starting from `feat/motion-14.7.1`. After the last merge run the full gate once, in CONTRIBUTING.md's "Full verification" order:
   `pnpm build`, `pnpm check`, `pnpm package`, `pnpm test`, `pnpm --filter @humanspeak/svelte-motion-consumer-vite6 test`,
   `pnpm --dir docs build`, `pnpm --dir docs check`, `pnpm --dir docs test`, `pnpm --dir docs test:geo-seo`,
   `pnpm exec playwright test --config docs/playwright.config.ts` (alone), `PW_PORT=4211 pnpm test:e2e`, and
@@ -107,10 +111,12 @@ Status values: TODO | IN PROGRESS | PHASE A RED | DONE | BLOCKED (reason) | REJE
 
 ## Shared hotspots
 
-- **`src/lib/html/_MotionContainer.svelte`**: 004 (1321-1327), 006 (775-820, 2776-2809, new effects after 2405), 007
+- **`src/lib/html/_MotionContainer.svelte`**: 013 (the `setCompositorHints` import and calls, :65, :2524, :2769-2771), 004 (1321-1327), 006 (775-820, 2776-2809, new effects after 2405), 007
   (props 211-214, `updateOptions` calls), 008 (696, 718-723), 010 (7-9, 150-155, ~161, 246-250), 011 (spike — its
   prototypes stay on a throwaway branch). The regions of 004/006/007/008/010 are disjoint.
 - **`src/lib/utils/presence.ts`**: 008, then 012 (depends on 008).
+- **`src/routes/tests/animate-presence/pop-layout-container-move/+page.svelte`**: created by 008; 013 deletes only
+  the `transform-origin: 50% 50% !important` pin and its comment.
 - **`tests/consumer-vite6/verify.mjs`**: 010 (SSR checks for `./m`) and 011 (featureless SSR) — same lane, serial.
 - **009's export tripwire** (`index.spec.ts` + allowlist): a later plan that re-exports a `motion` runtime name must
   update the allowlist.
@@ -124,6 +130,8 @@ Status values: TODO | IN PROGRESS | PHASE A RED | DONE | BLOCKED (reason) | REJE
 
 ## Dependency notes
 
+- **013 → 001, 008**: its e2e baseline is the 14.7.1 suite, and it removes the pin that 008's page added.
+- **014 → 009**: it extends 009's export tripwire and allowlist.
 - **Phase B of 002/003/004/005/009 → 001**: the fixes, `transition.out` and `Timeline` ship in motion-dom/framer-motion
   14.7.1. 003's `scrollXLength` port works on 14.6.0 (framer-motion 14.6.0 already computes `scrollLength`); only its
   #2546 horizontal case waits.
