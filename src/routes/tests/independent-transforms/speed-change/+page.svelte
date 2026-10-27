@@ -156,7 +156,7 @@
 
     const scenarios = {
         speed: async (element: Element) => {
-            const animation = animate(element, { x: 600 }, { duration: 3, ease: 'linear' })
+            const animation = animate(element, { x: [0, 600] }, { duration: 3, ease: 'linear' })
             await wait(300)
             const recording = recordFrames(element, 800)
             await wait(400)
@@ -166,7 +166,7 @@
             return judge(frames, speedSegments)
         },
         pause: async (element: Element) => {
-            const animation = animate(element, { x: 600 }, { duration: 3, ease: 'linear' })
+            const animation = animate(element, { x: [0, 600] }, { duration: 3, ease: 'linear' })
             await wait(300)
             const recording = recordFrames(element, 1000)
             await wait(300)
@@ -178,7 +178,7 @@
             return judge(frames, pauseSegments)
         },
         pauseSpeed: async (element: Element) => {
-            const animation = animate(element, { x: 600 }, { duration: 3, ease: 'linear' })
+            const animation = animate(element, { x: [0, 600] }, { duration: 3, ease: 'linear' })
             await wait(200)
             animation.pause()
             await wait(100)
@@ -217,7 +217,7 @@
         {
             text: 'Run "Speed ×2".',
             expected:
-                'Both boxes slide right; 0.7 s in they speed up, with no flicker back to the left edge.',
+                'Both boxes slide right; 0.7 s in they speed up, with no flicker back to the left edge. Check the flicker by eye: the verdict reads the main-thread value and can’t see a compositor flash (e2e/independent-transforms/speed-change.spec.ts checks it automatically with a screencast).',
             action: { label: 'Speed ×2', run: () => run('speed') }
         },
         {
@@ -270,8 +270,8 @@
     {#snippet checks()}
         <p>
             The top box is a plain <code>div</code>, the bottom one a <code>motion.div</code>. Each
-            action runs <code>animate(box, &#123; x: 600 &#125;)</code> over 3 s on the compositor and
-            then changes its speed or pauses it, recording the box after every Motion frame.
+            action runs <code>animate(box, &#123; x: [0, 600] &#125;)</code> over 3 s on the compositor
+            and then changes its speed or pauses it, recording the box after every Motion frame.
         </p>
         <p>
             A verdict is <code>STEADY ✓</code> when every frame moved at the expected speed (within
