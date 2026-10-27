@@ -691,3 +691,29 @@ in-scope files.
 - Reviewers: check the microtask ordering argument (our `applyPop` runs in `$effect.pre`, so its `read` callback
   is queued before any `didUpdate` from the same flush), and that `child.lastPopLayoutSnapshot` is never mutated
   by the correction.
+
+## Amendments (operator-approved 2026-10-27)
+
+### A1: Step 4 snapshot ordering (match upstream)
+
+Step 4's verify failed: `PresenceChild`'s `$effect.pre` calls `applyPop()`, which inserts the pop rule *before* the
+descendant motion element's own `$effect.pre` (`_MotionContainer.svelte:2187-2209`) takes its projection snapshot
+(`measureLayoutRect('snapshot')` + `projection.willUpdate()`). The snapshot therefore records the already-popped,
+displaced box and the layout animation runs from +70px back to 0.
+
+Upstream measures first and pops second: `getSnapshotBeforeUpdate` (`PresenceChild/PopChild.tsx` @v14.7.1) measures,
+then the pop rule goes in during `useInsertionEffect`. Match that order:
+
+1. Defer the pop-rule insertion in `applyPop` until after every descendant's pre-effect snapshot for the same flush
+   has run (e.g. queue it to run after the descendants' `$effect.pre`, using the existing microtask/frame
+   scheduling in `presence.ts`), so the snapshot sees the in-flow rect. Cite the upstream lines you mirror.
+2. Keep the change inside 008's files (`presence.ts`, `PresenceChild.svelte`, their specs). If the only working
+   fix needs `_MotionContainer.svelte`, STOP and report what and why.
+3. Add a unit test: the descendant snapshot is taken before the pop rule is inserted (fails with the old order).
+4. Re-run the Step 4 verify. Also explain the scrollable-element clamp failure (about 1402px off on both paths).
+   Fix it if the cause is in scope; otherwise report it with evidence before you continue.
+5. The two previously passing owned cases ("static, anchorY: bottom" and "item added in the same render") must
+   pass again.
+
+Keep the `transform-origin: 50% 50% !important` pin on the test page for now, with a comment pointing to plan 013,
+which owns the `setCompositorHints` resting `transform-origin: 0 0` divergence.
