@@ -59,6 +59,42 @@ test.describe('useTransform scroll acceleration', () => {
         ])
     })
 
+    test('a scroll-linked backgroundColor updates in JS, not as a native ScrollTimeline animation (Motion 14.7)', async ({
+        page
+    }) => {
+        // Upstream f9e080f21 removed backgroundColor from acceleratedValues, and
+        // a value with an accelerate config only gets a native animation when
+        // `value.accelerate && acceleratedValues.has(key)`
+        // (motion-dom/src/render/VisualElement.ts:557-563 @v14.7.1).
+        await page.goto(URL)
+        const supported = await page.evaluate(() => 'ScrollTimeline' in window)
+        test.skip(!supported, 'ScrollTimeline not supported')
+
+        const scrollTimelineProps = () =>
+            page.getByTestId('direct').evaluate((el) =>
+                el
+                    .getAnimations()
+                    .filter((a) => a.timeline?.constructor?.name === 'ScrollTimeline')
+                    .flatMap((a) =>
+                        ((a.effect as KeyframeEffect | null)?.getKeyframes() ?? []).flatMap((f) =>
+                            Object.keys(f)
+                        )
+                    )
+            )
+
+        // Guard: acceleration is live (opacity runs natively on `direct`).
+        await expect.poll(scrollTimelineProps).toContain('opacity')
+        const props = await scrollTimelineProps()
+        expect(props).not.toContain('backgroundColor')
+        expect(props).not.toContain('background-color')
+
+        // The colour still follows the scroll, in JS.
+        const background = () =>
+            page.getByTestId('direct').evaluate((el) => getComputedStyle(el).backgroundColor)
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+        await expect.poll(background).not.toBe('rgb(255, 0, 0)')
+    })
+
     test('no page errors across load and a full scroll', async ({ page }) => {
         const errors: Error[] = []
         page.on('pageerror', (error) => errors.push(error))

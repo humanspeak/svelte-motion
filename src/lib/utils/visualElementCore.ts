@@ -444,7 +444,7 @@ interface PanGestureProps {
 /**
  * Defer a pan callback to Motion's `update` step.
  *
- * Port of `framer-motion/src/gestures/pan/index.ts:12-17` (v14.5.0).
+ * Port of `packages/framer-motion/src/gestures/pan/index.ts:11-16 @v14.7.1`.
  * `PanSession` only ever delivers pointer events, but types its handlers with
  * `Event`, hence the narrowing cast.
  *
@@ -460,28 +460,10 @@ const asyncPanHandler =
     }
 
 /**
- * Resolve the window a VisualElement's element lives in.
- *
- * Port of `framer-motion/src/utils/get-context-window.ts` (v14.5.0).
- *
- * @param node The VisualElement.
- * @returns The element's `defaultView`, or `null` before mount.
- *
- * @example
- * ```ts
- * getContextWindow(visualElement) // → the element's window once mounted
- * ```
- */
-export const getContextWindow = ({
-    current
-}: VisualElement<Element>): (Window & typeof globalThis) | null =>
-    current ? current.ownerDocument.defaultView : null
-
-/**
  * The pan feature: reports `onPanSessionStart`/`onPanStart`/`onPan`/`onPanEnd`
  * from motion-dom's `PanSession`.
  *
- * Port of `framer-motion/src/gestures/pan/index.ts` (v14.5.0). Registered by
+ * Port of `framer-motion/src/gestures/pan/index.ts` (v14.7.1). Registered by
  * {@link registerMotionFeatures}; enabled by {@link isPanFeatureEnabled}. Like
  * upstream it runs alongside the drag feature when both are enabled.
  *
@@ -511,7 +493,8 @@ export class PanGestureFeature extends Feature<Element> {
         this.session = new PanSession(pointerDownEvent, this.createPanHandlers(), {
             // motion-dom types the getter's return as `any`.
             transformPagePoint: this.node.getTransformPagePoint() as PanTransformPagePoint,
-            contextWindow: getContextWindow(this.node)
+            // Fixes https://github.com/motiondivision/motion/issues/2270
+            contextWindow: this.node.current?.ownerDocument.defaultView
         })
     }
 
@@ -575,7 +558,7 @@ export class PanGestureFeature extends Feature<Element> {
      */
     update(): void {
         this.attachListener()
-        this.session && this.session.updateHandlers(this.createPanHandlers())
+        this.session?.updateHandlers(this.createPanHandlers())
     }
 
     /**
@@ -586,7 +569,7 @@ export class PanGestureFeature extends Feature<Element> {
     unmount(): void {
         this.removePointerDownListener?.()
         this.removePointerDownListener = null
-        this.session && this.session.end()
+        this.session?.end()
     }
 }
 

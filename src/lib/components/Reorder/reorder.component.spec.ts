@@ -210,6 +210,8 @@ describe('Reorder.Group / Reorder.Item', () => {
             clientY: 10,
             pointerId: 23
         })
+        // Upstream #1747 / 749cc1360: PanSession stamps the origin with time.now().
+        await flushFrame(16)
         dispatchMousePointer(window, 'pointermove', {
             clientX: 70,
             clientY: 10,
@@ -280,6 +282,8 @@ describe('Reorder.Group / Reorder.Item', () => {
             clientY: 10,
             pointerId: 24
         })
+        // Upstream #1747 / 749cc1360: PanSession stamps the origin with time.now().
+        await flushFrame(16)
         dispatchMousePointer(window, 'pointermove', {
             clientX: 150,
             clientY: 10,
@@ -647,6 +651,8 @@ describe('Reorder click after drag', () => {
             pointerId,
             bubbles: true
         })
+        // Upstream #1747 / 749cc1360: PanSession stamps the origin with time.now().
+        await flushFrame(16)
         dispatchMousePointer(window, 'pointermove', {
             clientX: 50 + dx,
             clientY: 25 + dy,
