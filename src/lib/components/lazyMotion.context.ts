@@ -9,7 +9,11 @@ export type LazyMotionContext = {
     getFeatures: () => FeatureBundle
     /** Returns whether an async bundle has finished loading. */
     getIsLoaded: () => boolean
-    /** Enables Framer Motion-style strict lazy usage checks. */
+    /**
+     * Strict LazyMotion usage checks. In development, rendering a `motion`
+     * component inside throws; render `m` components instead (Reorder: import
+     * it from `@humanspeak/svelte-motion/m`).
+     */
     strict: boolean
 }
 

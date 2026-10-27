@@ -61,6 +61,14 @@ describe('withMotionKind', () => {
         target.remove()
     })
 
+    it('never renders the injected kind prop as a DOM attribute', () => {
+        render(MDiv, { props: { 'data-testid': 'box' } })
+        const box = screen.getByTestId('box')
+
+        expect(box.hasAttribute(MOTION_KIND_PROP)).toBe(false)
+        expect(box.outerHTML).not.toContain(MOTION_KIND_PROP)
+    })
+
     it('reports injected keys through every Proxy trap', () => {
         let received: Record<PropertyKey, unknown> | undefined
         const Probe = (_anchor: unknown, props: Record<PropertyKey, unknown>) => {

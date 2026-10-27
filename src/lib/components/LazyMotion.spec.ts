@@ -1,5 +1,6 @@
 import { domAnimation, domMax, domMin } from '$lib'
 import { flushTimers } from '$lib/__tests__/flushTimers'
+import { resetWarnOnceForTests } from '$lib/utils/motionKind'
 import { render, screen } from '@testing-library/svelte'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LazyMotionKindProbe from './__tests__/LazyMotionKindProbe.svelte'
@@ -11,6 +12,7 @@ vi.mock('motion', () => {
 })
 
 beforeEach(() => {
+    resetWarnOnceForTests()
     vi.useFakeTimers()
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
         setTimeout(() => cb(0), 0)
@@ -127,7 +129,10 @@ describe('LazyMotion.svelte', () => {
         expect(message).toContain(
             'You have rendered a `motion` component within a `LazyMotion` component'
         )
-        expect(message.endsWith('https://motion.dev/troubleshooting/lazy-strict-mode')).toBe(true)
+        // Svelte's dev build appends the component stack after a blank line.
+        expect(
+            message.split('\n')[0].endsWith('https://motion.dev/troubleshooting/lazy-strict-mode')
+        ).toBe(true)
     })
 
     it('m components render inside LazyMotion strict without warnings', async () => {
