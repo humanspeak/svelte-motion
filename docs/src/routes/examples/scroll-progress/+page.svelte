@@ -10,6 +10,7 @@
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
     import ScrollProgressDefault from '$lib/examples/scroll-progress/demos/Default.svelte'
+    import ScrollProgressRemaining from '$lib/examples/scroll-progress/demos/Remaining.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
@@ -46,6 +47,18 @@
             notes: defaultNotes,
             barCells: [{ k: 'pattern', v: 'useScroll + useSpring' }],
             sourceUrl: `${SOURCE_URL}scroll-progress/demos/Default.svelte`
+        },
+        {
+            figId: 'FIG-002',
+            tag: 'SCROLL',
+            title: { prefix: 'distance to the ', accent: 'end', end: '.' },
+            description:
+                "`useScroll` also returns `scrollYLength`, the container's maximum scroll offset. Subtract `scrollY` from it to show how many pixels are left to scroll.",
+            snippet: remainingSection,
+            codeSnippet: remainingCode,
+            notes: remainingNotes,
+            barCells: [{ k: 'pattern', v: 'scrollYLength − scrollY' }],
+            sourceUrl: `${SOURCE_URL}scroll-progress/demos/Remaining.svelte`
         }
     ]
 </script>
@@ -88,6 +101,51 @@
                 'scroll-progress/demos/Default.svelte',
                 'scroll-progress-default',
                 'Default.svelte'
+            )
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#snippet remainingSection()}
+    <ScrollProgressRemaining />
+{/snippet}
+{#snippet remainingNotes()}
+    <ul>
+        <li>
+            <MoveVertical />
+            <span>
+                <code>scrollYLength</code> is the maximum scroll offset (<code
+                    >scrollHeight − clientHeight</code
+                >
+                for a container), so <code>scrollYLength.current − scrollY.current</code> is the
+                distance left to scroll. <code>scrollXLength</code> does the same horizontally.
+            </span>
+        </li>
+        <li>
+            <Gauge />
+            <span>
+                The lengths are recomputed when the container resizes and on the next scroll, or on
+                any content size change with <code>trackContentSize: true</code>, so the readout
+                stays right without measuring the DOM yourself.
+            </span>
+        </li>
+        <li>
+            <Waves />
+            <span>
+                The lengths always update in JavaScript. Only <code>scrollXProgress</code> /
+                <code>scrollYProgress</code> can run on a native scroll timeline.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet remainingCode()}
+    <CodeReferenceV2
+        samples={[
+            demoCodeSample(
+                'scroll-progress/demos/Remaining.svelte',
+                'scroll-progress-remaining',
+                'Remaining.svelte'
             )
         ]}
         columns={1}

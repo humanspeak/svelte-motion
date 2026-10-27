@@ -434,3 +434,27 @@ failing spec alone once and say so), `trunk check` on changed files, and `git st
   delete the test.
 - Upstream's fixture uses named offsets. A follow-up could add a native-path variant to prove ViewTimeline tracks
   horizontally too. It was left out because native timelines were already per-axis before #2546.
+
+## Amendments (operator-approved 2026-10-27)
+
+### A1: forward the remaining scroll options, as upstream does
+
+Upstream `useScroll` spreads `...options` into `scroll()` (`packages/framer-motion/src/value/use-scroll.ts:63-64, 96,
+138` @v14.7.1; `UseScrollOptions extends Omit<ScrollInfoOptions, "container" | "target">`, `:20`). That includes
+`trackContentSize` (`render/dom/scroll/types.ts:63-70`, present since v12.29.0). Ours passes only `container`,
+`target`, `offset` and `axis` (`src/lib/utils/scroll.svelte.ts:268-273`).
+
+1. Write this red first: `useScroll({ container, trackContentSize: true })` updates `scrollYLength` after a
+   content-only resize, with no scroll event.
+2. Add `trackContentSize?: boolean` to `UseScrollOptions`, with JSDoc copied from upstream. Forward it, and any
+   other `ScrollInfoOptions` field we don't already pass, to `scroll()`. Check that the accelerated (ViewTimeline)
+   path is unaffected, as upstream's `canAccelerateScroll` check is.
+3. Update the three docs spots from `db2d3dd8` to say: lengths update when the container resizes and on the next
+   scroll, or on any content size change with `trackContentSize: true`. Document the option on the useScroll
+   docs page.
+4. Add a minor changeset line (or extend `.changeset/use-scroll-lengths.md`).
+
+### A2: accelerated readout on the #2546 reporter page
+
+Add an `accelerated` readout to the reporter page, like the other #2546 page. Assert in the spec that it is
+`false`, so the `vw` offset is proven to stay off ViewTimeline.

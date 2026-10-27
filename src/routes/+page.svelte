@@ -197,6 +197,31 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/use-scroll/scroll-length') + searchParams}
+                    >
+                        useScroll scrollXLength / scrollYLength (distance from the end)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/use-scroll/horizontal-target') + searchParams}
+                    >
+                        useScroll horizontal container + target (#2546)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/use-scroll/horizontal-target/reporter') +
+                            searchParams}
+                    >
+                        useScroll horizontal container + target (#2546) reporter page
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout-dependency') + searchParams}
                     >
                         layoutDependency
