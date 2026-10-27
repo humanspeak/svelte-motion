@@ -36,25 +36,23 @@ test.describe('optimized appear follows the mount transition (#1725)', () => {
         })
     }
 
-    test('both boxes fade in continuously at the mount transition rate', async ({ page }) => {
-        await page.addInitScript((boxes: readonly string[]) => {
-            const samples: Record<string, Array<[number, number]>> = {}
-            for (const box of boxes) samples[box] = []
-            Object.defineProperty(window, '__initialOutSamples', { value: samples })
-            const sample = () => {
-                const now = performance.now()
-                for (const box of boxes) {
-                    const element = document.querySelector(`[data-testid="${box}"]`)
-                    if (element) samples[box].push([now, Number(getComputedStyle(element).opacity)])
+    for (const box of BOXES) {
+        test(`${box}: fades in continuously at the mount transition rate`, async ({ page }) => {
+            await page.addInitScript((testId: string) => {
+                const samples: Array<[number, number]> = []
+                Object.defineProperty(window, '__initialOutSamples', { value: samples })
+                const sample = () => {
+                    const element = document.querySelector(`[data-testid="${testId}"]`)
+                    if (element) {
+                        samples.push([performance.now(), Number(getComputedStyle(element).opacity)])
+                    }
+                    requestAnimationFrame(sample)
                 }
                 requestAnimationFrame(sample)
-            }
-            requestAnimationFrame(sample)
-        }, BOXES)
+            }, box)
 
-        await page.goto(URL)
+            await page.goto(URL)
 
-        for (const box of BOXES) {
             await expect
                 .poll(
                     () =>
@@ -64,19 +62,22 @@ test.describe('optimized appear follows the mount transition (#1725)', () => {
                     { timeout: 5000, message: `${box} never reached opacity 1` }
                 )
                 .toBe('1')
-        }
 
-        const all = await page.evaluate(
-            () =>
-                (window as unknown as { __initialOutSamples: Record<string, Sample[]> })
+            // Keep sampling until 1 s past the start of the fade, so the rate
+            // check below has a sample even when the box finishes sooner.
+            await page.waitForFunction(() => {
+                const s = (window as unknown as { __initialOutSamples: Sample[] })
                     .__initialOutSamples
-        )
+                const first = s.find(([, opacity]) => opacity > 0.01)
+                return !!first && s[s.length - 1][0] >= first[0] + 1000
+            })
 
-        for (const box of BOXES) {
-            const samples = all[box]
+            const samples = await page.evaluate(
+                () => (window as unknown as { __initialOutSamples: Sample[] }).__initialOutSamples
+            )
+
             const first = samples.findIndex(([, opacity]) => opacity > 0.01)
-            expect.soft(first, `${box} started fading in`).toBeGreaterThanOrEqual(0)
-            if (first < 0) continue
+            expect(first, `${box} started fading in`).toBeGreaterThanOrEqual(0)
 
             for (let i = Math.max(1, first); i < samples.length; i++) {
                 const [prevTime, prevOpacity] = samples[i - 1]
@@ -104,8 +105,8 @@ test.describe('optimized appear follows the mount transition (#1725)', () => {
                     .soft(atOneSecond[1], `${box} opacity 1 s in (a 0.6 s fade is at 1)`)
                     .toBeLessThanOrEqual(0.75)
             }
-        }
-    })
+        })
+    }
 
     test('the appear animation ran for both boxes', async ({ page }) => {
         await page.goto(URL)
