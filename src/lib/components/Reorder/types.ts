@@ -1,4 +1,5 @@
 import type { HTMLElementProps } from '$lib/types'
+import type { MotionKind } from '$lib/utils/motionKind'
 import type { MouseEventHandler, PointerEventHandler, SvelteHTMLElements } from 'svelte/elements'
 
 /** Element tags a Reorder component can render as, via the `as` prop. */
@@ -45,6 +46,8 @@ export type ReorderGroupProps<V> = HTMLElementProps & {
      * group swallows the click that follows a reorder.
      */
     onclickcapture?: MouseEventHandler<HTMLElement> | null
+    /** @internal Set by the `m` entry's `Reorder.Group`. */
+    __motionKind?: MotionKind
 }
 
 /**

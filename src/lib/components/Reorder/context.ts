@@ -1,4 +1,5 @@
 import type { DragPoint } from '$lib/types'
+import type { MotionKind } from '$lib/utils/motionKind'
 import type { Box } from '$lib/utils/projection'
 import { getContext, setContext } from 'svelte'
 import type { ReorderAxis } from './types'
@@ -40,6 +41,11 @@ export interface ItemData<V> {
 export interface ReorderContextProps<V> {
     /** The group's reorder axis. Items drag-lock to this by default. */
     readonly axis: ReorderAxis
+    /**
+     * The group's component kind, `motion` or `m`, for its items to render —
+     * upstream `ReorderContextProps.proxy`.
+     */
+    readonly kind: MotionKind
     /**
      * Record (or refresh) an item's measured layout slot. Called from
      * the item's `onLayoutMeasure`, so entries stay current as

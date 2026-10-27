@@ -5,9 +5,14 @@ import ts from 'typescript'
 
 const declaration = path.resolve(import.meta.dirname, '../../dist/reorder.d.ts')
 assert.ok(existsSync(declaration), 'The published Reorder declaration must exist.')
+const mDeclaration = path.resolve(import.meta.dirname, '../../dist/m.d.ts')
+assert.ok(existsSync(mDeclaration), 'The published ./m entry declaration must exist.')
 
-const fixture = path.join(import.meta.dirname, 'src/reorder-types.ts')
-const program = ts.createProgram([fixture], {
+// The main Reorder and the `./m` entry's Reorder (#2232) must type the same.
+const fixtures = ['src/reorder-types.ts', 'src/reorder-m-types.ts'].map((file) =>
+    path.join(import.meta.dirname, file)
+)
+const program = ts.createProgram(fixtures, {
     strict: true,
     noEmit: true,
     target: ts.ScriptTarget.ESNext,
@@ -26,4 +31,4 @@ assert.equal(
     })
 )
 
-console.log('Published Reorder consumer type checks passed.')
+console.log('Published Reorder (main and ./m) consumer type checks passed.')

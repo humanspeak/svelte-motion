@@ -8,6 +8,14 @@
     import { getLazyMotionContext } from '$lib/components/lazyMotion.context'
     import { domMax } from '$lib/features/domMax'
     import {
+        formatLazyStrictMessage,
+        LAZY_STRICT_MESSAGE,
+        REORDER_STRICT_HINT,
+        warnOnce,
+        type MotionKind
+    } from '$lib/utils/motionKind'
+    import { BROWSER, DEV } from 'esm-env'
+    import {
         filterReducedMotionKeyframes,
         useReducedMotionConfig
     } from '$lib/utils/reducedMotionConfig.svelte'
@@ -151,6 +159,13 @@
         children?: Snippet
         motionValueChild?: MotionValueChild
         tag: keyof SvelteHTMLElements
+        /** @internal Injected by the `m` namespace; `motion` components omit it. */
+        __motionKind?: MotionKind
+        /**
+         * @internal Upstream's name: set by the main `Reorder`, so strict mode
+         * warns once instead of throwing.
+         */
+        ignoreStrict?: boolean
         [key: string]: unknown
     }
 
@@ -159,6 +174,8 @@
     let {
         children,
         motionValueChild,
+        __motionKind: motionKindProp = 'motion',
+        ignoreStrict: ignoreStrictProp = false,
         tag = 'div',
         key: keyProp,
         variants: variantsProp,
@@ -244,10 +261,26 @@
     const motionConfig = $derived(getMotionConfig())
     const effectiveTransformPagePoint = $derived(motionConfig?.transformPagePoint)
     const lazyMotion = getLazyMotionContext()
-    const activeFeatures = $derived(lazyMotion?.getFeatures() ?? domMax)
+    // `motion` preloads every feature and ignores LazyMotion; `m` defers to it
+    // (Motion 14.7.1 `render/components/{motion,m}/create.ts`).
+    const activeFeatures = $derived(
+        motionKindProp === 'm' ? (lazyMotion?.getFeatures() ?? domMax) : domMax
+    )
     const hasGestureFeatures = $derived(!!activeFeatures.gestures)
     const hasDragFeatures = $derived(!!activeFeatures.drag)
     const hasLayoutFeatures = $derived(!!activeFeatures.layout)
+    // `<LazyMotion strict>`: a `motion` component inside defeats LazyMotion, so
+    // in development it throws; the main `Reorder` (`ignoreStrict`) warns once
+    // and names the `m` entry instead (Motion 14.7.1 `motion/index.tsx`
+    // `useStrictMode`, #2094). Client-only like upstream. Upstream re-checks
+    // every render; this runs once at component init, so a `strict` flip
+    // after mount is not re-checked.
+    // svelte-ignore state_referenced_locally
+    if (DEV && BROWSER && motionKindProp === 'motion' && lazyMotion?.strict) {
+        if (ignoreStrictProp)
+            warnOnce(formatLazyStrictMessage(LAZY_STRICT_MESSAGE + REORDER_STRICT_HINT))
+        else throw new Error(formatLazyStrictMessage(LAZY_STRICT_MESSAGE))
+    }
     const reducedMotionState = useReducedMotionConfig()
     // `.current` is $state-backed inside reducedMotionState; tracking it via
     // $derived makes `reducedMotion` re-evaluate whenever the OS preference

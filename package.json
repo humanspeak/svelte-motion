@@ -71,6 +71,10 @@
             "types": "./dist/index.d.ts",
             "svelte": "./dist/index.js"
         },
+        "./m": {
+            "types": "./dist/m.d.ts",
+            "svelte": "./dist/m.js"
+        },
         "./vite": {
             "types": "./dist/vite.d.ts",
             "default": "./dist/vite.js"

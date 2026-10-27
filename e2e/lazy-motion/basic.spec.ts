@@ -17,6 +17,11 @@ test.describe('LazyMotion', () => {
             .toBeNull()
         await expect(page.getByTestId('lazy-motion-domAnimation')).toHaveAttribute('tabindex', '0')
         await expect(page.getByTestId('lazy-motion-domMax')).toHaveAttribute('tabindex', '0')
+        // A `motion` component ignores LazyMotion and keeps every feature.
+        await expect(page.getByTestId('lazy-motion-motion-in-domMin')).toHaveAttribute(
+            'tabindex',
+            '0'
+        )
     })
 
     test('loads async feature bundles for m namespace components', async ({ page }) => {

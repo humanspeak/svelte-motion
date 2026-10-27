@@ -17,7 +17,11 @@
         children?: Snippet
         /** Eager or async feature bundle used by descendant `m.*` components. */
         features: FeatureBundle | LazyFeatureBundle
-        /** Enables strict LazyMotion usage checks. Defaults to false. */
+        /**
+         * Strict LazyMotion usage checks. Defaults to false. In development,
+         * rendering a `motion` component inside throws; render `m` components
+         * instead (Reorder: import it from `@humanspeak/svelte-motion/m`).
+         */
         strict?: boolean
     }
 
