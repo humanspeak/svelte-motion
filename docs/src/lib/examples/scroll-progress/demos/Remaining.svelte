@@ -3,7 +3,7 @@
 
     // Distance-to-the-end readout fed by `useScroll`'s `scrollYLength` (the
     // container's maximum scroll offset). `scrollYLength - scrollY` is how far
-    // is left to scroll, and it stays right when the content resizes.
+    // is left to scroll. It updates when the container resizes, and on the next scroll.
     let containerEl: HTMLElement | undefined = $state(undefined)
 
     // Pass a getter so useScroll resolves the element after mount.
