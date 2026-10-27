@@ -69,6 +69,22 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/reorder-m') + searchParams}
+                    >
+                        LazyMotion — Reorder from the m entry (#2232)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/reorder-strict') + searchParams}
+                    >
+                        LazyMotion — main Reorder in strict mode (#2094)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/enter-animation') + searchParams}
                     >
                         Enter Animation

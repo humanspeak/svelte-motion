@@ -1,7 +1,8 @@
-import { domAnimation, domMin } from '$lib'
+import { domAnimation, domMax, domMin } from '$lib'
 import { flushTimers } from '$lib/__tests__/flushTimers'
 import { render, screen } from '@testing-library/svelte'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import LazyMotionKindProbe from './__tests__/LazyMotionKindProbe.svelte'
 import LazyMotionProbe from './__tests__/LazyMotionProbe.svelte'
 
 vi.mock('motion', () => {
@@ -98,5 +99,49 @@ describe('LazyMotion.svelte', () => {
         await flushTimers()
 
         expect(screen.getByTestId('tap').getAttribute('tabindex')).toBe('0')
+    })
+
+    // Upstream `render/components/motion/create.ts` preloads every feature
+    // into `motion`; `m/create.ts` leaves `m` to LazyMotion (Motion 14.7.1).
+    it('motion components keep every feature inside LazyMotion', async () => {
+        render(LazyMotionKindProbe, { props: { features: domMin } })
+        await flushTimers()
+
+        expect(screen.getByTestId('motion-tap').getAttribute('tabindex')).toBe('0')
+        expect(screen.getByTestId('m-tap').hasAttribute('tabindex')).toBe(false)
+    })
+
+    // Upstream `motion/index.tsx` `useStrictMode` (#2094): `invariant` throws.
+    it('throws when a motion component renders inside LazyMotion strict', () => {
+        let error: unknown
+        try {
+            render(LazyMotionKindProbe, {
+                props: { features: domMax, strict: true, include: 'motion' }
+            })
+        } catch (caught) {
+            error = caught
+        }
+
+        expect(error).toBeInstanceOf(Error)
+        const message = (error as Error).message
+        expect(message).toContain(
+            'You have rendered a `motion` component within a `LazyMotion` component'
+        )
+        expect(message.endsWith('https://motion.dev/troubleshooting/lazy-strict-mode')).toBe(true)
+    })
+
+    it('m components render inside LazyMotion strict without warnings', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+        expect(() =>
+            render(LazyMotionKindProbe, {
+                props: { features: domMax, strict: true, include: 'm' }
+            })
+        ).not.toThrow()
+        await flushTimers()
+
+        expect(screen.getByTestId('m-tap')).toBeTruthy()
+        expect(warn).not.toHaveBeenCalled()
+        warn.mockRestore()
     })
 })
