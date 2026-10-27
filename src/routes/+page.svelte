@@ -812,6 +812,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/release-animate-variants') + searchParams}
+                    >
+                        Drag: release doesn't fire onAnimationComplete per animate label (#1831)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/mobile-drawer') + searchParams}
                     >
                         Drag Close Drawer (mobile drawer)
