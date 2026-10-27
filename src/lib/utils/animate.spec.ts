@@ -1,9 +1,10 @@
 import { sleep } from '$lib/utils/testing'
 import { fireEvent, render } from '@testing-library/svelte'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import UseAnimateConfigHarness from '../components/__tests__/UseAnimateConfigHarness.svelte'
 import UseAnimateSkipHarness from '../components/__tests__/UseAnimateSkipHarness.svelte'
 import { animate, createEffect } from '../index.js'
-import { useAnimate } from './animate.svelte.js'
+import { type AnimationScope, useAnimate } from './animate.svelte.js'
 
 describe('utils/animate - useAnimate', () => {
     beforeEach(() => {
@@ -155,6 +156,64 @@ describe('utils/animate - useAnimate', () => {
         await sleep(100)
 
         expect(Number.parseFloat(getComputedStyle(target).opacity)).toBe(1)
+    })
+
+    describe('useAnimate MotionConfig settings (upstream use-animate.ts @ v14.7.1)', () => {
+        it('passes reducedMotion="always" to the animations it starts', async () => {
+            const { getByTestId } = render(UseAnimateConfigHarness, {
+                props: { reducedMotion: 'always' }
+            })
+            const box = getByTestId('box')
+
+            await fireEvent.click(getByTestId('run-x'))
+            await sleep(100)
+
+            // Reduced motion makes positional keys instant…
+            expect(box.style.transform).toContain('translateX(100px)')
+            // …while opacity still tweens over its 2s duration.
+            expect(Number.parseFloat(getComputedStyle(box).opacity)).toBeLessThan(1)
+        })
+
+        it('the scope always reflects the current MotionConfig settings', async () => {
+            let captured: AnimationScope<HTMLDivElement> | undefined
+            const { rerender } = render(UseAnimateConfigHarness, {
+                props: {
+                    reducedMotion: 'always',
+                    skip: true,
+                    onScope: (scope: AnimationScope<HTMLDivElement>) => (captured = scope)
+                }
+            })
+            expect(captured).toBeDefined()
+
+            // Upstream writes both onto the scope every render (use-animate.ts:23-24);
+            // here they are read live, without any `animate` call.
+            expect(captured!.reduceMotion).toBe(true)
+            expect(captured!.skipAnimations).toBe(true)
+
+            await rerender({ reducedMotion: 'never', skip: false })
+
+            expect(captured!.reduceMotion).toBe(false)
+            expect(captured!.skipAnimations).toBe(false)
+        })
+
+        it("outside a component, reduceMotion defaults to false like React's MotionConfig default", () => {
+            const [scope] = useAnimate()
+
+            expect(scope.reduceMotion).toBe(false)
+            expect(scope.skipAnimations).toBeUndefined()
+        })
+
+        it('selector calls before the attachment fires throw, like upstream', () => {
+            const [, animate] = useAnimate()
+
+            // motion-dom resolveElements reads scope.current.querySelectorAll with no guard.
+            expect(() => animate('li', { opacity: 1 })).toThrow(TypeError)
+
+            const el = document.createElement('div')
+            document.body.append(el)
+            expect(() => animate(el, { opacity: 0.5 }, { duration: 0.01 })).not.toThrow()
+            document.body.removeChild(el)
+        })
     })
 })
 
