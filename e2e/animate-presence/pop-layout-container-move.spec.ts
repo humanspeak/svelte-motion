@@ -239,7 +239,14 @@ for (const path of PATHS) {
  * moved and then left to go stale. Samples the exiting item's centre every
  * frame for 300 ms, starting on the click itself.
  */
-async function realTimeDrift(page: Page, url: string, id: number, adds: number, add: string) {
+async function realTimeDrift(
+    page: Page,
+    url: string,
+    id: number,
+    adds: number,
+    add: string,
+    scroll = false
+) {
     await page.goto(url)
     await page.waitForFunction(() => window.MotionIsMounted === true)
     for (let i = 0; i < adds; i++) {
@@ -247,6 +254,15 @@ async function realTimeDrift(page: Page, url: string, id: number, adds: number, 
         await click(page, add)
     }
     await page.waitForTimeout(2000)
+    if (scroll) {
+        // Scroll the page while the list rests, then remove.
+        const scrolled = await page.evaluate(() => {
+            window.scrollTo(0, document.body.scrollHeight)
+            return window.scrollY
+        })
+        expect(scrolled).toBeGreaterThan(50)
+        await page.waitForTimeout(300)
+    }
 
     return page.evaluate(
         ({ selector }) =>
@@ -292,6 +308,25 @@ for (const path of PATHS) {
                 expect(drift).toBeLessThan(1)
             })
         }
+
+        /**
+         * A "fixed" list inside a transformed ancestor scrolls with the page,
+         * but the point's scroll walk stops at it (it is `position: fixed`),
+         * so a point recorded before the page scrolled is stale after.
+         */
+        test('exiting item holds after the page scrolls while it rests (scale(0.5) ancestor)', async ({
+            page
+        }) => {
+            const drift = await realTimeDrift(
+                page,
+                `/tests/animate-presence/pop-layout-container-move?@isPlaywright=true&popLayout&path=${path}&fixed&anchor=bottom&scale`,
+                1,
+                2,
+                '[data-testid="add"]',
+                true
+            )
+            expect(drift).toBeLessThan(1)
+        })
     })
 }
 
