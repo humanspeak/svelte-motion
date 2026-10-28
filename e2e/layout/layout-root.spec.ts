@@ -420,3 +420,53 @@ test('Shared layout="size" animation without a layoutRoot only animates size', a
     expect(widths.some((w) => w > 120 && w < 140)).toBe(true)
     expect(widths[widths.length - 1]).toBeCloseTo(160, 0)
 })
+
+/**
+ * Not in upstream's spec (plan 007 amendment A1): a second handoff. After
+ * Tomato → Lettuce → Tomato, the underline that departs was itself measured
+ * in a shared-layout update pass, with its ancestors' transforms reset.
+ * Its snapshot must still describe where it was drawn, so the next
+ * Tomato → Lettuce slides the same way as the first.
+ */
+async function selectLettuceAgain(
+    page: Page,
+    query: string,
+    before: { underline: number; list: number }
+) {
+    await selectLettuce(page, query, before)
+    await page.click('#tomato')
+    await page.waitForTimeout(1300)
+    await expect
+        .poll(() =>
+            page.evaluate(() => ({
+                underline: document.querySelector('.underline')!.getBoundingClientRect().left,
+                list: document.querySelector('ul')!.getBoundingClientRect().left
+            }))
+        )
+        .toEqual(before)
+    await page.click('#lettuce')
+    await page.waitForTimeout(1300)
+    return page.evaluate(() => {
+        window.recording = false
+        const first = window.records.findIndex(({ rendered }) => rendered)
+        return window.records.slice(first)
+    })
+}
+
+test('A second handoff inside a translated layoutRoot still animates relative to it', async ({
+    page
+}) => {
+    const records = await selectLettuceAgain(page, 'offset=true', { underline: 400, list: 400 })
+    expect(records.length).toBeGreaterThan(20)
+    for (const { list } of records) expect(list).toBeCloseTo(250, 0)
+    expectSlideAcrossList(leadOffsets(records))
+})
+
+test('A second handoff from a translated box inside a layoutRoot starts from its visual position', async ({
+    page
+}) => {
+    const records = await selectLettuceAgain(page, 'innerX=80', { underline: 430, list: 350 })
+    expect(records.length).toBeGreaterThan(20)
+    for (const { list } of records) expect(list).toBeCloseTo(200, 0)
+    expectSlideAcrossList(leadOffsets(records), 80)
+})
