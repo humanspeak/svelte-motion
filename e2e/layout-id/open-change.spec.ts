@@ -128,16 +128,27 @@ test("changing the card's layoutId mid-open lets it finish opening", async ({ pa
 
     // ...and the card ends up open in its box
     await page.waitForTimeout(1500)
-    const [cardSize, oneSize] = await page.evaluate(() =>
-        ['card', 'one'].map((id) => {
-            const element = document.getElementById(id)!
-            const { width, height } = element.getBoundingClientRect()
-            return {
-                width: width - element.offsetWidth,
-                height: height - element.offsetHeight
-            }
-        })
-    )
-    expect(cardSize).toEqual({ width: 0, height: 0 })
-    expect(oneSize).toEqual({ width: 0, height: 0 })
+    // Upstream samples once here. Thumbnail one's 2s tween starts at the
+    // "Next" click, so that sample lands on its last frame: under load one
+    // late frame leaves it a fraction of a pixel short. Poll briefly until it
+    // has finished; the expected sizes are unchanged.
+    await expect
+        .poll(
+            () =>
+                page.evaluate(() =>
+                    ['card', 'one'].map((id) => {
+                        const element = document.getElementById(id)!
+                        const { width, height } = element.getBoundingClientRect()
+                        return {
+                            width: width - element.offsetWidth,
+                            height: height - element.offsetHeight
+                        }
+                    })
+                ),
+            { timeout: 1000 }
+        )
+        .toEqual([
+            { width: 0, height: 0 },
+            { width: 0, height: 0 }
+        ])
 })
