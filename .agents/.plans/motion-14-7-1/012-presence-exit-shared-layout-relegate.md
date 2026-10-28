@@ -192,6 +192,9 @@ never recreates the node either: it unmounts only after `safeToRemove`.
       - Extend `snapshotLayoutStyle` (`presence.ts:123-134`) with computed `width`, `height`, `top`, `right`,
         `bottom` and `left`. It already records `boxSizing` and `margin`. These are used, fractional,
         untransformed values, so there is no integer `offsetWidth` rounding.
+      - When a computed `width`/`height` isn't a length (e.g. `auto` on an `inline` element), fall back to the
+        rect, as `measurePopLayoutSnapshot` does with `readNumericStyle` (`presence.ts:451`, used at 535-542). Reuse that helper.
+        The rect read is in the same record, so it is no extra forced layout.
       - `updateChildState` (`presence.ts:1615-1634`) already stores this record in every mode, from the
         container's ResizeObserver callback (`_MotionContainer.svelte:915-922`) and its rAF capture (789),
         whose callers already read layout. So the record adds no forced layout. Registration takes it too.
@@ -219,7 +222,9 @@ never recreates the node either: it unmounts only after `safeToRemove`.
         −scrollX/−scrollY`, `sx = sy = 1`, and there is no border or element scroll.
       - Set `margin: 0`, as non-`popLayout` clones already get. When `ownedLayoutKeys()` includes a margin key,
         the VisualElement will write that margin on the clone: subtract it from the matching offset
-        (`marginLeft` from `left`, `marginTop` from `top`; the `margin` shorthand from both).
+        (`marginLeft` from `left`, `marginTop` from `top`). For a `margin` shorthand with several values,
+        expand it by CSS rules (1–4 values: top, right, bottom, left), then subtract the **top** component from
+        `top` and the **left** component from `left`.
     - **Position, out of flow (no placeholder: `position: absolute | fixed`, not `popLayout`).**
       - Keep the element's **own resolved insets** from the recorded computed style (`top`/`right`/`bottom`/
         `left`) and its own `position`: `fixed` stays `fixed`. The clone sits in the same slot, so its
@@ -228,6 +233,8 @@ never recreates the node either: it unmounts only after `safeToRemove`.
       - Don't use `offsetTop`/`offsetLeft`. They are wrong under transform/filter/contain containing blocks,
         `null`-based for `fixed`, and stale when the element moves without resizing.
       - Insets in `ownedLayoutKeys()` aren't written: the VisualElement's own values win.
+      - Keep the element's **frozen margin**. The `margin = '0'` at `presence.ts:1894-1896` must not apply to
+        out-of-flow held clones: their resolved insets position the margin box, as the element's do.
     - **`popLayout`: unchanged.** It keeps 008's snapshot and correction.
     - For held clones, `unregisterChild` does **not** force `positioningParent.style.position = 'relative'`
       (`presence.ts:1843-1847`): the offsets are computed against the real containing block.
@@ -373,6 +380,20 @@ Upstream keeps every nested node of an exiting child: each nested `MeasureLayout
            `startExit()` now and `finishExit()` when that promise settles, instead of removing silently. The
            nested boundary's in-flight count and `onExitComplete` (`scheduleExitComplete`) then fire once, after
            its children have exited, and nothing is double-run.
+         - **The nested boundary outlives its own teardown until those exits settle (M1, round 5).**
+           - Order: the nested `AnimatePresence` is disposed by `onDestroy(context.dispose)`
+             (`AnimatePresence.svelte:189`), a user effect. Its children's teardowns come first (template
+             before user effects), so their `startExit()` calls run before `dispose()`.
+           - Today `dispose()` sets `disposed`, and `finishExit` then returns at once (`if (disposed) return`,
+             `presence.ts:1468`). `onExitComplete` would never fire.
+           - Upstream the boundary stays mounted until its children exit (`AnimatePresence/index.tsx:171-179`).
+           - So when `propagatedExits`-driven exits are in flight, `dispose()` **defers**:
+             - it stops observers, frames and non-propagated clones at once, as today;
+             - it keeps the in-flight counter, `finishExit`, `scheduleExitComplete` and the `onExitComplete`
+               callback alive until the last propagated exit settles;
+             - then it finishes disposing.
+           - Track the propagated in-flight count separately (e.g. `pendingPropagatedExits`), so the `disposed`
+             checks elsewhere keep today's cancellation semantics for everything else.
        - If this needs more than that one mechanism (for example, the VisualElement has no `animationState` on
          the clone path, or nested registration must change), STOP and report the size. It is not a
          deviation.
@@ -697,13 +718,15 @@ The **guard set** (used in Steps 1 and 7):
     point);
   - the propagate-exit step for every clone, the `propagatedExits` map, and the 10j path's
     `startExit()`/`finishExit()` for propagated children;
+  - `dispose()`: defer the counter, `finishExit` and `scheduleExitComplete` while propagated exits are in flight;
   - the completion tail order (holds and deferred unmounts before `clone.remove()`);
   - in `unregisterChild`:
     - the `canHandOff()` decision before any clone work;
     - the no-exit branch for held children, and the synchronous exit resolve;
     - the `!resolvedExit` branch settling the exit flag for held children;
     - held-clone placement by the placement rule (no extra forced layout): the recorded computed size, the placeholder rect minus
-      the containing block in one read pass, `margin: 0`, and the recorded offsets out of flow, with
+      the containing block in one read pass, `margin: 0` in flow, and the element's own resolved insets,
+      `position` and margin out of flow, with
       `ownedLayoutKeys()` left to the VisualElement. The element's frozen `box-sizing` is kept. No z-index lift
       and no forced `position: relative`;
     - placeholders of every clone sized from the recorded untransformed size;
@@ -945,16 +968,23 @@ For each case in 1 and 2, add a twin with `&owned=true` and the name suffixed ` 
        would paint with the lead's `opacityExit` and transform (`create-projection-node.ts:2124-2150`), not its
        own exit.
      - `fast=true` makes the shared-layout crossfade 0.3 s.
-     - On close, on every painted frame (screencast plus `elementFromPoint`), `#fade`'s clone copy paints its
-       own exit: opacity falls linearly from 1 to 0, and scale from 1 to 0.5 (from its painted box), each within
-       0.05 of the expected value at that frame's time.
-     - The outer clone is still connected at 0.3–0.9 s, after the crossfade has finished, and is removed only
-       after `#fade`'s 1 s exit completes (within 2 frames of 1 s).
+     - Painted opacity can't judge `#fade`. It sits inside the outer clone, so its painted opacity is multiplied
+       by the outer's fade and reaches 0 at about 0.3 s (upstream too). Clones are `pointer-events: none`
+       (`presence.ts:1886` at `b21e938a`, anchor `clone.style.pointerEvents = 'none'`), inherited by their children, so `elementFromPoint` never hits them.
+     - So the page runs a per-rAF log of what `#fade`'s VisualElement writes on its clone copy (found by its
+       class inside `[data-clone]`): inline `style.opacity`, and the scale parsed from inline
+       `style.transform`.
+     - On close, every logged frame's opacity is `1 − t` and its scale `1 − 0.5·t` (t = elapsed / 1 s, clamped),
+       each within 0.05.
+     - **Outer clone timing, from painted frames:** the outer clone is still connected and painted (screencast,
+       plus `isConnected` in the rAF log) at 0.3–0.9 s, after the crossfade has finished. It is removed within
+       2 frames of `#fade`'s 1 s exit completing.
      - Today no inner exit runs.
    - NC6 **RED** (`propagate` inside a non-layout exit): `?outer=plain&inner=propagate&innerExit=true`.
      - The lightbox's outer element is a plain `motion.div` with `exit={{ opacity: 0 }}` (0.3 s), and no
        `layout` or `layoutId`, so it is **not** held.
-     - `#fade` still paints its 1 s exit on its clone copy, and the outer clone stays until it ends.
+     - `#fade`'s VisualElement still writes its 1 s exit on its clone copy (the same per-rAF inline-style log and
+       linear check as NC5). The outer clone stays connected until the exit ends, within 2 frames of 1 s.
      - The page's nested `<AnimatePresence propagate onExitComplete>` counter (`#inner-done`) reads `1` once
        `#fade`'s exit ends, not before, and never `2`.
      - Today the outer clone is removed at 0.3 s, and `#inner-done` stays `0`.
@@ -1015,6 +1045,8 @@ U10. `presence.spec.ts`, `describe('exit holds (plan 012)')`:
     - 10p **RED** (nested `propagate` completion): an outer boundary's clone walk records a propagated child's
       exit promise. The nested boundary's later `unregisterChild` for that child (no connected slot parent)
       calls `startExit()` and fires its `onExitComplete` exactly once, after the promise resolves and not before.
+      `dispose()` runs **before** the promise resolves, and `onExitComplete` still fires once. After that the
+      boundary is fully disposed: a later `registerChild` is ignored.
     - 10q **RED** (`propagate` on a non-held clone): a clone without a hand-off, whose subtree has a
       `[data-propagate]` boundary with a registered `motion` child, re-points that child's VisualElement to its
       clone copy and calls `animationState.setActive('exit', true)`. The clone is removed only after that
