@@ -159,14 +159,26 @@ describe('AnimatePresence propagate', () => {
 
     it('legacy nested boundary with propagate leaves no clone behind', async () => {
         const group = await mountGroup({ form: 'legacy', propagate: true })
+        const { animate } = await import('motion')
+        const cloneExits = () =>
+            vi
+                .mocked(animate)
+                .mock.calls.filter(
+                    ([target]) => target instanceof HTMLElement && target.dataset.clone === 'true'
+                ).length
 
+        // The child is removed while it is already exiting with its parent:
+        // it must not also get a clone exit from its own boundary.
         await group.update({ outer: false })
-        await group.complete('outer')
-        await group.complete('inner')
-        await flushTimers()
+        expect(group.exitStarted('inner')).toBe(true)
+        await group.update({ innerShown: false })
+        expect(cloneExits()).toBe(0)
 
+        await group.complete('outer')
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
         expect(group.result.queryByTestId('outer')).toBeNull()
         expect(group.result.container.querySelector('[data-clone="true"]')).toBeNull()
+        expect(cloneExits()).toBe(0)
     })
 
     it('empty nested boundary with propagate releases the parent exit', async () => {
