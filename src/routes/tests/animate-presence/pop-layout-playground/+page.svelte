@@ -77,7 +77,7 @@
             anchor: 'static',
             scroll: true,
             mirror: true,
-            note: 'Scroll to the bottom first. The rows above the list shrink too, and the exiting item is pinned to the page, so it does not follow that part of the move (Motion behaves the same; its e2e uses these rows only with a fixed list). Owned path, unscrolled: plan 015 (the mirror rows are removed before the projection snapshot).'
+            note: 'Scroll to the bottom first: removing an item shrinks the page, which clamps its scroll position. The exiting item moves with the content, so it stays on its ghost (both measured in the page).'
         },
         {
             id: 'scroller',
@@ -155,8 +155,47 @@
     let groupShown = $state(true)
     const presentItems = $derived(items.filter((item) => item.present))
 
-    type Ghost = { id: number; left: number; top: number; width: number; height: number }
+    type Layer = 'fixed' | 'doc' | 'scroller'
+    type Ghost = { id: number; layer: Layer; x: number; y: number; width: number; height: number }
     let ghosts = $state<Ghost[]>([])
+
+    // Ghost layers, as upstream: one fixed to the viewport, one in the
+    // document, one inside the scrollable element.
+    let fixedLayer = $state<HTMLElement>()
+    let docLayer = $state<HTMLElement>()
+    let scrollerLayer = $state<HTMLElement>()
+    const layerName = $derived<Layer>(
+        preset.anchor !== 'static' && !preset.scale && !preset.rotate
+            ? 'fixed'
+            : preset.scroller
+              ? 'scroller'
+              : 'doc'
+    )
+    const layerOf = (layer: Layer) =>
+        ({ fixed: fixedLayer, doc: docLayer, scroller: scrollerLayer })[layer]
+
+    /** Upstream `layerScale`: the layer's on-screen scale. */
+    const layerScale = (layer: HTMLElement) => {
+        const { width, height } = layer.getBoundingClientRect()
+        return [width / layer.offsetWidth || 1, height / layer.offsetHeight || 1]
+    }
+
+    /** Upstream `rectIn`: the element's rect in a ghost layer's coordinate space. */
+    const rectIn = (element: Element, layer: HTMLElement) => {
+        const rect = element.getBoundingClientRect()
+        const origin = layer.getBoundingClientRect()
+        const [sx, sy] = layerScale(layer)
+        return {
+            x: (rect.left - origin.left) / sx,
+            y: (rect.top - origin.top) / sy,
+            width: rect.width / sx,
+            height: rect.height / sy
+        }
+    }
+    const centre = (rect: { x: number; y: number; width: number; height: number }) => [
+        rect.x + rect.width / 2,
+        rect.y + rect.height / 2
+    ]
     let drifts = $state<Record<number, number>>({})
 
     const reset = () => {
@@ -176,32 +215,25 @@
         document.querySelector<HTMLElement>(`[data-testid="pg-item-${id}"]`)
 
     /**
-     * Leaves a dashed ghost where the item was (page coordinates) and records
-     * the largest distance its centre strays over the next 300 ms.
+     * Leaves a dashed ghost where the item was and records the largest
+     * distance its centre strays from the ghost's over the next 300 ms, both
+     * in the ghost's own layer (upstream `recordGhost`), so an item that
+     * correctly moves with its layer (a clamped scroll) reads as holding.
      */
     const watch = (id: number) => {
         const element = query(id)
-        if (!element) return
-        const box = element.getBoundingClientRect()
-        ghosts = [
-            ...ghosts.filter((ghost) => ghost.id !== id),
-            {
-                id,
-                left: box.left + window.scrollX,
-                top: box.top + window.scrollY,
-                width: box.width,
-                height: box.height
-            }
-        ]
-        const before = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+        const layer = layerOf(layerName)
+        if (!element || !layer) return
+        const rect = rectIn(element, layer)
+        const [cx, cy] = centre(rect)
+        ghosts = [...ghosts.filter((ghost) => ghost.id !== id), { id, layer: layerName, ...rect }]
         let drift = 0
         const start = performance.now()
         const sample = () => {
-            const now = query(id)?.getBoundingClientRect()
-            if (now) {
-                const x = now.x + now.width / 2
-                const y = now.y + now.height / 2
-                drift = Math.max(drift, Math.hypot(x - before.x, y - before.y))
+            const current = query(id)
+            if (current && layer.isConnected) {
+                const [x, y] = centre(rectIn(current, layer))
+                drift = Math.max(drift, Math.hypot(x - cx, y - cy))
             }
             if (performance.now() - start < 300) {
                 requestAnimationFrame(sample)
@@ -413,13 +445,13 @@
                     ? `height: 300px; overflow: auto;${preset.positioned ? ' position: relative;' : ''}`
                     : undefined}
             >
+                {#if preset.scroller}
+                    <div class="ghost-layer-scroller" bind:this={scrollerLayer}>
+                        {@render ghostLayer('scroller')}
+                    </div>
+                {/if}
                 {#if preset.scroll || preset.scroller}
                     <div style="height: 2000px"></div>
-                {/if}
-                {#if preset.mirror}
-                    {#each presentItems as mirrored (mirrored.id)}
-                        <div style="height: 70px"></div>
-                    {/each}
                 {/if}
                 {#if preset.nested}
                     <motion.ul class={fixedClass}>
@@ -444,18 +476,29 @@
                         {@render list()}
                     </motion.ul>
                 {/if}
+                <!-- After the list, as upstream ({list}{mirror}). -->
+                {#if preset.mirror}
+                    {#each presentItems as mirrored (mirrored.id)}
+                        <div style="height: 70px"></div>
+                    {/each}
+                {/if}
             </div>
         </div>
     {/key}
 
-    {#each ghosts as ghost (ghost.id)}
+    <div class="ghost-layer-doc" bind:this={docLayer}>{@render ghostLayer('doc')}</div>
+    <div class="ghost-layer-fixed" bind:this={fixedLayer}>{@render ghostLayer('fixed')}</div>
+</div>
+
+{#snippet ghostLayer(layer: Layer)}
+    {#each ghosts.filter((ghost) => ghost.layer === layer) as ghost (ghost.id)}
         <div
             class="ghost"
             aria-hidden="true"
-            style="left: {ghost.left}px; top: {ghost.top}px; width: {ghost.width}px; height: {ghost.height}px"
+            style="left: {ghost.x}px; top: {ghost.y}px; width: {ghost.width}px; height: {ghost.height}px"
         ></div>
     {/each}
-</div>
+{/snippet}
 
 <TesterPanel
     eyebrow="AnimatePresence/PopChild.tsx (Motion 14.7.0, #2348)"
@@ -568,6 +611,29 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
+    }
+
+    /* Upstream `.pg-doc-layer`, `.pg-fixed-layer`, `.pg-scroller-layer`. */
+    .ghost-layer-doc {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100px;
+        height: 100px;
+        pointer-events: none;
+        z-index: 30;
+    }
+
+    .ghost-layer-fixed {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 30;
+    }
+
+    .ghost-layer-scroller {
+        position: relative;
+        height: 0;
     }
 
     .ghost {
