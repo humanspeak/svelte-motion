@@ -116,67 +116,138 @@
 
     // ---- Live verdict (tester only) ----
     //
-    // Once a recording ends (1.3 s after the click), read the new underline's
-    // offset from the list in every frame after the click rendered. RELATIVE
-    // if it starts near 0, never goes back and ends near 100; PAGE SPACE
-    // otherwise.
+    // Judges the Tomato → Lettuce click, the one upstream's spec defines.
+    // Just before it, note the old underline's left edge and width
+    // and the list's left edge. When the recording ends (1.3 s later), check
+    // the new underline's path in every frame after the click rendered,
+    // against what Motion does for this variant:
+    //
+    // - inside a layoutRoot, when the old underline was inside the list too,
+    //   its left edge moves relative to the list: from the old offset within
+    //   the old list (0, or 80 with innerX) to its new offset;
+    // - otherwise (no root, or coming from the outside box) it moves in page
+    //   space, from the old underline's page position;
+    // - layout="size" keeps x at its new place and animates only the width,
+    //   from the old width to the new one; layout="position" keeps the new
+    //   width throughout.
+    //
+    // MATCHES if the path starts at the expected point, never turns back,
+    // stays between its ends, passes through the middle and ends in place.
 
-    type Verdict = 'waiting' | 'recording' | 'relative' | 'page-space'
+    type Verdict = 'waiting' | 'recording' | 'matches' | 'off-path'
+    type Before = { left: number; width: number; listLeft: number; insideList: boolean }
     let verdict = $state<Verdict>('waiting')
-    let lastStart = $state<number | null>(null)
+    let readout = $state<string | null>(null)
 
-    const judge = (records: FrameRecord[]): Verdict => {
+    const measureBefore = (): Before | null => {
+        const old = document.querySelector('.fixture-1935 .underline')
+        const list = document.querySelector('.fixture-1935 ul')
+        if (!old || !list) return null
+        const box = old.getBoundingClientRect()
+        return {
+            left: box.left,
+            width: box.width,
+            listLeft: list.getBoundingClientRect().left,
+            insideList: list.contains(old)
+        }
+    }
+
+    /** Whether `values` run from `from` to `to` without turning back. */
+    const followsPath = (values: number[], from: number, to: number) => {
+        const lo = Math.min(from, to) - 0.5
+        const hi = Math.max(from, to) + 0.5
+        const sign = Math.sign(to - from)
+        const range = Math.abs(to - from)
+        return (
+            Math.abs(values[0] - from) < 5 &&
+            values.every((v) => v >= lo && v <= hi) &&
+            values.every((v, k) => k === 0 || sign * (v - values[k - 1]) >= -0.5) &&
+            (range < 10 ||
+                values.some(
+                    (v) => Math.abs(v - from) > range * 0.3 && Math.abs(v - to) > range * 0.3
+                )) &&
+            Math.abs(values[values.length - 1] - to) < 1
+        )
+    }
+
+    const judge = (records: FrameRecord[], before: Before): Verdict => {
         const first = records.findIndex(({ rendered }) => rendered)
         const frames = first < 0 ? [] : records.slice(first)
-        if (frames.length < 5) return 'page-space'
-        const offsets = frames.map(
-            ({ underlines, list }) => underlines[underlines.length - 1] - list
+        if (frames.length < 5) {
+            readout = 'too few frames recorded'
+            return 'off-path'
+        }
+        const last = frames[frames.length - 1]
+        const listLeft = last.list
+        const relative = layoutRoot && before.insideList
+        // Left edges in list-relative px when relative, else page px
+        // measured from the new list, so both read the same way.
+        const lefts = frames.map(({ underlines, list }) =>
+            relative
+                ? underlines[underlines.length - 1] - list
+                : underlines[underlines.length - 1] - listLeft
         )
-        const monotonic = offsets.every((o, i) => i === 0 || o >= offsets[i - 1] - 0.5)
-        const relative =
-            Math.abs(offsets[0]) < 5 &&
-            monotonic &&
-            Math.abs(offsets[offsets.length - 1] - 100) < 1 &&
-            offsets.every((o) => o >= -0.5 && o <= 100.5)
-        lastStart = offsets[0]
-        return relative ? 'relative' : 'page-space'
+        const widths = frames.map(
+            ({ underlineWidths }) => underlineWidths[underlineWidths.length - 1]
+        )
+        const from = relative ? before.left - before.listLeft : before.left - listLeft
+        const to = lefts[lefts.length - 1]
+        const finalWidth = widths[widths.length - 1]
+        const space = relative ? 'from the list' : 'page, from the list'
+        let ok: boolean
+        if (layoutType === 'size') {
+            ok =
+                lefts.every((l) => Math.abs(l - to) < 1) &&
+                followsPath(widths, before.width, finalWidth)
+            readout = `x stays ${to.toFixed(0)}px ${space}; width ${widths[0].toFixed(0)} → ${finalWidth.toFixed(0)} (expected ${before.width.toFixed(0)} → ${finalWidth.toFixed(0)})`
+        } else {
+            const widthOk = widths.every((w) => Math.abs(w - finalWidth) < 1)
+            ok = followsPath(lefts, from, to) && (layoutType !== 'position' || widthOk)
+            readout = `x ${lefts[0].toFixed(0)} → ${to.toFixed(0)}px ${space} (expected ${from.toFixed(0)} → ${to.toFixed(0)}, ${relative ? 'relative' : 'page space'})`
+        }
+        return ok ? 'matches' : 'off-path'
     }
 
     const testerSelect = (item: string) => {
+        if (isPlaywright()) {
+            select(item)
+            return
+        }
+        if (item === selected) return
+        const before = measureBefore()
         select(item)
-        if (isPlaywright()) return
+        // Only Tomato → Lettuce has an upstream path (issue-1935.spec.ts);
+        // any other click just resets the page for the next try.
+        if (item !== tabs[1] || !before) {
+            verdict = 'waiting'
+            readout = null
+            return
+        }
         verdict = 'recording'
+        readout = null
         setTimeout(() => {
             const w = recordingWindow()
             w.recording = false
-            verdict = judge(w.records)
+            verdict = judge(w.records, before)
         }, 1300)
-    }
-
-    const reset = () => {
-        showSidebar = false
-        selected = outside ? '' : tabs[0]
-        verdict = 'waiting'
-        lastStart = null
     }
 
     const steps: TesterStep[] = [
         {
             text: 'Click "🥬 Lettuce".',
             expected:
-                'A grey sidebar appears and the whole tab bar jumps left in one frame. The blue underline slides exactly one tab, from under Tomato to under Lettuce, over one second. The chip reads RELATIVE ✓.',
+                'A grey sidebar appears and the whole tab bar jumps left in one frame. The blue underline slides exactly one tab, from under Tomato to under Lettuce, over one second. The chip reads MATCHES ✓ and the readout says x 0 → 100 relative.',
             action: { label: 'Select Lettuce', run: () => testerSelect(tabs[1]) }
         },
         {
-            text: 'Click "🍅 Tomato" to reset (the sidebar goes away), then open the layoutRoot=false variant from the link below.',
-            expected: 'The page reloads without the layout root.',
-            action: { label: 'Reset', run: reset }
+            text: 'Click "🍅 Tomato" to reset (not judged), and wait for the underline to settle.',
+            expected: 'The sidebar goes and the underline returns under Tomato.',
+            action: { label: 'Select Tomato', run: () => testerSelect(tabs[0]) }
         },
         {
-            text: 'Click "🥬 Lettuce" there.',
+            text: 'Open each variant link in the panel and click "🥬 Lettuce" there.',
             expected:
-                'The tab bar still jumps, but the underline drifts in from where Tomato used to be on the page (right of the new Lettuce) instead of sliding one tab. The chip reads PAGE SPACE.',
-            action: { label: 'Select Lettuce', run: () => testerSelect(tabs[1]) }
+                "Every variant reads MATCHES ✓. layoutRoot=false drifts in page space from Tomato's old position (150 → 100 from the new list); innerX=80 starts 80px into the list; layout=size keeps x under Lettuce and grows the width 100 → 160; outside starts from the box left of the list (50 → 100)."
         }
     ]
 </script>
@@ -269,27 +340,23 @@
 <TesterPanel
     eyebrow="Motion 14.7.1 · #1935"
     title="Shared layoutId inside a layoutRoot"
-    status="Passes on this build (Motion 14.7.1), apart from the exit=true crossfades (plan 012)."
+    status="Passes on this build (Motion 14.7.1). The exit=true crossfades wait for plan 012."
     {steps}
 >
     {#snippet summary()}
         <span
-            class="verdict {verdict === 'relative'
-                ? 'ok'
-                : verdict === 'page-space'
-                  ? 'bad'
-                  : 'na'}"
+            class="verdict {verdict === 'matches' ? 'ok' : verdict === 'off-path' ? 'bad' : 'na'}"
         >
-            {verdict === 'relative'
-                ? 'RELATIVE ✓'
-                : verdict === 'page-space'
-                  ? 'PAGE SPACE'
+            {verdict === 'matches'
+                ? 'MATCHES ✓'
+                : verdict === 'off-path'
+                  ? 'OFF PATH ✗'
                   : verdict === 'recording'
                     ? 'RECORDING'
                     : 'WAITING'}
         </span>
-        {#if lastStart !== null}
-            <span class="readout">starts {lastStart.toFixed(1)}px into the list</span>
+        {#if readout}
+            <span class="readout">{readout}</span>
         {/if}
     {/snippet}
     {#snippet checks()}
@@ -311,6 +378,8 @@
             <a href="?outside=true">outside</a> ·
             <a href="?layout=position">layout=position</a> ·
             <a href="?layout=size">layout=size</a> ·
+            <a href="?layoutRoot=false&layout=position">layoutRoot=false&amp;layout=position</a> ·
+            <a href="?layoutRoot=false&layout=size">layoutRoot=false&amp;layout=size</a> ·
             <a href="?innerX=80">innerX=80</a> ·
             <a href="?">default</a>
         </p>
