@@ -565,10 +565,12 @@ export const measurePopLayoutSnapshot = (
  * children in a `display: contents` element, which never resizes. At rest
  * nothing is sampled.
  *
- * The point is scroll-space (see {@link measurePopLayoutPoint}), so scrolling
- * needs no refresh. A move that changes none of those boxes (for instance a
- * transform written on an ancestor) is not seen; the cache then holds the
- * last resting point.
+ * Scrolling (anywhere in the document) also re-samples: the point is in
+ * scroll space, but its walk stops at a `position: fixed` ancestor, and one
+ * inside a transformed ancestor still scrolls with the page. A move that
+ * changes none of those boxes and scrolls nothing (for instance a transform
+ * written on an ancestor) is not seen; the cache then holds the last resting
+ * point.
  *
  * @returns `track` (start following an element, or stop with `undefined`),
  *     `read` (the cached point of a connected element), `peek` (the last
@@ -582,6 +584,7 @@ export const createPopLayoutPointCache = () => {
     let stableFrames = 0
     let resizeObserver: ResizeObserver | undefined
     let mutationObserver: MutationObserver | undefined
+    let scrollTarget: Document | undefined
     // About five seconds at 60fps: long enough for a spring layout animation to settle.
     const maxFrames = 300
 
@@ -633,6 +636,8 @@ export const createPopLayoutPointCache = () => {
         mutationObserver?.disconnect()
         resizeObserver = undefined
         mutationObserver = undefined
+        scrollTarget?.removeEventListener('scroll', refresh, true)
+        scrollTarget = undefined
         element = undefined
         point = undefined
     }
@@ -664,6 +669,8 @@ export const createPopLayoutPointCache = () => {
                 mutationObserver = new MutationObserver(refresh)
                 mutationObserver.observe(container, { childList: true, subtree: true })
             }
+            scrollTarget = next.ownerDocument
+            scrollTarget.addEventListener('scroll', refresh, { capture: true, passive: true })
             // The element may still be settling (an enter or layout animation).
             refresh()
         },

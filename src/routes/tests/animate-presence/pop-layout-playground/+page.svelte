@@ -77,7 +77,7 @@
             anchor: 'static',
             scroll: true,
             mirror: true,
-            note: 'Scroll to the bottom first: the item should keep its place among the items around it. Owned path, unscrolled: plan 015 (the mirror rows are removed before the projection snapshot), so it drifts there.'
+            note: 'Scroll to the bottom first. The rows above the list shrink too, and the exiting item is pinned to the page, so it does not follow that part of the move (Motion behaves the same; its e2e uses these rows only with a fixed list). Owned path, unscrolled: plan 015 (the mirror rows are removed before the projection snapshot).'
         },
         {
             id: 'scroller',
