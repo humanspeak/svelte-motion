@@ -1,0 +1,65 @@
+---
+title: 'createScopedAnimate'
+description: 'Create an animate function bound to a scope element — the factory useAnimate is built on.'
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte'
+  import Default from '$lib/examples/create-scoped-animate/demos/Default.svelte'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'createScopedAnimate | Docs | Svelte Motion'
+      seo.description = 'Bind animate() to a scope element so selectors resolve inside it and its animations are tracked together.'
+      seo.ogTitle = 'createScopedAnimate'
+      seo.ogTagline = 'An animate() that only sees its own element'
+      seo.ogFeatures = ['createScopedAnimate', 'Scoped Selectors', 'useAnimate', 'Motion Parity']
+      seo.ogSlug = 'docs-create-scoped-animate'
+  }
+</script>
+
+# createScopedAnimate
+
+`createScopedAnimate` creates an `animate` function bound to a scope element and settings. Selector strings resolve inside `scope.current` instead of the whole document, and every animation it starts is pushed onto `scope.animations`. It is the factory [`useAnimate()`](/docs/use-animate) is built on, re-exported unchanged from Motion.
+
+<Example isSmall exampleUrl="/examples/create-scoped-animate">
+  <Default />
+</Example>
+
+## Usage
+
+```ts
+import { createScopedAnimate } from '@humanspeak/svelte-motion'
+
+const card = document.querySelector('.card')!
+const animateCard = createScopedAnimate({ scope: { current: card, animations: [] } })
+
+// Only the .chip elements inside .card move.
+animateCard('.chip', { x: 100 }, { duration: 0.4 })
+```
+
+## Options
+
+| Option | Default | Description |
+|---|---|---|
+| `scope` | none | `{ current, animations }`. Selectors resolve inside `current`; started animations are pushed onto `animations`. Accepts the scope from `useAnimate()`. |
+| `reduceMotion` | `undefined` | When `true`, transform and layout values animate instantly, as `MotionConfig reducedMotion="always"` does. |
+| `skipAnimations` | `undefined` | When `true`, every animation jumps straight to its final value. |
+
+## When to use it instead of useAnimate
+
+Use [`useAnimate()`](/docs/use-animate) inside components: it wires the scope as an attachment, follows the nearest `MotionConfig`, and stops its animations when the element detaches.
+
+Reach for `createScopedAnimate` outside components (actions, attachments, plain `.ts` modules) or when you own the element's lifecycle. Nothing stops its animations for you: call `stop()` on each entry in `scope.animations` when you tear the element down.
+
+```ts
+for (const animation of scope.animations) animation.stop()
+scope.animations.length = 0
+```
+
+## Returns
+
+A function with the same call shapes as [`animate`](/docs/api-reference): elements and selectors, motion values, objects, and sequences. Every call returns a mutable `Timeline` (Motion 14.7).
+
+Unlike the module-level `animate`, the scoped function has no `addEffect` / `removeEffect` statics. Register effects on `animate` itself.

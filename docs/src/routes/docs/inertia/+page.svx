@@ -1,0 +1,99 @@
+---
+title: 'inertia & keyframes'
+description: 'Motion generators for decelerating inertia and eased tweens — pass them as transition.type or sample them directly.'
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte'
+  import Default from '$lib/examples/inertia/demos/Default.svelte'
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'inertia & keyframes | Docs | Svelte Motion'
+      seo.description = 'Decelerate values from a velocity with inertia, tween them with keyframes, and sample either generator by hand.'
+      seo.ogTitle = 'inertia & keyframes'
+      seo.ogTagline = 'Coast, bounce, and tween with Motion generators'
+      seo.ogFeatures = ['inertia', 'keyframes', 'Generators', 'Motion Parity']
+      seo.ogSlug = 'docs-inertia'
+  }
+</script>
+
+# inertia & keyframes
+
+`inertia` and `keyframes` are the animation generators behind `transition.type: 'inertia'` and the default tween. They sit next to [`spring`](/docs/api-reference), re-exported unchanged from Motion.
+
+<Example isSmall exampleUrl="/examples/inertia">
+  <Default />
+</Example>
+
+## inertia
+
+Inertia decelerates a value from its initial velocity. The value coasts toward `origin + power × velocity`. If `min` or `max` is set and the value would cross it, a spring brings it back to the boundary.
+
+Use the string or the function as `type`. Both give the same result:
+
+```ts
+import { animate, inertia, motionValue } from '@humanspeak/svelte-motion'
+
+const x = motionValue(0)
+
+animate(x, [0], { type: 'inertia', velocity: 1000, power: 0.5 }) // settles at 500
+animate(x, [0], { type: inertia, velocity: 1000, power: 0.5 }) // same
+```
+
+### Options
+
+| Option | Default | Description |
+|---|---:|---|
+| `velocity` | `0` | Initial velocity, in units per second. |
+| `power` | `0.8` | How far the value travels: the target is `origin + power × velocity`. |
+| `timeConstant` | `325` | Deceleration time constant, in ms. Higher values feel heavier. |
+| `min` | none | Lower boundary. Crossing it hands off to the boundary spring. |
+| `max` | none | Upper boundary. Crossing it hands off to the boundary spring. |
+| `bounceStiffness` | `500` | Stiffness of the boundary spring. |
+| `bounceDamping` | `10` | Damping of the boundary spring. |
+| `modifyTarget` | none | Adjust the calculated target, e.g. to snap to a grid. |
+| `restDelta` | `0.5` | Distance from the target under which the animation can finish. |
+| `restSpeed` | none | Speed under which the animation can finish. |
+
+Snap the resting position to a 50px grid:
+
+```ts
+animate(x, [0], {
+  type: inertia,
+  velocity: 800,
+  modifyTarget: (target) => Math.round(target / 50) * 50
+})
+```
+
+### Sampling a generator by hand
+
+A generator is a function of options that returns `{ next(ms) }`. Call `next` with the elapsed time in milliseconds to read the value without running an animation:
+
+```ts
+import { inertia } from '@humanspeak/svelte-motion'
+
+const g = inertia({ keyframes: [0], velocity: 1000 })
+g.next(16) // { value: …, done: false }
+g.next(5000) // { value: 800, done: true }
+```
+
+## keyframes
+
+`keyframes` is the tween generator behind `type: 'keyframes'` / `'tween'`, and the engine's default. It interpolates through the keyframes over `duration`.
+
+| Option | Default | Description |
+|---|---:|---|
+| `duration` | `300` | Length of the tween in **milliseconds** when sampled directly. (`transition.duration` stays in seconds.) |
+| `ease` | `'easeInOut'` | An easing name, function, cubic-bezier array, or one easing per segment. |
+| `times` | evenly spaced | Progress (`0`–`1`) of each keyframe. |
+
+```ts
+import { keyframes } from '@humanspeak/svelte-motion'
+
+const tween = keyframes({ keyframes: [0, 100], duration: 1000, ease: 'linear' })
+tween.next(250).value // 25
+```
+
+`spring` works the same way: pass it as `type`, or call it with options and sample `next(ms)`.

@@ -68,6 +68,15 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'Curved motion paths with transition.path — keyframes, rotation, and shared layout.'
     },
+    'create-scoped-animate': {
+        title: 'createScopedAnimate',
+        description: 'An animate function bound to one element: selectors only resolve inside it.'
+    },
+    inertia: {
+        title: 'inertia',
+        description:
+            'Fling a value with inertia: it coasts, bounces off a boundary, and can snap to a grid.'
+    },
     'ai-gradient-card': {
         title: 'AI Gradient Card',
         description:
