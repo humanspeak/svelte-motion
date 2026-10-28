@@ -2,6 +2,13 @@ import type { AnimatePresenceMode, MotionExit, MotionTransition } from '$lib/typ
 import { mergeTransitions } from '$lib/utils/animation'
 import { holdLayoutIdHandoffs } from '$lib/utils/layoutId'
 import { pwLog } from '$lib/utils/log'
+import {
+    captureScrollSnapshot,
+    measureScreenScale,
+    measureScrollDelta,
+    translateRectByScrollDelta,
+    type ScrollSnapshot
+} from '$lib/utils/scrollBasis'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import {
     cancelFrame,
@@ -397,12 +404,6 @@ export type PopLayoutSnapshot = {
     point: [number, number]
 }
 
-type ScrollSnapshot = {
-    element: HTMLElement
-    scrollLeft: number
-    scrollTop: number
-}
-
 /**
  * Anchor used to preserve horizontal positioning in `mode="popLayout"`.
  */
@@ -465,14 +466,8 @@ const readNumericStyle = (value: string, fallback: () => number): number => {
 // list 0px tall, so its y-scale reads as 1 and that item's correction is off
 // by the scale. Upstream has the same arithmetic (`PopChild.tsx` @ v14.7.1,
 // lines 41-44); kept for parity.
-export const measurePopLayoutScale = (element?: HTMLElement | null): [number, number] => {
-    const { width, height } = element?.getBoundingClientRect() || ({} as DOMRect)
-    // Upstream's arithmetic: an unmeasurable ratio (NaN) reads as unscaled.
-    return [
-        width / (element?.offsetWidth as number) || 1,
-        height / (element?.offsetHeight as number) || 1
-    ]
-}
+export const measurePopLayoutScale = (element?: HTMLElement | null): [number, number] =>
+    measureScreenScale(element)
 
 /**
  * The element's position in the space it scrolls in, as the projection
@@ -848,66 +843,6 @@ const resetTransforms = (element: HTMLElement): void => {
     s.msTransform = 'none'
     s.MozTransform = 'none'
     s.OTransform = 'none'
-}
-
-const canElementScroll = (element: HTMLElement): boolean => {
-    const computed = getComputedStyle(element)
-    const overflow = `${computed.overflow}${computed.overflowX}${computed.overflowY}`
-    const canScroll =
-        element.scrollHeight > element.clientHeight + 1 ||
-        element.scrollWidth > element.clientWidth + 1
-
-    return canScroll && /(auto|scroll|overlay)/.test(overflow)
-}
-
-const captureScrollSnapshot = (element: HTMLElement): ScrollSnapshot[] => {
-    const snapshots: ScrollSnapshot[] = []
-    const doc = element.ownerDocument
-    let parent = element.parentElement
-
-    while (parent && parent !== doc.body && parent !== doc.documentElement) {
-        if (canElementScroll(parent)) {
-            snapshots.push({
-                element: parent,
-                scrollLeft: parent.scrollLeft,
-                scrollTop: parent.scrollTop
-            })
-        }
-
-        parent = parent.parentElement
-    }
-
-    const scrollingElement = doc.scrollingElement
-    if (snapshots.length === 0 && isHTMLElement(scrollingElement)) {
-        snapshots.push({
-            element: scrollingElement,
-            scrollLeft: scrollingElement.scrollLeft,
-            scrollTop: scrollingElement.scrollTop
-        })
-    }
-
-    return snapshots
-}
-
-const measureScrollDelta = (snapshots: ScrollSnapshot[]): { left: number; top: number } => {
-    return snapshots.reduce(
-        (delta, snapshot) => {
-            if (!snapshot.element.isConnected) return delta
-
-            return {
-                left: delta.left + snapshot.element.scrollLeft - snapshot.scrollLeft,
-                top: delta.top + snapshot.element.scrollTop - snapshot.scrollTop
-            }
-        },
-        { left: 0, top: 0 }
-    )
-}
-
-const translateRectByScrollDelta = (
-    rect: DOMRect,
-    delta: { left: number; top: number }
-): DOMRect => {
-    return new DOMRect(rect.left - delta.left, rect.top - delta.top, rect.width, rect.height)
 }
 
 /**

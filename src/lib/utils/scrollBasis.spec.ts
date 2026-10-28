@@ -8,7 +8,6 @@ import {
     scrollShift,
     seenScrollBasis,
     type ScrollBasis
-    // @ts-expect-error Plan 015a, Step 1: red until Step 2 adds the module.
 } from './scrollBasis.js'
 
 /**
