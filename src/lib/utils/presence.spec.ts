@@ -1676,6 +1676,9 @@ describe('exit clone layout follow (plan 015a)', () => {
         list.appendChild(el)
         scroller.appendChild(list)
         document.body.appendChild(scroller)
+        // Drawn at its offset size: unscaled.
+        Object.defineProperty(scroller, 'offsetWidth', { configurable: true, value: 400 })
+        Object.defineProperty(scroller, 'offsetHeight', { configurable: true, value: 320 })
         scroller.scrollTop = 500
 
         // The element's viewport rect at 500; the clone is drawn 70px lower

@@ -17,8 +17,9 @@ import { expect, test, type Page } from '@playwright/test'
  * is the first row with at least 20 pixels within ±24 per channel of its
  * colour, its bottom the last such row, and its left edge the first column
  * with at least 20 such pixels. A colour counts as found when at least 10
- * rows match, and pink (the exit clone, drawn above the others) only as its
- * whole 60px box. Green is tracked by its bottom edge: the pink exit clone
+ * rows match, pink (the exit clone, drawn above the others) only as its
+ * whole 60px box, and green (which the clone can cover) only when at least
+ * 20 rows show. Green is tracked by its bottom edge: the pink exit clone
  * sits above it in the stacking order and slides over its top.
  *
  * The screencast drops frames for about 200ms when an exit completes (the
@@ -199,6 +200,14 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
                     // but its whole 60px box is its fade crossing the
                     // tolerance over different backgrounds.
                     if (name === 'pink' && Math.abs((bottom + 1 - top) / scale - 60) > 3) continue
+                    // Green sits under the clone: a sliver left showing above
+                    // the clone isn't its band (the hit test tracks it there).
+                    if (
+                        name === 'green' &&
+                        rows.filter((count) => count >= 20).length < 20 * scale
+                    ) {
+                        continue
+                    }
                     const left = columns.findIndex((count) => count >= 20)
                     bands[name as Colour] = {
                         top: (y0 + top) / scale,
@@ -321,9 +330,12 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         )
         annotate(recording)
         const { frames } = recording
-        const all = framesWith(frames, ['blue', 'pink', 'green'])
+        // The clone slides over green, so each check takes the frames that
+        // show the colours it compares; the first frame shows all three.
+        const start = framesWith(frames, ['blue', 'pink', 'green'])[0].bands
+        const all = framesWith(frames, ['blue', 'pink'])
         expect(all.length).toBeGreaterThanOrEqual(10)
-        const start = all[0].bands
+        expect(framesWith(frames, ['green']).length).toBeGreaterThanOrEqual(10)
         const gap = start.pink!.top - start.blue!.top
         for (const { bands } of all) {
             expect(Math.abs(bands.pink!.top - bands.blue!.top - gap)).toBeLessThanOrEqual(2)
@@ -417,9 +429,10 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         const recording = await record(page, () => remove(page), 900)
         annotate(recording)
         const { frames } = recording
-        expect(framesWith(frames, ['blue', 'pink', 'green']).length).toBeGreaterThanOrEqual(10)
+        // The clone slides over green: each colour needs its own 10 frames.
         for (const colour of ['blue', 'pink', 'green'] as const) {
             const lefts = frames.flatMap(({ bands }) => (bands[colour] ? [bands[colour].left] : []))
+            expect(lefts.length, `${colour} frames`).toBeGreaterThanOrEqual(10)
             expect(Math.max(...lefts) - Math.min(...lefts), `${colour} x`).toBeLessThanOrEqual(2)
         }
     })
