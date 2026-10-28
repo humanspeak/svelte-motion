@@ -544,6 +544,116 @@ export const measurePopLayoutSnapshot = (
 }
 
 /**
+ * Caches where an owned `popLayout` element rests, for {@link PopLayoutSnapshot}'s
+ * "before" `point`.
+ *
+ * Upstream reads that point in `getSnapshotBeforeUpdate` (`PopChild.tsx` @
+ * v14.7.1, lines 87-111), before React commits any DOM change. Svelte has no
+ * such hook: by `PresenceChild`'s `$effect.pre`, a sibling added in the same
+ * update (a toast list's "remove the oldest, add one") is already in the DOM,
+ * so a live measurement reads the element where the grown container has
+ * moved it. So the point is measured while the element rests: when it is
+ * tracked, then again whenever its own box, its parent's box or child list,
+ * or the document's box changes, sampling once a frame until it stops moving
+ * (so a layout animation that follows the change is followed to rest).
+ *
+ * The point is scroll-space (see {@link measurePopLayoutPoint}), so scrolling
+ * needs no refresh. A move that changes none of those boxes (for instance a
+ * transform written on an ancestor) is not seen; the cache then holds the
+ * last resting point.
+ *
+ * @returns `track` (start following an element, or stop with `undefined`),
+ *     `read` (the cached point for an element, if it has one) and `dispose`.
+ */
+export const createPopLayoutPointCache = () => {
+    let element: HTMLElement | undefined
+    let point: [number, number] | undefined
+    let frame: number | undefined
+    let framesLeft = 0
+    let stableFrames = 0
+    let resizeObserver: ResizeObserver | undefined
+    let mutationObserver: MutationObserver | undefined
+    // About five seconds at 60fps: long enough for a spring layout animation to settle.
+    const maxFrames = 300
+
+    const nextFrame = (callback: () => void): number =>
+        typeof requestAnimationFrame === 'function'
+            ? requestAnimationFrame(callback)
+            : (setTimeout(callback, 16) as unknown as number)
+    const cancelFrame = (id: number) => {
+        if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(id)
+        else clearTimeout(id)
+    }
+
+    const sample = () => {
+        frame = undefined
+        if (!element?.isConnected) return
+        const next = measurePopLayoutPoint(element)
+        // Tight: a spring's tail moves well under a pixel a frame for a while.
+        const moved =
+            !point || Math.abs(next[0] - point[0]) > 0.01 || Math.abs(next[1] - point[1]) > 0.01
+        point = next
+        stableFrames = moved ? 0 : stableFrames + 1
+        if (stableFrames < 2 && --framesLeft > 0) frame = nextFrame(sample)
+    }
+
+    const refresh = () => {
+        framesLeft = maxFrames
+        stableFrames = 0
+        if (frame === undefined) frame = nextFrame(sample)
+    }
+
+    const stop = () => {
+        if (frame !== undefined) cancelFrame(frame)
+        frame = undefined
+        resizeObserver?.disconnect()
+        mutationObserver?.disconnect()
+        resizeObserver = undefined
+        mutationObserver = undefined
+        element = undefined
+        point = undefined
+    }
+
+    return {
+        /**
+         * Follow `next`'s resting point, or stop following with `undefined`.
+         *
+         * @param next The element `mode="popLayout"` would pop.
+         */
+        track(next: HTMLElement | undefined): void {
+            if (next === element) return
+            stop()
+            if (!next?.isConnected) return
+            element = next
+            point = measurePopLayoutPoint(next)
+            const parent = next.parentElement
+            if (typeof ResizeObserver !== 'undefined') {
+                resizeObserver = new ResizeObserver(refresh)
+                resizeObserver.observe(next)
+                if (parent) resizeObserver.observe(parent)
+                resizeObserver.observe(next.ownerDocument.documentElement)
+            }
+            if (parent && typeof MutationObserver !== 'undefined') {
+                mutationObserver = new MutationObserver(refresh)
+                mutationObserver.observe(parent, { childList: true })
+            }
+        },
+        /**
+         * The cached resting point of `target`.
+         *
+         * @param target The element about to pop.
+         * @returns Its last resting point, or `undefined` if it isn't tracked.
+         */
+        read(target: HTMLElement): [number, number] | undefined {
+            return target === element && target.isConnected && point
+                ? [point[0], point[1]]
+                : undefined
+        },
+        dispose: stop
+    }
+}
+
+/**
  * Offset a popped element back when popping it moved the container it is
  * pinned to (#2348): a bottom-anchored or centred container shrinks around
  * its remaining children, and the element, pinned to its edges, moves with

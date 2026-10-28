@@ -8,6 +8,7 @@
     import { createPresenceExitRegistry } from '$lib/utils/presenceExitRegistry'
     import type { PresenceContextProps } from 'motion-dom'
     import {
+        createPopLayoutPointCache,
         getAnimatePresenceContext,
         getPresenceDepth,
         measurePopLayoutSnapshot,
@@ -82,6 +83,37 @@
 
     let removePop: () => void = () => {}
 
+    // Where the pop element rests, for applyPop's "before" point (see
+    // `createPopLayoutPointCache`). Only followed in popLayout mode, while no
+    // exit holds the element popped.
+    const popPointCache = createPopLayoutPointCache()
+    let popTrackScheduled = false
+    let popTrackAttempts = 0
+    const trackPopElement = () => {
+        if (animatePresence?.mode !== 'popLayout' || popTrackScheduled) return
+        popTrackScheduled = true
+        queueMicrotask(() => {
+            popTrackScheduled = false
+            if (phase !== 'idle' || !present) {
+                popPointCache.track(undefined)
+                return
+            }
+            const element = exitRegistry.getPopElement()
+            popPointCache.track(element)
+            // The motion element registers as its VisualElement mounts, which
+            // can land after this flush: look again for a few frames.
+            if (element) popTrackAttempts = 0
+            else if (popTrackAttempts++ < 10) requestAnimationFrame(trackPopElement)
+        })
+    }
+    // Start (or restart, after a re-entry) following the resting point once
+    // the update is in the DOM.
+    $effect(() => {
+        void present
+        void phase
+        trackPopElement()
+    })
+
     /**
      * `mode="popLayout"`: take the held content out of the layout flow while it
      * exits, so siblings reflow immediately. Port of framer-motion
@@ -106,6 +138,10 @@
         if (!element) return
         const snapshot = measurePopLayoutSnapshot(element, getComputedStyle(element))
         if (!snapshot.width || !snapshot.height) return
+        // Where it rested before this update's DOM changes, when known.
+        snapshot.point = popPointCache.read(element) ?? snapshot.point
+        // Popped positions aren't resting ones.
+        popPointCache.track(undefined)
 
         const { anchorX, anchorY, root } = animatePresence?.getPopLayoutOptions() ?? {
             anchorX: 'left',
@@ -162,6 +198,8 @@
         removePop = () => {
             removePop = () => {}
             pendingPop = null
+            // Back in flow (re-entry), or about to unmount (tracking skips it).
+            trackPopElement()
             if (element.dataset.motionPopId === id) element.removeAttribute('data-motion-pop-id')
             style.remove()
         }
@@ -315,6 +353,7 @@
     })
 
     onDestroy(() => {
+        popPointCache.dispose()
         cancelWaitEnterBlock()
         exitRegistry.cancel()
         removePop()
