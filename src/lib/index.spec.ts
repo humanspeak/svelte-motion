@@ -1,6 +1,10 @@
 import { createEffect as createEffectCore, MotionValueState as MotionValueStateCore } from 'motion'
 import { describe, expect, it } from 'vitest'
-import { MOTION_EXPORTS_NOT_REEXPORTED } from './__tests__/motionExportAllowlist.js'
+import {
+    MOTION_EXPORTS_NOT_REEXPORTED,
+    MOTION_EXPORTS_PENDING_SVELTE_ADAPTATION,
+    MOTION_PUBLIC_REEXPORTS
+} from './__tests__/motionExportAllowlist.js'
 import {
     animate,
     AnimatePresence,
@@ -89,6 +93,31 @@ describe('public API: index.ts', () => {
             'allowlist entries motion no longer exports, or that we now re-export'
         ).toEqual([])
     })
+
+    it('re-exports Motion public API as-is (plan 014 bucket a)', async () => {
+        const motionNs = (await import('motion')) as Record<string, unknown>
+        const ours = (await import('./index.js')) as Record<string, unknown>
+        for (const name of MOTION_PUBLIC_REEXPORTS) {
+            expect(MOTION_EXPORTS_NOT_REEXPORTED.has(name), `${name} is still allowlisted`).toBe(
+                false
+            )
+            expect(typeof motionNs[name], `motion no longer exports ${name}`).toBe('function')
+            expect(ours[name], `${name} is not re-exported as motion's binding`).toBe(
+                motionNs[name]
+            )
+        }
+    })
+
+    it('keeps names awaiting a Svelte adaptation allowlisted and unexported (plan 014 bucket d)', async () => {
+        const ours = (await import('./index.js')) as Record<string, unknown>
+        for (const name of MOTION_EXPORTS_PENDING_SVELTE_ADAPTATION) {
+            expect(MOTION_EXPORTS_NOT_REEXPORTED.has(name), `${name} must stay allowlisted`).toBe(
+                true
+            )
+            expect(name in ours, `${name} is exported; drop it from the pending set`).toBe(false)
+        }
+    })
+
     it('exports MotionConfig coordinate transform types', () => {
         const transformPagePoint: MotionTransformPoint = ({ x, y }) => ({ x: x * 2, y: y * 2 })
         const config: MotionConfigProps = { transformPagePoint }

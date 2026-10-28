@@ -333,3 +333,28 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     // new in Motion 14.7.1 — not yet reviewed for re-export
     'buildTransformer'
 ])
+
+/**
+ * Upstream public, framework-agnostic API that `src/lib/index.ts` must re-export as-is
+ * (identical to `motion`'s binding). Bucket (a) of plan 014's audit: hand-curated in
+ * `framer-motion/src/dom.ts` (`createScopedAnimate`, `animateMini`), documented on motion.dev
+ * (`resolveElements`), or a generator sibling of the re-exported `spring` (`inertia`, `keyframes`).
+ */
+export const MOTION_PUBLIC_REEXPORTS: readonly string[] = [
+    'animateMini',
+    'createScopedAnimate',
+    'inertia',
+    'keyframes',
+    'resolveElements'
+]
+
+/**
+ * Allowlisted names that are public enough to want but need a Svelte adaptation before they
+ * can be exported (plan 014 bucket (d)). Each stays in MOTION_EXPORTS_NOT_REEXPORTED until its
+ * follow-up lands; that change removes it from both sets.
+ */
+export const MOTION_EXPORTS_PENDING_SVELTE_ADAPTATION: ReadonlySet<string> = new Set<string>([
+    'followValue', // augmented vanilla factory next to springValue (vanillaValues.svelte.ts)
+    'MotionValue', // runtime class vs our MotionValue type
+    'recordStats' // upstream ships it only from the motion/debug subpath
+])
