@@ -6,7 +6,6 @@ import {
     observeLayoutChanges,
     runLayoutSizeAnimation,
     selectLayoutDependencies,
-    setCompositorHints,
     stripNonChildLayoutStyle
 } from './layout.js'
 
@@ -295,14 +294,6 @@ describe('utils/layout', () => {
 
         await Promise.resolve()
         expect(el.hasAttribute('data-layout-size-animation')).toBe(false)
-    })
-
-    it('setCompositorHints: toggles styles', () => {
-        const el = document.createElement('div')
-        setCompositorHints(el, true)
-        expect(el.style.willChange).toBe('transform')
-        setCompositorHints(el, false)
-        expect(el.style.willChange).toBe('')
     })
 
     it('observeLayoutChanges: calls callback and cleans up (with parent branch)', () => {
@@ -720,6 +711,51 @@ describe('utils/layout', () => {
                 cb,
                 'an animation-channel-only ancestor change must be filtered'
             ).not.toHaveBeenCalled()
+            cleanup()
+        })
+
+        it('ignores an ancestor style rewrite that only re-serializes the authored text', async () => {
+            const parent = document.createElement('div')
+            const el = document.createElement('div')
+            // Authored text, never touched by the CSSOM yet: `#ddd`, not the
+            // browser's `rgb(221, 221, 221)` serialization.
+            parent.setAttribute('style', 'position: relative; width: 400px; background: #ddd')
+            parent.appendChild(el)
+            document.body.appendChild(parent)
+
+            const cb = vi.fn()
+            const cleanup = observeLayoutChanges(el, cb)
+            await flush()
+            cb.mockClear()
+
+            // The projection's first transform write re-serializes every
+            // declaration. Only an animation channel changed.
+            parent.style.transform = 'translate3d(0px, -74px, 0px)'
+            await flush()
+
+            expect(
+                cb,
+                'a serialization-only difference must not count as a layout change'
+            ).not.toHaveBeenCalled()
+            cleanup()
+        })
+
+        it('still re-slots on a geometric change to an ancestor with authored style text', async () => {
+            const parent = document.createElement('div')
+            const el = document.createElement('div')
+            parent.setAttribute('style', 'position: relative; width: 400px; background: #ddd')
+            parent.appendChild(el)
+            document.body.appendChild(parent)
+
+            const cb = vi.fn()
+            const cleanup = observeLayoutChanges(el, cb)
+            await flush()
+            cb.mockClear()
+
+            parent.style.width = '300px'
+            await flush()
+
+            expect(cb, 'a real geometric change must still be observed').toHaveBeenCalled()
             cleanup()
         })
 
