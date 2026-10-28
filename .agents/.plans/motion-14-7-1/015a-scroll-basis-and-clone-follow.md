@@ -247,7 +247,7 @@ helpers.
 - At the start of `unregisterChild`, take `preBasis = seenScrollBasis(slotParent)`. No reads.
 - After `schedulePopLayoutCorrection` (or right after the insert), queue one `microtask.read`. In it:
   - `move = scrollDelta(preBasis, readScrollBasis(slotParent), isFoldedIn)`;
-  - `from = move / measureScreenScale(clone.offsetParent)` (A1: sign corrected; the clone must start where it was
+  - `from = move` (A2: raw screen move, no scale division; A1: sign corrected; the clone must start where it was
     before the content moved). The 008 clamp gives `y: [-70, 0]`.
 - `layoutTransition = getValueTransition(t, 'layout')`. `t` is `child.mergedTransition` when it is defined and has
   keys, otherwise a local `defaultLayoutTransition` (cite 581-584, 626, 2546-2549).
@@ -610,4 +610,14 @@ Implement it in `presence.ts`.
   not a weakened assertion for the Done criteria diff check.
 - Part C's sign: `from = move / scale`, not `−move / scale` (plan slip; the clamp still gives `y: [-70, 0]`).
 - M6 is moot: the owned `?layoutGroup` case already passes.
+
+### A2 (2026-10-28, operator-approved)
+
+- Part C uses `from = move`, not `move / measureScreenScale(offsetParent)`. Upstream only accumulates scale from
+  projection nodes (`getClosestProjectingParent`, `create-projection-node.ts:1435-1442`; `treeScale`, 413,
+  1546-1560), so under a CSS-scaled ancestor with no projection node the siblings write the screen-space delta as a
+  local translate. The clone must move by the same raw amount or the gap opens by `move/2` (008's positioned+scale
+  case failed by 12.8 px with the division). Guard-confirmed.
+- Maintenance: the follow axes run on the main thread through a no-op `onUpdate`, which relies on motion-dom's
+  `canAccelerateTransform` checking `!options.hasOnUpdate` (`motion-value.ts:62`). Re-check this on every Motion bump.
 
