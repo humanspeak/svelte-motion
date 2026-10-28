@@ -231,6 +231,70 @@ for (const path of PATHS) {
     })
 }
 
+/**
+ * Real time, at human speed: items are added a couple of seconds apart, so
+ * each add's layout animation settles while the list rests, then one is
+ * removed. The mocked-clock cases above add every item before anything
+ * settles, so they never see a "before" point measured while the items
+ * moved and then left to go stale. Samples the exiting item's centre every
+ * frame for 300 ms, starting on the click itself.
+ */
+async function realTimeDrift(page: Page, url: string, id: number, adds: number, add: string) {
+    await page.goto(url)
+    await page.waitForFunction(() => window.MotionIsMounted === true)
+    for (let i = 0; i < adds; i++) {
+        await page.waitForTimeout(2000)
+        await click(page, add)
+    }
+    await page.waitForTimeout(2000)
+
+    return page.evaluate(
+        ({ selector }) =>
+            new Promise<number>((resolve) => {
+                const centre = () => {
+                    const box = document.querySelector(selector)?.getBoundingClientRect()
+                    return box && { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+                }
+                const before = centre()!
+                let drift = 0
+                const start = performance.now()
+                const sample = () => {
+                    const now = centre()
+                    if (now) drift = Math.max(drift, Math.hypot(now.x - before.x, now.y - before.y))
+                    if (performance.now() - start < 300) requestAnimationFrame(sample)
+                    else resolve(drift)
+                }
+                document.querySelector<HTMLElement>(selector)!.click()
+                requestAnimationFrame(sample)
+            }),
+        { selector: `[data-testid$="item-${id}"]` }
+    )
+}
+
+for (const path of PATHS) {
+    test.describe(`popLayout at human speed: items added while the list rests (${path})`, () => {
+        for (const [name, query] of [
+            ['fixed, bottom-anchored container', '&fixed&anchor=bottom'],
+            [
+                'fixed, bottom-anchored container, anchorY: bottom',
+                '&fixed&anchor=bottom&anchorY=bottom'
+            ],
+            ['fixed, transform-centred container', '&fixed&anchor=center']
+        ]) {
+            test(`exiting item holds after two adds (${name})`, async ({ page }) => {
+                const drift = await realTimeDrift(
+                    page,
+                    `/tests/animate-presence/pop-layout-container-move?@isPlaywright=true&popLayout&path=${path}${query}`,
+                    1,
+                    2,
+                    '[data-testid="add"]'
+                )
+                expect(drift).toBeLessThan(1)
+            })
+        }
+    })
+}
+
 test.describe('popLayout playground (#2348)', () => {
     test('loads, renders the default preset and reads a held removal', async ({ page }) => {
         await page.goto('/tests/animate-presence/pop-layout-playground?@isPlaywright=true')
@@ -243,9 +307,18 @@ test.describe('popLayout playground (#2348)', () => {
 
         const readout = page.locator('[data-testid="drift-1"]')
         await expect(readout).toBeVisible()
-        const drift = Number(
-            /max centre drift ([\d.]+)px/.exec((await readout.textContent()) ?? '')?.[1]
-        )
-        expect(drift).toBeLessThanOrEqual(1)
+        expect(
+            Number(/max centre drift ([\d.]+)px/.exec((await readout.textContent()) ?? '')?.[1])
+        ).toBeLessThanOrEqual(1)
+
+        // At human speed: add an item, let the list rest, then remove another.
+        await click(page, '[data-testid="pg-add"]')
+        await page.waitForTimeout(2000)
+        await click(page, '[data-testid="pg-item-2"]')
+        const later = page.locator('[data-testid="drift-2"]')
+        await expect(later).toBeVisible()
+        expect(
+            Number(/max centre drift ([\d.]+)px/.exec((await later.textContent()) ?? '')?.[1])
+        ).toBeLessThanOrEqual(1)
     })
 })
