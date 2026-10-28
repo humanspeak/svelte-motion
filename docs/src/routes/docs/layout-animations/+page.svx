@@ -188,8 +188,16 @@ Nested groups chain by default (`inherit={true}`), so a `<LayoutGroup id="inner"
 
 `layoutId` works best inside `AnimatePresence`, which provides the registry that coordinates the snapshot/consume handoff.
 
+### `layoutRoot` and `layoutAnchor`
+
+| Prop | Type | Description |
+|---|---|---|
+| `layoutRoot` | `boolean` | Make this element a layout root: descendants' layout animations, including shared `layoutId` ones whose previous element was inside it too, resolve relative to it. Its own layout change is instant. Read at mount. See [layoutRoot & layoutAnchor](/docs/layout-root). |
+| `layoutAnchor` | `{ x: number; y: number } \| false` | The point on the parent that relative layout projection is anchored to (default top-left; `{ x: 0.5, y: 0.5 }` for a centred child), or `false` to turn relative projection off. |
+
 ## Related
 
 - [AnimatePresence](/docs/animate-presence) — Coordinate enter/exit animations
 - [Shared Layout Animation example](/examples/shared-layout-animation) — Full interactive demo
 - [LayoutGroup example](/examples/layout-group) — Two sibling tab strips reusing the same `layoutId` without crossing over
+- [layoutRoot & layoutAnchor](/docs/layout-root) — Animate shared layout relative to a layout root, and anchor relative projection

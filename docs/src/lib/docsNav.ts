@@ -83,6 +83,7 @@ export const docsSections: NavSection[] = [
             { title: 'scopeMotion', href: '/docs/scope-motion', icon: Box },
             { title: 'arc()', href: '/docs/arc', icon: Spline },
             { title: 'layoutDependency', href: '/docs/layout-dependency', icon: Gauge },
+            { title: 'layoutRoot', href: '/docs/layout-root', icon: LayoutGrid },
             { title: 'onUpdate', href: '/docs/on-update', icon: Activity },
             { title: 'SVG Animation', href: '/docs/svg-animation', icon: Wand },
             { title: 'transformTemplate', href: '/docs/transform-template', icon: Code },

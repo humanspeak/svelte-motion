@@ -136,6 +136,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'Keep FLIP layout animations anchored when the parent container scrolls mid-animation.'
     },
+    'layout-root': {
+        title: 'layoutRoot & layoutAnchor',
+        description:
+            'A tab underline glides one tab while the whole tab bar jumps, and a centred child stays centred while its parent resizes.'
+    },
     'lazy-motion': {
         title: 'LazyMotion',
         description: 'Load Svelte Motion feature bundles with LazyMotion and the m namespace.'
