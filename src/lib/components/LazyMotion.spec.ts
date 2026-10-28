@@ -6,9 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LazyMotionKindProbe from './__tests__/LazyMotionKindProbe.svelte'
 import LazyMotionProbe from './__tests__/LazyMotionProbe.svelte'
 
-vi.mock('motion', () => {
+vi.mock('motion', async (importOriginal) => {
     const animateMock = vi.fn(() => ({ finished: Promise.resolve() }))
-    return { animate: animateMock }
+    return { ...(await importOriginal<typeof import('motion')>()), animate: animateMock }
 })
 
 beforeEach(() => {
