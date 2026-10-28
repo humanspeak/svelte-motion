@@ -94,6 +94,7 @@
     } from '$lib/utils/presence'
     import { getInitialKeyframes } from '$lib/utils/initial'
     import { boxFromRect, MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
+    import { isResizeBlocked, type ScrollBasis } from '$lib/utils/scrollBasis'
     import {
         getMotionDomProjectionParent,
         setMotionDomProjectionParent
@@ -2214,6 +2215,28 @@
     let lastRect: RectLike | null = null
     let observerRestartRect: RectLike | null = null
     let observerRestartElement: HTMLElement | null = null
+    // The scroll basis each cached rect was read in (plan 015a): a scroll
+    // container that isn't `layoutScroll`, or the window under a fixed
+    // element, can move the element's page box with no read here, so the
+    // cache is rebased (`rebaseRect`) before it is compared with a fresh
+    // read. Every write goes through `setLastRect`.
+    let lastRectBasis: ScrollBasis | undefined
+    let observerRestartBasis: ScrollBasis | undefined
+    /** The basis of the adapter's latest read, taken right after that read. */
+    const readRectBasis = () => motionDomProjection?.lastReadScrollBasis
+    /**
+     * Cache `rect` with the basis of the read that produced it.
+     *
+     * @param rect The rect just read, or `null` to clear the cache.
+     * @param basis Its scroll basis (defaults to the adapter's latest read).
+     */
+    const setLastRect = (rect: RectLike | null, basis = rect ? readRectBasis() : undefined) => {
+        lastRect = rect
+        lastRectBasis = basis
+    }
+    /** The cached rect, moved by any scroll since it was read. */
+    const rebasedLastRect = () =>
+        motionDomProjection?.rebaseRect(lastRect, lastRectBasis) ?? lastRect
     // Coordinates the two delivery paths so one layout change produces exactly
     // one FLIP commit (upstream guarantees one measure/animate pass per commit:
     // MeasureLayout.tsx getSnapshotBeforeUpdate→componentDidUpdate + the
@@ -2361,6 +2384,7 @@
         if (element.parentElement?.closest('[data-layout-size-animation]')) return
         const next = measureLayoutRect()
         if (!next) return
+        const nextBasis = readRectBasis()
         // The DOM observer already consumed this exact change: it committed a
         // changed rect on its microtask (serial advanced since this callback
         // was scheduled) AND the cached `lastRect` already equals `next`. The
@@ -2382,7 +2406,7 @@
         // idle "changed=false" event is part of the observable contract).
         emitProjectionUpdate(prev, next)
         if (hasRectChanged(prev, next)) {
-            lastRect = next
+            setLastRect(next, nextBasis)
             // A Svelte-owned prop change is this component re-rendering:
             // upstream re-renders (and so snapshots) every descendant,
             // including ones in a separate LayoutGroup (Step 4b-d). A live
@@ -2620,7 +2644,7 @@
 
         if (element.parentElement?.closest('[data-layout-size-animation]')) {
             finishFlipAnimations(element)
-            lastRect = measureLayoutRect()
+            setLastRect(measureLayoutRect())
             motionDomProjection?.seedLayout()
             motionDomProjection?.finishAnimation()
             return true
@@ -2636,7 +2660,7 @@
         if (hasPresenceHold || hasHiddenWaitEnter) return true
         if (hasPresencePlaceholder && !hasSizeCorrectionTarget) {
             finishFlipAnimations(element)
-            lastRect = measureLayoutRect()
+            setLastRect(measureLayoutRect())
             motionDomProjection?.seedLayout()
             motionDomProjection?.finishAnimation()
             return true
@@ -2651,8 +2675,9 @@
         const layoutMode =
             layoutProp && isLoaded === 'ready' && hasLayoutFeatures ? layoutProp : false
         if (!(observedElement && layoutMode)) {
-            lastRect = null
+            setLastRect(null)
             observerRestartRect = null
+            observerRestartBasis = undefined
             observerRestartElement = null
             return
         }
@@ -2664,16 +2689,21 @@
         // MutationObserver can deliver its child-list record. Preserve the
         // prior slot across that restart: startup's post-patch measurement is
         // the only path that still owns both sides of the keyed move.
-        const previousBeforeObserverRestart =
-            observerRestartElement === observedElement ? observerRestartRect : null
+        const restartedHere = observerRestartElement === observedElement
+        const restartRect = restartedHere ? observerRestartRect : null
+        const restartBasis = restartedHere ? observerRestartBasis : undefined
         observerRestartRect = null
+        observerRestartBasis = undefined
         observerRestartElement = null
         // One read seeds the projection AND primes the observer cache
         // (`seedLayout()` + `measureLayoutRect()` would read the box twice —
         // and a keyed reorder restarts this effect for every moved row).
         // Loud on purpose: this is the mount / restart slot `onLayoutMeasure`
         // consumers (Reorder.Item) register from.
-        lastRect = motionDomProjection?.refreshLayout() ?? measureLayoutRect()
+        setLastRect(motionDomProjection?.refreshLayout() ?? measureLayoutRect())
+        // The slot from before the restart, moved by any scroll since.
+        const previousBeforeObserverRestart =
+            motionDomProjection?.rebaseRect(restartRect, restartBasis) ?? restartRect
         // Upstream gate (#470): a `layoutDependency`-gated node only snapshots
         // when the dependency changed in THIS update (MeasureLayout.tsx:93-100
         // `prevProps.layoutDependency !== layoutDependency`). A pending reactive
@@ -2710,7 +2740,7 @@
             // ONE DOM read: seeds the projection layout and returns the rect
             // (`measurePageRect` + `seedLayout` would read the box twice).
             const next = motionDomProjection?.refreshLayout({ silent: true }) ?? null
-            if (next) lastRect = next
+            if (next) setLastRect(next)
         }
 
         // Own-subtree DOM changes (children added/removed, text changed) are
@@ -2744,11 +2774,21 @@
                 refreshGatedLayoutCache()
                 return
             }
+            // Upstream blocks updates for 250ms after a width change and
+            // measures without animating (create-projection-node.ts @
+            // v14.7.1, 523-528, 797-820): refresh the cache silently.
+            if (isResizeBlocked()) {
+                takeOwnSubtreeChange()
+                refreshGatedLayoutCache()
+                return
+            }
 
+            // The cached rect moved by any scroll since its read (plan
+            // 015a), before any comparison with the fresh one.
+            const previous = rebasedLastRect()
             const next = measureLayoutRect()
             if (!next) return
-            const previous = lastRect
-            lastRect = next
+            setLastRect(next)
             if (previous && hasRectChanged(previous, next)) {
                 // Separate LayoutGroup node group (plan 007 D6): a grouped
                 // node that wasn't snapshotted and only moved because its
@@ -2823,7 +2863,7 @@
             const next = measureLayoutRect()
             if (!(previous && next)) return
 
-            lastRect = next
+            setLastRect(next)
             // Presence-hold semantics: a hold that spanned a viewport scroll
             // or released offscreen still skips its release FLIP.
             // `previousRect` arrives in PAGE space (converted at capture in
@@ -2874,11 +2914,11 @@
         // fix race-proof: `finishAnimation()` alone can be outrun by a
         // projection update already queued on the frameloop.
         const handleSizeCorrectionSeed = () => {
-            lastRect = measureLayoutRect()
+            setLastRect(measureLayoutRect())
             motionDomProjection?.blockLayoutAnimation()
         }
         const handleSizeCorrectionEnd = () => {
-            lastRect = measureLayoutRect()
+            setLastRect(measureLayoutRect())
             motionDomProjection?.unblockLayoutAnimation()
         }
         element!.addEventListener(sizeCorrectionSeedEvent, handleSizeCorrectionSeed)
@@ -2922,22 +2962,28 @@
         // ungrouped elements keep their existing arbitration untouched.
         const offProjectionCommit = layoutGroupContext?.group
             ? motionDomProjection?.onProjectionCommit((rect) => {
-                  lastRect = rect
+                  setLastRect(rect)
                   observerCommitSerial += 1
               })
             : undefined
+        // A resize moves elements without resizing them: the adapter
+        // refreshes its cache once the resize settles and hands the rect over
+        // (plan 015a), so no second read is needed here.
+        const offCacheRefresh = motionDomProjection?.onCacheRefresh((rect) => setLastRect(rect))
 
         return () => {
             ownSubtreeObserver?.disconnect()
             offProjectionCommit?.()
+            offCacheRefresh?.()
             disconnectObservers()
             siblingLayoutObserver?.disconnect()
             element?.removeEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
             element?.removeEventListener(sizeCorrectionSeedEvent, handleSizeCorrectionSeed)
             element?.removeEventListener(sizeCorrectionEndEvent, handleSizeCorrectionEnd)
             observerRestartRect = lastRect
+            observerRestartBasis = lastRectBasis
             observerRestartElement = observedElement
-            lastRect = null
+            setLastRect(null)
             // Clear a projected transform when layout stops (unmount, layout turned off,
             // observer restart). Upstream never writes or clears transform-origin /
             // will-change for layout, so neither do we.

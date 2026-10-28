@@ -2,10 +2,22 @@ import type { AnimatePresenceMode, MotionExit, MotionTransition } from '$lib/typ
 import { mergeTransitions } from '$lib/utils/animation'
 import { holdLayoutIdHandoffs } from '$lib/utils/layoutId'
 import { pwLog } from '$lib/utils/log'
+import { MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
+import {
+    captureScrollSnapshot,
+    measureScreenScale,
+    measureScrollDelta,
+    readScrollBasis,
+    scrollDelta,
+    seenScrollBasis,
+    translateRectByScrollDelta,
+    type ScrollSnapshot
+} from '$lib/utils/scrollBasis'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import {
     cancelFrame,
     frame,
+    getValueTransition,
     microtask,
     readTransformValue,
     transformProps,
@@ -397,12 +409,6 @@ export type PopLayoutSnapshot = {
     point: [number, number]
 }
 
-type ScrollSnapshot = {
-    element: HTMLElement
-    scrollLeft: number
-    scrollTop: number
-}
-
 /**
  * Anchor used to preserve horizontal positioning in `mode="popLayout"`.
  */
@@ -428,6 +434,15 @@ export type PopLayoutOptions = {
      */
     root?: HTMLElement | ShadowRoot
 }
+
+/**
+ * Upstream's fallback layout transition (`defaultLayoutTransition`,
+ * `create-projection-node.ts` @ v14.7.1, 2546-2549), used when the element
+ * has no transition of its own (581-584).
+ */
+const defaultLayoutTransition = { duration: 0.45, ease: [0.4, 0, 0.1, 1] } as const
+
+const noop = () => {}
 
 const isHTMLElement = (element: Element | null): element is HTMLElement =>
     element instanceof HTMLElement
@@ -465,14 +480,8 @@ const readNumericStyle = (value: string, fallback: () => number): number => {
 // list 0px tall, so its y-scale reads as 1 and that item's correction is off
 // by the scale. Upstream has the same arithmetic (`PopChild.tsx` @ v14.7.1,
 // lines 41-44); kept for parity.
-export const measurePopLayoutScale = (element?: HTMLElement | null): [number, number] => {
-    const { width, height } = element?.getBoundingClientRect() || ({} as DOMRect)
-    // Upstream's arithmetic: an unmeasurable ratio (NaN) reads as unscaled.
-    return [
-        width / (element?.offsetWidth as number) || 1,
-        height / (element?.offsetHeight as number) || 1
-    ]
-}
+export const measurePopLayoutScale = (element?: HTMLElement | null): [number, number] =>
+    measureScreenScale(element)
 
 /**
  * The element's position in the space it scrolls in, as the projection
@@ -848,66 +857,6 @@ const resetTransforms = (element: HTMLElement): void => {
     s.msTransform = 'none'
     s.MozTransform = 'none'
     s.OTransform = 'none'
-}
-
-const canElementScroll = (element: HTMLElement): boolean => {
-    const computed = getComputedStyle(element)
-    const overflow = `${computed.overflow}${computed.overflowX}${computed.overflowY}`
-    const canScroll =
-        element.scrollHeight > element.clientHeight + 1 ||
-        element.scrollWidth > element.clientWidth + 1
-
-    return canScroll && /(auto|scroll|overlay)/.test(overflow)
-}
-
-const captureScrollSnapshot = (element: HTMLElement): ScrollSnapshot[] => {
-    const snapshots: ScrollSnapshot[] = []
-    const doc = element.ownerDocument
-    let parent = element.parentElement
-
-    while (parent && parent !== doc.body && parent !== doc.documentElement) {
-        if (canElementScroll(parent)) {
-            snapshots.push({
-                element: parent,
-                scrollLeft: parent.scrollLeft,
-                scrollTop: parent.scrollTop
-            })
-        }
-
-        parent = parent.parentElement
-    }
-
-    const scrollingElement = doc.scrollingElement
-    if (snapshots.length === 0 && isHTMLElement(scrollingElement)) {
-        snapshots.push({
-            element: scrollingElement,
-            scrollLeft: scrollingElement.scrollLeft,
-            scrollTop: scrollingElement.scrollTop
-        })
-    }
-
-    return snapshots
-}
-
-const measureScrollDelta = (snapshots: ScrollSnapshot[]): { left: number; top: number } => {
-    return snapshots.reduce(
-        (delta, snapshot) => {
-            if (!snapshot.element.isConnected) return delta
-
-            return {
-                left: delta.left + snapshot.element.scrollLeft - snapshot.scrollLeft,
-                top: delta.top + snapshot.element.scrollTop - snapshot.scrollTop
-            }
-        },
-        { left: 0, top: 0 }
-    )
-}
-
-const translateRectByScrollDelta = (
-    rect: DOMRect,
-    delta: { left: number; top: number }
-): DOMRect => {
-    return new DOMRect(rect.left - delta.left, rect.top - delta.top, rect.width, rect.height)
 }
 
 /**
@@ -1955,10 +1904,13 @@ export const createAnimatePresenceContext = (context: {
         // before this exit animation completes
         const exitingElement = child.element
 
-        activeExit.frame = requestAnimationFrame(() => {
-            activeExit.frame = undefined
-            // Re-entry or boundary teardown can cancel before the first frame.
-            if (activeExit.cancelled || disposed) return
+        /**
+         * Start the exit. `follow` (plan 015a, part C) is the move the update
+         * gave a `layout` clone's content, in px: the clone has no projection
+         * node, so it animates that move itself, with the element's layout transition, in the same
+         * `animate()` call as its exit (one grouped `transform` animation).
+         */
+        const startExitAnimation = (follow?: { x: number; y: number }) => {
             const resolvedExit = child.resolveExit?.(getCustom()) ?? child.exit
 
             if (!resolvedExit) {
@@ -1998,11 +1950,45 @@ export const createAnimatePresenceContext = (context: {
             // Start exit and track in-flight count (handles wait-mode blocking)
             startExit()
 
-            activeExit.base = readAnimatedValues(clone, Object.keys(exitKeyframes))
+            const keyframes: Record<string, unknown> = { ...exitKeyframes }
+            const transition: Record<string, unknown> = { ...finalTransition }
+            const followAxes = follow ? (['x', 'y'] as const).filter((axis) => follow[axis]) : []
+            activeExit.base = readAnimatedValues(clone, [
+                ...new Set([...Object.keys(exitKeyframes), ...followAxes])
+            ])
+            if (follow && followAxes.length) {
+                // `options.transition || defaultLayoutTransition`, then its
+                // `layout` entry (create-projection-node.ts @ v14.7.1,
+                // 581-584, 626).
+                const own = child.mergedTransition as Record<string, unknown> | undefined
+                const layoutTransition: unknown = getValueTransition(
+                    own && Object.keys(own).length ? own : defaultLayoutTransition,
+                    'layout'
+                )
+                for (const axis of followAxes) {
+                    const target = exitKeyframes[axis]
+                    if (target === undefined) {
+                        keyframes[axis] = [follow[axis], 0]
+                        // On the main thread (an `onUpdate` keeps it off the
+                        // compositor): its clock then starts on the next
+                        // frame, as the siblings' projection animations'
+                        // does, rather than on creation, a frame ahead.
+                        transition[axis] = { ...(layoutTransition as object), onUpdate: noop }
+                    } else {
+                        // The exit animates this axis too: start it from
+                        // where the content moved it.
+                        const current = Number.parseFloat(String(activeExit.base[axis] ?? 0)) || 0
+                        const to: unknown = Array.isArray(target)
+                            ? (target as unknown[])[target.length - 1]
+                            : target
+                        keyframes[axis] = [follow[axis] + current, to]
+                    }
+                }
+            }
             const exitAnimation = animate(
                 clone,
-                exitKeyframes as unknown as DOMKeyframesDefinition,
-                finalTransition
+                keyframes as unknown as DOMKeyframesDefinition,
+                transition as AnimationOptions
             )
             activeExit.animation = exitAnimation
             exitAnimation.finished
@@ -2054,7 +2040,41 @@ export const createAnimatePresenceContext = (context: {
                     removeExitPlaceholder(key, placeholder)
                     finishExit()
                 })
+        }
+
+        activeExit.frame = requestAnimationFrame(() => {
+            activeExit.frame = undefined
+            // Re-entry or boundary teardown can cancel before the first frame.
+            if (activeExit.cancelled || disposed) return
+            startExitAnimation()
         })
+
+        // Plan 015a, part C: when the update scrolls the content (a clamp),
+        // siblings animate the move from their rebased caches, so a `layout`
+        // clone must move with them. Queued after the #2348 correction, in
+        // the read step, where the projection measures the siblings too, so
+        // the follow starts with their animations. A non-layout exit moves
+        // with the content, as upstream.
+        if (clone.matches('[data-layout], [data-layout-id]')) {
+            // The scroll from before this update, from the tracker: no reads
+            // of a container it already knows.
+            const before = seenScrollBasis(clone)
+            const isFoldedIn = MotionDomProjectionAdapter.foldedInFor(slotParent)
+            microtask.read(() => {
+                if (activeExit.cancelled || disposed || activeExit.frame === undefined) return
+                if (!clone.isConnected) return
+                const move = scrollDelta(before, readScrollBasis(clone), isFoldedIn)
+                if (Math.abs(move.x) < 0.01 && Math.abs(move.y) < 0.01) return
+                cancelAnimationFrame(activeExit.frame)
+                activeExit.frame = undefined
+                // In the siblings' units: a projection node writes its
+                // measured (screen-space) delta as a local translate and
+                // never corrects it for a CSS-scaled ancestor that has no
+                // projection node, so neither does the clone, which stands
+                // in for the element's node.
+                startExitAnimation({ x: move.x, y: move.y })
+            })
+        }
     }
 
     const takeExitHandoff = (key: string): ExitHandoff | undefined => {

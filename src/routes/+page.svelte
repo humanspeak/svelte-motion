@@ -1021,6 +1021,15 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/pop-layout-scroll-siblings') +
+                            searchParams}
+                    >
+                        Layout siblings around exits in scroll containers (plan 015a/b)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/animate-presence/pop-layout-playground') +
                             searchParams}
                     >
