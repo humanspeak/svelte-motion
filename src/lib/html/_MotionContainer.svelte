@@ -86,7 +86,6 @@
         mergeInlineStyles,
         serializeMotionStyle
     } from '$lib/utils/style'
-    import { isNativelyFocusable } from '$lib/utils/a11y'
     import {
         getAnimatePresenceContext,
         getPresenceChildContext,
@@ -108,7 +107,6 @@
         resolveInitial,
         resolveAnimate,
         resolveExit,
-        resolveWhile,
         resolveVariantList,
         resolveRestingValues,
         resolveWildcardKeyframes
@@ -1331,18 +1329,10 @@
         )
     )
 
-    // Resolve `whileX` props against `variants` so each gesture's attach
-    // helper receives a plain keyframes object regardless of whether the
-    // consumer wrote inline keyframes, a variant key, or an array of
-    // variant keys. Mirrors framer-motion's `whileHover` etc. surface
-    // (#349).
-    const resolvedWhileTap = $derived(resolveWhile(whileTapProp, variantsProp, effectiveCustom))
-    // `resolvedWhileHover` / `resolvedWhileFocus` / `resolvedWhileInView` are
-    // gone with plan 003: the animationState resolves variant LABELS against
-    // `variants` itself, so pre-resolving them here was redundant. `whileTap`
-    // keeps its own because tap's `tabindex` affordance reads it. `whileDrag`
-    // goes through the animationState (`VisualElementDragControls` sets it
-    // active).
+    // No `resolvedWhile*` here: the animationState resolves variant LABELS
+    // against `variants` itself (plan 003), and tap's `tabindex` reads the raw
+    // props, as upstream `use-props.ts:76-81` does (plan 016). `whileDrag` goes
+    // through the animationState (`VisualElementDragControls` sets it active).
 
     // Extract keyframes from resolved initial, handling initial={false}
     const initialKeyframes = $derived(
@@ -1691,13 +1681,16 @@
     // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
     const derivedAttrs = $derived<Record<string, unknown>>({
         ...spreadAttrs,
-        // Gate on the *resolved* whileTap, not the raw prop. With
-        // variant-label support a truthy-but-unresolved value (unknown
-        // key, empty array) would otherwise add `tabindex=0` for an
-        // element that never actually receives a tap gesture — an
-        // unintended tab stop. (#349 CR feedback)
-        ...(isNotEmpty(resolvedWhileTap) &&
-        !isNativelyFocusable(tag, rest) &&
+        // Upstream `render/html/use-props.ts:76-81`: `tabIndex = 0` from props
+        // alone when none is set and `onTap`, `onTapStart` or `whileTap` is
+        // truthy. Raw prop truthiness (an unresolved `whileTap` label counts),
+        // no feature gate (a featureless `m` and the server markup get it too)
+        // and no tag check (buttons and links get it too). `onTapCancel` is not
+        // in the list; on the client with gestures loaded, motion-dom's
+        // `press()` still sets `tabIndex = 0` on mount for a non-keyboard-
+        // accessible element (`gestures/press/index.ts:144-149`), which covers
+        // the `onTapCancel`-only case.
+        ...((onTapProp || onTapStartProp || whileTapProp) &&
         ((rest as Record<string, unknown>)?.tabindex ??
             (rest as Record<string, unknown>)?.tabIndex ??
             undefined) === undefined
