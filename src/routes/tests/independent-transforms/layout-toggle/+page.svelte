@@ -114,10 +114,18 @@
         isTester = !window.location.search.includes('@isPlaywright=true')
     })
 
+    /**
+     * Accelerated transform animations each row expects after the toggle.
+     * `#toggle-layout` stays accelerated (re-enabling `layout` is a mount).
+     * Removing `#toggle-layout-id`'s `layoutId` is an update since Motion
+     * 14.7.1 (#1411): its `willUpdate()` moved `x` to the main thread.
+     */
+    const expectedCount: Record<string, number> = { 'toggle-layout': 1, 'toggle-layout-id': 0 }
+
     const countVerdict = (id: string) => {
         const seen = counts[id]
         if (!seen || seen.length < 3) return null
-        return seen.every((count) => count === 1)
+        return seen.every((count) => count === expectedCount[id])
     }
 
     const widenVerdict = $derived(widths === null ? null : Math.abs(widths[0] - widenWidth) <= 2)
@@ -131,7 +139,7 @@
         {
             text: 'Straight after reloading, while those boxes are still sliding, press "Toggle off and on".',
             expected:
-                'Both boxes keep sliding at the same steady pace; nothing jumps or changes size. The two "accelerated" rows read PASS.',
+                'Both boxes keep sliding at the same steady pace; nothing jumps or changes size. The "#toggle-layout accelerated" row reads PASS (still one hardware-accelerated animation). The "#toggle-layout-id main thread" row reads PASS too: removing a layoutId is an update since Motion 14.7.1, so its slide continues on the main thread.',
             action: { label: 'Toggle off and on', run: runToggle }
         },
         {
@@ -175,7 +183,7 @@
 <TesterPanel
     eyebrow="framer-motion MeasureLayout.tsx (mount vs update)"
     title="Re-enabling layout is a mount"
-    status="Expected on Chromium with Motion 14.2: every row below reads PASS."
+    status="Expected on Chromium with Motion 14.7.1: every row below reads PASS."
     {steps}
 >
     {#snippet checks()}
@@ -186,18 +194,27 @@
             <code>transform</code> animation, and a widen in the same update as the re-enable doesn't
             animate.
         </p>
+        <p>
+            Since Motion 14.7.1 (#1411), the render that <em>removes</em> a <code>layoutId</code> is
+            an update, not an unmount: <code>MeasureLayout</code> stays rendered while the node
+            still has the id, and its <code>willUpdate()</code> moves accelerated transforms back to
+            the main thread. So <code>#toggle-layout-id</code> keeps sliding on the main thread (0 accelerated
+            animations), and re-enabling the id doesn't snapshot it again.
+        </p>
     {/snippet}
     {#if isTester}
         <ul class="verdicts">
             {#each ['toggle-layout', 'toggle-layout-id'] as id (id)}
                 {@const ok = countVerdict(id)}
                 <li data-tester-verdict={id}>
-                    <code>#{id} accelerated</code>
+                    <code>#{id} {id === 'toggle-layout' ? 'accelerated' : 'main thread'}</code>
                     <span class="chip" class:ok class:pending={ok === null}>
                         {ok === null ? '…' : ok ? 'PASS' : 'FAIL'}
                     </span>
                     <span class="detail">
-                        1 transform animation after re-enabling
+                        {expectedCount[id]} accelerated transform animation{expectedCount[id] === 1
+                            ? ''
+                            : 's'} after re-enabling
                         {#if counts[id]}(saw {counts[id].join(' → ')}){/if}
                     </span>
                 </li>
