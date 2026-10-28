@@ -39,6 +39,7 @@ No additional prop is required. Svelte Motion enables optimized appear when all 
 - `initial` resolves to non-empty keyframes.
 - `animate` resolves to non-empty keyframes.
 - `initial={false}` is not set.
+- The element is a `motion` component, or an `m` component whose `LazyMotion` bundle is loaded synchronously.
 - The enter animation includes WAAPI-friendly `opacity` and/or transform values.
 
 The appear animation's timing comes from `initial`'s `transition.out` when it is set, otherwise from `animate`'s own `transition`, otherwise from the `transition` prop. That matches the runtime's mount animation, so hydration doesn't jump. See [transition.out](/docs/transition-out).
