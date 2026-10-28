@@ -7,6 +7,7 @@ import {
     getPresenceDepth,
     measurePopLayoutSnapshot,
     observeStyleChanges,
+    popLayoutPointFollowsScroll,
     readAnimatedValues,
     resolvePopLayoutStyles,
     setPresenceDepth,
@@ -749,6 +750,39 @@ describe('AnimatePresence modes', () => {
             expect(clone.style.top).toBe('')
         })
 
+        describe('popLayoutPointFollowsScroll', () => {
+            const classify = (styles: Map<Element, Partial<CSSStyleDeclaration>>) => {
+                vi.spyOn(window, 'getComputedStyle').mockImplementation((target: Element) =>
+                    mockComputedStyle({ position: 'static', ...styles.get(target) })
+                )
+                return popLayoutPointFollowsScroll(el)
+            }
+
+            it('is scroll-invariant with no fixed ancestor', () => {
+                expect(classify(new Map())).toBe(true)
+            })
+
+            it('is scroll-invariant inside a fixed ancestor the viewport contains', () => {
+                expect(classify(new Map([[parent, { position: 'fixed' }]]))).toBe(true)
+            })
+
+            it('re-samples inside a fixed ancestor that a transformed ancestor contains', () => {
+                expect(
+                    classify(
+                        new Map<Element, Partial<CSSStyleDeclaration>>([
+                            [parent, { position: 'fixed' }],
+                            [document.body, { transform: 'scale(0.5)' }]
+                        ])
+                    )
+                ).toBe(false)
+            })
+
+            it('re-samples what it cannot classify: a sticky ancestor or a fixed element', () => {
+                expect(classify(new Map([[parent, { position: 'sticky' }]]))).toBe(false)
+                expect(classify(new Map([[el, { position: 'fixed' }]]))).toBe(false)
+            })
+        })
+
         it("refreshes a resting child's popLayout point when siblings are added", async () => {
             Object.defineProperties(parent, {
                 offsetWidth: { configurable: true, value: 240 },
@@ -797,8 +831,9 @@ describe('AnimatePresence modes', () => {
             parent.appendChild(sibling)
             ctx.registerChild('k2', sibling, { opacity: 0 })
             // The container's MutationObserver sees the new sibling and
-            // re-samples k1 where it now rests.
+            // re-samples k1 where it now rests, in the next frame's read step.
             await Promise.resolve()
+            await vi.advanceTimersByTimeAsync(20)
 
             // Svelte detaches keyed nodes before the exit is registered.
             el.remove()

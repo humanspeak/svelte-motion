@@ -4,6 +4,8 @@ import { holdLayoutIdHandoffs } from '$lib/utils/layoutId'
 import { pwLog } from '$lib/utils/log'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import {
+    cancelFrame,
+    frame,
     microtask,
     readTransformValue,
     transformProps,
@@ -458,6 +460,11 @@ const readNumericStyle = (value: string, fallback: () => number): number => {
  * @param element The element to measure; `null` reads as unscaled.
  * @returns The `[x, y]` on-screen scale, `1` where it can't be measured.
  */
+// Maintenance note: an empty box reads as unscaled on that axis (0 / 0 is
+// NaN, so `|| 1`). Popping the last item of a scaled fixed list leaves the
+// list 0px tall, so its y-scale reads as 1 and that item's correction is off
+// by the scale. Upstream has the same arithmetic (`PopChild.tsx` @ v14.7.1,
+// lines 41-44); kept for parity.
 export const measurePopLayoutScale = (element?: HTMLElement | null): [number, number] => {
     const { width, height } = element?.getBoundingClientRect() || ({} as DOMRect)
     // Upstream's arithmetic: an unmeasurable ratio (NaN) reads as unscaled.
@@ -548,6 +555,45 @@ export const measurePopLayoutSnapshot = (
     }
 }
 
+const createsContainingBlockForFixed = (style: CSSStyleDeclaration): boolean =>
+    (!!style.transform && style.transform !== 'none') ||
+    (!!style.perspective && style.perspective !== 'none') ||
+    (!!style.filter && style.filter !== 'none') ||
+    /\b(paint|layout|strict|content)\b/.test(style.contain ?? '') ||
+    /\b(transform|perspective|filter)\b/.test(style.willChange ?? '')
+
+/**
+ * Whether {@link measurePopLayoutPoint} stays put when anything scrolls, so
+ * a cached point needs no scroll re-sample.
+ *
+ * The point adds every scrolling ancestor's scroll up to the first
+ * `position: fixed` ancestor. That is scroll-invariant, unless that fixed
+ * ancestor still scrolls (a transformed, filtered or contained ancestor is
+ * its containing block), or the walk meets a sticky ancestor, or the element
+ * itself is fixed or sticky: those can't be classified, so they re-sample.
+ *
+ * @param element The element whose point is cached.
+ * @returns `true` when scrolling can't move its point.
+ */
+export const popLayoutPointFollowsScroll = (element: HTMLElement): boolean => {
+    const view = element.ownerDocument.defaultView ?? window
+    const parentOf = (node: HTMLElement) =>
+        (node.parentElement || (node.parentNode as ShadowRoot | null)?.host) as
+            HTMLElement | null | undefined
+    const own = view.getComputedStyle(element).position
+    if (own === 'fixed' || own === 'sticky') return false
+    for (let node = parentOf(element); node; node = parentOf(node)) {
+        const position = view.getComputedStyle(node).position
+        if (position === 'sticky') return false
+        if (position !== 'fixed') continue
+        for (let ancestor = parentOf(node); ancestor; ancestor = parentOf(ancestor)) {
+            if (createsContainingBlockForFixed(view.getComputedStyle(ancestor))) return false
+        }
+        return true
+    }
+    return true
+}
+
 /**
  * Caches where an owned `popLayout` element rests, for {@link PopLayoutSnapshot}'s
  * "before" `point`.
@@ -565,12 +611,20 @@ export const measurePopLayoutSnapshot = (
  * children in a `display: contents` element, which never resizes. At rest
  * nothing is sampled.
  *
- * Scrolling (anywhere in the document) also re-samples: the point is in
- * scroll space, but its walk stops at a `position: fixed` ancestor, and one
- * inside a transformed ancestor still scrolls with the page. A move that
- * changes none of those boxes and scrolls nothing (for instance a transform
- * written on an ancestor) is not seen; the cache then holds the last resting
- * point.
+ * Scrolling usually needs no re-sample: the point adds every scrolling
+ * ancestor's scroll, so it doesn't move when they scroll. Except when the walk
+ * stops early, at a `position: fixed` ancestor that still scrolls because a
+ * transformed (or filtered, or contained) ancestor is its containing block, or
+ * when it meets something it can't classify (a sticky ancestor, or the element
+ * itself fixed or sticky). Only then does a capturing scroll listener on the
+ * document re-sample it ({@link popLayoutPointFollowsScroll}). The class is
+ * read when tracking starts; an ancestor transform added later isn't seen. A
+ * move that changes none of the observed boxes and scrolls nothing (for
+ * instance a transform written on an ancestor) is not seen either; the cache
+ * then holds the last resting point.
+ *
+ * Samples run in motion-dom's frameloop read step (`frame.read`), with the
+ * other layout reads of that frame.
  *
  * @returns `track` (start following an element, or stop with `undefined`),
  *     `read` (the cached point of a connected element), `peek` (the last
@@ -579,36 +633,28 @@ export const measurePopLayoutSnapshot = (
 export const createPopLayoutPointCache = () => {
     let element: HTMLElement | undefined
     let point: [number, number] | undefined
-    let frame: number | undefined
     let framesLeft = 0
     let stableFrames = 0
     let resizeObserver: ResizeObserver | undefined
     let mutationObserver: MutationObserver | undefined
     let scrollTarget: Document | undefined
-    // About five seconds at 60fps: long enough for a spring layout animation to settle.
+    // About five seconds at 60fps: long enough for a spring layout animation
+    // to settle. Maintenance note: an element whose transform keeps moving
+    // (an infinite or very long animation) stops being followed here and
+    // leaves a stale point; upstream measures live, in getSnapshotBeforeUpdate.
     const maxFrames = 300
 
-    const nextFrame = (callback: () => void): number =>
-        typeof requestAnimationFrame === 'function'
-            ? requestAnimationFrame(callback)
-            : (setTimeout(callback, 16) as unknown as number)
-    const cancelFrame = (id: number) => {
-        if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(id)
-        else clearTimeout(id)
-    }
-
-    // `scheduled`, not `frame`, says whether a sample is pending: a frame
-    // callback may run synchronously (inside `nextFrame`), before its id is
-    // returned.
+    // `scheduled` says whether a sample is pending; `run` is the queued
+    // process, kept to cancel it.
     let scheduled = false
+    const run = () => {
+        scheduled = false
+        sample()
+    }
     const schedule = () => {
         if (scheduled) return
         scheduled = true
-        frame = nextFrame(() => {
-            scheduled = false
-            frame = undefined
-            sample()
-        })
+        frame.read(run)
     }
 
     const sample = () => {
@@ -629,9 +675,8 @@ export const createPopLayoutPointCache = () => {
     }
 
     const stop = () => {
-        if (scheduled && frame !== undefined) cancelFrame(frame)
+        if (scheduled) cancelFrame(run)
         scheduled = false
-        frame = undefined
         resizeObserver?.disconnect()
         mutationObserver?.disconnect()
         resizeObserver = undefined
@@ -669,8 +714,10 @@ export const createPopLayoutPointCache = () => {
                 mutationObserver = new MutationObserver(refresh)
                 mutationObserver.observe(container, { childList: true, subtree: true })
             }
-            scrollTarget = next.ownerDocument
-            scrollTarget.addEventListener('scroll', refresh, { capture: true, passive: true })
+            if (!popLayoutPointFollowsScroll(next)) {
+                scrollTarget = next.ownerDocument
+                scrollTarget.addEventListener('scroll', refresh, { capture: true, passive: true })
+            }
             // The element may still be settling (an enter or layout animation).
             refresh()
         },
