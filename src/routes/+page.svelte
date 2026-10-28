@@ -1282,6 +1282,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/transform-origin-at-rest') + searchParams}
+                    >
+                        layout — transform-origin stays at the centre at rest
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout-root') + searchParams}
                     >
                         layoutRoot — shared layoutId animates relative to its layout root (#1935)
