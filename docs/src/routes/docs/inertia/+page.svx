@@ -55,7 +55,7 @@ animate(x, [0], { type: inertia, velocity: 1000, power: 0.5 }) // same
 | `bounceDamping` | `10` | Damping of the boundary spring. |
 | `modifyTarget` | none | Adjust the calculated target, e.g. to snap to a grid. |
 | `restDelta` | `0.5` | Distance from the target under which the animation can finish. |
-| `restSpeed` | none | Speed under which the animation can finish. |
+| `restSpeed` | spring default | Speed under which the boundary spring can finish. Passed through to it; unset, the spring uses `2`, or `0.01` when the remaining distance is under `5` (motion-dom `generators/inertia.ts`, `generators/spring.ts` @ v14.7.1). |
 
 Snap the resting position to a 50px grid:
 

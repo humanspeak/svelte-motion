@@ -83,8 +83,13 @@ describe('keyframes (motion-dom generators/keyframes.ts @ v14.7.1)', () => {
     })
 
     it('works as a transition type', async () => {
+        // keyframes is also the engine's default generator (JSAnimation.ts
+        // @ v14.7.1), so reaching 100 alone proves nothing: assert the
+        // passed generator is the one the engine actually called.
         const mv = motionValue(0)
-        await animate(mv, 100, { type: keyframes, duration: 0.2 })
+        const spy = vi.fn(keyframes)
+        await animate(mv, 100, { type: spy, duration: 0.2 })
+        expect(spy).toHaveBeenCalled()
         expect(mv.get()).toBe(100)
     })
 })

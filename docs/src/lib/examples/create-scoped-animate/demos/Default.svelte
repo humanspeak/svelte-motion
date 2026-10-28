@@ -8,7 +8,13 @@
 
     onMount(() => {
         // Selectors passed to animateA only resolve inside card A.
-        animateA = createScopedAnimate({ scope: { current: cardA, animations: [] } })
+        const scope = { current: cardA, animations: [] as { stop: () => void }[] }
+        animateA = createScopedAnimate({ scope })
+        // The scope only collects animations; stop them when the demo unmounts.
+        return () => {
+            for (const animation of scope.animations) animation.stop()
+            scope.animations.length = 0
+        }
     })
 
     const shuffle = () => {

@@ -5,11 +5,9 @@ import {
     resolveElements as resolveElementsCore
 } from 'motion'
 
-/**
- * Motion's public, framework-agnostic generators and helpers, re-exported
- * unchanged. Each binding is `===` to motion's own function (no wrapper), so
- * behaviour and tree-shaking match `motion` exactly.
- */
+// Motion's public, framework-agnostic generators and helpers, re-exported
+// unchanged. Each binding is `===` to motion's own function (no wrapper), so
+// behaviour and tree-shaking match `motion` exactly.
 
 /**
  * The decelerating "inertia" generator — the function behind
