@@ -6,12 +6,17 @@
  * bump makes the tripwire fail, decide per new name: re-export it with docs, or add it
  * here under the right group with a reason. The tripwire also fails on stale entries,
  * so a name we start re-exporting must be removed from this list in the same change.
+ *
+ * Each group comment carries its bucket from plan 014's audit: `[b]` React-only machinery
+ * whose user-facing Svelte equivalent we already ship, `[c]` internal / deprecated / dev-only,
+ * `[d]` public but pending a Svelte adaptation (mirrored in
+ * MOTION_EXPORTS_PENDING_SVELTE_ADAPTATION). The test for a new name: documented on
+ * motion.dev, hand-curated in `framer-motion/src/dom.ts`, or a sibling of something we
+ * re-export → re-export it (and list it in MOTION_PUBLIC_REEXPORTS); otherwise allowlist it
+ * here under a bucket.
  */
 export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string>([
-    // Renderer and VisualElement internals (props scraping, style/SVG building, variant resolution)
-    'addAttrValue',
-    'addStyleValue',
-    'addSVGValue',
+    // [b] Renderer and VisualElement internals (props scraping, style/SVG building, variant resolution)
     'buildHTMLStyles',
     'buildSVGAttrs',
     'buildSVGPath',
@@ -31,9 +36,6 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'isVariantLabel',
     'isVariantNode',
     'ObjectVisualElement',
-    'originProps',
-    'readStyleValue',
-    'readSVGValue',
     'readTransformValue',
     'renderHTML',
     'renderSVG',
@@ -51,7 +53,7 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'VisualElement',
     'visualElementStore',
 
-    // Projection and layout internals (boxes, deltas, projection nodes, layout builders)
+    // [b] Projection and layout internals (boxes, deltas, projection nodes, layout builders)
     'addScaleCorrector',
     'applyAxisDelta',
     'applyBoxDelta',
@@ -116,27 +118,58 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'transformBoxPoints',
     'translateAxis',
 
-    // Animation engine classes and helpers (JS/WAAPI animations, generators, transitions)
-    'acceleratedValues',
-    'animateElement',
-    'animateMini',
-    'animateMotionValue',
-    'animateSingleValue',
+    // [b] Variant, spring and follow engines behind React components and hooks (ours: variants, useAnimationControls, useSpring, useFollowValue)
     'animateTarget',
-    'animateValue',
-    'animateValues',
     'animateVariant',
     'animateVisualElement',
+    'attachFollow',
+    'attachSpring',
+
+    // [b] Will-change internals (we ship useWillChange)
+    'addValueToWillChange',
+    'isWillChangeMotionValue',
+
+    // [b] Gesture, pointer and drag internals
+    'addDomEvent',
+    'addPointerEvent',
+    'addPointerInfo',
+    'elementDragControls',
+    'expectsResolvedDragConstraints',
+    'extractEventInfo',
+    'isDragActive',
+    'isDragging',
+    'isElementKeyboardAccessible',
+    'isElementTextInput',
+    'isNodeOrChild',
+    'isPrimaryPointer',
+    'PanSession',
+    'setDragLock',
+    'VisualElementDragControls',
+
+    // [b] Reduced-motion internals (we ship useReducedMotion instead)
+    'hasReducedMotionListener',
+    'initPrefersReducedMotion',
+    'prefersReducedMotion',
+
+    // [b] Optimized-appear internals
+    'getOptimisedAppearId',
+    'handOffElementState',
+    'optimizedAppearDataId',
+    'releaseElement',
+
+    // [c] Animation engine classes and helpers (JS/WAAPI animations, generators, transitions)
+    'acceleratedValues',
+    'animateElement',
+    'animateMotionValue',
+    'animateSingleValue',
+    'animateValue',
+    'animateValues',
     'animationMapKey',
     'applyGeneratorOptions',
     'AsyncMotionValueAnimation',
-    'attachFollow',
-    'attachSpring',
     'calcChildStagger',
     'calcGeneratorDuration',
     'createGeneratorEasing',
-    'createScopedAnimate',
-    'followValue',
     'getAnimationMap',
     'getDefaultTransition',
     'getFinalKeyframe',
@@ -144,12 +177,10 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'getValueTransition',
     'GroupAnimation',
     'GroupAnimationWithThen',
-    'inertia',
     'isGenerator',
     'isKeyframesTarget',
     'isTransitionDefined',
     'JSAnimation',
-    'keyframes',
     'makeAnimationInstant',
     'maxGeneratorDuration',
     'NativeAnimation',
@@ -158,10 +189,11 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'resolveTransition',
     'startWaapiAnimation',
 
-    // Keyframe resolvers and value types
+    // [c] Keyframe resolvers and value types
     'alpha',
     'analyseComplexValue',
     'applyPxDefaults',
+    'buildTransformer',
     'camelToDash',
     'color',
     'complex',
@@ -206,15 +238,12 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'vh',
     'vw',
 
-    // Motion values and will-change internals
-    'addValueToWillChange',
+    // [c] Motion-value plumbing
     'collectMotionValues',
-    'isWillChangeMotionValue',
-    'MotionValue',
     'resolveMotionValue',
     'SubscriptionManager',
 
-    // Easing internals (WAAPI/linear() conversion, offsets)
+    // [c] Easing internals (WAAPI/linear() conversion, offsets)
     'convertOffsetToTimes',
     'cubicBezierAsString',
     'defaultEasing',
@@ -229,7 +258,7 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'mapEasingToNativeEasing',
     'supportedWaapiEasing',
 
-    // Frameloop, timing and stats internals
+    // [c] Frameloop, timing and stats internals (cancelSync and sync are deprecated)
     'cancelMicrotask',
     'cancelSync',
     'createRenderBatcher',
@@ -237,31 +266,13 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'frameSteps',
     'microtask',
     'millisecondsToSeconds',
-    'recordStats',
     'secondsToMilliseconds',
     'statsBuffer',
     'sync',
     'time',
     'velocityPerSecond',
 
-    // Gesture, pointer and drag internals
-    'addDomEvent',
-    'addPointerEvent',
-    'addPointerInfo',
-    'elementDragControls',
-    'expectsResolvedDragConstraints',
-    'extractEventInfo',
-    'isDragActive',
-    'isDragging',
-    'isElementKeyboardAccessible',
-    'isElementTextInput',
-    'isNodeOrChild',
-    'isPrimaryPointer',
-    'PanSession',
-    'setDragLock',
-    'VisualElementDragControls',
-
-    // Effect internals (the module-level animate carries addEffect/removeEffect)
+    // [c] Effect internals (the module-level animate carries addEffect/removeEffect)
     'addEffect',
     'animateEffectSubject',
     'findEffect',
@@ -269,7 +280,15 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'styleSubjectEffect',
     'svgSubjectEffect',
 
-    // Scope and element resolution internals
+    // [c] Style/SVG/attr effect internals (behind the re-exported styleEffect/svgEffect/attrEffect)
+    'addAttrValue',
+    'addStyleValue',
+    'addSVGValue',
+    'originProps',
+    'readStyleValue',
+    'readSVGValue',
+
+    // [c] Scope and element resolution internals
     'activeScope',
     'addBuilderToScope',
     'addToScope',
@@ -278,19 +297,13 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'isObject',
     'isSVGElement',
     'isSVGSVGElement',
-    'resolveElements',
 
-    // View transition internals
+    // [c] View transition internals
     'getViewAnimationLayerInfo',
     'getViewAnimations',
     'ViewTransitionBuilder',
 
-    // Reduced-motion internals (we ship useReducedMotion instead)
-    'hasReducedMotionListener',
-    'initPrefersReducedMotion',
-    'prefersReducedMotion',
-
-    // Feature detection
+    // [c] Feature detection
     'supportsBrowserAnimation',
     'supportsFlags',
     'supportsLinearEasing',
@@ -299,13 +312,7 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'supportsViewTimeline',
     'supportsWaapi',
 
-    // Optimized-appear internals
-    'getOptimisedAppearId',
-    'handOffElementState',
-    'optimizedAppearDataId',
-    'releaseElement',
-
-    // Colour, mix, array and number utilities not yet re-exported
+    // [c] Colour, mix, array and number utilities not yet re-exported
     'addUniqueItem',
     'getMixer',
     'hslaToRgba',
@@ -324,14 +331,16 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'round',
     'sampleDelta',
 
-    // Dev warnings
+    // [c] Dev warnings
     'hasWarned',
     'invariant',
     'warning',
     'warnOnce',
 
-    // new in Motion 14.7.1 — not yet reviewed for re-export
-    'buildTransformer'
+    // [d] Public, but needs a Svelte adaptation first (plan 014 follow-ups)
+    'followValue',
+    'MotionValue',
+    'recordStats'
 ])
 
 /**

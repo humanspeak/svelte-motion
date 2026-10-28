@@ -1,6 +1,10 @@
-import { animate as animateCore, createEffect } from 'motion'
+import {
+    animate as animateCore,
+    createEffect,
+    createScopedAnimate as createScopedAnimateCore
+} from 'motion'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { animate } from './animateValue.js'
+import { animate, createScopedAnimate } from './animateValue.js'
 import { motionValue } from './vanillaValues.svelte.js'
 
 /**
@@ -39,6 +43,54 @@ describe('utils/animateValue - animate', () => {
 
         await vi.advanceTimersByTimeAsync(600)
         expect(mv.get()).toBe(1)
+    })
+})
+
+// Upstream: framer-motion/src/animation/animate/index.ts @ v14.7.1 (createScopedAnimate)
+describe('utils/animateValue - createScopedAnimate', () => {
+    it("is motion's createScopedAnimate (pure re-type, no runtime wrapper)", () => {
+        expect(createScopedAnimate).toBe(createScopedAnimateCore)
+    })
+
+    it('registers its animations on the scope', () => {
+        const scope = { current: document.createElement('div'), animations: [] as unknown[] }
+        const tl = createScopedAnimate({ scope })(motionValue(0), 100, { duration: 0.5 })
+        expect(scope.animations).toContain(tl)
+    })
+
+    it('resolves selectors only inside the scope', async () => {
+        const container = document.createElement('div')
+        const inner = document.createElement('div')
+        inner.className = 'box'
+        container.appendChild(inner)
+        const outer = document.createElement('div')
+        outer.className = 'box'
+        document.body.append(container, outer)
+        try {
+            createScopedAnimate({ scope: { current: container, animations: [] } })(
+                '.box',
+                { opacity: 0.5 },
+                { duration: 0.1 }
+            )
+            await vi.advanceTimersByTimeAsync(300)
+            expect(inner.style.opacity).toBe('0.5')
+            expect(outer.style.opacity).toBe('')
+        } finally {
+            container.remove()
+            outer.remove()
+        }
+    })
+
+    it('skipAnimations jumps to the target', async () => {
+        const mv = motionValue(0)
+        createScopedAnimate({ skipAnimations: true })(mv, 100, { duration: 5 })
+        await vi.advanceTimersByTimeAsync(100)
+        expect(mv.get()).toBe(100)
+    })
+
+    it('returns a Motion 14.7 Timeline', () => {
+        const mv = motionValue(0)
+        expect(typeof createScopedAnimate()(mv, 1).add).toBe('function')
     })
 })
 

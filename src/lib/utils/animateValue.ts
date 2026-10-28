@@ -1,5 +1,6 @@
 import {
     animate as animateCore,
+    createScopedAnimate as createScopedAnimateCore,
     type AnimationSequence,
     type ObjectTarget,
     type Timeline,
@@ -10,6 +11,7 @@ import type {
     AnimationOptions,
     DOMKeyframesDefinition,
     ElementOrSelector,
+    AnimationScope as MotionAnimationScope,
     UnresolvedValueKeyframe,
     ValueAnimationTransition
 } from 'motion-dom'
@@ -122,3 +124,54 @@ export interface SvelteMotionAnimateWithEffects extends SvelteMotionAnimate {
  * ```
  */
 export const animate = animateCore as SvelteMotionAnimateWithEffects
+
+/**
+ * Options for {@link createScopedAnimate}. Mirrors upstream's (unexported)
+ * `ScopedAnimateOptions` in `framer-motion/src/animation/animate/index.ts`.
+ */
+export interface ScopedAnimateOptions {
+    /** Element scope: selectors resolve inside `scope.current`, and started animations are pushed onto `scope.animations`. Accepts the scope from `useAnimate()`. */
+    scope?: MotionAnimationScope
+    /** Make transform and layout values animate instantly, as `MotionConfig reducedMotion="always"` does. */
+    reduceMotion?: boolean
+    /** Skip every animation straight to its final value. */
+    skipAnimations?: boolean
+}
+
+/**
+ * Create an `animate` function bound to an optional scope element and
+ * settings — Motion's `createScopedAnimate`, re-typed like {@link animate} so
+ * Svelte-augmented motion values are accepted without a cast.
+ *
+ * Selector strings passed to the returned function resolve inside
+ * `scope.current` instead of the whole document, and every animation it
+ * starts is pushed onto `scope.animations`, so stopping the scope's
+ * animations stops them all. This is the factory `useAnimate()` is built on;
+ * reach for it directly outside components (actions, attachments, plain
+ * modules) or when you own the element's lifecycle.
+ *
+ * Every call shape returns a mutable `Timeline` (Motion 14.7). Unlike the
+ * module-level `animate`, the returned function has no
+ * `addEffect`/`removeEffect` statics.
+ *
+ * Identical to motion's `createScopedAnimate` at runtime — a single
+ * type-level cast, not a wrapper.
+ *
+ * @param options - `scope` to resolve selectors in and register animations
+ *   on, plus `reduceMotion` and `skipAnimations`.
+ * @returns An `animate` function bound to those options.
+ *
+ * @example
+ * ```ts
+ * import { createScopedAnimate } from '@humanspeak/svelte-motion'
+ *
+ * const card = document.querySelector('.card')!
+ * const animateCard = createScopedAnimate({ scope: { current: card, animations: [] } })
+ * animateCard('.dot', { x: 100 }) // only the dots inside .card move
+ * ```
+ *
+ * @see {@link https://motion.dev/docs/animate}
+ */
+export const createScopedAnimate = createScopedAnimateCore as (
+    options?: ScopedAnimateOptions
+) => SvelteMotionAnimate

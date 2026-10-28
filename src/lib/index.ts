@@ -65,6 +65,13 @@ export type {
     TimelineOptions
 } from 'motion'
 
+// Upstream public, framework-agnostic API (plan 014): the scoped animate
+// factory useAnimate is built on, the WAAPI-only `motion/mini` animate, the
+// inertia/keyframes generators (siblings of `spring`) and resolveElements.
+// Identical bindings to motion's; JSDoc lives at the definitions.
+export { createScopedAnimate } from '$lib/utils/animateValue'
+export { animateMini, inertia, keyframes, resolveElements } from '$lib/utils/motionReexports'
+
 // Motion 13.2 effect registry: build effects for non-DOM subjects with
 // `createEffect` and register them via `animate.addEffect`. `createEffect`
 // and the effect types come from `$lib/utils/effects` — re-typed so the
