@@ -116,8 +116,9 @@
 
     // ---- Live verdict (tester only) ----
     //
-    // Judges the Tomato → Lettuce click, the one upstream's spec defines.
-    // Just before it, note the old underline's left edge and width
+    // Judges every tab change, both ways: upstream's #1935 handling has no
+    // direction (`notifyLayoutUpdate`, `resolveTargetDelta`). Just before a
+    // click, note the old underline's left edge and width
     // and the list's left edge. When the recording ends (1.3 s later), check
     // the new underline's path in every frame after the click rendered,
     // against what Motion does for this variant:
@@ -125,8 +126,9 @@
     // - inside a layoutRoot, when the old underline was inside the list too,
     //   its left edge moves relative to the list: from the old offset within
     //   the old list (0, or 80 with innerX) to its new offset;
-    // - otherwise (no root, or coming from the outside box) it moves in page
-    //   space, from the old underline's page position;
+    // - otherwise (no root, coming from the outside box, or arriving inside a
+    //   translated box) it moves in page space, from the old underline's page
+    //   position;
     // - layout="size" keeps x at its new place and animates only the width,
     //   from the old width to the new one; layout="position" keeps the new
     //   width throughout.
@@ -170,8 +172,9 @@
         )
     }
 
-    const judge = (records: FrameRecord[], before: Before): Verdict => {
-        const first = records.findIndex(({ rendered }) => rendered)
+    const judge = (records: FrameRecord[], before: Before, sidebar: boolean): Verdict => {
+        // The click has rendered once the sidebar shows (or hides) as it should.
+        const first = records.findIndex(({ rendered }) => rendered === sidebar)
         const frames = first < 0 ? [] : records.slice(first)
         if (frames.length < 5) {
             readout = 'too few frames recorded'
@@ -179,7 +182,20 @@
         }
         const last = frames[frames.length - 1]
         const listLeft = last.list
-        const relative = layoutRoot && before.insideList
+        // motion-dom's `getClosestProjectingParent` (create-projection-node.ts
+        // 1435-1442 @ v14.7.1) gives no relative parent when the node's
+        // parent has a scale or a 2D translate. So an underline arriving
+        // inside a translated box (innerX, back to Tomato) animates in page
+        // space even inside the root.
+        // (Skip `AnimatePresence`'s `display: contents` wrapper.)
+        const arriving = document.querySelectorAll('.fixture-1935 .underline')
+        let arrivingParent = arriving[arriving.length - 1]?.parentElement ?? null
+        while (arrivingParent && getComputedStyle(arrivingParent).display === 'contents') {
+            arrivingParent = arrivingParent.parentElement
+        }
+        const parentTransformed =
+            !!arrivingParent && getComputedStyle(arrivingParent).transform !== 'none'
+        const relative = layoutRoot && before.insideList && !parentTransformed
         // Left edges in list-relative px when relative, else page px
         // measured from the new list, so both read the same way.
         const lefts = frames.map(({ underlines, list }) =>
@@ -216,19 +232,13 @@
         if (item === selected) return
         const before = measureBefore()
         select(item)
-        // Only Tomato → Lettuce has an upstream path (issue-1935.spec.ts);
-        // any other click just resets the page for the next try.
-        if (item !== tabs[1] || !before) {
-            verdict = 'waiting'
-            readout = null
-            return
-        }
+        if (!before) return
         verdict = 'recording'
         readout = null
         setTimeout(() => {
             const w = recordingWindow()
             w.recording = false
-            verdict = judge(w.records, before)
+            verdict = judge(w.records, before, item === tabs[1])
         }, 1300)
     }
 
@@ -240,14 +250,15 @@
             action: { label: 'Select Lettuce', run: () => testerSelect(tabs[1]) }
         },
         {
-            text: 'Click "🍅 Tomato" to reset (not judged), and wait for the underline to settle.',
-            expected: 'The sidebar goes and the underline returns under Tomato.',
+            text: 'Click "🍅 Tomato".',
+            expected:
+                'The sidebar goes, the bar jumps back right, and the underline slides one tab back (x 100 → 0 relative). MATCHES ✓.',
             action: { label: 'Select Tomato', run: () => testerSelect(tabs[0]) }
         },
         {
-            text: 'Open each variant link in the panel and click "🥬 Lettuce" there.',
+            text: 'Open each variant link in the panel and click Lettuce, then Tomato, there.',
             expected:
-                "Every variant reads MATCHES ✓. layoutRoot=false drifts in page space from Tomato's old position (150 → 100 from the new list); innerX=80 starts 80px into the list; layout=size keeps x under Lettuce and grows the width 100 → 160; outside starts from the box left of the list (50 → 100)."
+                'Every click reads MATCHES ✓. layoutRoot=false moves in page space (150 → 100 from the new list, and back -50 → 0); innerX=80 starts 80px into the list, and back to Tomato it moves in page space (its translated box turns relative projection off, as in Motion); layout=size keeps x and animates only the width; outside starts from the box left of the list (50 → 100).'
         }
     ]
 </script>
