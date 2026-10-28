@@ -9,9 +9,20 @@
      * thumbnail one's id, for "shows a follower again once it loses its
      * layoutId" (pass `null` for no id: `undefined` falls back to `'one'`).
      *
+     * `onCardProjectionUpdate` is the card's `onProjectionUpdate`, for counting
+     * its layout updates.
+     *
      * The spec mocks `getBoundingClientRect` from each element's `data-box`.
      */
-    let { open, thumbLayoutId = 'one' }: { open?: string; thumbLayoutId?: string | null } = $props()
+    let {
+        open,
+        thumbLayoutId = 'one',
+        onCardProjectionUpdate
+    }: {
+        open?: string
+        thumbLayoutId?: string | null
+        onCardProjectionUpdate?: () => void
+    } = $props()
 
     const transition = { type: 'tween', ease: 'linear', duration: 10 } as const
 </script>
@@ -19,5 +30,11 @@
 <motion.div id="one" data-box="one" layoutId={thumbLayoutId ?? undefined} {transition} />
 <motion.div id="two" data-box="two" layoutId="two" {transition} />
 {#if open}
-    <motion.div id="card" data-box="card" layoutId={open} {transition} />
+    <motion.div
+        id="card"
+        data-box="card"
+        layoutId={open}
+        {transition}
+        onProjectionUpdate={onCardProjectionUpdate}
+    />
 {/if}

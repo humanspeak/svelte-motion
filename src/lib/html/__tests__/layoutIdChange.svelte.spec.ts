@@ -386,6 +386,40 @@ describe("changing an open card's layoutId (#1411)", () => {
         expect(element('two').style.visibility).toBe('hidden')
     })
 
+    // Amendment A1.3: the card that mounts with thumbnail one's layoutId (a
+    // lead still on screen) animates out of it exactly once. A registry
+    // handoff for the same id, left by some other element in its handoff
+    // window, must not start a second animation from the mount-path consume.
+    it('opening the card from a live thumbnail runs one layout animation', async () => {
+        const updates: number[] = []
+        const onCardProjectionUpdate = () => updates.push(1)
+        const { rerender } = render(LayoutIdGalleryHarness, {
+            props: { onCardProjectionUpdate }
+        })
+        await frames(2)
+        const one = getNode(element('one'))
+        const startAnimation = vi.spyOn(Object.getPrototypeOf(one), 'startAnimation')
+        const notify = vi.spyOn(Object.getPrototypeOf(one), 'notifyListeners')
+        layoutIdRegistry.snapshot('one', new DOMRect(600, 600, 10, 10), {}, {})
+
+        await rerender({ open: 'one', onCardProjectionUpdate })
+        await frames(4)
+
+        const card = getNode(element('card'))
+        const ofCard = (spy: typeof startAnimation) =>
+            spy.mock.calls.filter((_, index) => spy.mock.contexts[index] === card)
+        // One layout animation, out of thumbnail one, from one update pass.
+        expect(ofCard(startAnimation).length).toBe(1)
+        expect(card.resumingFrom === one).toBe(true)
+        expect(ofCard(notify).filter(([event]) => event === 'didUpdate').length).toBe(1)
+        // A layoutId-only card reports no reactive layout commit, so any
+        // `onProjectionUpdate` would be a second, registry-driven commit.
+        expect(updates).toEqual([])
+        // ...and nothing is left behind to animate a later change.
+        expect(card.snapshot).toBeUndefined()
+        expect(layoutIdRegistry.has('one')).toBe(false)
+    })
+
     // A thumbnail that follows an open card and then loses its layoutId must
     // show again, as it no longer follows anything. Upstream's
     // `layoutCrossfade={false}` variant isn't ported (not a svelte-motion prop).
