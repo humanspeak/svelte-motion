@@ -1708,3 +1708,50 @@ describe('MotionDomProjectionAdapter mount-time takeover of a live lead (#1411 A
         expect(adapter.projection.isLayoutDirty).toBe(true)
     })
 })
+
+/**
+ * Plan 007 (Motion 14.7.1, #1935): `layoutRoot`, `layoutAnchor` and
+ * `layoutDependency` reach the projection node. Upstream passes `layoutRoot`
+ * at creation (`use-visual-element.ts:229-248 @ v14.7.1`) and syncs
+ * `layoutAnchor` / `layoutDependency` on every update (`MeasureLayout.tsx`
+ * `layoutOptions`, 43-52), port of "keeps layoutAnchor in sync"
+ * (`layout-id-change.test.tsx:102-112`).
+ */
+describe('MotionDomProjectionAdapter layout options sync (#1935)', () => {
+    it('forwards layoutRoot, layoutAnchor and layoutDependency to the projection node', () => {
+        const adapter = new MotionDomProjectionAdapter()
+        adapter.updateOptions({
+            layout: true,
+            layoutRoot: true,
+            layoutAnchor: { x: 0, y: 0 },
+            layoutDependency: 1
+        } as never)
+        expect(adapter.projection.options.layoutRoot).toBe(true)
+        expect(adapter.projection.options.layoutAnchor).toEqual({ x: 0, y: 0 })
+        expect(adapter.projection.options.layoutDependency).toBe(1)
+    })
+
+    it('keeps layoutAnchor and layoutDependency in sync, and a call without layoutRoot does not clear it', () => {
+        const adapter = new MotionDomProjectionAdapter()
+        adapter.updateOptions({
+            layout: true,
+            layoutRoot: true,
+            layoutAnchor: { x: 0, y: 0 },
+            layoutDependency: 1
+        } as never)
+        adapter.updateOptions({
+            layout: true,
+            layoutAnchor: { x: 1, y: 1 },
+            layoutDependency: 2
+        } as never)
+        expect(adapter.projection.options.layoutAnchor).toEqual({ x: 1, y: 1 })
+        expect(adapter.projection.options.layoutDependency).toBe(2)
+        expect(adapter.projection.options.layoutRoot).toBe(true)
+    })
+
+    it('forwards layoutAnchor={false}', () => {
+        const adapter = new MotionDomProjectionAdapter()
+        adapter.updateOptions({ layout: true, layoutAnchor: false } as never)
+        expect(adapter.projection.options.layoutAnchor).toBe(false)
+    })
+})
