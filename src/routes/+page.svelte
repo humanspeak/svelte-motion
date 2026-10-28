@@ -85,6 +85,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/featureless-m') + searchParams}
+                    >
+                        LazyMotion — m without features (spike 011)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/enter-animation') + searchParams}
                     >
                         Enter Animation

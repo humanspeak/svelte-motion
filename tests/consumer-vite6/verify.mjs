@@ -87,4 +87,20 @@ for (const html of [kindHtml, reorderHtml, reorderMHtml]) {
     }
 }
 
+// Spike 011 guard: no component has a VisualElement on the server (Motion
+// 14.7.1 `motion/index.tsx`), so a bare `m`, an `m` inside LazyMotion and a
+// `motion` with the same props render identical markup. The optimized-appear
+// ids are per-instance counters (`svelte-motion-s1`, `-s2`, …), so normalize them.
+const featurelessHtml = stripComments(await renderPlain('/src/render-featureless-ssr.js'))
+    .replace(/svelte-motion-s\d+/g, 'svelte-motion-sN')
+    .trim()
+const featurelessMatch = featurelessHtml.match(
+    /^<div data-kind="m-bare">([\s\S]*)<\/div>\s*<div data-kind="m-lazy">([\s\S]*)<\/div>\s*<div data-kind="motion">([\s\S]*)<\/div>$/
+)
+assert.ok(featurelessMatch, `FeaturelessSsr markup has no data-kind wrappers: ${featurelessHtml}`)
+const [, bareInner, lazyInner, motionKindInner] = featurelessMatch
+assert.match(motionKindInner, /<div\b[^>]*data-testid="box"/)
+assert.equal(bareInner, motionKindInner)
+assert.equal(lazyInner, motionKindInner)
+
 console.log('Vite 6 consumer SSR regression checks passed.')
