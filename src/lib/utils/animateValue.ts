@@ -2,12 +2,12 @@ import {
     animate as animateCore,
     type AnimationSequence,
     type ObjectTarget,
-    type SequenceOptions
+    type Timeline,
+    type TimelineOptions
 } from 'motion'
 import type {
     AnimateEffect,
     AnimationOptions,
-    AnimationPlaybackControlsWithThen,
     DOMKeyframesDefinition,
     ElementOrSelector,
     UnresolvedValueKeyframe,
@@ -29,41 +29,47 @@ import type { AnyMotionValue } from './transform.svelte.js'
  * like `animate(motionValue, [0, 1])` resolves to the value overload rather than
  * being (mis)matched against `<O>(object: O, keyframes: ObjectTarget<O>)`.
  *
+ * Every overload returns a mutable `Timeline` (Motion 14.7): segments, labels
+ * (with offsets like `'mid+0.5'`), callbacks and pauses can be added, moved and
+ * removed while it plays, and it can `playTo` a label or `reverse`. The sequence
+ * overload takes the timeline options (`autoplay`, `onUpdate`, `onRepeat`,
+ * `onReverseComplete`, …) minus `scope`, which comes from `useAnimate()`.
+ *
  * @see {@link https://motion.dev/docs/animate} for the runtime behavior.
  */
 export interface SvelteMotionAnimate {
     /** Animate a sequence of segments on a shared timeline. */
-    (sequence: AnimationSequence, options?: SequenceOptions): AnimationPlaybackControlsWithThen
+    (sequence: AnimationSequence, options?: Omit<TimelineOptions, 'scope'>): Timeline
     /** Animate a string motion value (raw or augmented). */
     (
         value: string | AnyMotionValue<string>,
         keyframes: string | UnresolvedValueKeyframe<string>[],
         options?: ValueAnimationTransition<string>
-    ): AnimationPlaybackControlsWithThen
+    ): Timeline
     /** Animate a numeric motion value (raw or augmented). */
     (
         value: number | AnyMotionValue<number>,
         keyframes: number | UnresolvedValueKeyframe<number>[],
         options?: ValueAnimationTransition<number>
-    ): AnimationPlaybackControlsWithThen
+    ): Timeline
     /** Animate a motion value of any keyframe-compatible type (raw or augmented). */
     <V extends string | number>(
         value: V | AnyMotionValue<V>,
         keyframes: V | UnresolvedValueKeyframe<V>[],
         options?: ValueAnimationTransition<V>
-    ): AnimationPlaybackControlsWithThen
+    ): Timeline
     /** Animate DOM element(s) or a CSS selector. */
     (
         element: ElementOrSelector,
         keyframes: DOMKeyframesDefinition,
         options?: AnimationOptions
-    ): AnimationPlaybackControlsWithThen
+    ): Timeline
     /** Animate the properties of a plain object (or array of objects). */
     <O extends object>(
         object: O | O[],
         keyframes: ObjectTarget<O>,
         options?: AnimationOptions
-    ): AnimationPlaybackControlsWithThen
+    ): Timeline
 }
 
 /**
@@ -102,8 +108,10 @@ export interface SvelteMotionAnimateWithEffects extends SvelteMotionAnimate {
  * See `effects.ts` for the same pattern and `augmentMotionValue.svelte.ts` for
  * why the augmented type drops the class's private-field brand.
  *
- * When bumping `motion`/`motion-dom`, re-check the passthrough overloads below
- * against upstream's `animate`/`createScopedAnimate` signatures.
+ * When bumping `motion`/`motion-dom`, re-check the passthrough overloads in
+ * {@link SvelteMotionAnimate} against upstream's `animate`/`createScopedAnimate`
+ * signatures (last checked against framer-motion `animation/animate/index.ts`
+ * @ v14.7.1).
  *
  * @example
  * ```ts

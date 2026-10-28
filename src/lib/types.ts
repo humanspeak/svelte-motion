@@ -68,6 +68,9 @@ export type Variants = Record<string, Variant>
  * - Can be an object with animation properties
  * - Can be a string key referencing a variant
  * - Set to `false` to skip the initial animation and render directly at the animated state
+ * - An object may carry an inline `transition`. Its `out` is the transition of the mount
+ *   animation only (Motion 14.7, #1725): later returns to `animate` use their own
+ *   transitions. The SSR optimized appear animation follows it too.
  *
  * @example
  * ```svelte
@@ -79,9 +82,24 @@ export type Variants = Record<string, Variant>
  *
  * <!-- Use variant key -->
  * <motion.div variants={myVariants} initial="hidden" animate="visible" />
+ *
+ * <!-- Delay only the mount animation, not later hover ends -->
+ * <motion.div
+ *     initial={{ scale: 0, transition: { out: { delay: 1 } } }}
+ *     animate={{ scale: 1 }}
+ *     whileHover={{ scale: 1.2 }}
+ * />
  * ```
  */
-export type MotionInitial = DOMKeyframesDefinition | string | string[] | false | undefined
+export type MotionInitial =
+    | (DOMKeyframesDefinition & {
+          transition?: AnimationOptions
+          transitionEnd?: DOMKeyframesDefinition
+      })
+    | string
+    | string[]
+    | false
+    | undefined
 
 /**
  * Target animation properties for a motion component.
@@ -194,14 +212,48 @@ export type AnimationControls = {
     mount: () => () => void
 }
 
+/**
+ * Animate target for a motion component.
+ *
+ * - Can be an object with animation properties; it may carry an inline `transition`
+ *   (which wins over the `transition` prop, merging with it only on `inherit: true`)
+ *   and `transitionEnd` (values set once the animation completes)
+ * - A scalar `null` holds a value at its current state (`animate={{ x: null }}`)
+ * - Can be a string key referencing a variant, or a list of variant keys
+ * - Can be `AnimationControls` from `useAnimationControls()` for imperative control
+ *
+ * @example
+ * ```svelte
+ * <!-- Animate to an object target -->
+ * <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} />
+ *
+ * <!-- Variant label, or a list of labels -->
+ * <motion.div {variants} initial="hidden" animate={['visible', 'raised']} />
+ *
+ * <!-- Hold x at its current value while y animates -->
+ * <motion.div animate={{ x: null, y: 100 }} />
+ *
+ * <!-- Inline transition for this target -->
+ * <motion.div animate={{ opacity: 1, transition: { duration: 0.2 } }} />
+ *
+ * <!-- Imperative controls -->
+ * <motion.div animate={controls} />
+ * ```
+ */
 export type MotionAnimate =
-    | DOMKeyframesDefinition
+    | (DOMKeyframesDefinition & {
+          transition?: AnimationOptions
+          transitionEnd?: DOMKeyframesDefinition
+      })
     // Per-channel `null` wildcard scalars (`animate={{ x: null }}` = "hold the
     // current value") resolve against the live value at animation start — see
     // resolveWildcardKeyframes. DOMKeyframesDefinition only admits `null`
     // inside keyframe ARRAYS, so the documented scalar-hold idiom needs this
     // explicit widening to be legal for consumers.
-    | { [K in keyof DOMKeyframesDefinition]: DOMKeyframesDefinition[K] | null }
+    | ({ [K in keyof DOMKeyframesDefinition]: DOMKeyframesDefinition[K] | null } & {
+          transition?: AnimationOptions
+          transitionEnd?: DOMKeyframesDefinition
+      })
     | string
     | string[]
     | AnimationControls
@@ -735,6 +787,54 @@ export type MotionProps = {
      * ```
      */
     layoutScroll?: boolean
+    /**
+     * Make this element a "layout root": the layout animations of its
+     * descendants resolve relative to it. Since Motion 14.7.1 (#1935) that
+     * includes shared `layoutId` elements, which animate within the root when
+     * the previous element was also inside it. So a tab underline slides one
+     * tab across its list even when the list itself jumps in the same update.
+     *
+     * The root's own layout change is instant. Read when the element mounts,
+     * as upstream: changing it afterwards has no effect, so remount the element
+     * (e.g. with `{#key}`) to toggle it.
+     *
+     * Mirrors framer-motion's `layoutRoot`.
+     *
+     * @example
+     * ```svelte
+     * <motion.ul layout layoutRoot>
+     *   {#each tabs as tab (tab)}
+     *     <li>
+     *       {tab}
+     *       {#if tab === selected}
+     *         <motion.div layoutId="underline" class="underline" />
+     *       {/if}
+     *     </li>
+     *   {/each}
+     * </motion.ul>
+     * ```
+     */
+    layoutRoot?: boolean
+    /**
+     * The anchor point for relative layout projection: the point on the
+     * parent that this element's position is measured from while the parent's
+     * layout animates.
+     *
+     * - `{ x: 0, y: 0 }` (default) anchors to the parent's top-left corner.
+     * - `{ x: 0.5, y: 0.5 }` anchors to its centre, which keeps a child of a
+     *   centring (e.g. flexbox) parent centred while the parent resizes.
+     * - `false` turns relative projection off for this element.
+     *
+     * Mirrors framer-motion's `layoutAnchor`.
+     *
+     * @example
+     * ```svelte
+     * <motion.div layout style="display: flex; align-items: center; justify-content: center">
+     *   <motion.div layout layoutAnchor={{ x: 0.5, y: 0.5 }} />
+     * </motion.div>
+     * ```
+     */
+    layoutAnchor?: { x: number; y: number } | false
     /**
      * Gates `layout` measurement so FLIP only recomputes when this value
      * changes, instead of on every render that touches `class`, `style`,

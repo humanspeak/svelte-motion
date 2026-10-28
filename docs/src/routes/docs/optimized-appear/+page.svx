@@ -41,6 +41,8 @@ No additional prop is required. Svelte Motion enables optimized appear when all 
 - `initial={false}` is not set.
 - The enter animation includes WAAPI-friendly `opacity` and/or transform values.
 
+The appear animation's timing comes from `initial`'s `transition.out` when it is set, otherwise from `animate`'s own `transition`, otherwise from the `transition` prop. That matches the runtime's mount animation, so hydration doesn't jump. See [transition.out](/docs/transition-out).
+
 ## Public helpers
 
 `startOptimizedAppearAnimation` is exported for low-level integrations that need to start a handoff animation manually.

@@ -51,6 +51,19 @@ export type { DragOptions } from 'motion-dom'
 export { animate } from '$lib/utils/animateValue'
 export { attrEffect, propEffect, styleEffect, svgEffect } from '$lib/utils/effects'
 export type { EffectValues } from '$lib/utils/effects'
+// Motion 14.7: animate() returns a mutable Timeline. Type-only upstream too.
+export type {
+    AnimationSequence,
+    NestedSequence,
+    ObjectTarget,
+    Segment,
+    SequenceInfo,
+    SequenceOptions,
+    Timeline,
+    TimelineCallback,
+    TimelineItem,
+    TimelineOptions
+} from 'motion'
 
 // Motion 13.2 effect registry: build effects for non-DOM subjects with
 // `createEffect` and register them via `animate.addEffect`. `createEffect`

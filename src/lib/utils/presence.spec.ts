@@ -7,6 +7,7 @@ import {
     getPresenceDepth,
     measurePopLayoutSnapshot,
     observeStyleChanges,
+    popLayoutPointFollowsScroll,
     readAnimatedValues,
     resolvePopLayoutStyles,
     setPresenceDepth,
@@ -569,7 +570,10 @@ describe('AnimatePresence modes', () => {
                 left: 32,
                 right: 88,
                 bottom: 36,
-                direction: 'ltr'
+                direction: 'ltr',
+                // The rect (10, 20) in the parent's space: its 200px rect over
+                // its 240×180 offset size reads as a scaled parent.
+                point: [12, 18]
             })
         })
 
@@ -582,7 +586,8 @@ describe('AnimatePresence modes', () => {
                     left: 32,
                     right: 88,
                     bottom: 36,
-                    direction: 'ltr'
+                    direction: 'ltr',
+                    point: [0, 0]
                 })
             ).toMatchObject({
                 position: 'absolute',
@@ -603,7 +608,8 @@ describe('AnimatePresence modes', () => {
                         left: 32,
                         right: 88,
                         bottom: 36,
-                        direction: 'ltr'
+                        direction: 'ltr',
+                        point: [0, 0]
                     },
                     'right',
                     'bottom'
@@ -677,6 +683,168 @@ describe('AnimatePresence modes', () => {
             await Promise.resolve()
 
             expect(document.querySelector('[data-presence-placeholder="true"]')).toBeFalsy()
+        })
+
+        /**
+         * #2348 on the clone path: popping the clone out of the flow moves its
+         * container, so the clone is laid out 70px lower than the element was.
+         * jsdom has no layout, so the move is mocked through the rects.
+         */
+        const popCloneWithDrop = async (anchorY?: 'top' | 'bottom') => {
+            Object.defineProperties(parent, {
+                offsetWidth: { configurable: true, value: 240 },
+                offsetHeight: { configurable: true, value: 180 }
+            })
+            Object.defineProperties(el, {
+                offsetParent: { configurable: true, value: parent },
+                offsetTop: { configurable: true, value: 64 },
+                offsetLeft: { configurable: true, value: 32 },
+                offsetWidth: { configurable: true, value: 120 },
+                offsetHeight: { configurable: true, value: 80 }
+            })
+            vi.spyOn(window, 'getComputedStyle').mockImplementation((target: Element) =>
+                target === el
+                    ? mockComputedStyle({
+                          direction: 'ltr',
+                          height: '80px',
+                          position: 'static',
+                          width: '120px'
+                      })
+                    : mockComputedStyle({ position: 'static' })
+            )
+            vi.spyOn(el, 'getBoundingClientRect').mockReturnValue(makeRect(32, 100, 120, 80))
+            // Unscaled: the parent's rect matches its offset size.
+            vi.spyOn(parent, 'getBoundingClientRect').mockReturnValue(makeRect(0, 0, 240, 180))
+            const getBoundingClientRect = Object.getOwnPropertyDescriptor(
+                Element.prototype,
+                'getBoundingClientRect'
+            )!.value as (this: Element) => DOMRect
+            const rectSpy = vi
+                .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+                .mockImplementation(function (this: HTMLElement) {
+                    return this.dataset?.clone === 'true'
+                        ? makeRect(32, 170, 120, 80)
+                        : getBoundingClientRect.call(this)
+                })
+            onTestFinished(() => rectSpy.mockRestore())
+
+            const ctx = createAnimatePresenceContext({ mode: 'popLayout', anchorY })
+            ctx.registerChild('k1', el, { opacity: 0 })
+            ctx.unregisterChild('k1')
+
+            const clone = parent.querySelector<HTMLElement>('[data-clone="true"]')
+            expect(clone).toBeTruthy()
+            await Promise.resolve()
+            await Promise.resolve()
+            return clone!
+        }
+
+        it('offsets a popLayout clone back when popping moves the container', async () => {
+            const clone = await popCloneWithDrop()
+            expect(clone.style.top).toBe(`${64 - 70}px`)
+        })
+
+        it('offsets a bottom-anchored popLayout clone back when popping moves the container', async () => {
+            const clone = await popCloneWithDrop('bottom')
+            expect(clone.style.bottom).toBe(`${36 + 70}px`)
+            expect(clone.style.top).toBe('')
+        })
+
+        describe('popLayoutPointFollowsScroll', () => {
+            const classify = (styles: Map<Element, Partial<CSSStyleDeclaration>>) => {
+                vi.spyOn(window, 'getComputedStyle').mockImplementation((target: Element) =>
+                    mockComputedStyle({ position: 'static', ...styles.get(target) })
+                )
+                return popLayoutPointFollowsScroll(el)
+            }
+
+            it('is scroll-invariant with no fixed ancestor', () => {
+                expect(classify(new Map())).toBe(true)
+            })
+
+            it('is scroll-invariant inside a fixed ancestor the viewport contains', () => {
+                expect(classify(new Map([[parent, { position: 'fixed' }]]))).toBe(true)
+            })
+
+            it('re-samples inside a fixed ancestor that a transformed ancestor contains', () => {
+                expect(
+                    classify(
+                        new Map<Element, Partial<CSSStyleDeclaration>>([
+                            [parent, { position: 'fixed' }],
+                            [document.body, { transform: 'scale(0.5)' }]
+                        ])
+                    )
+                ).toBe(false)
+            })
+
+            it('re-samples what it cannot classify: a sticky ancestor or a fixed element', () => {
+                expect(classify(new Map([[parent, { position: 'sticky' }]]))).toBe(false)
+                expect(classify(new Map([[el, { position: 'fixed' }]]))).toBe(false)
+            })
+        })
+
+        it("refreshes a resting child's popLayout point when siblings are added", async () => {
+            Object.defineProperties(parent, {
+                offsetWidth: { configurable: true, value: 240 },
+                offsetHeight: { configurable: true, value: 180 }
+            })
+            Object.defineProperties(el, {
+                offsetParent: { configurable: true, value: parent },
+                offsetTop: { configurable: true, value: 64 },
+                offsetLeft: { configurable: true, value: 32 },
+                offsetWidth: { configurable: true, value: 120 },
+                offsetHeight: { configurable: true, value: 80 }
+            })
+            vi.spyOn(window, 'getComputedStyle').mockImplementation((target: Element) =>
+                target === el
+                    ? mockComputedStyle({
+                          direction: 'ltr',
+                          height: '80px',
+                          position: 'static',
+                          width: '120px'
+                      })
+                    : mockComputedStyle({ position: 'static' })
+            )
+            vi.spyOn(parent, 'getBoundingClientRect').mockReturnValue(makeRect(0, 0, 240, 180))
+            const elRect = vi
+                .spyOn(el, 'getBoundingClientRect')
+                .mockReturnValue(makeRect(32, 100, 120, 80))
+            const getBoundingClientRect = Object.getOwnPropertyDescriptor(
+                Element.prototype,
+                'getBoundingClientRect'
+            )!.value as (this: Element) => DOMRect
+            const rectSpy = vi
+                .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+                .mockImplementation(function (this: HTMLElement) {
+                    return this.dataset?.clone === 'true'
+                        ? makeRect(32, 170, 120, 80)
+                        : getBoundingClientRect.call(this)
+                })
+            onTestFinished(() => rectSpy.mockRestore())
+
+            const ctx = createAnimatePresenceContext({ mode: 'popLayout' })
+            ctx.registerChild('k1', el, { opacity: 0 })
+
+            // The list grows while k1 rests: k1 is now laid out 70px lower.
+            elRect.mockReturnValue(makeRect(32, 170, 120, 80))
+            const sibling = document.createElement('div')
+            parent.appendChild(sibling)
+            ctx.registerChild('k2', sibling, { opacity: 0 })
+            // The container's MutationObserver sees the new sibling and
+            // re-samples k1 where it now rests, in the next frame's read step.
+            await Promise.resolve()
+            await vi.advanceTimersByTimeAsync(20)
+
+            // Svelte detaches keyed nodes before the exit is registered.
+            el.remove()
+            ctx.unregisterChild('k1')
+
+            const clone = parent.querySelector<HTMLElement>('[data-clone="true"]')
+            expect(clone).toBeTruthy()
+            await Promise.resolve()
+            await Promise.resolve()
+            // The clone sits where k1 last was: nothing to correct.
+            expect(clone!.style.top).toBe('64px')
         })
 
         it('does not insert a placeholder during exit', async () => {

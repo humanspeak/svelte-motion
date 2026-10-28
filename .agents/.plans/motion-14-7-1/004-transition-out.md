@@ -731,3 +731,12 @@ changed file (clean). `git diff --check` clean. `git status` shows only in-scope
   later, it must read the inherited `initial`'s `out`, as upstream's `6c6a96940` does at runtime.
 - Reviewers: check that the e2e thresholds follow upstream's fixture (0.02 drop, `dt / 2.4 s + 0.08` rise) and
   were not widened.
+
+## Amendments (operator-approved 2026-10-27)
+
+### A3: one per-frame appear test per box
+
+Split the per-frame test in `e2e/motion/optimized-appear-initial-out.spec.ts` into one test per box
+(`initial-out-box`, `animate-transition-box`), so that each box's result shows on its own. Don't change the
+assertions. On 14.6.0, expect `initial-out-box` red on rate and payload, and `animate-transition-box` red on payload
+only. Record both.

@@ -5,6 +5,7 @@ import {
     mapEasingToNativeEasing,
     optimizedAppearDataAttribute,
     optimizedAppearDataId,
+    resolveTransition,
     transformProps
 } from 'motion-dom'
 
@@ -176,8 +177,11 @@ const toNativeOptions = (transition: AnimationOptions | undefined): KeyframeAnim
  * upstream motion-dom's `acceleratedValues` allowlist: WAAPI-safe properties
  * that need no Motion-side normalization. `opacity` and the composite
  * `transform` are handled by their dedicated paths in
- * {@link createOptimizedAppearData}; `backgroundColor` stays on the main
- * thread, matching upstream (disabled pending Chromium issue 41491098).
+ * {@link createOptimizedAppearData}. `backgroundColor` and other colours
+ * stay on the main thread, matching upstream: WAAPI mixes colours in sRGB, but
+ * Motion's JS animations (and the sampler that estimates a WAAPI value on
+ * interrupt) mix them in linear colour space, so interrupting one would
+ * visibly jump (motion-dom `acceleratedValues`, f9e080f21).
  */
 const APPEAR_VALUES = new Set(['filter', 'clipPath'])
 
@@ -226,13 +230,24 @@ const extractKeyframeScalar = (value: unknown): string | number | undefined => {
  * {@link APPEAR_VALUES} allowlist (`filter`, `clipPath`) are emitted by
  * name. Anything else — colors, dimensions, Motion pseudo-properties like
  * `originX` — stays on the main-thread runtime, mirroring upstream
- * motion-dom's `acceleratedValues`. Each entry resolves its own per-key
- * transition (`transition[name] ?? transition.default ?? transition`) so the
- * bootstrap's timing matches what the hydrated runtime will adopt.
+ * motion-dom's `acceleratedValues`.
+ *
+ * The mount transition follows upstream's rule (#1725): `initial`'s
+ * `transition.out` when set (`out: true` reuses `initial`'s own transition),
+ * otherwise `animate`'s own `transition` (merged with the `transition` prop
+ * only on `inherit: true`), otherwise the `transition` prop. That is the
+ * transition the runtime's mount animation, and so the hydration handoff,
+ * uses; any mismatch makes the element jump on hydration. Each entry then
+ * resolves its own per-key transition (`mount[name] ?? mount.default ?? mount`).
  *
  * @param initial Initial keyframes reflected into SSR markup.
  * @param animate Target keyframes for the enter animation.
- * @param transition Motion transition options.
+ * @param transition The `transition` prop (Motion transition options).
+ * @param initialTransition The `initial` definition's transition to read `out`
+ *     from. `undefined` (omitted) means `initial.transition`. When `initial` is
+ *     a list of labels, pass the first label's transition, or `null` when the
+ *     first label has none: upstream reads `out` only from `definition[0]`, so
+ *     `null` must not fall back to the merged `initial.transition`.
  * @returns Appear entries for the WAAPI-supported properties in `initial`/`animate`.
  *
  * @example
@@ -243,13 +258,40 @@ const extractKeyframeScalar = (value: unknown): string | number | undefined => {
  *     { duration: 0.6, ease: [0.16, 1, 0.3, 1] }
  * )
  * ```
+ *
+ * @example
+ * ```ts
+ * // initial's out times the appear animation: 2.4 s, not the prop's 0.6 s.
+ * const entries = createOptimizedAppearData(
+ *     { opacity: 0, transition: { out: { duration: 2.4 } } },
+ *     { opacity: 1 },
+ *     { duration: 0.6 }
+ * )
+ * ```
  */
 export const createOptimizedAppearData = (
     initial: Record<string, unknown> | null | undefined,
     animate: Record<string, unknown> | null | undefined,
-    transition?: AnimationOptions
+    transition?: AnimationOptions,
+    initialTransition?: AnimationOptions | null
 ): OptimizedAppearEntry[] => {
     if (!initial || !animate) return []
+
+    // Upstream (#1725, 1a451de16): the generator builds the appear animation
+    // from initial's transition.out when it's set, otherwise from animate's
+    // transition, the rule the runtime's mount animation (and so the handoff)
+    // follows (motion-dom animation-state.ts `initialOut`,
+    // visual-element-target.ts `animationTypeState?.out[key] || transition`).
+    const fromInitial = (
+        initialTransition === undefined
+            ? (initial as { transition?: AnimationOptions }).transition
+            : (initialTransition ?? undefined)
+    ) as (AnimationOptions & { out?: unknown }) | undefined
+    const out = fromInitial?.out === true ? fromInitial : fromInitial?.out
+    const animateTransition = (animate as { transition?: AnimationOptions }).transition
+    const mountTransition = (out ||
+        (animateTransition ? resolveTransition(animateTransition, transition) : transition)) as
+        AnimationOptions | undefined
 
     const target = resolveRestingValues(animate as never) as Record<string, unknown> | undefined
     if (!target) return []
@@ -262,7 +304,7 @@ export const createOptimizedAppearData = (
                 Array.isArray(initial.opacity) ? initial.opacity[0] : initial.opacity,
                 Array.isArray(target.opacity) ? target.opacity[0] : target.opacity
             ] as [string | number, string | number],
-            options: toNativeOptions(getValueTransition(transition, 'opacity'))
+            options: toNativeOptions(getValueTransition(mountTransition, 'opacity'))
         })
     }
 
@@ -272,7 +314,7 @@ export const createOptimizedAppearData = (
         entries.push({
             name: 'transform',
             keyframes: [initialTransform, targetTransform],
-            options: toNativeOptions(getValueTransition(transition, 'transform'))
+            options: toNativeOptions(getValueTransition(mountTransition, 'transform'))
         })
     }
 
@@ -284,7 +326,7 @@ export const createOptimizedAppearData = (
         entries.push({
             name: key,
             keyframes: [from, to],
-            options: toNativeOptions(getValueTransition(transition, key))
+            options: toNativeOptions(getValueTransition(mountTransition, key))
         })
     }
 
