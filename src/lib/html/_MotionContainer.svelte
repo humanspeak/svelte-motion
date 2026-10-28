@@ -794,8 +794,10 @@
     // causes the exit to snap (the element is disconnected before onDestroy, so
     // getAnimations()/commitStyles() can't work at clone time).
     // Skipped inside <PresenceChild>: the wrapper drives exit, no clone path.
+    // Skipped without a node (a featureless `m`): it never registers an exit,
+    // see the `registerChild` effect below.
     $effect(() => {
-        if (!(element && shouldRegisterPresenceExit)) return
+        if (!(element && visualElement && shouldRegisterPresenceExit)) return
         let rafId: number
         let wasAnimating = false
         const capture = () => {
@@ -890,9 +892,16 @@
         }
     })
 
-    // Reactively update registration when element/exit/transition props change
+    // Reactively update registration when element/exit/transition props change.
+    //
+    // Only with a node. Upstream registers a child with its `PresenceChild`
+    // from the exit feature (`motion/features/animation/exit.ts:73-83`), which
+    // needs a VisualElement. A featureless `m` never registers, so when it is
+    // removed nothing holds it (`PresenceChild.tsx:104-113`): it leaves at once,
+    // with no clone, and never blocks a `mode="wait"` sibling. The node is
+    // `$state.raw`, so a late node registers as soon as it exists.
     $effect(() => {
-        if (element && shouldRegisterPresenceExit && exitProp !== undefined) {
+        if (element && visualElement && shouldRegisterPresenceExit && exitProp !== undefined) {
             const resolvePresenceExit = (custom: unknown) => {
                 const resolved = resolveExit(
                     exitProp,
@@ -927,7 +936,8 @@
     // Update presence context with current state when element is ready and has size.
     // Skipped inside <PresenceChild> — the rect/style snapshot only feeds the clone path.
     $effect(() => {
-        if (!(shouldRegisterPresenceExit && element && isLoaded === 'ready')) return
+        if (!(shouldRegisterPresenceExit && element && visualElement && isLoaded === 'ready'))
+            return
 
         let lastWidth = 0
         let lastHeight = 0
@@ -1911,6 +1921,17 @@
         }
         releaseWaitLayoutHold()
     }
+
+    // A featureless `m` entering behind a `mode="wait"` exit renders hidden,
+    // and `runAnimation()`, which owns the reveal, needs a node. Reveal it when
+    // the exit completes instead; there is nothing to animate, so it shows
+    // `initial` (upstream: a node-less child just renders, `PresenceChild.tsx:104-113`
+    // and `exit.ts:73-83`). When a late node arrives this re-runs, unsubscribes,
+    // and `runAnimation()` takes the reveal over.
+    $effect(() => {
+        if (visualElement || !element || !context || !waitEnterBlockedBeforeMount) return
+        return context.onEnterUnblocked(() => revealWaitHiddenElement())
+    })
 
     // A post-mount "strip transforms the reducing policy forbids" pass used to
     // live here. It is GONE: `useReducedMotionConfig` already resolves
