@@ -9,6 +9,7 @@ import {
 } from 'motion-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MotionDomProjectionAdapter, layoutMeasureStats } from './motionDomProjection.js'
+import { readScrollBasis } from './scrollBasis.js'
 import { createMotionVisualElement } from './visualElementCore.js'
 
 /**
@@ -2175,5 +2176,243 @@ describe('MotionDomProjectionAdapter scroll-rebased snapshots (plan 015a)', () =
         adapter.seedLayout()
 
         expect(adapter.currentVisualPageRect()?.left).toBe(element.getBoundingClientRect().left)
+    })
+})
+
+/**
+ * Plan 015b part D: `layout` nodes that follow a list's layout parent but sit
+ * outside it (a footer after the list). Upstream re-renders them with the
+ * list's owner, so their `MeasureLayout` snapshots (`getSnapshotBeforeUpdate`
+ * → `willUpdate()`, MeasureLayout.tsx:149-204 @ v14.7.1). Here the change has
+ * already hit the DOM, so the picked nodes are seeded from their cached
+ * layouts, without a read; on a completed exit they are refreshed silently
+ * instead (the snap: upstream re-renders only that AnimatePresence,
+ * AnimatePresence/index.tsx:244).
+ *
+ * Read off the class so a missing method fails only these cases.
+ */
+describe('MotionDomProjectionAdapter.seedFollowingLayout (plan 015b)', () => {
+    type Cause = { kind: 'change' } | { kind: 'exit-complete'; markers: [] }
+    const seedFollowingLayout = (
+        parent: Element,
+        records: MutationRecord[] | null,
+        cause: Cause = { kind: 'change' }
+    ) =>
+        (
+            MotionDomProjectionAdapter as unknown as {
+                seedFollowingLayout: (
+                    parent: Element,
+                    records: MutationRecord[] | null,
+                    cause: Cause
+                ) => void
+            }
+        ).seedFollowingLayout(parent, records, cause)
+
+    const rects = new Map<HTMLElement, DOMRect>()
+    const reads = new Map<HTMLElement, number>()
+    const adapters: MotionDomProjectionAdapter[] = []
+    const place = (element: HTMLElement, top: number) =>
+        rects.set(element, new DOMRect(10, top, 100, 50))
+    /** A `layout` node in its own wrapper `div` (like `#foot-wrap`) inside `host`. */
+    const mountIn = (
+        host: Element,
+        top: number,
+        options: { parent?: MotionDomProjectionAdapter; gated?: boolean; layoutId?: string } = {}
+    ) => {
+        const wrap = document.createElement('div')
+        const element = document.createElement('div')
+        wrap.append(element)
+        host.append(wrap)
+        place(element, top)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
+            reads.set(element, (reads.get(element) ?? 0) + 1)
+            return rects.get(element)!
+        })
+        const adapter = new MotionDomProjectionAdapter({ parent: options.parent })
+        adapter.updateOptions({
+            layout: true,
+            layoutId: options.layoutId,
+            ...(options.gated ? { measurementGated: true } : {})
+        })
+        adapter.mount(element)
+        adapters.push(adapter)
+        return { adapter, element, wrap }
+    }
+    const list = (host: Element) => {
+        const parent = document.createElement('ul')
+        host.append(parent)
+        return parent
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+    const records = () => [] as MutationRecord[]
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+        reads.clear()
+    })
+    afterEach(async () => {
+        await flush()
+        for (const adapter of adapters.splice(0).reverse()) adapter.unmount()
+        document.body.innerHTML = ''
+    })
+
+    it('3h: seeds a following node from its cache, with no read, and it animates', async () => {
+        const parent = list(document.body)
+        const footer = mountIn(document.body, 300)
+        const didUpdate = vi.fn()
+        footer.adapter.projection.addEventListener('didUpdate', didUpdate)
+        // The list shrank: the footer is 70px higher.
+        place(footer.element, 230)
+        reads.clear()
+
+        seedFollowingLayout(parent, records())
+
+        expect(reads.get(footer.element) ?? 0).toBe(0)
+        expect(footer.adapter.projection.isLayoutDirty).toBe(true)
+        expect(footer.adapter.projection.snapshot?.layoutBox.y.min).toBe(300)
+        await flush()
+        expect(didUpdate).toHaveBeenCalledTimes(1)
+        expect(didUpdate.mock.calls[0][0].layout.y.min).toBe(230)
+    })
+
+    it("3i: prunes preceding subtrees and skips the parent's line, gated, dirty, unmounted, size-animating, unreliable and other-ancestor nodes", () => {
+        const outerHost = document.createElement('section')
+        document.body.append(outerHost)
+        const outer = mountIn(outerHost, 0)
+        const host = outer.element
+        const preceding = mountIn(host, 10, { parent: outer.adapter })
+        const precedingChild = mountIn(preceding.element, 15, { parent: preceding.adapter })
+        const parent = list(host)
+        const descendant = mountIn(parent, 20, { parent: outer.adapter })
+        const picked = mountIn(host, 100, { parent: outer.adapter })
+        const gated = mountIn(host, 110, { parent: outer.adapter, gated: true })
+        const dirty = mountIn(host, 120, { parent: outer.adapter })
+        const sticky = mountIn(host, 130, { parent: outer.adapter })
+        const stale = mountIn(host, 140, { parent: outer.adapter })
+        const sizeHost = document.createElement('div')
+        sizeHost.setAttribute('data-layout-size-animation', 'true')
+        host.append(sizeHost)
+        const sizing = mountIn(sizeHost, 150, { parent: outer.adapter })
+        // Follows the parent, but its nearest motion ancestor is the document.
+        const other = mountIn(document.body, 400)
+        const unmounted = new MotionDomProjectionAdapter({ parent: outer.adapter })
+        unmounted.updateOptions({ layout: true })
+
+        dirty.adapter.projection.isLayoutDirty = true
+        const internals = (adapter: MotionDomProjectionAdapter) =>
+            adapter as unknown as { lastLayoutBasis: unknown }
+        const basis = {
+            scrollers: [],
+            values: [],
+            epoch: 0,
+            resizeEpoch: readScrollBasis(sticky.element).resizeEpoch,
+            fixedRoot: null,
+            unreliable: false
+        }
+        internals(sticky.adapter).lastLayoutBasis = { ...basis, unreliable: true }
+        internals(stale.adapter).lastLayoutBasis = { ...basis, resizeEpoch: basis.resizeEpoch - 1 }
+        reads.clear()
+
+        seedFollowingLayout(parent, records())
+
+        expect(picked.adapter.projection.isLayoutDirty, 'picked').toBe(true)
+        expect(picked.adapter.projection.snapshot?.layoutBox.y.min).toBe(100)
+        for (const [name, skipped] of Object.entries({
+            outer,
+            preceding,
+            precedingChild,
+            descendant,
+            gated,
+            sticky,
+            stale,
+            sizing,
+            other
+        })) {
+            expect(skipped.adapter.projection.snapshot, name).toBeUndefined()
+            expect(skipped.adapter.projection.isLayoutDirty, name).toBe(false)
+        }
+        expect(dirty.adapter.projection.snapshot, 'dirty').toBeUndefined()
+        expect(unmounted.projection.snapshot, 'unmounted').toBeUndefined()
+        // Seeding reads nothing at all.
+        expect([...reads.values()].reduce((a, b) => a + b, 0)).toBe(0)
+        dirty.adapter.projection.isLayoutDirty = false
+    })
+
+    it('3j: runs once per records array', async () => {
+        const parent = list(document.body)
+        const footer = mountIn(document.body, 300)
+        const didUpdate = vi.fn()
+        footer.adapter.projection.addEventListener('didUpdate', didUpdate)
+        const batch = records()
+
+        seedFollowingLayout(parent, batch)
+        await flush()
+        expect(didUpdate).toHaveBeenCalledTimes(1)
+
+        // Every sibling's observer hands over the same batch.
+        seedFollowingLayout(parent, batch)
+        expect(footer.adapter.projection.isLayoutDirty).toBe(false)
+        await flush()
+        expect(didUpdate).toHaveBeenCalledTimes(1)
+
+        seedFollowingLayout(parent, records())
+        await flush()
+        expect(didUpdate).toHaveBeenCalledTimes(2)
+    })
+
+    it('3k: runs one root update for every picked node', () => {
+        const parent = list(document.body)
+        const a = mountIn(document.body, 300)
+        mountIn(document.body, 400)
+        const root = a.adapter.projection.root!
+        const didUpdate = vi.spyOn(root, 'didUpdate')
+
+        seedFollowingLayout(parent, records())
+
+        expect(didUpdate).toHaveBeenCalledTimes(1)
+        didUpdate.mockRestore()
+    })
+
+    it('3l: on a completed exit, refreshes silently and seeds nothing', async () => {
+        const parent = list(document.body)
+        const footer = mountIn(document.body, 300)
+        const refresh = vi.spyOn(footer.adapter, 'refreshLayout')
+        const onCacheRefresh = vi.fn()
+        footer.adapter.onCacheRefresh(onCacheRefresh)
+        const didUpdate = vi.fn()
+        footer.adapter.projection.addEventListener('didUpdate', didUpdate)
+        place(footer.element, 230)
+        reads.clear()
+
+        seedFollowingLayout(parent, records(), { kind: 'exit-complete', markers: [] })
+
+        expect(refresh).toHaveBeenCalledTimes(1)
+        expect(refresh).toHaveBeenCalledWith({ silent: true })
+        expect(reads.get(footer.element)).toBe(1)
+        expect(onCacheRefresh).toHaveBeenCalledWith({ left: 10, top: 230, width: 100, height: 50 })
+        expect(footer.adapter.projection.snapshot).toBeUndefined()
+        expect(footer.adapter.projection.isLayoutDirty).toBe(false)
+        await flush()
+        expect(didUpdate).not.toHaveBeenCalled()
+        expect(footer.adapter.lastMeasuredRect?.top).toBe(230)
+    })
+
+    it('3m: leaves resumeFrom and shared-layout stacks untouched', () => {
+        const parent = list(document.body)
+        const footer = mountIn(document.body, 300, { layoutId: 'footer-015b' })
+        const projection = footer.adapter.projection
+        const stack = projection.getStack()
+        const members = [...(stack?.members ?? [])]
+        const lead = stack?.lead
+        const resumeFrom = projection.resumeFrom
+
+        seedFollowingLayout(parent, records())
+
+        expect(projection.resumeFrom).toBe(resumeFrom)
+        expect(projection.getStack()).toBe(stack)
+        expect(stack?.lead).toBe(lead)
+        expect([...(stack?.members ?? [])]).toEqual(members)
     })
 })

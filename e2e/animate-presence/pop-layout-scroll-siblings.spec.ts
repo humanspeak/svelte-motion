@@ -36,7 +36,10 @@ const BASE = '/tests/animate-presence/pop-layout-scroll-siblings?@isPlaywright=t
 const COLOURS = {
     blue: [0x00, 0x77, 0xff],
     pink: [0xff, 0x00, 0x88],
-    green: [0x00, 0xaa, 0x44]
+    green: [0x00, 0xaa, 0x44],
+    // Plan 015b's `?footer` bands.
+    orange: [0xff, 0xaa, 0x00],
+    purple: [0xaa, 0x00, 0xff]
 } as const
 type Colour = keyof typeof COLOURS
 
@@ -56,6 +59,14 @@ interface Hit {
     green?: number
     /** Green's left edge, along the row through its centre (clear of the corner radius). */
     greenLeft?: number
+    /** The first (grey) item's top (plan 015b). */
+    zero?: number
+    /**
+     * The orange `?footer` band's bottom (plan 015b): items FLIPping up from
+     * their old slots are drawn over a footer that moved up under them, so
+     * only its bottom edge shows where its box is.
+     */
+    orange?: number
 }
 interface Recording {
     frames: Frame[]
@@ -100,7 +111,10 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
         void cdp.send('Page.screencastFrameAck', { sessionId: event.sessionId }).catch(() => {})
     })
     const clip = await page.evaluate(() => {
-        const target = document.getElementById('scroller') ?? document.getElementById('list')!
+        const target =
+            document.getElementById('scroller') ??
+            document.getElementById('stage') ??
+            document.getElementById('list')!
         const rect = target.getBoundingClientRect()
         return {
             left: Math.max(0, rect.left - 40),
@@ -125,6 +139,8 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
         }
         const blueX = column('sib-1')
         const greenX = column('sib-3')
+        const zeroX = column('sib-0')
+        const orangeX = column('footer')
         const greenRect = document.getElementById('sib-3')?.getBoundingClientRect()
         const greenY = greenRect ? greenRect.top + greenRect.height / 2 : undefined
         const scanRow = (y: number | undefined, id: string) => {
@@ -151,7 +167,9 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
                 t: performance.now(),
                 blue: scan(blueX, 'sib-1', false),
                 green: scan(greenX, 'sib-3', true),
-                greenLeft: scanRow(greenY, 'sib-3')
+                greenLeft: scanRow(greenY, 'sib-3'),
+                zero: scan(zeroX, 'sib-0', false),
+                orange: scan(orangeX, 'footer', true)
             })
             requestAnimationFrame(sample)
         }
@@ -236,8 +254,13 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
     return { frames, hits }
 }
 
-/** The edge a colour is tracked by (see the file comment). */
-const edge = (colour: Colour, band: Band) => (colour === 'green' ? band.bottom : band.top)
+/**
+ * The edge a colour is tracked by (see the file comment). Orange (plan 015b's
+ * footer) by its bottom too: items FLIPping from their old slots are drawn
+ * over its top.
+ */
+const edge = (colour: Colour, band: Band) =>
+    colour === 'green' || colour === 'orange' ? band.bottom : band.top
 
 /** Frames in which every colour in `colours` was found. */
 const framesWith = (frames: Frame[], colours: Colour[]) =>
@@ -263,8 +286,10 @@ function maxStep(frames: Frame[], colour: Colour): number {
     return step
 }
 
-/** The largest move of blue's top or green's bottom between two rendered frames. */
-function maxHitStep(hits: Hit[], colour: 'blue' | 'green'): number {
+type HitEdge = 'blue' | 'green' | 'zero' | 'orange'
+
+/** The largest move of a hit-tested edge between two rendered frames. */
+function maxHitStep(hits: Hit[], colour: HitEdge): number {
     let step = 0
     for (let i = 1; i < hits.length; i++) {
         const a = hits[i - 1][colour]
@@ -296,11 +321,11 @@ function expectNoJump({ frames, hits }: Recording, colours: Array<'blue' | 'gree
 
 const annotate = ({ frames, hits }: Recording) => {
     test.info().annotations.push({
-        type: 'hit-tested frames (ms: blue top/green bottom)',
+        type: 'hit-tested frames (ms: blue top/green bottom[/orange bottom])',
         description: hits
             .map(
-                ({ t, blue, green }) =>
-                    `${(t - hits[0].t).toFixed(0)}: ${blue?.toFixed(0) ?? '-'}/${green?.toFixed(0) ?? '-'}`
+                ({ t, blue, green, orange }) =>
+                    `${(t - hits[0].t).toFixed(0)}: ${blue?.toFixed(0) ?? '-'}/${green?.toFixed(0) ?? '-'}${orange === undefined ? '' : `/${orange.toFixed(0)}`}`
             )
             .join(' ')
     })
@@ -511,6 +536,254 @@ test.describe('layout siblings around exits in scroll containers (owned path)', 
     })
 })
 
+/**
+ * Plan 015b: every motion element in the render that changed snapshots, as
+ * upstream's `MeasureLayout` does (`getSnapshotBeforeUpdate`,
+ * MeasureLayout.tsx:149-204 @ v14.7.1). On the owned path each item sits in
+ * its own `AnimatePresence`, so the siblings must now see each other's pops
+ * and removals; and a `layout` footer outside the list's parent must see the
+ * list. When a sync exit completes, upstream re-renders only that
+ * `AnimatePresence` (`AnimatePresence/index.tsx:244`, its children through
+ * `PresenceChild.tsx:91-98`): everything outside it snaps, unless it shares
+ * the boundary's `LayoutGroup` (`index.tsx:206`, `group.ts:26-33`).
+ */
+
+/** Every hit-tested move of `edge` larger than 2px, in rendered order. */
+const hitSteps = (hits: Hit[], edge: HitEdge) => {
+    const out: number[] = []
+    for (let i = 1; i < hits.length; i++) {
+        const a = hits[i - 1][edge]
+        const b = hits[i][edge]
+        if (a !== undefined && b !== undefined && Math.abs(b - a) > 2) out.push(b - a)
+    }
+    return out
+}
+
+/** Where `edge` is first and last seen in the hit test. */
+const hitRange = (hits: Hit[], edge: HitEdge) => {
+    const found = hits.flatMap((hit) => {
+        const value = hit[edge]
+        return value === undefined ? [] : [value]
+    })
+    return { count: found.length, first: found[0] ?? NaN, last: found.at(-1) ?? NaN }
+}
+
+const add = (page: Page) =>
+    page.evaluate(() => document.querySelector<HTMLElement>('[data-testid="add"]')!.click())
+
+/** Wait until pink (or its exit clone) has left the DOM. */
+const waitForCompletion = (page: Page) =>
+    page.waitForFunction(() => !document.querySelector('[data-testid="sib-2"]'), undefined, {
+        timeout: 5000
+    })
+
+test.describe('layout siblings around exits (plan 015b, owned path)', () => {
+    test('clamp, popLayout: blue, pink and green move together, no jump', async ({ page }) => {
+        await open(page, '&path=owned')
+        await scrollBottom(page)
+        await page.waitForTimeout(200)
+        const recording = await record(page, () => remove(page), 900)
+        annotate(recording)
+        const { frames, hits } = recording
+        const start = framesWith(frames, ['blue', 'pink', 'green'])[0].bands
+        const all = framesWith(frames, ['blue', 'pink'])
+        expect(all.length).toBeGreaterThanOrEqual(10)
+        const gap = start.pink!.top - start.blue!.top
+        for (const { bands } of all) {
+            expect(Math.abs(bands.pink!.top - bands.blue!.top - gap)).toBeLessThanOrEqual(2)
+        }
+        for (const { bands } of frames) {
+            if (bands.green) {
+                expect(Math.abs(bands.green.bottom - start.green!.bottom)).toBeLessThanOrEqual(2)
+            }
+        }
+        for (const colour of ['blue', 'pink', 'green'] as const) {
+            expect(maxStep(frames, colour), `${colour} step`).toBeLessThanOrEqual(35)
+        }
+        for (const colour of ['blue', 'green'] as const) {
+            expect(maxHitStep(hits, colour), `${colour} hit-tested step`).toBeLessThanOrEqual(35)
+        }
+    })
+
+    test('?layoutScroll, popLayout: the clamp is a one-frame content jump', async ({ page }) => {
+        await open(page, '&path=owned&layoutScroll')
+        await scrollBottom(page)
+        await page.waitForTimeout(200)
+        const recording = await record(page, () => remove(page), 600)
+        annotate(recording)
+        const { frames } = recording
+        const blueSteps = steps(frames, 'blue').filter(({ step }) => Math.abs(step) > 2)
+        const pinkSteps = steps(frames, 'pink').filter(({ step }) => Math.abs(step) > 2)
+        expect(blueSteps).toHaveLength(1)
+        expect(Math.abs(blueSteps[0].step - 70)).toBeLessThanOrEqual(2)
+        expect(pinkSteps).toHaveLength(1)
+        expect(Math.abs(pinkSteps[0].step - 70)).toBeLessThanOrEqual(2)
+        expect(pinkSteps[0].index).toBe(blueSteps[0].index)
+        const all = framesWith(frames, ['blue', 'pink'])
+        expect(all.length).toBeGreaterThanOrEqual(10)
+        const gap = all[0].bands.pink!.top - all[0].bands.blue!.top
+        for (const { bands } of all) {
+            expect(Math.abs(bands.pink!.top - bands.blue!.top - gap)).toBeLessThanOrEqual(2)
+        }
+        const transform = await page.evaluate(
+            () => getComputedStyle(document.getElementById('sib-1')!).transform
+        )
+        expect(transform).toBe('none')
+    })
+
+    test('?fixed, window scrolled by 300, remove: the siblings slide, no 300px phantom', async ({
+        page
+    }) => {
+        await open(page, '&path=owned&fixed')
+        await page.evaluate(() => window.scrollTo(0, 300))
+        await page.waitForTimeout(200)
+        expect(await page.evaluate(() => window.scrollY)).toBe(300)
+        const recording = await record(page, () => remove(page), 900)
+        annotate(recording)
+        const { hits } = recording
+        // The bottom-anchored list shrinks from the top: the first item and
+        // blue move down 70px (blue under the popped pink item, so the first
+        // item is the one tracked).
+        const zero = hitRange(hits, 'zero')
+        expect(zero.count).toBeGreaterThanOrEqual(10)
+        expect(Math.abs(zero.last - zero.first - 70)).toBeLessThanOrEqual(2)
+        expect(maxHitStep(hits, 'zero'), 'first item hit-tested step').toBeLessThanOrEqual(35)
+        expect(maxHitStep(hits, 'green'), 'green hit-tested step').toBeLessThanOrEqual(35)
+    })
+
+    test('resize, then remove: nothing slides on x', async ({ page }) => {
+        await open(page, '&path=owned')
+        await scrollBottom(page)
+        await page.setViewportSize({ width: 1600, height: 1080 })
+        await page.waitForTimeout(400)
+        const recording = await record(page, () => remove(page), 900)
+        annotate(recording)
+        const { frames } = recording
+        // The popped pink item is the real element here, drawn over blue as
+        // blue moves down under it: a sliver of blue left showing beside the
+        // fading pink isn't its band (its corner radius moves the first full
+        // column), so blue's left edge is read where at least 40px of it shows.
+        const lefts = {
+            blue: frames.flatMap(({ bands }) =>
+                bands.blue && bands.blue.bottom - bands.blue.top >= 40 ? [bands.blue.left] : []
+            ),
+            pink: frames.flatMap(({ bands }) => (bands.pink ? [bands.pink.left] : [])),
+            green: recording.hits.flatMap(({ greenLeft }) =>
+                greenLeft === undefined ? [] : [greenLeft]
+            )
+        }
+        for (const [colour, values] of Object.entries(lefts)) {
+            expect(values.length, `${colour} frames`).toBeGreaterThanOrEqual(10)
+            expect(Math.max(...values) - Math.min(...values), `${colour} x`).toBeLessThanOrEqual(2)
+        }
+    })
+
+    test('?sticky, scroll, remove: no jump', async ({ page }) => {
+        await open(page, '&path=owned&sticky')
+        await scrollBottom(page)
+        await page.waitForTimeout(200)
+        const recording = await record(page, () => remove(page), 900)
+        annotate(recording)
+        expectNoJump(recording, ['blue', 'green'])
+    })
+
+    test('sync completion, no LayoutGroup: blue snaps once by 70px (as in Motion)', async ({
+        page
+    }) => {
+        await open(page, '&path=owned&mode=sync')
+        await scrollBottom(page)
+        await page.waitForTimeout(200)
+        const recording = await record(page, () => remove(page), 2200)
+        annotate(recording)
+        const blue = hitSteps(recording.hits, 'blue')
+        expect(blue, 'blue hit-tested steps').toHaveLength(1)
+        expect(Math.abs(Math.abs(blue[0]) - 70)).toBeLessThanOrEqual(2)
+        const transform = await page.evaluate(
+            () => getComputedStyle(document.getElementById('sib-1')!).transform
+        )
+        expect(transform).toBe('none')
+    })
+})
+
+test.describe('layout followers outside the list (plan 015b, ?footer)', () => {
+    for (const path of ['clone', 'owned'] as const) {
+        const query = `&footer&path=${path}`
+
+        test(`${path}: popLayout remove, the footer slides up 70px`, async ({ page }) => {
+            await open(page, query)
+            const recording = await record(page, () => remove(page), 900)
+            annotate(recording)
+            const orange = hitRange(recording.hits, 'orange')
+            expect(orange.count).toBeGreaterThanOrEqual(10)
+            expect(Math.abs(orange.first - orange.last - 70)).toBeLessThanOrEqual(2)
+            expect(maxHitStep(recording.hits, 'orange'), 'orange step').toBeLessThanOrEqual(35)
+            expect(maxStep(recording.frames, 'orange'), 'orange frame step').toBeLessThanOrEqual(35)
+            expect(hitSteps(recording.hits, 'zero'), 'the first item never moves').toEqual([])
+        })
+
+        test(`${path}: popLayout add, the footer slides down 70px`, async ({ page }) => {
+            await open(page, query)
+            const recording = await record(page, () => add(page), 900)
+            annotate(recording)
+            const orange = hitRange(recording.hits, 'orange')
+            expect(orange.count).toBeGreaterThanOrEqual(10)
+            expect(Math.abs(orange.last - orange.first - 70)).toBeLessThanOrEqual(2)
+            expect(maxHitStep(recording.hits, 'orange'), 'orange step').toBeLessThanOrEqual(35)
+            expect(maxStep(recording.frames, 'orange'), 'orange frame step').toBeLessThanOrEqual(35)
+        })
+
+        test(`${path}: sync completion, the footer snaps up once by 70px (as in Motion)`, async ({
+            page
+        }) => {
+            await open(page, `${query}&mode=sync`)
+            const recording = await record(page, () => remove(page), 2200)
+            annotate(recording)
+            const orange = hitSteps(recording.hits, 'orange')
+            expect(orange, 'orange hit-tested steps').toHaveLength(1)
+            expect(Math.abs(orange[0] + 70)).toBeLessThanOrEqual(2)
+        })
+
+        test(`${path}: sync completion in a LayoutGroup, the footer slides`, async ({ page }) => {
+            await open(page, `${query}&mode=sync&layoutGroup`)
+            const recording = await record(page, () => remove(page), 2400)
+            annotate(recording)
+            const orange = hitRange(recording.hits, 'orange')
+            expect(Math.abs(orange.first - orange.last - 70)).toBeLessThanOrEqual(2)
+            expect(maxHitStep(recording.hits, 'orange'), 'orange step').toBeLessThanOrEqual(35)
+        })
+
+        test(`${path}: sync remove, completion, then add: the footer slides from where it snapped to`, async ({
+            page
+        }) => {
+            await open(page, `${query}&mode=sync`)
+            await remove(page)
+            await waitForCompletion(page)
+            await page.waitForTimeout(300)
+            const recording = await record(page, () => add(page), 900)
+            annotate(recording)
+            const orange = hitRange(recording.hits, 'orange')
+            expect(orange.count).toBeGreaterThanOrEqual(10)
+            expect(Math.abs(orange.last - orange.first - 70)).toBeLessThanOrEqual(2)
+            expect(maxHitStep(recording.hits, 'orange'), 'orange step').toBeLessThanOrEqual(35)
+        })
+
+        test(`${path}: &items=1 sync, the only item completes, then add: the footer slides`, async ({
+            page
+        }) => {
+            await open(page, `${query}&mode=sync&items=1`)
+            await remove(page)
+            await waitForCompletion(page)
+            await page.waitForTimeout(300)
+            const recording = await record(page, () => add(page), 900)
+            annotate(recording)
+            const orange = hitRange(recording.hits, 'orange')
+            expect(orange.count).toBeGreaterThanOrEqual(10)
+            expect(Math.abs(orange.last - orange.first - 70)).toBeLessThanOrEqual(2)
+            expect(maxHitStep(recording.hits, 'orange'), 'orange step').toBeLessThanOrEqual(35)
+        })
+    }
+})
+
 type ReadsWindow = Window & {
     reads: Record<string, number[]>
     lastResize: number
@@ -579,5 +852,113 @@ test.describe('layout siblings in scroll containers: read budgets', () => {
             expect(counts[id]?.length ?? 0, id).toBe(1)
             expect(counts[id][0] - lastResize, `${id} delay`).toBeGreaterThanOrEqual(240)
         }
+    })
+
+    // ---- Plan 015b ----
+
+    type ProjectionReads = Window & { __projectionReads: Record<string, number> }
+    const projectionReads = (page: Page) =>
+        page.evaluate(() => ({ ...(window as unknown as ProjectionReads).__projectionReads }))
+    const resetProjectionReads = (page: Page) =>
+        page.evaluate(() => {
+            ;(window as unknown as ProjectionReads).__projectionReads = {}
+        })
+    const scrollSteps = (page: Page, target: 'page' | 'scroller') =>
+        page.evaluate(async (target) => {
+            const scroller = document.getElementById('scroller')
+            for (let i = 0; i < 30; i++) {
+                if (target === 'page') window.scrollBy(0, 20)
+                else scroller!.scrollTop += 20
+                await new Promise(requestAnimationFrame)
+            }
+        }, target)
+    const footerIds = ['header', 'footer', ...ids]
+
+    test('?footer: 30 page scroll steps read no header, footer or item', async ({ page }) => {
+        await open(page, '&footer')
+        await resetReads(page)
+        await scrollSteps(page, 'page')
+        await page.waitForTimeout(300)
+        const counts = await reads(page)
+        for (const id of footerIds) expect(counts[id]?.length ?? 0, id).toBe(0)
+    })
+
+    test('owned popLayout: 30 scroller and page scroll steps take no projection read', async ({
+        page
+    }) => {
+        await open(page, '&path=owned&countReads')
+        await resetProjectionReads(page)
+        await scrollSteps(page, 'scroller')
+        await scrollSteps(page, 'page')
+        await page.waitForTimeout(300)
+        const counts = await projectionReads(page)
+        for (const id of ids) expect(counts[id] ?? 0, id).toBe(0)
+    })
+
+    test('owned popLayout ?footer: 30 page scroll steps take no projection read', async ({
+        page
+    }) => {
+        await open(page, '&path=owned&footer&countReads')
+        await resetProjectionReads(page)
+        await scrollSteps(page, 'page')
+        await page.waitForTimeout(300)
+        const counts = await projectionReads(page)
+        for (const id of footerIds) expect(counts[id] ?? 0, id).toBe(0)
+    })
+
+    for (const path of ['clone', 'owned'] as const) {
+        test(`${path} sync: each sibling reads at most 3 times after the completion, then never`, async ({
+            page
+        }) => {
+            await open(page, `&path=${path}&mode=sync`)
+            await scrollBottom(page)
+            await page.waitForTimeout(200)
+            await resetReads(page)
+            await remove(page)
+            await waitForCompletion(page)
+            await page.waitForTimeout(1100)
+            const { counts, removedAt } = await page.evaluate(() => {
+                const w = window as unknown as ReadsWindow & { __removedAt: number }
+                return { counts: w.reads, removedAt: w.__removedAt }
+            })
+            expect(removedAt).toBeGreaterThan(0)
+            for (const id of ids.filter((id) => id !== 'sib-2')) {
+                const times = counts[id] ?? []
+                const first = times.filter((t) => t >= removedAt && t < removedAt + 500)
+                const later = times.filter((t) => t >= removedAt + 500 && t < removedAt + 1000)
+                expect(first.length, `${id} in 500ms`).toBeLessThanOrEqual(3)
+                expect(later.length, `${id} afterwards`).toBe(0)
+            }
+        })
+    }
+
+    test('?footer&followers=3, clone popLayout remove: at most one read per footer, none on the header', async ({
+        page
+    }) => {
+        await open(page, '&footer&followers=3')
+        await resetReads(page)
+        await remove(page)
+        await page.waitForTimeout(500)
+        const counts = await reads(page)
+        const followers = ['footer', 'footer-2', 'footer-3']
+        for (const id of followers) expect(counts[id]?.length ?? 0, id).toBeLessThanOrEqual(1)
+        const total = followers.reduce((sum, id) => sum + (counts[id]?.length ?? 0), 0)
+        expect(total).toBeLessThanOrEqual(3)
+        expect(counts.header?.length ?? 0, 'header').toBe(0)
+    })
+
+    test('?footer&followers=3, owned popLayout remove: at most one projection read per footer, none on the header', async ({
+        page
+    }) => {
+        await open(page, '&path=owned&footer&followers=3&countReads')
+        await resetProjectionReads(page)
+        await remove(page)
+        await page.waitForTimeout(500)
+        const counts = await projectionReads(page)
+        const followers = ['footer', 'footer-2', 'footer-3']
+        for (const id of followers) expect(counts[id] ?? 0, id).toBeLessThanOrEqual(1)
+        const total = followers.reduce((sum, id) => sum + (counts[id] ?? 0), 0)
+        expect(total).toBeLessThanOrEqual(3)
+        expect(counts.header ?? 0, 'header').toBe(0)
     })
 })
