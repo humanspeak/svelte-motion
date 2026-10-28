@@ -1437,7 +1437,13 @@
             optimizedAppearEntries.some((entry) => entry.name === 'transform')
     )
     const optimizedAppearId = $derived(
-        effectiveInitialProp !== false &&
+        // A component that started featureless (an `m` outside LazyMotion or in
+        // an async one, decided the same way on the server and the client) has
+        // no node to hand the appear animation off to, so it gets no appear id,
+        // attribute or script. The constant keeps a later bundle from injecting
+        // them after load (plan 016, Design 3).
+        !startedFeatureless &&
+            effectiveInitialProp !== false &&
             isNotEmpty(initialKeyframes) &&
             isNotEmpty(animateKeyframes) &&
             !optimizedAppearSuppressedByTransformTemplate &&
@@ -1455,13 +1461,8 @@
     const optimizedAppearScript = $derived(
         createOptimizedAppearScript(optimizedAppearId, optimizedAppearEntries)
     )
-    // A featureless `m` (decidable on the server too) emits no
-    // optimized-appear script; with no node to hand off to, the WAAPI appear
-    // animation would otherwise animate it in on its own.
     const renderedOptimizedAppearScript = $derived(
-        !featureless &&
-            optimizedAppearScript &&
-            (typeof window === 'undefined' || !window.MotionIsMounted)
+        optimizedAppearScript && (typeof window === 'undefined' || !window.MotionIsMounted)
             ? optimizedAppearScript
             : ''
     )
@@ -1530,7 +1531,12 @@
     // The holds this string carries are RETAINED verbatim through the plan-002
     // collapse — neither is an animated-key concern:
     //   1. the wait-mode `display:none` holds,
-    //   2. the `pathLength` mounting `visibility:hidden` hold.
+    //   2. the `pathLength` mounting `visibility:hidden` hold, which covers the
+    //      first frames before the enter animation writes the path. Not for a
+    //      component that started featureless (`startedFeatureless`): it never
+    //      leaves `mounting` without a node, and a late node has nothing to
+    //      flash because the element already shows `initial`. Upstream has no
+    //      hold at all (plan 016, Design 1).
     // (A third hold, drag's `liveGestureTransform` splice, is gone with the
     // single-writer swap — the VisualElement composes the live drag transform.)
     // Upstream `use-visual-element.ts` projection option
@@ -1552,7 +1558,7 @@
             : ''
     )
     const inlineStyleBaseWithHolds = $derived(
-        `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' ? `${serializedStyleProp};visibility:hidden` : serializedStyleProp}${upstreamDragDefaultStyle ? `;${upstreamDragDefaultStyle}` : ''}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`
+        `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' && !startedFeatureless ? `${serializedStyleProp};visibility:hidden` : serializedStyleProp}${upstreamDragDefaultStyle ? `;${upstreamDragDefaultStyle}` : ''}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`
     )
 
     /**
