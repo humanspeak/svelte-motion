@@ -1957,6 +1957,9 @@ describe('MotionDomProjectionAdapter scroll-rebased snapshots (plan 015a)', () =
         element.setAttribute('style', style)
         document.body.appendChild(element)
         vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 320))
+        // Drawn at its offset size: unscaled.
+        Object.defineProperty(element, 'offsetWidth', { configurable: true, value: 400 })
+        Object.defineProperty(element, 'offsetHeight', { configurable: true, value: 320 })
         return element
     }
     const create = (parent: HTMLElement, top: number, style = '') => {
