@@ -247,7 +247,8 @@ helpers.
 - At the start of `unregisterChild`, take `preBasis = seenScrollBasis(slotParent)`. No reads.
 - After `schedulePopLayoutCorrection` (or right after the insert), queue one `microtask.read`. In it:
   - `move = scrollDelta(preBasis, readScrollBasis(slotParent), isFoldedIn)`;
-  - `from = −move / measureScreenScale(clone.offsetParent)`. The 008 clamp gives `y: [-70, 0]`.
+  - `from = move / measureScreenScale(clone.offsetParent)` (A1: sign corrected; the clone must start where it was
+    before the content moved). The 008 clamp gives `y: [-70, 0]`.
 - `layoutTransition = getValueTransition(t, 'layout')`. `t` is `child.mergedTransition` when it is defined and has
   keys, otherwise a local `defaultLayoutTransition` (cite 581-584, 626, 2546-2549).
 - **One animation.** When `move` is non-zero, start the exit in this microtask, not on the rAF, as a single
@@ -530,7 +531,8 @@ Implement it in `presence.ts`.
       **RED** (stale-cache jump).
     - **`?layoutScroll`, popLayout.** Blue and pink each step by 70 ± 2 px in the same frame, the gap holds, and
       blue has no layout transform. Green isn't asserted. **GUARD.**
-    - **Sync completion in the scrolled container.** No step above 35 px. **RED** (stale cache).
+    - **Sync completion in the scrolled container.** No step above 35 px. **GUARD** (A1: passes on unfixed code;
+      the placeholder re-seed leaves nothing stale).
     - **`?fixed`, window scrolled by 300, remove.** No step above 35 px and no 300 px phantom. **RED.**
     - **`?fixed`, height-only resize** (1080 → 900, wait 400 ms, remove). No phantom move, no step above 35 px.
       **RED** (the cached fixed box is stale).
@@ -540,7 +542,8 @@ Implement it in `presence.ts`.
     - **`?sticky`, scroll, remove.** No step above 35 px. **RED** (stale cache).
     - **`?nolayout`, clamp.** Pink steps with the content by the clamp in one frame. **GUARD.**
   - Cases, **owned path**:
-    - **Sync completion in the scrolled container, `?layoutGroup`.** No step above 35 px. **RED**. Today the
+    - **Sync completion in the scrolled container, `?layoutGroup`.** No step above 35 px. **GUARD** (A1: passes
+      on unfixed code once measured soundly). Planned rationale, kept for reference: today the
       owned completion goes `finishExit` (`presence.ts:1108-1114`, reached via 1748) → `forceRender` →
       `commitGroup` at postRender (`LayoutGroup.svelte:79-81`) → seeds every member
       (`motionDomProjection.ts:1253-1262`) from a cache that ignores the scroll. Step 3's `onScreenSnapshot` rebase makes it pass (see Step 3's M6 note).
@@ -594,3 +597,17 @@ Implement it in `presence.ts`.
   - that every `lastLayout` write updates its basis;
   - that `previous` is rebased before every comparison;
   - that part C is queued after 008's correction and gated on `data-layout`.
+
+## Amendments
+
+### A1 (2026-10-28, operator-approved)
+
+- Step 1's two sync-completion cases (clone `?mode=sync`, and owned `?layoutGroup`) are relabelled **GUARD**. On
+  the unfixed code they pass once the measurement is sound; their Step 1 "failure" was the screencast dropping
+  ~190–290 ms of frames when an exit completes, which read as a ~55 px step. They must stay green.
+- The spec's measurement change (`70236473`) is accepted: a frame step across a capture gap longer than 50 ms is
+  not judged from the screencast; instead blue and green are hit-tested with `elementFromPoint` every rAF. This is
+  not a weakened assertion for the Done criteria diff check.
+- Part C's sign: `from = move / scale`, not `−move / scale` (plan slip; the clamp still gives `y: [-70, 0]`).
+- M6 is moot: the owned `?layoutGroup` case already passes.
+
