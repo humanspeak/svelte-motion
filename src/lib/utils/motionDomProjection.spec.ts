@@ -1755,3 +1755,126 @@ describe('MotionDomProjectionAdapter layout options sync (#1935)', () => {
         expect(adapter.projection.options.layoutAnchor).toBe(false)
     })
 })
+
+/**
+ * Plan 007 amendment A1 (#1935): Svelte detaches a departing `layoutId` lead
+ * before its teardown, so its unmount-time `willUpdate()` would measure a
+ * detached element and drop the zero box. The adapter gives it the snapshot
+ * upstream takes while it is still attached (`create-projection-node.ts`
+ * `unmount` 668-678, `willUpdate`, `updateSnapshot` 967-979 and `measure`
+ * 1080-1103 @ v14.7.1), so `promote()` (`stack.ts:45-74`) hands it to the
+ * arriving node with a foreign `source`: a shared snapshot.
+ */
+describe('MotionDomProjectionAdapter departing-lead snapshot (#1935 A1)', () => {
+    const rects = new Map<HTMLElement, DOMRect>()
+    const mounted: MotionDomProjectionAdapter[] = []
+    const mount = (
+        options: { layoutId?: string; layout?: boolean },
+        rect: DOMRect,
+        parent?: MotionDomProjectionAdapter
+    ) => {
+        const adapter = new MotionDomProjectionAdapter(parent ? { parent } : {})
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        rects.set(element, rect)
+        // A detached element reads as an all-zero box, like a browser.
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() =>
+            element.isConnected ? rects.get(element)! : new DOMRect()
+        )
+        adapter.updateOptions(options)
+        adapter.mount(element)
+        mounted.push(adapter)
+        return { adapter, element }
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+    })
+    afterEach(async () => {
+        await flush()
+        for (const adapter of mounted.splice(0)) adapter.unmount()
+    })
+
+    it('hands a detached lead its pre-removal box as a shared snapshot through promote()', () => {
+        const { adapter: lead, element } = mount(
+            { layoutId: 'a1-shared' },
+            new DOMRect(10, 20, 100, 50)
+        )
+        element.remove()
+        lead.unmount()
+
+        const { adapter } = mount({ layoutId: 'a1-shared' }, new DOMRect(300, 20, 100, 50))
+
+        const node = adapter.projection
+        expect(node.resumeFrom === lead.projection).toBe(true)
+        const snapshot = node.resumeFrom?.snapshot
+        expect(snapshot).toBeDefined()
+        expect(snapshot!.measuredBox.x.min).toBe(10)
+        expect(snapshot!.layoutBox.x.min).toBe(10)
+        // A foreign source: motion-dom's `isShared` (`notifyLayoutUpdate`).
+        expect(snapshot!.source).toBe(lead.projection.id)
+        expect(snapshot!.source).not.toBe(node.layout?.source)
+        expect((adapter as { mountedFromSharedSnapshot?: boolean }).mountedFromSharedSnapshot).toBe(
+            true
+        )
+        // Re-measured in the update pass with its path transforms reset.
+        expect(node.isLayoutDirty).toBe(true)
+    })
+
+    it('removes the transforms from the layout box but keeps them in the measured box', () => {
+        const { adapter: lead, element } = mount(
+            { layoutId: 'a1-transform' },
+            new DOMRect(90, 20, 100, 50)
+        )
+        // Drawn 80px right of its layout slot by its own `x`.
+        lead.projection.latestValues.x = 80
+        element.remove()
+        lead.unmount()
+
+        const { adapter } = mount({ layoutId: 'a1-transform' }, new DOMRect(300, 20, 100, 50))
+
+        const snapshot = adapter.projection.resumeFrom?.snapshot
+        expect(snapshot?.measuredBox.x.min).toBe(90)
+        expect(snapshot?.layoutBox.x.min).toBe(10)
+    })
+
+    it('leaves a plain (non-layoutId) unmount without a snapshot', () => {
+        const { adapter, element } = mount({ layout: true }, new DOMRect(10, 20, 100, 50))
+        element.remove()
+        adapter.unmount()
+        expect(adapter.projection.snapshot).toBeUndefined()
+    })
+
+    it("an observed commit doesn't overwrite a descendant's existing snapshot", async () => {
+        const { adapter: parent, element: parentElement } = mount(
+            { layout: true },
+            new DOMRect(10, 0, 300, 50)
+        )
+        const { adapter: child } = mount(
+            { layoutId: 'a1-guard' },
+            new DOMRect(10, 0, 100, 50),
+            parent
+        )
+        const handed = {
+            animationId: 0,
+            measuredBox: { x: { min: 500, max: 600 }, y: { min: 0, max: 50 } },
+            layoutBox: { x: { min: 500, max: 600 }, y: { min: 0, max: 50 } },
+            latestValues: {},
+            source: -1
+        }
+        child.projection.snapshot = handed
+        let seen: unknown
+        child.projection.addEventListener('didUpdate', ({ snapshot }: { snapshot: unknown }) => {
+            seen = snapshot
+        })
+
+        rects.set(parentElement, new DOMRect(160, 0, 300, 50))
+        parent.commitObservedLayoutChange({ left: 10, top: 0, width: 300, height: 50 })
+        await flush()
+
+        expect(seen).toBe(handed)
+    })
+})

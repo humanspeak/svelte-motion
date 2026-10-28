@@ -324,3 +324,48 @@ test('Crossfading inside a scaled ancestor of a layoutRoot animates relative to 
         }
     }
 })
+
+/**
+ * Not in upstream's spec (plan 007 amendment A1): the same `layout` types in
+ * page space, without a layoutRoot. The list is 360px wide and jumps from
+ * 320px to 170px, so Tomato's underline was at 320px and Lettuce's is at
+ * 270px, 160px wide. Upstream resizes the shared snapshot to the new layout
+ * before animating (`resizeSnapshot` in `notifyLayoutUpdate`).
+ */
+test('Shared layout="position" animation without a layoutRoot animates position in page space', async ({
+    page
+}) => {
+    const records = await selectLettuce(page, 'layoutRoot=false&layout=position', {
+        underline: 320,
+        list: 320
+    })
+    expect(records.length).toBeGreaterThan(20)
+    for (const { list } of records) expect(list).toBeCloseTo(170, 0)
+
+    // From Tomato's old page position to Lettuce's, at Lettuce's width
+    const lefts = records.map(({ underlines }) => underlines[underlines.length - 1])
+    expect(lefts[0]).toBeGreaterThan(315)
+    for (let i = 1; i < lefts.length; i++) expect(lefts[i]).toBeLessThanOrEqual(lefts[i - 1] + 0.5)
+    expect(lefts.some((left) => left > 285 && left < 305)).toBe(true)
+    expect(lefts[lefts.length - 1]).toBeCloseTo(270, 0)
+    for (const { underlineWidths } of records) {
+        expect(underlineWidths[underlineWidths.length - 1]).toBeCloseTo(160, 0)
+    }
+})
+
+test('Shared layout="size" animation without a layoutRoot only animates size', async ({ page }) => {
+    const records = await selectLettuce(page, 'layoutRoot=false&layout=size', {
+        underline: 320,
+        list: 320
+    })
+    expect(records.length).toBeGreaterThan(20)
+
+    // Under Lettuce throughout, growing to its width
+    for (const { underlines } of records) {
+        expect(underlines[underlines.length - 1]).toBeCloseTo(270, 0)
+    }
+    const widths = records.map(({ underlineWidths }) => underlineWidths[underlineWidths.length - 1])
+    expect(widths[0]).toBeLessThan(105)
+    expect(widths.some((w) => w > 120 && w < 140)).toBe(true)
+    expect(widths[widths.length - 1]).toBeCloseTo(160, 0)
+})
