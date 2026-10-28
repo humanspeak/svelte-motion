@@ -652,18 +652,39 @@ const ANCESTOR_ATTRIBUTE_INIT: MutationObserverInit = {
     attributeOldValue: true
 }
 
+let styleScratch: HTMLElement | null = null
+
+/**
+ * Re-serialize inline style text through the CSSOM, so authored text
+ * (`background: #ddd`) and the browser's own serialization of the same
+ * declarations (`background: rgb(221, 221, 221)`) compare equal.
+ *
+ * Uses one detached scratch element: parsing `cssText` never reads layout.
+ *
+ * @param style Inline style text (may be empty).
+ * @returns The CSSOM serialization of the same declarations.
+ */
+const normalizeStyleText = (style: string): string => {
+    if (!style) return ''
+    styleScratch ??= document.createElement('div')
+    styleScratch.style.cssText = style
+    return styleScratch.style.cssText
+}
+
 /**
  * Whether an ancestor attribute mutation batch can re-slot children. Style
  * mutations that only touch animation channels (transforms / opacity /
  * will-change — written every frame by gesture and FLIP animations) never
- * re-slot children, so they are filtered out to avoid commit storms.
+ * re-slot children, so they are filtered out to avoid commit storms. Both
+ * sides are normalized first: the first CSSOM write re-serializes authored
+ * style text, which is not a layout change.
  */
 const ancestorMutationsAffectLayout = (mutations: MutationRecord[]): boolean => {
     for (const mutation of mutations) {
         if (mutation.attributeName === 'style') {
-            const before = stripNonChildLayoutStyle(mutation.oldValue ?? '')
+            const before = stripNonChildLayoutStyle(normalizeStyleText(mutation.oldValue ?? ''))
             const after = stripNonChildLayoutStyle(
-                (mutation.target as HTMLElement).getAttribute('style') ?? ''
+                normalizeStyleText((mutation.target as HTMLElement).getAttribute('style') ?? '')
             )
             if (before === after) continue
         }
