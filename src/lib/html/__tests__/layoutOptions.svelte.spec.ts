@@ -1,7 +1,7 @@
 import { render } from '@testing-library/svelte'
 import { visualElementStore } from 'motion-dom'
 import { tick } from 'svelte'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import LayoutOptionsHarness from './LayoutOptionsHarness.svelte'
 
@@ -23,6 +23,22 @@ const element = () => document.getElementById('layout-options') as HTMLElement
 const getOptions = () => visualElementStore.get(element())!.projection!.options
 
 describe('layoutRoot and layoutAnchor props (#1935)', () => {
+    beforeEach(() => {
+        vi.useRealTimers()
+        // JSDOM has no ResizeObserver; `layout` elements observe their own size.
+        vi.stubGlobal(
+            'ResizeObserver',
+            class {
+                observe() {}
+                unobserve() {}
+                disconnect() {}
+            }
+        )
+    })
+    afterEach(() => {
+        vi.unstubAllGlobals()
+    })
+
     it('does not render either prop as a DOM attribute', async () => {
         render(LayoutOptionsHarness, {
             props: { layoutRoot: true, layoutAnchor: { x: 0.5, y: 0.5 } }

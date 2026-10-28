@@ -228,6 +228,8 @@
         layout: layoutProp,
         layoutId: layoutIdProp,
         layoutScroll: layoutScrollProp,
+        layoutRoot: layoutRootProp,
+        layoutAnchor: layoutAnchorProp,
         layoutDependency: layoutDependencyProp,
         onProjectionUpdate: onProjectionUpdateProp,
         onLayoutMeasure: onLayoutMeasureProp,
@@ -1927,10 +1929,16 @@
 
     $effect(() => {
         if (!motionDomProjection) return
+        // `layoutAnchor` and `layoutDependency` follow every update, as
+        // upstream `MeasureLayout`'s `layoutOptions` (MeasureLayout.tsx:43-52
+        // @ v14.7.1). `layoutRoot` is creation-time only: the mount effect
+        // below passes it, never this one.
         motionDomProjection.updateOptions({
             layout: layoutProp,
             layoutId: scopedLayoutId,
             layoutScroll: layoutScrollProp,
+            layoutAnchor: layoutAnchorProp,
+            layoutDependency: layoutDependencyProp,
             transition: mergedTransition as never,
             style: styleProp,
             alwaysMeasureLayout: upstreamAlwaysMeasureLayout
@@ -1959,6 +1967,14 @@
                 layout: layoutProp,
                 layoutId: scopedLayoutId,
                 layoutScroll: layoutScrollProp,
+                // Creation-time only, as upstream passes it when it creates
+                // the projection node (use-visual-element.ts:229-248 @
+                // v14.7.1) and leaves it out of `layoutOptions`
+                // (MeasureLayout.tsx:43-52): changing it after mount has no
+                // effect.
+                layoutRoot: layoutRootProp,
+                layoutAnchor: layoutAnchorProp,
+                layoutDependency: layoutDependencyProp,
                 transition: mergedTransition as never,
                 style: styleProp,
                 alwaysMeasureLayout: upstreamAlwaysMeasureLayout

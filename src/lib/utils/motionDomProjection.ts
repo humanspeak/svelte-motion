@@ -94,6 +94,12 @@ export interface MotionDomProjectionUpdateOptions {
     layoutId?: string
     /** Tracks scroll on this element for descendant layout projection. */
     layoutScroll?: boolean
+    /** Makes this node a layout root. Creation-time only: omit the key to leave it unchanged. */
+    layoutRoot?: boolean
+    /** Anchor point on the parent for relative projection, or `false` to turn it off. */
+    layoutAnchor?: { x: number; y: number } | false
+    /** Forwarded so `NodeStack.promote` can compare it, as upstream `layoutOptions` does. */
+    layoutDependency?: unknown
     /** Transition passed to the upstream layout animation builder. */
     transition?: Transition
     /** Inline style props passed through to the visual element. */
@@ -414,10 +420,18 @@ export class MotionDomProjectionAdapter {
             } as never,
             this.ownsVisualElement ? null : this.visualElement.presenceContext
         )
+        // `layoutAnchor` and `layoutDependency` are synced on every update, as
+        // upstream `layoutOptions` (MeasureLayout.tsx:43-52 @ v14.7.1).
+        // `layoutRoot` is a creation option (use-visual-element.ts:229-248 @
+        // v14.7.1): `setOptions` merges and an explicit `undefined` would
+        // overwrite, so it's written only when the caller passes the key.
         this.projection.setOptions({
             layout: options.layout,
             layoutId,
             layoutScroll: options.layoutScroll,
+            ...('layoutRoot' in options ? { layoutRoot: options.layoutRoot } : {}),
+            layoutAnchor: options.layoutAnchor,
+            layoutDependency: options.layoutDependency,
             alwaysMeasureLayout: options.alwaysMeasureLayout,
             animationType: animationTypeForLayout(options.layout),
             transition: options.transition,

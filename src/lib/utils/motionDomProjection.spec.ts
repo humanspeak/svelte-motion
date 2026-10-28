@@ -1725,7 +1725,7 @@ describe('MotionDomProjectionAdapter layout options sync (#1935)', () => {
             layoutRoot: true,
             layoutAnchor: { x: 0, y: 0 },
             layoutDependency: 1
-        } as never)
+        })
         expect(adapter.projection.options.layoutRoot).toBe(true)
         expect(adapter.projection.options.layoutAnchor).toEqual({ x: 0, y: 0 })
         expect(adapter.projection.options.layoutDependency).toBe(1)
@@ -1738,12 +1738,12 @@ describe('MotionDomProjectionAdapter layout options sync (#1935)', () => {
             layoutRoot: true,
             layoutAnchor: { x: 0, y: 0 },
             layoutDependency: 1
-        } as never)
+        })
         adapter.updateOptions({
             layout: true,
             layoutAnchor: { x: 1, y: 1 },
             layoutDependency: 2
-        } as never)
+        })
         expect(adapter.projection.options.layoutAnchor).toEqual({ x: 1, y: 1 })
         expect(adapter.projection.options.layoutDependency).toBe(2)
         expect(adapter.projection.options.layoutRoot).toBe(true)
@@ -1751,7 +1751,7 @@ describe('MotionDomProjectionAdapter layout options sync (#1935)', () => {
 
     it('forwards layoutAnchor={false}', () => {
         const adapter = new MotionDomProjectionAdapter()
-        adapter.updateOptions({ layout: true, layoutAnchor: false } as never)
+        adapter.updateOptions({ layout: true, layoutAnchor: false })
         expect(adapter.projection.options.layoutAnchor).toBe(false)
     })
 })
