@@ -2122,6 +2122,12 @@ export type PresenceChildContext = {
     register: PresenceContextProps['register']
     /** Completion callback captured for the current exit cycle. */
     readonly onExitComplete: NonNullable<PresenceContextProps['onExitComplete']>
+    /**
+     * Installed by a legacy `<AnimatePresence propagate>`; its `isPresent`
+     * follows the parent presence, while descendants still register clone
+     * exits with the nested boundary.
+     */
+    readonly propagated?: boolean
 }
 
 const PRESENCE_CHILD_CONTEXT = Symbol('presence-child-context')

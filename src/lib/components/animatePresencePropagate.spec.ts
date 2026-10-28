@@ -1,5 +1,5 @@
-import { flushTimers } from '$lib/__tests__/flushTimers'
 import { cleanup, render } from '@testing-library/svelte'
+import { tick } from 'svelte'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Clone exits resolve at once (as in `src/lib/html/_MotionContainer.spec.ts`);
@@ -7,6 +7,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('motion', () => ({
     animate: vi.fn(() => ({ finished: Promise.resolve() }))
 }))
+
+/**
+ * Like `$lib/__tests__/flushTimers`, but bounded: a clone-path child polls
+ * its styles every frame, so `vi.runAllTimers()` would never return.
+ */
+const flushTimers = async () => {
+    for (let i = 0; i < 3; i++) {
+        await vi.advanceTimersByTimeAsync(20)
+        await Promise.resolve()
+        await tick()
+    }
+}
 
 type Props = {
     form?: 'owned' | 'legacy' | 'empty'
@@ -67,22 +79,36 @@ async function mountGroup(props: Props) {
  * v14.7.1, lines 58, 70-71, 95-99, 213-217, 246; `use-presence.ts:40-65`).
  */
 describe('AnimatePresence propagate', () => {
+    // jsdom has no WAAPI; the clone path's style polling calls it.
+    const proto = Element.prototype as unknown as { getAnimations?: () => Animation[] }
+    const originalGetAnimations = proto.getAnimations
+
     beforeEach(() => {
+        vi.clearAllMocks()
+        proto.getAnimations = () => []
         vi.useFakeTimers()
+        vi.stubGlobal(
+            'ResizeObserver',
+            class {
+                observe() {}
+                unobserve() {}
+                disconnect() {}
+            }
+        )
         vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
             setTimeout(() => cb(0), 0)
             return 0 as unknown as number
         })
     })
 
-    afterEach(() => {
-        // Unmount while the fake timers are still installed, so no held exit
-        // leaks into the next case. Like `_MotionContainer.spec.ts`, never go
-        // back to real timers mid-file: that drops motion-dom's pending frame
-        // and its frameloop never runs again.
+    afterEach(async () => {
+        // Unmount, then let motion-dom's frameloop finish its pending frame on
+        // the fake clock. Reinstalling fake timers (or going back to real
+        // ones) drops a pending frame, and the frameloop never runs again.
         cleanup()
-        vi.runOnlyPendingTimers()
+        await vi.advanceTimersByTimeAsync(100)
         vi.unstubAllGlobals()
+        proto.getAnimations = originalGetAnimations
     })
 
     it.each(['owned', 'legacy'] as const)(
@@ -121,7 +147,14 @@ describe('AnimatePresence propagate', () => {
         const group = await mountGroup({ form: 'legacy', propagate: false })
 
         await group.update({ innerShown: false })
-        expect(group.result.container.querySelector('[data-clone="true"]')).not.toBeNull()
+        // The (mocked, instant) exit animation ran on an exit clone.
+        const { animate } = await import('motion')
+        const animated = vi.mocked(animate).mock.calls.map(([target]) => target)
+        expect(
+            animated.some(
+                (target) => target instanceof HTMLElement && target.dataset.clone === 'true'
+            )
+        ).toBe(true)
     })
 
     it('legacy nested boundary with propagate leaves no clone behind', async () => {

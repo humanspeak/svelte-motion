@@ -1,13 +1,18 @@
 <script lang="ts">
-    import { onDestroy, type Snippet } from 'svelte'
+    import type { VisualElement } from 'motion-dom'
+    import { onDestroy, untrack, type Snippet } from 'svelte'
     import PresenceChild from '$lib/components/PresenceChild.svelte'
     import { getLayoutGroupContext } from '$lib/components/layoutGroup.context'
     import type { AnimatePresenceMode } from '$lib/types'
+    import { createPresenceExitRegistry } from '$lib/utils/presenceExitRegistry'
     import {
         createAnimatePresenceContext,
+        getPresenceChildContext,
         setAnimatePresenceContext,
+        setPresenceChildContext,
         setPresenceDepth,
         type PopLayoutAnchorX,
+        type PresenceChildContext,
         type PopLayoutAnchorY
     } from '$lib/utils/presence'
     import { pwLog } from '$lib/utils/log'
@@ -40,6 +45,12 @@
      * @prop root Root element to use when injecting styles, used when
      *     `mode="popLayout"`. Defaults to the head of the document the element
      *     is rendered in, but can be overridden, e.g. for use in shadow DOM.
+     * @prop propagate If true, the AnimatePresence component will propagate
+     *     parent exit animations to its children. Needs an owned parent exit (a
+     *     `present` + `child` boundary or a `PresenceChild`): a clone exit
+     *     replaces the parent's subtree with a static copy, so nothing nested
+     *     is left to animate. Defaults to `false`, so a nested boundary is
+     *     independent of its parent's exit.
      */
     type SharedProps = {
         custom?: unknown
@@ -49,6 +60,7 @@
         anchorX?: PopLayoutAnchorX
         anchorY?: PopLayoutAnchorY
         root?: HTMLElement | ShadowRoot
+        propagate?: boolean
     }
 
     type Props = SharedProps &
@@ -77,8 +89,80 @@
         onExitComplete,
         anchorX = 'left',
         anchorY = 'top',
-        root
+        root,
+        propagate = false
     }: Props = $props()
+
+    // ── propagate (upstream AnimatePresence/index.tsx @ v14.7.1, lines 58,
+    // 70-71, 95-99, 213-217, 246; use-presence.ts:40-65) ──────────────────
+    // The presence this boundary sits in, when it is inside an owned exit.
+    const parentPresence = getPresenceChildContext()
+    const presenceId = $props.id()
+    // Read once: which context the legacy children see is fixed at mount.
+    const propagates = untrack(() => propagate) && !!parentPresence
+    const isLegacy = untrack(() => !child)
+
+    /** Complete this boundary's part in the parent's current exit cycle. */
+    const releaseParent = () => {
+        // Read at call time: the parent's callback is versioned per cycle.
+        parentPresence?.onExitComplete(presenceId)
+    }
+    const isParentExiting = () => propagates && parentPresence?.isPresent === false
+
+    // Only a propagating boundary holds its parent's exit (upstream
+    // `usePresence(propagate)` only subscribes when it propagates).
+    if (propagates) {
+        const unregister = parentPresence!.register(presenceId)
+        onDestroy(unregister)
+    }
+
+    if (isLegacy && !propagates) {
+        // Children of a non-propagating boundary don't exit with the parent:
+        // they get their own (clone) exits from this boundary instead.
+        setPresenceChildContext(undefined as never)
+    } else if (isLegacy && parentPresence) {
+        // Propagating legacy boundary: its children follow the parent's
+        // presence and exit as real nodes, and only this boundary is the
+        // parent's participant. Its own registry tracks them, so it can
+        // release the parent once they have all exited.
+        const innerRegistry = createPresenceExitRegistry()
+        let liveParticipants = 0
+        let completeInner: ReturnType<typeof innerRegistry.begin> = () => {}
+        // motion-dom types the node as `any`; the registry takes a VisualElement.
+        const register: PresenceChildContext['register'] = (id, node?: VisualElement) => {
+            liveParticipants += 1
+            const unregister = innerRegistry.register(id, node)
+            return () => {
+                liveParticipants -= 1
+                unregister()
+            }
+        }
+        setPresenceChildContext({
+            get isPresent() {
+                return parentPresence.isPresent
+            },
+            safeToRemove: releaseParent,
+            register,
+            get onExitComplete() {
+                return completeInner
+            },
+            propagated: true
+        })
+        let wasParentPresent = true
+        $effect.pre(() => {
+            const parentPresent = parentPresence.isPresent
+            if (wasParentPresent && !parentPresent) {
+                // Nothing to exit: release at once (the registry keeps empty
+                // holds open by design, so it can't be relied on here).
+                if (liveParticipants === 0) releaseParent()
+                else completeInner = innerRegistry.begin(releaseParent)
+            } else if (!wasParentPresent && parentPresent) {
+                innerRegistry.cancel()
+                completeInner = () => {}
+            }
+            wasParentPresent = parentPresent
+        })
+    }
 
     pwLog('[AnimatePresence] mounting', {
         initial,
@@ -88,7 +172,11 @@
     const context = createAnimatePresenceContext({
         initial,
         mode,
-        onExitComplete,
+        onExitComplete: () => {
+            onExitComplete?.()
+            // Owned form: the held child finished exiting with the parent.
+            if (isParentExiting()) releaseParent()
+        },
         // Upstream re-renders the surrounding LayoutGroup once every exit
         // completes, so its members animate into the freed space.
         forceRender: getLayoutGroupContext()?.forceRender,
@@ -107,11 +195,23 @@
     $effect.pre(() => {
         context.setCustom(custom)
     })
+
+    // Owned form whose child was already gone when the parent started
+    // exiting: nothing will exit, so release the parent at once (upstream's
+    // `propagate && !isParentPresent && !renderedChildren.length`).
+    $effect(() => {
+        if (!isLegacy && isParentExiting() && present === false) releaseParent()
+    })
+
+    // Owned form: a propagating boundary's child leaves with the parent.
+    const ownedPresent = $derived(
+        (present ?? true) && (!propagates || (parentPresence?.isPresent ?? true))
+    )
 </script>
 
 <div class="animate-presence-container">
     {#if child}
-        <PresenceChild present={present ?? true}>
+        <PresenceChild present={ownedPresent}>
             {@render child()}
         </PresenceChild>
     {:else}
