@@ -650,7 +650,7 @@ on all of them):
 | E2 | `… async LazyMotion waits for its bundle, then animates in`: remove `test.fail`; per-frame probe before `load`; after `load`, a probe that sees opacity rise monotonically from about 0.4 to 1 | RED | report §1.1 |
 | E3 | control card (existing) | GUARD | report §1.1 |
 | E4 | `basic.spec.ts:12` rewritten: hover each bundle card and probe the scale per frame. `domMin` stays at 1 on every frame; `domAnimation`, `domMax` and `motion-in-domMin` reach about 1.15. Also assert `tabindex="0"` on all four | RED (the `domMin` `tabindex`) / GUARD (hover) | `domMin` has no `tabindex` today |
-| E4b | `basic.spec.ts:27` rewritten (`loads async feature bundles …`). The old `tabindex` null → `0` assertion at `:32-33` no longer holds, because the box has `whileTap`. The page's loader resolves `domAnimation` after a hard-coded 300 ms, too short to probe reliably, so add a `?delay=<ms>` query (default `300`) to `src/routes/tests/lazy-motion/async/+page.svelte` and use `?delay=1500`. Assert: (1) `lazy-motion-async-box` has `tabindex="0"` from the first check on; (2) hover it right after it is visible, then run a 30-frame per-frame probe: scale `1` and opacity `0 ± 0.01` on every frame; (3) then opacity reaches `1` and the hover scale reaches about `1.08` | RED (1, 2) / GUARD (3) | today the pending `m` has a `domMin` node: no `tabindex` until load, and the box animates in at once |
+| E4b | `basic.spec.ts:27` rewritten (`loads async feature bundles …`). The old `tabindex` null → `0` assertion at `:32-33` no longer holds, because the box has `whileTap`. The page's loader resolves `domAnimation` after a hard-coded 300 ms, too short to probe reliably, so add a `?delay=<ms>` query (default `300`) to `src/routes/tests/lazy-motion/async/+page.svelte` and use `?delay=1500`. Assert: (1) `lazy-motion-async-box` has `tabindex="0"` from the first check on; (2) hover it right after it is visible, then run a 30-frame per-frame probe: scale `1` and opacity `0 ± 0.01` on every frame; (3) then opacity reaches `1`; move the mouse off the box and back on (hover listens for `pointerenter`, which never fires for a pointer already inside), and the hover scale reaches about `1.08` | RED (1, 2) / GUARD (3) | today the pending `m` has a `domMin` node: no `tabindex` until load, and the box animates in at once |
 | E5 | `featureless-m-presence.spec.ts` `a featureless m with exit leaves at once`: click `toggle-exit` in the probe; on every frame from the first: `exit-bare` not in the DOM and `[data-clone="true"]` count for it 0 (the control's clone is identified by its own `data-testid`) | RED | clone path runs without a node (`:869-897`) |
 | E6 | `… control m exits with a clone`: the control's clone is painted on ≥ 3 frames | GUARD | |
 | E7 | `… wait mode reveals a featureless entrant`: click `swap-enter`; within 2 s a frame exists where `wait-old` is gone, and on every frame after it `wait-new` has `display !== 'none'` | GUARD | today `runAnimation` reveals it; A1 without Design 5 would not |
@@ -702,8 +702,9 @@ at `:1509` stays. Step 3 fixes it. Any other new red is a STOP. `pnpm check`
    Update the hold comment at `:1484-1490`.
 
 **Verify**: U10 and U11 pass. Order the `verify.mjs` asserts S4, S1, S2, S5, S3, S6 (the file stops at the first
-failure). After Step 3 the consumer SSR command must get through S4, S1, S2 and S5 and is **expected to fail at
-S3** (`m-async` still lacks the prop-derived `tabindex` and drag styles until Step 4). Any earlier failure is a STOP.
+failure). After Step 3 the consumer SSR command must get through S4, S1, S2, S5 and S3 and is **expected to fail at
+S6** (the TapSsr cases wait for Step 4; A1 already removed the feature gates from the drag style and the `tabindex`
+condition, so `m-async` matches `motion` at S3). Any earlier failure, including at S3, is a STOP.
 E1 and E2 pass
 (`PW_PORT=4220 pnpm exec playwright test e2e/lazy-motion/featureless-m.spec.ts`).
 
@@ -772,11 +773,12 @@ e2e/animate-presence` → all pass.
    an async card with a "Load features" button whose loader resolves `domAnimation` when pressed, then animates in.
    Add a `FIG-004` section (`tag: 'ASYNC'`) to `docs/src/routes/examples/lazy-motion/+page.svelte`, the same shape
    as FIG-002, with notes on both behaviours. Regenerate the demo registry with the docs build command.
-6. `.changeset/featureless-m.md`, `patch`:
+6. `.changeset/featureless-m.md`, `patch`. 016 must not ship in a release without 017 (until 017 lands, a featureless
+   `m` with `exit` under `<AnimatePresence present>` waits for `safeToRemove`; no test pins that interim state):
    > **Behaviour change (Motion parity):** `m` components now match Motion's `LazyMotion`. Without a `LazyMotion`
    > above them, or while an async `features` bundle is loading, they have no animation runtime: they render
    > `style`, `initial`, `tabindex` and the drag styles, and run no animation, gesture, drag, layout or exit (an
-   > `AnimatePresence` removes them at once). When the bundle loads they animate in from `initial`. Previously an
+   > `AnimatePresence` removes a direct child at once). When the bundle loads they animate in from `initial`. Previously an
    > `m` outside `LazyMotion` had every feature and a pending bundle gave it `domMin`. 
    >
    > **Visible change:** as in Motion, `onTap`, `onTapStart` and `whileTap` now add `tabindex="0"` from props
