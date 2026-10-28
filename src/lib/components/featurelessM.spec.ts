@@ -147,7 +147,12 @@ describe('m without LazyMotion features', () => {
         expect(visualElementStore.get(screen.getByTestId('box'))).toBeDefined()
     })
 
-    type StyleProbe = { setX: (value: number) => void; getX: () => number }
+    type StyleProbe = {
+        setX: (value: number) => void
+        getX: () => number
+        setWillChange: (value: string) => void
+        getWillChange: () => string
+    }
 
     // U6. Upstream `use-props.ts:9-49` copies MotionValues' first-render value
     // only (`useConstant(visualState)`); without a node nothing re-reads them.
@@ -225,6 +230,26 @@ describe('m without LazyMotion features', () => {
         await flushTimers()
 
         expect(box.style.transform).toContain('80px')
+    })
+
+    // Upstream `VisualElement.ts:437-446` leaves `willChange` out of the
+    // constructor reset (`const { willChange, ...initialMotionValues }`).
+    it('a late node does not reset a willChange MotionValue', async () => {
+        const features = createDeferred<typeof domMax>()
+        const { component } = render(FeaturelessStyleProbe, {
+            props: { wrap: 'async', loader: async () => features.promise }
+        })
+        await flushTimers()
+        const probe = component as unknown as StyleProbe
+        probe.setWillChange('transform')
+        await flushTimers()
+
+        features.resolve(domMax)
+        await flushTimers()
+        await flushTimers()
+        await flushTimers()
+
+        expect(probe.getWillChange()).toBe('transform')
     })
 
     // U9. Upstream `useVisualElement` reads a parent that has no node.

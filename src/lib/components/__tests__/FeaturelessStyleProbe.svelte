@@ -19,11 +19,18 @@
     export const setX = (value: number) => x.set(value)
     /** Reads the box's style MotionValue `x`. */
     export const getX = () => x.get()
+
+    const willChange = useMotionValue('auto')
+    /** Sets the third box's `willChange` MotionValue. */
+    export const setWillChange = (value: string) => willChange.set(value)
+    /** Reads the third box's `willChange` MotionValue. */
+    export const getWillChange = () => willChange.get()
 </script>
 
 {#snippet boxes()}
     <m.div data-testid="box" style={{ x, width }} />
     <m.div data-testid="forced" style={{ x: rawX }} />
+    <m.div data-testid="will-change" style={{ willChange }} />
 {/snippet}
 
 {#if wrap === 'none'}
