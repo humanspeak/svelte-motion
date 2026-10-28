@@ -454,6 +454,20 @@ describe('ExitAnimationFeature', () => {
     })
 })
 
+describe('createMotionVisualElement latestValues', () => {
+    // Upstream seeds every node from the constant first-render `visualState`
+    // (`use-visual-state.ts:134-142`); the option lets a late node do the same.
+    it('replaces makeLatestValues when given', () => {
+        const props: MotionNodeOptions = { initial: { opacity: 0 } }
+
+        const seeded = createMotionVisualElement({ props, latestValues: { opacity: 0.3 } })
+        const derived = createMotionVisualElement({ props })
+
+        expect(seeded.latestValues.opacity).toBe(0.3)
+        expect(derived.latestValues.opacity).toBe(0)
+    })
+})
+
 describe('animation state (motion-dom)', () => {
     it("doesn't re-animate animate's labels when a type with no prop is deactivated (#1831)", () => {
         // Port of framer-motion animation-state.test.ts "Deactivating a type

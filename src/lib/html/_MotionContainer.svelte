@@ -36,7 +36,7 @@
         frameSteps,
         time,
         isDeltaZero,
-        styleEffect,
+        isMotionValue,
         animateVisualElement,
         isControllingVariants,
         isVariantLabel,
@@ -80,9 +80,9 @@
     } from '$lib/utils/layout'
     import type { SvelteHTMLElements } from 'svelte/elements'
     import {
-        applyMotionStyleEffect,
-        collectMotionStyleValues,
+        captureMotionStyleValues,
         extractTransform,
+        freezeMotionStyle,
         mergeInlineStyles,
         serializeMotionStyle
     } from '$lib/utils/style'
@@ -348,7 +348,22 @@
         })
     }
 
-    const serializedStyleProp = $derived(serializeMotionStyle(styleProp, transformTemplateProp))
+    // A client render without a node (only a featureless `m`) renders style the
+    // way upstream does without a VisualElement (`render/html/use-props.ts:9-49`,
+    // `motion/utils/use-visual-state.ts:134-142`): raw, non-forced values follow
+    // every render, while MotionValues and forced keys (`x`, `scale`, `origin*`,
+    // …) keep the values of the first render. This is that first-render snapshot;
+    // `serializedStyleProp` (after the node bindings) renders it. The server path
+    // is unchanged (plan 016, Design 4).
+    const featurelessStyleValues =
+        typeof window !== 'undefined' && startedFeatureless
+            ? untrack(() =>
+                  captureMotionStyleValues(styleProp, {
+                      layout: layoutProp,
+                      layoutId: layoutIdProp
+                  })
+              )
+            : undefined
     // The user-authored transform, sourced from the `style` prop rather
     // than the live inline transform — the latter already carries any
     // transform-type `initial`/`animate` keyframe by the time the
@@ -981,28 +996,6 @@
         })
     })
 
-    // Style MotionValues are driven by the VisualElement (#449 plan 002): its
-    // `bindToMotionValue` subscribes each scraped value and schedules a render,
-    // and `buildHTMLStyles` composes the transform (honouring
-    // `props.transformTemplate`). That is the same job the former
-    // `styleEffect` / `applyMotionStyleEffect` subscription did here, so
-    // keeping both would make two writers race for the element's style.
-    //
-    // Retained only as the no-VisualElement fallback (SSR has no VE, but this
-    // effect never runs there; a client render always has one).
-    $effect(() => {
-        if (!element || visualElement) return
-
-        const styleValues = collectMotionStyleValues(styleProp)
-        if (!styleValues) return
-
-        if (transformTemplateProp) {
-            return applyMotionStyleEffect(element, styleProp, transformTemplateProp)
-        }
-
-        return styleEffect(element, styleValues)
-    })
-
     // Variant inheritance and resolution
     // `inherit={false}` severs BOTH label channels (animate store + initial
     // context) so the node neither follows its parent nor lets the parent's
@@ -1188,6 +1181,39 @@
     let motionDomProjection = $state.raw<MotionDomProjectionAdapter | null>(null)
     setVisualElementParent(() => visualElement)
     setMotionDomProjectionParent(() => motionDomProjection)
+    // Without a node on the client, style MotionValues and forced keys render
+    // their first-render values (see `featurelessStyleValues`).
+    const serializedStyleProp = $derived(
+        serializeMotionStyle(
+            typeof window !== 'undefined' && !visualElement
+                ? freezeMotionStyle(styleProp, featurelessStyleValues, {
+                      layout: layoutProp,
+                      layoutId: layoutIdProp
+                  })
+                : styleProp,
+            transformTemplateProp
+        )
+    )
+
+    // The rest of the first-render visual state of a component that started
+    // featureless: what `makeLatestValues` seeds from `initial` / `animate`
+    // (upstream `useConstant(make)`, use-visual-state.ts:134-142). The no-node
+    // render reads it instead of re-deriving every pass, and a late node is
+    // seeded from it together with `featurelessStyleValues`. No style keys:
+    // `buildMotionNodeProps(false)` omits `style` (plan 016, Design 4).
+    const featurelessLatestValues =
+        typeof window !== 'undefined' && startedFeatureless
+            ? untrack(() =>
+                  makeLatestValues(
+                      buildMotionNodeProps(false),
+                      { initial: inheritedInitialVariant, animate: effectiveAnimate },
+                      buildPresenceContext(),
+                      isSVGTag(String(tag))
+                          ? scrapeSVGMotionValuesFromProps
+                          : scrapeHTMLMotionValuesFromProps
+                  )
+              )
+            : undefined
 
     /**
      * Create this component's motion-dom VisualElement and its projection
@@ -1200,10 +1226,17 @@
      *
      * @param late Whether the component rendered before its features arrived.
      *   A late node gets `manuallyAnimateOnMount = true`, so it animates in
-     *   from `initial` (upstream `use-visual-element.ts:84-86`).
+     *   from `initial` (upstream `use-visual-element.ts:84-86`). It is seeded
+     *   from the first-render snapshot, and its style MotionValues are reset to
+     *   it, as upstream (`motion-dom` `render/VisualElement.ts:437-446`).
      * @returns Nothing.
      */
     const createNodes = (late: boolean) => {
+        // Upstream order: the scraped style values first, then the `initial` /
+        // `animate` targets over them (use-visual-state.ts:66-71 and on).
+        const lateSeed = late
+            ? { ...featurelessStyleValues, ...featurelessLatestValues }
+            : undefined
         // `untrack`: the node is created ONCE with the props of this render, the
         // way upstream's `useConstant(makeState)` does (use-visual-state.ts:135).
         // Later prop changes flow through the update effect below, not by
@@ -1223,6 +1256,9 @@
                 // claim the DOM does not back. Landed atomically with the
                 // legacy-writer deletion — plan 002 Step 3.
                 seedLatestValues: true,
+                // A late node starts from the first render, not the current
+                // props (see `featurelessLatestValues`).
+                latestValues: lateSeed,
                 // plan 004: the PresenceChild adapter (null for direct
                 // AnimatePresence children, which use the clone path).
                 presenceContext: buildPresenceContext(),
@@ -1268,6 +1304,21 @@
         // Upstream use-visual-element.ts:84-86: a node created after the first
         // commit must run its initial animation.
         if (late) node.manuallyAnimateOnMount = true
+        // The node is created without `style` (see above), so motion-dom's own
+        // constructor reset never sees the style MotionValues. Mirror it here
+        // (`render/VisualElement.ts:437-446`): each style MotionValue goes back
+        // to its first-render value, and the first `node.update()` then binds it
+        // and writes that value into `latestValues`. A `set()` made while the
+        // `m` was featureless is lost, as upstream.
+        if (lateSeed) {
+            const style = untrack(() => styleProp)
+            if (style && typeof style === 'object') {
+                for (const [key, value] of Object.entries(style)) {
+                    const first = lateSeed[key]
+                    if (first !== undefined && isMotionValue(value)) value.set(first)
+                }
+            }
+        }
         visualElement = node
         motionDomProjection = new MotionDomProjectionAdapter({
             parent: readMotionDomProjectionParent(),
@@ -1643,14 +1694,19 @@
               )
             : mergeInlineStyles(
                   inlineStyleBaseWithHolds,
-                  makeLatestValues(
-                      buildMotionNodeProps(false),
-                      { initial: inheritedInitialVariant, animate: effectiveAnimate },
-                      buildPresenceContext(),
-                      isSVGTag(String(tag))
-                          ? scrapeSVGMotionValuesFromProps
-                          : scrapeHTMLMotionValuesFromProps
-                  ),
+                  // On the client the only node-less render is a featureless
+                  // `m`: it keeps its first-render state (upstream
+                  // `useConstant(make)`), so it reads the init snapshot.
+                  typeof window !== 'undefined'
+                      ? featurelessLatestValues
+                      : makeLatestValues(
+                            buildMotionNodeProps(false),
+                            { initial: inheritedInitialVariant, animate: effectiveAnimate },
+                            buildPresenceContext(),
+                            isSVGTag(String(tag))
+                                ? scrapeSVGMotionValuesFromProps
+                                : scrapeHTMLMotionValuesFromProps
+                        ),
                   svgAttrSplit
                       ? computeSSRSVGStyleValues(svgAttrSplit.motionValueAttrs)
                       : undefined,
