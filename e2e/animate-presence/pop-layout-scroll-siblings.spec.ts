@@ -20,6 +20,14 @@ import { expect, test, type Page } from '@playwright/test'
  * rows match, and pink (the exit clone, drawn above the others) only as its
  * whole 60px box. Green is tracked by its bottom edge: the pink exit clone
  * sits above it in the stacking order and slides over its top.
+ *
+ * The screencast drops frames for about 200ms when an exit completes (the
+ * clone and placeholder leave the DOM), with `?nolayout` too, while the page
+ * itself keeps rendering every frame (no long task, no rAF gap). A move
+ * across such a capture gap can't be judged from the screencast, so every
+ * frame is also hit-tested: in each `requestAnimationFrame`, blue's top and
+ * green's bottom are found with `elementFromPoint` down a column through
+ * them (the clone has `pointer-events: none`, so it never hides green).
  */
 
 const BASE = '/tests/animate-presence/pop-layout-scroll-siblings?@isPlaywright=true'
@@ -40,6 +48,19 @@ interface Frame {
     t: number
     bands: Partial<Record<Colour, Band>>
 }
+/** One hit-tested frame: blue's top and green's bottom, in viewport px. */
+interface Hit {
+    t: number
+    blue?: number
+    green?: number
+}
+interface Recording {
+    frames: Frame[]
+    hits: Hit[]
+}
+
+/** Screencast frames further apart than this are a capture gap. */
+const CAPTURE_GAP_MS = 50
 
 type ScreencastFrame = { data: string; metadata: { deviceWidth: number; timestamp?: number } }
 
@@ -64,10 +85,11 @@ const remove = (page: Page) =>
     page.evaluate(() => document.querySelector<HTMLElement>('[data-testid="remove"]')!.click())
 
 /**
- * Runs `action` under a CDP screencast and returns every painted frame's
- * colour bands, in CSS px, in capture order.
+ * Runs `action` under a CDP screencast and returns every captured frame's
+ * colour bands, in CSS px, in capture order, plus every rendered frame's
+ * hit-tested blue top and green bottom.
  */
-async function record(page: Page, action: () => Promise<unknown>, ms: number): Promise<Frame[]> {
+async function record(page: Page, action: () => Promise<unknown>, ms: number): Promise<Recording> {
     const cdp = await page.context().newCDPSession(page)
     const shots: ScreencastFrame[] = []
     cdp.on('Page.screencastFrame', (event) => {
@@ -90,14 +112,51 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
         maxWidth: 1920,
         maxHeight: 1080
     })
+    await page.evaluate((clip) => {
+        const w = window as unknown as { hits: Hit[]; hitting: boolean }
+        w.hits = []
+        w.hitting = true
+        const column = (id: string) => {
+            const rect = document.getElementById(id)?.getBoundingClientRect()
+            return rect ? rect.left + rect.width / 2 : undefined
+        }
+        const blueX = column('sib-1')
+        const greenX = column('sib-3')
+        const scan = (x: number | undefined, id: string, last: boolean) => {
+            if (x === undefined) return undefined
+            let found: number | undefined
+            for (let y = Math.ceil(clip.top); y <= clip.bottom; y++) {
+                if (document.elementFromPoint(x, y)?.closest(`#${id}`)) {
+                    found = y
+                    if (!last) break
+                }
+            }
+            return found === undefined ? undefined : last ? found + 1 : found
+        }
+        const sample = () => {
+            if (!w.hitting) return
+            w.hits.push({
+                t: performance.now(),
+                blue: scan(blueX, 'sib-1', false),
+                green: scan(greenX, 'sib-3', true)
+            })
+            requestAnimationFrame(sample)
+        }
+        requestAnimationFrame(sample)
+    }, clip)
     await page.waitForTimeout(250)
     await action()
     await page.waitForTimeout(ms)
+    const hits = await page.evaluate(() => {
+        const w = window as unknown as { hits: Hit[]; hitting: boolean }
+        w.hitting = false
+        return w.hits
+    })
     await cdp.send('Page.stopScreencast')
     await cdp.detach()
     shots.sort((a, b) => (a.metadata.timestamp ?? 0) - (b.metadata.timestamp ?? 0))
 
-    return page.evaluate(
+    const frames = await page.evaluate(
         async ({ shots, clip, colours }) => {
             const frames: Frame[] = []
             for (const { data, metadata } of shots) {
@@ -153,6 +212,7 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
         },
         { shots, clip, colours: COLOURS }
     )
+    return { frames, hits }
 }
 
 /** The edge a colour is tracked by (see the file comment). */
@@ -162,16 +222,33 @@ const edge = (colour: Colour, band: Band) => (colour === 'green' ? band.bottom :
 const framesWith = (frames: Frame[], colours: Colour[]) =>
     frames.filter((frame) => colours.every((colour) => frame.bands[colour]))
 
-/** The largest frame-to-frame move of `colour`'s tracked edge. */
+/**
+ * The largest move of `colour`'s tracked edge between two consecutive
+ * captured frames it was found in, leaving out capture gaps (see the file
+ * comment; the hit test covers those).
+ */
 function maxStep(frames: Frame[], colour: Colour): number {
     let step = 0
-    let previous: number | undefined
+    let previous: { t: number; value: number } | undefined
     for (const frame of frames) {
         const band = frame.bands[colour]
         if (!band) continue
         const value = edge(colour, band)
-        if (previous !== undefined) step = Math.max(step, Math.abs(value - previous))
-        previous = value
+        if (previous && (frame.t - previous.t) * 1000 <= CAPTURE_GAP_MS) {
+            step = Math.max(step, Math.abs(value - previous.value))
+        }
+        previous = { t: frame.t, value }
+    }
+    return step
+}
+
+/** The largest move of blue's top or green's bottom between two rendered frames. */
+function maxHitStep(hits: Hit[], colour: 'blue' | 'green'): number {
+    let step = 0
+    for (let i = 1; i < hits.length; i++) {
+        const a = hits[i - 1][colour]
+        const b = hits[i][colour]
+        if (a !== undefined && b !== undefined) step = Math.max(step, Math.abs(b - a))
     }
     return step
 }
@@ -187,23 +264,35 @@ function steps(frames: Frame[], colour: Colour): Array<{ index: number; step: nu
     return out
 }
 
-function expectNoJump(frames: Frame[], colours: Colour[]) {
+function expectNoJump({ frames, hits }: Recording, colours: Array<'blue' | 'green'>) {
     expect(framesWith(frames, colours).length).toBeGreaterThanOrEqual(10)
     for (const colour of colours) {
         expect(maxStep(frames, colour), `${colour} step`).toBeLessThanOrEqual(35)
+        expect(hits.filter((hit) => hit[colour] !== undefined).length).toBeGreaterThanOrEqual(10)
+        expect(maxHitStep(hits, colour), `${colour} hit-tested step`).toBeLessThanOrEqual(35)
     }
 }
 
-const annotate = (frames: Frame[]) =>
+const annotate = ({ frames, hits }: Recording) => {
     test.info().annotations.push({
-        type: 'frames (blue top, pink top, green bottom)',
-        description: frames
+        type: 'hit-tested frames (ms: blue top/green bottom)',
+        description: hits
             .map(
-                ({ bands }) =>
-                    `${bands.blue?.top.toFixed(0) ?? '-'}/${bands.pink?.top.toFixed(0) ?? '-'}/${bands.green?.bottom.toFixed(0) ?? '-'}`
+                ({ t, blue, green }) =>
+                    `${(t - hits[0].t).toFixed(0)}: ${blue?.toFixed(0) ?? '-'}/${green?.toFixed(0) ?? '-'}`
             )
             .join(' ')
     })
+    test.info().annotations.push({
+        type: 'frames (ms: blue top/pink top/green bottom)',
+        description: frames
+            .map(
+                ({ t, bands }) =>
+                    `${((t - frames[0].t) * 1000).toFixed(0)}: ${bands.blue?.top.toFixed(0) ?? '-'}/${bands.pink?.top.toFixed(0) ?? '-'}/${bands.green?.bottom.toFixed(0) ?? '-'}`
+            )
+            .join(' ')
+    })
+}
 
 test.describe('layout siblings around exits in scroll containers (clone path)', () => {
     test('clamp, popLayout: blue, the pink clone and green move together, no jump', async ({
@@ -213,7 +302,7 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         await scrollBottom(page)
         await page.waitForTimeout(200)
         let hit = ''
-        const frames = await record(
+        const recording = await record(
             page,
             async () => {
                 await remove(page)
@@ -230,7 +319,8 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
             },
             900
         )
-        annotate(frames)
+        annotate(recording)
+        const { frames } = recording
         const all = framesWith(frames, ['blue', 'pink', 'green'])
         expect(all.length).toBeGreaterThanOrEqual(10)
         const start = all[0].bands
@@ -246,6 +336,13 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         for (const colour of ['blue', 'pink', 'green'] as const) {
             expect(maxStep(frames, colour), `${colour} step`).toBeLessThanOrEqual(35)
         }
+        const { hits } = recording
+        for (const colour of ['blue', 'green'] as const) {
+            expect(maxHitStep(hits, colour), `${colour} hit-tested step`).toBeLessThanOrEqual(35)
+        }
+        const greenHits = hits.flatMap(({ green }) => (green === undefined ? [] : [green]))
+        expect(greenHits.length).toBeGreaterThanOrEqual(10)
+        expect(Math.max(...greenHits) - Math.min(...greenHits)).toBeLessThanOrEqual(2)
         expect(hit).toBe('sib-1')
     })
 
@@ -253,8 +350,9 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         await open(page, '&layoutScroll')
         await scrollBottom(page)
         await page.waitForTimeout(200)
-        const frames = await record(page, () => remove(page), 600)
-        annotate(frames)
+        const recording = await record(page, () => remove(page), 600)
+        annotate(recording)
+        const { frames } = recording
         const blueSteps = steps(frames, 'blue').filter(({ step }) => Math.abs(step) > 2)
         const pinkSteps = steps(frames, 'pink').filter(({ step }) => Math.abs(step) > 2)
         expect(blueSteps).toHaveLength(1)
@@ -279,9 +377,9 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         await scrollBottom(page)
         await page.waitForTimeout(200)
         // The exit fades over 1.2s; the clamp comes when it completes.
-        const frames = await record(page, () => remove(page), 2200)
-        annotate(frames)
-        expectNoJump(frames, ['blue', 'green'])
+        const recording = await record(page, () => remove(page), 2200)
+        annotate(recording)
+        expectNoJump(recording, ['blue', 'green'])
     })
 
     test('?fixed, window scrolled by 300, remove: no 300px phantom', async ({ page }) => {
@@ -289,18 +387,19 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         await page.evaluate(() => window.scrollTo(0, 300))
         await page.waitForTimeout(200)
         expect(await page.evaluate(() => window.scrollY)).toBe(300)
-        const frames = await record(page, () => remove(page), 900)
-        annotate(frames)
-        expectNoJump(frames, ['blue', 'green'])
+        const recording = await record(page, () => remove(page), 900)
+        annotate(recording)
+        expectNoJump(recording, ['blue', 'green'])
     })
 
     test('?fixed, height-only resize, remove: no phantom move', async ({ page }) => {
         await open(page, '&fixed')
         await page.setViewportSize({ width: 1920, height: 900 })
         await page.waitForTimeout(400)
-        const frames = await record(page, () => remove(page), 900)
-        annotate(frames)
-        expectNoJump(frames, ['blue', 'green'])
+        const recording = await record(page, () => remove(page), 900)
+        annotate(recording)
+        const { frames } = recording
+        expectNoJump(recording, ['blue', 'green'])
         const all = framesWith(frames, ['green'])
         for (const { bands } of all) {
             expect(Math.abs(bands.green!.bottom - all[0].bands.green!.bottom)).toBeLessThanOrEqual(
@@ -315,8 +414,9 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         await page.setViewportSize({ width: 1600, height: 1080 })
         // Longer than upstream's 250ms resize block.
         await page.waitForTimeout(400)
-        const frames = await record(page, () => remove(page), 900)
-        annotate(frames)
+        const recording = await record(page, () => remove(page), 900)
+        annotate(recording)
+        const { frames } = recording
         expect(framesWith(frames, ['blue', 'pink', 'green']).length).toBeGreaterThanOrEqual(10)
         for (const colour of ['blue', 'pink', 'green'] as const) {
             const lefts = frames.flatMap(({ bands }) => (bands[colour] ? [bands[colour].left] : []))
@@ -328,9 +428,9 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         await open(page, '&sticky')
         await scrollBottom(page)
         await page.waitForTimeout(200)
-        const frames = await record(page, () => remove(page), 900)
-        annotate(frames)
-        expectNoJump(frames, ['blue', 'green'])
+        const recording = await record(page, () => remove(page), 900)
+        annotate(recording)
+        expectNoJump(recording, ['blue', 'green'])
     })
 
     test('?nolayout, clamp: the pink clone steps with the content in one frame', async ({
@@ -339,8 +439,9 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         await open(page, '&nolayout')
         await scrollBottom(page)
         await page.waitForTimeout(200)
-        const frames = await record(page, () => remove(page), 600)
-        annotate(frames)
+        const recording = await record(page, () => remove(page), 600)
+        annotate(recording)
+        const { frames } = recording
         const pinkSteps = steps(frames, 'pink').filter(({ step }) => Math.abs(step) > 2)
         expect(pinkSteps).toHaveLength(1)
         expect(Math.abs(pinkSteps[0].step - 70)).toBeLessThanOrEqual(2)
@@ -352,17 +453,18 @@ test.describe('layout siblings around exits in scroll containers (owned path)', 
         await open(page, '&path=owned&mode=sync&layoutGroup')
         await scrollBottom(page)
         await page.waitForTimeout(200)
-        const frames = await record(page, () => remove(page), 2200)
-        annotate(frames)
-        expectNoJump(frames, ['blue', 'green'])
+        const recording = await record(page, () => remove(page), 2200)
+        annotate(recording)
+        expectNoJump(recording, ['blue', 'green'])
     })
 
     test('?fixed, window scrolled by 300, remove: no 300px phantom', async ({ page }) => {
         await open(page, '&path=owned&fixed')
         await page.evaluate(() => window.scrollTo(0, 300))
         await page.waitForTimeout(200)
-        const frames = await record(page, () => remove(page), 900)
-        annotate(frames)
+        const recording = await record(page, () => remove(page), 900)
+        annotate(recording)
+        const { frames } = recording
         // Blue moves into the popped pink item's slot, under it, so only
         // green (which stays put) must be seen throughout.
         expect(framesWith(frames, ['green']).length).toBeGreaterThanOrEqual(10)
