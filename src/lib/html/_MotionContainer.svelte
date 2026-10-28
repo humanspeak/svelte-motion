@@ -1319,11 +1319,13 @@
         // (`render/VisualElement.ts:437-446`): each style MotionValue goes back
         // to its first-render value, and the first `node.update()` then binds it
         // and writes that value into `latestValues`. A `set()` made while the
-        // `m` was featureless is lost, as upstream.
+        // `m` was featureless is lost, as upstream. `willChange` is left out,
+        // as upstream does (`const { willChange, ...initialMotionValues }`).
         if (lateSeed) {
             const style = untrack(() => styleProp)
             if (style && typeof style === 'object') {
                 for (const [key, value] of Object.entries(style)) {
+                    if (key === 'willChange') continue
                     const first = lateSeed[key]
                     if (first !== undefined && isMotionValue(value)) value.set(first)
                 }

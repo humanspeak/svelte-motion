@@ -71,16 +71,44 @@
         focusable['tap-bare'] &&
             focusable['tap-control'] &&
             focusable['tap-dommin'] &&
-            bareTaps === 0
+            bareTaps === 0 &&
+            controlTaps > 0
     )
     const styleOk = $derived(Math.abs(bareX) < 0.5)
     const pathOk = $derived(bareVisible && bareDash === firstBareDash)
+
+    /** Presses and releases the bare and the control tap boxes, as a pointer would. */
+    const tapBoth = () => {
+        for (const id of ['tap-bare', 'tap-control']) {
+            const el = document.querySelector<HTMLElement>(`[data-testid="${id}"]`)
+            if (!el) continue
+            const rect = el.getBoundingClientRect()
+            const init = {
+                bubbles: true,
+                isPrimary: true,
+                pointerType: 'mouse',
+                button: 0,
+                clientX: rect.left + rect.width / 2,
+                clientY: rect.top + rect.height / 2
+            }
+            el.dispatchEvent(new PointerEvent('pointerdown', { ...init, buttons: 1 }))
+            el.dispatchEvent(new PointerEvent('pointerup', { ...init, buttons: 0 }))
+        }
+    }
+
+    /** Remounts both paths so their first frames can be watched again. */
+    let pathGeneration = $state(0)
+    const replayPaths = () => {
+        firstBareDash = ''
+        pathGeneration += 1
+    }
 
     const steps: TesterStep[] = [
         {
             text: 'Tap card: click the "bare" box and the "control" box. Then click the bare box once more and press Tab twice.',
             expected:
-                'The bare counter stays at 0; the control counter goes up. Tab moves focus bare → control → domMin (a focus ring on each). The chip reads OK.'
+                'The bare counter stays at 0; the control counter goes up. Tab moves focus bare → control → domMin (a focus ring on each). The chip reads OK.',
+            action: { label: 'Tap both', run: tapBoth }
         },
         {
             text: 'Style card: press "Nudge" a few times.',
@@ -89,9 +117,10 @@
             action: { label: 'Nudge', run: nudge }
         },
         {
-            text: 'Path card: reload and watch both lines.',
+            text: 'Path card: press "Replay paths" and watch both lines.',
             expected:
-                'The bare line is painted at once and stays short (20%). The control line draws to its full length. The chip reads OK.'
+                'The bare line is painted at once and stays short (20%). The control line draws to its full length. The chip reads OK.',
+            action: { label: 'Replay paths', run: replayPaths }
         }
     ]
 </script>
@@ -166,30 +195,32 @@
                 `bare dasharray ${bareDash || '–'} · control ${controlDash || '–'}`
             )}
         </h2>
-        <svg class="line" width="200" height="40" viewBox="0 0 200 40">
-            <m.path
-                data-testid="path-bare"
-                d="M10 20 L190 20"
-                stroke="#a5b4fc"
-                stroke-width="8"
-                fill="none"
-                initial={{ pathLength: 0.2 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 1.2 }}
-            />
-        </svg>
-        <svg class="line" width="200" height="40" viewBox="0 0 200 40">
-            <motion.path
-                data-testid="path-control"
-                d="M10 20 L190 20"
-                stroke="#38bdf8"
-                stroke-width="8"
-                fill="none"
-                initial={{ pathLength: 0.2 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 1.2 }}
-            />
-        </svg>
+        {#key pathGeneration}
+            <svg class="line" width="200" height="40" viewBox="0 0 200 40">
+                <m.path
+                    data-testid="path-bare"
+                    d="M10 20 L190 20"
+                    stroke="#a5b4fc"
+                    stroke-width="8"
+                    fill="none"
+                    initial={{ pathLength: 0.2 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: 1.2 }}
+                />
+            </svg>
+            <svg class="line" width="200" height="40" viewBox="0 0 200 40">
+                <motion.path
+                    data-testid="path-control"
+                    d="M10 20 L190 20"
+                    stroke="#38bdf8"
+                    stroke-width="8"
+                    fill="none"
+                    initial={{ pathLength: 0.2 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: 1.2 }}
+                />
+            </svg>
+        {/key}
     </section>
 </main>
 
