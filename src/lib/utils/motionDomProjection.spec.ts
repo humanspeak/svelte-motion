@@ -1769,7 +1769,7 @@ describe('MotionDomProjectionAdapter departing-lead snapshot (#1935 A1)', () => 
     const rects = new Map<HTMLElement, DOMRect>()
     const mounted: MotionDomProjectionAdapter[] = []
     const mount = (
-        options: { layoutId?: string; layout?: boolean },
+        options: { layoutId?: string; layout?: boolean; layoutScroll?: boolean },
         rect: DOMRect,
         parent?: MotionDomProjectionAdapter
     ) => {
@@ -1839,6 +1839,72 @@ describe('MotionDomProjectionAdapter departing-lead snapshot (#1935 A1)', () => 
         const snapshot = adapter.projection.resumeFrom?.snapshot
         expect(snapshot?.measuredBox.x.min).toBe(90)
         expect(snapshot?.layoutBox.x.min).toBe(10)
+    })
+
+    it('hands over a page-space measuredBox under a scrolled layoutScroll ancestor', () => {
+        // The scroller is scrolled 50px: the lead is drawn at page x 10, its
+        // layout (scroll removed, upstream `removeElementScroll`) is at 60.
+        const { adapter: scroller, element: scrollerElement } = mount(
+            { layoutScroll: true },
+            new DOMRect(0, 0, 300, 100)
+        )
+        Object.defineProperty(scrollerElement, 'scrollLeft', { configurable: true, value: 50 })
+        Object.defineProperty(scrollerElement, 'scrollTop', { configurable: true, value: 0 })
+        const { adapter: lead, element } = mount(
+            { layoutId: 'a1-scroll' },
+            new DOMRect(10, 20, 100, 50),
+            scroller
+        )
+        element.remove()
+        lead.unmount()
+
+        const { adapter } = mount(
+            { layoutId: 'a1-scroll' },
+            new DOMRect(300, 20, 100, 50),
+            scroller
+        )
+
+        const snapshot = adapter.projection.resumeFrom?.snapshot
+        expect(snapshot?.measuredBox.x.min).toBe(10)
+        expect(snapshot?.layoutBox.x.min).toBe(60)
+    })
+
+    it("doesn't seed while the root's updates are blocked, as upstream willUpdate returns", () => {
+        const { adapter: lead, element } = mount(
+            { layoutId: 'a1-blocked' },
+            new DOMRect(10, 20, 100, 50)
+        )
+        const root = lead.projection.root!
+        root.blockUpdate()
+        try {
+            element.remove()
+            lead.unmount()
+            expect(lead.projection.snapshot).toBeUndefined()
+        } finally {
+            root.unblockUpdate()
+        }
+    })
+
+    it('joins an update that is already running instead of starting another', () => {
+        const { adapter: lead, element } = mount(
+            { layoutId: 'a1-updating' },
+            new DOMRect(10, 20, 100, 50)
+        )
+        const root = lead.projection.root!
+        root.startUpdate()
+        // The root is shared across specs, and `spyOn` reuses an existing spy
+        // with its call history: start from a clean count, restore after.
+        const startUpdate = vi.spyOn(root, 'startUpdate')
+        startUpdate.mockClear()
+        try {
+            element.remove()
+            lead.unmount()
+
+            expect(startUpdate).not.toHaveBeenCalled()
+            expect(lead.projection.snapshot?.animationId).toBe(root.animationId)
+        } finally {
+            startUpdate.mockRestore()
+        }
     })
 
     it('leaves a plain (non-layoutId) unmount without a snapshot', () => {
