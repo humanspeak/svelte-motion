@@ -796,6 +796,9 @@ describe('AnimatePresence modes', () => {
             const sibling = document.createElement('div')
             parent.appendChild(sibling)
             ctx.registerChild('k2', sibling, { opacity: 0 })
+            // The container's MutationObserver sees the new sibling and
+            // re-samples k1 where it now rests.
+            await Promise.resolve()
 
             // Svelte detaches keyed nodes before the exit is registered.
             el.remove()

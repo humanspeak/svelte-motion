@@ -89,11 +89,14 @@
     const popPointCache = createPopLayoutPointCache()
     let popTrackScheduled = false
     let popTrackAttempts = 0
+    // Set on destroy: a queued microtask or retry frame must not re-track.
+    let destroyed = false
     const trackPopElement = () => {
-        if (animatePresence?.mode !== 'popLayout' || popTrackScheduled) return
+        if (destroyed || animatePresence?.mode !== 'popLayout' || popTrackScheduled) return
         popTrackScheduled = true
         queueMicrotask(() => {
             popTrackScheduled = false
+            if (destroyed) return
             if (phase !== 'idle' || !present) {
                 popPointCache.track(undefined)
                 return
@@ -353,6 +356,7 @@
     })
 
     onDestroy(() => {
+        destroyed = true
         popPointCache.dispose()
         cancelWaitEnterBlock()
         exitRegistry.cancel()

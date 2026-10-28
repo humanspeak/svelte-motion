@@ -61,6 +61,11 @@ type PresenceChild = {
     stopObservingStyle?: () => void
     lastPopLayoutSnapshot?: PopLayoutSnapshot
     /**
+     * `mode="popLayout"`: follows where the element rests, for the exit's
+     * "before" point (see `createPopLayoutPointCache`).
+     */
+    popPointCache?: ReturnType<typeof createPopLayoutPointCache>
+    /**
      * The element's parent captured at registration. The exit placeholder is
      * inserted here when the element is already detached — even a
      * `display: contents` parent (e.g. AnimatePresence's container) works,
@@ -553,9 +558,12 @@ export const measurePopLayoutSnapshot = (
  * update (a toast list's "remove the oldest, add one") is already in the DOM,
  * so a live measurement reads the element where the grown container has
  * moved it. So the point is measured while the element rests: when it is
- * tracked, then again whenever its own box, its parent's box or child list,
+ * tracked, then again whenever its own box, its container's box or subtree,
  * or the document's box changes, sampling once a frame until it stops moving
- * (so a layout animation that follows the change is followed to rest).
+ * (so a layout animation that follows the change is followed to rest). The
+ * container is the closest ancestor with a box: `AnimatePresence` wraps its
+ * children in a `display: contents` element, which never resizes. At rest
+ * nothing is sampled.
  *
  * The point is scroll-space (see {@link measurePopLayoutPoint}), so scrolling
  * needs no refresh. A move that changes none of those boxes (for instance a
@@ -563,7 +571,8 @@ export const measurePopLayoutSnapshot = (
  * last resting point.
  *
  * @returns `track` (start following an element, or stop with `undefined`),
- *     `read` (the cached point for an element, if it has one) and `dispose`.
+ *     `read` (the cached point of a connected element), `peek` (the last
+ *     point, even once the element is detached) and `dispose`.
  */
 export const createPopLayoutPointCache = () => {
     let element: HTMLElement | undefined
@@ -585,8 +594,21 @@ export const createPopLayoutPointCache = () => {
         else clearTimeout(id)
     }
 
+    // `scheduled`, not `frame`, says whether a sample is pending: a frame
+    // callback may run synchronously (inside `nextFrame`), before its id is
+    // returned.
+    let scheduled = false
+    const schedule = () => {
+        if (scheduled) return
+        scheduled = true
+        frame = nextFrame(() => {
+            scheduled = false
+            frame = undefined
+            sample()
+        })
+    }
+
     const sample = () => {
-        frame = undefined
         if (!element?.isConnected) return
         const next = measurePopLayoutPoint(element)
         // Tight: a spring's tail moves well under a pixel a frame for a while.
@@ -594,17 +616,18 @@ export const createPopLayoutPointCache = () => {
             !point || Math.abs(next[0] - point[0]) > 0.01 || Math.abs(next[1] - point[1]) > 0.01
         point = next
         stableFrames = moved ? 0 : stableFrames + 1
-        if (stableFrames < 2 && --framesLeft > 0) frame = nextFrame(sample)
+        if (stableFrames < 2 && --framesLeft > 0) schedule()
     }
 
     const refresh = () => {
         framesLeft = maxFrames
         stableFrames = 0
-        if (frame === undefined) frame = nextFrame(sample)
+        schedule()
     }
 
     const stop = () => {
-        if (frame !== undefined) cancelFrame(frame)
+        if (scheduled && frame !== undefined) cancelFrame(frame)
+        scheduled = false
         frame = undefined
         resizeObserver?.disconnect()
         mutationObserver?.disconnect()
@@ -626,17 +649,23 @@ export const createPopLayoutPointCache = () => {
             if (!next?.isConnected) return
             element = next
             point = measurePopLayoutPoint(next)
-            const parent = next.parentElement
+            const view = next.ownerDocument.defaultView ?? window
+            let container = next.parentElement
+            while (container && view.getComputedStyle(container).display === 'contents') {
+                container = container.parentElement
+            }
             if (typeof ResizeObserver !== 'undefined') {
                 resizeObserver = new ResizeObserver(refresh)
                 resizeObserver.observe(next)
-                if (parent) resizeObserver.observe(parent)
+                if (container) resizeObserver.observe(container)
                 resizeObserver.observe(next.ownerDocument.documentElement)
             }
-            if (parent && typeof MutationObserver !== 'undefined') {
+            if (container && typeof MutationObserver !== 'undefined') {
                 mutationObserver = new MutationObserver(refresh)
-                mutationObserver.observe(parent, { childList: true })
+                mutationObserver.observe(container, { childList: true, subtree: true })
             }
+            // The element may still be settling (an enter or layout animation).
+            refresh()
         },
         /**
          * The cached resting point of `target`.
@@ -648,6 +677,16 @@ export const createPopLayoutPointCache = () => {
             return target === element && target.isConnected && point
                 ? [point[0], point[1]]
                 : undefined
+        },
+        /**
+         * The last resting point recorded for `target`, connected or not (the
+         * clone path reads it after Svelte has detached the element).
+         *
+         * @param target The element about to pop.
+         * @returns Its last resting point, or `undefined` if it isn't tracked.
+         */
+        peek(target: HTMLElement): [number, number] | undefined {
+            return target === element && point ? [point[0], point[1]] : undefined
         },
         dispose: stop
     }
@@ -1480,6 +1519,7 @@ export const createAnimatePresenceContext = (context: {
         // Re-registration (exit/transition props changed) replaces the record;
         // stop the previous record's attribute watcher first.
         children.get(key)?.stopObservingStyle?.()
+        children.get(key)?.popPointCache?.dispose()
         const record: PresenceChild = {
             element,
             exit,
@@ -1497,6 +1537,10 @@ export const createAnimatePresenceContext = (context: {
         record.stopObservingStyle = observeStyleChanges(element, () => {
             record.lastStyleSnapshot = snapshotComputedStyle(getComputedStyle(element), element)
         })
+        if (mode === 'popLayout') {
+            record.popPointCache = createPopLayoutPointCache()
+            record.popPointCache.track(element)
+        }
         children.set(key, record)
         if (element.parentElement) {
             structureObserver?.observe(element.parentElement, { childList: true })
@@ -1574,6 +1618,11 @@ export const createAnimatePresenceContext = (context: {
         // style snapshot.
         child.stopObservingStyle?.()
         child.stopObservingStyle = undefined
+        // Where it rested before this update (Svelte has usually detached it
+        // by now, and a frame-after-mutation snapshot can be mid-animation).
+        const restingPoint = child.popPointCache?.peek(child.element)
+        child.popPointCache?.dispose()
+        child.popPointCache = undefined
         // Its siblings' structural matches change once it is gone.
         scheduleSnapshotRefresh()
 
@@ -1726,12 +1775,16 @@ export const createAnimatePresenceContext = (context: {
             positioningParent = positioningParent.parentElement ?? doc.body
         }
 
-        const popLayoutSnapshot =
+        const measuredPopLayoutSnapshot =
             mode === 'popLayout'
                 ? liveStyle
                     ? measurePopLayoutSnapshot(child.element, liveStyle)
                     : child.lastPopLayoutSnapshot
                 : undefined
+        const popLayoutSnapshot =
+            measuredPopLayoutSnapshot && restingPoint
+                ? { ...measuredPopLayoutSnapshot, point: restingPoint }
+                : measuredPopLayoutSnapshot
         const parentRect = popLayoutSnapshot ? undefined : positioningParent.getBoundingClientRect()
 
         if (!popLayoutSnapshot) {
@@ -1990,7 +2043,10 @@ export const createAnimatePresenceContext = (context: {
         structureObserver?.disconnect()
         if (initialRenderFrame !== undefined) cancelAnimationFrame(initialRenderFrame)
         if (snapshotRefreshFrame !== undefined) cancelAnimationFrame(snapshotRefreshFrame)
-        for (const child of children.values()) child.stopObservingStyle?.()
+        for (const child of children.values()) {
+            child.stopObservingStyle?.()
+            child.popPointCache?.dispose()
+        }
         for (const active of activeExits.values()) {
             active.cancelled = true
             if (active.frame !== undefined) cancelAnimationFrame(active.frame)
