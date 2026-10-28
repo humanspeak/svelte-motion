@@ -109,7 +109,9 @@ afterEach(() => {
 })
 
 describe('_MotionContainer', () => {
-    it('does not add tabindex when element is natively focusable', async () => {
+    // Upstream `render/html/use-props.ts:76-81` has no tag check, so a link
+    // with `whileTap` gets `tabIndex=0` too (plan 016).
+    it('adds tabindex=0 to a natively focusable element with whileTap (upstream use-props)', async () => {
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'a',
@@ -119,7 +121,7 @@ describe('_MotionContainer', () => {
         })
         await flushTimers()
         const el = container.firstElementChild as HTMLElement
-        expect(el.hasAttribute('tabindex')).toBe(false)
+        expect(el.getAttribute('tabindex')).toBe('0')
     })
 
     it('adds tabindex=0 for non-focusable elements with whileTap', async () => {

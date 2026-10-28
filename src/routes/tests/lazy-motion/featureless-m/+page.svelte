@@ -4,7 +4,7 @@
     import TesterPanel, { type TesterStep } from '../../layout/_parity/TesterPanel.svelte'
 
     /**
-     * An `m` component with no LazyMotion features (spike 011).
+     * An `m` component with no LazyMotion features (plan 016, upstream parity).
      *
      * Upstream (Motion 14.7.1 `render/components/m/create.ts`,
      * `motion/utils/use-visual-element.ts`) an `m` gets its renderer only from
@@ -145,7 +145,7 @@
 <TesterPanel
     eyebrow="render/components/m/create.ts (Motion 14.7.1)"
     title="An m without features renders initial only"
-    status="Expected on this build: the bare and async cards read WRONG (they animate today); spike 011 tracks the fix."
+    status="Expected on this build: all three cards read OK."
     {steps}
 >
     {#snippet checks()}
