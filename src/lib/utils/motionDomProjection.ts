@@ -288,6 +288,13 @@ const collectTransformEffects = (
     }
 }
 
+/** Whether two boxes match to within half a pixel on every edge. */
+const sameBox = (a: Box, b: Box): boolean =>
+    Math.abs(a.x.min - b.x.min) < 0.5 &&
+    Math.abs(a.x.max - b.x.max) < 0.5 &&
+    Math.abs(a.y.min - b.y.min) < 0.5 &&
+    Math.abs(a.y.max - b.y.max) < 0.5
+
 /**
  * Svelte lifecycle adapter for motion-dom's upstream projection node system.
  *
@@ -538,6 +545,9 @@ export class MotionDomProjectionAdapter {
      * Mount the upstream projection node to an element and seed its layout.
      *
      * @param element Element represented by the current motion component.
+     * @param options `takeOverLiveLead: false` skips the mount-time takeover
+     *     of a `layoutId` lead that is still on screen (see {@link didMount}),
+     *     for a component that renders no layout measurement.
      * @returns Nothing.
      *
      * @example
@@ -545,7 +555,7 @@ export class MotionDomProjectionAdapter {
      * adapter.mount(element)
      * ```
      */
-    mount(element: HTMLElement): void {
+    mount(element: HTMLElement, options: { takeOverLiveLead?: boolean } = {}): void {
         if (this.element === element) return
         if (this.element) this.unmount()
 
@@ -564,6 +574,12 @@ export class MotionDomProjectionAdapter {
             this.rememberLayoutBox(box)
         })
         this.seedLayout()
+        this.mountedFromLiveLead = false
+        // Registering with the layoutId's stack (projection `mount()` above)
+        // promoted this node: `promote` gave it the previous lead as
+        // `resumeFrom` (stack.ts:45-74 @ v14.7.1). `didMount` runs the update
+        // pass for it when that lead is still on screen.
+        this.mountTakeOverLead = options.takeOverLiveLead === false ? null : this.liveResumeFrom()
         // Only grouped nodes are re-measured by passes they didn't trigger
         // themselves in a way the observer path must reconcile (plan 007
         // D4); ungrouped nodes keep their pre-LayoutGroup-group behaviour.
@@ -682,8 +698,86 @@ export class MotionDomProjectionAdapter {
      * ```
      */
     didMount(): void {
-        if (!this.element || !hasTakenAnySnapshot) return
+        if (!this.element) return
+        const lead = this.mountTakeOverLead
+        this.mountTakeOverLead = null
+        if (lead && lead === this.liveResumeFrom()) {
+            this.takeOverLiveLeadOnMount(lead)
+            return
+        }
+        if (!hasTakenAnySnapshot) return
         this.projection.root?.didUpdate()
+        this.refreshCachedLayout()
+    }
+
+    /**
+     * Whether this node mounted by taking over a `layoutId` lead that was
+     * still on screen, and so already animates from it (see
+     * {@link didMount}). The container then only drops a registry handoff for
+     * the same id, so the two never animate one change.
+     */
+    mountedFromLiveLead = false
+
+    /** The live lead `mount()` found for {@link didMount} to take over. */
+    private mountTakeOverLead: IProjectionNode | null = null
+
+    /**
+     * The previous lead this node's stack handed it as `resumeFrom`, if that
+     * lead is still present and attached.
+     */
+    private liveResumeFrom(): IProjectionNode | null {
+        const lead = this.projection.resumeFrom
+        if (!lead || !this.projection.options.layoutId) return null
+        if (lead.isPresent === false) return null
+        if (!(lead.instance as HTMLElement | undefined)?.isConnected) return null
+        return lead
+    }
+
+    /**
+     * Run the update pass of a node that mounted with the `layoutId` of a
+     * lead that is still on screen, so it animates out of that lead and the
+     * snapshot `promote` copied onto it is consumed.
+     *
+     * Upstream that pass comes with the commit that mounts the node: the
+     * parent re-render makes the previous lead `willUpdate()` in
+     * `MeasureLayout.getSnapshotBeforeUpdate` (149-204 @ v14.7.1) and
+     * `componentDidUpdate` (206-218) calls `root.didUpdate()`. Then `promote`
+     * (stack.ts:45-74 @ v14.7.1) finds the root updating, marks the new node
+     * layout-dirty and hands it the lead's snapshot. A Svelte sibling doesn't
+     * re-render, so nothing else here would run that pass. The lead is
+     * snapshotted from its cached (pre-mount, in-flow) box rather than
+     * re-measured, as the mount may already have moved it.
+     */
+    private takeOverLiveLeadOnMount(lead: IProjectionNode): void {
+        hasTakenAnySnapshot = true
+        const projection = this.projection
+        const root = projection.root
+        if (!root) return
+        root.startUpdate()
+        // `promote` measured the lead (`updateSnapshot`), as upstream's
+        // `willUpdate()` would, transforms included. Keep that unless this
+        // mount already moved the lead's layout, then fall back to its
+        // cached pre-mount box.
+        const leadAdapter = MotionDomProjectionAdapter.adapters.get(lead)
+        const cached = leadAdapter?.onScreenSnapshot()
+        const measured = lead.snapshot
+        if (
+            leadAdapter &&
+            cached &&
+            (!measured || !sameBox(measured.layoutBox, cached.layoutBox))
+        ) {
+            leadAdapter.prepareSnapshotPath(lead)
+            lead.snapshot = cached
+        }
+        lead.isLayoutDirty = true
+        if (lead.snapshot) {
+            projection.snapshot = lead.snapshot
+            projection.snapshot.latestValues = lead.animationValues || lead.latestValues
+        }
+        projection.isLayoutDirty = true
+        this.mountedFromLiveLead = true
+        root.didUpdate()
+        this.visualElement.scheduleRenderMicrotask()
         this.refreshCachedLayout()
     }
 

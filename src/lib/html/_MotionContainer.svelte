@@ -1921,7 +1921,13 @@
                 alwaysMeasureLayout: upstreamAlwaysMeasureLayout
             })
         })
-        motionDomProjection.mount(mountTarget)
+        // A node that mounts with the `layoutId` of a lead still on screen
+        // takes it over in `didMount()` below, with one update pass (#1411
+        // amendment A1, the pass upstream gets from the mounting commit).
+        // Only where layout measurement exists at all.
+        motionDomProjection.mount(mountTarget, {
+            takeOverLiveLead: untrack(() => hasLayoutFeatures)
+        })
         // `MeasureLayout` mounts with the element (see
         // `createMeasureLayoutMountTracker`): run its `componentDidMount`
         // here, with the DOM as first rendered, and record the layout
@@ -2918,6 +2924,12 @@
         layoutIdConsumedOn = element
         const id = scopedLayoutId
         if (!id) return
+        // Mounted by taking over a lead that is still on screen: motion-dom
+        // already animates from it, so only drop a handoff for the same id.
+        if (motionDomProjection?.mountedFromLiveLead) {
+            layoutIdRegistry.consume(id, element)
+            return
+        }
         untrack(() => consumeLayoutIdHandoff(id))
     })
 
