@@ -46,10 +46,12 @@ any port work and the gate. Tests that cannot go red on 14.6.0 are kept as guard
 - **Wave 1** (parallel, from the wave-0 SHA): 001, 008, and Phase A of 002, 003, 004, 005, 009.
 - **Wave 2** (after 001 is merged into `feat/motion-14.7.1`): Phase B of 002, 003, 004, 005, 009; 006; 010.
 - **Wave 3**: 007 (after 006, same lane); 011 (after 010, same lane — merge `feat/motion-14.7.1` into the lane first
-  so it starts with 004, 006, 007 and 008 merged); 012 (after 007 and 008).
+  so it starts with 004, 006, 007 and 008 merged); 012 (after 007, 008 and 015).
 - **Wave 4** (after 001, 006, 007 and 008 are merged into `feat/motion-14.7.1`): 013, in its own lane off
   `feat/motion-14.7.1`; 014 (after 009 merges), in its own lane (`exports`, merges back last after merging
   `feat/motion-14.7.1` into the lane and re-running its gate).
+- **Wave 4, alongside 013** (after 006 with A1, 007 and 008 are merged): 015, in its own lane `siblings` off
+  `feat/motion-14.7.1`. It merges back after 013. 012 starts only after 015 has merged.
 
 ## Status
 
@@ -66,9 +68,10 @@ any port work and the gate. Tests that cannot go red on 14.6.0 are kept as guard
 | [009](009-use-animate-timeline.md) | `useAnimate` timelines inherit MotionConfig; Timeline types re-exported; export tripwire | 1A / 2B | P1 | M | 001 (B) | `animate.svelte.ts` + spec, `animateValue.ts`, `index.ts` (one block), `index.spec.ts`, export allowlist, `tests/useAnimate/timeline`, docs `use-animate` + example, `compare-data.ts` (GSAP) | TODO |
 | [010](010-lazy-motion-m-split-reorder.md) | `motion.*` has every feature, `m.*` defers to LazyMotion, strict works, Reorder `m` entry | 2 | P2 | L | 001 | new `motionKind.ts`, `m.ts`, `reorder.ts`, `Reorder/*`, `_MotionContainer.svelte` (7-9, 150-155, ~161, 246-250), `LazyMotion*`, `package.json` (`exports`), consumer-vite6 checks, lazy-motion pages/specs, docs `lazy-motion` + `reorder` | TODO |
 | [011](011-m-without-lazy-motion-features.md) | SPIKE: featureless `m` outside LazyMotion and while an async bundle loads; red `test.fail()` specs, prototypes A/B on a throwaway branch, report | 3 | P2 | M (spike) | 010 | on the lane: `__tests__/FeaturelessMProbe.svelte`, `featurelessM.spec.ts`, `tests/lazy-motion/featureless-m` + e2e, consumer-vite6 `FeaturelessSsr.svelte` + `verify.mjs`, report; prototypes in `src/lib` on the throwaway branch only | TODO |
-| [012](012-presence-exit-shared-layout-relegate.md) | SPIKE: exiting `layoutId` children take part in shared layout (relegate); prototypes on a throwaway branch + report | 3 | P1 | M (spike) | 006, 007, 008 | red `test.fail()` specs on the lane; prototypes on a throwaway branch (`presence.ts`, `PresenceChild.svelte`, projection adapter) | TODO |
+| [012](012-presence-exit-shared-layout-relegate.md) | SPIKE: exiting `layoutId` children take part in shared layout (relegate); prototypes on a throwaway branch + report | 3 | P1 | M (spike) | 006, 007, 008, 015 | red `test.fail()` specs on the lane; prototypes on a throwaway branch (`presence.ts`, `PresenceChild.svelte`, projection adapter) | TODO |
 | [013](013-layout-transform-origin-at-rest.md) | `layout` elements at rest keep the default `transform-origin` (no `0 0`, no `will-change`); 008's pin removed | 4 | P2 | S | 001, 006, 007, 008 | `layout.ts` (`setCompositorHints`) + spec, `_MotionContainer.svelte` (the `setCompositorHints` import and two calls; planned-at :65, :2524, :2769-2771, next to 006's :2776-2809), `_MotionContainer.spec.ts` (:526-548), `tests/layout/transform-origin-at-rest` + e2e, `+page.svelte` link, `tests/animate-presence/pop-layout-container-move` (pin only), changeset | TODO |
 | [014](014-reexport-missing-motion-api.md) | Re-export Motion's public API we still hide (`createScopedAnimate`, `animateMini`, `inertia`, `keyframes`, `resolveElements`) + types; allowlist bucketed | 4 | P2 | M | 009 | `index.ts` (two blocks), `index.spec.ts`, export allowlist, new `motionReexports.ts` + spec, `animateValue.ts` + spec, `animate.svelte.ts` (import only), `tests/motion-reexports` + e2e, `+page.svelte` link, consumer `verify-tree-shaking.mjs`, docs `create-scoped-animate` + `inertia` + examples, `api-reference`, `docsNav.ts`, `examplesIndex.ts`, changeset | TODO |
+| [015](015-sibling-layout-snapshots.md) | Layout siblings and following `layout` nodes (a footer) snapshot before presence/list changes; cached layouts survive container scrolls; exit clones follow layout moves (un-fixmes 008's five cases) | 4 | P1 | L | 006 (A1), 007, 008 | new `scrollBasis.ts` + spec, `motionDomProjection.ts` (scroll rebases, `seedOwnSnapshotFromCache`, `seedFollowingLayout`) + spec, `layout.ts` (`observeLayoutChanges`) + spec, `_MotionContainer.svelte` (2179-2181, 2229-2254, 2350, observer effect 2519-2818 except 013's lines), `presence.ts` (`unregisterChild` clone follow, `measurePopLayoutScale`) + spec, `__tests__/PresenceSiblingsHarness.svelte`, `presenceSiblingSnapshots.spec.ts`, `pop-layout-container-move.spec.ts` (un-fixme), `tests/animate-presence/pop-layout-scroll-siblings` + e2e, `+page.svelte` link, changeset | TODO |
 
 Every plan adds its own `.changeset/*.md`, except 002 and 005: their fixes arrive with the bump, so 001's changeset lists them. Most plans add links to
 `src/routes/+page.svelte` (expected merge conflicts: keep all links).
@@ -90,6 +93,7 @@ Status values: TODO | IN PROGRESS | PHASE A RED | DONE | BLOCKED (reason) | REJE
 | lazy | `lane/1471-lazy` off `feat/motion-14.7.1` after 001 | 010 → 011 | 4220 |
 | origin | `lane/1471-origin` in `../svelte-motion-1471-origin`, cut from `feat/motion-14.7.1` after the layoutid lane (006, 007) and 008 have merged | 013 | 4221 |
 | exports | `lane/1471-exports` off `feat/motion-14.7.1` after 009 is merged | 014 | 4222 |
+| siblings | `lane/1471-siblings` in `../svelte-motion-1471-siblings`, cut from `feat/motion-14.7.1` after 006 (with A1), 007 and 008 have merged | 015 | 4223 |
 
 **Lane rules** (they override any per-plan wording):
 
@@ -103,8 +107,8 @@ Status values: TODO | IN PROGRESS | PHASE A RED | DONE | BLOCKED (reason) | REJE
 - 001's full-suite triage runs while no other lane is running Playwright.
 - Lanes don't edit this README. The dispatcher updates the status table on `feat/motion-14.7.1`.
 - **Merge back** into `feat/motion-14.7.1` (merge, no squash) in this order: 001 (committed there directly); 008; 002, 003, 005, 009; 004; the
-  layoutid lane (006, 007); the lazy lane's 010; then 011 and 012 (each merges `feat/motion-14.7.1` into its lane
-  before starting); then 013 (after the layoutid lane's 006 and 007 and after 008; its lane starts from `feat/motion-14.7.1` with all of them merged) and 014 (after 009), each starting from `feat/motion-14.7.1`. After the last merge run the full gate once, in CONTRIBUTING.md's "Full verification" order:
+  layoutid lane (006, 007); the lazy lane's 010; then 011 (merges `feat/motion-14.7.1` into its lane before
+  starting); then 013 (after the layoutid lane's 006 and 007 and after 008; its lane starts from `feat/motion-14.7.1` with all of them merged); then 015 (its lane starts from the same base, and before merging back it merges `feat/motion-14.7.1` in, keeping 013's deletions, and re-runs its guards); then 012 (merges `feat/motion-14.7.1` into its lane before starting, so it prototypes on top of 015); and 014 (after 009), each starting from `feat/motion-14.7.1`. After the last merge run the full gate once, in CONTRIBUTING.md's "Full verification" order:
   `pnpm build`, `pnpm check`, `pnpm package`, `pnpm test`, `pnpm --filter @humanspeak/svelte-motion-consumer-vite6 test`,
   `pnpm --dir docs build`, `pnpm --dir docs check`, `pnpm --dir docs test`, `pnpm --dir docs test:geo-seo`,
   `pnpm exec playwright test --config docs/playwright.config.ts` (alone), `PW_PORT=4211 pnpm test:e2e`, and
@@ -114,10 +118,13 @@ Status values: TODO | IN PROGRESS | PHASE A RED | DONE | BLOCKED (reason) | REJE
 
 ## Shared hotspots
 
-- **`src/lib/html/_MotionContainer.svelte`**: 013 (the `setCompositorHints` import and calls, :65, :2524, :2769-2771), 004 (1321-1327), 006 (775-820, 2776-2809, new effects after 2405), 007
+- **`src/lib/html/_MotionContainer.svelte`**: 013 (the `setCompositorHints` import and calls, :65, :2524, :2769-2771), 015 (observer-cache declarations, layout pre-update effect, `runReactiveCommit`'s `lastRect = next`, and in the observer effect: the `lastRect` assignments, the diff, the `observeLayoutChanges` call and `offProjectionCommit`; next to 013's lines), 004 (1321-1327), 006 (775-820, 2776-2809, new effects after 2405), 007
   (props 211-214, `updateOptions` calls), 008 (696, 718-723), 010 (7-9, 150-155, ~161, 246-250), 011 (spike — its
   prototypes stay on a throwaway branch). The regions of 004/006/007/008/010 are disjoint.
-- **`src/lib/utils/presence.ts`**: 008, then 012 (depends on 008).
+- **`src/lib/utils/presence.ts`**: 008, then 015 (`unregisterChild` clone follow), then 012.
+- **`src/lib/utils/motionDomProjection.ts`**: 006/007 (layoutid lane), then 015 (scroll-basis rebases, `seedFollowingLayout`).
+- **`src/lib/utils/layout.ts`**: 013 (`setCompositorHints`) and 015 (`observeLayoutChanges`), disjoint.
+- **`e2e/animate-presence/pop-layout-container-move.spec.ts`**: created by 008, with five cases `fixme`'d; 015 un-fixmes them.
 - **`src/routes/tests/animate-presence/pop-layout-container-move/+page.svelte`**: created by 008; 013 deletes only
   the `transform-origin: 50% 50% !important` pin and its comment.
 - **`tests/consumer-vite6/verify.mjs`**: 010 (SSR checks for `./m`) and 011 (featureless SSR) — same lane, serial.
@@ -147,7 +154,12 @@ Status values: TODO | IN PROGRESS | PHASE A RED | DONE | BLOCKED (reason) | REJE
 - **007 → 006**: same `setOptions` call and `_MotionContainer.svelte` options plumbing.
 - **010 → 001**: both edit `package.json`; 010's e2e baseline is the 14.7.1 suite.
 - **011 → 010**: needs the `motion` / `m` kind and the `./m` entry.
-- **012 → 007, 008**: un-fixmes 007's #1935 `exit=true` cases; edits `presence.ts` after 008.
+- **012 → 007, 008, 015**: un-fixmes 007's #1935 `exit=true` cases; edits `presence.ts` after 008. Its prototypes
+  edit the `unregisterChild` region where 015's clone follow lives, and its crossfade measurements depend on
+  sibling snapshots.
+- **015 → 006 (A1), 007, 008**: it rebases the `onScreenSnapshot()` that 006 A1 reads, edits
+  `_MotionContainer.svelte` and the adapter after 006/007's changes, and builds on 008's `presence.ts` helpers,
+  its page and its five `fixme`s.
 
 ## Known gaps carried as decisions
 
