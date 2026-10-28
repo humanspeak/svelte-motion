@@ -136,14 +136,26 @@ never recreates the node either: it unmounts only after `safeToRemove`.
   - P5 widens the gate to `exitProp !== undefined || measureLayoutMounted`.
   - It passes the hand-off as the **last** `registerChild` parameter, located by name, `layoutHandOff`. 015b
     adds `layoutGroup` before it; don't rely on positions.
-  - The container also passes a cheap `canHandOff(): boolean`: the adapter is mounted and
-    `measureLayoutMounted`. Pass it inside the same options object, or as a property of the callback.
+  - The hand-off is an object with three members:
+    - `canHandOff(): boolean`. True when the adapter is mounted, **not already handed off**, and
+      `measureLayoutMounted`. It runs during teardown, where it reads the `$derived` `measureLayoutMounted`;
+      Svelte serves a destroyed derived its last value through `old_values`. So a `layoutId` cleared in the
+      same flush as the removal reads the pre-flush value, as upstream's `MeasureLayout` still renders with its
+      last props. 10d-ii covers this. Once an adapter is handed off, it returns `false`, so a second
+      `unregisterChild` for the same key can't re-home it twice (10i).
+    - `layoutRect(): PopLayoutSnapshot | undefined`. The held clone's placement (see Placement). It is called
+      right after `canHandOff()`, before any clone work.
+    - `handOff(clone, release): ExitLayoutHold | undefined`.
 - **Which children.** Every child whose `MeasureLayout` would be rendered upstream, i.e. the container's
   `measureLayoutMounted` (`layout || layoutId`, or `drag`, with the features loaded). `layout`-only children
   are included (ruling 3).
 - In `unregisterChild`:
-  - **Decide `canHandOff()` first, before any clone work.** A child that won't be held and has no `exit` keeps
-    today's immediate removal, so a non-held no-`exit` child never flashes a clone.
+  - **Decide `canHandOff()` first, before any clone work**, then read `layoutRect()`. A child that won't be held
+    and has no `exit` keeps today's immediate removal, so a non-held no-`exit` child never flashes a clone.
+  - **No connected slot parent → no clone (N4).** Today a detached child whose `insertionParent` is gone falls
+    back to `doc.body` (`const slotParent = insertionParent ?? doc.body`, `presence.ts:1817`). Instead,
+    `unregisterChild` builds no clone, settles a hold it would have taken (none is taken), and removes the
+    child at once, held or not (10j).
   - For a held child, the no-`exit` early return is skipped, and the exit is **resolved synchronously at
     hand-off time**. Today the container always passes `resolvePresenceExit`, which can return `undefined`,
     and the rAF's `!resolvedExit` branch (`presence.ts:1963`) removes the clone. For a held child that branch
@@ -154,10 +166,26 @@ never recreates the node either: it unmounts only after `safeToRemove`.
     transforms (`x`, `scale`, …) and its `style` motion values onto it each frame. Today the clone is placed
     from the element's **transformed** rect and frozen styles (`presence.ts:1704-1706, 1871-1875`), so those
     transforms and any `style` layout keys (`top`, `left`, `width`, `height`, `margin*`) would be applied twice.
-    A held clone is therefore placed from the node's **untransformed** cached layout box (`latestLayoutBox`, or
-    `lastLayout.layoutBox`, converted to the clone's offsetParent), minus any margin the VisualElement will
-    write. Then the VisualElement's transform is the only transform, and its layout keys agree with the
-    placement. Step 3 probes this (3d).
+    A held clone is therefore placed from an **untransformed, offsetParent-relative, margin-aware** box. That is
+    008's `measurePopLayoutSnapshot` (`presence.ts:526-555`: raw `offsetTop`/`offsetLeft`/`offsetWidth`
+    against `offsetParent`, as upstream `PopChild` measures). Following the operator's rule (dedup to the
+    strongest existing variant), 012 reuses it rather than the adapter's `latestLayoutBox`. That box keeps
+    style transforms whenever `latestLayoutKeepsTransforms` is set (`motionDomProjection.ts:385`), as
+    `seedDepartingLeadSnapshot` has to correct for (819-823).
+    - **Capture in every mode.** For a child whose `canHandOff()` would be true, the container records
+      `measurePopLayoutSnapshot(element, getComputedStyle(element))` in **every** mode, not only `popLayout`.
+      It reads only at its existing post-commit layout reads (the adapter's commit/measure listeners, where
+      layout is already clean), so it costs no extra forced layout. `layoutRect()` returns the latest record.
+    - `unregisterChild` places a held clone from `layoutRect()` exactly as it places a `popLayout` clone today
+      (absolute, `top`/`left`/`width`/`height`), whatever the mode. In sync/wait mode the placeholder keeps the
+      slot.
+    - **Fallback, only if the offset snapshot can't be exact in sync/wait mode** (3d shows it): the adapter's
+      cached box through `removeTransform` when `latestLayoutKeepsTransforms` is set, then converted
+      page → offsetParent. Record in the report why the offset snapshot failed.
+    - For held clones, `unregisterChild` does **not** force `positioningParent.style.position = 'relative'`
+      (`presence.ts:1843-1847`): the offset snapshot is already against the real `offsetParent`, as in
+      `popLayout` today.
+    - Step 3 probes this (3d).
   - **Paint order (M2).** Held clones get no z-index lift. Today `presence.ts:1897-1913` raises exiting clones,
     which inverts upstream, where the exiting child renders first (earlier in the tree,
     `AnimatePresence/index.tsx:155-164`) and the entering one paints over it. Held clones keep the element's
@@ -249,18 +277,35 @@ Upstream keeps every nested node of an exiting child: each nested `MeasureLayout
      before the descendants' teardowns, and before this component's own projection `$effect` cleanup.
 2. **Pair the subtrees.** In the hand-off, walk the detached element's subtree and the clone side by side.
    `cloneNode(true)` keeps the structure, after the strip in part 4 is applied to both walks.
-   - For each original descendant with a `visualElementStore.get(el)` whose adapter
-     (`MotionDomProjectionAdapter.adapters.get(ve.projection)`, through a new static lookup) is mounted and
-     measures layout, re-home that adapter onto the paired clone element with its own hold.
-   - The clone is removed once **every** hold in the subtree and the exit have settled.
-   - Descendants are released by their own signals, as upstream (every nested `MeasureLayout` must call
-     `safeToRemove` before `PresenceChild` completes, `PresenceChild.tsx:67-75`).
+   - **Every** original descendant with a VisualElement in `visualElementStore` is re-homed onto its paired
+     clone element (operator ruling: adopt upstream, where every nested node stays mounted with its element).
+     Its adapter is found through a new static lookup (`MotionDomProjectionAdapter.adapters.get(ve.projection)`).
+     A descendant with no adapter (no projection) has only its VisualElement re-pointed
+     (`current`, `visualElementStore`).
+   - **Which descendants hold.** A descendant holds only when it measures layout (`layout || layoutId`, or
+     `drag`) **and** belongs to the same presence scope as the exiting child, i.e. no
+     `.animate-presence-container` lies between them. These relegate and hold exactly like the child.
+   - **Below a nested `AnimatePresence` boundary,** stop the relegate-and-hold, as upstream. A nested
+     `AnimatePresence` gives its children their own `PresenceContext`, and its `PresenceChild`'s `isPresent`
+     doesn't change when an ancestor exits (`AnimatePresence/index.tsx:213-217`, `propagate && !isParentPresent`
+     is the only exception). Descendants below such a boundary are re-homed with `isPresent` unchanged and no
+     hold, and are unmounted when the outer hold releases.
+   - **The `propagate` exception.** When the nested boundary is a `propagate` boundary, its children are
+     exiting with the parent (`index.tsx:213-215`). They are treated as in-scope: `isPresent = false`, relegate,
+     hold.
+   - Descendants that don't measure layout get no hold. They are re-homed (so their VisualElement keeps
+     rendering the clone, as upstream keeps rendering the element) and unmounted when the outer hold releases.
+   - The clone is removed once **every** hold in the subtree and the exit have settled. Holding descendants are
+     released by their own signals, as upstream (every nested `MeasureLayout` must call `safeToRemove` before
+     `PresenceChild` completes, `PresenceChild.tsx:67-75`).
 3. **Later teardowns defer by themselves.** When the descendants' own teardowns run afterwards, two existing
    guards make them no-ops for now: the VisualElement effect's `if (visualElement.current === mounted)` (now the
    clone), and the adapter's deferred-unmount branch.
-4. **Strip nested artifacts.** Remove nested `[data-clone]` and `[data-presence-placeholder]` copies from the
-   clone, and skip them in both walks. They belong to nested `AnimatePresence` boundaries that tear down with
-   the subtree.
+4. **Strip nested artifacts, from every clone (N3).** Since P6, nested boundaries are still present when
+   `cloneNode(true)` runs, so **every** clone, held or not, copies their in-flight `[data-clone]` and
+   `[data-presence-placeholder]` nodes. Remove those copies from every clone right after `cloneNode(true)`, and
+   skip them in both walks. They belong to nested `AnimatePresence` boundaries that tear down with the subtree.
+   GUARD 10k covers a non-layout child.
 
 Step 3c probes this, with a STOP. **Fallback, which needs approval:** re-home only the direct child (as 3a)
 and record that nested crossfades on the direct-child path need the owned syntax.
@@ -459,8 +504,8 @@ framer-motion paths are under `packages/framer-motion/src/`; motion-dom paths un
     code):
     - `startExitAnimation(follow?)`'s `followAxes` / `getValueTransition(…, 'layout')` merge;
     - the `if (clone.matches('[data-layout], [data-layout-id]'))` block after the comment
-      `// Plan 015a, part C:`, which runs `seenScrollBasis`, `foldedInFor`, `microtask.read`, `scrollDelta` and
-      `measureScreenScale`, then `startExitAnimation({ x, y })`.
+      `// Plan 015a, part C:`, which runs `seenScrollBasis`, `foldedInFor`, `microtask.read` and `scrollDelta`,
+      then `startExitAnimation({ x: move.x, y: move.y })`.
 
     012 deletes it (ruling 3). 015a's unit cases for it are `presence.spec.ts` 6a–6c. Its e2e GUARDs are 008's
     clone `&scroller` cases and the clone cases of `pop-layout-scroll-siblings.spec.ts`.
@@ -546,16 +591,17 @@ The **guard set** (used in Steps 1 and 7):
 
 - `src/lib/utils/motionDomProjection.ts`: new public `setPresence`, `commitPresence`, `handOffToExitClone`,
   `cancelExitHandOff` (or a `cancel` on the returned hold), the private safe-to-remove wiring installed in
-  `mount`, the per-cycle release latch, the deferred-unmount branch at the top of `unmount()`, and a static
-  lookup from a VisualElement's projection to its adapter (for the nested walk). It reuses the existing
+  `mount`, the per-cycle release latch, an `isHandedOff` getter, the deferred-unmount branch at the top of
+  `unmount()`, and a static lookup from a VisualElement's projection to its adapter (for the nested walk). It reuses the existing
   `seedDepartingLeadSnapshot` and `seedOwnOnScreenSnapshot` unchanged, with no new seed method. Export a
   `ExitLayoutHold` type. Don't change `switchLayoutId` or 015a/015b/015c members.
   `motionDomProjection.spec.ts`: new `describe`s only.
 - `src/lib/html/_MotionContainer.svelte`, these regions only:
   - P1: the new presence `$effect.pre` / `$effect` pair right after 006's switch pair;
   - P2: the participant registration (new `$effect` next to P1);
-  - P3: the `registerChild(` call: append `layoutHandOff` (and `canHandOff`) as the **last** parameter,
-    located by name, after 015b's `layoutGroup`;
+  - P3: the `registerChild(` call: append `layoutHandOff` (`canHandOff`, `layoutRect`, `handOff`) as the
+    **last** parameter, located by name, after 015b's `layoutGroup`. Plus the every-mode offset-snapshot
+    record (`lastOffsetSnapshot`), written from the adapter's existing commit/measure listeners;
   - P5: that registration `$effect`'s gate (anchor `exitProp !== undefined`), widened to
     `exitProp !== undefined || measureLayoutMounted`;
   - P6: the presence teardown. Replace the `onDestroy` (anchor `context.unregisterChild(presenceKey)`) with a
@@ -569,8 +615,10 @@ The **guard set** (used in Steps 1 and 7):
     - the `canHandOff()` decision before any clone work;
     - the no-exit branch for held children, and the synchronous exit resolve;
     - the `!resolvedExit` branch settling the exit flag for held children;
-    - held-clone placement from the untransformed layout box, with no z-index lift;
-    - the nested artifact strip and the paired subtree walk;
+    - held-clone placement from `layoutRect()`, with no z-index lift and no forced `position: relative`;
+    - no clone without a connected slot parent (instead of falling back to `doc.body`);
+    - the nested artifact strip, for every clone, and the paired subtree walk with the boundary and
+      `propagate` rules;
     - the hand-off call after the insert;
     - the hold/exit join before the completion tail;
     - `id` kept on held clones;
@@ -768,10 +816,12 @@ For each case in 1 and 2, add a twin with `&owned=true` and the name suffixed ` 
    - a gallery of `motion.li layoutId={color}`, each with a `motion.div layoutId="child-{color}"`;
    - `<AnimatePresence>{#if open}<motion.div key="lightbox" id="parent" layoutId={shownColor} …><motion.div id="child" layoutId="child-{shownColor}" …/></motion.div>{/if}</AnimatePresence>`,
      where `shownColor` is the latched colour;
-   - a 1 s linear transition, and a TesterPanel.
+   - a 1 s linear transition, and a TesterPanel;
+   - `?inner=boundary` wraps the lightbox's `#child` in a nested `<AnimatePresence>`, and `?inner=propagate`
+     uses `<AnimatePresence propagate>` (for N3/N4).
 
    `e2e/layout-id/nested-crossfade.spec.ts` uses `recordPainted` with probes on `#item-child`'s box:
-   - 9a (close): from the overlay click until the end, on every frame:
+   - N1 (close): from the overlay click until the end, on every frame:
      - the held `#child` copy (inside the clone) follows `#item-child`, whose rAF-recorded rects grow out of
        the lightbox child;
      - at least 20 frames show both mounted with the clone child's centre within 1 px of `#item-child`'s;
@@ -779,8 +829,14 @@ For each case in 1 and 2, add a twin with `&owned=true` and the name suffixed ` 
 
      **RED**: the nested node is torn down before the direct child's `onDestroy`, so the clone's inner copy has
      no node and fades in place.
-   - 9b **RED**: the outer pair (`#parent` → `#item-parent`) follows and crossfades like case 1. Same reason as
+   - N2 **RED**: the outer pair (`#parent` → `#item-parent`) follows and crossfades like case 1. Same reason as
      case 1: the clone has no node.
+   - N3 **RED** (nested boundary): the lightbox child sits inside a nested `<AnimatePresence>`. On close, the
+     inner `#child` is **not** relegated: `#item-child` doesn't grow out of it. The inner copy stays in the
+     clone at its own box, following the outer node's projection, until the outer hold releases. Then both are
+     removed together. Today the whole clone fades in place without an outer follow.
+   - N4 **RED** (`propagate`): the same with `<AnimatePresence propagate>`. The inner `#child` is relegated and
+     crossfades into `#item-child`, like N1.
 10. Link the four new pages from `src/routes/+page.svelte`.
 
 **Part C GUARDs (ruling 3).** These are 015a's cases; they must pass now, unchanged, and after part C is
@@ -820,11 +876,17 @@ U10. `presence.spec.ts`, `describe('exit holds (plan 012)')`:
     - 10b **RED**: with an `exit`, the clone is removed only after **both** the exit animation finishes and the
       hold releases, in either order.
     - 10c **RED**: `takeExitHandoff` (re-entry) and `dispose()` cancel the hold.
-    - 10d **RED**: a held clone keeps its `id`, has no z-index lift, and is placed at the node's untransformed
-      layout box (a mocked `latestLayoutBox` 30 px left of the transformed rect gives `left` 30 px lower).
-    - 10d-ii **RED** (B1): a child registered without `exit` whose `canHandOff()` is `true` resolves its exit
+    - 10d **RED**: a held clone keeps its `id`, has no z-index lift, and its positioning parent isn't forced to
+      `position: relative`. It is placed from the hand-off's `layoutRect()`: stub it to return a snapshot whose
+      `left` is 30 px less than the element's transformed rect's, and the clone's `left` is that snapshot's.
+      This works in `sync` mode, not just `popLayout`.
+    - 10d-ii **RED** (B1, N7): a child registered without `exit` whose `canHandOff()` is `true` resolves its exit
       synchronously at hand-off. The rAF's `!resolvedExit` branch settles the exit flag and doesn't remove the
       clone. With `canHandOff()` `false`, no clone is ever inserted (spy on `insertBefore`).
+
+      Component level (in `presenceSharedLayout.spec.ts`): a direct child whose `layoutId` is cleared **in the
+      same flush** as its removal is still handed off. Its `canHandOff()` reads the pre-flush
+      `measureLayoutMounted`.
     - 10d-iii **RED** (nested): a clone of an element with a nested `motion` descendant (an adapter mounted on
       the inner element) re-homes the descendant onto the paired clone element. Nested `[data-clone]` and
       `[data-presence-placeholder]` copies are stripped, and the clone is removed only after both holds
@@ -847,6 +909,26 @@ U10. `presence.spec.ts`, `describe('exit holds (plan 012)')`:
       today.
     - 10h **RED**: a `layout`-only child (no `layoutId`) with no `exit` is handed off, and is released and
       removed in the same task's microtasks when nothing moved: the clone is gone before the next rAF.
+    - 10i **RED** (N4, double hand-off): after one hand-off, the adapter's `canHandOff()` is `false`. A second
+      `unregisterChild` for the same key (the record re-registered with the same element) builds no second
+      hold, and `handOffToExitClone` is called once.
+    - 10j **RED** (N4, no slot parent): a detached child whose element parent and `insertionParent` are both
+      disconnected builds **no** clone. Nothing is inserted into `document.body`, and the child is removed at
+      once. Today it falls back to `doc.body`.
+    - 10k **GUARD** (N3): a **non-layout** direct child (no hand-off) containing a nested `AnimatePresence`
+      with an exit in flight (a `[data-clone]` and a `[data-presence-placeholder]` inside it) gets a clone with
+      neither copy. **GUARD** if Step 1 shows today's clone already lacks them (P6 not yet in). Otherwise
+      **RED**. Record which.
+    - 10l **RED** (nested boundary): a held child with a `layoutId` descendant inside a nested
+      `.animate-presence-container` (non-`propagate`) re-homes that descendant with `isPresent` unchanged
+      (`!== false`), takes **no** hold for it, never calls its `relegate`, and unmounts it when the outer hold
+      releases.
+    - 10m **RED** (`propagate`): the same with the nested boundary marked `propagate`. The descendant gets
+      `isPresent = false`, relegates and holds.
+    - 10n **RED** (non-measuring descendants): a descendant `motion` node with neither `layout` nor `layoutId`
+      nor `drag` is re-homed (its `visualElement.current` is the paired clone element and
+      `visualElementStore.get(cloneEl)` is its VisualElement), takes no hold, and is unmounted when the outer
+      hold releases.
 U11. `presenceSharedLayout.spec.ts` with `PresenceSharedLayoutHarness.svelte` (a clone-syntax `{#if}` swap of two
     `layoutId` siblings). Spy on `MotionDomProjectionAdapter.prototype.unmount` and `.mount` and on the
     context's `unregisterChild`:
@@ -896,7 +978,7 @@ Implement only:
   - for the probe only, skip part C for held clones (Step 5 deletes it).
 
 **3a: `layoutId`.** Run:
-- 9d, 9e, 10d, 10d-ii, 11a, 11b;
+- 9d, 9e, 10d, 10d-ii, 10i, 10j, 11a, 11b;
 - `PW_PORT=4216 pnpm exec playwright test e2e/layout/layout-root.spec.ts -g "Crossfading shared layout animation inside a layoutRoot animates relative to it$"`;
 - 6a.
 
@@ -926,7 +1008,8 @@ without a new mechanism. For example:
 
 **3c: nested descendants.** Add the paired subtree walk and the artifact strip. Run 10d-iii, 11b and
 `PW_PORT=4216 pnpm exec playwright test e2e/layout-id/nested-crossfade.spec.ts`.
-- Confirmed when 10d-iii and 11b pass and 9a's nested child follows `#item-child` on every painted frame.
+- Confirmed when 10d-iii, 10l, 10m, 10n and 11b pass, N1's nested child follows `#item-child` on every painted
+  frame, and N3/N4 hold.
 - Refuted when either of these holds:
   - P6's `$effect.pre` teardown doesn't run before the descendants' teardowns in a real flush;
   - the paired walk can't find the descendant's VisualElement (for example, its store entry is gone by then).
@@ -936,16 +1019,24 @@ without a new mechanism. For example:
 
 **3d: placement (M1).** Add two probe cases to `e2e/layout-id/presence-crossfade.spec.ts`, kept as permanent
 GUARDs after Step 5:
-- 3d-i: a sync-mode exit of a `layout` child that interrupts its enter mid-flight (`initial={{ x: -100, scale: 0.5 }}`,
-  `animate={{ x: 0, scale: 1 }}`, click to remove at ~40%). On every painted frame after the removal, the
-  clone's on-screen box equals the element's last painted box (from the rAF log taken just before removal)
-  within 1 px: no double `x` or `scale`.
-- 3d-ii: a held child whose `style` object has layout keys (`{ position: 'absolute', top: 40, left: 60, width: 120, marginLeft: 10 }`).
-  The clone's on-screen box equals the element's last painted box within 1 px, on every frame.
+- 3d-i: a sync-mode exit of a `layout` child with `exit={{ opacity: 0 }}` and `transition={{ duration: 1 }}`,
+  so the clone paints for a second. It interrupts its enter mid-flight: `initial={{ x: -100, scale: 0.5 }}`,
+  `animate={{ x: 0, scale: 1 }}` over 1 s, click to remove at ~40%. Next to it is a **control** element with
+  the same `initial`/`animate`/`transition`, mounted at the same moment and never removed.
+  - The re-homed VisualElement keeps running the interrupted enter, as upstream keeps animating the exiting
+    element.
+  - Assert, on painted frames: the first frame after the removal is within 1 px of the element's last box
+    before the removal (no jump, no double `x` or `scale`).
+  - From then until the clone is gone, the clone's box tracks the control's box (offset by their fixed layout
+    distance) within 1 px on every frame.
+- 3d-ii: a `layout`-only child (no `layoutId`) with an `exit` (`exit={{ opacity: 0 }}`, 1 s), whose `style`
+  object has layout keys: `{ position: 'absolute', top: 40, left: 60, width: 120, marginLeft: 10 }`. On every
+  painted frame until the clone is gone, the clone's box equals the element's last painted box within 1 px.
 
-The probe is confirmed when both pass. Otherwise fix the placement rule (untransformed layout box minus the
-margins the VisualElement writes). If it can't be made exact with the cached box, STOP and report the measured
-offsets.
+The probe is confirmed when both pass. Otherwise fix the placement:
+- first within the offset-snapshot rule (`layoutRect()`);
+- then the `removeTransform` fallback, recording why;
+- if neither is exact, STOP and report the measured offsets.
 
 **Outcomes.**
 - On a 3a refutation, STOP and report the evidence and the first fallback. Don't implement B1 without the
@@ -953,7 +1044,7 @@ offsets.
 - On a 3b refutation alone, STOP and report. With approval, the plan continues with re-homing for `layoutId`
   clones only, and keeps part C gated to clones without a hold (second fallback).
 - On a 3c refutation, STOP and report. With approval, continue on the nested fallback.
-- On a 3d failure that the placement rule can't fix, STOP and report.
+- On a 3d failure that neither the offset snapshot nor the `removeTransform` fallback can fix, STOP and report.
 - On confirmation of all four, commit
   `fix(presence): re-home an exiting layout node onto its exit clone (plan 012)` and continue.
 
@@ -1007,7 +1098,7 @@ offsets.
 
 In `presence.ts`:
 
-1. The `registerChild` parameter is `layoutHandOff?: { canHandOff(): boolean; handOff(clone: HTMLElement, release: () => void): ExitLayoutHold | undefined }`.
+1. The `registerChild` parameter is `layoutHandOff?: { canHandOff(): boolean; layoutRect(): PopLayoutSnapshot | undefined; handOff(clone: HTMLElement, release: () => void): ExitLayoutHold | undefined }`.
    It is the **last** parameter, located by name (after 015b's `layoutGroup`). Store it on the record.
 2. In `unregisterChild`:
    - Call `child.layoutHandOff?.canHandOff()` **before any clone work**. When it is `false` and there's no
@@ -1017,11 +1108,13 @@ In `presence.ts`:
    - Resolve the exit **synchronously** for a held child (`child.resolveExit?.(getCustom()) ?? child.exit`).
      In `startExitAnimation`, the `!resolvedExit` branch for a held child **settles the exit flag** and does
      not remove the clone.
-   - Keep the `id` on held clones. Skip the z-index lift for them. Place them from the node's untransformed
-     cached layout box (the 3d rule).
-   - Strip nested `[data-clone]` / `[data-presence-placeholder]` copies, then call the hand-off for the child
-     and for each paired descendant (the 3c walk), right after the clone is inserted and 008's correction is
-     scheduled, before the exit rAF.
+   - Keep the `id` on held clones. Skip the z-index lift and the forced `position: relative` on the
+     positioning parent for them. Place them from `layoutRect()` (the 3d rule).
+   - With no connected slot parent, build no clone (N4).
+   - Strip nested `[data-clone]` / `[data-presence-placeholder]` copies from **every** clone (N3). Then, for held
+     clones, call the hand-off for the child and re-home each paired descendant (the 3c walk, with the boundary
+     and `propagate` rules), right after the clone is inserted and 008's correction is scheduled, before the
+     exit rAF.
    - Join the exit animation and every hold in the subtree: each settles one flag, and the existing
      completion tail runs once when all are settled. A held child with no exit keyframes calls `startExit()` at hand-off time and
      settles the exit flag at once. Reuse `createPresenceExitRegistry()` for the join if it fits; otherwise
@@ -1041,15 +1134,17 @@ In `presence.ts`:
    subtree, then removes the clone (m9). `dispose` cancels every hold.
 4. `_MotionContainer.svelte`:
    - P3 passes
-     `{ canHandOff: () => !!motionDomProjection?.isMounted && measureLayoutMounted, handOff: (clone, release) => motionDomProjection?.handOffToExitClone(clone, release) }`,
-     so `layout`, `layoutId` and `drag` children are all included, as upstream renders `MeasureLayout` for each;
+     `{ canHandOff: () => !!motionDomProjection?.isMounted && !motionDomProjection.isHandedOff && measureLayoutMounted, layoutRect: () => lastOffsetSnapshot, handOff: (clone, release) => motionDomProjection?.handOffToExitClone(clone, release) }`,
+     so `layout`, `layoutId` and `drag` children are all included, as upstream renders `MeasureLayout` for each.
+     `lastOffsetSnapshot` is recorded by the container in every mode (Placement), from its existing
+     post-commit reads;
    - P5's gate is in place;
    - P6 is in place (both from Step 3).
 5. Update `buildPresenceContext`'s JSDoc: direct children's projection nodes now move to their clone.
 
 **Verify**:
-- 10a–10h (including 10d-ii, 10d-iii, 10g-i and 10g-ii), 11a and 11b pass.
-- 1, 2, 5a, 6a, 9a and 9b pass, and 3d-i and 3d-ii still pass.
+- 10a–10n (including 10d-ii, 10d-iii, 10g-i and 10g-ii), 11a and 11b pass.
+- 1, 2, 5a, 6a and N1–N4 pass, and 3d-i and 3d-ii still pass.
 - The clone exit-complete-once variant passes.
 - The part C GUARDs pass within their Step 1 values.
 - `PW_PORT=4216 pnpm exec playwright test e2e/layout/layout-root.spec.ts e2e/layout-id e2e/animate-presence`
@@ -1123,10 +1218,10 @@ Report:
 
 - **Red anchors**: the seven un-fixmed cases (1, 2), their owned twins (3, 4), the presence-crossfade port
   (5a/5b), the painted-frame crossfade (6a/6b), the exit-complete-once clone variant (7), the lightbox close
-  half (8), the nested crossfade (9a, 9b), and unit cases 9a–9e, 10a–10e, 10d-ii, 10d-iii, 10g-ii, 10h, 11b and
+  half (8), the nested crossfades (N1–N4), and unit cases 9a–9e, 10a–10e, 10d-ii, 10d-iii, 10g-ii, 10h–10j, 10l–10n, 11b and
   Step 2.3. Each fails at `RED_SHA` for its stated reason and passes after its step. Item 3's owned twins are
   recorded, not labelled.
-- **Guards**: 9f, 10f, 10g-i, 11a; 3d-i and 3d-ii once added; the exit-complete-once owned variant; the lightbox
+- **Guards**: 9f, 10f, 10g-i, 10k (if GUARD at `RED_SHA`), 11a; 3d-i and 3d-ii once added; the exit-complete-once owned variant; the lightbox
   open half (if it passed at
   `RED_SHA`); the part C e2e GUARDs (008's clone `&scroller` cases, `pop-layout-scroll-siblings` clone cases);
   the guard set. The guard set includes the
@@ -1143,8 +1238,8 @@ Report:
 - [ ] The seven former `fixme` cases are plain `test`s and pass. No `fixme` remains in the six specs listed in
       Step 7.5.
 - [ ] Owned twins (3, 4), 5a/5b, 6a/6b (with the paint-order precondition), both exit-complete-once variants,
-      both lightbox tests, the nested crossfade (9a, 9b) and the placement GUARDs 3d-i/3d-ii pass.
-- [ ] Unit 9a–9f, 10a–10h (with 10d-ii, 10d-iii, 10g-i, 10g-ii), 11a, 11b and Step 2.3 pass. 015a's 6a is
+      both lightbox tests, the nested crossfades (N1–N4) and the placement GUARDs 3d-i/3d-ii pass.
+- [ ] Unit 9a–9f, 10a–10n (with 10d-ii, 10d-iii, 10g-i, 10g-ii), 11a, 11b and Step 2.3 pass. 015a's 6a is
       deleted and 6b/6c are re-pointed. `pnpm test:only` passes, and Step 7.7's cast grep prints nothing.
 - [ ] P5 and P6 are in place: `grep -n "exitProp !== undefined || measureLayoutMounted" src/lib/html/_MotionContainer.svelte`
       prints a line, and `context.unregisterChild(presenceKey)` sits inside an `$effect.pre` teardown, not an
@@ -1222,7 +1317,13 @@ Report:
   `MeasureLayout.tsx:163-167`.
 - **Deviations kept.**
   - `containsStatefulCloneContent` children are still removed at once.
-  - Held clones are placed from the cached untransformed layout box, not a live read.
+  - Held clones are placed from the container's last offset snapshot, not a live read.
+  - **Held clones are still absolutely positioned**, so they paint above non-positioned siblings that follow
+    them in the slot. Upstream's real element stays in flow. This matches today's clones and is a kept
+    structural deviation: an absolutely positioned stand-in is the only way to keep the slot (placeholder)
+    without the real node.
+  - `canHandOff()` relies on Svelte serving destroyed `$derived` values from `old_values` during teardown (N7).
+    10d-ii fails first if a Svelte upgrade changes that.
   - A re-entering clone-path child gets a new node; upstream re-promotes the same one.
   - `presenceAffectsLayout={false}` isn't supported.
 - **Reviewers should check**:

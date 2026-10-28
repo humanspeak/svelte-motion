@@ -28,7 +28,10 @@
 >
 > **Drift check**: `git diff --stat <012 merge SHA>..HEAD -- src/lib/utils/layout.ts src/lib/html/_MotionContainer.svelte src/lib/utils/presence.ts src/lib/utils/motionDomProjection.ts`
 > should show only 008's A2 fix, if that landed after 012. Get the SHA with
-> `git log --merges --oneline --grep "1471-layoutid" feat/motion-14.7.1 | head -1` (012's lane merge).
+> `git log --merges --oneline --grep "1471-layoutid" feat/motion-14.7.1 | head -1` (012's lane merge). The grep
+> assumes 012's merge is the **newest** `layoutid`-lane merge into feat. If a later layoutid merge exists,
+> confirm with `git log --merges --oneline --grep "plan 012" feat/motion-14.7.1` instead, and STOP if neither
+> identifies it.
 >
 > 012 changed these files after 015b:
 > - `_MotionContainer.svelte`: the registration gate P5, the presence teardown P6, the presence effect pair after
@@ -49,7 +52,7 @@
   012 (it edits `_MotionContainer.svelte`, `presence.ts` and `motionDomProjection.ts` after 015b; it adds the
   presence pair that must follow R2; and it already reuses `seedOwnOnScreenSnapshot` for `layout`-only exit
   hand-offs), and 008's A2 fix.
-- **Wave**: after 015b, same lane.
+- **Wave**: after 015b and 012, same lane (`siblings`).
 - **Category**: bug (upstream parity)
 - **Planned at**: `3365c175`, with 015a and 015b on top, 2026-10-28.
 
