@@ -5,6 +5,7 @@ import {
     createBox,
     hasTransform,
     transformPropOrder,
+    translateAxis,
     visualElementStore,
     type IProjectionNode,
     type LayoutUpdateData,
@@ -106,6 +107,25 @@ export interface MotionDomProjectionUpdateOptions {
     style?: unknown
     /** Upstream projection option (`use-visual-element.ts`): `true` for draggable elements. */
     alwaysMeasureLayout?: boolean
+}
+
+/**
+ * Upstream `roundBox` (create-projection-node.ts 2550-2575 @ v14.7.1):
+ * measured boxes are rounded in Safari and left untouched elsewhere, so
+ * non-integer layouts inside scaled elements don't jump.
+ */
+const roundMeasuredPoint =
+    typeof navigator !== 'undefined' &&
+    navigator.userAgent.toLowerCase().includes('applewebkit/') &&
+    !navigator.userAgent.toLowerCase().includes('chrome/')
+        ? Math.round
+        : (value: number) => value
+
+const roundBox = (box: Box): void => {
+    box.x.min = roundMeasuredPoint(box.x.min)
+    box.x.max = roundMeasuredPoint(box.x.max)
+    box.y.min = roundMeasuredPoint(box.y.min)
+    box.y.max = roundMeasuredPoint(box.y.max)
 }
 
 const createVisualState = () => ({
@@ -757,41 +777,85 @@ export class MotionDomProjectionAdapter {
      * Give a departing `layoutId` lead the snapshot upstream takes while it
      * is still attached. Upstream's `unmount()` runs `willUpdate()` first
      * (create-projection-node.ts 668-678 @ v14.7.1), whose `updateSnapshot()`
-     * (967-979) `measure()`s it (1080-1103): `measuredBox` is the on-screen
-     * page box and `layoutBox` the box with transforms removed
-     * (`removeTransform`), `source` its own id. `promote()` then hands that
-     * snapshot to the arriving node, and the foreign `source` makes it a
-     * shared one (`notifyLayoutUpdate`'s `isShared`), which #1935's
-     * `layoutRoot` math needs.
+     * (967-979) `measure()`s it (1080-1103): `measuredBox` is the page box
+     * (`measurePageBox`, 1105-1127) and `layoutBox` that box with element
+     * scroll (`removeElementScroll`, 1129-1159) and transforms
+     * (`removeTransform`) removed, then rounded (`roundBox`, 2561-2575), with
+     * its own id as `source`. `promote()` then hands that snapshot to the
+     * arriving node, and the foreign `source` makes it a shared one
+     * (`notifyLayoutUpdate`'s `isShared`), which #1935's `layoutRoot` math
+     * needs.
      *
      * Svelte detaches the DOM before effect teardown reaches here, so that
      * `measure()` would read a zero box, which `updateSnapshot()` drops. The
-     * on-screen box comes from cache instead: the animating target, else the
-     * last layout read. Those reads keep style transforms in the DOM, so the
-     * box is used as is, with no second `applyTransform`.
+     * box comes from cache instead: the animating target, else the last
+     * layout read. Those are scroll-removed boxes that keep style transforms
+     * in the DOM, so the page box is the cached box with the element scroll
+     * added back (no second `applyTransform`).
      */
     private seedDepartingLeadSnapshot(element: HTMLElement): void {
         const projection = this.projection
         if (!projection.options.layoutId || element.isConnected || projection.snapshot) return
-        const onScreen =
-            this.visualTargetBox() ?? this.latestLayoutBox ?? this.lastLayout?.layoutBox
-        if (!onScreen) return
-        const measuredBox = createBox()
-        copyBoxInto(measuredBox, onScreen)
-        projection.root?.startUpdate()
+        const root = projection.root
+        if (!root) return
+        // `willUpdate` (708-714): a blocked root takes no snapshot.
+        if (root.isUpdateBlocked()) return
+        const cached = this.visualTargetBox() ?? this.latestLayoutBox ?? this.lastLayout?.layoutBox
+        if (!cached) return
+        // `willUpdate` (735): join an update already running.
+        !root.isUpdating && root.startUpdate()
         this.prepareSnapshotPath(projection as unknown as ProjectionTreeNode)
+        const node = projection as typeof projection & {
+            removeElementScroll(box: Box): Box
+            removeTransform(box: Box): Box
+        }
+        const pageBox = this.addElementScroll(cached)
+        const layoutBox = node.removeTransform(node.removeElementScroll(pageBox))
+        roundBox(layoutBox)
         projection.snapshot = {
-            animationId: projection.root?.animationId ?? 0,
-            measuredBox,
-            // On motion-dom's node class, not on `IProjectionNode`.
-            layoutBox: (
-                projection as typeof projection & { removeTransform(box: Box): Box }
-            ).removeTransform(measuredBox),
+            animationId: root.animationId,
+            measuredBox: pageBox,
+            layoutBox,
             latestValues: { ...projection.latestValues },
             source: projection.id
         }
         // `willUpdate()` returns before measuring a layout-dirty node.
         projection.isLayoutDirty = true
+    }
+
+    /**
+     * The inverse of upstream `removeElementScroll` (create-projection-node.ts
+     * 1129-1159 @ v14.7.1): a scroll-removed box back in page space. Undoes
+     * the offset of every non-root `layoutScroll` path node from the last one
+     * that `wasRoot`, with the same phase-cached `scroll` values.
+     */
+    private addElementScroll(box: Box): Box {
+        const pageBox = createBox()
+        copyBoxInto(pageBox, box)
+        const projection = this.projection
+        if (projection.scroll?.wasRoot) return pageBox
+        const path = projection.path
+        let start = 0
+        for (let i = 0; i < path.length; i++) {
+            const node = path[i]
+            if (
+                node !== projection.root &&
+                node.scroll &&
+                node.options.layoutScroll &&
+                node.scroll.wasRoot
+            ) {
+                start = i
+            }
+        }
+        for (let i = start; i < path.length; i++) {
+            const node = path[i]
+            const { scroll, options } = node
+            if (node !== projection.root && scroll && options.layoutScroll) {
+                translateAxis(pageBox.x, -scroll.offset.x)
+                translateAxis(pageBox.y, -scroll.offset.y)
+            }
+        }
+        return pageBox
     }
 
     /** The live lead `mount()` found for {@link didMount} to take over. */
