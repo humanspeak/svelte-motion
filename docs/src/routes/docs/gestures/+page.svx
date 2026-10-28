@@ -73,6 +73,8 @@ Animate while the element is being pressed.
 
 **Keyboard accessible.** Pressing **Enter** or **Space** on a focused element fires the same tap lifecycle as a pointer press. Combine with `whileFocus` to make tap interactions discoverable for keyboard users.
 
+`whileTap`, `onTap` and `onTapStart` add `tabindex="0"` unless you set `tabindex` yourself, matching Motion. This applies to every tag, including buttons and links, and to server-rendered markup.
+
 `onTap` fires only when the press completes on the element. If the pointer drags off before release, `onTapCancel` fires instead.
 
 ### Tuning the tap transition

@@ -85,6 +85,30 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/featureless-m') + searchParams}
+                    >
+                        LazyMotion — m without features
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/featureless-m-presence') + searchParams}
+                    >
+                        LazyMotion — featureless m in AnimatePresence
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/featureless-m-props') + searchParams}
+                    >
+                        LazyMotion — featureless m tabindex, style and pathLength
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/enter-animation') + searchParams}
                     >
                         Enter Animation
