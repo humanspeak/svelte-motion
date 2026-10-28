@@ -470,3 +470,85 @@ test('A second handoff from a translated box inside a layoutRoot starts from its
     for (const { list } of records) expect(list).toBeCloseTo(200, 0)
     expectSlideAcrossList(leadOffsets(records), 80)
 })
+
+/**
+ * Not in upstream's spec (plan 007 amendment A1): the reverse handoff,
+ * Lettuce → Tomato, after the first click. The sidebar goes and the list
+ * jumps back right in the same render. Upstream's #1935 handling has no
+ * direction (`notifyLayoutUpdate` 2302-2350, `resolveTargetDelta` 1403-1412
+ * @ v14.7.1), so it mirrors the forward slide.
+ */
+async function selectTomatoBack(
+    page: Page,
+    query: string,
+    before: { underline: number; list: number }
+) {
+    await selectLettuce(page, query, before)
+    await page.click('#tomato')
+    await page.waitForTimeout(1300)
+    return page.evaluate(() => {
+        window.recording = false
+        // Drop frames recorded before the sidebar went
+        const first = window.records.findIndex(({ rendered }) => !rendered)
+        return window.records.slice(first)
+    })
+}
+
+/** A slide from `from` down to `to`: the forward check, mirrored. */
+const expectSlideBack = (offsets: number[], from: number, to: number) =>
+    expectSlideAcrossList(
+        offsets.map((offset) => -offset),
+        -from,
+        -to
+    )
+
+test('A reverse handoff inside a layoutRoot slides back one tab', async ({ page }) => {
+    const records = await selectTomatoBack(page, '', { underline: 350, list: 350 })
+    expect(records.length).toBeGreaterThan(20)
+    for (const { list } of records) expect(list).toBeCloseTo(350, 0)
+    expectSlideBack(leadOffsets(records), 100, 0)
+})
+
+test('A reverse handoff inside a translated layoutRoot slides back relative to it', async ({
+    page
+}) => {
+    const records = await selectTomatoBack(page, 'offset=true', { underline: 400, list: 400 })
+    expect(records.length).toBeGreaterThan(20)
+    for (const { list, listTop } of records) {
+        expect(list).toBeCloseTo(400, 0)
+        expect(listTop).toBeCloseTo(100, 0)
+    }
+    expectSlideBack(leadOffsets(records), 100, 0)
+    for (const { underlineTops, listTop } of records) {
+        expect(underlineTops[0] - listTop).toBeCloseTo(38, 0)
+    }
+})
+
+/**
+ * Back into Tomato's translated box the underline animates in page space:
+ * motion-dom's `getClosestProjectingParent` (create-projection-node.ts
+ * 1435-1442 @ v14.7.1) gives no relative parent when the parent has a scale
+ * or 2D translate. So it starts where Lettuce's underline was on the page
+ * (300px) and ends in the box, 80px into the list (430px).
+ */
+test('A reverse handoff into a translated box inside a layoutRoot animates in page space', async ({
+    page
+}) => {
+    const records = await selectTomatoBack(page, 'innerX=80', { underline: 430, list: 350 })
+    expect(records.length).toBeGreaterThan(20)
+    for (const { list } of records) expect(list).toBeCloseTo(350, 0)
+    const lefts = records.map(({ underlines }) => underlines[underlines.length - 1])
+    expectSlideAcrossList(lefts, 300, 430)
+})
+
+test('A reverse layout="size" handoff inside a layoutRoot only animates size', async ({ page }) => {
+    const records = await selectTomatoBack(page, 'layout=size', { underline: 320, list: 320 })
+    expect(records.length).toBeGreaterThan(20)
+    for (const { list } of records) expect(list).toBeCloseTo(320, 0)
+    // Under Tomato throughout, shrinking from Lettuce's width to its own
+    for (const offset of leadOffsets(records)) expect(offset).toBeCloseTo(0, 0)
+    const widths = records.map(({ underlineWidths }) => underlineWidths[underlineWidths.length - 1])
+    expect(widths[0]).toBeGreaterThan(155)
+    expect(widths.some((w) => w > 120 && w < 140)).toBe(true)
+    expect(widths[widths.length - 1]).toBeCloseTo(100, 0)
+})
