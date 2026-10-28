@@ -838,7 +838,14 @@
             offCommit?.()
             const rect = adapter?.currentVisualPageRect() ?? layoutIdLastRect
             layoutIdLastRect = null
-            if (rect && scopedLayoutId) {
+            // Only a real removal is a handoff. This cleanup also runs when
+            // the id changes on an element that stays mounted (the effect
+            // reads `layoutIdProp`), and Svelte teardowns read the value from
+            // before the write (`old_values`), so it would write the OLD id
+            // with the rect of an element still on screen. That is a stack
+            // switch (#1411), not a handoff. On a real removal Svelte has
+            // already detached the DOM (`__tests__/layoutIdTeardown.svelte.spec.ts`).
+            if (!target.isConnected && rect && scopedLayoutId) {
                 layoutIdRegistry.snapshot(
                     scopedLayoutId,
                     new DOMRect(rect.left, rect.top, rect.width, rect.height),
@@ -1957,7 +1964,13 @@
                 alwaysMeasureLayout: upstreamAlwaysMeasureLayout
             })
         })
-        motionDomProjection.mount(mountTarget)
+        // A node that mounts with the `layoutId` of a lead still on screen
+        // takes it over in `didMount()` below, with one update pass (#1411
+        // amendment A1, the pass upstream gets from the mounting commit).
+        // Only where layout measurement exists at all.
+        motionDomProjection.mount(mountTarget, {
+            takeOverLiveLead: untrack(() => hasLayoutFeatures)
+        })
         // `MeasureLayout` mounts with the element (see
         // `createMeasureLayoutMountTracker`): run its `componentDidMount`
         // here, with the DOM as first rendered, and record the layout
@@ -2446,6 +2459,101 @@
         motionDomProjection?.didUpdate()
     })
 
+    // A `layoutId` that changes after mount (#1411, Motion 14.7.1). motion-dom
+    // registers a node with its `layoutId`'s shared-layout stack once, at
+    // `mount()`, and `setOptions` doesn't move it, so the adapter's
+    // `switchLayoutId` moves it, as an unmount and remount with the new id
+    // would. Mirrors framer-motion `MeasureLayout.tsx` @ v14.7.1:
+    // - `getSnapshotBeforeUpdate` (149-173): when the id changed,
+    //   `willUpdate()` then `switchLayoutId`, before the DOM update, for every
+    //   node in the update and regardless of `layoutDependency`;
+    // - `componentDidUpdate` (206-211): run the takeover, then
+    //   `root.didUpdate()`, so every node has switched before any takeover
+    //   decides;
+    // - `componentDidMount` (116-147): a mounted element that gains an id
+    //   while `MeasureLayout` mounts (no `layout`/`drag`) switches with no
+    //   `willUpdate()`, and takes over right away.
+    // `motion/index.tsx` @ v14.7.1 keeps `MeasureLayout` rendered while
+    // `projection.options.layoutId` is still set, so the update that removes
+    // the id from a `layoutId`-only element is an update, not an unmount.
+    //
+    // Whether upstream's `MeasureLayout` was rendered for a reason other than
+    // the id (`layout` or `drag`), as of the previous post run.
+    let measuredBeforeLayoutIdChange = false
+    let layoutIdChangePending = false
+    let pendingLayoutIdTakeOver: (() => void) | undefined
+    // Whether the `layout` effects above will commit this update themselves
+    // (their reactive commit closes it). Read in the pre effect only: the
+    // `layout` post effect clears `motionDomProjectionUpdatePending` before
+    // this pair's post effect runs.
+    let layoutCommitCoversLayoutIdChange = false
+
+    /**
+     * After a mounted element gained a `layoutId`, consume the registry's
+     * handoff for it. When motion-dom already has a source (the takeover hid
+     * a live lead, or the node resumes from a lead's snapshot), the entry is
+     * only dropped, so the two never animate the same change. Otherwise the
+     * old holder was removed from the DOM earlier in this flush, before it
+     * could be resumed from (Svelte detaches before teardown), and the entry
+     * is consumed exactly as on mount.
+     */
+    const consumeLayoutIdHandoffAfterSwitch = (id: string) => {
+        if (!(motionDomProjection && layoutIdRegistry && element)) return
+        const { projection } = motionDomProjection
+        if (motionDomProjection.lastSwitchTookOver || projection.resumeFrom?.snapshot) {
+            layoutIdRegistry.consume(id, element)
+            return
+        }
+        consumeLayoutIdHandoff(id)
+    }
+
+    $effect.pre(() => {
+        const next = scopedLayoutId
+        if (!(element && motionDomProjection && hasLayoutFeatures)) return
+        if (!motionDomProjection.isMounted) return
+        const adapter = motionDomProjection
+        const current = untrack(() => adapter.projection.options.layoutId)
+        if (current === next) return
+        // Not measured before and no current id: `MeasureLayout` is mounting
+        // with the id, which the post effect handles.
+        if (!(measuredBeforeLayoutIdChange || current !== undefined)) return
+        adapter.willUpdate()
+        pendingLayoutIdTakeOver = adapter.switchLayoutId(next)
+        layoutIdChangePending = true
+        layoutCommitCoversLayoutIdChange = untrack(() => motionDomProjectionUpdatePending)
+    })
+    $effect(() => {
+        const next = scopedLayoutId
+        const measured = (hasLayoutFeatures && !!layoutProp) || (hasDragFeatures && !!dragProp)
+        const adapter = motionDomProjection
+        if (element && adapter && hasLayoutFeatures && adapter.isMounted) {
+            if (layoutIdChangePending) {
+                layoutIdChangePending = false
+                const takeOver = pendingLayoutIdTakeOver
+                pendingLayoutIdTakeOver = undefined
+                // The `layout` effects' reactive commit (queued on a
+                // microtask) closes the update.
+                if (layoutCommitCoversLayoutIdChange) takeOver?.()
+                else adapter.commitLayoutIdChange(takeOver)
+                layoutCommitCoversLayoutIdChange = false
+                if (next !== undefined) untrack(() => consumeLayoutIdHandoffAfterSwitch(next))
+            } else if (
+                next !== undefined &&
+                untrack(() => adapter.projection.options.layoutId) === undefined
+            ) {
+                // Gained while `MeasureLayout` mounts (componentDidMount
+                // 133-134). Its `root.didUpdate()` (125-127) only schedules
+                // the update pass on motion-dom's microtask, so the pass runs
+                // after this switch; a second `didMount()` in this flush (the
+                // `layout` pre effect's mount pass) is coalesced the same way.
+                adapter.switchLayoutId(next)?.()
+                adapter.didMount()
+                untrack(() => consumeLayoutIdHandoffAfterSwitch(next))
+            }
+        }
+        measuredBeforeLayoutIdChange = measured
+    })
+
     // Cancel a pending reactive commit when the component tears down.
     $effect(() => {
         return () => {
@@ -2831,24 +2939,41 @@
      * ARRIVING element's transition (the node's own projection option) instead of
      * the departing element's snapshotted one. That matches upstream, where a
      * shared-layout animation is driven by the promoted node.
+     *
+     * This is the mount path only. A `layoutId` that changes on a mounted
+     * element is a stack switch (#1411), handled by the `switchLayoutId`
+     * effects, which fall back to the registry the same way.
      */
-    $effect(() => {
-        if (!(
-            element &&
-            scopedLayoutId &&
-            layoutIdRegistry &&
-            isLoaded === 'ready' &&
-            hasLayoutFeatures
-        ))
-            return
-
-        // Never its own entry: re-enabling `layoutId` keeps this element the
-        // lead of its own stack upstream, so it doesn't animate.
-        const prev = layoutIdRegistry.consume(scopedLayoutId, element)
+    let layoutIdConsumedOn: HTMLElement | null = null
+    /**
+     * Consume the departing element's registry entry for `id` and animate
+     * from it. Never its own entry: re-enabling `layoutId` keeps this element
+     * the lead of its own stack upstream, so it doesn't animate.
+     */
+    function consumeLayoutIdHandoff(id: string) {
+        if (!(layoutIdRegistry && element)) return
+        const prev = layoutIdRegistry.consume(id, element)
         if (!prev) return // First appearance, no animation needed
         if (motionDomProjection && layoutProp) return
-
         motionDomProjection?.commitObservedLayoutChange(prev.rect)
+    }
+    $effect(() => {
+        if (!(element && layoutIdRegistry && isLoaded === 'ready' && hasLayoutFeatures)) return
+        // The mount path only (#1411): once per mounted element, on its first
+        // ready run, with or without an id. Later id changes on the same
+        // element move its projection node between stacks (the
+        // `switchLayoutId` effects above), which consume the registry there.
+        if (layoutIdConsumedOn === element) return
+        layoutIdConsumedOn = element
+        const id = scopedLayoutId
+        if (!id) return
+        // Mounted by taking over a lead that is still on screen: motion-dom
+        // already animates from it, so only drop a handoff for the same id.
+        if (motionDomProjection?.mountedFromLiveLead) {
+            layoutIdRegistry.consume(id, element)
+            return
+        }
+        untrack(() => consumeLayoutIdHandoff(id))
     })
 
     // ── Gestures (#449 plan 003) ─────────────────────────────────────────────

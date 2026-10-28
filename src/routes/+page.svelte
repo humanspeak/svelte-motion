@@ -1151,6 +1151,46 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/change-after-mount') + searchParams}
+                    >
+                        layoutId — changed after mount is honoured (#1411)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/move-to-sibling') + searchParams}
+                    >
+                        layoutId — moved to a sibling keeps it visible (#1411)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/tabs') + searchParams}
+                    >
+                        layoutId — tabs highlight moves between mounted elements (#1411)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/takeover') + searchParams}
+                    >
+                        layoutId — taking an on-screen element's id takes over instantly (#1411)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/open-change') + searchParams}
+                    >
+                        layoutId — changing an open card's id switches it instantly (#1411)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout/scroll') + searchParams}
                     >
                         layoutScroll — single container
