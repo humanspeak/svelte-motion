@@ -1863,7 +1863,7 @@ describe('MotionDomProjectionAdapter departing-lead snapshot (#1935 A1)', () => 
             measuredBox: { x: { min: 500, max: 600 }, y: { min: 0, max: 50 } },
             layoutBox: { x: { min: 500, max: 600 }, y: { min: 0, max: 50 } },
             latestValues: {},
-            source: -1
+            source: child.projection.id
         }
         child.projection.snapshot = handed
         let seen: unknown

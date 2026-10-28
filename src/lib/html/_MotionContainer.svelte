@@ -2977,7 +2977,9 @@
         if (!(layoutIdRegistry && element)) return
         const prev = layoutIdRegistry.consume(id, element)
         if (!prev) return // First appearance, no animation needed
-        if (motionDomProjection && layoutProp) return
+        // motion-dom already resumes from the departing lead's own snapshot
+        // (#1935 A1): the entry is only dropped, as after a switch.
+        if (motionDomProjection?.mountedFromSharedSnapshot) return
         motionDomProjection?.commitObservedLayoutChange(prev.rect)
     }
     $effect(() => {
