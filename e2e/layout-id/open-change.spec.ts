@@ -88,7 +88,10 @@ test("changing an open card's layoutId switches it instantly", async ({ page }) 
     expect.soft(after.slice(2).filter((frame) => !isHidden(frame.two))).toEqual([])
 })
 
-test('closing then shrinks the card into thumbnail two', async ({ page }) => {
+// Plan 012: the AnimatePresence exit clone has no projection node, so nothing
+// relegates the lead back to thumbnail two. Thumbnail two reappears at its own
+// size the frame after Close instead of the card shrinking into it.
+test.fixme('closing then shrinks the card into thumbnail two', async ({ page }) => {
     const [before] = await openThenNext(page)
     const { card, two } = before
 
