@@ -14,9 +14,15 @@
 > - `grep -n "setLastRect" src/lib/html/_MotionContainer.svelte` (015a)
 > - `grep -n "onCacheRefresh" src/lib/utils/motionDomProjection.ts` (015a)
 > - `grep -n "Plan 015b" e2e/animate-presence/pop-layout-container-move.spec.ts` (015a's re-pointed fixme)
+> - `grep -n "static foldedInFor" src/lib/utils/motionDomProjection.ts` (015a)
+>
+> **Re-pin the presence line numbers.** Presence-side lines (`presence.ts`, `PresenceChild.svelte`,
+> `AnimatePresence.svelte`, 008's spec) are cited at presence lane `6972dac3`, as "008's merge SHA (to be pinned)".
+> Once 008 is in feat, re-locate each one by its anchor at the merged SHA. If an anchor is gone, STOP.
 >
 > **Drift check**: `git diff --stat <015a merge SHA>..HEAD -- src/lib/utils/layout.ts src/lib/utils/motionDomProjection.ts src/lib/utils/presence.ts src/lib/html/_MotionContainer.svelte e2e/animate-presence src/routes/tests/animate-presence docs/src/lib/examples/multi-state-badge`
-> should be empty. Line numbers below are at `3365c175` (feat) or `4e90127c` (presence lane).
+> should be empty. Line numbers below are at `3365c175` (feat) or `6972dac3` (presence lane, i.e. 008's merge SHA
+> to be pinned).
 > 015a and 008 shift them, so **locate every excerpt by its anchor**. If an anchor's content differs, STOP.
 >
 > **Not in scope yet**: plan 007's finding that `seedCachedSnapshotsForSubtree` has no descendant `isLayoutDirty`
@@ -73,7 +79,7 @@ This plan matches upstream both ways.
   - `didUpdate` (881-886), with the repeat guard at 825-828;
   - `scheduleCheckAfterUnmount` (913-926) only acts on a dirty node.
 
-### svelte-motion (feat `3365c175` + 015a; presence lane `4e90127c`)
+### svelte-motion (feat `3365c175` + 015a; presence lane `6972dac3`)
 
 - **`src/lib/utils/layout.ts`, `observeLayoutChanges` (702-841):**
   - It observes its own size, attributes and subtree. The self-subtree `childList` observer is at 825.
@@ -87,9 +93,9 @@ This plan matches upstream both ways.
   - **Consequence 2:** today a footer that shares the parent animates when a sync exit completes. Upstream snaps
     it.
 - **`src/lib/components/AnimatePresence.svelte`:**
-  - 102-106: `.animate-presence-container { display: contents; }` is component CSS. Vitest's `css.include: []`
-    blanks it, so **jsdom never sees `display: contents`**.
-  - 77 passes `forceRender: getLayoutGroupContext()?.forceRender`.
+  - 223-225 (after 008; 102-106 before): `.animate-presence-container { display: contents; }` is component CSS.
+    Vitest's `css.include: []` blanks it, so **jsdom never sees `display: contents`**.
+  - 182 (after 008; 77 before) passes `forceRender: getLayoutGroupContext()?.forceRender`.
 - **`src/lib/html/_MotionContainer.svelte`:**
   - `presenceChildContext` is declared at 303; `layoutGroupContext` at 314 (`const layoutGroupContext = getLayoutGroupContext()`).
   - `context.registerChild(presenceKey, element, filteredExit, …)` is at about 875.
@@ -103,11 +109,14 @@ This plan matches upstream both ways.
   - `seedCachedSnapshotsForSubtree` is 1503-1537. It seeds a committer's descendants from cache.
 - **`src/lib/utils/presence.ts`:**
   - `registerChild` captures `insertionParent`, the element's parent at registration.
+  - The two `motionDomProjection.updateOptions({ … })` calls are at 1930 and 1958 (`3365c175`). The adapter knows
+    nothing about `layoutDependency`. `isLayoutMeasurementGated(layoutDependencyProp, dragProp)` is a container
+    `$derived` (2215-2216).
   - Feat-branch `finishExit` is at 1108-1114 (reached from 1748); in the presence lane it is at 1374-1379. It calls
     `forceRender?.()` → `LayoutGroup.svelte:79-81` → `commitGroup` at postRender.
   - Clones carry `data-clone` / `data-exiting`. `clone.remove()` and `removeExitPlaceholder` run per clone.
-- **`src/lib/components/PresenceChild.svelte`** (presence lane): `removePop` deletes `data-motion-pop-id` on
-  completion (about 174-176). The `{#if}` that unrenders content is at about 186.
+- **`src/lib/components/PresenceChild.svelte`** (presence lane `6972dac3`): `removePop` deletes
+  `data-motion-pop-id` on completion (about line 270). The `{#if}` that unrenders content is at about line 378.
 
 ### Baselines (from 008; **owned values to re-baseline** after 008's A2 fix lands)
 
@@ -164,7 +173,7 @@ parent.
   both.
   - **Owned (R5, a new `$effect` after 314).** Mark the element when its own `presenceChildContext.isPresent`
     flips true → false, while it is connected and not `[data-presence-wait-hidden]`. That rules out a wait-mode
-    child that was never shown (`PresenceChild.svelte:186`). Unmark only on re-entry, never in a teardown.
+    child that was never shown (`PresenceChild.svelte:378`). Unmark only on re-entry, never in a teardown.
     - `boundary` = `element.closest('.animate-presence-container')`.
     - `group` = `layoutGroupContext?.group`.
   - **Clone (M3).** The element is detached before `unregisterChild`, so the boundary comes from the
@@ -179,7 +188,7 @@ parent.
     removed subtree (walk the removed subtree; the cost is bounded by its size); or was removed from a record
     target that is the marker's `boundary`;
   - and every `data-motion-pop-id` attribute record it contains is on a marker. Completion's `removePop` is part
-    of the same completion (`PresenceChild.svelte:174-176`).
+    of the same completion (`PresenceChild.svelte:270`).
 
   The cause carries the markers' `{ boundary, group }`.
 - **Throttles keep the cause.** `schedule()` (`layout.ts:730-731`) and `scheduleProjectionCommit` (2831-2843)
@@ -193,6 +202,13 @@ parent.
   - the element's `layoutGroupContext.group` is one of the cause's groups (`index.tsx:206`, `group.ts:26-33`).
 
   Adds, exit starts (a clone appearing) and pops stay ordinary triggers.
+- **Gated committers inside the boundary (M1).** Take a node that is `layoutDependency`-gated and contained by a
+  cause boundary. Upstream still re-renders it: `index.tsx:58` → `use-presence.ts:40-43`. Its own box stays gated,
+  but its descendants re-render and snapshot.
+  - So on an exit-complete cause, such a node refreshes its own cache silently, as the gate requires, and then
+    seeds its **descendants that are inside the same boundary** from their rebased caches
+    (`seedCachedSnapshotsForSubtree`, restricted to `boundary.contains(instance)`). Then `root.didUpdate()`.
+  - This is what makes clone case 8 animate `#inner`.
 
 ### D. Following nodes outside the list's parent
 
@@ -205,12 +221,16 @@ parent.
   `seedFollowingLayout(layoutParentCapturedAtMount, null, { kind: 'exit-complete', … })`. For clones,
   `presence.ts` makes the same call right after `clone.remove()`. This only happens for marked elements, and only
   post-change.
+  - **Dedupe (M2).** Both the teardown call and the observer-delivered call go through a per-(layout parent,
+    microtask) guard. A `Set` is filled on the first call and cleared by a `queueMicrotask`, so whichever arrives
+    first runs and the other is a no-op.
+  - The guard keeps the footer's refresh at ≤ 1 read per change.
 - **Walk.**
   - Start at the projection root.
   - Prune subtrees whose `instance` precedes `parent` without containing it.
   - Skip `parent`, its ancestors and its descendants.
   - **Pick** nodes that follow `parent` and are: mounted; `layout || layoutId`; not dirty; not gated
-    (`isLayoutMeasurementGated`); not inside `[data-layout-size-animation]`; have a reliable basis in the current
+    (the new per-node adapter field `measurementGated`, see below); not inside `[data-layout-size-animation]`; have a reliable basis in the current
     `resizeEpoch` (015a's `scrollShift` is not `null`); and share `parent`'s nearest motion-ancestor element (or
     the document).
 - **Seed mode** (any cause other than exit-complete):
@@ -221,6 +241,9 @@ parent.
 - **Refresh mode** (exit-complete): for each picked node not covered by the boundary/group rule, call
   `refreshLayout({ silent: true })` and `onCacheRefresh`. That's the snap. It keeps the cache true, so a later add
   slides from where the node now is (upstream measures live: `create-projection-node.ts:787, 967-978`).
+- **`measurementGated`** is a new adapter option. Pass `measurementGated: layoutMeasurementGated` in both
+  `updateOptions` calls (1930, 1958), and store it on the adapter. That is region R7. It mirrors upstream passing
+  `layoutDependency` into the projection options (`MeasureLayout.tsx:43-52`).
 - **`presenceSeeded`** is a private adapter field.
   - The `'didUpdate'` listener is installed for every adapter. For an ungrouped adapter it acts only when the flag
     is set: refresh `lastLayout`/`lastUpdate`, fire the commit listeners, clear the flag. It never runs
@@ -245,28 +268,40 @@ Same as 015a: `pnpm exec vitest run <path>`, `pnpm test:only`, `pnpm check`,
   - `onLayoutParentChange`.
 
   Also `layout.spec.ts` (new `describe` only).
-- **`src/lib/utils/motionDomProjection.ts`**: `static seedFollowingLayout`, `presenceSeeded`, and the `'didUpdate'`
+- **`src/lib/utils/motionDomProjection.ts`**: `static seedFollowingLayout` (with the M2 dedupe), the M1
+  boundary-restricted descendant seed, the `measurementGated` option, `presenceSeeded`, and the `'didUpdate'`
   listener for every adapter. Its spec gets new `describe`s only.
 - **`src/lib/html/_MotionContainer.svelte`**:
   - R5: a new `$effect` after 314;
   - R6: the `registerChild` call at about 875 (add the `layoutGroup` argument);
   - R4: `scheduleProjectionCommit` (cause plumbing and rule), the 2866 call (cause and option), the teardown call
-    for marked elements in the observer effect's cleanup, and `offProjectionCommit`.
+    for marked elements in the observer effect's cleanup, and `offProjectionCommit`;
+  - R7: the two `updateOptions({ … })` calls (1930, 1958): add `measurementGated`.
 - **`src/lib/utils/presence.ts`**: `registerChild`'s `layoutGroup` parameter, the clone marker in
   `unregisterChild`, and the D refresh call after `clone.remove()`. Its spec gets new cases.
 - **`src/lib/components/__tests__/PresenceSiblingsHarness.svelte`**,
   **`src/lib/components/presenceSiblingSnapshots.spec.ts`** (create).
-- **`e2e/animate-presence/pop-layout-container-move.spec.ts`**: delete the about-line-166 `test.fixme(path === 'owned', …)`
-  and its comment.
+- **`e2e/animate-presence/pop-layout-container-move.spec.ts`**: delete the about-line-166
+  `test.fixme(path === 'owned' && query.includes('&scroller'), 'Plan 015b: …')` and its comment.
 - **`src/routes/tests/animate-presence/pop-layout-scroll-siblings/+page.svelte`** (add `footer`, `items`,
-  `TesterPanel` steps) and its spec (new cases).
+  `followers`, `countReads` and `TesterPanel` steps) and its spec (new cases).
 - **The parity changes, exactly as listed**: `layout-button.spec.ts` (the named branches/windows only) and
   `ModeExample.svelte:168`.
 - **`.changeset/presence-causes-following-layout.md`** (create).
 
 **Out of scope**: `PresenceChild.svelte`, `AnimatePresence.svelte`, `presenceExitRegistry.ts`,
 `LayoutGroup.svelte`, `scrollBasis.ts` (015a's), the pre-update effect R2 (015c's), the MultiStateBadge docs
-component, `commitPresenceLayoutRelease`, `package.json`.
+component, `commitPresenceLayoutRelease`, `measureRect` in `layout.ts` (dead outside specs), `package.json`.
+
+## Considered and rejected
+
+- **A live tree-wide `willUpdate` on presence changes.** On the clone path the DOM has already changed by then,
+  and on the owned path a live read sees earlier DOM changes in the same flush.
+- **Running D on every mount or unmount.** That's a scan per mount, O(N²) at initial render.
+- **Svelte `out:` transitions as a pre-removal hook.** Spike 012 refuted them.
+- **Stealing the shared observers' records with `takeRecords()`.** That starves the other subscribers.
+- **A `data-exiting` DOM attribute as the marker.** Svelte's teardown order erases it before classification.
+- **Recording case 8 as a divergence.** M1's boundary-restricted descendant seed matches upstream instead.
 
 ## Git workflow
 
@@ -280,6 +315,8 @@ Same lane. One commit per step, each ending with `Co-Authored-By: Claude Opus 5.
 Label each case **RED** (fails today) or **GUARD** (passes today, must stay green), per path. Record every
 outcome; a label that doesn't hold is a STOP.
 
+0. **008's spec.** Delete the about-line-166
+   `test.fixme(path === 'owned' && query.includes('&scroller'), …)` call and its comment. Nothing else changes.
 1. **`layout.spec.ts`**, `describe('observeLayoutChanges reach and causes (plan 015b)')`. Real jsdom
    `MutationObserver`; no CSS injected.
    - 4a **RED**: under an `.animate-presence-container` parent, an append to the grandparent calls `onChange`.
@@ -336,8 +373,9 @@ outcome; a label that doesn't hold is a STOP.
           its post-completion box.
      7. **GUARD (clone sync completion).** Item 2, in the same `AnimatePresence`, animates.
      8. **`nested` + `gateItem2`, sync, item 1 completes, `#inner` mocked 70 up, no `layoutGroup`:**
-        - **RED (clone)**: item 2 is gated, so its commit seeds nothing. `#inner` animates only because item 1's
-          boundary *contains* it (`use-presence.ts:40-43`).
+        - **RED (clone)**: item 2 is gated, so its own commit seeds nothing. `#inner` animates only through M1:
+          item 2 is a gated committer inside item 1's boundary, so it seeds its in-boundary descendants
+          (`index.tsx:58` → `use-presence.ts:40-43`).
         - **GUARD (owned)**: `#inner` is in a different boundary, so it snaps.
         - (Without `gateItem2`, the clone case passes today through item 2's `seedCachedSnapshotsForSubtree`
           (1503-1537). That's why the gate is there.)
@@ -357,12 +395,14 @@ Commit and record the SHA.
 
 ### Step 2: Layout parent and pop reach (B a, b)
 
+Implement the layout-parent resolver (class rule plus computed `display: contents`), and add the `CHILD_LIST_INIT`
+and `POP_ATTRIBUTE_INIT` observers on the layout parent through `acquireMutationObserver` (619).
+
 **Verify**:
 - 4a, 4b and 4g pass; component case 1 passes.
-- `PW_PORT=4223 pnpm exec playwright test e2e/animate-presence`: the expected failures are exactly the two owned
-  clamp cases, now passing. Every listed "expected to fail / may fail" parity test still passes, because
-  completion hasn't changed yet.
-- No other spec fails.
+- `PW_PORT=4223 pnpm exec playwright test e2e/animate-presence`:
+  - the two owned `&scroller` clamp cases in `pop-layout-container-move.spec.ts` now pass;
+  - **no spec fails**. The parity-table tests still pass, because completion isn't classified until Step 3.
 
 ### Step 3: Markers, classification, causes and the rule (B c, R5, R6)
 
@@ -375,6 +415,9 @@ Commit and record the SHA.
   - Any other failure is a STOP.
 
 ### Step 4: D and the last-item path
+
+Implement D (seed and refresh modes, the M2 dedupe), the teardown call for marked elements, the call after
+`clone.remove()`, `measurementGated` (R7) and the unconditional `offProjectionCommit`.
 
 **Verify**:
 - 4f, 3h–3m and component cases 2, 3 and 6 (the N1 and M5 bullets) pass.
@@ -401,6 +444,12 @@ Commit and record the SHA.
 ## Test plan
 
 **Page additions.**
+- `?followers=N` renders N `layout` footers in `#foot-wrap` (ids `footer`, `footer-2`, …).
+- `?countReads`: the page wraps `HTMLProjectionNode.prototype.measure` (imported from `motion-dom`) at module top
+  level, before any child mounts. Each call does `window.__projectionReads[this.instance?.id] += 1`.
+  - Every adapter or projection read goes through `measure`: `measurePageRect`, `updateLayout`, and so
+    `refreshLayout`. 008's point cache doesn't go through it.
+  - That gives per-id **projection** reads, which `layoutMeasureStats` (one global counter) can't give.
 - `?footer`: no scroller. `#head-wrap > motion.div layout #header` (`#aa00ff`), the list, then
   `#foot-wrap > motion.div layout #footer` (`#ffaa00`).
 - `?items=N` sets the list length.
@@ -412,6 +461,14 @@ Commit and record the SHA.
 **Spec additions.** Use 015a's frame rules.
 - **Owned, clamp, popLayout.** The gap holds every frame, no step is above 35 px, and green holds. **RED** (the
   sibling snaps).
+- **Owned, `?layoutScroll`, popLayout.** Blue and pink each step by 70 ± 2 px in the same frame, the gap holds, and
+  blue has no layout transform. **GUARD.**
+- **Owned, `?fixed`, window scrolled by 300, remove.** Siblings slide instead of snapping (no step above 35 px),
+  with no 300 px phantom. **RED** (today the owned siblings snap 70).
+- **Owned, resize** (1920 → 1600, wait 400 ms, remove). No band moves on x by more than 2 px. **GUARD**: today the
+  owned siblings don't commit, so there's no stale-x slide. After B(a) they do commit, so this pins 015a's
+  resize refresh on the owned path.
+- **Owned, `?sticky`, scroll, remove.** No step above 35 px. **RED** (the sibling snaps).
 - **Owned, sync completion, no `layoutGroup`.** Blue steps once by 70 ± 2 px and has no layout transform.
   **GUARD.**
 - **`?footer`, popLayout remove, and add.** Orange never steps more than 35 px and ends 70 ± 2 px away. **RED** on
@@ -421,8 +478,10 @@ Commit and record the SHA.
 - **N1, `?footer&mode=sync`: remove, wait for completion, add.** Orange slides 70 ± 2 px with no step above 35 px.
   **RED.**
 - **M5, `?footer&mode=sync&items=1`: remove, complete, add.** Orange slides. **RED.**
-- **Read budgets** (wrapped `getBoundingClientRect`, counted per `id`; owned popLayout counts **adapter reads
-  only**, via `layoutMeasureStats`, because 008 A2's point cache also reads):
+- **Read budgets.** Clone path and owned sync: wrapped `getBoundingClientRect` per `id`. Owned popLayout:
+  `?countReads` per-id projection reads, because 008 A2's point cache also calls `getBoundingClientRect`.
+  - 30 rAF-spaced page and `#scroller` scroll steps → **0** reads on `header`, `footer` and every `sib-*`.
+    **GUARD**.
   - Owned and clone sync: at most **3** reads per sibling in the 500 ms from `__removedAt`, then **0** over the
     next 500 ms.
   - `?footer`: at most **1** read per follower per qualifying change. With `?footer&followers=3` (three footers),
@@ -432,7 +491,9 @@ Commit and record the SHA.
 
 - [ ] `grep -n "POP_ATTRIBUTE_INIT\|exit-complete\|markExiting" src/lib/utils/layout.ts` prints ≥ 4 lines.
 - [ ] `grep -n "static seedFollowingLayout" src/lib/utils/motionDomProjection.ts` prints 1 line.
-- [ ] `grep -rn "data-exiting" src/lib/html` prints nothing.
+- [ ] `grep -n "exitingElements" src/lib/utils/layout.ts` prints at least one line, and
+      `grep -rn "markExiting" src/lib/html/_MotionContainer.svelte src/lib/utils/presence.ts` prints at least two.
+- [ ] `grep -n "measurementGated" src/lib/html/_MotionContainer.svelte` prints at least two lines.
 - [ ] `grep -n "Plan 015b" e2e/animate-presence/pop-layout-container-move.spec.ts` prints nothing; the owned
       clamp cases pass.
 - [ ] 4a–4g, 3h–3m and component cases 1–3 and 5–10 pass, with the labels above. The new spec's 015b cases pass.
@@ -455,7 +516,10 @@ Commit and record the SHA.
   seed on an exit-complete batch.
 - Any fix needs a full-tree measure or a per-frame read.
 - A read budget needs raising.
-- A node animates twice for one change, or an animation restarts from its origin.
+- A node animates twice for one change, `onProjectionUpdate` fires twice, or an animation restarts from its
+  origin.
+- 008's owned layout cases drift by the container move (the projection measured before 008's correction). Report
+  the microtask order you observed.
 - **A demo's visible behaviour changes and it isn't in the parity table**, or a spec fails that isn't in it. Report
   for sign-off, and use CLAUDE.md's failed-e2e review workflow.
 - The class-based layout-parent rule doesn't make 4a pass without injected CSS.

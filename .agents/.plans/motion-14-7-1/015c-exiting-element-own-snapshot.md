@@ -10,15 +10,19 @@
 > **Third of three plans split from the old 015.** It runs in lane `siblings` after 015b has merged. In the lane,
 > run `git merge --no-ff feat/motion-14.7.1` and then `pnpm install --frozen-lockfile`.
 >
-> **Precondition B1: 008's A2 fix is merged and re-baselined.** 008's A2 resting-point cache used to observe the
-> `display: contents` container. The fix walks past `display: contents`, observes `{childList, subtree}` on the
-> real container, calls `refresh()` on track, and adds a `peek()`. Confirm all of these print at least one line,
-> otherwise STOP:
+> **Precondition B1: 008's A2 fix is merged.** 008's A2 resting-point cache used to observe the
+> `display: contents` container. The fix (presence lane `c817fe6e`, lane now at `6972dac3`) walks past
+> `display: contents`, observes `{childList, subtree}` on the real container, calls `refresh()` on track, and adds
+> a `peek()`. The fix already exists on the lane; this precondition checks it reached feat. Confirm each prints at
+> least one line, otherwise STOP:
 > - `grep -n "peek(" src/lib/utils/presence.ts`
 > - `grep -n "display === 'contents'" src/lib/utils/presence.ts`
 > - `grep -n "static seedFollowingLayout" src/lib/utils/motionDomProjection.ts` (015b merged)
 > - `grep -n "Plan 015" e2e/animate-presence/pop-layout-container-move.spec.ts` (the same-render `fixme` is
 >   still there)
+>
+> **Re-pin the presence line numbers.** Presence-side lines are cited at `6972dac3`, as "008's merge SHA (to be
+> pinned)". Re-locate each one by its anchor at the merged SHA before you start.
 >
 > **Drift check**: `git diff --stat <015b merge SHA>..HEAD -- src/lib/utils/layout.ts src/lib/html/_MotionContainer.svelte src/lib/utils/presence.ts`
 > should show only 008's A2 fix. The `_MotionContainer.svelte` line numbers below are at `3365c175`, so locate
@@ -29,8 +33,8 @@
 - **Priority**: P1
 - **Effort**: S-M
 - **Risk**: MED. It changes the snapshot source of one effect run.
-- **Depends on**: 015a (rebased caches, `seedOwnSnapshotFromCache` support), 015b (`layout.ts` edits in the same
-  function), and 008's A2 fix.
+- **Depends on**: 015a (rebased caches and `onScreenSnapshot`, which this plan's new `seedOwnSnapshotFromCache`
+  builds on), 015b (`layout.ts` edits in the same function), and 008's A2 fix.
 - **Wave**: after 015b, same lane.
 - **Category**: bug (upstream parity)
 - **Planned at**: `3365c175`, with 015a and 015b on top, 2026-10-28.
@@ -48,8 +52,11 @@ have already changed the DOM. Two examples:
 Each read comes back a row off, so the exit's layout animation starts about 70 px away from where the element
 actually was.
 
-**This may already be fixed by 008's A2 fix.** That fix keeps the popLayout pop point fresh. If it also makes these
-cases pass, this plan becomes a re-baseline and un-fixme step and implements nothing (see Step 1).
+**Expect B(d) to be needed.** 008's A2 fix corrects the *pop point*, but the motion element's own *projection
+snapshot* is still taken live after the insert. 008's spec says so at lines 122-125: "the owned item's layout
+animation starts ~69px off. The #2348 correction itself is right here (its pop rule stays at 0px)". Step 1
+re-measures to confirm. If the fixed 008 somehow makes every case pass, the plan reduces to a re-baseline and
+un-fixme (Step 1.4).
 
 ## Current state
 
@@ -105,12 +112,17 @@ callback drains them. It reads no layout, does nothing per frame while idle, and
 - `src/lib/components/presenceSiblingSnapshots.spec.ts` and its harness: case 4.
 - `e2e/animate-presence/pop-layout-container-move.spec.ts`: delete only the same-render `test.fixme` and its
   comment.
-- `e2e/animate-presence/pop-layout-scroll-siblings.spec.ts`: the two playground cases.
+- `e2e/animate-presence/pop-layout-container-move.spec.ts`: the two playground cases, inside the existing
+  `test.describe('popLayout playground (#2348)', …)` block (about line 333), next to the smoke test.
 - `src/routes/tests/animate-presence/pop-layout-playground/+page.svelte`: only the preset notes and tester copy that
-  cite plan 015. Keep the three "Still wrong with the fix" notes.
+  cite plan 015, at about lines 71, 80, 88, 97, 284, 290 and 463 (presence lane `44989ca5`). This plan runs last,
+  so it rewrites **all** of them. That includes the scrollable-element notes (88, 97), whose presets 015a (clone)
+  and 015b (owned) fixed; neither of those plans edits the playground. Keep the three "Still wrong with the fix"
+  notes.
 - `.changeset/exiting-element-own-snapshot.md` (create).
 
-**Out of scope**: everything 015a and 015b own, `PresenceChild.svelte`, and `presence.ts`.
+**Out of scope**: the regions 015a and 015b own (their `_MotionContainer.svelte` regions, `scrollBasis.ts`, and
+the observer-reach and cause code in `layout.ts`), `PresenceChild.svelte`, and `presence.ts`.
 
 ## Git workflow
 
@@ -119,17 +131,20 @@ Same lane. Make one commit per step, ending each message with
 
 ## Steps
 
-### Step 1: Re-baseline on the fixed 008, then decide
+### Step 1: Re-baseline on the fixed 008 (expect B(d))
 
 1. Temporarily delete the same-render `test.fixme` (don't commit yet), then run
    `PW_PORT=4223 pnpm exec playwright test e2e/animate-presence/pop-layout-container-move.spec.ts -g "same render"`.
-2. Add the two playground cases to `pop-layout-scroll-siblings.spec.ts` and run them:
+2. Add the two playground cases to the `popLayout playground (#2348)` describe in
+   `pop-layout-container-move.spec.ts`, next to the smoke test, and run them:
    - `?preset=toast&path=owned`: click `pg-cycle`; `drift-0` must be ≤ 1 px.
    - `?preset=scroll-mirror&path=owned`, unscrolled: click `pg-item-1`; `drift-1` must be ≤ 1 px.
 3. Add component case 4 to `presenceSiblingSnapshots.spec.ts`. It uses owned popLayout, and item 0 exits while
    `addFirst` prepends an item in the same update. The prepend pushes item 0 **down** 70 px before item 0's
    pre-update effect runs. Expected: item 0's seeded snapshot is its **pre-insert** box.
 4. **Decision.**
+   - **Expected outcome: they fail** (the projection snapshot is ~69 px off; see "Why this matters"). Continue
+     with the second bullet.
    - **If all three e2e cases and case 4 pass on the fixed 008**, don't implement B(d):
      - commit the un-fixme, the playground cases, case 4 and the notes;
      - record the new numbers in your report;
@@ -151,7 +166,8 @@ Implement the design and comment it, citing `MeasureLayout.tsx:149-204`.
 
 ### Step 3: Notes, changeset, gate
 
-1. Rewrite the playground notes that cite plan 015 so they describe the fixed behaviour.
+1. Rewrite every playground note and tester line that cites plan 015 (about lines 71, 80, 88, 97, 284, 290 and
+   463) so it describes the fixed behaviour.
 2. Changeset (patch): "An exiting element's own layout animation starts from where it was, even when other
    elements were added or removed in the same update, as in Motion."
 3. Gate:

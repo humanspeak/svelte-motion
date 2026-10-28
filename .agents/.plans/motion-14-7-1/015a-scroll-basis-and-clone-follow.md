@@ -9,17 +9,23 @@
 >
 > **First of three plans split from the old 015.** 015b and 015c build on this one.
 >
-> **Requires 006 (A1, merged at `3365c175`), 007 and 008 (with A1–A3) merged into `feat/motion-14.7.1`.**
-> Confirm each prints at least one line, otherwise STOP:
+> **Requires 006 (A1, merged at `3365c175`), 007 and 008 (with A1–A3 and the A2 fix `c817fe6e`) all merged
+> into `feat/motion-14.7.1`.** Don't start this plan before 007 and 008 are both merged into the feat branch.
+> Confirm each command prints at least one line, otherwise STOP:
 > - `grep -n "takeOverLiveLeadOnMount" src/lib/utils/motionDomProjection.ts`
 > - `grep -n "layoutRoot?: boolean" src/lib/types.ts`
 > - `grep -n "schedulePopLayoutCorrection" src/lib/utils/presence.ts`
 > - `grep -n "Plan 015" e2e/animate-presence/pop-layout-container-move.spec.ts`
 >
+> **Re-pin the presence line numbers first.** Every `presence.ts`, `PresenceChild.svelte`, `AnimatePresence.svelte`
+> and 008-spec line number below is cited at presence lane `6972dac3`, as "008's merge SHA (to be pinned)". Once
+> 008 merges into feat, run `git log -1 --format=%h -- src/lib/utils/presence.ts` and re-locate each excerpt by its
+> anchor at that SHA before you start. If an anchor is gone, STOP.
+>
 > **Drift check**:
 > `git diff --stat 3365c175..HEAD -- src/lib/utils/motionDomProjection.ts src/lib/utils/presence.ts src/lib/html/_MotionContainer.svelte e2e/animate-presence/pop-layout-container-move.spec.ts src/routes/+page.svelte`
 > 007 and 008 (and 013, if it merged first) are expected. Feat-branch line numbers are at `3365c175`;
-> presence-lane line numbers (marked "presence lane") are at `4e90127c`. Locate every excerpt by its anchor. If the
+> presence line numbers (marked "presence lane") are at `6972dac3`. Locate every excerpt by its anchor. If the
 > content differs, STOP.
 
 ## Status
@@ -85,10 +91,24 @@ All paths below are under `packages/motion-dom/src/projection/node/` unless show
       (1444) and `commitGroup` (1254);
     - `seedCachedSnapshotsForSubtree()` (1504);
     - `commitObservedLayoutChange()` (1202, via `measurementsFromRect` at 154);
-    - `currentVisualPageRect()` (1048);
-    - 006's `takeOverLiveLeadOnMount`.
+    - `currentVisualPageRect()` (1048). Its base is `visualTargetBox()` (1122), `latestLayoutBox` or `lastLayout`;
+    - 006's `takeOverLiveLeadOnMount`;
+    - 007's new unmount seed (layoutid lane, not yet merged). It reads `visualTargetBox`, `latestLayoutBox` and
+      `lastLayout`; locate it by content once 007 merges.
 
     None of them rebases.
+  - The adapter registry is `private static adapters = new WeakMap<object, MotionDomProjectionAdapter>()` (306),
+    keyed by **projection node**. Nothing can look up an adapter from an element.
+  - `refreshCachedLayout`'s deferred rAF write (1695-1705) copies `projection.layout` into `lastLayout` again, a
+    frame later.
+  - **Measurement keeps user-authored transforms; upstream doesn't** (found by 007's executor).
+    - `stripToBaseTransforms` resets each element to its *user-authored* base transform for the read.
+    - Upstream's `resetTransform` (`create-projection-node.ts:1046-1076`, via `HTMLProjectionNode.ts:20-22`) writes
+      `none` (or the `transformTemplate` value). Upstream `measure()` (1080-1101) and `removeTransform()` (1200)
+      then remove `latestValues` transforms by calculation.
+    - `currentVisualPageRect()` adds the node's and its ancestors' `latestValues` transforms back on top through
+      `applyTransform(box, true)`. So an ancestor's translate, or the element's own `x`, ends up applied twice.
+    - 007's executor saw the `layoutRoot=false&offset=true` handoff start at 500 instead of 400.
 - `src/lib/html/_MotionContainer.svelte` (`3365c175`):
   - `lastRect` is declared at 2192 (anchor `let lastRect: RectLike | null = null`). `observerRestartRect` follows
     it.
@@ -103,18 +123,23 @@ All paths below are under `packages/motion-dom/src/projection/node/` unless show
   - `data-layout` / `data-layout-id` are spread at 1659-1662. `cloneNode` copies them onto exit clones.
 - `src/lib/utils/presence.ts` (presence lane):
   - `canElementScroll`, `captureScrollSnapshot`, `measureScrollDelta` and `translateRectByScrollDelta` are at
-    760-818. `canElementScroll` matches `/(auto|scroll|overlay)/` against `overflow + overflowX + overflowY`,
+    799-858 (008's merge SHA, to be pinned; `6972dac3`). `canElementScroll` matches `/(auto|scroll|overlay)/` against `overflow + overflowX + overflowY`,
     because jsdom computes `overflowX`/`overflowY` as `visible` for `overflow: auto`.
   - `unregisterChild` inserts the clone (`slotParent.insertBefore(clone, …)`), calls
     `schedulePopLayoutCorrection`, and starts the exit on the next rAF: `animate(clone, exitKeyframes,
     finalTransition)`.
-  - `measurePopLayoutScale` is upstream's `measureScale`.
+  - `measurePopLayoutScale` is upstream's `measureScale` (read at 486-487).
+  - The 008 correction scheduler `schedulePopLayoutCorrection` is at about 716-736.
+  - 008's A2 resting-point cache (`createPopLayoutPointCache`, about 579) has a `ResizeObserver` on
+    `documentElement` (649-668). It is tracked for every popLayout child (1540-1543), and it reads item rects
+    through `measurePopLayoutPoint`.
 
 ### 008's fixmes and baselines
 
 `e2e/animate-presence/pop-layout-container-move.spec.ts`, presence lane:
 - about line 126: `test.fixme(path === 'owned', …)` (same-render);
-- about line 166: `test.fixme(query.includes('&scroller'), …)`.
+- about line 166: `test.fixme(query.includes('&scroller'), …)`. It sits inside the loop over the `&scroll`,
+  `&scroller` and positioned-scale queries.
 
 | Case | clone | owned |
 | --- | --- | --- |
@@ -145,29 +170,49 @@ All paths below are under `packages/motion-dom/src/projection/node/` unless show
 - No layout read per frame, per scroll event, or across the whole tree.
 - Mount: one forced style recalc per layout element (the ancestor walk is memoized per element).
 - Tracker resample: reads `scrollLeft`/`scrollTop` only. On a `scroll` event it reads the target; on
-  `pointerdown`, `keydown` or `click` it reads every connected known container (typically 1–3). No rect reads.
+  `pointerdown`, `keydown` or `click` it reads every connected known container. "Known" means every scroller on
+  the path of any measured node, `overflow: hidden` ones included, so it can be more than a few on pages with
+  clipping wrappers. That's O(known containers) scroll-offset reads per input event, with no rect reads.
 - Resize: exactly one refresh read per mounted layout node, after the last viewport size change (the refresh hands
-  its rect to the container, so no second read).
+  its rect to the container, so no second read). This is the **one deliberate whole-tree read**: once per resize
+  gesture, never per frame. It is exempt from the full-tree STOP, as upstream re-measures after its resize block
+  too (`create-projection-node.ts:797-820`).
 
 ### A. Scroll basis
 
-New module `src/lib/utils/scrollBasis.ts`. It also absorbs `presence.ts` 760-818, and `presence.ts` imports
-those helpers from it.
+New module `src/lib/utils/scrollBasis.ts`. It also absorbs `presence.ts` 799-858, and `presence.ts` imports those
+helpers from it unchanged. `captureScrollSnapshot`'s `canScroll` size test (`scrollHeight > clientHeight + 1`,
+`presence.ts:799-807`) and its reads stay as they are. Only `getScrollAncestors` uses the size-free rule.
+
+Exports, all with Google-style JSDoc: `ScrollBasis`, `getScrollAncestors`, `readScrollBasis`, `seenScrollBasis`,
+`scrollDelta`, `scrollShift`, `scheduleResample`, `measureScreenScale` and `isResizeBlocked`, plus the four moved
+helpers.
 
 - **`getScrollAncestors(element)`** returns `{ scrollers, fixed, sticky }`.
   - Walk `parentElement || (parentNode as ShadowRoot).host` (`PopChild.tsx:63-80`).
   - A scroller is any element whose `overflow + overflowX + overflowY` matches `/(auto|scroll|hidden|overlay)/`.
-  - Exclude `document.scrollingElement`. Exclude `html` and `body` only when they are the scrolling element or
-    have `overflow: visible`, so a body scroller under `html { overflow: hidden }` counts.
+  - Exclude the root scroller, `const root = document.scrollingElement ?? document.documentElement`. Exclude
+    `html` and `body` only when they are `root` or have `overflow: visible`, so a body scroller under
+    `html { overflow: hidden }` counts.
   - `fixed`: the element or an ancestor is `position: fixed`. The walk stops after it.
-  - `sticky`: a `position: sticky` node exists between the element and the outermost scroller.
+  - `sticky`: a `position: sticky` node exists between the element and the outermost scroller. **This includes
+    the element itself**: a sticky element's box doesn't move with its scroller's offset, so the basis can't
+    model it.
   - Computed style is memoized per element.
 - **Folded-in containers are decided at read time.** Reads take a predicate `isFoldedIn(container)`.
   - The adapter passes `c => this.projection.path.some(n => n.options.layoutScroll && n.instance === c)`.
-  - The clone path passes the predicate of the slot parent's nearest motion-ancestor adapter, including that
-    adapter's own node.
-- **Root term.** When `fixed` is set and no `layoutScroll` path node `wasRoot`, add the document scrolling element
-  with sign +1 (`measurePageBox`). Scrollers have sign −1.
+  - **Element registry (B2).** Add a second `private static byElement = new WeakMap<Element, MotionDomProjectionAdapter>()`.
+    Set it in `mount()`, clear it in `unmount()`.
+  - Add a public `static foldedInFor(el: Element)`. It walks `el` and its ancestors (crossing shadow hosts) to the
+    nearest registered adapter, and returns that adapter's predicate over its path **plus its own node**. It also
+    returns `{ wasRoot }`, true when any of those `layoutScroll` nodes `scroll.wasRoot`. With no adapter it returns
+    `() => false` and `wasRoot: false`.
+  - The clone path uses `foldedInFor(slotParent)`. This is **load-bearing** for 008's "fixed container stays put
+    when the page's scroll position is clamped" case (`&fixed&anchor=bottom&scroll&mirror&layoutScroll`) and for
+    the `?layoutScroll` GUARD. Without it, the clone would treat a `layoutScroll` list as an ordinary scroller and
+    animate the clamp.
+- **Root term.** When `fixed` is set and the predicate's `wasRoot` is false, add `root` with sign +1
+  (`measurePageBox`). Scrollers have sign −1.
 - **Tracker.**
   - `seen: WeakMap<Element, [x, y]>` holds the pre-change scroll. `known: Set<Element>` is its iterable companion,
     pruned when a container disconnects.
@@ -214,6 +259,31 @@ those helpers from it.
   - One call keeps Motion's single grouped `transform` animation, so the follow can't fight the exit's `scale`.
   - Starting in the microtask aligns it with the siblings' projection animations.
 
+### Where the rebase happens (M5)
+
+Rebase in **exactly one place** per rect:
+- **The adapter rebases its own caches**: `lastLayout`, `latestLayoutBox`, the target box, and 007's unmount seed.
+  - `lastLayoutBasis` is copied from the `'measure'` stamp of the box that produced `projection.layout`, and
+    nothing else ever re-reads it. `refreshCachedLayout`'s deferred write (1695-1705) copies that same stamp
+    alongside the box.
+- **The container rebases `lastRect`** with `rebaseRect(lastRect, lastRectBasis)`, then passes the already-rebased
+  rect to `commitObservedLayoutChange` **without** `previousBasis`.
+- `previousBasis` exists only for callers that hold a **raw** rect (none in this plan, apart from unit 3c).
+
+### Measurement transforms (from 007)
+
+`currentVisualPageRect()`, and every cached box that `applyTransform` is later applied to, must measure the
+element the way upstream does: with transforms reset to `none` (or the `transformTemplate` value) during the read,
+as `resetTransform` (1046-1076) does.
+- Change `stripToBaseTransforms`'s base for these reads to upstream's `'none'`/template value. The user-authored
+  transform is restored afterwards, as today.
+- The `latestValues` transforms are then removed by calculation (`removeTransform`, 1200) and added back once by
+  `applyTransform`.
+- If `layoutMeasureStats`, a Reorder spec or the drag specs depend on the old base, STOP and report. Don't widen the
+  change.
+- This change is pending operator approval of 007's A1. If the dispatcher says 007 A1 was rejected, skip this
+  subsection and its two RED cases, and report that you did.
+
 ### How this interacts with 006 A1
 
 A1's `takeOverLiveLeadOnMount` calls `onScreenSnapshot()`, which becomes rebased. Nothing else in A1 changes. No
@@ -242,7 +312,10 @@ at 825-828.
   - `rebaseRect` (a `null` rect gives `null`);
   - `commitObservedLayoutChange`'s `previousBasis` option;
   - `onCacheRefresh`;
-  - resize registration.
+  - resize registration;
+  - the element registry (`byElement`, set and cleared in `mount`/`unmount`) and `static foldedInFor`;
+  - the measurement-transform base in `stripToBaseTransforms` (see "Measurement transforms");
+  - the rebase in 007's unmount seed.
 
   Plus `motionDomProjection.spec.ts`, new `describe`s only.
 - `src/lib/html/_MotionContainer.svelte`, these regions only (lines at `3365c175`):
@@ -254,7 +327,7 @@ at 825-828.
 
   **Not** 2675 or 2920-2922 (013's).
 - `src/lib/utils/presence.ts`:
-  - delete 760-818 and import those helpers from `scrollBasis.ts`;
+  - delete 799-858 and import those helpers from `scrollBasis.ts`;
   - `unregisterChild` (part C);
   - the `ActiveExit` type;
   - cancel and cleanup sites;
@@ -268,8 +341,17 @@ at 825-828.
 - `src/routes/+page.svelte` (one link)
 - `.changeset/scroll-rebased-layouts.md` (create)
 
-**Out of scope**: `layout.ts`, `PresenceChild.svelte`, `AnimatePresence.svelte`, `LayoutGroup.svelte`, other
-plans' container regions, `commitPresenceLayoutRelease`, docs, `package.json`.
+**Out of scope**: `layout.ts` (015b's), `PresenceChild.svelte`, `AnimatePresence.svelte`, `LayoutGroup.svelte`,
+other plans' container regions, `commitPresenceLayoutRelease`, `measureRect` in `layout.ts` (dead outside specs),
+docs, `package.json`.
+
+## Considered and rejected
+
+- **A live tree-wide `willUpdate` on every change.** On the clone path the DOM has already changed by then.
+- **Treating every scroller as `layoutScroll`.** That would make siblings jump instead of animating, which
+  contradicts consequence (i).
+- **Refreshing caches on every scroll frame.** That costs N reads per frame.
+- **Two `animate()` calls on the clone.** They would fight over the grouped `transform` animation.
 
 ## Git workflow
 
@@ -286,22 +368,25 @@ plans' container regions, `commitPresenceLayoutRelease`, docs, `package.json`.
 Label every case **RED** (fails today) or **GUARD** (passes today and must keep passing). Record each outcome. If a
 label doesn't hold, STOP.
 
-1. **008's spec.** Change only the about-line-166 call to `test.fixme(path === 'owned', 'Plan 015b: owned siblings take no snapshot')`.
+1. **008's spec.** Change only the about-line-166 call, inside the `&scroll` / `&scroller` / positioned-scale loop,
+   to `test.fixme(path === 'owned' && query.includes('&scroller'), 'Plan 015b: owned siblings take no snapshot')`.
    Keep its comment, updated to point at 015b.
 2. **`scrollBasis.spec.ts`.** All of these are **RED** because the module is missing:
    - 2a: `overflow:auto` is detected through the shorthand (jsdom reports `overflowX`/`overflowY` as `visible`).
    - 2b: `hidden` is included; `visible` is excluded.
-   - 2c: `scrollingElement` is excluded.
-   - 2d: a body scroller under `html { overflow:hidden }` is included.
+   - 2c: the root scroller (`document.scrollingElement ?? document.documentElement`) is excluded. Stub
+     `scrollingElement` both as `documentElement` and as `null`.
+   - 2d: a body scroller under `html { overflow:hidden }` is included. Stub `scrollingElement` as
+     `documentElement`.
    - 2e: a fixed element or fixed ancestor sets `fixed` and stops the walk.
-   - 2f: a sticky node below the scroller sets `sticky`.
+   - 2f: a sticky node below the scroller sets `sticky`, and so does a sticky element itself.
    - 2g: the walk crosses a shadow `host`.
    - 2h: `isFoldedIn` is read at read time (flipping it between two reads changes the result).
    - 2i: `seen` updates on a `scroll` event.
    - 2j: `seen` updates on a `document` `click` with no scroll event.
    - 2k: `scrollDelta` from 0 → 500 is 500.
    - 2l: it is 250 when `getBoundingClientRect().height` is half of a defined `offsetHeight`.
-   - 2m: the fixed root term has sign +1 (via `documentElement.scrollTop`).
+   - 2m: the fixed root term has sign +1, via `documentElement.scrollTop`, with `scrollingElement` stubbed.
    - 2n: a same-epoch basis gives a `{0, 0}` shift.
    - 2o: an unreliable basis gives `null`, and so does a stale-`resizeEpoch` basis.
    - 2p: a basis with no terms makes no `getBoundingClientRect` calls.
@@ -318,6 +403,12 @@ label doesn't hold, STOP.
      most once. This passes trivially today; it is the check that a rebase without epochs would fail.
    - 3f **GUARD**: a node on a sticky path keeps its unrebased cache.
    - 3g **GUARD**: with no scrollers, `expect(adapter.lastReadScrollBasis).toBeFalsy()`.
+   - 3n **RED** (`foldedInFor` missing): for an element inside a mounted `layoutScroll` adapter's element,
+     `MotionDomProjectionAdapter.foldedInFor(el)` folds in that container. After unmount it no longer does.
+   - 3o **RED** (from 007): the registry-fallback handoff rect (`currentVisualPageRect()`) of an element inside an
+     ancestor with `style="transform: translateX(100px)"` equals the element's on-screen box. Today the translate
+     is counted twice, 100 px too far.
+   - 3p **RED** (from 007): the same check for an element with its own `x: 100`.
 4. **`presence.spec.ts`**:
    - 6a **RED**: a `data-layout` clone in a scroller tracked at 500, `scrollTop = 430` before draining, the clone
      mocked 70 px lower. `animate` is called once, before any rAF, with `expect.objectContaining({ y: [-70, 0] })`.
@@ -352,7 +443,12 @@ Implement Design A with JSDoc. The header cites `PopChild.tsx:39-46, 63-80` and
    shift keeps today's cache.
 3. Add the public members, resize registration, and `scheduleResample()`.
 
-**Verify**: 3a–3g pass. Every existing `motionDomProjection.spec.ts` block passes.
+**Verify**:
+- 3a–3g and 3n–3p pass. Every existing `motionDomProjection.spec.ts` block passes.
+- **M6**: re-run the new spec's owned `?layoutGroup` sync-completion case. Step 3's `onScreenSnapshot` rebase is
+  what should fix it (`commitGroup` reads `onScreenSnapshot`). If it still fails, record the timing: did the
+  postRender `commitGroup` land after the clamp's `scroll` event? Then move the case to 015b's list in your report.
+  This is not a STOP.
 
 ### Step 4: The container uses rebased rects
 
@@ -366,7 +462,10 @@ Implement Design A with JSDoc. The header cites `PopChild.tsx:39-46, 63-80` and
   declaration `let lastRect: RectLike | null = null` doesn't match this pattern.
 - `pnpm check` → 0 errors.
 - `PW_PORT=4223 pnpm exec playwright test e2e/animate-presence/pop-layout-container-move.spec.ts e2e/animate-presence/pop-layout-scroll-siblings.spec.ts`:
-  every case passes except the two owned `&scroller` fixmes and the same-render fixme (all still `fixme`).
+  - **expected failures**: exactly the two clone `&scroller` cases and the new spec's clone clamp case. They need
+    Step 5's clone follow (the clone still jumps while siblings animate, `presence.ts:716-736`).
+  - the owned `&scroller` and same-render cases are still `fixme`;
+  - everything else passes.
 
 ### Step 5: Clone follow (part C)
 
@@ -403,6 +502,8 @@ Implement it in `presence.ts`.
   - Header comment cites #2348, `create-projection-node.ts:1105-1156, 511-532` and plan 015a.
   - Params: `path=owned|clone`, `mode=popLayout|sync`, `layoutScroll`, `layoutGroup` (wraps the whole list in a
     `LayoutGroup`), `fixed`, `sticky`, `nolayout`.
+  - Default `mode` is `popLayout`. `?fixed` and `?sticky` use the default `popLayout` unless the case says `sync`.
+  - **x metric**: a colour band's left edge, the first column with ≥ 20 matching pixels in the band's rows.
   - Default layout: a 320 px `#scroller` (`overflow:auto`; a `motion.div layoutScroll` when `layoutScroll` is set),
     centred with `margin-inline:auto`. Inside it, a 600 px spacer, then a `motion.ul` with five
     `motion.li layout` items `sib-0`…`sib-4`, 150×60, 10 px gap, `transition={{ type: 'spring' }}`,
@@ -442,22 +543,24 @@ Implement it in `presence.ts`.
     - **Sync completion in the scrolled container, `?layoutGroup`.** No step above 35 px. **RED**. Today the
       owned completion goes `finishExit` (`presence.ts:1108-1114`, reached via 1748) → `forceRender` →
       `commitGroup` at postRender (`LayoutGroup.svelte:79-81`) → seeds every member
-      (`motionDomProjection.ts:1253-1262`) from a cache that ignores the scroll. Step 4's rebase makes it pass.
+      (`motionDomProjection.ts:1253-1262`) from a cache that ignores the scroll. Step 3's `onScreenSnapshot` rebase makes it pass (see Step 3's M6 note).
     - **`?fixed`, remove.** No 300 px phantom. **GUARD**: owned siblings don't commit today, so there's no
       phantom. Their snap belongs to 015b.
   - Read budgets (wrapped `getBoundingClientRect` counted per `id`):
-    - 30 rAF-spaced steps scrolling `#scroller` → **0** reads on every `sib-*`.
-    - **Clone path only**: a resize → exactly **1** read per item, 250 ms after the last resize event, and **0**
-      during the resize. (008 A2's `ResizeObserver` on `documentElement` reads owned items, so the owned path
-      isn't budgeted here.)
+    - **GUARD**: 30 rAF-spaced steps scrolling `#scroller` → **0** reads on every `sib-*`.
+    - **RED**: on the clone path with `mode=sync` (which tracks no 008 A2 point cache, so its `documentElement`
+      `ResizeObserver` makes no reads), a resize → exactly **1** read per item, 250 ms after the last resize
+      event, and **0** during the resize. Today: no refresh happens (0), and later commits use the stale cache.
 
 ## Done criteria
 
-- [ ] `grep -n "export const scrollShift\|export const scrollDelta\|export const getScrollAncestors\|export const captureScrollSnapshot" src/lib/utils/scrollBasis.ts`
-      prints four lines, and `grep -n "const captureScrollSnapshot" src/lib/utils/presence.ts` prints nothing.
-- [ ] 2a–2q, 3a–3g and 6a–6c pass.
+- [ ] `grep -cE "export const (scrollShift|scrollDelta|getScrollAncestors|captureScrollSnapshot|scheduleResample|seenScrollBasis|readScrollBasis|measureScreenScale|isResizeBlocked)\b" src/lib/utils/scrollBasis.ts`
+      prints `9`, and `grep -n "const captureScrollSnapshot" src/lib/utils/presence.ts` prints nothing.
+- [ ] `grep -n "static foldedInFor" src/lib/utils/motionDomProjection.ts` prints one line.
+- [ ] 2a–2q, 3a–3g, 3n–3p and 6a–6c pass (3o/3p only if 007 A1 was approved).
 - [ ] 008's two clone `&scroller` cases pass.
-- [ ] In the new spec, these pass: the owned `?layoutGroup` sync-completion case, the clone clamp, `?fixed` (scroll and height-only), resize, `?sticky` and
+- [ ] In the new spec, these pass: the owned `?layoutGroup` sync-completion case (or it was moved to 015b per M6),
+      the clone "sync completion in the scrolled container" case, the clone clamp, `?fixed` (scroll and height-only), resize, `?sticky` and
       `?nolayout` cases; the scroll and clone resize budgets; and every GUARD.
 - [ ] `git diff <step-1 SHA>..HEAD -- src/lib/utils/scrollBasis.spec.ts src/lib/utils/motionDomProjection.spec.ts src/lib/utils/presence.spec.ts e2e/animate-presence/pop-layout-scroll-siblings.spec.ts e2e/animate-presence/pop-layout-container-move.spec.ts`
       removes or weakens no assertion: no deleted `expect`, no loosened tolerance, no new `fixme`/`skip`.
@@ -467,9 +570,11 @@ Implement it in `presence.ts`.
 
 - A precondition or excerpt doesn't match.
 - A Step 1 label doesn't hold.
-- The fix needs a layout read per frame or per scroll event, or a full-tree measure.
+- The fix needs a layout read per frame or per scroll event, or a full-tree measure. The one exception is the
+  resize refresh: one read per node, once per resize gesture.
 - A read budget needs raising.
-- A node animates twice for one change, or an animation restarts from its origin.
+- A node animates twice for one change, `onProjectionUpdate` fires twice for one change, or an animation restarts
+  from its origin.
 - 008's owned layout cases drift by the container move (the projection measured before 008's correction).
 - Part C loses or snaps the exit, or breaks a `custom` or exit-timing spec.
 - The fix needs an out-of-scope file, especially `layout.ts` (015b's).
