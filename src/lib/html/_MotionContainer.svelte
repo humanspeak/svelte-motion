@@ -265,12 +265,24 @@
     const lazyMotion = getLazyMotionContext()
     // `motion` preloads every feature and ignores LazyMotion; `m` defers to it
     // (Motion 14.7.1 `render/components/{motion,m}/create.ts`).
-    const activeFeatures = $derived(
-        motionKindProp === 'm' ? (lazyMotion?.getFeatures() ?? domMax) : domMax
-    )
-    const hasGestureFeatures = $derived(!!activeFeatures.gestures)
-    const hasDragFeatures = $derived(!!activeFeatures.drag)
-    const hasLayoutFeatures = $derived(!!activeFeatures.layout)
+    // An `m` with no loaded bundle (no LazyMotion, or an async one still
+    // pending or rejected) is featureless, like upstream's `m` without a
+    // `LazyContext.renderer`: it gets no VisualElement until one arrives
+    // (Motion 14.7.1 `motion/utils/use-visual-element.ts:60-87`,
+    // `components/LazyMotion/index.tsx:52-66`).
+    const activeFeatures = $derived(motionKindProp === 'm' ? lazyMotion?.getFeatures() : domMax)
+    // Live: whether this `m` has a bundle right now. Drives only the late node
+    // creation below.
+    const featureless = $derived(!activeFeatures)
+    // Constant: whether the component started without features. The server and
+    // the client compute it the same way (an `m` outside LazyMotion or inside an
+    // async one is featureless at init on both), so every MARKUP decision keys
+    // off this and never changes after load; NODE behaviour keys off whether
+    // `visualElement` exists (plan 016, Design 1).
+    const startedFeatureless = untrack(() => featureless)
+    const hasGestureFeatures = $derived(!!activeFeatures?.gestures)
+    const hasDragFeatures = $derived(!!activeFeatures?.drag)
+    const hasLayoutFeatures = $derived(!!activeFeatures?.layout)
     // `<LazyMotion strict>`: a `motion` component inside defeats LazyMotion, so
     // in development it throws; the main `Reorder` (`ignoreStrict`) warns once
     // and names the `m` entry instead (Motion 14.7.1 `motion/index.tsx`
@@ -1162,60 +1174,87 @@
     // writer saw. `visualElementStore` is a `WeakMap<instance, VisualElement>`
     // written in `VisualElement.mount()`, so there is exactly one node per
     // element and the projection adapter is handed this instance.
-    const visualElementParent = typeof window !== 'undefined' ? getVisualElementParent() : undefined
-    // `untrack`: the node is created ONCE with the props of this render, the
-    // way upstream's `useConstant(makeState)` does (use-visual-state.ts:135).
-    // Later prop changes flow through the update effect below, not by
-    // rebuilding the node.
-    const visualElement =
-        typeof window !== 'undefined'
-            ? untrack(() =>
-                  createMotionVisualElement({
-                      // No `style` at creation: the adapter used to construct
-                      // its node with `props: {}` and bind the style
-                      // MotionValues on its first `updateOptions`, so seeding
-                      // them into `latestValues` here would move that write
-                      // earlier than it has ever happened.
-                      props: buildMotionNodeProps(false),
-                      parent: visualElementParent,
-                      // `latestValues` is authoritative now: `animationState`
-                      // drives it (animateChanges below) and the VE renders it,
-                      // so the seed is the real starting state rather than a
-                      // claim the DOM does not back. Landed atomically with the
-                      // legacy-writer deletion — plan 002 Step 3.
-                      seedLatestValues: true,
-                      // plan 004: the PresenceChild adapter (null for direct
-                      // AnimatePresence children, which use the clone path).
-                      presenceContext: buildPresenceContext(),
-                      // Inherited variant labels travel via `context`, NOT via
-                      // props — upstream's exact split (`use-visual-state.ts`
-                      // takes `props` and `MotionContext` separately).
-                      //
-                      // `props.animate` must stay undefined for an inheriting
-                      // child so `isControllingVariants` is false and
-                      // `addVariantChild` registers it for parent-driven
-                      // propagation. But `makeLatestValues` then has nothing to
-                      // seed from, so the child would first-paint unstyled. The
-                      // context supplies the label for SEEDING only, which is how
-                      // a stacked child renders correctly before its parent ever
-                      // animates. (plan 002 Step 5)
-                      // Both halves of the variant context. `makeLatestValues`
-                      // applies each only when the node has no OWN value
-                      // (`if (initial === undefined) initial = context.initial`),
-                      // so an own `initial` still wins — the precedence is not
-                      // duplicated here.
-                      context: {
-                          initial: inheritedInitialVariant,
-                          animate: effectiveAnimate
-                      },
-                      reducedMotionConfig: motionConfig?.reducedMotion ?? 'never',
-                      skipAnimations,
-                      isSVG: isSVGTag(String(tag))
-                  })
-              )
-            : null
-    if (visualElement) {
-        visualElementForRelatives = visualElement
+    //
+    // The VisualElement and the projection adapter exist only while the
+    // component has features: at init, or later when an `m`'s LazyMotion bundle
+    // arrives (upstream `use-visual-element.ts:60-87` creates the node the first
+    // render `lazyContext.renderer` exists). Both are `$state.raw`, and children
+    // read them through getter contexts, so a late parent still reaches children
+    // that create their node after it. Effects that read them re-run once when a
+    // late node arrives; never write them from an effect that reads them.
+    const readVisualElementParent =
+        typeof window !== 'undefined' ? getVisualElementParent() : () => undefined
+    const readMotionDomProjectionParent =
+        typeof window !== 'undefined' ? getMotionDomProjectionParent() : () => null
+    let visualElement = $state.raw<ReturnType<typeof createMotionVisualElement> | null>(null)
+    let motionDomProjection = $state.raw<MotionDomProjectionAdapter | null>(null)
+    setVisualElementParent(() => visualElement)
+    setMotionDomProjectionParent(() => motionDomProjection)
+
+    /**
+     * Create this component's motion-dom VisualElement and its projection
+     * adapter, and publish both (`visualElement`, `motionDomProjection`).
+     *
+     * Runs once per component, on the client only: at init when the component
+     * has features (every `motion`, an `m` in a sync LazyMotion), otherwise
+     * from the `$effect.pre` below the first time an `m`'s LazyMotion bundle
+     * is available (upstream `motion/utils/use-visual-element.ts:60-87`).
+     *
+     * @param late Whether the component rendered before its features arrived.
+     *   A late node gets `manuallyAnimateOnMount = true`, so it animates in
+     *   from `initial` (upstream `use-visual-element.ts:84-86`).
+     * @returns Nothing.
+     */
+    const createNodes = (late: boolean) => {
+        // `untrack`: the node is created ONCE with the props of this render, the
+        // way upstream's `useConstant(makeState)` does (use-visual-state.ts:135).
+        // Later prop changes flow through the update effect below, not by
+        // rebuilding the node.
+        const node = untrack(() =>
+            createMotionVisualElement({
+                // No `style` at creation: the adapter used to construct
+                // its node with `props: {}` and bind the style
+                // MotionValues on its first `updateOptions`, so seeding
+                // them into `latestValues` here would move that write
+                // earlier than it has ever happened.
+                props: buildMotionNodeProps(false),
+                parent: readVisualElementParent(),
+                // `latestValues` is authoritative now: `animationState`
+                // drives it (animateChanges below) and the VE renders it,
+                // so the seed is the real starting state rather than a
+                // claim the DOM does not back. Landed atomically with the
+                // legacy-writer deletion — plan 002 Step 3.
+                seedLatestValues: true,
+                // plan 004: the PresenceChild adapter (null for direct
+                // AnimatePresence children, which use the clone path).
+                presenceContext: buildPresenceContext(),
+                // Inherited variant labels travel via `context`, NOT via
+                // props — upstream's exact split (`use-visual-state.ts`
+                // takes `props` and `MotionContext` separately).
+                //
+                // `props.animate` must stay undefined for an inheriting
+                // child so `isControllingVariants` is false and
+                // `addVariantChild` registers it for parent-driven
+                // propagation. But `makeLatestValues` then has nothing to
+                // seed from, so the child would first-paint unstyled. The
+                // context supplies the label for SEEDING only, which is how
+                // a stacked child renders correctly before its parent ever
+                // animates. (plan 002 Step 5)
+                // Both halves of the variant context. `makeLatestValues`
+                // applies each only when the node has no OWN value
+                // (`if (initial === undefined) initial = context.initial`),
+                // so an own `initial` still wins — the precedence is not
+                // duplicated here.
+                context: {
+                    initial: inheritedInitialVariant,
+                    animate: effectiveAnimate
+                },
+                reducedMotionConfig: motionConfig?.reducedMotion ?? 'never',
+                skipAnimations,
+                isSVG: isSVGTag(String(tag))
+            })
+        )
+        visualElementForRelatives = node
         // `initial={false}` (own prop, inherited, or a presence re-entry that
         // must not replay) means "start AT the animate target".
         // `makeLatestValues` already seeded from `animate`'s LAST keyframe
@@ -1226,10 +1265,25 @@
         // `presenceContext.initial === false` (use-visual-element.ts:64-76) — so
         // an `AnimatePresence initial={false}` wrapper suppresses the first enter
         // even when the element itself declares an `initial`. (plan 004 Step 3)
-        visualElement.blockInitialAnimation =
-            effectiveInitialProp === false || visualElement.presenceContext?.initial === false
-        setVisualElementParent(visualElement)
+        node.blockInitialAnimation =
+            effectiveInitialProp === false || node.presenceContext?.initial === false
+        // Upstream use-visual-element.ts:84-86: a node created after the first
+        // commit must run its initial animation.
+        if (late) node.manuallyAnimateOnMount = true
+        visualElement = node
+        motionDomProjection = new MotionDomProjectionAdapter({
+            parent: readMotionDomProjectionParent(),
+            getBaseTransform: () => userBaseTransform,
+            visualElement: node,
+            group: layoutGroupContext?.group
+        })
     }
+    if (typeof window !== 'undefined' && !startedFeatureless) createNodes(false)
+    // The late path: an `m` whose LazyMotion bundle arrives after init.
+    $effect.pre(() => {
+        if (featureless || visualElement) return
+        untrack(() => createNodes(true))
+    })
 
     /**
      * Whether this element's drag gesture is live. Reads the `drag` feature's
@@ -1238,21 +1292,6 @@
      */
     const isDragActive = (): boolean =>
         !!(visualElement && elementDragControls.get(visualElement)?.isDragging)
-
-    const motionDomProjectionParent =
-        typeof window !== 'undefined' ? getMotionDomProjectionParent() : null
-    const motionDomProjection =
-        typeof window !== 'undefined'
-            ? new MotionDomProjectionAdapter({
-                  parent: motionDomProjectionParent,
-                  getBaseTransform: () => userBaseTransform,
-                  visualElement: visualElement ?? undefined,
-                  group: layoutGroupContext?.group
-              })
-            : null
-    if (motionDomProjection) {
-        setMotionDomProjectionParent(motionDomProjection)
-    }
 
     $effect(() => {
         if (!variantsProp) return localVariantStore.set(undefined)
@@ -1332,12 +1371,14 @@
     // takes the exit over: the clone is removed (no overlap) and this
     // element starts from the values it was showing, instead of replaying
     // `initial`. Runs before first paint, while `latestValues` is only seeded.
+    // Init-time only: a node created late (a featureless `m`) never takes a
+    // handoff, which is right, because it never registered an exit.
     let reentryRestore: Record<string, string | number> | undefined
+    const initNode = untrack(() => visualElement)
     const reentryHandoff =
-        visualElement && shouldRegisterPresenceExit
-            ? context?.takeExitHandoff(presenceKey)
-            : undefined
-    if (visualElement && reentryHandoff) {
+        initNode && shouldRegisterPresenceExit ? context?.takeExitHandoff(presenceKey) : undefined
+    if (initNode && reentryHandoff) {
+        const reentryNode = initNode
         untrack(() => {
             const lastKeyframe = (value: unknown): unknown =>
                 Array.isArray(value) ? (value as unknown[])[value.length - 1] : value
@@ -1353,9 +1394,9 @@
             // Exit keys start from what the clone was showing.
             Object.assign(seed, reentryHandoff.from)
             for (const [key, value] of Object.entries(seed)) {
-                const motionValue = visualElement.getValue(key)
+                const motionValue = reentryNode.getValue(key)
                 if (motionValue) motionValue.jump(value as AnyResolvedKeyframe)
-                else visualElement.setStaticValue(key, value as AnyResolvedKeyframe)
+                else reentryNode.setStaticValue(key, value as AnyResolvedKeyframe)
             }
             // Exit keys the enter won't animate go back to their pre-exit
             // value once mounted (upstream animates them to the base target).
@@ -1414,8 +1455,13 @@
     const optimizedAppearScript = $derived(
         createOptimizedAppearScript(optimizedAppearId, optimizedAppearEntries)
     )
+    // A featureless `m` (decidable on the server too) emits no
+    // optimized-appear script; with no node to hand off to, the WAAPI appear
+    // animation would otherwise animate it in on its own.
     const renderedOptimizedAppearScript = $derived(
-        optimizedAppearScript && (typeof window === 'undefined' || !window.MotionIsMounted)
+        !featureless &&
+            optimizedAppearScript &&
+            (typeof window === 'undefined' || !window.MotionIsMounted)
             ? optimizedAppearScript
             : ''
     )
@@ -1501,7 +1547,7 @@
     // @ v14.5.0). Upstream assigns them AFTER copying the user's `style`, so they
     // win over it (and, being inline, over class CSS too). Appended to match.
     const upstreamDragDefaultStyle = $derived(
-        hasDragFeatures && dragProp && dragListenerProp !== false
+        dragProp && dragListenerProp !== false
             ? `user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:${dragProp === true ? 'none' : `pan-${dragProp === 'x' ? 'y' : 'x'}`}`
             : ''
     )
@@ -1644,8 +1690,7 @@
         // key, empty array) would otherwise add `tabindex=0` for an
         // element that never actually receives a tap gesture — an
         // unintended tab stop. (#349 CR feedback)
-        ...(hasGestureFeatures &&
-        isNotEmpty(resolvedWhileTap) &&
+        ...(isNotEmpty(resolvedWhileTap) &&
         !isNativelyFocusable(tag, rest) &&
         ((rest as Record<string, unknown>)?.tabindex ??
             (rest as Record<string, unknown>)?.tabIndex ??
@@ -1936,11 +1981,12 @@
 
     $effect(() => {
         if (!motionDomProjection) return
+        const adapter = motionDomProjection
         // `layoutAnchor` and `layoutDependency` follow every update, as
         // upstream `MeasureLayout`'s `layoutOptions` (MeasureLayout.tsx:43-52
         // @ v14.7.1). `layoutRoot` is creation-time only: the mount effect
         // below passes it, never this one.
-        motionDomProjection.updateOptions({
+        adapter.updateOptions({
             layout: layoutProp,
             layoutId: scopedLayoutId,
             layoutScroll: layoutScrollProp,
@@ -1967,10 +2013,11 @@
     // effect. The effect above owns reactive option updates.
     $effect(() => {
         if (!motionDomProjection) return
+        const adapter = motionDomProjection
         if (!element) return
         const mountTarget = element
         untrack(() => {
-            motionDomProjection.updateOptions({
+            adapter.updateOptions({
                 layout: layoutProp,
                 layoutId: scopedLayoutId,
                 layoutScroll: layoutScrollProp,
@@ -1991,7 +2038,7 @@
         // takes it over in `didMount()` below, with one update pass (#1411
         // amendment A1, the pass upstream gets from the mounting commit).
         // Only where layout measurement exists at all.
-        motionDomProjection.mount(mountTarget, {
+        adapter.mount(mountTarget, {
             takeOverLiveLead: untrack(() => hasLayoutFeatures)
         })
         // `MeasureLayout` mounts with the element (see
@@ -2003,10 +2050,10 @@
             const deps = trackLayoutProjectionDependencies()
             layoutMountTracker.markMounted(mountTarget, deps)
             layoutIdMountTracker.markMounted(mountTarget, deps)
-            motionDomProjection.didMount()
+            adapter.didMount()
         })
         return () => {
-            motionDomProjection.unmount()
+            adapter.unmount()
         }
     })
 
@@ -2021,16 +2068,17 @@
     // no-adapter fallback, the feature instantiation, and teardown.
     $effect(() => {
         if (!visualElement || !element) return
+        const node = visualElement
         const mounted = element
-        if (visualElement.current !== mounted) visualElement.mount(mounted)
+        if (node.current !== mounted) node.mount(mounted)
         // motion-dom never calls this itself — the consumer does, after mount
         // (upstream use-visual-element.ts:147). It instantiates the enabled
         // features, giving the node its `animationState`.
-        visualElement.updateFeatures()
+        node.updateFeatures()
         // Upstream use-visual-element.ts:148 — flush `latestValues` to the DOM so
         // the seeded starting state is actually applied before anything animates.
         // Safe now that `animationState` drives `latestValues`.
-        visualElement.scheduleRenderMicrotask()
+        node.scheduleRenderMicrotask()
         // Re-entry handoff (see `reentryHandoff`): exit keys outside the
         // `animate` target animate back to their pre-exit values. One-shot and
         // untracked, so a later transition change never re-runs this effect.
@@ -2038,7 +2086,7 @@
             const restore = reentryRestore
             reentryRestore = undefined
             untrack(() =>
-                animateTarget(visualElement, restore as TargetAndTransition, {
+                animateTarget(node, restore as TargetAndTransition, {
                     transitionOverride: mergedTransition as Transition | undefined
                 })
             )
@@ -2052,23 +2100,23 @@
         // the VisualElement's events instead. The controls path still fires its
         // own callbacks directly (it is not animationState-driven until Step 7),
         // hence the guard.
-        const offStart = visualElement.on('AnimationStart', (definition) => {
+        const offStart = node.on('AnimationStart', (definition) => {
             onAnimationStartProp?.(definition as DOMKeyframesDefinition | undefined)
         })
-        const offComplete = visualElement.on('AnimationComplete', (definition) => {
+        const offComplete = node.on('AnimationComplete', (definition) => {
             // Flush one render on settle. An INTERRUPTED animation (a variant
             // retargeted mid-flight) can land its final value without a
             // subsequent render, leaving the element frozen at the frame the
             // interrupt happened on while `latestValues` reads correct — measured
             // on e2e/variants/stagger-interrupt. Scheduling here is idempotent:
             // motion-dom coalesces onto the frameloop's render step.
-            visualElement.scheduleRender()
+            node.scheduleRender()
             onAnimationCompleteProp?.(definition as DOMKeyframesDefinition | undefined)
         })
         return () => {
             offStart()
             offComplete()
-            if (visualElement.current === mounted) visualElement.unmount()
+            if (node.current === mounted) node.unmount()
             visualElementStore.delete(mounted)
         }
     })
@@ -2097,6 +2145,7 @@
     // bookkeeping required.
     $effect(() => {
         if (!visualElement) return
+        const node = visualElement
         const next = buildMotionNodeProps()
         // Build outside `untrack` so a PresenceChild isPresent flip reruns this
         // effect. The object must be fresh on every pass: ExitAnimationFeature
@@ -2111,12 +2160,12 @@
                 // render-commit timestamp (including config/closure changes).
                 motionDomProjection?.projection.willUpdate()
             }
-            visualElement.update(next, nextPresenceContext)
+            node.update(next, nextPresenceContext)
             // Upstream runs feature updates after every VisualElement update.
             // Without this, a motion.* child held by PresenceChild receives the
             // new context but ExitAnimationFeature never observes the flip, so
             // its exit never runs and safeToRemove is never called.
-            visualElement.updateFeatures()
+            node.updateFeatures()
             // `update()` can change what the node renders WITHOUT scheduling a
             // render of its own: `addValue()` writes `latestValues[key]` directly
             // when a MotionValue instance is replaced (VisualElement.mjs:437-447),
@@ -2128,7 +2177,7 @@
             // per-commit flush, exactly as upstream does after every React commit
             // (use-visual-element.ts:148); the frameloop variant can sit unflushed
             // when nothing else is animating, which left `renderState` stale.
-            visualElement.scheduleRenderMicrotask()
+            node.scheduleRenderMicrotask()
             if (activeDragCommit) motionDomProjection?.projection.root?.didUpdate()
             // Only once the mount/enter effect has run the first pass — it owns
             // the enter ordering and the wait-mode gate.
@@ -3323,7 +3372,10 @@
     // `scheduleRenderMicrotask()`. This effect owns only the `isLoaded` phase
     // machine and the enter ordering.
     $effect(() => {
-        if (!(element && isLoaded === 'mounting')) return
+        // A featureless `m` has no node, so it stays in `mounting` until its
+        // LazyMotion bundle arrives (upstream runs the mount and the enter only
+        // when a node exists, use-visual-element.ts:149-161).
+        if (!(element && visualElement && isLoaded === 'mounting')) return
         markMotionMounted()
 
         pwLog('[motion] main effect running', {
