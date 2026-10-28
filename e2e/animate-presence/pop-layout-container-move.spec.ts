@@ -230,3 +230,22 @@ for (const path of PATHS) {
         })
     })
 }
+
+test.describe('popLayout playground (#2348)', () => {
+    test('loads, renders the default preset and reads a held removal', async ({ page }) => {
+        await page.goto('/tests/animate-presence/pop-layout-playground?@isPlaywright=true')
+        await page.waitForFunction(() => window.MotionIsMounted === true)
+        for (let id = 0; id <= 3; id++) {
+            await expect(page.locator(`[data-testid="pg-item-${id}"]`)).toBeVisible()
+        }
+
+        await click(page, '[data-testid="pg-item-1"]')
+
+        const readout = page.locator('[data-testid="drift-1"]')
+        await expect(readout).toBeVisible()
+        const drift = Number(
+            /max centre drift ([\d.]+)px/.exec((await readout.textContent()) ?? '')?.[1]
+        )
+        expect(drift).toBeLessThanOrEqual(1)
+    })
+})
