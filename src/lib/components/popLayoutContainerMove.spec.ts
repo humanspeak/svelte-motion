@@ -1,6 +1,7 @@
 import { render } from '@testing-library/svelte'
 import { tick } from 'svelte'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import PopLayoutCycleHarness from './__tests__/PopLayoutCycleHarness.svelte'
 import PopLayoutMoveHarness from './__tests__/PopLayoutMoveHarness.svelte'
 
 // Same set-up as `__tests__/onExitCompleteTiming.svelte.spec.ts`.
@@ -169,6 +170,52 @@ describe('AnimatePresence popLayout when popping moves the container', () => {
         expect(element.dataset.motionPopId).toBeDefined()
         expect(poppedAtSnapshot.length).toBeGreaterThan(0)
         expect(poppedAtSnapshot[0]).toBe(false)
+        unmount()
+    })
+
+    /**
+     * Toast list: the oldest item exits as a new one arrives, in the same
+     * update, so the bottom-anchored list ends up where it was. Svelte has no
+     * hook before the DOM commit: by `PresenceChild`'s `$effect.pre` the new
+     * item is already in the list, which has grown upwards, so a live "before"
+     * measurement reads the exiting item 70px too high. Upstream reads it in
+     * `getSnapshotBeforeUpdate`, before React commits anything.
+     */
+    it('measures the exiting item where it rested when an item is added in the same update', async () => {
+        // A bottom-anchored list (bottom at 170px) of 70px rows: in-flow
+        // items stack up from the bottom; a popped item is pinned to the
+        // list's top edge plus its pop offset.
+        const bottom = 170
+        const inFlow = () =>
+            Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="item-"]')).filter(
+                (item) => !item.dataset.motionPopId
+            )
+        mockRects((element) => {
+            if (!element.dataset?.testid?.startsWith('item-')) return { left: 0, top: 0 } as DOMRect
+            const items = inFlow()
+            const listTop = bottom - 70 * items.length
+            if (element.dataset.motionPopId) {
+                const offset = parseFloat(getPopRule()?.getPropertyValue('top') || '0')
+                return { left: 20, top: listTop + offset } as DOMRect
+            }
+            return { left: 20, top: listTop + 70 * items.indexOf(element) } as DOMRect
+        })
+
+        const { rerender, getByTestId, unmount } = render(PopLayoutCycleHarness, {
+            props: { items: [{ id: 0, present: true }] }
+        })
+        await drain()
+
+        await rerender({
+            items: [
+                { id: 0, present: false },
+                { id: 1, present: true }
+            ]
+        })
+        await drain()
+
+        expect(getByTestId('item-0').dataset.motionPopId).toBeDefined()
+        expect(getPopRule()!.getPropertyValue('top')).toBe('0px')
         unmount()
     })
 
