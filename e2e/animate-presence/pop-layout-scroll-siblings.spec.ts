@@ -54,6 +54,8 @@ interface Hit {
     t: number
     blue?: number
     green?: number
+    /** Green's left edge, along the row through its centre (clear of the corner radius). */
+    greenLeft?: number
 }
 interface Recording {
     frames: Frame[]
@@ -123,6 +125,15 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
         }
         const blueX = column('sib-1')
         const greenX = column('sib-3')
+        const greenRect = document.getElementById('sib-3')?.getBoundingClientRect()
+        const greenY = greenRect ? greenRect.top + greenRect.height / 2 : undefined
+        const scanRow = (y: number | undefined, id: string) => {
+            if (y === undefined) return undefined
+            for (let x = Math.ceil(clip.left); x <= clip.right; x++) {
+                if (document.elementFromPoint(x, y)?.closest(`#${id}`)) return x
+            }
+            return undefined
+        }
         const scan = (x: number | undefined, id: string, last: boolean) => {
             if (x === undefined) return undefined
             let found: number | undefined
@@ -139,7 +150,8 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
             w.hits.push({
                 t: performance.now(),
                 blue: scan(blueX, 'sib-1', false),
-                green: scan(greenX, 'sib-3', true)
+                green: scan(greenX, 'sib-3', true),
+                greenLeft: scanRow(greenY, 'sib-3')
             })
             requestAnimationFrame(sample)
         }
@@ -430,10 +442,19 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         annotate(recording)
         const { frames } = recording
         // The clone slides over green: each colour needs its own 10 frames.
-        for (const colour of ['blue', 'pink', 'green'] as const) {
-            const lefts = frames.flatMap(({ bands }) => (bands[colour] ? [bands[colour].left] : []))
-            expect(lefts.length, `${colour} frames`).toBeGreaterThanOrEqual(10)
-            expect(Math.max(...lefts) - Math.min(...lefts), `${colour} x`).toBeLessThanOrEqual(2)
+        // Green's left edge comes from the hit test: the screencast only sees
+        // a sliver of it beside the clone, where its corner radius moves the
+        // first full column.
+        const lefts = {
+            blue: frames.flatMap(({ bands }) => (bands.blue ? [bands.blue.left] : [])),
+            pink: frames.flatMap(({ bands }) => (bands.pink ? [bands.pink.left] : [])),
+            green: recording.hits.flatMap(({ greenLeft }) =>
+                greenLeft === undefined ? [] : [greenLeft]
+            )
+        }
+        for (const [colour, values] of Object.entries(lefts)) {
+            expect(values.length, `${colour} frames`).toBeGreaterThanOrEqual(10)
+            expect(Math.max(...values) - Math.min(...values), `${colour} x`).toBeLessThanOrEqual(2)
         }
     })
 
