@@ -1282,6 +1282,22 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-root') + searchParams}
+                    >
+                        layoutRoot — shared layoutId animates relative to its layout root (#1935)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-root/anchor') + searchParams}
+                    >
+                        layoutAnchor — a centered child stays centered while its parent resizes
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout/overdamped-spring') + searchParams}
                     >
                         Slow overdamped spring layout animation (#1207)

@@ -5,6 +5,7 @@ import {
     createBox,
     hasTransform,
     transformPropOrder,
+    translateAxis,
     visualElementStore,
     type IProjectionNode,
     type LayoutUpdateData,
@@ -94,12 +95,37 @@ export interface MotionDomProjectionUpdateOptions {
     layoutId?: string
     /** Tracks scroll on this element for descendant layout projection. */
     layoutScroll?: boolean
+    /** Makes this node a layout root. Creation-time only: omit the key to leave it unchanged. */
+    layoutRoot?: boolean
+    /** Anchor point on the parent for relative projection, or `false` to turn it off. */
+    layoutAnchor?: { x: number; y: number } | false
+    /** Forwarded so `NodeStack.promote` can compare it, as upstream `layoutOptions` does. */
+    layoutDependency?: unknown
     /** Transition passed to the upstream layout animation builder. */
     transition?: Transition
     /** Inline style props passed through to the visual element. */
     style?: unknown
     /** Upstream projection option (`use-visual-element.ts`): `true` for draggable elements. */
     alwaysMeasureLayout?: boolean
+}
+
+/**
+ * Upstream `roundBox` (create-projection-node.ts 2550-2575 @ v14.7.1):
+ * measured boxes are rounded in Safari and left untouched elsewhere, so
+ * non-integer layouts inside scaled elements don't jump.
+ */
+const roundMeasuredPoint =
+    typeof navigator !== 'undefined' &&
+    navigator.userAgent.toLowerCase().includes('applewebkit/') &&
+    !navigator.userAgent.toLowerCase().includes('chrome/')
+        ? Math.round
+        : (value: number) => value
+
+const roundBox = (box: Box): void => {
+    box.x.min = roundMeasuredPoint(box.x.min)
+    box.x.max = roundMeasuredPoint(box.x.max)
+    box.y.min = roundMeasuredPoint(box.y.min)
+    box.y.max = roundMeasuredPoint(box.y.max)
 }
 
 const createVisualState = () => ({
@@ -347,6 +373,18 @@ export class MotionDomProjectionAdapter {
      * layout was last seen", the idle source of {@link currentVisualPageRect}.
      */
     private latestLayoutBox: Box | undefined
+    /**
+     * How {@link latestLayoutBox} (and the `lastLayout` taken from the same
+     * read) was measured. The adapter's own reads (`seedLayout`,
+     * `refreshLayout`, `measurePageRect`) keep style transforms in the DOM,
+     * so the box is where the element was drawn. A motion-dom update pass
+     * resets the transforms of the nodes it measures first
+     * (`resetTransformStyle`, create-projection-node.ts @ v14.7.1), so its
+     * box is the transform-free layout.
+     */
+    private latestLayoutKeepsTransforms = true
+    /** Set while the adapter itself runs `updateLayout()`. */
+    private readingOwnLayout = false
     private offProjectionMeasure: (() => void) | null = null
 
     constructor(options: MotionDomProjectionOptions = {}) {
@@ -414,10 +452,18 @@ export class MotionDomProjectionAdapter {
             } as never,
             this.ownsVisualElement ? null : this.visualElement.presenceContext
         )
+        // `layoutAnchor` and `layoutDependency` are synced on every update, as
+        // upstream `layoutOptions` (MeasureLayout.tsx:43-52 @ v14.7.1).
+        // `layoutRoot` is a creation option (use-visual-element.ts:229-248 @
+        // v14.7.1): `setOptions` merges and an explicit `undefined` would
+        // overwrite, so it's written only when the caller passes the key.
         this.projection.setOptions({
             layout: options.layout,
             layoutId,
             layoutScroll: options.layoutScroll,
+            ...('layoutRoot' in options ? { layoutRoot: options.layoutRoot } : {}),
+            layoutAnchor: options.layoutAnchor,
+            layoutDependency: options.layoutDependency,
             alwaysMeasureLayout: options.alwaysMeasureLayout,
             animationType: animationTypeForLayout(options.layout),
             transition: options.transition,
@@ -571,10 +617,22 @@ export class MotionDomProjectionAdapter {
         // reads for this node (create-projection-node.ts `updateLayout`), so
         // this costs no extra DOM read.
         this.offProjectionMeasure = this.projection.addEventListener('measure', (box: Box) => {
-            this.rememberLayoutBox(box)
+            this.rememberLayoutBox(box, this.readingOwnLayout)
         })
         this.seedLayout()
         this.mountedFromLiveLead = false
+        // `promote()` copies the previous lead's snapshot (its foreign
+        // `source` makes it shared) when that lead had one: a departing lead
+        // seeded in `unmount()` below. Mark this node layout-dirty with its
+        // path flagged for a transform reset, so the update pass re-measures
+        // it the way upstream's `update()` does (`resetTransformStyle`, then
+        // `updateLayout`, create-projection-node.ts @ v14.7.1): its mount-time
+        // `seedLayout()` read kept its ancestors' style transforms.
+        this.mountedFromSharedSnapshot = !!this.projection.resumeFrom?.snapshot
+        if (this.mountedFromSharedSnapshot) {
+            this.prepareSnapshotPath(this.projection as unknown as ProjectionTreeNode)
+            this.projection.isLayoutDirty = true
+        }
         // Registering with the layoutId's stack (projection `mount()` above)
         // promoted this node: `promote` gave it the previous lead as
         // `resumeFrom` (stack.ts:45-74 @ v14.7.1). `didMount` runs the update
@@ -641,6 +699,7 @@ export class MotionDomProjectionAdapter {
             if (this.seedCachedSnapshotsForGroup() > 0) root?.didUpdate()
         }
         this.leaveGroup()
+        this.seedDepartingLeadSnapshot(element)
         this.offProjectionDidUpdate?.()
         this.offProjectionDidUpdate = null
         this.offProjectionMeasure?.()
@@ -717,6 +776,106 @@ export class MotionDomProjectionAdapter {
      * the same id, so the two never animate one change.
      */
     mountedFromLiveLead = false
+
+    /**
+     * Whether this node mounted resuming from a previous lead's snapshot (a
+     * shared snapshot `promote()` handed over, see {@link unmount}), so
+     * motion-dom already animates the handoff. The container then only drops
+     * a registry entry for the same id, so the change never animates twice.
+     */
+    mountedFromSharedSnapshot = false
+
+    /**
+     * Give a departing `layoutId` lead the snapshot upstream takes while it
+     * is still attached. Upstream's `unmount()` runs `willUpdate()` first
+     * (create-projection-node.ts 668-678 @ v14.7.1), whose `updateSnapshot()`
+     * (967-979) `measure()`s it (1080-1103): `measuredBox` is the page box
+     * (`measurePageBox`, 1105-1127) and `layoutBox` that box with element
+     * scroll (`removeElementScroll`, 1129-1159) and transforms
+     * (`removeTransform`) removed, then rounded (`roundBox`, 2561-2575), with
+     * its own id as `source`. `promote()` then hands that snapshot to the
+     * arriving node, and the foreign `source` makes it a shared one
+     * (`notifyLayoutUpdate`'s `isShared`), which #1935's `layoutRoot` math
+     * needs.
+     *
+     * Svelte detaches the DOM before effect teardown reaches here, so that
+     * `measure()` would read a zero box, which `updateSnapshot()` drops. The
+     * box comes from cache instead: the animating target, else the last
+     * layout read. Both are scroll-removed. A read that kept the style
+     * transforms is already where the element was drawn; a transform-free
+     * one gets its transforms applied (`applyTransform`, transform only).
+     * The page box is then that box with the element scroll added back.
+     */
+    private seedDepartingLeadSnapshot(element: HTMLElement): void {
+        const projection = this.projection
+        if (!projection.options.layoutId || element.isConnected || projection.snapshot) return
+        const root = projection.root
+        if (!root) return
+        // `willUpdate` (708-714): a blocked root takes no snapshot.
+        if (root.isUpdateBlocked()) return
+        // The animating target and a box from a motion-dom pass are
+        // transform-free layout boxes; the adapter's own reads kept the style
+        // transforms (see `latestLayoutKeepsTransforms`).
+        const target = this.visualTargetBox()
+        const cached = target ?? this.latestLayoutBox ?? this.lastLayout?.layoutBox
+        if (!cached) return
+        const keepsTransforms = !target && this.latestLayoutKeepsTransforms
+        // `willUpdate` (735): join an update already running.
+        !root.isUpdating && root.startUpdate()
+        this.prepareSnapshotPath(projection as unknown as ProjectionTreeNode)
+        const node = projection as typeof projection & {
+            removeElementScroll(box: Box): Box
+            removeTransform(box: Box): Box
+        }
+        const drawn = keepsTransforms ? cached : projection.applyTransform(cached, true)
+        const pageBox = this.addElementScroll(drawn)
+        const layoutBox = node.removeTransform(node.removeElementScroll(pageBox))
+        roundBox(layoutBox)
+        projection.snapshot = {
+            animationId: root.animationId,
+            measuredBox: pageBox,
+            layoutBox,
+            latestValues: { ...projection.latestValues },
+            source: projection.id
+        }
+        // `willUpdate()` returns before measuring a layout-dirty node.
+        projection.isLayoutDirty = true
+    }
+
+    /**
+     * The inverse of upstream `removeElementScroll` (create-projection-node.ts
+     * 1129-1159 @ v14.7.1): a scroll-removed box back in page space. Undoes
+     * the offset of every non-root `layoutScroll` path node from the last one
+     * that `wasRoot`, with the same phase-cached `scroll` values.
+     */
+    private addElementScroll(box: Box): Box {
+        const pageBox = createBox()
+        copyBoxInto(pageBox, box)
+        const projection = this.projection
+        if (projection.scroll?.wasRoot) return pageBox
+        const path = projection.path
+        let start = 0
+        for (let i = 0; i < path.length; i++) {
+            const node = path[i]
+            if (
+                node !== projection.root &&
+                node.scroll &&
+                node.options.layoutScroll &&
+                node.scroll.wasRoot
+            ) {
+                start = i
+            }
+        }
+        for (let i = start; i < path.length; i++) {
+            const node = path[i]
+            const { scroll, options } = node
+            if (node !== projection.root && scroll && options.layoutScroll) {
+                translateAxis(pageBox.x, -scroll.offset.x)
+                translateAxis(pageBox.y, -scroll.offset.y)
+            }
+        }
+        return pageBox
+    }
 
     /** The live lead `mount()` found for {@link didMount} to take over. */
     private mountTakeOverLead: IProjectionNode | null = null
@@ -826,8 +985,18 @@ export class MotionDomProjectionAdapter {
         // viewport box with a contemporaneous scroll offset (page space).
         this.updatePathScroll('measure')
         this.projection.isLayoutDirty = true
-        this.projection.updateLayout()
+        this.updateOwnLayout()
         this.lastLayout = cloneMeasurements(this.projection.layout)
+    }
+
+    /** `projection.updateLayout()`, marked as the adapter's own read. */
+    private updateOwnLayout(): void {
+        this.readingOwnLayout = true
+        try {
+            this.projection.updateLayout()
+        } finally {
+            this.readingOwnLayout = false
+        }
     }
 
     /**
@@ -861,7 +1030,7 @@ export class MotionDomProjectionAdapter {
         const restore = this.stripToBaseTransforms()
         try {
             this.projection.isLayoutDirty = true
-            this.projection.updateLayout()
+            this.updateOwnLayout()
         } finally {
             restore()
         }
@@ -929,7 +1098,7 @@ export class MotionDomProjectionAdapter {
             // slot.
             const { layoutBox } = this.projection.measure(false)
             rect = rectFromBox(layoutBox)
-            this.rememberLayoutBox(layoutBox)
+            this.rememberLayoutBox(layoutBox, true)
         } finally {
             restore()
         }
@@ -1132,9 +1301,10 @@ export class MotionDomProjectionAdapter {
         return undefined
     }
 
-    private rememberLayoutBox(box: Box): void {
+    private rememberLayoutBox(box: Box, keepsTransforms: boolean): void {
         if (!this.latestLayoutBox) this.latestLayoutBox = createBox()
         copyBoxInto(this.latestLayoutBox, box)
+        this.latestLayoutKeepsTransforms = keepsTransforms
     }
 
     /**
@@ -1527,7 +1697,11 @@ export class MotionDomProjectionAdapter {
         )
 
         // `layoutId`-only nodes are seeded too — see `commitObservedLayoutChange`.
-        if (snapshot && (projection.options.layout || projection.options.layoutId)) {
+        // A descendant that already holds a snapshot keeps it, as
+        // `willUpdate()` returns early for a layout-dirty node: e.g. an
+        // arriving `layoutId` node `promote()` handed a shared snapshot.
+        const keepsOwn = !isCommitter && (projection.isLayoutDirty || !!projection.snapshot)
+        if (snapshot && !keepsOwn && (projection.options.layout || projection.options.layoutId)) {
             this.prepareSnapshotPath(projection)
             projection.snapshot = snapshot
             projection.isLayoutDirty = true
