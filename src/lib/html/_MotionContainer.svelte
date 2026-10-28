@@ -70,7 +70,6 @@
         computeFlipTransforms,
         runLayoutSizeAnimation,
         finishFlipAnimations,
-        setCompositorHints,
         isLayoutMeasurementGated,
         observeLayoutChanges,
         selectLayoutDependencies,
@@ -2695,7 +2694,6 @@
             emitProjectionUpdate(previousBeforeObserverRestart, lastRect)
             motionDomProjection?.commitObservedLayoutChange(previousBeforeObserverRestart)
         }
-        setCompositorHints(observedElement, true)
 
         // Gated on `layoutDependency` with no dependency (or own-presence)
         // change in this update: upstream takes no snapshot, so the node is
@@ -2940,9 +2938,10 @@
             observerRestartRect = lastRect
             observerRestartElement = observedElement
             lastRect = null
-            if (element) {
-                setCompositorHints(element, false)
-            }
+            // Clear a projected transform when layout stops (unmount, layout turned off,
+            // observer restart). Upstream never writes or clears transform-origin /
+            // will-change for layout, so neither do we.
+            if (element) element.style.transform = ''
             if (rafId) cancelAnimationFrame(rafId)
         }
     })

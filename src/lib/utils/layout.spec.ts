@@ -6,7 +6,6 @@ import {
     observeLayoutChanges,
     runLayoutSizeAnimation,
     selectLayoutDependencies,
-    setCompositorHints,
     stripNonChildLayoutStyle
 } from './layout.js'
 
@@ -295,14 +294,6 @@ describe('utils/layout', () => {
 
         await Promise.resolve()
         expect(el.hasAttribute('data-layout-size-animation')).toBe(false)
-    })
-
-    it('setCompositorHints: toggles styles', () => {
-        const el = document.createElement('div')
-        setCompositorHints(el, true)
-        expect(el.style.willChange).toBe('transform')
-        setCompositorHints(el, false)
-        expect(el.style.willChange).toBe('')
     })
 
     it('observeLayoutChanges: calls callback and cleans up (with parent branch)', () => {

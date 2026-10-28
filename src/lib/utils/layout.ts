@@ -25,9 +25,8 @@
  * INTO the projection adapter — tracked as a follow-up, out of scope here.
  *
  * Pure helpers with live callers: `measureRect`, `computeFlipTransforms`,
- * `finishFlipAnimations`, `setCompositorHints`, `observeLayoutChanges`,
- * `selectLayoutDependencies`, `stripNonChildLayoutStyle`, and the two
- * size-correction events.
+ * `finishFlipAnimations`, `observeLayoutChanges`, `selectLayoutDependencies`,
+ * `stripNonChildLayoutStyle`, and the two size-correction events.
  */
 
 import {
@@ -472,18 +471,6 @@ export const runLayoutSizeAnimation = (
     if (!el.querySelector('[data-svelte-motion-layout]')) return
 
     runBoxSizeAnimation(el, { dx, dy, sx, sy }, transition)
-}
-
-/**
- * Toggle compositor hints for smoother transform animations.
- *
- * @param el Target element.
- * @param enabled Whether to enable compositor hints.
- */
-export const setCompositorHints = (el: HTMLElement, enabled: boolean): void => {
-    el.style.willChange = enabled ? 'transform' : ''
-    el.style.transformOrigin = enabled ? '0 0' : ''
-    if (!enabled) el.style.transform = ''
 }
 
 /**
