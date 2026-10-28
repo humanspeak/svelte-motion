@@ -92,7 +92,8 @@ describe('changing layoutId after mount (#1411)', () => {
             'group-b',
             'selected',
             'other',
-            'underline'
+            'underline',
+            'fresh'
         )
     })
     afterEach(() => {
@@ -249,6 +250,21 @@ describe('changing layoutId after mount (#1411)', () => {
         await update([{ key: 'x' }])
         await frames(1)
         expect((sharedNodes.get('joined')?.members ?? []).includes(node)).toBe(false)
+    })
+
+    // Amendment A1 guard: only a node that takes over a lead still on screen
+    // runs a mount-time update pass. A plain mount (no lead to resume from)
+    // starts no update, exactly as before.
+    it('a mount with no live resumeFrom runs no extra update pass', async () => {
+        const { update } = await mount([{ key: 'a' }])
+        const root = getNode(element('a')).root!
+        const startUpdate = vi.spyOn(root, 'startUpdate')
+
+        await update([{ key: 'a' }, { key: 'x', layoutId: 'fresh' }])
+        await frames(2)
+
+        expect(getNode(element('x')).resumeFrom).toBeUndefined()
+        expect(startUpdate).not.toHaveBeenCalled()
     })
 
     // Tabs: layoutId={selected ? 'underline' : undefined}. The id moves from
