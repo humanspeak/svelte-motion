@@ -7,7 +7,10 @@ import {
 } from './__tests__/motionExportAllowlist.js'
 import {
     animate,
+    animateMini,
     AnimatePresence,
+    type AnimationOptions,
+    type AnimationPlaybackControlsWithThen,
     type AnimationSequence,
     anticipate,
     arc,
@@ -20,18 +23,27 @@ import {
     clamp,
     createDragControls,
     createEffect,
+    createScopedAnimate,
     cubicBezier,
     delay,
     distance,
     distance2D,
+    type DOMKeyframesDefinition,
     drag,
     type DragOptions,
     easeIn,
     easeInOut,
     easeOut,
+    type ElementOrSelector,
+    type GeneratorFactory,
     hover,
+    inertia,
+    type InertiaOptions,
     interpolate,
     inView,
+    type KeyframeGenerator,
+    type KeyframeOptions,
+    keyframes,
     mix,
     motion,
     MotionConfig,
@@ -47,11 +59,14 @@ import {
     progress,
     propEffect,
     resize,
+    resolveElements,
     scopeMotion,
     scroll,
     type Segment,
+    type SelectorCache,
     type SequenceInfo,
     type SequenceOptions,
+    type SpringOptions,
     stagger,
     stringifyStyleObject,
     type Timeline,
@@ -72,8 +87,10 @@ import {
     useSpring,
     useTime,
     useTransform,
+    type ValueAnimationOptions,
     wrap
 } from './index.js'
+import { motionValue } from './utils/vanillaValues.svelte.js'
 
 describe('public API: index.ts', () => {
     it('re-exports or deliberately skips every runtime export of motion', async () => {
@@ -299,3 +316,46 @@ function timelineTypeAssertions() {
 
 // Compile-time only: referenced so the checker keeps it, and lint sees a use.
 void timelineTypeAssertions
+
+/**
+ * Compile-only assertions for plan 014's re-exports — never invoked. `pnpm
+ * check` validates that the public types fit the re-exported functions, that
+ * useAnimate's scope and augmented motion values need no cast, and that the
+ * two `@ts-expect-error` lines stay errors.
+ */
+function plan014TypeAssertions() {
+    const [scope] = useAnimate<HTMLDivElement>()
+    const scoped = createScopedAnimate({ scope, reduceMotion: true, skipAnimations: false })
+    const tl: Timeline = scoped(motionValue(0), 100) // augmented value, no cast
+    const fromSelector: Timeline = createScopedAnimate()('.box', { opacity: 1 })
+    // @ts-expect-error the scoped animate has no effect-registry statics
+    void scoped.addEffect
+    const options: ValueAnimationOptions<number> = { keyframes: [0], velocity: 500 }
+    const gen: KeyframeGenerator<number> = inertia(options)
+    const tween: KeyframeGenerator<number> = keyframes({ keyframes: [0, 1], duration: 300 })
+    const factory: GeneratorFactory = inertia
+    const inertiaTransition: InertiaOptions = { power: 0.5, min: 0, max: 100 }
+    const tweenTransition: KeyframeOptions = { ease: 'linear', times: [0, 1] }
+    const springTransition: SpringOptions = { stiffness: 300, damping: 20 }
+    const target: ElementOrSelector = '.box'
+    const cache: SelectorCache = {}
+    const els: Element[] = resolveElements(target, scope, cache)
+    const kf: DOMKeyframesDefinition = { opacity: [0, 1] }
+    const opts: AnimationOptions = { duration: 0.2 }
+    const mini: AnimationPlaybackControlsWithThen = animateMini('.box', kf, opts)
+    // @ts-expect-error animateMini animates elements only, not motion values
+    animateMini(motionValue(0), { opacity: 1 })
+    void [
+        tl,
+        fromSelector,
+        gen,
+        tween,
+        factory,
+        inertiaTransition,
+        tweenTransition,
+        springTransition,
+        els,
+        mini
+    ]
+}
+void plan014TypeAssertions

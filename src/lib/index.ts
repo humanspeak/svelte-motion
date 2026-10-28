@@ -71,6 +71,20 @@ export type {
 // Identical bindings to motion's; JSDoc lives at the definitions.
 export { createScopedAnimate } from '$lib/utils/animateValue'
 export { animateMini, inertia, keyframes, resolveElements } from '$lib/utils/motionReexports'
+// Types in the signatures of the re-exports above, plus SpringOptions for `spring`.
+export type {
+    AnimationOptions,
+    AnimationPlaybackControlsWithThen,
+    DOMKeyframesDefinition,
+    ElementOrSelector,
+    GeneratorFactory,
+    InertiaOptions,
+    KeyframeGenerator,
+    KeyframeOptions,
+    SelectorCache,
+    SpringOptions,
+    ValueAnimationOptions
+} from 'motion'
 
 // Motion 13.2 effect registry: build effects for non-DOM subjects with
 // `createEffect` and register them via `animate.addEffect`. `createEffect`
