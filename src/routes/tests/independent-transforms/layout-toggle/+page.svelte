@@ -18,8 +18,18 @@
      * again: `componentDidMount` runs, never `willUpdate()`
      * (`motion/features/layout/MeasureLayout.tsx`, 39-65).
      *
-     * - `#toggle-layout` and `#toggle-layout-id` run a slow accelerated `x`
-     *   animation. Re-enabling must not move it to the main thread.
+     * Since Motion 14.7.1 (#1411) the render that REMOVES a `layoutId` is an
+     * update, not an unmount: `motion/index.tsx` @ v14.7.1 keeps
+     * `MeasureLayout` while `projection.options.layoutId` is still set, and
+     * its `getSnapshotBeforeUpdate` calls `willUpdate()`
+     * (`MeasureLayout.tsx:149-204` @ v14.7.1), which demotes accelerated
+     * transforms (motion-dom `create-projection-node.ts:744-750`).
+     *
+     * - `#toggle-layout` runs a slow accelerated `x` animation. Re-enabling
+     *   must not move it to the main thread.
+     * - `#toggle-layout-id` runs the same animation. Removing its `layoutId`
+     *   demotes `x` to the main thread; re-enabling is a mount and doesn't
+     *   snapshot it again.
      * - `#toggle-widen` is re-enabled in the same update that widens it. The
      *   widen isn't a layout update of a mounted element, so it jumps.
      */
