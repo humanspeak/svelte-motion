@@ -717,3 +717,37 @@ then the pop rule goes in during `useInsertionEffect`. Match that order:
 
 Keep the `transform-origin: 50% 50% !important` pin on the test page for now, with a comment pointing to plan 013,
 which owns the `setCompositorHints` resting `transform-origin: 0 0` divergence.
+
+## Amendments (operator-approved 2026-10-28)
+
+### A2: a cached resting point for the owned path ("item added in the same render")
+
+Svelte has no hook before the DOM commit. By `PresenceChild`'s `$effect.pre`, the page's `{#each}` has already
+inserted the new item, so the owned path measures the "before" point 70px off. Upstream reads it in
+`getSnapshotBeforeUpdate` (`PresenceChild/PopChild.tsx` @v14.7.1), before React commits anything.
+
+1. Give `PresenceChild` a cached resting point for its pop element, as the clone path already has. Record it at
+   the end of each settled flush (post-update `$effect`), and refresh it from an observer when the element or its
+   siblings change size or position (for example a `ResizeObserver` on the element and its parent, plus the scroll
+   containers you already track). The cache must hold the value from before the current render's DOM changes.
+2. `applyPop` reads the cached point when one exists, and falls back to measuring live when it doesn't (first
+   render, or the cache was invalidated). Tear the observers down when the child unmounts or its exit completes.
+3. Stay inside 008's files (`presence.ts`, `PresenceChild.svelte`, their specs and harnesses). If the cache needs
+   `_MotionContainer.svelte` or `layout.ts`, STOP and report.
+4. Red first: a unit test that adds an item in the same render as the exit and fails on the live-measure order,
+   then passes with the cache. The owned "item added in the same render" e2e case must pass. Re-run the whole spec
+   on both paths, and the existing `e2e/animate-presence` suite, so the cache causes no regression.
+
+### A3: the four scrollable-element clamp cases move to plan 015
+
+The four "scrollable element" and "positioned scrollable element in a scale(0.5) ancestor" clamp cases (owned and
+clone paths) fail outside 008's code. The owned path fails because siblings take no layout snapshot, and the
+clone path because the cached layout rects are stale after `#scroller` scrolls. Plan 015 owns both, and ships in
+this release.
+
+1. Mark exactly those four cases `test.fixme`, each with a comment: `// Plan 015: <owned: siblings take no
+   snapshot | clone: stale cached rects after the container scrolls>`. Use a condition inside the existing loop;
+   don't restructure the spec.
+2. Record their current failure numbers in your report (owned 52px / 12px, clone 1392px / 313px, or whatever they
+   are now), so 015 has a baseline.
+3. Then continue with Steps 5–7. The done criteria count the four as expected `fixme`s, not failures.
