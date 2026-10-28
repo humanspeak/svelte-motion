@@ -728,7 +728,12 @@
     // Upstream AnimatePresence only holds direct motion children for exit.
     // Nested motion elements can animate on mount/update, but their own
     // conditional unmounts are immediate unless wrapped in another boundary.
-    const shouldRegisterPresenceExit = !!context && presenceDepth === 0 && !inPresenceChild
+    const shouldRegisterPresenceExit =
+        !!context &&
+        presenceDepth === 0 &&
+        // A legacy `<AnimatePresence propagate>` child exits as a real node
+        // with its parent, and through its own boundary's clone path alone.
+        (!inPresenceChild || presenceChildContext?.propagated === true)
 
     // Use the provided key for presence tracking, normalized to a string so
     // numeric keys (e.g. 0) address the same registry entries as their
@@ -753,6 +758,8 @@
     if (shouldRegisterPresenceExit) {
         onDestroy(() => {
             pwLog('[presence] onDestroy triggered', { key: presenceKey })
+            // Already exited with its parent (`propagate`): no clone exit.
+            if (presenceChildContext?.propagated === true && !presenceChildContext.isPresent) return
             context.unregisterChild(presenceKey)
         })
     }
