@@ -293,11 +293,23 @@
         font-family: monospace;
         font-size: 12px;
     }
+    /*
+     * Each column reserves the expanded 400px parent, so growing parents
+     * never overlap or push each other. The row wraps on narrow windows and
+     * starts at the left, clear of the tester panel's right-hand column.
+     */
     .row {
         display: flex;
+        flex-wrap: wrap;
+        align-self: flex-start;
         gap: 40px;
-        padding: 20px;
         margin-top: 240px;
+        margin-right: auto;
+        padding: 20px;
+    }
+    .row > div {
+        flex: none;
+        width: 400px;
     }
     .caption {
         margin-bottom: 8px;
