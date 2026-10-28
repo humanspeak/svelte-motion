@@ -1944,3 +1944,233 @@ describe('MotionDomProjectionAdapter departing-lead snapshot (#1935 A1)', () => 
         expect(seen).toBe(handed)
     })
 })
+
+describe('MotionDomProjectionAdapter scroll-rebased snapshots (plan 015a)', () => {
+    type RectLike = { left: number; top: number; width: number; height: number }
+    /** Content-space (unscrolled) rects; the viewport rect subtracts the scroller's scroll. */
+    const content = new Map<HTMLElement, { left: number; top: number }>()
+    const mounted: MotionDomProjectionAdapter[] = []
+    let scroller: HTMLElement
+
+    const makeScroller = (style = 'overflow: auto') => {
+        const element = document.createElement('div')
+        element.setAttribute('style', style)
+        document.body.appendChild(element)
+        vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 320))
+        return element
+    }
+    const create = (parent: HTMLElement, top: number, style = '') => {
+        const element = document.createElement('div')
+        if (style) element.setAttribute('style', style)
+        parent.appendChild(element)
+        content.set(element, { left: 10, top })
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
+            const at = content.get(element)!
+            const scrolled = parent === scroller && !style.includes('sticky')
+            return new DOMRect(at.left, at.top - (scrolled ? scroller.scrollTop : 0), 100, 50)
+        })
+        return element
+    }
+    const mount = (
+        element: HTMLElement,
+        options: { layout?: boolean; layoutId?: string; layoutScroll?: boolean } = {
+            layout: true
+        },
+        extra: ConstructorParameters<typeof MotionDomProjectionAdapter>[0] = {}
+    ) => {
+        const adapter = new MotionDomProjectionAdapter(extra)
+        adapter.updateOptions(options)
+        adapter.mount(element)
+        mounted.push(adapter)
+        return adapter
+    }
+    /** Scroll and let the tracker see it, as a browser's `scroll` event would. */
+    const scrollTo = (element: HTMLElement, top: number) => {
+        element.scrollTop = top
+        element.dispatchEvent(new Event('scroll'))
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+    const topOf = (rect: RectLike | null | undefined) => rect?.top
+    /** Plan 015a's adapter API, typed here so these cases compile on their own. */
+    type Rebasing = {
+        lastReadScrollBasis?: unknown
+        commitObservedLayoutChange(previous?: RectLike, options?: { previousBasis?: unknown }): void
+    }
+    const rebasing = (adapter: MotionDomProjectionAdapter) => adapter as unknown as Rebasing
+    const foldedInFor = (element: Element) =>
+        (
+            MotionDomProjectionAdapter as unknown as {
+                foldedInFor(element: Element): ((container: Element) => boolean) & {
+                    wasRoot?: boolean
+                }
+            }
+        ).foldedInFor(element)
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        content.clear()
+        scroller = makeScroller()
+    })
+    afterEach(async () => {
+        await flush()
+        for (const adapter of mounted.splice(0)) adapter.unmount()
+        document.body.innerHTML = ''
+        document.documentElement.scrollTop = 0
+    })
+
+    it('3a: commitGroup seeds the rebased snapshot after a scroller scrolls 0 → 500', () => {
+        const group = nodeGroup()
+        mount(create(scroller, 100), { layout: true }, { group })
+        const b = mount(create(scroller, 200), { layout: true }, { group })
+
+        scrollTo(scroller, 500)
+        MotionDomProjectionAdapter.commitGroup(group)
+
+        // Upstream's live willUpdate would measure 200 - 500.
+        expect(b.projection.snapshot?.layoutBox.y.min).toBe(-300)
+    })
+
+    it('3b: currentVisualPageRect is rebased after a scroller scrolls 0 → 500', () => {
+        const adapter = mount(create(scroller, 200), { layoutId: 'rebased' })
+
+        scrollTo(scroller, 500)
+
+        expect(topOf(adapter.currentVisualPageRect())).toBe(-300)
+        // A fresh read agrees.
+        expect(topOf(adapter.measurePageRect('measure', { silent: true }))).toBe(-300)
+    })
+
+    it('3c: commitObservedLayoutChange rebases a raw previous rect by its previousBasis', () => {
+        const adapter = mount(create(scroller, 200))
+        const previous = adapter.measurePageRect('measure', { silent: true })!
+        const previousBasis = rebasing(adapter).lastReadScrollBasis
+
+        scrollTo(scroller, 500)
+        rebasing(adapter).commitObservedLayoutChange(previous, { previousBasis })
+
+        expect(adapter.projection.snapshot?.layoutBox.y.min).toBe(-300)
+    })
+
+    it('3d: a fixed element is rebased by +300 after a window scroll of 300', () => {
+        const element = create(document.body, 100, 'position: fixed')
+        const adapter = mount(element, { layoutId: 'fixed' })
+        expect(topOf(adapter.currentVisualPageRect())).toBe(100)
+
+        // A fixed element's page box moves with the window scroll (upstream
+        // `measurePageBox` adds the root scroll to its fixed viewport box).
+        document.documentElement.scrollTop = 300
+        document.dispatchEvent(new Event('scroll'))
+
+        expect(topOf(adapter.currentVisualPageRect())).toBe(400)
+        expect(topOf(adapter.measurePageRect('measure', { silent: true }))).toBe(400)
+    })
+
+    it('3e: a post-clamp commit in the same task is not shifted (phantom tripwire)', async () => {
+        const aElement = create(scroller, 100)
+        const bElement = create(scroller, 200)
+        const a = mount(aElement)
+        const b = mount(bElement)
+        scrollTo(scroller, 500)
+        a.refreshLayout({ silent: true })
+        b.refreshLayout({ silent: true })
+        const starts = new Map<MotionDomProjectionAdapter, number>([
+            [a, 0],
+            [b, 0]
+        ])
+        for (const adapter of [a, b]) {
+            adapter.projection.addEventListener('animationStart', () =>
+                starts.set(adapter, starts.get(adapter)! + 1)
+            )
+        }
+
+        // Content shrank: the scroll position clamps with no scroll event yet.
+        scroller.scrollTop = 430
+        a.commitObservedLayoutChange()
+        const bRect = b.refreshLayout({ silent: true })!
+        b.commitObservedLayoutChange()
+
+        expect(b.projection.snapshot?.layoutBox.y.min).toBe(bRect.top)
+        await flush()
+        await flush()
+        expect(starts.get(a)).toBeLessThanOrEqual(1)
+        expect(starts.get(b)).toBeLessThanOrEqual(1)
+    })
+
+    it('3f: a node on a sticky path keeps its unrebased cache', () => {
+        const element = create(scroller, 0, 'position: sticky; top: 0')
+        const adapter = mount(element)
+        const cached = adapter.currentVisualPageRect()
+
+        scrollTo(scroller, 500)
+
+        expect(adapter.currentVisualPageRect()).toEqual(cached)
+        adapter.commitObservedLayoutChange()
+        expect(adapter.projection.snapshot?.layoutBox.y.min).toBe(cached!.top)
+    })
+
+    it('3g: a node with no scrollers keeps no scroll basis', () => {
+        const adapter = mount(create(document.body, 100))
+        adapter.measurePageRect('measure', { silent: true })
+
+        expect(rebasing(adapter).lastReadScrollBasis).toBeFalsy()
+    })
+
+    it('3n: foldedInFor folds in a mounted layoutScroll container, until it unmounts', () => {
+        const container = mount(scroller, { layoutScroll: true })
+        const inner = document.createElement('div')
+        scroller.appendChild(inner)
+
+        expect(foldedInFor(inner)(scroller)).toBe(true)
+        expect(foldedInFor(document.body)(scroller)).toBe(false)
+        container.unmount()
+        expect(foldedInFor(inner)(scroller)).toBe(false)
+        expect(foldedInFor(inner).wasRoot).toBe(false)
+    })
+
+    /**
+     * A browser-like rect: the layout box moved by every inline translate on
+     * the element and its ancestors.
+     */
+    const drawn = (element: HTMLElement, layoutLeft: number) =>
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
+            let left = layoutLeft
+            for (let node: HTMLElement | null = element; node; node = node.parentElement) {
+                for (const [, name, args] of node.style.transform.matchAll(/(\w+)\(([^)]*)\)/g)) {
+                    if (/^translate(X|3d)?$/.test(name)) left += parseFloat(args)
+                }
+            }
+            return new DOMRect(left, 0, 100, 50)
+        })
+
+    it('3o: the handoff rect inside an ancestor drawn at translateX(100px) is its on-screen box', () => {
+        const parentElement = document.createElement('div')
+        document.body.appendChild(parentElement)
+        drawn(parentElement, 0)
+        const parent = mount(parentElement)
+        // The ancestor's `style={{ x: 100 }}`: rendered as translateX(100px).
+        parent.visualElement.latestValues.x = 100
+        parent.visualElement.render()
+        expect(parentElement.style.transform).toContain('translateX(100px)')
+
+        const element = document.createElement('div')
+        parentElement.appendChild(element)
+        drawn(element, 10)
+        const adapter = mount(element, { layoutId: 'ancestor-x' }, { parent })
+
+        expect(adapter.currentVisualPageRect()?.left).toBe(element.getBoundingClientRect().left)
+    })
+
+    it('3p: the handoff rect of an element with its own x: 100 is its on-screen box', () => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        drawn(element, 10)
+        const adapter = mount(element, { layoutId: 'own-x' })
+        adapter.visualElement.latestValues.x = 100
+        adapter.visualElement.render()
+        expect(element.style.transform).toContain('translateX(100px)')
+        adapter.seedLayout()
+
+        expect(adapter.currentVisualPageRect()?.left).toBe(element.getBoundingClientRect().left)
+    })
+})

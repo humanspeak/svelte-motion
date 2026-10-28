@@ -159,15 +159,13 @@ for (const path of PATHS) {
             test(`popLayout exiting item moves with the content when the ${name}'s scroll position is clamped`, async ({
                 page
             }) => {
-                // Plan 015: owned: siblings take no snapshot | clone: stale
-                // cached rects after the container scrolls. Both
-                // scrollable-element cases fail outside the #2348
-                // correction, on both paths.
+                // Plan 015b: on the owned path the siblings take no
+                // snapshot, so both scrollable-element cases fail outside
+                // the #2348 correction. (Plan 015a fixed the clone path's
+                // stale cached rects after the container scrolls.)
                 test.fixme(
-                    query.includes('&scroller'),
-                    path === 'owned'
-                        ? 'Plan 015: siblings take no snapshot'
-                        : 'Plan 015: stale cached rects after the container scrolls'
+                    path === 'owned' && query.includes('&scroller'),
+                    'Plan 015b: owned siblings take no snapshot'
                 )
                 await setup(page, path, query)
 
