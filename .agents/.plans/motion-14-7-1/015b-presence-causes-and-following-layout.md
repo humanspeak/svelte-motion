@@ -625,3 +625,49 @@ from there). Upstream behaviour comes from a React 18 + `framer-motion@14.7.1` r
 
 **Not changed.** MultiStateBadge (`mode="sync"`, width through `animate.width`) needs no snap. Its operator
 sign-off stays in Done criteria.
+
+### A2 (2026-10-29, operator-approved)
+
+Answers the A1 STOPs at `0c065cae`. Upstream frames come from the ModeButton mirror (`/tmp/fm1471-repro/src/modeshell.tsx`,
+`m-mode.mjs`) and the siblings mirror (`src/siblings.tsx`, `m-siblings.mjs`), both on React 18 + `framer-motion@14.7.1`.
+
+**1. Wait-mode release snaps outside the boundary (`commitPresenceLayoutRelease` comes into scope).**
+- Upstream, with no group: the shell snaps from 77.31 to 92.97 px, and the label centre stays at 0 px in every frame.
+- Ours: the shell snaps the same way, but the label starts 15.66 px off-centre. The wait-mode hold-release FLIP
+  animates the `.state` span, which sits outside the `AnimatePresence` boundary.
+- Fix: in `commitPresenceLayoutRelease`, apply the same rule as B(c). A completion that doesn't re-render the held
+  element (not inside a cause boundary, and not in the same `LayoutGroup`) refreshes it silently instead of running
+  the release FLIP (`index.tsx:244`, `use-presence.ts:40-43`).
+- Inside a shared `LayoutGroup`, the release still animates.
+- Keep the 8.5 px cap on `:898` unchanged. Our wait frames must match upstream's within 1 px, per frame.
+- Red first: `:898`'s wait branch already fails. Add a unit case for the rule.
+- The "Wait mode" maintenance note is now partly closed. Update it.
+
+**2. Fix the grouped shell's size animation clash in 015b (pre-existing bug; operator: "fix the bug").**
+- The bug: in `wait-group`, the shell's inline-width size animation and its projection `scale` run together. The width
+  restarts from near its origin (79 → 86 → 80 → 93 px), and the inline `width` never clears.
+- It reproduces on the Step 1 code too.
+- Upstream (the `?group` mirror) animates the width smoothly in one run. The label drifts at most 7.83 px off
+  centre.
+- In scope: the size-animation path that the clash runs through (find it from `data-svelte-motion-layout` /
+  `[data-layout-size-animation]` and `commitGroup`), plus whatever it touches in `_MotionContainer.svelte`,
+  `layout.ts` and `motionDomProjection.ts`.
+- First, record the root cause and the frames, and add a red unit or component case that reproduces the restart.
+- Then fix it so that:
+  - `wait-group` animates in one monotonic run, with no restart toward the origin;
+  - the inline `width` clears at rest;
+  - ours paints upstream's `?group` frames within 2 px per frame.
+- Still out of scope: `PresenceChild.svelte` and `AnimatePresence.svelte`. If the fix needs either one, STOP.
+- No budget raises, and no loosening of other `layout-button` cases. The full `e2e/animate-presence` run and the
+  Step 5 guard set must stay green.
+
+**3. The owned `?layoutScroll` GUARD follows upstream's stacking.**
+- On the owned path, upstream draws exactly what we draw:
+  - pink is hit in 10–11 of 20 frames;
+  - green covers pink's centre from 164–170 ms;
+  - the popped element has no z-index (`PopChild.tsx:167-168`).
+- Only our exit clone raises its z-index.
+- Change the owned branch of that case so that pink holds its position, stays fully visible until green first covers
+  its centre, and green covers it no earlier than 140 ms after the pop.
+- The clone branch keeps "at least 10 frames with blue and pink". Cite `PopChild.tsx:167-168` in the spec.
+- This one edit is allowed by the Done criteria's "no weakening" check.
