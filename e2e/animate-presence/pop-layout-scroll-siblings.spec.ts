@@ -609,6 +609,31 @@ const waitForCompletion = (page: Page) =>
         timeout: 5000
     })
 
+/**
+ * Green's readings with the ones pink covers made capture gaps (plan 015b
+ * A3.2, A4). On the owned path the popped pink item is the real element:
+ * transformed while it moves with the clamp, unstacked (no z-index:
+ * `PopChild.tsx:167-168` @ v14.7.1) and taking pointer events, it draws over
+ * green, as in Motion (the framer-motion 14.7.1 mirror,
+ * `/tmp/fm1471-repro/m-clamp.mjs`, plain and `?sticky`: green's bottom holds
+ * in every frame). Where pink covers green's bottom, the found edge is pink's
+ * top: such a reading, hit-tested or painted, is a gap, and step
+ * measurements reset there. Only green's readings change; check blue and
+ * pink on the recording itself (a gap frame resets every colour).
+ */
+function withoutCoveredGreen(recording: Recording): Recording {
+    return {
+        hits: recording.hits.map((hit) =>
+            hit.greenBelowPink ? { ...hit, green: undefined } : hit
+        ),
+        frames: recording.frames.map((frame) => {
+            const { green, pink } = frame.bands
+            if (!green || !pink || Math.abs(pink.top - green.bottom) > 2) return frame
+            return { ...frame, gap: true, bands: { ...frame.bands, green: undefined } }
+        })
+    }
+}
+
 test.describe('layout siblings around exits (plan 015b, owned path)', () => {
     test('clamp, popLayout: blue, pink and green move together, no jump', async ({ page }) => {
         await open(page, '&path=owned')
@@ -616,22 +641,7 @@ test.describe('layout siblings around exits (plan 015b, owned path)', () => {
         await page.waitForTimeout(200)
         const recording = await record(page, () => remove(page), 900)
         annotate(recording)
-        // The popped pink item is the real element here: transformed while
-        // it moves with the clamp, unstacked (no z-index:
-        // `PopChild.tsx:167-168` @ v14.7.1) and taking pointer events, it
-        // draws over green, as in Motion (the framer-motion 14.7.1 mirror,
-        // `/tmp/fm1471-repro/m-clamp.mjs`: green's bottom holds in every
-        // frame). Where pink covers green's bottom, the found edge is pink's
-        // top: such a reading, hit-tested or painted, is a capture gap
-        // (plan 015b A3.2).
-        const hits = recording.hits.map((hit) =>
-            hit.greenBelowPink ? { ...hit, green: undefined } : hit
-        )
-        const frames = recording.frames.map((frame) => {
-            const { green, pink } = frame.bands
-            if (!green || !pink || Math.abs(pink.top - green.bottom) > 2) return frame
-            return { ...frame, gap: true, bands: { ...frame.bands, green: undefined } }
-        })
+        const { frames, hits } = withoutCoveredGreen(recording)
         const start = framesWith(frames, ['blue', 'pink', 'green'])[0].bands
         const all = framesWith(frames, ['blue', 'pink'])
         expect(all.length).toBeGreaterThanOrEqual(10)
@@ -765,7 +775,9 @@ test.describe('layout siblings around exits (plan 015b, owned path)', () => {
         await page.waitForTimeout(200)
         const recording = await record(page, () => remove(page), 900)
         annotate(recording)
-        expectNoJump(recording, ['blue', 'green'])
+        // Pink draws over green here too (see `withoutCoveredGreen`, A4).
+        expectNoJump(recording, ['blue'])
+        expectNoJump(withoutCoveredGreen(recording), ['green'])
     })
 
     test('sync completion, no LayoutGroup: blue snaps once by 70px (as in Motion)', async ({
