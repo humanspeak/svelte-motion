@@ -45,6 +45,10 @@ const TOP = 100
 type Update = { snapshot: number; layout: number }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+/**
+ * Pops, adds and removals are checked within 120ms; popLayout cases use a 2s
+ * owned exit so its completion (cases 5 and 10) stays out of that window.
+ */
 const settle = async (ms = 120) => {
     await tick()
     await sleep(ms)
@@ -157,7 +161,7 @@ describe('layout siblings around AnimatePresence changes (plan 015b)', () => {
 
     // 1. RED (owned): popping item 1 out of flow moves item 2 up a slot.
     it('1: owned popLayout, item 1 exits: item 2 animates once from its old slot', async () => {
-        const { update } = await mount({ mode: 'popLayout' })
+        const { update } = await mount({ mode: 'popLayout', slow: true })
         const updates = listen(['item-2'])
 
         await update({ remove: [1] })
@@ -170,7 +174,7 @@ describe('layout siblings around AnimatePresence changes (plan 015b)', () => {
     // header before it is never touched (GUARD).
     for (const clone of [false, true]) {
         it(`2: ${clone ? 'clone' : 'owned'} popLayout, item 1 exits: the footer animates, the header is untouched`, async () => {
-            const { update } = await mount({ mode: 'popLayout', clone })
+            const { update } = await mount({ mode: 'popLayout', clone, slow: true })
             const updates = listen(['footer', 'header'])
             reads.clear()
 
@@ -223,9 +227,13 @@ describe('layout siblings around AnimatePresence changes (plan 015b)', () => {
     // 6. Clone sync completion, no LayoutGroup.
     it('6: clone sync completion: a footer outside the list parent snaps (GUARD)', async () => {
         const { update } = await mount({ mode: 'sync', clone: true })
+        await update({ remove: [1] })
+        // The removal itself re-renders the list's owner, footer included
+        // (a pass in which it doesn't move); the completion must not.
+        await settle(40)
+        expect(document.querySelector('[data-clone]')).not.toBeNull()
         const updates = listen(['footer'])
 
-        await update({ remove: [1] })
         await settle(300)
 
         expect(document.querySelector('[data-clone]')).toBeNull()
@@ -315,7 +323,12 @@ describe('layout siblings around AnimatePresence changes (plan 015b)', () => {
     // 9. GUARD: an unchanged layoutDependency takes no snapshot.
     for (const clone of [false, true]) {
         it(`9: ${clone ? 'clone' : 'owned'} popLayout: item 2 with an unchanged layoutDependency has no didUpdate (GUARD)`, async () => {
-            const { update } = await mount({ mode: 'popLayout', clone, gateItem2: true })
+            const { update } = await mount({
+                mode: 'popLayout',
+                clone,
+                gateItem2: true,
+                slow: true
+            })
             const updates = listen(['item-2'])
 
             await update({ remove: [1] })
@@ -353,4 +366,19 @@ describe('layout siblings around AnimatePresence changes (plan 015b)', () => {
         expect(document.getElementById('item-1')).toBeNull()
         expect(silent).toContain('item-2')
     })
+
+    // A1.1 GUARD: part D runs on an add, never for the initial render.
+    for (const clone of [false, true]) {
+        it(`A1.1: ${clone ? 'clone' : 'owned'}, initial render of N items and a footer: no follower seed`, async () => {
+            const seed = vi.spyOn(MotionDomProjectionAdapter, 'seedFollowingLayout')
+            await mount({ mode: 'popLayout', clone, items: 5 })
+            const updates = listen(['footer'])
+            await settle()
+
+            const list = document.getElementById('list')!
+            const perParent = seed.mock.calls.filter(([parent]) => parent === list).length
+            expect(perParent).toBeLessThanOrEqual(1)
+            expect(updates.footer).toEqual([])
+        })
+    }
 })

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { sampleTransformSeries } from '../_helpers/transform'
 
 type ButtonSample = {
@@ -1638,57 +1638,94 @@ test.describe('AnimatePresence layout button dogfood', () => {
         expect(returned.width).toBeGreaterThan(before.width + 4)
     })
 
-    test('animates button width instead of snapping to the final size', async ({ page }) => {
+    /**
+     * Per-rAF widths of `${prefix}-button` from the click until 3s later,
+     * plus its resting widths before and after.
+     */
+    const recordWaitSwap = async (page: Page, prefix: 'wait' | 'wait-group') => {
         await page.goto('/tests/animate-presence/layout-button?@isPlaywright=true')
 
-        const button = page.getByTestId('wait-button')
+        const button = page.getByTestId(`${prefix}-button`)
         await expect(button).toBeVisible()
         await expect(button).toHaveText('copy')
         await expect(button).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
-        await expectReadyCopyState(page, 'wait')
+        await expectReadyCopyState(page, prefix)
 
         const baselineWidth = await button.evaluate(
             (element) => element.getBoundingClientRect().width
         )
-
-        await button.click()
-        await expect(page.getByTestId('wait-copied-state')).not.toHaveAttribute(
-            'data-presence-wait-hidden',
-            'true',
-            { timeout: 2500 }
-        )
-
-        const samples = await page.evaluate(async () => {
-            const buttonElement = document.querySelector<HTMLElement>('[data-testid="wait-button"]')
-            if (!buttonElement) throw new Error('missing wait button')
+        const samples = await page.evaluate(async (testIdPrefix) => {
+            const buttonElement = document.querySelector<HTMLElement>(
+                `[data-testid="${testIdPrefix}-button"]`
+            )
+            if (!buttonElement) throw new Error(`missing ${testIdPrefix} button`)
 
             const widths: number[] = []
             const started = performance.now()
+            buttonElement.click()
 
             return await new Promise<number[]>((resolve) => {
                 const frame = () => {
                     widths.push(buttonElement.getBoundingClientRect().width)
-                    if (performance.now() - started < 2600) requestAnimationFrame(frame)
+                    if (performance.now() - started < 3000) requestAnimationFrame(frame)
                     else resolve(widths)
                 }
                 requestAnimationFrame(frame)
             })
-        })
+        }, prefix)
 
-        await page.waitForFunction(() => {
-            const buttonElement = document.querySelector<HTMLElement>('[data-testid="wait-button"]')
+        await page.waitForFunction((testIdPrefix) => {
+            const buttonElement = document.querySelector<HTMLElement>(
+                `[data-testid="${testIdPrefix}-button"]`
+            )
             return buttonElement && buttonElement.style.width === ''
-        })
-
+        }, prefix)
         const settledWidth = await button.evaluate(
             (element) => element.getBoundingClientRect().width
         )
-        expect(settledWidth).toBeGreaterThan(baselineWidth + 4)
+        expect(settledWidth, prefix).toBeGreaterThan(baselineWidth + 4)
+        return { baselineWidth, settledWidth, samples }
+    }
+
+    /**
+     * Wait mode, no LayoutGroup: the shell is outside the AnimatePresence,
+     * and the exit's completion re-renders only the AnimatePresence
+     * (`AnimatePresence/index.tsx:244` @ v14.7.1), so the shell has no
+     * snapshot when the new label mounts and snaps to its width, as in
+     * Motion. Plan 015b A1.2: the framer-motion 14.7.1 mirror of ModeButton
+     * (`/tmp/fm1471-repro/src/modeshell.tsx`) paints 77.31px, then 92.97px
+     * in the next frame, with no width between.
+     */
+    test('snaps the wait button width to the final size, as in Motion', async ({ page }) => {
+        const { baselineWidth, settledWidth, samples } = await recordWaitSwap(page, 'wait')
 
         const intermediateWidths = samples.filter(
             (width) => width > baselineWidth + 1 && width < settledWidth - 1
         )
-        expect(intermediateWidths.length).toBeGreaterThan(3)
+        expect(intermediateWidths).toEqual([])
+        const snap = samples.findIndex((width) => width >= settledWidth - 1)
+        expect(snap).toBeGreaterThan(0)
+        expect(Math.abs(samples[snap - 1] - baselineWidth)).toBeLessThanOrEqual(1)
+        expect(Math.max(...samples)).toBeLessThanOrEqual(settledWidth + 2)
+    })
+
+    /**
+     * Wait mode in a LayoutGroup: the completion's `forceRender` re-renders
+     * the group (`AnimatePresence/index.tsx:206`, `LayoutGroup/index.tsx:31,
+     * 50-53`, `group.ts`), so the shell animates its width, as in Motion
+     * (the mirror's `?group` frames: 77.31px to 92.97px over 2.4s).
+     */
+    test('animates the wait button width inside a LayoutGroup', async ({ page }) => {
+        const { baselineWidth, settledWidth, samples } = await recordWaitSwap(page, 'wait-group')
+
+        const intermediateWidths = samples.filter(
+            (width) => width > baselineWidth + 1 && width < settledWidth - 1
+        )
+        expect(intermediateWidths.length).toBeGreaterThanOrEqual(3)
+        const change = settledWidth - baselineWidth
+        for (let i = 1; i < samples.length; i++) {
+            expect(Math.abs(samples[i] - samples[i - 1])).toBeLessThanOrEqual(0.35 * change)
+        }
         expect(Math.max(...samples)).toBeLessThanOrEqual(settledWidth + 2)
     })
 

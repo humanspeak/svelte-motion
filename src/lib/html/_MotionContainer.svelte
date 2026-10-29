@@ -71,7 +71,14 @@
         runLayoutSizeAnimation,
         finishFlipAnimations,
         isLayoutMeasurementGated,
+        isObservedLayoutParent,
+        layoutParentOf,
+        markExiting,
+        mergeLayoutCauses,
         observeLayoutChanges,
+        unmarkExiting,
+        type ExitMarker,
+        type LayoutChangeCause,
         selectLayoutDependencies,
         sizeCorrectionSeedEvent,
         sizeCorrectionEndEvent,
@@ -315,6 +322,38 @@
     // node group is handed to the adapter below (plan 007 D3).
     const layoutGroupContext = getLayoutGroupContext()
     const layoutGroupId = layoutGroupContext?.id
+
+    // Plan 015b (R5): mark this element as exiting when its own presence
+    // flips to absent, so the removal that completes the exit reads as one
+    // (see `markExiting`). Only while it is shown: a wait-mode child that was
+    // never revealed has no exit to complete. Cleared only on re-entry, never
+    // in a teardown: Svelte removes the DOM before teardowns run, and the
+    // removal is classified after both.
+    let exitMarker: ExitMarker | null = null
+    $effect(() => {
+        const isPresent = presenceChildContext?.isPresent
+        const target = element
+        if (!presenceChildContext || !target) return
+        untrack(() => {
+            if (isPresent === false) {
+                if (
+                    exitMarker ||
+                    !target.isConnected ||
+                    target.hasAttribute('data-presence-wait-hidden')
+                ) {
+                    return
+                }
+                exitMarker = {
+                    boundary: target.closest('.animate-presence-container'),
+                    group: layoutGroupContext?.group
+                }
+                markExiting(target, exitMarker)
+            } else if (exitMarker) {
+                unmarkExiting(target)
+                exitMarker = null
+            }
+        })
+    })
     const scopedLayoutId = $derived(
         layoutIdProp ? scopeLayoutId(layoutGroupId, layoutIdProp) : undefined
     )
@@ -894,7 +933,9 @@
                 // derived: that value also feeds the projection adapter, and
                 // upstream does not skip layout/FLIP animations.
                 skipAnimations ? { ...mergedTransition, skipAnimations: true } : mergedTransition,
-                resolvePresenceExit
+                resolvePresenceExit,
+                // Plan 015b (R6): the clone's completion re-renders this group.
+                layoutGroupContext?.group
             )
         }
     })
@@ -1946,6 +1987,8 @@
             layoutScroll: layoutScrollProp,
             layoutAnchor: layoutAnchorProp,
             layoutDependency: layoutDependencyProp,
+            // Plan 015b (R7): part D never seeds a gated node.
+            measurementGated: layoutMeasurementGated,
             transition: mergedTransition as never,
             style: styleProp,
             alwaysMeasureLayout: upstreamAlwaysMeasureLayout
@@ -1982,6 +2025,7 @@
                 layoutRoot: layoutRootProp,
                 layoutAnchor: layoutAnchorProp,
                 layoutDependency: layoutDependencyProp,
+                measurementGated: layoutMeasurementGated,
                 transition: mergedTransition as never,
                 style: styleProp,
                 alwaysMeasureLayout: upstreamAlwaysMeasureLayout
@@ -2214,6 +2258,8 @@
     const layoutMountTracker = createMeasureLayoutMountTracker()
     let lastRect: RectLike | null = null
     let observerRestartRect: RectLike | null = null
+    // Plan 015b A1.1: this element's mount was reported to part D (once).
+    let followAddReported = false
     let observerRestartElement: HTMLElement | null = null
     // The scroll basis each cached rect was read in (plan 015a): a scroll
     // container that isn't `layoutScroll`, or the window under a fixed
@@ -2768,9 +2814,52 @@
             return changed
         }
 
-        const commitObservedLayout = () => {
+        // Plan 015b: a completed exit re-renders only its AnimatePresence
+        // (and the children of a nested one in it) and, through
+        // `forceRender`, its LayoutGroup (`AnimatePresence/index.tsx:206,
+        // 244` @ v14.7.1, `use-presence.ts:40-43`, `group.ts:26-33`). Any
+        // other node snaps.
+        const boundariesHolding = (cause: LayoutChangeCause | undefined) =>
+            cause?.kind === 'exit-complete'
+                ? cause.markers.flatMap(({ boundary }) =>
+                      boundary?.contains(element!) ? [boundary] : []
+                  )
+                : []
+        const isSnappedBy = (cause: LayoutChangeCause | undefined) =>
+            cause?.kind === 'exit-complete' &&
+            !boundariesHolding(cause).length &&
+            !(
+                layoutGroupContext?.group &&
+                cause.markers.some(({ group }) => group === layoutGroupContext.group)
+            )
+
+        // One completion is one upstream render: the trailing frame and an
+        // inheriting ResizeObserver delivery carry the same cause object, and
+        // must not snap or re-seed again (a second seed would restart the
+        // descendants from their stale caches).
+        const handledCompletions = new WeakSet<LayoutChangeCause>()
+        const isHandledCompletion = (cause: LayoutChangeCause | undefined) => {
+            if (cause?.kind !== 'exit-complete') return false
+            if (handledCompletions.has(cause)) return true
+            handledCompletions.add(cause)
+            return false
+        }
+
+        const commitObservedLayout = (cause?: LayoutChangeCause) => {
             if (suppressObservedLayoutCommit()) return
             if (isObservedCommitGated()) {
+                if (isHandledCompletion(cause)) return
+                refreshGatedLayoutCache()
+                // M1: a gated node inside the completing boundary still
+                // re-renders upstream, so its descendants in that boundary
+                // snapshot (its own box stays gated).
+                const boundaries = boundariesHolding(cause)
+                if (boundaries.length) motionDomProjection?.commitDescendantsWithin(boundaries)
+                return
+            }
+            if (isSnappedBy(cause)) {
+                if (isHandledCompletion(cause)) return
+                takeOwnSubtreeChange()
                 refreshGatedLayoutCache()
                 return
             }
@@ -2889,13 +2978,18 @@
             }
         }
 
-        const scheduleProjectionCommit = () => {
+        // Causes of calls the throttle dropped, merged (plan 015b).
+        let pendingCommitCause: LayoutChangeCause | undefined
+        const scheduleProjectionCommit = (cause?: LayoutChangeCause) => {
+            pendingCommitCause = mergeLayoutCauses(pendingCommitCause, cause)
             // A sibling animation can occupy this frame's throttle before a
             // keyed reorder moves the dragged element. Consume its fresh slot
             // immediately so the upstream delta compensates the drag before
             // paint; waiting another frame exposes the uncompensated DOM move.
             if (rafId && !isDragActive()) return
-            commitObservedLayout()
+            const merged = pendingCommitCause
+            pendingCommitCause = undefined
+            commitObservedLayout(merged)
             if (rafId) return
             rafId = requestAnimationFrame(() => {
                 rafId = null
@@ -2924,7 +3018,30 @@
         element!.addEventListener(sizeCorrectionSeedEvent, handleSizeCorrectionSeed)
         element!.addEventListener(sizeCorrectionEndEvent, handleSizeCorrectionEnd)
 
-        const disconnectObservers = observeLayoutChanges(element!, () => scheduleProjectionCommit())
+        // Part D (plan 015b): `layout` nodes after this element's layout
+        // parent, outside it, follow its children's changes.
+        const followParent = layoutParentOf(element!)
+        // A1.1: mounting into a list an earlier render already observed is
+        // an add. Upstream re-renders the list's parent, so `layout` nodes
+        // after it snapshot; with an empty list no sibling observer exists to
+        // report it, so this element does (once, deduped per microtask).
+        if (
+            !followAddReported &&
+            !restartedHere &&
+            followParent &&
+            isObservedLayoutParent(followParent)
+        ) {
+            MotionDomProjectionAdapter.seedFollowingLayout(followParent, null, { kind: 'add' })
+        }
+        followAddReported = true
+        const disconnectObservers = observeLayoutChanges(
+            element!,
+            (cause) => scheduleProjectionCommit(cause),
+            {
+                onLayoutParentChange: (parent, records, cause) =>
+                    MotionDomProjectionAdapter.seedFollowingLayout(parent, records, cause)
+            }
+        )
         // A sibling can re-slot a dragged layout element without changing the
         // dragged node, its parent, or either element's size. React observes
         // this through the parent's render commit. Svelte's fine-grained DOM
@@ -2960,18 +3077,26 @@
         // reactive commit) see the change as already consumed instead of
         // restarting the animation from origin. Grouped nodes only, so
         // ungrouped elements keep their existing arbitration untouched.
-        const offProjectionCommit = layoutGroupContext?.group
-            ? motionDomProjection?.onProjectionCommit((rect) => {
-                  setLastRect(rect)
-                  observerCommitSerial += 1
-              })
-            : undefined
+        // Ungrouped nodes fire it too when part D seeded them (plan 015b).
+        const offProjectionCommit = motionDomProjection?.onProjectionCommit((rect) => {
+            setLastRect(rect)
+            observerCommitSerial += 1
+        })
         // A resize moves elements without resizing them: the adapter
         // refreshes its cache once the resize settles and hands the rect over
         // (plan 015a), so no second read is needed here.
         const offCacheRefresh = motionDomProjection?.onCacheRefresh((rect) => setLastRect(rect))
 
         return () => {
+            // M5: when the last item of a list completes its exit, no
+            // sibling observer is left to report it, so this element's own
+            // teardown does (deduped with the observers' report).
+            if (exitMarker && followParent && !observedElement.isConnected) {
+                MotionDomProjectionAdapter.seedFollowingLayout(followParent, null, {
+                    kind: 'exit-complete',
+                    markers: [exitMarker]
+                })
+            }
             ownSubtreeObserver?.disconnect()
             offProjectionCommit?.()
             offCacheRefresh?.()

@@ -1,5 +1,6 @@
 import type { AnimatePresenceMode, MotionExit, MotionTransition } from '$lib/types'
 import { mergeTransitions } from '$lib/utils/animation'
+import { layoutParentOf, markExiting, type ExitMarker } from '$lib/utils/layout'
 import { holdLayoutIdHandoffs } from '$lib/utils/layoutId'
 import { pwLog } from '$lib/utils/log'
 import { MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
@@ -87,6 +88,11 @@ type PresenceChild = {
      * grid/flex layout in DOM order.
      */
     insertionParent?: HTMLElement
+    /**
+     * The element's nearest `LayoutGroup` node group (plan 015b): its exit
+     * clone's completion re-renders that group.
+     */
+    layoutGroup?: object
     /**
      * The element's next sibling captured while it was still connected.
      * Svelte detaches keyed nodes before `unregisterChild` runs, so the exit
@@ -910,7 +916,8 @@ export type AnimatePresenceContext = {
         element: HTMLElement,
         exit?: MotionExit,
         mergedTransition?: MotionTransition,
-        resolveExit?: PresenceExitResolver
+        resolveExit?: PresenceExitResolver,
+        layoutGroup?: object
     ) => void
     /**
      * Update the last known rect/style snapshot for a registered child.
@@ -1484,7 +1491,8 @@ export const createAnimatePresenceContext = (context: {
         element: HTMLElement,
         exit?: MotionExit,
         mergedTransition?: MotionTransition,
-        resolveExit?: PresenceExitResolver
+        resolveExit?: PresenceExitResolver,
+        layoutGroup?: object
     ) => {
         if (disposed) return
         const wasExited = exitedKeys.has(key)
@@ -1534,6 +1542,7 @@ export const createAnimatePresenceContext = (context: {
             lastPopLayoutSnapshot:
                 mode === 'popLayout' ? measurePopLayoutSnapshot(element, initialStyle) : undefined,
             insertionParent: element.parentElement ?? undefined,
+            layoutGroup,
             hasScrollableAncestor: initialScrollSnapshot.length > 0,
             lastScrollSnapshot: initialScrollSnapshot
         }
@@ -1869,6 +1878,17 @@ export const createAnimatePresenceContext = (context: {
         clone.setAttribute('data-clone', 'true')
         clone.setAttribute('data-exiting', 'true')
         clone.setAttribute('data-mode', mode)
+        // Plan 015b (M3): its removal completes the exit. The element is
+        // detached by now, so the boundary comes from the parent captured at
+        // registration.
+        const exitBoundaryFrom = child.insertionParent ?? slotParent
+        const exitMarker: ExitMarker = {
+            boundary: exitBoundaryFrom.closest('.animate-presence-container') ?? exitBoundaryFrom,
+            group: child.layoutGroup
+        }
+        markExiting(clone, exitMarker)
+        // Part D's M5 report of the completion, from the slot it leaves.
+        const followParent = layoutParentOf(slotParent, true)
 
         pwLog('[presence] clone created', {
             key,
@@ -2038,6 +2058,16 @@ export const createAnimatePresenceContext = (context: {
                     })
 
                     removeExitPlaceholder(key, placeholder)
+                    // Plan 015b (M5): `layout` nodes after the list snap to
+                    // where the completion leaves them, even when no sibling
+                    // is left to report it. After the placeholder is gone:
+                    // in sync mode it still held the slot.
+                    if (followParent) {
+                        MotionDomProjectionAdapter.seedFollowingLayout(followParent, null, {
+                            kind: 'exit-complete',
+                            markers: [exitMarker]
+                        })
+                    }
                     finishExit()
                 })
         }

@@ -1260,4 +1260,20 @@ describe('observeLayoutChanges reach and causes (plan 015b)', () => {
 
         expect(onChange).not.toHaveBeenCalled()
     })
+
+    it('A1.3a: a popped element does not re-commit for its own pop or its list changing', async () => {
+        // Upstream never re-snapshots a popped exiting element for its own
+        // pop (PresenceChild's pop is a style rule, not a render of it).
+        const { ul, el } = ownedList()
+        const onChange = watch(el)
+        await deliver()
+        onChange.mockClear()
+
+        el.setAttribute('data-motion-pop-id', 'pop-self')
+        await deliver()
+        ul.append(document.createElement('li'))
+        await deliver()
+
+        expect(onChange).not.toHaveBeenCalled()
+    })
 })

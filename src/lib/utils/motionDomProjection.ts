@@ -4,6 +4,7 @@ import {
     copyBoxInto,
     createBox,
     hasTransform,
+    rootProjectionNode,
     transformPropOrder,
     translateAxis,
     visualElementStore,
@@ -16,7 +17,9 @@ import {
     type Transition,
     type VisualElement
 } from 'motion-dom'
+import type { LayoutChangeCause } from './layout'
 import {
+    isResizeBlocked,
     onResizeSettled,
     readScrollBasis,
     scheduleResample,
@@ -115,6 +118,13 @@ export interface MotionDomProjectionUpdateOptions {
     style?: unknown
     /** Upstream projection option (`use-visual-element.ts`): `true` for draggable elements. */
     alwaysMeasureLayout?: boolean
+    /**
+     * The node takes no snapshot of its own unless its `layoutDependency`
+     * changed (`isLayoutMeasurementGated`), as upstream's `MeasureLayout`
+     * decides from the `layoutDependency` it is given (MeasureLayout.tsx:43-52
+     * @ v14.7.1). Part D (plan 015b) never seeds such a node.
+     */
+    measurementGated?: boolean
 }
 
 /**
@@ -371,6 +381,14 @@ export class MotionDomProjectionAdapter {
     private isGroupMember = false
     private readonly commitListeners = new Set<(rect: RectLike) => void>()
     private offProjectionDidUpdate: (() => void) | null = null
+    /** See {@link MotionDomProjectionUpdateOptions.measurementGated}. */
+    private measurementGated = false
+    /**
+     * Set when {@link seedFollowingLayout} seeded this node: its next
+     * `didUpdate` refreshes the cache and tells the commit listeners, as a
+     * grouped node's always does.
+     */
+    private presenceSeeded = false
     /** Before/after layout of this node's most recent upstream update pass. */
     private lastUpdate: { previous: RectLike; next: RectLike } | null = null
     /**
@@ -528,6 +546,7 @@ export class MotionDomProjectionAdapter {
         this.layout = options.layout
         this.layoutId = layoutId
         this.transition = options.transition
+        this.measurementGated = !!options.measurementGated
 
         // An injected VisualElement's props are the owning component's contract
         // (#449), so MERGE rather than replace: a bare `{ transition, style }`
@@ -741,31 +760,40 @@ export class MotionDomProjectionAdapter {
         // `resumeFrom` (stack.ts:45-74 @ v14.7.1). `didMount` runs the update
         // pass for it when that lead is still on screen.
         this.mountTakeOverLead = options.takeOverLiveLead === false ? null : this.liveResumeFrom()
-        // Only grouped nodes are re-measured by passes they didn't trigger
+        // Grouped nodes are re-measured by passes they didn't trigger
         // themselves in a way the observer path must reconcile (plan 007
-        // D4); ungrouped nodes keep their pre-LayoutGroup-group behaviour.
-        if (this.group) {
-            this.offProjectionDidUpdate = this.projection.addEventListener(
-                'didUpdate',
-                ({ layout, snapshot }: LayoutUpdateData) => {
-                    // This node was layout-dirty and re-measured in an
-                    // upstream update pass, whoever triggered it (its own
-                    // commit, a group sibling's fan-out, a same-group
-                    // ancestor's subtree seed): keep the cached snapshot the
-                    // observer path fans out (D5) in step.
+        // D4). An ungrouped node only is when part D seeded it (plan 015b),
+        // and then never shifts its descendants (they weren't part of it).
+        this.offProjectionDidUpdate = this.projection.addEventListener(
+            'didUpdate',
+            ({ layout, snapshot }: LayoutUpdateData) => {
+                const seeded = this.presenceSeeded
+                this.presenceSeeded = false
+                if (!this.group) {
+                    if (!seeded) return
                     this.copyLayoutToCache()
                     const rect = rectFromBox(layout)
-                    // Descendants in a separate group use this pair to tell
-                    // "I only moved because this node did" (D6).
                     this.lastUpdate = { previous: rectFromBox(snapshot.layoutBox), next: rect }
-                    this.shiftFollowingDescendants(
-                        layout.x.min - snapshot.layoutBox.x.min,
-                        layout.y.min - snapshot.layoutBox.y.min
-                    )
                     for (const listener of this.commitListeners) listener(rect)
+                    return
                 }
-            )
-        }
+                // This node was layout-dirty and re-measured in an
+                // upstream update pass, whoever triggered it (its own
+                // commit, a group sibling's fan-out, a same-group
+                // ancestor's subtree seed): keep the cached snapshot the
+                // observer path fans out (D5) in step.
+                this.copyLayoutToCache()
+                const rect = rectFromBox(layout)
+                // Descendants in a separate group use this pair to tell
+                // "I only moved because this node did" (D6).
+                this.lastUpdate = { previous: rectFromBox(snapshot.layoutBox), next: rect }
+                this.shiftFollowingDescendants(
+                    layout.x.min - snapshot.layoutBox.x.min,
+                    layout.y.min - snapshot.layoutBox.y.min
+                )
+                for (const listener of this.commitListeners) listener(rect)
+            }
+        )
         this.syncGroupMembership()
     }
 
@@ -1277,8 +1305,9 @@ export class MotionDomProjectionAdapter {
      * own DOM observers don't commit the same change a second time.
      *
      * The rect comes from the update pass's own measurement, so listening
-     * costs no extra DOM read. Only adapters constructed with a `group`
-     * fire; an ungrouped adapter's listeners are never called.
+     * costs no extra DOM read. Adapters constructed with a `group` fire for
+     * every such pass; an ungrouped adapter only for a pass part D seeded it
+     * into (plan 015b, {@link seedFollowingLayout}).
      *
      * @param listener Called with the freshly measured page-space rect.
      * @returns Unsubscribe function.
@@ -1685,6 +1714,191 @@ export class MotionDomProjectionAdapter {
         this.refreshCachedLayout()
     }
 
+    /** Layout parents part D ran for in this microtask (the M2 dedupe). */
+    private static followParentsThisTick = new Set<Element>()
+    /** Mutation batches part D already ran for. */
+    private static followBatches = new WeakSet<MutationRecord[]>()
+
+    /**
+     * Part D (plan 015b): `layout` nodes after a list's layout parent but
+     * outside it, such as a footer, follow a change of the list. Upstream
+     * re-renders them with the list's owner, so their `MeasureLayout`
+     * snapshots before the DOM changes (`getSnapshotBeforeUpdate`,
+     * MeasureLayout.tsx:149-204 @ v14.7.1). Here the DOM has already changed,
+     * so each node is seeded from its cached (rebased) layout, with no read,
+     * and one update pass animates the ones that moved.
+     *
+     * When an exit completed, upstream re-renders only its `AnimatePresence`
+     * and `LayoutGroup` (`AnimatePresence/index.tsx:206, 244`): the nodes
+     * outside both are refreshed silently instead, one read each, so they
+     * snap and a later change animates from where they now are (upstream
+     * measures live, create-projection-node.ts:787, 967-978).
+     *
+     * The walk reads no layout: from the projection root it prunes subtrees
+     * that precede `parent`, skips `parent`'s own line (itself, its ancestors
+     * and descendants), and picks mounted, idle `layout` / `layoutId` nodes
+     * that follow it, share its nearest motion ancestor (or the document),
+     * aren't gated by `layoutDependency`, aren't in a size-animating box,
+     * have a reliable cached layout, and don't already watch `parent`'s
+     * subtree through their own parent. Runs once per mutation batch and
+     * once per layout parent per microtask (the teardown of a completed
+     * exit's element and the observers of its siblings report the same
+     * change).
+     *
+     * @param parent The layout parent whose children changed.
+     * @param records The observer batch, or `null` for a teardown call.
+     * @param cause Why: `exit-complete` refreshes instead of seeding.
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * observeLayoutChanges(element, onChange, {
+     *     onLayoutParentChange: (parent, records, cause) =>
+     *         MotionDomProjectionAdapter.seedFollowingLayout(parent, records, cause)
+     * })
+     * ```
+     */
+    static seedFollowingLayout(
+        parent: Element,
+        records: MutationRecord[] | null,
+        cause: LayoutChangeCause = { kind: 'change' }
+    ): void {
+        const self = MotionDomProjectionAdapter
+        if (records) {
+            if (self.followBatches.has(records)) return
+            self.followBatches.add(records)
+        }
+        if (self.followParentsThisTick.has(parent)) return
+        if (!self.followParentsThisTick.size) {
+            queueMicrotask(() => self.followParentsThisTick.clear())
+        }
+        self.followParentsThisTick.add(parent)
+        // During a resize block upstream measures without animating, and
+        // every node refreshes once it settles (plan 015a).
+        if (typeof window === 'undefined' || isResizeBlocked()) return
+        const followers = self.followersOf(parent)
+        if (!followers.length) return
+
+        if (cause.kind === 'exit-complete') {
+            for (const follower of followers) {
+                if (follower.isRerenderedBy(cause)) continue
+                const rect = follower.refreshLayout({ silent: true })
+                if (!rect) continue
+                for (const listener of follower.cacheRefreshListeners) listener(rect)
+            }
+            return
+        }
+
+        const root = followers[0].projection.root
+        root?.startUpdate()
+        for (const follower of followers) {
+            const snapshot = follower.onScreenSnapshot()
+            if (!snapshot) continue
+            const projection = follower.projection
+            follower.prepareSnapshotPath(projection as unknown as ProjectionTreeNode)
+            projection.snapshot = snapshot
+            projection.isLayoutDirty = true
+            follower.presenceSeeded = true
+        }
+        root?.didUpdate()
+        scheduleResample()
+    }
+
+    /** The nodes part D picks for `parent` (see {@link seedFollowingLayout}). */
+    private static followersOf(parent: Element): MotionDomProjectionAdapter[] {
+        const self = MotionDomProjectionAdapter
+        let motionAncestor: Element | null = null
+        for (let node = parent.parentElement; node; node = node.parentElement) {
+            if (self.byElement.get(node)?.element) {
+                motionAncestor = node
+                break
+            }
+        }
+        const root = rootProjectionNode.current
+        const picked: MotionDomProjectionAdapter[] = []
+        const visit = (node: ProjectionTreeNode) => {
+            for (const child of node.children) {
+                const instance = child.instance
+                if (!(instance instanceof Element) || instance === parent) continue
+                const position = instance.compareDocumentPosition(parent)
+                // An ancestor of `parent`: skipped, its children visited.
+                if (position & Node.DOCUMENT_POSITION_CONTAINED_BY) {
+                    visit(child)
+                    continue
+                }
+                // Inside `parent`, or before it: nothing in it follows.
+                if (
+                    position & Node.DOCUMENT_POSITION_CONTAINS ||
+                    position & Node.DOCUMENT_POSITION_FOLLOWING
+                ) {
+                    continue
+                }
+                const adapter = self.adapters.get(child)
+                if (adapter?.followsLayoutOf(parent, motionAncestor)) picked.push(adapter)
+            }
+        }
+        if (root) visit(root)
+        return picked
+    }
+
+    /** Whether part D picks this node, which follows `parent` in the document. */
+    private followsLayoutOf(parent: Element, motionAncestor: Element | null): boolean {
+        const element = this.element
+        const projection = this.projection
+        if (!element || !(this.layout || this.layoutId) || !this.lastLayout) return false
+        if (projection.isLayoutDirty || this.measurementGated) return false
+        if (element.closest('[data-layout-size-animation]')) return false
+        // Its own observers already see `parent`'s subtree.
+        if (element.parentElement?.contains(parent)) return false
+        const basis = this.lastLayoutBasis
+        if (basis && !scrollShift(basis, this.isFoldedIn)) return false
+        const above = projection.parent
+        const aboveElement = above && above !== above.root ? above.instance : null
+        return (aboveElement ?? null) === motionAncestor
+    }
+
+    /** Whether a completed exit re-renders this node upstream (it then isn't snapped). */
+    private isRerenderedBy(cause: Extract<LayoutChangeCause, { kind: 'exit-complete' }>): boolean {
+        const element = this.element
+        return cause.markers.some(
+            ({ boundary, group }) =>
+                (!!element && !!boundary?.contains(element)) ||
+                (!!this.group && group === this.group)
+        )
+    }
+
+    /**
+     * Snapshot this node's descendants that sit inside `boundaries` from
+     * their cached layouts and run one update pass, leaving this node's own
+     * box alone (plan 015b, M1). For a `layoutDependency`-gated node inside an
+     * `AnimatePresence` whose exit completed: upstream still re-renders it
+     * (`AnimatePresence/index.tsx:58` → `use-presence.ts:40-43` @ v14.7.1), so
+     * its descendants snapshot while its own box stays gated.
+     *
+     * @param boundaries The completing `AnimatePresence` containers that
+     *     contain this node.
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * adapter.refreshLayout({ silent: true })
+     * adapter.commitDescendantsWithin([boundary])
+     * ```
+     */
+    commitDescendantsWithin(boundaries: Element[]): void {
+        if (!this.element || !boundaries.length) return
+        const within = (projection: ProjectionTreeNode<unknown>) => {
+            const instance = projection.instance
+            return instance instanceof Element && boundaries.some((b) => b.contains(instance))
+        }
+        const root = this.projection.root
+        root?.startUpdate()
+        for (const child of this.projection.children) {
+            this.seedCachedSnapshotsForSubtree(child, undefined, false, within)
+        }
+        root?.didUpdate()
+    }
+
     /**
      * Re-commit every mounted member of a LayoutGroup node group from its
      * cached (or, mid-animation, on-screen) snapshot and run one update pass
@@ -1956,7 +2170,8 @@ export class MotionDomProjectionAdapter {
     private seedCachedSnapshotsForSubtree<Instance>(
         projection: ProjectionTreeNode<Instance>,
         rootSnapshot?: Measurements,
-        acrossGroups = false
+        acrossGroups = false,
+        within?: (projection: ProjectionTreeNode<unknown>) => boolean
     ): void {
         const adapter = MotionDomProjectionAdapter.adapters.get(projection)
         const isCommitter =
@@ -1970,7 +2185,7 @@ export class MotionDomProjectionAdapter {
         // boundary doesn't apply: upstream re-renders every descendant.
         if (!acrossGroups && !isCommitter && adapter?.group !== this.group) {
             for (const child of projection.children) {
-                this.seedCachedSnapshotsForSubtree(child)
+                this.seedCachedSnapshotsForSubtree(child, undefined, false, within)
             }
             return
         }
@@ -1985,7 +2200,9 @@ export class MotionDomProjectionAdapter {
         // A descendant that already holds a snapshot keeps it, as
         // `willUpdate()` returns early for a layout-dirty node: e.g. an
         // arriving `layoutId` node `promote()` handed a shared snapshot.
-        const keepsOwn = !isCommitter && (projection.isLayoutDirty || !!projection.snapshot)
+        const keepsOwn =
+            (!isCommitter && (projection.isLayoutDirty || !!projection.snapshot)) ||
+            (within !== undefined && !within(projection as ProjectionTreeNode<unknown>))
         if (snapshot && !keepsOwn && (projection.options.layout || projection.options.layoutId)) {
             this.prepareSnapshotPath(projection)
             projection.snapshot = snapshot
@@ -1993,7 +2210,7 @@ export class MotionDomProjectionAdapter {
         }
 
         for (const child of projection.children) {
-            this.seedCachedSnapshotsForSubtree(child, undefined, acrossGroups)
+            this.seedCachedSnapshotsForSubtree(child, undefined, acrossGroups, within)
         }
     }
 

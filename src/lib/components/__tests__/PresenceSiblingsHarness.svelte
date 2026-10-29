@@ -1,3 +1,10 @@
+<script module lang="ts">
+    // Constant objects: a new transition object counts as a prop change and
+    // re-snapshots the items.
+    const fastExit = { duration: 0.05 }
+    const slowExit = { duration: 2 }
+</script>
+
 <script lang="ts">
     import AnimatePresence from '$lib/components/AnimatePresence.svelte'
     import LayoutGroup from '$lib/components/LayoutGroup.svelte'
@@ -23,6 +30,7 @@
      * - `nested`: item 2 holds an inner `AnimatePresence` with
      *   `motion.div layout #inner`.
      * - `gateItem2`: `layoutDependency={1}` on item 2.
+     * - `slow`: a 2s exit tween instead of 50ms.
      */
     let {
         items = 3,
@@ -33,7 +41,8 @@
         layoutGroup = false,
         footerInList = false,
         nested = false,
-        gateItem2 = false
+        gateItem2 = false,
+        slow = false
     }: {
         items?: number
         remove?: number[]
@@ -44,6 +53,7 @@
         footerInList?: boolean
         nested?: boolean
         gateItem2?: boolean
+        slow?: boolean
     } = $props()
 
     const ids = $derived([
@@ -61,7 +71,7 @@
         layout
         layoutDependency={gateItem2 && id === 2 ? 1 : undefined}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.05 }}
+        transition={slow ? slowExit : fastExit}
     >
         {#if nested && id === 2}
             <AnimatePresence>

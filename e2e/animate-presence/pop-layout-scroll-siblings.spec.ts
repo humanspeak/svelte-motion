@@ -120,7 +120,9 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
             left: Math.max(0, rect.left - 40),
             top: Math.max(0, rect.top - 40),
             right: rect.right + 40,
-            bottom: rect.bottom + 40
+            // `?footer`'s stage grows by an item on an add: keep its footer
+            // in the clip.
+            bottom: rect.bottom + (target.id === 'stage' ? 140 : 40)
         }
     })
     await cdp.send('Page.startScreencast', {
@@ -778,7 +780,8 @@ test.describe('layout followers outside the list (plan 015b, ?footer)', () => {
             annotate(recording)
             const orange = hitRange(recording.hits, 'orange')
             expect(orange.count).toBeGreaterThanOrEqual(10)
-            expect(Math.abs(orange.last - orange.first - 70)).toBeLessThanOrEqual(2)
+            // The first item of an empty list adds its 60px height, no gap.
+            expect(Math.abs(orange.last - orange.first - 60)).toBeLessThanOrEqual(2)
             expect(maxHitStep(recording.hits, 'orange'), 'orange step').toBeLessThanOrEqual(35)
         })
     }

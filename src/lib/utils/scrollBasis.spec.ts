@@ -376,3 +376,48 @@ describe('scrollBasis (plan 015a)', () => {
         })
     })
 })
+
+/**
+ * Plan 015b amendment A1.3: a `position: fixed` box whose containing block is
+ * a transformed (filtered, `perspective`, `will-change: transform` or
+ * `contain: paint`) ancestor is laid out against that ancestor, so it scrolls
+ * with it, not with the viewport. Treating it as a fixed root rebased a
+ * cached rect by the page scroll (480px under `scale(0.5)`: a 240px drift on
+ * `pop-layout-container-move.spec.ts:307`).
+ */
+describe('getScrollAncestors: fixed under a containing-block ancestor (plan 015b A1)', () => {
+    beforeEach(() => {
+        document.body.innerHTML = ''
+    })
+
+    it.each([
+        'transform: scale(0.5)',
+        'filter: blur(1px)',
+        'perspective: 100px',
+        'will-change: transform',
+        'contain: paint'
+    ])('a fixed element under `%s` is not a fixed root', (style) => {
+        const scroller = make('overflow: auto')
+        const block = make(style, scroller)
+        const element = make('position: fixed', block)
+
+        const ancestors = getScrollAncestors(element)
+        expect(ancestors.fixed).toBe(false)
+        expect(ancestors.scrollers).toEqual([scroller])
+    })
+
+    it('a fixed element with no such ancestor stays a fixed root', () => {
+        const scroller = make('overflow: auto')
+        const element = make('position: fixed', scroller)
+
+        expect(getScrollAncestors(element)).toMatchObject({ fixed: true, scrollers: [] })
+    })
+
+    it('a scroller between the fixed box and its containing block does not move it', () => {
+        const block = make('transform: translateX(1px)')
+        const inner = make('overflow: auto', block)
+        const element = make('position: fixed', inner)
+
+        expect(getScrollAncestors(element)).toMatchObject({ fixed: false, scrollers: [] })
+    })
+})
