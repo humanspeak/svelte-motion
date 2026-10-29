@@ -1828,7 +1828,10 @@
             new CustomEvent(presenceLayoutReleaseEvent, {
                 detail: {
                     previousRect,
-                    viewportScrolledDuringHold
+                    viewportScrolledDuringHold,
+                    // Plan 015b A2.1: where the completed exit re-renders.
+                    boundary: element?.closest('.animate-presence-container') ?? null,
+                    group: layoutGroupContext?.group
                 }
             })
         )
@@ -2919,6 +2922,7 @@
 
                 if (shouldUseSizeCorrectedFallback) {
                     finishFlipAnimations(element!)
+                    motionDomProjection?.yieldToSizeAnimation()
                     runLayoutSizeAnimation(element!, transforms, mergedTransition ?? {})
                 } else {
                     motionDomProjection?.commitObservedLayoutChange(previous, {
@@ -2935,6 +2939,8 @@
                 event as CustomEvent<{
                     previousRect?: RectLike
                     viewportScrolledDuringHold?: boolean
+                    boundary?: Element | null
+                    group?: object
                 }>
             ).detail
             // A wait-mode child swap is a CHILD's presence change, not this
@@ -2944,6 +2950,18 @@
             // Decided before any DOM read: the gated branch needs neither the
             // viewport rect nor the held `previousRect`.
             if (isObservedCommitGated()) {
+                refreshGatedLayoutCache()
+                return
+            }
+            // Plan 015b A2.1, the B(c) rule: the release follows a wait-mode
+            // exit's completion, which re-renders only its AnimatePresence
+            // and, through `forceRender`, its LayoutGroup
+            // (`AnimatePresence/index.tsx:206, 244` @ v14.7.1,
+            // `use-presence.ts:40-43`). A held element outside both snaps.
+            const rerendered =
+                !!detail?.boundary?.contains(element!) ||
+                (!!layoutGroupContext?.group && detail?.group === layoutGroupContext.group)
+            if (!rerendered) {
                 refreshGatedLayoutCache()
                 return
             }
@@ -2967,6 +2985,7 @@
 
             if (!shouldSkipLayoutAnimation && shouldUseSizeCorrectedFallback) {
                 finishFlipAnimations(element!)
+                motionDomProjection?.yieldToSizeAnimation()
                 runLayoutSizeAnimation(element!, transforms, mergedTransition ?? {})
             }
             if (!shouldSkipLayoutAnimation && hasRectChanged(previous, next)) {

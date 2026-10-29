@@ -242,6 +242,9 @@ const runBoxSizeAnimation = (
     }
 
     const writeBox = (progress: number) => {
+        // An offscreen completion cleans up at once, before the animation's
+        // own final update lands (plan 015b A2.2): never write after it.
+        if (cleanupRan) return
         el.style.width = roundedPx(mix(prevWidth, nextRect.width, progress))
         el.style.height = roundedPx(mix(prevHeight, nextRect.height, progress))
 

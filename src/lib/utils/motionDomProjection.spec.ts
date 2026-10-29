@@ -2416,3 +2416,107 @@ describe('MotionDomProjectionAdapter.seedFollowingLayout (plan 015b)', () => {
         expect([...(stack?.members ?? [])]).toEqual(members)
     })
 })
+
+/**
+ * Plan 015b A2.2: a group member that is running its own box-size animation
+ * (`data-layout-size-animation`, `runBoxSizeAnimation` in layout.ts) is drawn
+ * at a transient inline width. `commitGroup` seeding it measured that width,
+ * started a second (projection) animation on top, and wrote the transient
+ * rect into its cache, so when the size animation ended the observer saw a
+ * change from it and restarted the size animation from the origin (the
+ * layout-button wait-group shell: 79 → 86 → 80 → 93px).
+ */
+describe('MotionDomProjectionAdapter.commitGroup and size-animating members (plan 015b A2.2)', () => {
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+    })
+
+    it('leaves a member that runs its own box-size animation alone', async () => {
+        const group = nodeGroup()
+        const host = new MotionDomProjectionAdapter({ group })
+        const other = new MotionDomProjectionAdapter({ group })
+        const hostElement = document.createElement('div')
+        const otherElement = document.createElement('div')
+        document.body.append(hostElement, otherElement)
+        let hostWidth = 93
+        vi.spyOn(hostElement, 'getBoundingClientRect').mockImplementation(
+            () => new DOMRect(10, 0, hostWidth, 32)
+        )
+        vi.spyOn(otherElement, 'getBoundingClientRect').mockImplementation(
+            () => new DOMRect(10, 100, 100, 50)
+        )
+        for (const [adapter, element] of [
+            [host, hostElement],
+            [other, otherElement]
+        ] as const) {
+            adapter.updateOptions({ layout: true })
+            adapter.mount(element)
+        }
+        const hostCommit = vi.fn()
+        host.onProjectionCommit(hostCommit)
+        // Mid size animation: the inline width holds the box at 77px.
+        hostElement.setAttribute('data-layout-size-animation', 'true')
+        hostWidth = 77
+
+        MotionDomProjectionAdapter.commitGroup(group)
+
+        expect(host.projection.snapshot).toBeUndefined()
+        expect(host.projection.isLayoutDirty).toBe(false)
+        await flush()
+        expect(hostCommit).not.toHaveBeenCalled()
+        expect(host.projection.currentAnimation).toBeUndefined()
+        hostElement.removeAttribute('data-layout-size-animation')
+        other.unmount()
+        host.unmount()
+        hostElement.remove()
+        otherElement.remove()
+    })
+
+    it('a member seeded just before its own box-size animation starts keeps its cache and gets no projection animation', async () => {
+        const group = nodeGroup()
+        const host = new MotionDomProjectionAdapter({ group })
+        const other = new MotionDomProjectionAdapter({ group })
+        const hostElement = document.createElement('div')
+        const otherElement = document.createElement('div')
+        document.body.append(hostElement, otherElement)
+        let hostWidth = 77
+        let otherTop = 100
+        vi.spyOn(hostElement, 'getBoundingClientRect').mockImplementation(
+            () => new DOMRect(10, 0, hostWidth, 32)
+        )
+        vi.spyOn(otherElement, 'getBoundingClientRect').mockImplementation(
+            () => new DOMRect(10, otherTop, 100, 50)
+        )
+        for (const [adapter, element] of [
+            [host, hostElement],
+            [other, otherElement]
+        ] as const) {
+            adapter.updateOptions({ layout: true })
+            adapter.mount(element)
+        }
+        const hostCommit = vi.fn()
+        host.onProjectionCommit(hostCommit)
+
+        // A group sibling's commit seeds the host (the wait-group release)...
+        otherTop = 120
+        other.commitObservedLayoutChange({ left: 10, top: 100, width: 100, height: 50 })
+        expect(host.projection.isLayoutDirty).toBe(true)
+        // ...then, in the same task, the host starts its own box-size
+        // animation, whose inline width holds it at 77px for now.
+        hostElement.setAttribute('data-layout-size-animation', 'true')
+        host.yieldToSizeAnimation()
+        await flush()
+
+        expect(hostCommit).not.toHaveBeenCalled()
+        expect(host.projection.currentAnimation).toBeUndefined()
+        hostWidth = 93
+        hostElement.removeAttribute('data-layout-size-animation')
+        other.unmount()
+        host.unmount()
+        hostElement.remove()
+        otherElement.remove()
+    })
+})

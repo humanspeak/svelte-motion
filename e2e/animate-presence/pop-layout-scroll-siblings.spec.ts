@@ -61,6 +61,9 @@ interface Hit {
     greenLeft?: number
     /** The first (grey) item's top (plan 015b). */
     zero?: number
+    /** Pink's (the real element's, or its clone's) top, and whether its centre hits it. */
+    pinkTop?: number
+    pinkHit?: boolean
     /**
      * The orange `?footer` band's bottom (plan 015b): items FLIPping up from
      * their old slots are drawn over a footer that moved up under them, so
@@ -163,6 +166,16 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
             }
             return found === undefined ? undefined : last ? found + 1 : found
         }
+        const pinkCentre = () => {
+            const pink = document.querySelector<HTMLElement>('[data-testid="sib-2"]')
+            const rect = pink?.getBoundingClientRect()
+            if (!pink || !rect) return {}
+            const hit = document.elementFromPoint(
+                rect.left + rect.width / 2,
+                rect.top + rect.height / 2
+            )
+            return { pinkTop: rect.top, pinkHit: hit === pink }
+        }
         const sample = () => {
             if (!w.hitting) return
             w.hits.push({
@@ -171,6 +184,7 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
                 green: scan(greenX, 'sib-3', true),
                 greenLeft: scanRow(greenY, 'sib-3'),
                 zero: scan(zeroX, 'sib-0', false),
+                ...pinkCentre(),
                 orange: scan(orangeX, 'footer', true)
             })
             requestAnimationFrame(sample)
@@ -607,13 +621,32 @@ test.describe('layout siblings around exits (plan 015b, owned path)', () => {
         }
     })
 
+    /**
+     * On the owned path the popped pink item is the real element, which its
+     * pop leaves unstacked (`position: absolute`, no z-index:
+     * `PopChild.tsx:167-168` @ v14.7.1): green, later in the document and
+     * animating up into pink's slot, draws over it. Only the exit clone
+     * raises its z-index. Plan 015b A2.3: the framer-motion 14.7.1 mirror
+     * (`/tmp/fm1471-repro/src/siblings.tsx`) hits pink at its centre in 10-11
+     * of the first 20 frames, and green covers it from 164-170ms.
+     */
     test('?layoutScroll, popLayout: the clamp is a one-frame content jump', async ({ page }) => {
         await open(page, '&path=owned&layoutScroll')
         await scrollBottom(page)
         await page.waitForTimeout(200)
-        const recording = await record(page, () => remove(page), 600)
+        let poppedAt = 0
+        const recording = await record(
+            page,
+            async () => {
+                poppedAt = await page.evaluate(() => {
+                    document.querySelector<HTMLElement>('[data-testid="remove"]')!.click()
+                    return performance.now()
+                })
+            },
+            600
+        )
         annotate(recording)
-        const { frames } = recording
+        const { frames, hits } = recording
         const blueSteps = steps(frames, 'blue').filter(({ step }) => Math.abs(step) > 2)
         const pinkSteps = steps(frames, 'pink').filter(({ step }) => Math.abs(step) > 2)
         expect(blueSteps).toHaveLength(1)
@@ -622,10 +655,24 @@ test.describe('layout siblings around exits (plan 015b, owned path)', () => {
         expect(Math.abs(pinkSteps[0].step - 70)).toBeLessThanOrEqual(2)
         expect(pinkSteps[0].index).toBe(blueSteps[0].index)
         const all = framesWith(frames, ['blue', 'pink'])
-        expect(all.length).toBeGreaterThanOrEqual(10)
         const gap = all[0].bands.pink!.top - all[0].bands.blue!.top
         for (const { bands } of all) {
             expect(Math.abs(bands.pink!.top - bands.blue!.top - gap)).toBeLessThanOrEqual(2)
+        }
+        // After the clamp's one-frame jump, pink holds still and its centre
+        // shows until green first covers it, no sooner than 140ms in.
+        const after = hits.filter(({ t, pinkTop }) => t > poppedAt && pinkTop !== undefined)
+        expect(after.length).toBeGreaterThanOrEqual(10)
+        const settledTop = after.at(-1)!.pinkTop!
+        const coveredAt = after.findIndex(({ pinkHit }) => !pinkHit)
+        const shown = coveredAt < 0 ? after : after.slice(0, coveredAt)
+        expect(shown.length, 'frames showing pink').toBeGreaterThanOrEqual(5)
+        for (const { pinkTop } of after.slice(1)) {
+            expect(Math.abs(pinkTop! - settledTop), 'pink holds still').toBeLessThanOrEqual(1)
+        }
+        if (coveredAt >= 0) {
+            expect(after[coveredAt].t - poppedAt, 'green covers pink').toBeGreaterThanOrEqual(140)
+            for (const hit of after.slice(coveredAt)) expect(hit.pinkHit).toBe(false)
         }
         const transform = await page.evaluate(
             () => getComputedStyle(document.getElementById('sib-1')!).transform

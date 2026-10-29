@@ -1277,3 +1277,47 @@ describe('observeLayoutChanges reach and causes (plan 015b)', () => {
         expect(onChange).not.toHaveBeenCalled()
     })
 })
+
+/**
+ * Plan 015b A2.2: an offscreen box-size animation completes at once, but its
+ * animation's final `onUpdate` arrives after the cleanup, which rewrote the
+ * final inline width and left it set at rest (the layout-button wait-group
+ * shell kept `width: 93px` below the fold).
+ */
+describe('runLayoutSizeAnimation offscreen completion (plan 015b A2.2)', () => {
+    it('leaves no inline size behind when a late final update lands after the cleanup', async () => {
+        const el = document.createElement('button')
+        const child = document.createElement('span')
+        child.setAttribute('data-svelte-motion-layout', '')
+        el.appendChild(child)
+        document.body.appendChild(el)
+        // Below the fold.
+        vi.spyOn(el, 'getBoundingClientRect').mockImplementation(
+            () => new DOMRect(100, window.innerHeight + 200, 93, 32)
+        )
+        animateMock.mockImplementationOnce(((
+            _from: number,
+            _to: number,
+            options: { onUpdate?: (progress: number) => void }
+        ) => ({
+            finished: Promise.resolve(),
+            // Like motion's, the final value is written on a later tick.
+            complete: () => queueMicrotask(() => options.onUpdate?.(1)),
+            stop() {},
+            cancel() {}
+        })) as never)
+
+        runLayoutSizeAnimation(
+            el,
+            { dx: 0, dy: 0, sx: 0.83, sy: 1, shouldTranslate: false, shouldScale: true },
+            {}
+        )
+        await Promise.resolve()
+        await Promise.resolve()
+
+        expect(el.hasAttribute('data-layout-size-animation')).toBe(false)
+        expect(el.style.width).toBe('')
+        expect(el.style.height).toBe('')
+        el.remove()
+    })
+})

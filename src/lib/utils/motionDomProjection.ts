@@ -769,6 +769,9 @@ export class MotionDomProjectionAdapter {
             ({ layout, snapshot }: LayoutUpdateData) => {
                 const seeded = this.presenceSeeded
                 this.presenceSeeded = false
+                // Its box-size animation owns its box (plan 015b A2.2): the
+                // pass measured a transient inline size.
+                if (this.isSizeAnimatingHost()) return
                 if (!this.group) {
                     if (!seeded) return
                     this.copyLayoutToCache()
@@ -2092,6 +2095,7 @@ export class MotionDomProjectionAdapter {
         let seeded = 0
         for (const member of members) {
             if (member === this || !member.element) continue
+            if (member.isSizeAnimatingHost()) continue
             const projection = member.projection
             if (projection.isLayoutDirty) continue
             if (!(projection.options.layout || projection.options.layoutId)) continue
@@ -2105,10 +2109,45 @@ export class MotionDomProjectionAdapter {
         return seeded
     }
 
+    /**
+     * Whether this node's element is running its own box-size animation
+     * (`runBoxSizeAnimation`, plan 015b A2.2). Its inline width is transient
+     * and that animation already moves it to its new box: a group re-commit
+     * would measure the transient box, start a second (projection) animation
+     * on top, and cache the transient rect, which restarted the size
+     * animation from its origin when it ended.
+     */
+    private isSizeAnimatingHost(): boolean {
+        return !!this.element?.hasAttribute('data-layout-size-animation')
+    }
+
+    /**
+     * Hand this node's move to the box-size animation that just started on
+     * its element (plan 015b A2.2): drop a snapshot a group sibling seeded it
+     * with in the same task, so the update pass neither starts a second
+     * (projection) animation on top nor caches the size animation's
+     * transient box.
+     *
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * adapter.yieldToSizeAnimation()
+     * runLayoutSizeAnimation(element, transforms, transition)
+     * ```
+     */
+    yieldToSizeAnimation(): void {
+        const projection = this.projection
+        projection.snapshot = undefined
+        projection.isLayoutDirty = false
+        this.presenceSeeded = false
+    }
+
     /** Seed this node from {@link onScreenSnapshot} unless already dirty. */
     private seedOwnOnScreenSnapshot(): number {
         const projection = this.projection
         if (projection.isLayoutDirty || !(this.layout || this.layoutId)) return 0
+        if (this.isSizeAnimatingHost()) return 0
         const snapshot = this.onScreenSnapshot()
         if (!snapshot) return 0
         this.prepareSnapshotPath(projection)

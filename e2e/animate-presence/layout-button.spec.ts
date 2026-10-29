@@ -1651,6 +1651,9 @@ test.describe('AnimatePresence layout button dogfood', () => {
         await expect(button).toHaveAttribute('data-is-loaded', 'ready', { timeout: 3000 })
         await expectReadyCopyState(page, prefix)
 
+        // In view, as `button.click()` would scroll it: an offscreen box-size
+        // animation completes at once.
+        await button.scrollIntoViewIfNeeded()
         const baselineWidth = await button.evaluate(
             (element) => element.getBoundingClientRect().width
         )
