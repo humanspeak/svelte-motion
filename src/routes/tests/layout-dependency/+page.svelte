@@ -365,8 +365,11 @@
                 <p class="expectation">
                     Both parents have <code>layout</code> and wrap an
                     <code>AnimatePresence mode="wait"</code>
-                    swapping a small child for a large one. The ungated parent animates its size; the
-                    gated parent (<code>layoutDependency={0}</code>) jumps.
+                    swapping a small child for a large one. Both parents jump to the new size, as in Motion:
+                    the exit's completion re-renders only the <code>AnimatePresence</code>, so
+                    neither parent takes a snapshot (the gated one,
+                    <code>layoutDependency={0}</code>, never would). Inside a
+                    <code>LayoutGroup</code> the ungated parent would animate.
                 </p>
                 <div class="panel-controls">
                     <button

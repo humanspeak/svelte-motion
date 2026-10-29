@@ -51,6 +51,8 @@ interface Band {
 interface Frame {
     t: number
     bands: Partial<Record<Colour, Band>>
+    /** Treat as a capture gap: steps are not measured across it (plan 015b A3.2). */
+    gap?: boolean
 }
 /** One hit-tested frame: blue's top and green's bottom, in viewport px. */
 interface Hit {
@@ -61,6 +63,8 @@ interface Hit {
     greenLeft?: number
     /** The first (grey) item's top (plan 015b). */
     zero?: number
+    /** The point just below green's found bottom edge hit-tests as pink (plan 015b A3.2). */
+    greenBelowPink?: boolean
     /** Pink's (the real element's, or its clone's) top, and whether its centre hits it. */
     pinkTop?: number
     pinkHit?: boolean
@@ -166,6 +170,14 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
             }
             return found === undefined ? undefined : last ? found + 1 : found
         }
+        const greenEdge = () => {
+            const green = scan(greenX, 'sib-3', true)
+            const below =
+                green === undefined || greenX === undefined
+                    ? null
+                    : document.elementFromPoint(greenX, green)
+            return { green, greenBelowPink: !!below?.closest('[data-testid="sib-2"]') }
+        }
         const pinkCentre = () => {
             const pink = document.querySelector<HTMLElement>('[data-testid="sib-2"]')
             const rect = pink?.getBoundingClientRect()
@@ -181,7 +193,7 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
             w.hits.push({
                 t: performance.now(),
                 blue: scan(blueX, 'sib-1', false),
-                green: scan(greenX, 'sib-3', true),
+                ...greenEdge(),
                 greenLeft: scanRow(greenY, 'sib-3'),
                 zero: scan(zeroX, 'sib-0', false),
                 ...pinkCentre(),
@@ -291,6 +303,10 @@ function maxStep(frames: Frame[], colour: Colour): number {
     let step = 0
     let previous: { t: number; value: number } | undefined
     for (const frame of frames) {
+        if (frame.gap) {
+            previous = undefined
+            continue
+        }
         const band = frame.bands[colour]
         if (!band) continue
         const value = edge(colour, band)
@@ -600,7 +616,22 @@ test.describe('layout siblings around exits (plan 015b, owned path)', () => {
         await page.waitForTimeout(200)
         const recording = await record(page, () => remove(page), 900)
         annotate(recording)
-        const { frames, hits } = recording
+        // The popped pink item is the real element here: transformed while
+        // it moves with the clamp, unstacked (no z-index:
+        // `PopChild.tsx:167-168` @ v14.7.1) and taking pointer events, it
+        // draws over green, as in Motion (the framer-motion 14.7.1 mirror,
+        // `/tmp/fm1471-repro/m-clamp.mjs`: green's bottom holds in every
+        // frame). Where pink covers green's bottom, the found edge is pink's
+        // top: such a reading, hit-tested or painted, is a capture gap
+        // (plan 015b A3.2).
+        const hits = recording.hits.map((hit) =>
+            hit.greenBelowPink ? { ...hit, green: undefined } : hit
+        )
+        const frames = recording.frames.map((frame) => {
+            const { green, pink } = frame.bands
+            if (!green || !pink || Math.abs(pink.top - green.bottom) > 2) return frame
+            return { ...frame, gap: true, bands: { ...frame.bands, green: undefined } }
+        })
         const start = framesWith(frames, ['blue', 'pink', 'green'])[0].bands
         const all = framesWith(frames, ['blue', 'pink'])
         expect(all.length).toBeGreaterThanOrEqual(10)
@@ -613,9 +644,10 @@ test.describe('layout siblings around exits (plan 015b, owned path)', () => {
                 expect(Math.abs(bands.green.bottom - start.green!.bottom)).toBeLessThanOrEqual(2)
             }
         }
-        for (const colour of ['blue', 'pink', 'green'] as const) {
-            expect(maxStep(frames, colour), `${colour} step`).toBeLessThanOrEqual(35)
+        for (const colour of ['blue', 'pink'] as const) {
+            expect(maxStep(recording.frames, colour), `${colour} step`).toBeLessThanOrEqual(35)
         }
+        expect(maxStep(frames, 'green'), 'green step').toBeLessThanOrEqual(35)
         for (const colour of ['blue', 'green'] as const) {
             expect(maxHitStep(hits, colour), `${colour} hit-tested step`).toBeLessThanOrEqual(35)
         }
