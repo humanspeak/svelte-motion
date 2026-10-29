@@ -707,3 +707,25 @@ fixed. Correction: this is a svelte-motion gap and upstream behaves as designed.
 > `commitPresenceLayoutRelease` follows B(c)'s rule (A2.1): it refreshes silently outside the boundary or group and
 > animates inside a shared `LayoutGroup`. It still keeps an un-rebased `previousRect`. A node starting its own
 > box-size animation yields any group-seeded snapshot from the same task (`yieldToSizeAnimation`, A2.2).
+
+### A4 (2026-10-29, operator-approved)
+
+- **The covered-reading rule now covers the owned `?sticky` case.**
+  - A3.2's rule now also applies to owned `?sticky` (`pop-layout-scroll-siblings.spec.ts`, about 762, "?sticky,
+    scroll, remove: no jump").
+  - The rule: when the point just below the found green edge hit-tests as pink (or the painted pink band starts
+    within 2 px of green's bottom), that reading is a capture gap, and the step measurement resets.
+- **Why.**
+  - The siblings mirror's `?sticky` variant (three runs each, upstream and ours, `m-clamp.mjs`) shows the same paint
+    on both. Pink is transformed, has `z-index: auto`, takes pointer events and draws over green. Green's bottom
+    holds in every frame.
+  - On both, the hit-tested reading drops 57–58 px when pink covers green's bottom.
+  - The sticky header never reaches green's column.
+- **Where the change goes.** Make it in `expectNoJump` or in that test. If it goes in the shared helper, gate it to
+  readings where pink covers the next point, so other callers' counted steps are unchanged.
+- **What stays the same.** The "no step above 35 px" rule. Cite `PopChild.tsx:167-168`. The no-weakening check allows
+  this edit.
+- **Verify.**
+  - `:762` passes 5 times in a row.
+  - The owned clamp passes 5 times.
+  - The full Step 5.1 guard set, `pnpm test:only`, `pnpm check` and `pnpm build` all pass.
