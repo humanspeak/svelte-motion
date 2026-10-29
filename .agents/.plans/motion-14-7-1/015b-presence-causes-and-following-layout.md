@@ -538,8 +538,9 @@ Divergences from upstream that this plan records rather than closes:
 - **Per-clone removal.** Upstream removes in a batch (`index.tsx:171-176`).
 - **`presenceAffectsLayout={false}`** isn't supported.
 - **Plain non-motion lists** never trigger D.
-- **Wait mode.** `commitPresenceLayoutRelease` keeps its own rule (not `MeasureLayout.tsx:116-127`) and an
-  un-rebased `previousRect`.
+- **Wait mode.** `commitPresenceLayoutRelease` follows B(c)'s rule since A2.1, but keeps an un-rebased
+  `previousRect`. See A3.
+- **Grouped wait label (A3.3).** Upstream's label drifts up to 7.83 px off-centre; ours stays centred.
 
 Reviewers: check the merged causes across both throttles, the boundary-contains and same-group rule, the
 completion-teardown D call (it runs only for marked elements), and the parity diff allow-list.
@@ -671,3 +672,35 @@ Answers the A1 STOPs at `0c065cae`. Upstream frames come from the ModeButton mir
   its centre, and green covers it no earlier than 140 ms after the pop.
 - The clone branch keeps "at least 10 frames with blue and pink". Cite `PopChild.tsx:167-168` in the spec.
 - This one edit is allowed by the Done criteria's "no weakening" check.
+
+### A3 (2026-10-29, operator-approved)
+
+Answers the Step 5 STOPs at `07a24e2e`.
+
+**1. `e2e/layout/layout-dependency.spec.ts:293`: the ungated wait-mode parent snaps, as upstream does.**
+- This is the same rule as A2.1. A `layout` parent outside a `LayoutGroup` doesn't re-render when a wait-mode exit
+  completes, so it snaps (`index.tsx:244`; the `modeshell.tsx` mirror with no group).
+- Change only the ungated half to assert that no FLIP transform appears and that the width reaches its final value.
+  Cite `index.tsx:244`.
+- Update the card's caption in `src/routes/tests/layout-dependency/+page.svelte`. Both parents jump, as in Motion.
+  Inside a `LayoutGroup`, the ungated one would animate.
+- Both files join the allow-list.
+
+**2. `pop-layout-scroll-siblings.spec.ts:597`, the owned clamp: skip covered readings.**
+- Upstream fails this hit test too (`m-clamp.mjs`, two runs). Upstream and ours paint the same here:
+  - pink is transformed, takes pointer events, has `z-index: auto` and draws over green;
+  - green's bottom holds in every frame.
+- Keep the "no step above 35 px" rule. Drop any frame where the point just below the found green edge hit-tests as
+  pink, and treat it as a capture gap. Apply the same rule to the screencast green band.
+- Cite `PopChild.tsx:167-168`. The no-weakening check allows this edit.
+
+**3. A recorded divergence: the grouped wait label.** In `wait-group`, upstream's label drifts up to 7.83 px
+off-centre while the shell scales, because its `.state` is projected for position inside the scaling shell. Ours
+stays centred. Matching it would mean projecting `.state` through the size-animation path. That's logged here and not
+fixed.
+
+**Plan text** (dispatcher edit). The "Wait mode" maintenance note now reads as follows.
+
+> `commitPresenceLayoutRelease` follows B(c)'s rule (A2.1): it refreshes silently outside the boundary or group and
+> animates inside a shared `LayoutGroup`. It still keeps an un-rebased `previousRect`. A node starting its own
+> box-size animation yields any group-seeded snapshot from the same task (`yieldToSizeAnimation`, A2.2).
