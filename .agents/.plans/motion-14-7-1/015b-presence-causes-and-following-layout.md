@@ -540,7 +540,9 @@ Divergences from upstream that this plan records rather than closes:
 - **Plain non-motion lists** never trigger D.
 - **Wait mode.** `commitPresenceLayoutRelease` follows B(c)'s rule since A2.1, but keeps an un-rebased
   `previousRect`. See A3.
-- **Grouped wait label (A3.3).** Upstream's label drifts up to 7.83 px off-centre; ours stays centred.
+- **Grouped wait label (A3.3, issue #510).** This is our gap, not an upstream bug. Upstream's `layout="position"`
+  `.state` runs its own position animation on its own (default spring) transition, so it drifts up to 7.83 px
+  off-centre inside the 2.4 s linear shell. Ours keeps it centred because that animation never runs.
 
 Reviewers: check the merged causes across both throttles, the boundary-contains and same-group rule, the
 completion-teardown D call (it runs only for marked elements), and the parity diff allow-list.
@@ -697,7 +699,8 @@ Answers the Step 5 STOPs at `07a24e2e`.
 **3. A recorded divergence: the grouped wait label.** In `wait-group`, upstream's label drifts up to 7.83 px
 off-centre while the shell scales, because its `.state` is projected for position inside the scaling shell. Ours
 stays centred. Matching it would mean projecting `.state` through the size-animation path. That's logged here and not
-fixed.
+fixed. Correction: this is a svelte-motion gap and upstream behaves as designed. `.state` has
+`layout="position"` and no `transition`, so upstream runs its own spring. It's tracked after 2.7.0 as issue #510.
 
 **Plan text** (dispatcher edit). The "Wait mode" maintenance note now reads as follows.
 
