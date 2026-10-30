@@ -81,19 +81,23 @@
                     onExitComplete={() => index === maxNum - 1 && onDone()}
                 >
                     {#snippet child()}
-                        <!-- TODO(plan 012 Step 2): onLayoutAnimationComplete={advance} -->
-                        <motion.div layout layoutId="measurer" style={measurerStyle} />
+                        <motion.div
+                            layout
+                            layoutId="measurer"
+                            style={measurerStyle}
+                            onLayoutAnimationComplete={advance}
+                        />
                     {/snippet}
                 </AnimatePresence>
             {:else}
                 <AnimatePresence onExitComplete={() => index === maxNum - 1 && onDone()}>
                     {#if currentIndex === index}
-                        <!-- TODO(plan 012 Step 2): onLayoutAnimationComplete={advance} -->
                         <motion.div
                             key="measurer"
                             layout
                             layoutId="measurer"
                             style={measurerStyle}
+                            onLayoutAnimationComplete={advance}
                         />
                     {/if}
                 </AnimatePresence>

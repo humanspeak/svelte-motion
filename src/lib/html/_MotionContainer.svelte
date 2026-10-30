@@ -238,6 +238,8 @@
         layoutDependency: layoutDependencyProp,
         onProjectionUpdate: onProjectionUpdateProp,
         onLayoutMeasure: onLayoutMeasureProp,
+        onLayoutAnimationStart: onLayoutAnimationStartProp,
+        onLayoutAnimationComplete: onLayoutAnimationCompleteProp,
         // trunk-ignore(eslint/no-useless-assignment): `ref` is write-only here — mirrored from the internal `element` node via the effect below
         ref = $bindable(),
         ...rest
@@ -713,6 +715,11 @@
             // template off the props, so the VE composes templated transforms
             // natively — the job `applyMotionStyleEffect` used to do.
             transformTemplate: transformTemplateProp,
+            // Plan 012: read by the projection node off `visualElement.getProps()`
+            // and passed to the layout animation as `onPlay` / `onComplete`
+            // (create-projection-node.ts:586-589, 626-628 @ v14.7.1).
+            onLayoutAnimationStart: onLayoutAnimationStartProp,
+            onLayoutAnimationComplete: onLayoutAnimationCompleteProp,
             // Forwarded only, never invoked here: motion-dom subscribes it
             // through `propEventHandlers` and fires it on `preRender` with
             // `latestValues` whenever a bound value changes. Its presence also

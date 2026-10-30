@@ -14,9 +14,7 @@ for (const [suffix, query] of [
     ['', ''],
     [' (owned)', '&owned=true']
 ] as const) {
-    test.fixme(`Only fires once when layoutId child exits and re-enters${suffix} (plan 012 Step 2)`, async ({
-        page
-    }) => {
+    test(`Only fires once when layoutId child exits and re-enters${suffix}`, async ({ page }) => {
         await page.goto(`/tests/layout-id/exit-complete-once?@isPlaywright=true${query}`)
         await expect(page.locator('#done-count[data-hydrated]')).toBeAttached()
         // Wait for initial layout animations to settle

@@ -769,6 +769,28 @@ export type MotionProps = {
      * Mirrors framer-motion's `onLayoutMeasure`.
      */
     onLayoutMeasure?: MotionOnLayoutMeasure
+    /**
+     * Called when this element's layout animation starts, as in Motion: the
+     * projection node passes it to the layout animation as `onPlay`
+     * (`create-projection-node.ts:586-589, 626-628 @ v14.7.1`).
+     *
+     * @example
+     * ```svelte
+     * <motion.div layout onLayoutAnimationStart={() => (moving = true)} />
+     * ```
+     */
+    onLayoutAnimationStart?: () => void
+    /**
+     * Called when this element's layout animation completes, as in Motion:
+     * the projection node passes it to the layout animation as `onComplete`
+     * (`create-projection-node.ts:586-589, 626-628 @ v14.7.1`).
+     *
+     * @example
+     * ```svelte
+     * <motion.div layout onLayoutAnimationComplete={() => (moving = false)} />
+     * ```
+     */
+    onLayoutAnimationComplete?: () => void
     /** Shared layout animation identifier. Elements with matching layoutId animate between positions. */
     layoutId?: string
     /**

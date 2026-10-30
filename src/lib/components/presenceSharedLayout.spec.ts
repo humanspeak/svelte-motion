@@ -121,3 +121,52 @@ describe('presence shared layout teardown order (plan 012)', () => {
         }
     })
 })
+
+/**
+ * Plan 012 Step 2: `onLayoutAnimationStart` / `onLayoutAnimationComplete`
+ * reach the VisualElement's props, where the projection node reads them for
+ * the layout animation's `onPlay` / `onComplete`
+ * (`create-projection-node.ts:586-589, 626-628 @ v14.7.1`).
+ */
+describe('layout animation callbacks (plan 012 Step 2)', () => {
+    beforeEach(() => {
+        vi.useRealTimers()
+        vi.stubGlobal(
+            'ResizeObserver',
+            class {
+                observe() {}
+                unobserve() {}
+                disconnect() {}
+            }
+        )
+        ;(Element.prototype as unknown as { getAnimations: () => Animation[] }).getAnimations =
+            () => []
+        // jsdom has no layout: a box is as wide as its inline width.
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+            this: HTMLElement
+        ) {
+            return new DOMRect(10, 10, parseFloat(this.style.width) || 0, 50)
+        })
+    })
+    afterEach(() => {
+        vi.restoreAllMocks()
+        vi.unstubAllGlobals()
+    })
+
+    it("calls both once for a layout element's layout animation", async () => {
+        const onLayoutAnimationStart = vi.fn()
+        const onLayoutAnimationComplete = vi.fn()
+        const { rerender } = render(PresenceSharedLayoutHarness, {
+            boxWidth: 100,
+            onLayoutAnimationStart,
+            onLayoutAnimationComplete
+        })
+        await tick()
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        await rerender({ boxWidth: 200, onLayoutAnimationStart, onLayoutAnimationComplete })
+        await tick()
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        expect(onLayoutAnimationStart).toHaveBeenCalledTimes(1)
+        expect(onLayoutAnimationComplete).toHaveBeenCalledTimes(1)
+    })
+})
