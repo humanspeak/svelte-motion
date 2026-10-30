@@ -740,8 +740,8 @@ Answers the guard's findings at `3f2fe7cf`.
 - An exit **start** re-renders the list's owner, and upstream re-renders the footer with it. So the footer may get a
   `didUpdate` then, but it must not move: every update must have `snapshot === layout`.
 - When the exit **completes**, the footer gets **no** `didUpdate` at all.
-- Attach the listener before the removal, as Step 1 did. The no-weakening check allows this edit, because it is
-  stricter than both the Step 1 version and the `3f2fe7cf` version.
+- Attach the listener before the removal, as Step 1 did. The no-weakening check allows this edit. It is stricter than the `3f2fe7cf` version.
+  Compared with Step 1, it allows only the zero-move update at exit start, which upstream also produces.
 
 **2. The fixed-root check reads live containing-block styles (A1.3 follow-up).**
 - In `scrollBasis.ts`, `holdsFixed` is cached in `styleMemo` forever, but it depends on `transform`, `filter`,
