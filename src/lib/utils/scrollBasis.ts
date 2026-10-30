@@ -84,14 +84,40 @@ type Point = { x: number; y: number }
 
 const overflowPattern = /(auto|scroll|hidden|overlay)/
 
-const styleMemo = new WeakMap<Element, { overflow: string; position: string }>()
+type NodeStyle = { overflow: string; position: string }
+
+const styleMemo = new WeakMap<Element, NodeStyle>()
+
+/**
+ * Whether `element` is the containing block of its `position: fixed`
+ * descendants (plan 015b A1.3, A5): a transform, filter, backdrop filter,
+ * perspective, a `will-change` of one of them, or layout or paint
+ * containment (`strict` and `content` include both). Read live, never
+ * memoized: a motion ancestor's transform changes at any time. Only read on
+ * a walk past a fixed node, which runs for a commit, never per frame.
+ */
+const holdsFixedDescendants = (element: Element): boolean => {
+    const view = element.ownerDocument.defaultView ?? window
+    const computed = view.getComputedStyle(element)
+    const set = (value: string | undefined) => !!value && value !== 'none'
+    const willChange = computed.willChange ?? ''
+    const contain = computed.contain ?? ''
+    return (
+        set(computed.transform) ||
+        set(computed.filter) ||
+        set(computed.backdropFilter) ||
+        set(computed.perspective) ||
+        /\b(transform|filter|backdrop-filter|perspective)\b/.test(willChange) ||
+        /\b(layout|paint|strict|content)\b/.test(contain)
+    )
+}
 
 /**
  * The computed overflow and position of `element`, memoized. `html` and
  * `body` aren't memoized: whether they scroll depends on which of them is
  * the root scroller.
  */
-const styleOf = (element: Element): { overflow: string; position: string } => {
+const styleOf = (element: Element): NodeStyle => {
     const memo = styleMemo.get(element)
     if (memo) return memo
     const view = element.ownerDocument.defaultView ?? window
@@ -127,8 +153,11 @@ const readRootScroll = (doc: Document): [number, number] => [
  * scrolled by script). The root scroller
  * (`document.scrollingElement ?? document.documentElement`) is left out, as
  * are `html` and `body` with `overflow: visible`, so a body scroller under
- * `html { overflow: hidden }` counts. The walk crosses shadow hosts and stops
- * after a fixed node.
+ * `html { overflow: hidden }` counts. The walk crosses shadow hosts. After a
+ * fixed node it skips to the fixed node's containing block, a transformed
+ * (filtered, `perspective`, `will-change`, paint-contained) ancestor, and
+ * goes on from there (plan 015b A1.3): the box scrolls with that ancestor.
+ * With no such ancestor the node is fixed to the viewport.
  *
  * @param element The element whose page box is cached.
  * @returns Its scrollers (innermost first), and whether it is fixed or sticky.
@@ -142,19 +171,22 @@ export const getScrollAncestors = (element: Element): ScrollAncestors => {
     const doc = element.ownerDocument
     const root = rootScroller(doc)
     const scrollers: Element[] = []
+    // Inside a fixed box, looking for its containing block: the scrollers on
+    // the way don't move it.
     let fixed = false
     let sticky = false
     for (let node: Element | null = element; node; node = parentOf(node)) {
         const { overflow, position } = styleOf(node)
+        if (fixed) {
+            if (!holdsFixedDescendants(node)) continue
+            fixed = false
+        }
         if (position === 'sticky') sticky = true
         // `visible` (`html`/`body` included) never matches.
         if (node !== element && node !== root && overflowPattern.test(overflow)) {
             scrollers.push(node)
         }
-        if (position === 'fixed') {
-            fixed = true
-            break
-        }
+        if (position === 'fixed') fixed = true
     }
     return { scrollers, fixed, sticky }
 }

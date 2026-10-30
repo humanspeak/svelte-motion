@@ -376,3 +376,117 @@ describe('scrollBasis (plan 015a)', () => {
         })
     })
 })
+
+/**
+ * Plan 015b amendment A1.3: a `position: fixed` box whose containing block is
+ * a transformed (filtered, `perspective`, `will-change: transform` or
+ * `contain: paint`) ancestor is laid out against that ancestor, so it scrolls
+ * with it, not with the viewport. Treating it as a fixed root rebased a
+ * cached rect by the page scroll (480px under `scale(0.5)`: a 240px drift on
+ * `pop-layout-container-move.spec.ts:307`).
+ */
+describe('getScrollAncestors: fixed under a containing-block ancestor (plan 015b A1)', () => {
+    beforeEach(() => {
+        document.body.innerHTML = ''
+    })
+
+    it.each([
+        'transform: scale(0.5)',
+        'filter: blur(1px)',
+        'perspective: 100px',
+        'will-change: transform',
+        'contain: paint'
+    ])('a fixed element under `%s` is not a fixed root', (style) => {
+        const scroller = make('overflow: auto')
+        const block = make(style, scroller)
+        const element = make('position: fixed', block)
+
+        const ancestors = getScrollAncestors(element)
+        expect(ancestors.fixed).toBe(false)
+        expect(ancestors.scrollers).toEqual([scroller])
+    })
+
+    it('a fixed element with no such ancestor stays a fixed root', () => {
+        const scroller = make('overflow: auto')
+        const element = make('position: fixed', scroller)
+
+        expect(getScrollAncestors(element)).toMatchObject({ fixed: true, scrollers: [] })
+    })
+
+    it('a scroller between the fixed box and its containing block does not move it', () => {
+        const block = make('transform: translateX(1px)')
+        const inner = make('overflow: auto', block)
+        const element = make('position: fixed', inner)
+
+        expect(getScrollAncestors(element)).toMatchObject({ fixed: false, scrollers: [] })
+    })
+})
+
+/**
+ * Plan 015b A5: the containing-block check reads live styles (a motion
+ * ancestor's transform changes at any time), and also counts layout
+ * containment and backdrop filters.
+ */
+describe('getScrollAncestors: live containing-block check (plan 015b A5)', () => {
+    beforeEach(() => {
+        document.body.innerHTML = ''
+    })
+    // The backdrop-filter case spies on getComputedStyle: never let it leak.
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('an ancestor gaining a transform after a first walk holds the fixed box', () => {
+        const scroller = make('overflow: auto')
+        const block = make('', scroller)
+        const element = make('position: fixed', block)
+        expect(getScrollAncestors(element).fixed).toBe(true)
+
+        block.style.transform = 'scale(0.5)'
+
+        expect(getScrollAncestors(element)).toMatchObject({ fixed: false, scrollers: [scroller] })
+    })
+
+    it('an ancestor losing its transform after a first walk lets the fixed box go', () => {
+        const scroller = make('overflow: auto')
+        const block = make('transform: scale(0.5)', scroller)
+        const element = make('position: fixed', block)
+        expect(getScrollAncestors(element).fixed).toBe(false)
+
+        block.style.transform = 'none'
+
+        expect(getScrollAncestors(element)).toMatchObject({ fixed: true, scrollers: [] })
+    })
+
+    it.each(['contain: layout', 'contain: strict', 'contain: content'])(
+        'a fixed element under `%s` is not a fixed root',
+        (style) => {
+            const scroller = make('overflow: auto')
+            const block = make(style, scroller)
+            const element = make('position: fixed', block)
+
+            expect(getScrollAncestors(element)).toMatchObject({
+                fixed: false,
+                scrollers: [scroller]
+            })
+        }
+    )
+
+    it('a fixed element under a backdrop filter is not a fixed root', () => {
+        const scroller = make('overflow: auto')
+        const block = make('', scroller)
+        // jsdom's CSSOM doesn't parse `backdrop-filter`: stub the computed value.
+        const getComputedStyle = window.getComputedStyle.bind(window)
+        vi.spyOn(window, 'getComputedStyle').mockImplementation((target, pseudo) => {
+            const style = getComputedStyle(target, pseudo)
+            if (target !== block) return style
+            return new Proxy(style, {
+                get: (base, key) =>
+                    key === 'backdropFilter' ? 'blur(2px)' : (Reflect.get(base, key) as unknown)
+            })
+        })
+        const element = make('position: fixed', block)
+
+        expect(getScrollAncestors(element)).toMatchObject({ fixed: false, scrollers: [scroller] })
+    })
+})

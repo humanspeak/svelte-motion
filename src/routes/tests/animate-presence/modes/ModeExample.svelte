@@ -165,7 +165,7 @@
         mode === 'popLayout'
             ? 'Layout row: MID fades as an overlay; RIGHT should move into the dashed slot immediately.'
             : mode === 'sync'
-              ? 'Layout row: MID keeps its layout slot while fading; RIGHT should wait, then move after exit.'
+              ? 'MID keeps its layout slot while fading; RIGHT then jumps into place when the exit completes (as in Motion).'
               : 'Layout row: enter waits in swaps; here the slot also stays until exit completes.'
     )
 
