@@ -139,7 +139,8 @@
     }
 
     // ---- Live verdict (tester only; never under `@isPlaywright=true`) ----
-    type Verdict = { gap: number; jump: number }
+    /** `clamp`: the one-frame 70px content jump `?layoutScroll` expects (see `watch`). */
+    type Verdict = { gap: number; jump: number; clamp: boolean }
     let isTester = $state(false)
     let verdict = $state<Verdict | null>(null)
     /** How the tracked sibling (the footer, or blue) reached its new place. */
@@ -161,6 +162,12 @@
      * Samples blue and pink every frame for a second after a removal: the
      * largest change of the pink−blue gap, and the largest step any of them
      * takes between two frames.
+     *
+     * Under `?layoutScroll` the removal's clamp is a one-frame content jump,
+     * as in Motion: in that one frame blue and pink (and green, which moves
+     * with the content before it slides up) step by 70 ± 2px. That frame is
+     * allowed once; every other step, green's slide included, still counts
+     * against the 35px rule.
      */
     const watch = (action: 'remove' | 'add' = 'remove') => {
         if (!isTester) return
@@ -169,27 +176,49 @@
         const pink = pinkTop()
         if (blue === undefined || pink === undefined) return
         const startGap = pink - blue
-        let previous: Record<'blue' | 'green', number | undefined> = { blue, green: topOf(3) }
+        type Tops = Record<'blue' | 'pink' | 'green', number | undefined>
+        let previous: Tops = { blue, pink, green: topOf(3) }
         let gap = 0
         let jump = 0
+        let clamp = false
+        const isClampStep = (step: number | undefined) =>
+            step !== undefined && Math.abs(Math.abs(step) - 70) <= 2
         const start = performance.now()
         const sample = () => {
-            const now = { blue: topOf(1), green: topOf(3) }
-            const pinkNow = pinkTop()
-            if (now.blue !== undefined && pinkNow !== undefined) {
-                gap = Math.max(gap, Math.abs(pinkNow - now.blue - startGap))
+            const now: Tops = { blue: topOf(1), pink: pinkTop(), green: topOf(3) }
+            if (now.blue !== undefined && now.pink !== undefined) {
+                gap = Math.max(gap, Math.abs(now.pink - now.blue - startGap))
             }
-            for (const key of ['blue', 'green'] as const) {
+            const frameSteps: Partial<Record<keyof Tops, number>> = {}
+            for (const key of ['blue', 'pink', 'green'] as const) {
                 const a = previous[key]
                 const b = now[key]
-                if (a !== undefined && b !== undefined) jump = Math.max(jump, Math.abs(b - a))
+                if (a !== undefined && b !== undefined) frameSteps[key] = b - a
+            }
+            const isClampFrame =
+                layoutScroll &&
+                action === 'remove' &&
+                !clamp &&
+                isClampStep(frameSteps.blue) &&
+                isClampStep(frameSteps.pink)
+            if (isClampFrame) {
+                clamp = true
+            } else {
+                for (const key of ['blue', 'green'] as const) {
+                    const step = frameSteps[key]
+                    if (step !== undefined) jump = Math.max(jump, Math.abs(step))
+                }
             }
             previous = now
             if (performance.now() - start < 1000) {
                 requestAnimationFrame(sample)
                 return
             }
-            verdict = { gap: Math.round(gap * 10) / 10, jump: Math.round(jump * 10) / 10 }
+            verdict = {
+                gap: Math.round(gap * 10) / 10,
+                jump: Math.round(jump * 10) / 10,
+                clamp
+            }
         }
         requestAnimationFrame(sample)
     }
@@ -221,7 +250,10 @@
             }
             if (moved < 20) return
             const snapped = step >= 50
-            const expectSnap = action === 'remove' && mode === 'sync' && !layoutGroup
+            // A sync exit's completion outside its group snaps, and under
+            // `?layoutScroll` a removal's clamp is a one-frame content jump.
+            const expectSnap =
+                action === 'remove' && ((mode === 'sync' && !layoutGroup) || layoutScroll)
             movement = { snapped, expected: snapped === expectSnap, step: Math.round(step) }
         }
         requestAnimationFrame(sample)
@@ -342,7 +374,11 @@
                 {verdict.gap > 2 ? 'GAP DRIFTS' : 'GAP HOLDS'} · {verdict.gap}px
             </span>
             <span class="chip" class:bad={verdict.jump > 35}>
-                {verdict.jump > 35 ? 'JUMPED' : 'NO JUMP'} · max step {verdict.jump}px
+                {verdict.jump > 35
+                    ? 'JUMPED'
+                    : verdict.clamp
+                      ? '70px one-frame step (expected)'
+                      : 'NO JUMP'} · max step {verdict.jump}px
             </span>
         {/if}
         {#if isTester && movement}
