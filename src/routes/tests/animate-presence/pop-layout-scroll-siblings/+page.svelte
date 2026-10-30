@@ -27,7 +27,7 @@
 <script lang="ts">
     import { page } from '$app/state'
     import { AnimatePresence, LayoutGroup, motion } from '$lib'
-    import { onMount } from 'svelte'
+    import { onMount, tick } from 'svelte'
     import TesterPanel, { type TesterStep } from '../../layout/_parity/TesterPanel.svelte'
 
     /**
@@ -155,8 +155,21 @@
         document
             .querySelector<HTMLElement>(`[data-testid="sib-${id}"]:not([data-clone])`)
             ?.getBoundingClientRect().top
+    /** The painted pink: its exit clone while one exists, else the item. */
     const pinkTop = () =>
-        document.querySelector<HTMLElement>('[data-testid="sib-2"]')?.getBoundingClientRect().top
+        (
+            document.querySelector<HTMLElement>('[data-testid="sib-2"][data-clone]') ??
+            document.querySelector<HTMLElement>('[data-testid="sib-2"]')
+        )?.getBoundingClientRect().top
+    /**
+     * Start sampling after the update has flushed, so each frame's sample
+     * runs after the frame callbacks the update scheduled (an exit clone's
+     * first follow transform is written in one): a sample registered in the
+     * click itself would read the clone a frame before it is drawn there.
+     */
+    const sampleFrames = (sample: FrameRequestCallback) => {
+        void tick().then(() => requestAnimationFrame(sample))
+    }
 
     /**
      * Samples blue and pink every frame for a second after a removal: the
@@ -220,7 +233,7 @@
                 clamp
             }
         }
-        requestAnimationFrame(sample)
+        sampleFrames(sample)
     }
 
     /**
@@ -250,13 +263,18 @@
             }
             if (moved < 20) return
             const snapped = step >= 50
-            // A sync exit's completion outside its group snaps, and under
-            // `?layoutScroll` a removal's clamp is a one-frame content jump.
+            // A sync exit's completion snaps what is outside its
+            // AnimatePresence and LayoutGroup: the footer, or blue on the
+            // owned path (its own AnimatePresence); on the clone path blue
+            // shares pink's AnimatePresence and slides. Under `?layoutScroll`
+            // a removal's clamp is a one-frame content jump.
+            const outsideBoundary = footer || path === 'owned'
             const expectSnap =
-                action === 'remove' && ((mode === 'sync' && !layoutGroup) || layoutScroll)
+                action === 'remove' &&
+                ((mode === 'sync' && !layoutGroup && outsideBoundary) || layoutScroll)
             movement = { snapped, expected: snapped === expectSnap, step: Math.round(step) }
         }
-        requestAnimationFrame(sample)
+        sampleFrames(sample)
     }
 
     const steps: TesterStep[] = [
