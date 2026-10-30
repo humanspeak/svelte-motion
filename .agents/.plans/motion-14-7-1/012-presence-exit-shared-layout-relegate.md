@@ -1748,3 +1748,59 @@ Report:
   - the hand-off's update pass measures the clone after 008's correction;
   - no `layout` sibling animates twice now that held clones are classified exit-complete;
   - the registry handoff is only dropped when motion-dom resumes.
+
+## Amendments
+
+### A1 (2026-10-30, operator-approved)
+
+Answers the Step 1 label STOP. Lane merge `a22c7332`; the Step 1 work stays uncommitted in the lane and
+continues from there. Upstream behaviour comes from the React 18 + `framer-motion@14.7.1` repro
+(`/tmp/fm1471-repro`: `src/lightbox.tsx`, `src/sharedpresence.tsx`, `m-012probe.mjs`). Where this amendment
+and the body disagree, this amendment wins. Every change below is test-only. None changes library source.
+
+**1. Item 2 (clone `closing then shrinks the card into thumbnail two`) asserts the held card.**
+- Today it passes for the wrong reason. The card is removed on the next frame, and thumbnail two still grows out
+  of the card's last box because 007 A1's departing-lead snapshot promotes it. The spec checks only thumbnail
+  two's width.
+- Add what upstream paints: after the close click, the card (or its exit clone) stays connected and painted
+  while thumbnail two grows, and the two crossfade (the card's opacity falls from 1 towards 0 over the shared
+  animation, and it is gone only after that animation ends). Judge it with `recordPainted` (screencast plus
+  per-rAF `elementFromPoint`), not sampled rects alone.
+- **RED** today: the card disappears at once. Keep the width assertion.
+- Apply the same strengthening to the `(owned)` twin (item 4), whose label stays RED.
+
+**2. Items 5b and 6b (owned) assert the release.**
+- Today they pass by accident. The owned held `#shape-0` is never released: it is still mounted at opacity 0
+  16 s after the click, with a 10 s transition. Upstream removes it when the shared animation ends (gone by
+  about 11 s in the repro).
+- Add a release check to 5b and 6b, using a short transition so the test stays fast: a page param
+  `?duration=<s>` (default 10, as upstream) that changes only the shared-layout transition length. With
+  `&duration=1`, `#shape-0` exists during the animation and is removed within 1 s after it ends
+  (`expect.poll`, timeout `duration + 1` s). Keep 5b's verbatim mid-animation assertions on the default 10 s
+  page.
+- Also add the same release check to 5a and 6a (clone). It is RED today for the existing reason.
+- **RED** (5b, 6b) today: `#shape-0` is never released. "Held forever" is a real bug that Step 4 fixes.
+
+**3. Item 8, open half: 599.9994 × 399.9999 at (200.0003, 130.00005), against upstream's exact 600 × 400 at
+(200, 130).**
+- Before choosing, check the lightbox's computed `transform` once the open animation has finished.
+  - If it is not `none` (a leftover scale or translate that upstream would have reset), it's a real bug. Keep
+    the port's exact `expectBbox` values, and re-label the open half **RED**. Steps 4–5 fix it. If the fix is
+    more than one new mechanism, STOP (as for the radius correction).
+  - If it is `none` and the difference is only floating-point layout rounding, compare each `expectBbox` value
+    with a ±0.01 px tolerance. Write a comment at the helper that cites this amendment, and keep the open half
+    a **GUARD**.
+- Report which branch applied and the measured transform.
+
+**4. Item 8, close half.**
+- Run it. If it fails for the stated reason (`#item-parent` stays hidden, or the lightbox is removed before the
+  shared animation), it stays **RED**.
+- If it passes today, strengthen it as in 1: assert from painted frames that the lightbox stays connected and
+  painted while `#item-parent` grows, then is removed after the shared animation. Re-check that it is RED.
+
+**5. Accepted test-side changes from Step 1.**
+- The lightbox fixture uses `box-sizing: content-box`, as upstream's harness does, so its sizes match.
+- 6a and 6b accept a single screencast frame when the frozen animation repaints nothing. The per-rAF
+  `elementFromPoint` hits still apply to every frame.
+- `src/routes/tests/layout-id/lightbox-crossfade/SingleImage.svelte` is in scope. `useIsPresent()` needs a
+  component, and a snippet can't host it.
