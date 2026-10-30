@@ -431,6 +431,10 @@ describe('getScrollAncestors: live containing-block check (plan 015b A5)', () =>
     beforeEach(() => {
         document.body.innerHTML = ''
     })
+    // The backdrop-filter case spies on getComputedStyle: never let it leak.
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
 
     it('an ancestor gaining a transform after a first walk holds the fixed box', () => {
         const scroller = make('overflow: auto')
@@ -484,6 +488,5 @@ describe('getScrollAncestors: live containing-block check (plan 015b A5)', () =>
         const element = make('position: fixed', block)
 
         expect(getScrollAncestors(element)).toMatchObject({ fixed: false, scrollers: [scroller] })
-        vi.restoreAllMocks()
     })
 })
