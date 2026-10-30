@@ -1,8 +1,13 @@
 <script lang="ts">
+    import { page } from '$app/state'
     import { LazyMotion, domAnimation, m, type FeatureBundle } from '$lib'
 
+    // `?delay=<ms>` stretches the loader so the pending state can be probed.
+    const requestedDelay = Number(page.url.searchParams.get('delay'))
+    const delay = Number.isFinite(requestedDelay) && requestedDelay > 0 ? requestedDelay : 300
+
     const loadFeatures = async (): Promise<FeatureBundle> => {
-        await new Promise((resolve) => setTimeout(resolve, 300))
+        await new Promise((resolve) => setTimeout(resolve, delay))
         return domAnimation
     }
 </script>

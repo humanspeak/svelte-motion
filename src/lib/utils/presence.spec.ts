@@ -1,6 +1,6 @@
 import { animate } from 'motion'
 import { getContext, setContext, tick } from 'svelte'
-import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import {
     containsStatefulCloneContent,
     createAnimatePresenceContext,
@@ -1640,5 +1640,115 @@ describe('observeStyleChanges', () => {
         await flushMicrotasks()
         runFrame()
         expect(onChange).not.toHaveBeenCalled()
+    })
+})
+
+/**
+ * Plan 015a, part C: a `layout` element's exit clone has no projection node,
+ * so it would never animate the layout move its element would have. When
+ * the update scrolls the content (a clamp), the clone follows the move with
+ * the element's layout transition, in the same `animate()` call as its exit.
+ */
+describe('exit clone layout follow (plan 015a)', () => {
+    let scroller: HTMLElement
+    let list: HTMLElement
+    let el: HTMLElement
+    let frames: FrameRequestCallback[]
+
+    const drain = async () => {
+        for (let i = 0; i < 10; i++) await Promise.resolve()
+    }
+    const runFrames = () => {
+        for (const callback of frames.splice(0)) callback(0)
+    }
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        vi.clearAllMocks()
+        // Earlier describes spy on getComputedStyle; this one needs the real
+        // computed overflow of the scroller.
+        vi.restoreAllMocks()
+        document.body.innerHTML = ''
+        scroller = document.createElement('div')
+        scroller.setAttribute('style', 'overflow: auto; height: 320px')
+        list = document.createElement('ul')
+        el = document.createElement('li')
+        list.appendChild(el)
+        scroller.appendChild(list)
+        document.body.appendChild(scroller)
+        // Drawn at its offset size: unscaled.
+        Object.defineProperty(scroller, 'offsetWidth', { configurable: true, value: 400 })
+        Object.defineProperty(scroller, 'offsetHeight', { configurable: true, value: 320 })
+        scroller.scrollTop = 500
+
+        // The element's viewport rect at 500; the clone is drawn 70px lower
+        // once the scroll position has clamped to 430.
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+            this: HTMLElement
+        ) {
+            if (this === el) return makeRect(10, 100, 150, 60)
+            if (this.dataset.clone) return makeRect(10, 170, 150, 60)
+            return makeRect(0, 0, 400, 320)
+        })
+        frames = []
+        // Assigned rather than spied: fake-timer installs swap these globals.
+        vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+            frames.push(callback)
+            return frames.length
+        })
+        vi.stubGlobal('cancelAnimationFrame', (handle: number) => {
+            frames[handle - 1] = () => {}
+        })
+    })
+    afterEach(() => {
+        vi.unstubAllGlobals()
+    })
+
+    const exitAfterClamp = async (clamp: boolean) => {
+        const ctx = createAnimatePresenceContext({ mode: 'popLayout' })
+        ctx.registerChild('item', el, { opacity: 0 }, { type: 'spring' })
+        // Svelte detaches the keyed node before teardown reaches unregister.
+        el.remove()
+        ctx.unregisterChild('item')
+        // The content shrank: the scroll position clamps, no scroll event yet.
+        if (clamp) scroller.scrollTop = 430
+        await drain()
+        return ctx
+    }
+
+    it('6a: a data-layout clone follows the clamp in one animation, before any frame', async () => {
+        el.setAttribute('data-layout', 'true')
+        const ctx = await exitAfterClamp(true)
+
+        expect(animate).toHaveBeenCalledTimes(1)
+        expect(animate).toHaveBeenCalledWith(
+            expect.any(HTMLElement),
+            expect.objectContaining({ opacity: 0, y: [-70, 0] }),
+            expect.objectContaining({ y: expect.objectContaining({ type: 'spring' }) })
+        )
+        runFrames()
+        expect(animate).toHaveBeenCalledTimes(1)
+        ctx.dispose()
+    })
+
+    it('6b: a non-layout clone gets no follow; its exit still starts on the frame', async () => {
+        const ctx = await exitAfterClamp(true)
+
+        expect(animate).not.toHaveBeenCalled()
+        runFrames()
+        expect(animate).toHaveBeenCalledTimes(1)
+        expect(vi.mocked(animate).mock.calls[0][1]).not.toHaveProperty('y')
+        ctx.dispose()
+    })
+
+    it('6c: with no scroll change there is no follow', async () => {
+        el.setAttribute('data-layout', 'true')
+        const ctx = await exitAfterClamp(false)
+
+        expect(animate).not.toHaveBeenCalled()
+        runFrames()
+        expect(animate).toHaveBeenCalledTimes(1)
+        expect(vi.mocked(animate).mock.calls[0][1]).not.toHaveProperty('y')
+        ctx.dispose()
     })
 })

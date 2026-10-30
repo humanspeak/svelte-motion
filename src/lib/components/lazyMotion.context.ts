@@ -5,8 +5,11 @@ import { getContext, setContext } from 'svelte'
  * Context value published by `<LazyMotion>` for descendant motion elements.
  */
 export type LazyMotionContext = {
-    /** Returns the currently active feature bundle. */
-    getFeatures: () => FeatureBundle
+    /**
+     * Returns the loaded feature bundle, or `undefined` while an async bundle
+     * is pending or after it failed (upstream `LazyContext` has no renderer then).
+     */
+    getFeatures: () => FeatureBundle | undefined
     /** Returns whether an async bundle has finished loading. */
     getIsLoaded: () => boolean
     /**

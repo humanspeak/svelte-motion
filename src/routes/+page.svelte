@@ -85,6 +85,30 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/featureless-m') + searchParams}
+                    >
+                        LazyMotion — m without features
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/featureless-m-presence') + searchParams}
+                    >
+                        LazyMotion — featureless m in AnimatePresence
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/featureless-m-props') + searchParams}
+                    >
+                        LazyMotion — featureless m tabindex, style and pathLength
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/enter-animation') + searchParams}
                     >
                         Enter Animation
@@ -1021,6 +1045,15 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/pop-layout-scroll-siblings') +
+                            searchParams}
+                    >
+                        Layout siblings around exits in scroll containers (plan 015a/b)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/animate-presence/pop-layout-playground') +
                             searchParams}
                     >
@@ -1277,6 +1310,14 @@
                         href={resolve('/tests/layout/relative-children') + searchParams}
                     >
                         LayoutGroup — relative children follow a re-laid-out parent
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/transform-origin-at-rest') + searchParams}
+                    >
+                        layout — transform-origin stays at the centre at rest
                     </a>
                 </li>
                 <li>
