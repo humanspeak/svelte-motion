@@ -2520,3 +2520,191 @@ describe('MotionDomProjectionAdapter.commitGroup and size-animating members (pla
         otherElement.remove()
     })
 })
+
+/**
+ * Plan 012 (U9): exiting nodes take part in shared layout, as upstream
+ * `MeasureLayout` does (`getSnapshotBeforeUpdate` 149-204, `componentDidUpdate`
+ * 206-218, `safeToRemove` through `usePresence` @ v14.7.1). `setPresence` /
+ * `commitPresence` are the owned path's pre and post halves;
+ * `handOffToExitClone` re-points a departing node at its exit clone.
+ */
+describe('presence in shared layout (plan 012)', () => {
+    type ExitHold = { cancel(): void; finish(): void }
+    type PresenceApi = {
+        setPresence(isPresent: boolean, safeToRemove: () => void): void
+        commitPresence(): void
+        handOffToExitClone(clone: HTMLElement, release: () => void): ExitHold | undefined
+        readonly isHandedOff: boolean
+    }
+    const api = (adapter: MotionDomProjectionAdapter) => adapter as unknown as PresenceApi
+    const rects = new Map<HTMLElement, DOMRect>()
+    const mounted: MotionDomProjectionAdapter[] = []
+    const mount = (layoutId: string | undefined, rect: DOMRect, layout?: boolean) => {
+        const visualElement = createMotionVisualElement({ props: {} })
+        const adapter = new MotionDomProjectionAdapter({ visualElement })
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        rects.set(element, rect)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() =>
+            element.isConnected ? rects.get(element)! : new DOMRect()
+        )
+        adapter.updateOptions({ layoutId, layout, transition: { duration: 0.05 } as never })
+        adapter.mount(element)
+        mounted.push(adapter)
+        return { adapter, element }
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+    const frames = (n = 2) =>
+        new Promise<void>((resolve) => {
+            let left = n
+            const step = () => (--left <= 0 ? resolve() : frame.postRender(step))
+            frame.postRender(step)
+        })
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+    })
+    afterEach(async () => {
+        await flush()
+        for (const adapter of mounted.splice(0)) adapter.unmount()
+    })
+
+    it('9a: an exiting lead relegates, promoting the earlier present member with its snapshot', () => {
+        const { adapter: b } = mount('p9a', new DOMRect(10, 0, 100, 50))
+        const { adapter: a } = mount('p9a', new DOMRect(300, 0, 100, 50))
+        const stack = a.projection.getStack()!
+        expect(stack.lead === a.projection).toBe(true)
+
+        api(a).setPresence(false, vi.fn())
+        api(a).commitPresence()
+
+        expect(stack.lead === b.projection).toBe(true)
+        expect(b.projection.resumeFrom === a.projection).toBe(true)
+        expect(a.projection.snapshot).toBeDefined()
+        expect(b.projection.snapshot === a.projection.snapshot).toBe(true)
+    })
+
+    it('9b: a lone exiting node is released once, by the microtask lead check', async () => {
+        const { adapter: a } = mount('p9b', new DOMRect(10, 0, 100, 50))
+        const release = vi.fn()
+
+        api(a).setPresence(false, release)
+        expect(release).not.toHaveBeenCalled()
+        api(a).commitPresence()
+        await flush()
+        await frames(3)
+
+        expect(release).toHaveBeenCalledTimes(1)
+    })
+
+    it('9c: held until the new lead animates in, released once per exit cycle', async () => {
+        const { adapter: a } = mount('p9c', new DOMRect(10, 0, 100, 50))
+        const release = vi.fn()
+
+        api(a).setPresence(false, release)
+        const { adapter: b } = mount('p9c', new DOMRect(300, 0, 100, 50))
+        api(a).commitPresence()
+        await flush()
+        await frames(2)
+        expect(b.projection.currentAnimation).toBeDefined()
+        expect(release).not.toHaveBeenCalled()
+
+        await new Promise((resolve) => setTimeout(resolve, 200))
+        await frames(2)
+        expect(b.projection.currentAnimation).toBeUndefined()
+        expect(release).toHaveBeenCalledTimes(1)
+        // Every member's `onExitComplete` again: the latch holds.
+        a.projection.getStack()!.exitAnimationComplete()
+        expect(release).toHaveBeenCalledTimes(1)
+
+        // A new cycle re-arms it.
+        api(a).setPresence(true, release)
+        api(a).commitPresence()
+        api(a).setPresence(false, release)
+        api(a).commitPresence()
+        await flush()
+        await frames(3)
+        a.projection.getStack()!.exitAnimationComplete()
+        expect(release).toHaveBeenCalledTimes(2)
+    })
+
+    it('9d: hands a detached node off to its exit clone and defers its unmount', async () => {
+        const { adapter: a, element } = mount('p9d', new DOMRect(10, 0, 100, 50))
+        const visualElement = a.visualElement
+        const unmountVisualElement = vi.spyOn(visualElement, 'unmount')
+        element.remove()
+        const clone = element.cloneNode(true) as HTMLElement
+        rects.set(clone, new DOMRect(10, 0, 100, 50))
+        vi.spyOn(clone, 'getBoundingClientRect').mockImplementation(() =>
+            clone.isConnected ? rects.get(clone)! : new DOMRect()
+        )
+        document.body.appendChild(clone)
+        const held: { hold?: ExitHold } = {}
+        const release = vi.fn(() => held.hold?.finish())
+
+        const hold = api(a).handOffToExitClone(clone, release)
+        held.hold = hold
+
+        expect(hold).toBeDefined()
+        expect(a.projection.instance === clone).toBe(true)
+        expect(visualElement.current).toBe(clone)
+        expect(visualElementStore.get(clone)).toBe(visualElement)
+        expect(visualElementStore.get(element)).toBeUndefined()
+        expect(a.projection.isPresent).toBe(false)
+        expect(a.projection.snapshot).toBeDefined()
+        expect(api(a).isHandedOff).toBe(true)
+        // `byElement` follows the clone (E16).
+        expect(MotionDomProjectionAdapter.foldedInFor(clone)).not.toBe(
+            MotionDomProjectionAdapter.foldedInFor(element)
+        )
+
+        // The container's teardown: deferred.
+        a.unmount()
+        expect(unmountVisualElement).not.toHaveBeenCalled()
+
+        await flush()
+        await frames(3)
+        expect(release).toHaveBeenCalledTimes(1)
+        expect(unmountVisualElement).toHaveBeenCalledTimes(1)
+        expect(visualElementStore.get(clone)).toBeUndefined()
+        hold!.finish()
+        expect(unmountVisualElement).toHaveBeenCalledTimes(1)
+    })
+
+    it('9e: cancelling the hold unmounts at once, and a later release is a no-op', async () => {
+        const { adapter: a, element } = mount('p9e', new DOMRect(10, 0, 100, 50))
+        const unmountVisualElement = vi.spyOn(a.visualElement, 'unmount')
+        element.remove()
+        const clone = element.cloneNode(true) as HTMLElement
+        document.body.appendChild(clone)
+        const release = vi.fn()
+        const hold = api(a).handOffToExitClone(clone, release)
+        a.unmount()
+
+        hold!.cancel()
+        expect(unmountVisualElement).toHaveBeenCalledTimes(1)
+        expect(a.isMounted).toBe(false)
+
+        await flush()
+        await frames(3)
+        expect(release).not.toHaveBeenCalled()
+        expect(unmountVisualElement).toHaveBeenCalledTimes(1)
+        clone.remove()
+    })
+
+    it('9f: an adapter never given a presence unmounts as before', () => {
+        const { adapter: a, element } = mount('p9f', new DOMRect(10, 0, 100, 50))
+        const unmountVisualElement = vi.spyOn(a.visualElement, 'unmount')
+        element.remove()
+
+        a.unmount()
+
+        expect(unmountVisualElement).toHaveBeenCalledTimes(1)
+        expect(a.isMounted).toBe(false)
+        expect(visualElementStore.get(element)).toBeUndefined()
+        // The departing-lead snapshot is still handed over (#1935 A1).
+        expect(a.projection.snapshot).toBeDefined()
+    })
+})

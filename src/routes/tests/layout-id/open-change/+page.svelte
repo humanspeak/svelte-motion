@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { page } from '$app/state'
     import { AnimatePresence, motion } from '$lib'
     import { onMount } from 'svelte'
 
@@ -22,6 +23,14 @@
     // harness's StrictMode), with `?strict=true` rendering inside it. Svelte
     // has no StrictMode, so there is one variant.
     // e2e/layout-id/open-change.spec.ts.
+    //
+    // ?owned=true renders the card through the owned syntax,
+    // `<AnimatePresence present={!!open}>{#snippet child()}`, so the closing
+    // card stays mounted as the real element (plan 012). Svelte deviation: a
+    // snippet reads live state, so while the card is held after Close it
+    // would see `open === null`, where upstream re-renders the exiting child
+    // with its last props. The owned card reads `shown`, the id latched while
+    // it was open.
 
     type Recorded = Record<string, object>
     // Not `Window &`: the DOM's own `window.frames` is typed as a Window.
@@ -35,6 +44,12 @@
     const items = ['one', 'two']
 
     let open = $state<string | null>(null)
+    const owned = page.url.searchParams.get('owned') === 'true'
+    // The id the owned card was last shown with (see the header).
+    let shown = $state<string | null>(null)
+    $effect.pre(() => {
+        if (open) shown = open
+    })
 
     onMount(() => {
         const w = window as unknown as RecordingWindow
@@ -84,17 +99,30 @@
                 i * 180}px; width: 160px; height: 100px; background: {i ? 'royalblue' : 'tomato'};"
         />
     {/each}
-    <AnimatePresence>
-        {#if open}
-            <motion.div
-                key="card"
-                id="card"
-                layoutId={open}
-                {transition}
-                style="position: absolute; top: 210px; left: 200px; width: 400px; height: 280px; background: grey; z-index: 1;"
-            />
-        {/if}
-    </AnimatePresence>
+    {#if owned}
+        <AnimatePresence present={!!open}>
+            {#snippet child()}
+                <motion.div
+                    id="card"
+                    layoutId={shown ?? undefined}
+                    {transition}
+                    style="position: absolute; top: 210px; left: 200px; width: 400px; height: 280px; background: grey; z-index: 1;"
+                />
+            {/snippet}
+        </AnimatePresence>
+    {:else}
+        <AnimatePresence>
+            {#if open}
+                <motion.div
+                    key="card"
+                    id="card"
+                    layoutId={open}
+                    {transition}
+                    style="position: absolute; top: 210px; left: 200px; width: 400px; height: 280px; background: grey; z-index: 1;"
+                />
+            {/if}
+        </AnimatePresence>
+    {/if}
     <button
         id="next"
         type="button"

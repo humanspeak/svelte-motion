@@ -23,7 +23,9 @@
      * wraps Tomato's underline in a translated box inside its tab, within the
      * list. ?scroll=<px> puts the tabs in a scrolled layoutScroll box in the
      * list. ?underlineX=<px> translates the underlines. ?offsetScale=<n> also
-     * scales the ?offset ancestor.
+     * scales the ?offset ancestor. ?owned=true renders each underline through
+     * the owned syntax, `<AnimatePresence present={…}>{#snippet child()}`, so
+     * the exiting underline stays mounted as the real element (plan 012).
      *
      * Deviations: direct `AnimatePresence` children need a `key`. The fixture
      * sits in a `position: fixed` full-window box so the route layout's
@@ -67,6 +69,8 @@
     const scroll = parseInt(params.get('scroll') || '0')
     // Translate the underlines themselves
     const underlineX = parseInt(params.get('underlineX') || '0')
+    // Render the underlines through `present` + `child` instead of `{#if}`
+    const owned = params.get('owned') === 'true'
 
     let selected = $state(outside ? '' : tabs[0])
     // Set on mount, so the spec doesn't click before hydration
@@ -268,19 +272,34 @@
 </svelte:head>
 
 {#snippet underline(item: string)}
-    <AnimatePresence>
-        {#if item === selected}
-            <motion.div
-                key="underline"
-                class="underline"
-                layoutId="underline"
-                layout={layoutType || undefined}
-                style={{ x: underlineX }}
-                exit={exit ? { opacity: 0 } : undefined}
-                {transition}
-            />
-        {/if}
-    </AnimatePresence>
+    {#if owned}
+        <AnimatePresence present={item === selected}>
+            {#snippet child()}
+                <motion.div
+                    class="underline"
+                    layoutId="underline"
+                    layout={layoutType || undefined}
+                    style={{ x: underlineX }}
+                    exit={exit ? { opacity: 0 } : undefined}
+                    {transition}
+                />
+            {/snippet}
+        </AnimatePresence>
+    {:else}
+        <AnimatePresence>
+            {#if item === selected}
+                <motion.div
+                    key="underline"
+                    class="underline"
+                    layoutId="underline"
+                    layout={layoutType || undefined}
+                    style={{ x: underlineX }}
+                    exit={exit ? { opacity: 0 } : undefined}
+                    {transition}
+                />
+            {/if}
+        </AnimatePresence>
+    {/if}
 {/snippet}
 
 {#snippet tabItems()}
@@ -307,17 +326,30 @@
     <div class="window">
         {#if outside}
             <motion.div class="outside" style={{ x: outsideX }}>
-                <AnimatePresence>
-                    {#if !selected}
-                        <motion.div
-                            key="underline"
-                            class="underline"
-                            layoutId="underline"
-                            exit={exit ? { opacity: 0 } : undefined}
-                            {transition}
-                        />
-                    {/if}
-                </AnimatePresence>
+                {#if owned}
+                    <AnimatePresence present={!selected}>
+                        {#snippet child()}
+                            <motion.div
+                                class="underline"
+                                layoutId="underline"
+                                exit={exit ? { opacity: 0 } : undefined}
+                                {transition}
+                            />
+                        {/snippet}
+                    </AnimatePresence>
+                {:else}
+                    <AnimatePresence>
+                        {#if !selected}
+                            <motion.div
+                                key="underline"
+                                class="underline"
+                                layoutId="underline"
+                                exit={exit ? { opacity: 0 } : undefined}
+                                {transition}
+                            />
+                        {/if}
+                    </AnimatePresence>
+                {/if}
             </motion.div>
         {/if}
         <nav>

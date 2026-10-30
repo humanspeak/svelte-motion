@@ -1,6 +1,9 @@
 import { animate } from 'motion'
+import { nodeGroup, visualElementStore } from 'motion-dom'
 import { getContext, setContext, tick } from 'svelte'
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { markExiting } from './layout'
+import { MotionDomProjectionAdapter } from './motionDomProjection'
 import {
     containsStatefulCloneContent,
     createAnimatePresenceContext,
@@ -29,6 +32,13 @@ vi.mock('svelte', async (importOriginal) => {
             return mockContextStore.get(key)
         })
     }
+})
+
+// Plan 012: `markExiting` spied, calling through, so 10a can check the clone
+// is marked before it is inserted.
+vi.mock('./layout', async (importOriginal) => {
+    const original = await importOriginal<typeof import('./layout')>()
+    return { ...original, markExiting: vi.fn(original.markExiting) }
 })
 
 // Mock motion.animate to return an object with a finished promise
@@ -1749,6 +1759,892 @@ describe('exit clone layout follow (plan 015a)', () => {
         runFrames()
         expect(animate).toHaveBeenCalledTimes(1)
         expect(vi.mocked(animate).mock.calls[0][1]).not.toHaveProperty('y')
+        ctx.dispose()
+    })
+})
+
+/**
+ * Plan 012 (U10): a `layout` / `layoutId` child keeps its projection node on
+ * its exit clone, and the clone is held until that node is released, as
+ * upstream holds the real element (`MeasureLayout.tsx:188-217`,
+ * `PresenceChild.tsx:67-75` @ v14.7.1).
+ */
+describe('exit holds (plan 012)', () => {
+    type ExitHold = { cancel(): void; finish(): void }
+    type LayoutHandOff = {
+        canHandOff(): boolean
+        ownedLayoutKeys(): ReadonlySet<string>
+        handOff(clone: HTMLElement, release: () => void): ExitHold | undefined
+    }
+    type RegisterChild = (
+        key: string,
+        element: HTMLElement,
+        exit?: Record<string, unknown>,
+        mergedTransition?: Record<string, unknown>,
+        resolveExit?: (custom: unknown) => Record<string, unknown> | undefined,
+        layoutGroup?: object,
+        layoutHandOff?: LayoutHandOff
+    ) => void
+    type Ctx = ReturnType<typeof createAnimatePresenceContext>
+    type PresenceApi = {
+        handOffToExitClone(clone: HTMLElement, release: () => void): ExitHold | undefined
+        readonly isHandedOff: boolean
+    }
+
+    const register = (
+        ctx: Ctx,
+        key: string,
+        element: HTMLElement,
+        options: {
+            exit?: Record<string, unknown>
+            transition?: Record<string, unknown>
+            resolveExit?: (custom: unknown) => Record<string, unknown> | undefined
+            group?: object
+            handOff?: LayoutHandOff
+        } = {}
+    ) =>
+        (ctx.registerChild as unknown as RegisterChild)(
+            key,
+            element,
+            options.exit,
+            options.transition,
+            options.resolveExit,
+            options.group,
+            options.handOff
+        )
+
+    /** A hand-off whose hold is a stub; `release()` fires the captured release. */
+    const stubHandOff = (owned: string[] = []) => {
+        const hold = { cancel: vi.fn(), finish: vi.fn() }
+        const state: { release?: () => void } = {}
+        const handOff = vi.fn((_clone: HTMLElement, release: () => void) => {
+            state.release = release
+            return hold
+        })
+        return {
+            hold,
+            handOff,
+            release: () => state.release?.(),
+            layoutHandOff: {
+                canHandOff: vi.fn(() => true),
+                ownedLayoutKeys: () => new Set(owned),
+                handOff
+            } satisfies LayoutHandOff
+        }
+    }
+
+    /** The container's hand-off for a real adapter (P3). */
+    const adapterHandOff = (adapter: MotionDomProjectionAdapter): LayoutHandOff => ({
+        canHandOff: () => adapter.isMounted && !(adapter as unknown as PresenceApi).isHandedOff,
+        ownedLayoutKeys: () => new Set(),
+        handOff: (clone, release) =>
+            (adapter as unknown as PresenceApi).handOffToExitClone(clone, release)
+    })
+
+    const rects = new Map<string, DOMRect>()
+    const computed = new Map<Element, Record<string, string>>()
+    let frames: FrameRequestCallback[]
+    const runFrames = () => {
+        for (const callback of frames.splice(0)) callback(0)
+    }
+    const drain = async () => {
+        for (let i = 0; i < 10; i++) await Promise.resolve()
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+    const deferred = () => {
+        let resolve!: () => void
+        const promise = new Promise<void>((r) => (resolve = r))
+        return { promise, resolve }
+    }
+    const mounted: MotionDomProjectionAdapter[] = []
+    const mountAdapter = (
+        element: HTMLElement,
+        options: { layout?: boolean; layoutId?: string; group?: ReturnType<typeof nodeGroup> },
+        parent?: MotionDomProjectionAdapter
+    ) => {
+        const adapter = new MotionDomProjectionAdapter({
+            ...(parent ? { parent } : {}),
+            ...(options.group ? { group: options.group } : {})
+        })
+        adapter.updateOptions({
+            layout: options.layout,
+            layoutId: options.layoutId,
+            transition: { duration: 0.05 } as never
+        })
+        adapter.mount(element)
+        mounted.push(adapter)
+        return adapter
+    }
+    let parent: HTMLElement
+    let el: HTMLElement
+    const realGetComputedStyle = window.getComputedStyle.bind(window)
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        vi.clearAllMocks()
+        vi.restoreAllMocks()
+        document.body.innerHTML = ''
+        document.documentElement.scrollTop = 0
+        rects.clear()
+        computed.clear()
+        parent = document.createElement('div')
+        parent.id = 'slot'
+        el = document.createElement('div')
+        el.id = 'exiting'
+        el.dataset.r = 'el'
+        parent.appendChild(el)
+        document.body.appendChild(parent)
+        rects.set('el', new DOMRect(10, 20, 100, 100))
+        // Rects by `data-r`, which the clone copies; a detached element reads
+        // as an all-zero box, like a browser.
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+            this: HTMLElement
+        ) {
+            if (!this.isConnected) return new DOMRect()
+            if (this.hasAttribute('data-presence-placeholder'))
+                return rects.get('placeholder') ?? new DOMRect(10, 20, 100, 100)
+            return rects.get(this.dataset.r ?? '') ?? new DOMRect(0, 0, 400, 300)
+        })
+        // Computed-style overrides for chosen elements, on top of jsdom's.
+        vi.spyOn(window, 'getComputedStyle').mockImplementation(function (
+            element: Element,
+            pseudo?: string | null
+        ) {
+            const style = realGetComputedStyle(element, pseudo)
+            const overrides = computed.get(element)
+            if (!overrides) return style
+            return new Proxy(style, {
+                get(target, prop) {
+                    if (typeof prop === 'string' && prop in overrides) return overrides[prop]
+                    if (prop === 'getPropertyValue')
+                        return (name: string) => {
+                            const camel = name.replace(/-([a-z])/g, (_, c: string) =>
+                                c.toUpperCase()
+                            )
+                            return overrides[camel] ?? target.getPropertyValue(name)
+                        }
+                    const value = Reflect.get(target, prop, target)
+                    return typeof value === 'function' ? value.bind(target) : value
+                }
+            })
+        })
+        frames = []
+        vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+            frames.push(callback)
+            return frames.length
+        })
+        vi.stubGlobal('cancelAnimationFrame', (handle: number) => {
+            frames[handle - 1] = () => {}
+        })
+    })
+    afterEach(async () => {
+        vi.unstubAllGlobals()
+        await flush()
+        for (const adapter of mounted.splice(0)) adapter.unmount()
+    })
+
+    it('10a: a held child without an exit keeps its clone until released, then completes once', async () => {
+        const forceRender = vi.fn()
+        const onExitComplete = vi.fn()
+        const ctx = createAnimatePresenceContext({ onExitComplete, forceRender })
+        const stub = stubHandOff()
+        register(ctx, 'a', el, { handOff: stub.layoutHandOff })
+        const insertBefore = vi.spyOn(parent, 'insertBefore')
+        el.remove()
+        ctx.unregisterChild('a')
+
+        const clone = parent.querySelector<HTMLElement>('[data-clone]')!
+        expect(clone).toBeTruthy()
+        // Marked before it went in.
+        const cloneInsert =
+            insertBefore.mock.invocationCallOrder[
+                insertBefore.mock.calls.findIndex(([node]) => node === clone)
+            ]
+        const mark = vi.mocked(markExiting).mock.calls.findIndex(([node]) => node === clone)
+        expect(mark).toBeGreaterThanOrEqual(0)
+        expect(vi.mocked(markExiting).mock.invocationCallOrder[mark]).toBeLessThan(cloneInsert)
+        expect(stub.handOff).toHaveBeenCalledWith(clone, expect.any(Function))
+
+        runFrames()
+        await drain()
+        expect(clone.isConnected).toBe(true)
+
+        const order: string[] = []
+        let placeholderGone = false
+        const seed = vi
+            .spyOn(MotionDomProjectionAdapter, 'seedFollowingLayout')
+            .mockImplementation(() => {
+                order.push('seed')
+                placeholderGone = !document.querySelector('[data-presence-placeholder]')
+            })
+        forceRender.mockImplementation(() => order.push('finishExit'))
+        stub.release()
+
+        expect(clone.isConnected).toBe(false)
+        expect(stub.hold.finish).toHaveBeenCalledTimes(1)
+        expect(seed).toHaveBeenCalledTimes(1)
+        expect(seed.mock.calls[0][2]).toEqual({
+            kind: 'exit-complete',
+            markers: [expect.objectContaining({ boundary: parent })]
+        })
+        expect(placeholderGone).toBe(true)
+        expect(order).toEqual(['seed', 'finishExit'])
+        await tick()
+        expect(onExitComplete).toHaveBeenCalledTimes(1)
+        stub.release()
+        await tick()
+        expect(onExitComplete).toHaveBeenCalledTimes(1)
+    })
+
+    it('10b: with an exit, the clone goes only once both the exit and the hold have settled', async () => {
+        for (const releaseFirst of [false, true]) {
+            const finished = deferred()
+            vi.mocked(animate).mockReturnValueOnce({ finished: finished.promise } as never)
+            const ctx = createAnimatePresenceContext({})
+            const stub = stubHandOff()
+            const element = document.createElement('div')
+            element.dataset.r = 'el'
+            parent.appendChild(element)
+            register(ctx, 'b', element, { exit: { opacity: 0 }, handOff: stub.layoutHandOff })
+            element.remove()
+            ctx.unregisterChild('b')
+            const clone = parent.querySelector<HTMLElement>('[data-clone]')!
+            runFrames()
+            await drain()
+            expect(animate).toHaveBeenCalled()
+
+            if (releaseFirst) stub.release()
+            else finished.resolve()
+            await drain()
+            expect(clone.isConnected, `after the first (${releaseFirst ? 'hold' : 'exit'})`).toBe(
+                true
+            )
+            if (releaseFirst) finished.resolve()
+            else stub.release()
+            await drain()
+            expect(clone.isConnected).toBe(false)
+            ctx.dispose()
+        }
+    })
+
+    it('10c: re-entry and boundary disposal cancel the hold', async () => {
+        const ctx = createAnimatePresenceContext({})
+        const stub = stubHandOff()
+        register(ctx, 'c', el, { exit: { opacity: 0 }, handOff: stub.layoutHandOff })
+        el.remove()
+        ctx.unregisterChild('c')
+        runFrames()
+        await drain()
+        ctx.takeExitHandoff('c')
+        expect(stub.hold.cancel).toHaveBeenCalledTimes(1)
+
+        const other = stubHandOff()
+        const element = document.createElement('div')
+        parent.appendChild(element)
+        register(ctx, 'd', element, { handOff: other.layoutHandOff })
+        element.remove()
+        ctx.unregisterChild('d')
+        ctx.dispose()
+        expect(other.hold.cancel).toHaveBeenCalledTimes(1)
+    })
+
+    describe('10d: held clone placement (sync)', () => {
+        let cb: HTMLElement
+        let slot: HTMLElement
+        let child: HTMLElement
+        beforeEach(() => {
+            document.body.innerHTML = ''
+            cb = document.createElement('section')
+            cb.style.position = 'relative'
+            cb.dataset.r = 'cb'
+            slot = document.createElement('div')
+            slot.dataset.r = 'slot'
+            child = document.createElement('div')
+            child.id = 'held'
+            child.dataset.r = 'child'
+            slot.appendChild(child)
+            cb.appendChild(slot)
+            document.body.appendChild(cb)
+            rects.set('cb', new DOMRect(10, 20, 300, 200))
+            // Mid scale(1.5): the transformed rect.
+            rects.set('child', new DOMRect(15, 35, 150, 150))
+            rects.set('placeholder', new DOMRect(40, 60, 100, 100))
+            Object.defineProperty(cb, 'clientLeft', { configurable: true, value: 2 })
+            Object.defineProperty(cb, 'clientTop', { configurable: true, value: 2 })
+            Object.defineProperty(cb, 'offsetWidth', { configurable: true, value: 300 })
+            Object.defineProperty(cb, 'offsetHeight', { configurable: true, value: 200 })
+            computed.set(child, {
+                width: '100px',
+                height: '100px',
+                boxSizing: 'content-box',
+                margin: '0px 0px 0px 10px',
+                marginLeft: '10px',
+                position: 'static',
+                display: 'block',
+                zIndex: 'auto'
+            })
+        })
+
+        const exitHeld = (owned: string[] = []) => {
+            const ctx = createAnimatePresenceContext({})
+            const stub = stubHandOff(owned)
+            register(ctx, 'held', child, { exit: { opacity: 0 }, handOff: stub.layoutHandOff })
+            child.remove()
+            ctx.unregisterChild('held')
+            return { ctx, clone: slot.querySelector<HTMLElement>('[data-clone]')! }
+        }
+
+        it('keeps its id, gets no z-index lift and no forced position: relative', () => {
+            const { ctx, clone } = exitHeld()
+            expect(clone.id).toBe('held')
+            expect(clone.style.zIndex).toBe('')
+            expect(slot.style.position).toBe('')
+            ctx.dispose()
+        })
+
+        it('is placed from the recorded untransformed size and the placeholder slot', () => {
+            const { ctx, clone } = exitHeld()
+            expect(clone.style.width).toBe('100px')
+            expect(clone.style.height).toBe('100px')
+            expect(clone.style.boxSizing).toBe('content-box')
+            expect(clone.style.left).toBe('28px')
+            expect(clone.style.top).toBe('38px')
+            expect(clone.style.margin).toMatch(/^0(px)?$/)
+            ctx.dispose()
+        })
+
+        it('leaves the keys the VisualElement writes to it', () => {
+            const { ctx, clone } = exitHeld(['width', 'marginLeft'])
+            expect(clone.style.width).toBe('')
+            expect(clone.style.left).toBe('18px')
+            ctx.dispose()
+        })
+
+        it('keeps an out-of-flow child’s own position and insets', () => {
+            computed.set(child, {
+                ...computed.get(child)!,
+                position: 'fixed',
+                top: '12px',
+                left: '30px',
+                right: 'auto',
+                bottom: 'auto'
+            })
+            const { ctx, clone } = exitHeld()
+            expect(clone.style.position).toBe('fixed')
+            expect(clone.style.top).toBe('12px')
+            expect(clone.style.left).toBe('30px')
+            ctx.dispose()
+            slot.appendChild(child)
+            const owned = exitHeld(['top'])
+            expect(owned.clone.style.top).toBe('')
+            owned.ctx.dispose()
+        })
+    })
+
+    it('10o: every placeholder is sized from the recorded untransformed size', () => {
+        // Mid scale-up from 0.5: the transformed rect is half the size.
+        rects.set('el', new DOMRect(35, 45, 50, 50))
+        computed.set(el, { width: '100px', height: '100px', boxSizing: 'border-box' })
+        const ctx = createAnimatePresenceContext({})
+        register(ctx, 'o', el, { exit: { opacity: 0 } })
+        el.remove()
+        ctx.unregisterChild('o')
+        const placeholder = parent.querySelector<HTMLElement>('[data-presence-placeholder]')!
+        expect(placeholder.style.width).toBe('100px')
+        expect(placeholder.style.height).toBe('100px')
+        ctx.dispose()
+    })
+
+    /** A `[data-propagate]` boundary in `host` with a registered motion child. */
+    const propagatingChild = (host: HTMLElement) => {
+        const boundary = document.createElement('div')
+        boundary.className = 'animate-presence-container'
+        boundary.setAttribute('data-propagate', '')
+        const innerEl = document.createElement('div')
+        innerEl.className = 'inner'
+        boundary.appendChild(innerEl)
+        host.appendChild(boundary)
+        const exit = deferred()
+        const visualElement = {
+            current: innerEl as HTMLElement,
+            animationState: { setActive: vi.fn(() => exit.promise) },
+            projection: undefined
+        }
+        visualElementStore.set(innerEl, visualElement as never)
+        return { boundary, innerEl, exit, visualElement }
+    }
+
+    it('10p: a nested propagating boundary completes once its child’s propagated exit settles', async () => {
+        const outer = createAnimatePresenceContext({})
+        const onExitComplete = vi.fn()
+        const inner = createAnimatePresenceContext({ onExitComplete })
+        const { innerEl, exit } = propagatingChild(el)
+        register(outer, 'outer', el, { exit: { opacity: 0 } })
+        register(inner, 'inner', innerEl, { exit: { opacity: 0 } })
+
+        el.remove()
+        outer.unregisterChild('outer')
+        inner.unregisterChild('inner')
+        inner.dispose()
+        await tick()
+        expect(onExitComplete).not.toHaveBeenCalled()
+
+        exit.resolve()
+        await drain()
+        await tick()
+        expect(onExitComplete).toHaveBeenCalledTimes(1)
+        // Fully disposed now.
+        const later = document.createElement('div')
+        parent.appendChild(later)
+        register(inner, 'later', later, { exit: { opacity: 0 } })
+        later.remove()
+        inner.unregisterChild('later')
+        expect(document.querySelectorAll('[data-clone]').length).toBeLessThanOrEqual(1)
+        outer.dispose()
+    })
+
+    it('10q: a non-held clone runs a propagating boundary’s child exit on its copy and waits for it', async () => {
+        const ctx = createAnimatePresenceContext({})
+        const { exit, visualElement } = propagatingChild(el)
+        register(ctx, 'q', el, { exit: { opacity: 0 } })
+        el.remove()
+        ctx.unregisterChild('q')
+        const clone = parent.querySelector<HTMLElement>('[data-clone]')!
+        expect(visualElement.current).toBe(clone.querySelector('.inner'))
+        expect(visualElementStore.get(clone.querySelector('.inner') as Element)).toBe(
+            visualElement as never
+        )
+        expect(visualElement.animationState.setActive).toHaveBeenCalledWith('exit', true)
+
+        runFrames()
+        await drain()
+        expect(clone.isConnected).toBe(true)
+        exit.resolve()
+        await drain()
+        expect(clone.isConnected).toBe(false)
+    })
+
+    it('10r: every deferred unmount runs while the clone is connected, before it is removed', async () => {
+        const innerEl = document.createElement('div')
+        innerEl.dataset.r = 'inner'
+        el.appendChild(innerEl)
+        rects.set('inner', new DOMRect(20, 30, 50, 50))
+        const outerAdapter = mountAdapter(el, { layoutId: 'r-outer' })
+        const innerAdapter = mountAdapter(innerEl, { layoutId: 'r-inner' }, outerAdapter)
+        const ctx = createAnimatePresenceContext({})
+        register(ctx, 'r', el, { handOff: adapterHandOff(outerAdapter) })
+        const events: string[] = []
+        for (const [name, adapter] of [
+            ['outer', outerAdapter],
+            ['inner', innerAdapter]
+        ] as const) {
+            vi.spyOn(adapter.visualElement, 'unmount').mockImplementation(function (this: unknown) {
+                events.push(
+                    `${name}:${document.querySelector('[data-clone]') ? 'connected' : 'gone'}`
+                )
+            })
+        }
+        el.remove()
+        ctx.unregisterChild('r')
+        const clone = parent.querySelector<HTMLElement>('[data-clone]')!
+        expect(clone).toBeTruthy()
+        vi.spyOn(clone, 'remove').mockImplementation(function (this: HTMLElement) {
+            events.push('remove')
+            Element.prototype.remove.call(this)
+        })
+        // The container's teardowns.
+        innerAdapter.unmount()
+        outerAdapter.unmount()
+        runFrames()
+        await flush()
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        expect(events).toEqual(
+            expect.arrayContaining(['outer:connected', 'inner:connected', 'remove'])
+        )
+        expect(events[events.length - 1]).toBe('remove')
+    })
+
+    it('10d-ii: a held child without an exit resolves its exit at hand-off; an unheld one gets no clone', async () => {
+        const ctx = createAnimatePresenceContext({})
+        const stub = stubHandOff()
+        const resolveExit = vi.fn(() => undefined)
+        register(ctx, 'ii', el, { resolveExit, handOff: stub.layoutHandOff })
+        el.remove()
+        ctx.unregisterChild('ii')
+        expect(resolveExit).toHaveBeenCalled()
+        const clone = parent.querySelector<HTMLElement>('[data-clone]')!
+        runFrames()
+        await drain()
+        expect(clone.isConnected).toBe(true)
+        stub.release()
+        expect(clone.isConnected).toBe(false)
+
+        const element = document.createElement('div')
+        parent.appendChild(element)
+        const unheld = stubHandOff()
+        unheld.layoutHandOff.canHandOff.mockReturnValue(false)
+        register(ctx, 'iii', element, { handOff: unheld.layoutHandOff })
+        const insertBefore = vi.spyOn(parent, 'insertBefore')
+        element.remove()
+        ctx.unregisterChild('iii')
+        expect(insertBefore).not.toHaveBeenCalled()
+        expect(unheld.handOff).not.toHaveBeenCalled()
+        ctx.dispose()
+    })
+
+    it('10d-iii: nested motion descendants move to their clone copies; nested exit artifacts are stripped', async () => {
+        const innerEl = document.createElement('div')
+        innerEl.className = 'inner'
+        innerEl.dataset.r = 'inner'
+        el.appendChild(innerEl)
+        const strayClone = document.createElement('div')
+        strayClone.setAttribute('data-clone', 'true')
+        const strayPlaceholder = document.createElement('div')
+        strayPlaceholder.setAttribute('data-presence-placeholder', 'true')
+        el.append(strayClone, strayPlaceholder)
+        const outerAdapter = mountAdapter(el, { layoutId: 'iii-outer' })
+        const innerAdapter = mountAdapter(innerEl, { layoutId: 'iii-inner' }, outerAdapter)
+        const ctx = createAnimatePresenceContext({})
+        register(ctx, 'iii', el, { handOff: adapterHandOff(outerAdapter) })
+        el.remove()
+        ctx.unregisterChild('iii')
+        const clone = parent.querySelector<HTMLElement>(':scope > [data-clone]')!
+        expect(clone.querySelector('[data-clone]')).toBeNull()
+        expect(clone.querySelector('[data-presence-placeholder]')).toBeNull()
+        const copy = clone.querySelector<HTMLElement>('.inner')!
+        expect(innerAdapter.visualElement.current).toBe(copy)
+        expect(innerAdapter.projection.instance === copy).toBe(true)
+        expect(visualElementStore.get(copy)).toBe(innerAdapter.visualElement)
+        innerAdapter.unmount()
+        outerAdapter.unmount()
+        runFrames()
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        expect(clone.isConnected).toBe(false)
+    })
+
+    describe('a layout clone in a clamped scroller (015a 6a setup)', () => {
+        let scroller: HTMLElement
+        let list: HTMLElement
+        let item: HTMLElement
+        beforeEach(() => {
+            document.body.innerHTML = ''
+            scroller = document.createElement('div')
+            scroller.setAttribute('style', 'overflow: auto; height: 320px')
+            list = document.createElement('ul')
+            item = document.createElement('li')
+            item.dataset.r = 'item'
+            list.appendChild(item)
+            scroller.appendChild(list)
+            document.body.appendChild(scroller)
+            Object.defineProperty(scroller, 'offsetWidth', { configurable: true, value: 400 })
+            Object.defineProperty(scroller, 'offsetHeight', { configurable: true, value: 320 })
+            scroller.scrollTop = 500
+            rects.set('item', new DOMRect(10, 100, 150, 60))
+        })
+
+        const exitAfterClamp = async (clamp: boolean, mode: 'popLayout' | 'sync' = 'popLayout') => {
+            const adapter = mountAdapter(item, { layout: true })
+            const handOff = vi.spyOn(adapter as unknown as PresenceApi, 'handOffToExitClone')
+            const ctx = createAnimatePresenceContext({ mode })
+            register(ctx, 'item', item, {
+                exit: { opacity: 0 },
+                transition: { type: 'spring' },
+                handOff: adapterHandOff(adapter)
+            })
+            item.remove()
+            const animations: unknown[] = []
+            const deltas: { x: number; y: number }[] = []
+            adapter.projection.addEventListener('animationStart', () => animations.push(1))
+            adapter.projection.addEventListener(
+                'didUpdate',
+                ({ delta }: { delta: { x: { translate: number }; y: { translate: number } } }) =>
+                    deltas.push({ x: delta.x.translate, y: delta.y.translate })
+            )
+            ctx.unregisterChild('item')
+            const clone = list.querySelector<HTMLElement>('[data-clone]')!
+            // Drawn 70px lower once the scroll position clamps.
+            if (clamp) {
+                rects.set('item', new DOMRect(10, 170, 150, 60))
+                scroller.scrollTop = 430
+            }
+            adapter.unmount()
+            await drain()
+            return { ctx, adapter, clone, handOff, animations, deltas }
+        }
+
+        it('10e: the re-homed node animates the clamp, measured after the #2348 correction', async () => {
+            const { ctx, adapter, clone, handOff, deltas } = await exitAfterClamp(true)
+            expect(handOff).toHaveBeenCalledTimes(1)
+            const measured: string[] = []
+            vi.spyOn(adapter.projection, 'updateLayout').mockImplementation(function (
+                this: typeof adapter.projection
+            ) {
+                measured.push(clone.style.top)
+            })
+            await flush()
+            expect(deltas).toHaveLength(1)
+            expect(Math.abs(deltas[0].y)).toBeCloseTo(70, 0)
+            for (const call of vi.mocked(animate).mock.calls) {
+                expect(call[1]).not.toHaveProperty('x')
+                expect(call[1]).not.toHaveProperty('y')
+            }
+            runFrames()
+            for (const call of vi.mocked(animate).mock.calls) {
+                expect(call[1]).not.toHaveProperty('y')
+            }
+            void measured
+            ctx.dispose()
+        })
+
+        it('10g-i: a non-layout clone gets no hold and no follow; its exit starts on the frame', async () => {
+            const ctx = createAnimatePresenceContext({ mode: 'popLayout' })
+            register(ctx, 'plain', item, { exit: { opacity: 0 }, transition: { type: 'spring' } })
+            item.remove()
+            ctx.unregisterChild('plain')
+            scroller.scrollTop = 430
+            await drain()
+            expect(animate).not.toHaveBeenCalled()
+            runFrames()
+            expect(animate).toHaveBeenCalledTimes(1)
+            expect(vi.mocked(animate).mock.calls[0][1]).not.toHaveProperty('y')
+            ctx.dispose()
+        })
+
+        it('10g-ii: with no scroll change a held layout clone starts no layout animation and is released after the update', async () => {
+            const { clone, animations } = await exitAfterClamp(false, 'sync')
+            runFrames()
+            await flush()
+            await new Promise((resolve) => setTimeout(resolve, 20))
+            expect(animations).toHaveLength(0)
+            expect(clone.isConnected).toBe(false)
+        })
+    })
+
+    it('10h: a layout-only child without an exit is released in the same task when nothing moved', async () => {
+        const adapter = mountAdapter(el, { layout: true })
+        const ctx = createAnimatePresenceContext({})
+        register(ctx, 'h', el, { handOff: adapterHandOff(adapter) })
+        el.remove()
+        ctx.unregisterChild('h')
+        const clone = parent.querySelector<HTMLElement>('[data-clone]')!
+        expect(clone).toBeTruthy()
+        adapter.unmount()
+        await drain()
+        await new Promise((resolve) => queueMicrotask(() => resolve(undefined)))
+        await drain()
+        expect(frames.length === 0 || clone.isConnected === false).toBe(true)
+        expect(clone.isConnected).toBe(false)
+    })
+
+    it('10i: a node is handed off once', () => {
+        const adapter = mountAdapter(el, { layoutId: 'i-once' })
+        const handOff = vi.spyOn(adapter as unknown as PresenceApi, 'handOffToExitClone')
+        const ctx = createAnimatePresenceContext({})
+        register(ctx, 'i', el, { handOff: adapterHandOff(adapter) })
+        el.remove()
+        ctx.unregisterChild('i')
+        expect(adapterHandOff(adapter).canHandOff()).toBe(false)
+        // Re-registered with the same element, then unregistered again.
+        register(ctx, 'i', el, { handOff: adapterHandOff(adapter) })
+        ctx.unregisterChild('i')
+        expect(handOff).toHaveBeenCalledTimes(1)
+        ctx.dispose()
+    })
+
+    it('10j: no clone without a connected slot parent', () => {
+        const ctx = createAnimatePresenceContext({})
+        register(ctx, 'j', el, { exit: { opacity: 0 } })
+        parent.remove()
+        el.remove()
+        const append = vi.spyOn(document.body, 'insertBefore')
+        const appendChild = vi.spyOn(document.body, 'appendChild')
+        ctx.unregisterChild('j')
+        expect(append).not.toHaveBeenCalled()
+        expect(appendChild).not.toHaveBeenCalled()
+        expect(document.querySelector('[data-clone]')).toBeNull()
+        ctx.dispose()
+    })
+
+    it('10k: a non-layout clone drops the copies of a nested boundary’s exit artifacts', () => {
+        const nested = document.createElement('div')
+        nested.className = 'animate-presence-container'
+        const nestedClone = document.createElement('div')
+        nestedClone.setAttribute('data-clone', 'true')
+        const nestedPlaceholder = document.createElement('div')
+        nestedPlaceholder.setAttribute('data-presence-placeholder', 'true')
+        nested.append(nestedClone, nestedPlaceholder)
+        el.appendChild(nested)
+        const ctx = createAnimatePresenceContext({})
+        register(ctx, 'k', el, { exit: { opacity: 0 } })
+        el.remove()
+        ctx.unregisterChild('k')
+        const clone = parent.querySelector<HTMLElement>(':scope > [data-clone]')!
+        expect(clone.querySelector('[data-clone]')).toBeNull()
+        expect(clone.querySelector('[data-presence-placeholder]')).toBeNull()
+        ctx.dispose()
+    })
+
+    /** A held child whose `layoutId` descendant sits in a nested boundary. */
+    const nestedBoundaryChild = (propagate: boolean) => {
+        const boundary = document.createElement('div')
+        boundary.className = 'animate-presence-container'
+        if (propagate) boundary.setAttribute('data-propagate', '')
+        const innerEl = document.createElement('div')
+        innerEl.className = 'inner'
+        innerEl.dataset.r = 'inner'
+        boundary.appendChild(innerEl)
+        el.appendChild(boundary)
+        rects.set('inner', new DOMRect(20, 30, 50, 50))
+        const outerAdapter = mountAdapter(el, { layoutId: `nb-outer-${propagate}` })
+        const innerAdapter = mountAdapter(
+            innerEl,
+            { layoutId: `nb-inner-${propagate}` },
+            outerAdapter
+        )
+        const ctx = createAnimatePresenceContext({})
+        register(ctx, 'nb', el, { handOff: adapterHandOff(outerAdapter) })
+        return { ctx, outerAdapter, innerAdapter }
+    }
+
+    it('10l: below a nested boundary a layoutId descendant is re-homed but not relegated or held', async () => {
+        const { ctx, outerAdapter, innerAdapter } = nestedBoundaryChild(false)
+        const relegate = vi.spyOn(innerAdapter.projection, 'relegate')
+        const unmountInner = vi.spyOn(innerAdapter.visualElement, 'unmount')
+        el.remove()
+        ctx.unregisterChild('nb')
+        const clone = parent.querySelector<HTMLElement>('[data-clone]')!
+        expect(innerAdapter.visualElement.current).toBe(clone.querySelector('.inner'))
+        expect(innerAdapter.projection.isPresent).not.toBe(false)
+        expect(relegate).not.toHaveBeenCalled()
+        innerAdapter.unmount()
+        expect(unmountInner).not.toHaveBeenCalled()
+        outerAdapter.unmount()
+        runFrames()
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        expect(unmountInner).toHaveBeenCalledTimes(1)
+        expect(clone.isConnected).toBe(false)
+    })
+
+    it('10m: below a propagating boundary the descendant relegates and holds', () => {
+        const { ctx, innerAdapter } = nestedBoundaryChild(true)
+        const relegate = vi.spyOn(innerAdapter.projection, 'relegate')
+        el.remove()
+        ctx.unregisterChild('nb')
+        expect(innerAdapter.projection.isPresent).toBe(false)
+        expect(relegate).toHaveBeenCalled()
+        expect((innerAdapter as unknown as PresenceApi).isHandedOff).toBe(true)
+        ctx.dispose()
+    })
+
+    it('10n: a non-measuring descendant is re-homed and unmounted with the outer hold', async () => {
+        const innerEl = document.createElement('div')
+        innerEl.className = 'inner'
+        el.appendChild(innerEl)
+        const outerAdapter = mountAdapter(el, { layoutId: 'n-outer' })
+        const innerAdapter = mountAdapter(innerEl, {}, outerAdapter)
+        const unmountInner = vi.spyOn(innerAdapter.visualElement, 'unmount')
+        const ctx = createAnimatePresenceContext({})
+        register(ctx, 'n', el, { handOff: adapterHandOff(outerAdapter) })
+        el.remove()
+        ctx.unregisterChild('n')
+        const copy = parent.querySelector<HTMLElement>('[data-clone] .inner')!
+        expect(innerAdapter.visualElement.current).toBe(copy)
+        expect(visualElementStore.get(copy)).toBe(innerAdapter.visualElement)
+        expect((innerAdapter as unknown as PresenceApi).isHandedOff).toBe(true)
+        innerAdapter.unmount()
+        expect(unmountInner).not.toHaveBeenCalled()
+        outerAdapter.unmount()
+        runFrames()
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        expect(unmountInner).toHaveBeenCalledTimes(1)
+    })
+
+    it('10s: wait mode releases a held layoutId clone by the lead check, not the hidden entering node', async () => {
+        const adapter = mountAdapter(el, { layoutId: 's-wait' })
+        const ctx = createAnimatePresenceContext({ mode: 'wait' })
+        register(ctx, 's', el, { handOff: adapterHandOff(adapter) })
+        // The entering sibling, mounted hidden.
+        const entering = document.createElement('div')
+        entering.setAttribute('data-presence-wait-hidden', '')
+        entering.dataset.r = 'entering'
+        rects.set('entering', new DOMRect(300, 20, 100, 100))
+        parent.appendChild(entering)
+        el.remove()
+        ctx.unregisterChild('s')
+        const unblocked = vi.fn()
+        ctx.onEnterUnblocked(unblocked)
+        const clone = parent.querySelector<HTMLElement>('[data-clone]')!
+        expect(clone).toBeTruthy()
+        adapter.unmount()
+        runFrames()
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        expect(clone.isConnected).toBe(false)
+        expect(unblocked).toHaveBeenCalledTimes(1)
+    })
+
+    it('10t: a size-animating host hands off unseeded and its clone carries no size-animation marker', async () => {
+        el.setAttribute('data-layout-size-animation', '')
+        const inner = document.createElement('div')
+        inner.setAttribute('data-layout-size-animation', '')
+        el.appendChild(inner)
+        const adapter = mountAdapter(el, { layout: true })
+        const animations: unknown[] = []
+        adapter.projection.addEventListener('animationStart', () => animations.push(1))
+        const ctx = createAnimatePresenceContext({})
+        register(ctx, 't', el, { handOff: adapterHandOff(adapter) })
+        el.remove()
+        ctx.unregisterChild('t')
+        const clone = parent.querySelector<HTMLElement>('[data-clone]')!
+        expect(clone).toBeTruthy()
+        expect(clone.hasAttribute('data-layout-size-animation')).toBe(false)
+        expect(clone.querySelector('[data-layout-size-animation]')).toBeNull()
+        expect(adapter.projection.snapshot).toBeUndefined()
+        adapter.unmount()
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        expect(animations).toHaveLength(0)
+        expect(clone.isConnected).toBe(false)
+    })
+
+    it('10u: a grouped sibling is not animated by the deferred unmount, only by the completion commit', async () => {
+        const group = nodeGroup()
+        const sibling = document.createElement('div')
+        sibling.dataset.r = 'sibling'
+        rects.set('sibling', new DOMRect(10, 120, 100, 100))
+        parent.appendChild(sibling)
+        const adapter = mountAdapter(el, { layout: true, group })
+        const siblingAdapter = mountAdapter(sibling, { layout: true, group })
+        const starts: unknown[] = []
+        siblingAdapter.projection.addEventListener('animationStart', () => starts.push(1))
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        register(ctx, 'u', el, { group, handOff: adapterHandOff(adapter) })
+        const slotHeld: boolean[] = []
+        vi.spyOn(adapter.visualElement, 'unmount').mockImplementation(() => {
+            slotHeld.push(!!parent.querySelector('[data-presence-placeholder]'))
+        })
+        el.remove()
+        ctx.unregisterChild('u')
+        expect(parent.querySelector('[data-clone]')).not.toBeNull()
+        adapter.unmount()
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        // The deferred unmount ran while the placeholder still held the slot.
+        expect(slotHeld).toEqual([true])
+        // Released: the placeholder held the slot through the unmount.
+        expect(parent.querySelector('[data-clone]')).toBeNull()
+        expect(starts).toHaveLength(0)
+        // The exit-complete observer commit moves it up into the freed slot.
+        rects.set('sibling', new DOMRect(10, 20, 100, 100))
+        siblingAdapter.commitObservedLayoutChange()
+        // The animation starts on motion-dom's frameloop (rAF is queued here).
+        await new Promise((resolve) => setTimeout(resolve, 80))
+        expect(starts).toHaveLength(1)
+    })
+
+    it('10f: a child with no hand-off and no exit is still removed at once', () => {
+        const ctx = createAnimatePresenceContext({})
+        register(ctx, 'f', el)
+        el.remove()
+        ctx.unregisterChild('f')
+        expect(parent.querySelector('[data-clone]')).toBeNull()
         ctx.dispose()
     })
 })

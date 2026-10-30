@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { recordPainted } from '../_helpers/paintedFrames'
 
 /**
  * Port of upstream motion `tests/react/issue-1411-open-change.spec.ts` @
@@ -47,8 +48,8 @@ async function framesSince(page: Page, key: string): Promise<Frame[]> {
 }
 
 /** Opens "one", lets the 2s opening animation finish, then clicks "Next". */
-async function openThenNext(page: Page) {
-    await page.goto(URL)
+async function openThenNext(page: Page, query = '') {
+    await page.goto(URL + query)
     await expect(page.locator('#one')).toBeVisible()
     await page.waitForTimeout(200)
     await page.click('#one')
@@ -88,23 +89,58 @@ test("changing an open card's layoutId switches it instantly", async ({ page }) 
     expect.soft(after.slice(2).filter((frame) => !isHidden(frame.two))).toEqual([])
 })
 
-// Plan 012: the AnimatePresence exit clone has no projection node, so nothing
-// relegates the lead back to thumbnail two. Thumbnail two reappears at its own
-// size the frame after Close instead of the card shrinking into it.
-test.fixme('closing then shrinks the card into thumbnail two', async ({ page }) => {
-    const [before] = await openThenNext(page)
-    const { card, two } = before
+/**
+ * Closing runs on the clone path and on the owned path (`?owned=true`:
+ * `present` + `child`), plan 012.
+ */
+for (const [suffix, query] of [
+    ['', ''],
+    [' (owned)', '&owned=true']
+] as const) {
+    test(`closing then shrinks the card into thumbnail two${suffix}`, async ({ page }) => {
+        const [before] = await openThenNext(page, query)
+        const { card, two } = before
 
-    // Closing shrinks the card into thumbnail two
-    await page.waitForTimeout(2000)
-    await page.click('#close')
-    await page.waitForTimeout(1000)
-    const closing = await framesSince(page, 'closedAt')
-    const mid = closing[closing.length - 1].two
-    expect(isHidden(mid)).toBe(false)
-    expect(mid.width).toBeLessThan(card.width - 40)
-    expect(mid.width).toBeGreaterThan(two.width + 40)
-})
+        // Closing shrinks the card into thumbnail two
+        await page.waitForTimeout(2000)
+        // Plan 012 A1: judged from painted frames too. Upstream the card is
+        // held while thumbnail two grows out of it, and crossfades out over
+        // the 2s shared animation (`MeasureLayout.tsx:188-201` relegate,
+        // `PresenceChild.tsx:67-75`); it is removed only after that ends.
+        const { frames, hits } = await recordPainted(
+            page,
+            () => page.click('#close'),
+            1000,
+            [],
+            ['#card', '#two']
+        )
+        const closing = await framesSince(page, 'closedAt')
+        const mid = closing[closing.length - 1].two
+        expect(isHidden(mid)).toBe(false)
+        expect(mid.width).toBeLessThan(card.width - 40)
+        expect(mid.width).toBeGreaterThan(two.width + 40)
+
+        expect(frames.length).toBeGreaterThan(0)
+        const judged = hits.filter((hit) => hit.t >= 50)
+        expect(judged.length).toBeGreaterThan(20)
+        const opacities: number[] = []
+        for (const hit of judged) {
+            const at = `${hit.t.toFixed(0)}ms`
+            expect(hit.counts[0], `card held at ${at}`).toBe(1)
+            expect(hit.visible[0], `card painted at ${at}`).toBe(true)
+            expect(hit.visible[1], `thumbnail two painted at ${at}`).toBe(true)
+            opacities.push(hit.opacities[0]!)
+        }
+        // The crossfade: the card fades from 1 towards 0, never back up.
+        expect(opacities[0]).toBeGreaterThan(0.8)
+        expect(opacities.some((o) => o > 0.1 && o < 0.9)).toBe(true)
+        for (let i = 1; i < opacities.length; i++) {
+            expect(opacities[i]).toBeLessThanOrEqual(opacities[i - 1] + 0.02)
+        }
+        // Removed once the 2s animation has ended, not before.
+        await expect.poll(() => page.locator('#card').count(), { timeout: 3000 }).toBe(0)
+    })
+}
 
 test("changing the card's layoutId mid-open lets it finish opening", async ({ page }) => {
     await page.goto(URL)
