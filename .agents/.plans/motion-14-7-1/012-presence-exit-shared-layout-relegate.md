@@ -1804,3 +1804,51 @@ and the body disagree, this amendment wins. Every change below is test-only. Non
   `elementFromPoint` hits still apply to every frame.
 - `src/routes/tests/layout-id/lightbox-crossfade/SingleImage.svelte` is in scope. `useIsPresent()` needs a
   component, and a snippet can't host it.
+
+### A2 (2026-10-30, operator-approved)
+
+Answers the Step 3 STOP. Steps 1–2 are committed (`30194916` = `RED_SHA`, `deed0e49`). The Step 3 work stays
+uncommitted in the lane and continues from there. Where this amendment and the body disagree, this amendment
+wins.
+
+**1. The `?fixed` height-only resize case: the resize refresh is in scope.**
+- The popLayout point cache misses a viewport resize, so 008's correction places the clone 180 px off
+  (`style.top` 250px instead of 70px). Before 012 the clone faded in place. Now the re-homed node animates the
+  misplacement. Upstream measures fresh on every resize.
+- Keep the window `resize` refresh in `createPopLayoutPointCache` (`presence.ts`). Remove the `EXPERIMENT` marker
+  and write it as production code, with a short comment and a unit case that is RED without it. The resize case
+  (`pop-layout-scroll-siblings.spec.ts:476`) must pass on both syntaxes.
+- This is the only change to the cache. Anything more is a STOP.
+
+**2. 3d-i: the ~2 px step at removal is not accepted.**
+- Upstream never swaps the element, so the interrupted enter continues with no step. Time-box this to about two
+  hours. Try these in order, and stop at the first one that works:
+  a. Move the element's running WAAPI animations to the clone, including the transform ones: take them from
+     `element.getAnimations()` and set `effect.target = clone`, so you don't need Motion's private map. Check that
+     Motion's later `stop`/`cancel` still reaches the moved animation (no orphaned animation, and no double
+     animation when the clone's node animates).
+  b. Otherwise, when the transform moves to the main thread, seed the main-thread animation from the WAAPI
+     animation's `currentTime` (or from the clone's computed transform on the removal frame), so the first
+     main-thread frame continues from the last compositor frame.
+- Pass: on every painted frame from removal to the end, the clone's box is within 0.5 px of the control's.
+- If neither gets within 0.5 px, STOP and report the closest result with its frames. Don't loosen 3d-i.
+
+**3. Reverse handoff inside a translated layoutRoot (clone path, `offset=true`): root-cause it now, in Step 3.**
+- This is a GUARD that passed at `RED_SHA` and now fails: the lead starts 50 px into its slide instead of 100.
+- Find the cause before Step 4. The likely place is the re-homed node's snapshot or the clone's placement under a
+  transformed ancestor; 008's correction and the root offset may be applied twice or not at all.
+- Fix it inside 012's design. It must pass unchanged. If the fix needs a new mechanism outside the listed
+  in-scope files, or if upstream measurably does the same thing (check in the repro at 4224), STOP and report
+  first.
+
+**4. Accepted from the Step 3 report.**
+- The held clone is inserted where Svelte removed the element, using the structure observer's removal records
+  (needed for `{#key}` paint order).
+- The release runs in its own microtask, not inside motion-dom's `microtask` batch.
+- Part C, `seenScrollBasis` and 015a's 6a–6c are deleted in Step 3; 10g-i and 10g-ii replace 6b and 6c. The
+  body-fallback unit test is rewritten for 10j.
+- `recordPainted` samples after each frame's rAF callbacks (ResizeObserver sentinel). The 3d-i control uses
+  `onUpdate` only if the approach in 2 still needs it.
+- The test fixes in NC3–NC6: the `&` URLs, NC3's dot reading (the repro's `src/nested012.tsx` paints the dot fixed
+  until release), the logged computed values, and timing from the removal frame.
+- Exit-complete-once `(owned)` failing in Step 2 is recorded. Step 4 must make it pass.
