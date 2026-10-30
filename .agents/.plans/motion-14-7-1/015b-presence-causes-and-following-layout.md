@@ -729,3 +729,34 @@ fixed. Correction: this is a svelte-motion gap and upstream behaves as designed.
   - `:762` passes 5 times in a row.
   - The owned clamp passes 5 times.
   - The full Step 5.1 guard set, `pnpm test:only`, `pnpm check` and `pnpm build` all pass.
+
+### A5 (2026-10-30, operator-approved)
+
+Answers the guard's findings at `3f2fe7cf`.
+
+**1. Case 6 checks both phases.**
+- Applies to `presenceSiblingSnapshots.spec.ts`, case 6: "clone sync completion: a footer outside the list parent
+  snaps".
+- An exit **start** re-renders the list's owner, and upstream re-renders the footer with it. So the footer may get a
+  `didUpdate` then, but it must not move: every update must have `snapshot === layout`.
+- When the exit **completes**, the footer gets **no** `didUpdate` at all.
+- Attach the listener before the removal, as Step 1 did. The no-weakening check allows this edit, because it is
+  stricter than both the Step 1 version and the `3f2fe7cf` version.
+
+**2. The fixed-root check reads live containing-block styles (A1.3 follow-up).**
+- In `scrollBasis.ts`, `holdsFixed` is cached in `styleMemo` forever, but it depends on `transform`, `filter`,
+  `perspective`, `will-change` and `contain`, which can change at any time (a motion ancestor animating its
+  transform).
+- Keep caching overflow and position. Read the containing-block properties fresh on each walk. The bounds don't
+  change: the read happens only on the walk that already runs for a commit, never per frame.
+- Red first: a `scrollBasis.spec.ts` case. An ancestor's transform goes from `none` to a scale after a first walk, and
+  the fixed box must then be treated as scrolling with that ancestor. Also cover the reverse, from a scale back to
+  `none`.
+
+**3. Two more containing-block triggers.**
+- Add `contain: layout` (and the `strict` and `content` values that include it) and `backdrop-filter` (anything other
+  than `none`) to the fixed-root check.
+- Red first: one `scrollBasis.spec.ts` case for each.
+
+**Verify.** The new cases fail before the fix and pass after it, and 008's `:307` and the owned clamp still pass. The
+full Step 5.1 guard set, `pnpm test:only`, `pnpm check` and `pnpm build` all pass.
