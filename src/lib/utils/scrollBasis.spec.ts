@@ -421,3 +421,69 @@ describe('getScrollAncestors: fixed under a containing-block ancestor (plan 015b
         expect(getScrollAncestors(element)).toMatchObject({ fixed: false, scrollers: [] })
     })
 })
+
+/**
+ * Plan 015b A5: the containing-block check reads live styles (a motion
+ * ancestor's transform changes at any time), and also counts layout
+ * containment and backdrop filters.
+ */
+describe('getScrollAncestors: live containing-block check (plan 015b A5)', () => {
+    beforeEach(() => {
+        document.body.innerHTML = ''
+    })
+
+    it('an ancestor gaining a transform after a first walk holds the fixed box', () => {
+        const scroller = make('overflow: auto')
+        const block = make('', scroller)
+        const element = make('position: fixed', block)
+        expect(getScrollAncestors(element).fixed).toBe(true)
+
+        block.style.transform = 'scale(0.5)'
+
+        expect(getScrollAncestors(element)).toMatchObject({ fixed: false, scrollers: [scroller] })
+    })
+
+    it('an ancestor losing its transform after a first walk lets the fixed box go', () => {
+        const scroller = make('overflow: auto')
+        const block = make('transform: scale(0.5)', scroller)
+        const element = make('position: fixed', block)
+        expect(getScrollAncestors(element).fixed).toBe(false)
+
+        block.style.transform = 'none'
+
+        expect(getScrollAncestors(element)).toMatchObject({ fixed: true, scrollers: [] })
+    })
+
+    it.each(['contain: layout', 'contain: strict', 'contain: content'])(
+        'a fixed element under `%s` is not a fixed root',
+        (style) => {
+            const scroller = make('overflow: auto')
+            const block = make(style, scroller)
+            const element = make('position: fixed', block)
+
+            expect(getScrollAncestors(element)).toMatchObject({
+                fixed: false,
+                scrollers: [scroller]
+            })
+        }
+    )
+
+    it('a fixed element under a backdrop filter is not a fixed root', () => {
+        const scroller = make('overflow: auto')
+        const block = make('', scroller)
+        // jsdom's CSSOM doesn't parse `backdrop-filter`: stub the computed value.
+        const getComputedStyle = window.getComputedStyle.bind(window)
+        vi.spyOn(window, 'getComputedStyle').mockImplementation((target, pseudo) => {
+            const style = getComputedStyle(target, pseudo)
+            if (target !== block) return style
+            return new Proxy(style, {
+                get: (base, key) =>
+                    key === 'backdropFilter' ? 'blur(2px)' : (Reflect.get(base, key) as unknown)
+            })
+        })
+        const element = make('position: fixed', block)
+
+        expect(getScrollAncestors(element)).toMatchObject({ fixed: false, scrollers: [scroller] })
+        vi.restoreAllMocks()
+    })
+})

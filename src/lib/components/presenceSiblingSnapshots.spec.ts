@@ -227,17 +227,20 @@ describe('layout siblings around AnimatePresence changes (plan 015b)', () => {
     // 6. Clone sync completion, no LayoutGroup.
     it('6: clone sync completion: a footer outside the list parent snaps (GUARD)', async () => {
         const { update } = await mount({ mode: 'sync', clone: true })
-        await update({ remove: [1] })
-        // The removal itself re-renders the list's owner, footer included
-        // (a pass in which it doesn't move); the completion must not.
-        await settle(40)
-        expect(document.querySelector('[data-clone]')).not.toBeNull()
         const updates = listen(['footer'])
 
-        await settle(300)
+        // The exit's start re-renders the list's owner, footer included, as
+        // upstream does: an update is allowed, but the footer doesn't move.
+        await update({ remove: [1] })
+        await settle(40)
+        expect(document.querySelector('[data-clone]')).not.toBeNull()
+        const atStart = updates.footer.length
+        for (const { snapshot, layout } of updates.footer) expect(snapshot).toBe(layout)
 
+        // The completion re-renders only the AnimatePresence: nothing at all.
+        await settle(300)
         expect(document.querySelector('[data-clone]')).toBeNull()
-        expect(updates.footer).toEqual([])
+        expect(updates.footer.slice(atStart)).toEqual([])
     })
 
     it('6: clone sync completion, footerInList: the footer snaps (RED)', async () => {

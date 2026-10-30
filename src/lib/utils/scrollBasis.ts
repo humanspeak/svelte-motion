@@ -84,25 +84,31 @@ type Point = { x: number; y: number }
 
 const overflowPattern = /(auto|scroll|hidden|overlay)/
 
-type NodeStyle = { overflow: string; position: string; holdsFixed: boolean }
+type NodeStyle = { overflow: string; position: string }
 
 const styleMemo = new WeakMap<Element, NodeStyle>()
 
 /**
- * Whether `computed` makes its element the containing block of `position:
- * fixed` descendants (plan 015b A1.3): a transform, filter, perspective, a
- * `will-change` of one of them, or paint containment.
+ * Whether `element` is the containing block of its `position: fixed`
+ * descendants (plan 015b A1.3, A5): a transform, filter, backdrop filter,
+ * perspective, a `will-change` of one of them, or layout or paint
+ * containment (`strict` and `content` include both). Read live, never
+ * memoized: a motion ancestor's transform changes at any time. Only read on
+ * a walk past a fixed node, which runs for a commit, never per frame.
  */
-const holdsFixedDescendants = (computed: CSSStyleDeclaration): boolean => {
+const holdsFixedDescendants = (element: Element): boolean => {
+    const view = element.ownerDocument.defaultView ?? window
+    const computed = view.getComputedStyle(element)
     const set = (value: string | undefined) => !!value && value !== 'none'
     const willChange = computed.willChange ?? ''
     const contain = computed.contain ?? ''
     return (
         set(computed.transform) ||
         set(computed.filter) ||
+        set(computed.backdropFilter) ||
         set(computed.perspective) ||
-        /\b(transform|filter|perspective)\b/.test(willChange) ||
-        /\b(paint|strict|content)\b/.test(contain)
+        /\b(transform|filter|backdrop-filter|perspective)\b/.test(willChange) ||
+        /\b(layout|paint|strict|content)\b/.test(contain)
     )
 }
 
@@ -120,8 +126,7 @@ const styleOf = (element: Element): NodeStyle => {
         // jsdom reports `overflowX`/`overflowY` as `visible` for an
         // `overflow: auto` shorthand, so read all three.
         overflow: `${computed.overflow}${computed.overflowX}${computed.overflowY}`,
-        position: computed.position,
-        holdsFixed: holdsFixedDescendants(computed)
+        position: computed.position
     }
     const doc = element.ownerDocument
     if (element !== doc.documentElement && element !== doc.body) styleMemo.set(element, style)
@@ -171,9 +176,9 @@ export const getScrollAncestors = (element: Element): ScrollAncestors => {
     let fixed = false
     let sticky = false
     for (let node: Element | null = element; node; node = parentOf(node)) {
-        const { overflow, position, holdsFixed } = styleOf(node)
+        const { overflow, position } = styleOf(node)
         if (fixed) {
-            if (!holdsFixed) continue
+            if (!holdsFixedDescendants(node)) continue
             fixed = false
         }
         if (position === 'sticky') sticky = true
