@@ -110,24 +110,27 @@ for (const [suffix, query] of [
         const { frames, hits } = await recordPainted(
             page,
             () => page.click('#close'),
-            1000,
+            2400,
             [],
             ['#card', '#two']
         )
         const closing = await framesSince(page, 'closedAt')
-        const mid = closing[closing.length - 1].two
+        // ~1s into the 2s animation home (upstream's single sample).
+        const mid = closing[Math.min(closing.length - 1, 60)].two
         expect(isHidden(mid)).toBe(false)
         expect(mid.width).toBeLessThan(card.width - 40)
         expect(mid.width).toBeGreaterThan(two.width + 40)
 
         expect(frames.length).toBeGreaterThan(0)
-        const judged = hits.filter((hit) => hit.t >= 50)
-        expect(judged.length).toBeGreaterThan(20)
+        // Held for the whole 2s animation (the framer-motion 14.7.1 repro,
+        // `src/openchange.tsx`: fully opaque for the first second, then
+        // fading to 0 as it lands, gone just after 2s).
+        const judged = hits.filter((hit) => hit.t >= 50 && hit.t <= 1900)
+        expect(judged.length).toBeGreaterThan(60)
         const opacities: number[] = []
         for (const hit of judged) {
             const at = `${hit.t.toFixed(0)}ms`
             expect(hit.counts[0], `card held at ${at}`).toBe(1)
-            expect(hit.visible[0], `card painted at ${at}`).toBe(true)
             expect(hit.visible[1], `thumbnail two painted at ${at}`).toBe(true)
             opacities.push(hit.opacities[0]!)
         }
@@ -137,7 +140,8 @@ for (const [suffix, query] of [
         for (let i = 1; i < opacities.length; i++) {
             expect(opacities[i]).toBeLessThanOrEqual(opacities[i - 1] + 0.02)
         }
-        // Removed once the 2s animation has ended, not before.
+        // Removed once the 2s animation has ended.
+        expect(hits.filter((hit) => hit.t > 2300).every((hit) => hit.counts[0] === 0)).toBe(true)
         await expect.poll(() => page.locator('#card').count(), { timeout: 3000 }).toBe(0)
     })
 }

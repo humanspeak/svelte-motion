@@ -104,31 +104,22 @@ test('NC2: the outer clone follows the gallery item and crossfades', async ({ pa
     expect(widths.some((w) => w > 200 && w < 400)).toBe(true)
 })
 
-test('NC3: inside a nested AnimatePresence the dot rides the card, then the gallery dot grows from its last box', async ({
+test('NC3: inside a nested AnimatePresence the dot stays at its box, then the gallery dot grows from it', async ({
     page
 }) => {
-    await openLightbox(page, '?inner=boundary', 1300)
+    await openLightbox(page, '&inner=boundary', 1300)
     const { hits } = await close(page, 2600)
     const held = hits.filter((hit) => hit.rects[CLONE])
     expect(held.length).toBeGreaterThan(20)
-    // While held, the copy keeps its offset in the card (it rides the
-    // outer projection), and the gallery dot isn't promoted over it.
-    const offsets = held
-        .filter((hit) => hit.rects[CLONE_CHILD])
-        .map((hit) => {
-            const card = centre(hit.rects[CLONE]!)
-            const dot = centre(hit.rects[CLONE_CHILD]!)
-            return {
-                x: (dot.x - card.x) / hit.rects[CLONE]!.width,
-                y: (dot.y - card.y) / hit.rects[CLONE]!.height,
-                scale: hit.rects[CLONE_CHILD]!.width / hit.rects[CLONE]!.width
-            }
-        })
-    expect(offsets.length).toBeGreaterThan(20)
-    for (const offset of offsets) {
-        expect(Math.abs(offset.x - offsets[0].x)).toBeLessThan(0.02)
-        expect(Math.abs(offset.y - offsets[0].y)).toBeLessThan(0.02)
-        expect(Math.abs(offset.scale - offsets[0].scale)).toBeLessThan(0.02)
+    // While held, the copy stays at its own box (the framer-motion 14.7.1
+    // repro paints it fixed at its layout while the card shrinks), and the
+    // gallery dot isn't promoted over it.
+    const dots = held.filter((hit) => hit.rects[CLONE_CHILD]).map((hit) => hit.rects[CLONE_CHILD]!)
+    expect(dots.length).toBeGreaterThan(20)
+    for (const dot of dots) {
+        expect(Math.abs(dot.left - dots[0].left)).toBeLessThanOrEqual(1)
+        expect(Math.abs(dot.top - dots[0].top)).toBeLessThanOrEqual(1)
+        expect(Math.abs(dot.width - dots[0].width)).toBeLessThanOrEqual(1)
     }
     for (const hit of held) {
         expect(hit.visible[ITEM_CHILD], `gallery dot hidden at ${hit.t.toFixed(0)}ms`).toBe(false)
@@ -152,7 +143,7 @@ test('NC3: inside a nested AnimatePresence the dot rides the card, then the gall
 test('NC4: inside a propagating AnimatePresence the dot relegates and crossfades like NC1', async ({
     page
 }) => {
-    await openLightbox(page, '?inner=propagate', 1300)
+    await openLightbox(page, '&inner=propagate', 1300)
     const { hits } = await close(page, 1400)
     const together = both(hits, ITEM_CHILD, CLONE_CHILD)
     expect(together.length).toBeGreaterThanOrEqual(20)
@@ -173,11 +164,19 @@ const logSince = (page: Page, since: number) =>
             .map((entry) => ({ ...entry, t: (entry.t - since) / 1000 }))
     }, since)
 
+/**
+ * Close, then the log from the frame the exit clone first appears (the
+ * removal), so a click's own latency doesn't count as exit time.
+ */
 async function closeAndLog(page: Page, ms: number) {
-    const since = await page.evaluate(() => performance.timeOrigin + performance.now())
+    const clicked = await page.evaluate(() => performance.timeOrigin + performance.now())
     await page.locator('#close').click()
     await page.waitForTimeout(ms)
-    return logSince(page, since)
+    const removedAt = await page.evaluate((clicked) => {
+        const log = (window as unknown as { nestedLog: LogEntry[] }).nestedLog
+        return log.find((entry) => entry.t >= clicked && entry.cloneConnected)?.t ?? clicked
+    }, clicked)
+    return logSince(page, removedAt)
 }
 
 /** The propagated `#fade` exit runs on its clone copy: opacity 1 − t, scale 1 − t/2. */
@@ -207,7 +206,7 @@ function expectCloneUntilFadeEnds(log: Awaited<ReturnType<typeof logSince>>) {
 test('NC5: a propagating boundary inside a held clone runs its child’s own exit, and the clone waits for it', async ({
     page
 }) => {
-    await openLightbox(page, '?inner=propagate&innerExit=true&fast=true', 600)
+    await openLightbox(page, '&inner=propagate&innerExit=true&fast=true', 600)
     const log = await closeAndLog(page, 1500)
     expectFadeExit(log)
     expectCloneUntilFadeEnds(log)
@@ -216,7 +215,7 @@ test('NC5: a propagating boundary inside a held clone runs its child’s own exi
 test('NC6: a propagating boundary inside a non-layout exit runs its child’s exit; onExitComplete fires once after it', async ({
     page
 }) => {
-    await openLightbox(page, '?outer=plain&inner=propagate&innerExit=true', 600)
+    await openLightbox(page, '&outer=plain&inner=propagate&innerExit=true', 600)
     const log = await closeAndLog(page, 1500)
     expectFadeExit(log)
     expectCloneUntilFadeEnds(log)

@@ -7,8 +7,9 @@ import type { Page } from '@playwright/test'
  *
  * - a CDP screencast (`everyNthFrame: 1`, PNG), sorted by the compositor's
  *   `metadata.timestamp` as in `e2e/independent-transforms/speed-change.spec.ts`;
- * - an in-page `requestAnimationFrame` loop that, on every frame, hit-tests
- *   each probe with `document.elementFromPoint` and reads the rects of the
+ * - an in-page per-frame sample, taken after the frame's
+ *   `requestAnimationFrame` callbacks and before paint, that hit-tests each
+ *   probe with `document.elementFromPoint` and reads the rects of the
  *   requested selectors (plan 015a amendment A1: the screencast drops frames,
  *   the rAF loop does not).
  *
@@ -122,7 +123,7 @@ export async function recordPainted(
                 const rect = element.getBoundingClientRect()
                 return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
             }
-            const tick = () => {
+            const sample = () => {
                 if (state.stop) return
                 state.hits.push({
                     t: performance.timeOrigin + performance.now(),
@@ -148,6 +149,25 @@ export async function recordPainted(
                         return element ? parseFloat(getComputedStyle(element).opacity) : null
                     })
                 })
+            }
+            // Sampled after every requestAnimationFrame callback of the frame
+            // (Motion's frameloop renders in one), before paint: a
+            // ResizeObserver delivery, forced each frame by a 1px sentinel.
+            const sentinel = document.createElement('div')
+            sentinel.style.cssText =
+                'position:fixed;left:0;top:0;width:1px;height:1px;visibility:hidden;pointer-events:none'
+            document.body.appendChild(sentinel)
+            const observer = new ResizeObserver(sample)
+            observer.observe(sentinel)
+            let wide = false
+            const tick = () => {
+                if (state.stop) {
+                    observer.disconnect()
+                    sentinel.remove()
+                    return
+                }
+                wide = !wide
+                sentinel.style.width = wide ? '2px' : '1px'
                 requestAnimationFrame(tick)
             }
             requestAnimationFrame(tick)

@@ -52,7 +52,7 @@
         type Transition
     } from 'motion-dom'
     import { isPlaywrightEnv, pwLog } from '$lib/utils/log'
-    import { onDestroy, untrack, type Snippet } from 'svelte'
+    import { untrack, type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants'
     // The container never animates an ELEMENT directly: every writer goes
     // through the VisualElement (`animationState` or `animateTarget`).
@@ -96,7 +96,8 @@
         getAnimatePresenceContext,
         getPresenceChildContext,
         getPresenceDepth,
-        setPresenceDepth
+        setPresenceDepth,
+        type PresenceLayoutHandOff
     } from '$lib/utils/presence'
     import { getInitialKeyframes } from '$lib/utils/initial'
     import { boxFromRect, MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
@@ -824,15 +825,28 @@
         mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {})
     )
 
-    // Register onDestroy at component level (guaranteed to work in Svelte 5)
-    // — getContext()/onDestroy() must run during component initialization.
+    // The presence teardown (plan 012, P6). A script-level `$effect.pre` is a
+    // render effect created now, before the template, and Svelte destroys an
+    // effect's children in creation order (`destroy_effect_children`,
+    // effects.js:464-488), so this teardown runs before the descendants'
+    // and before this component's own projection and VisualElement
+    // teardowns: `unregisterChild` can hand the still-mounted nodes, nested
+    // ones included, to the exit clone. An `onDestroy` (a user effect, queued
+    // until `pop()`) ran after the descendants had torn down.
     if (shouldRegisterPresenceExit) {
-        onDestroy(() => {
-            pwLog('[presence] onDestroy triggered', { key: presenceKey })
-            // Already exited with its parent (`propagate`): no clone exit.
-            if (presenceChildContext?.propagated === true && !presenceChildContext.isPresent) return
-            context.unregisterChild(presenceKey)
-        })
+        $effect.pre(
+            () => () =>
+                untrack(() => {
+                    pwLog('[presence] teardown', { key: presenceKey })
+                    // Already exited with its parent (`propagate`): no clone exit.
+                    if (
+                        presenceChildContext?.propagated === true &&
+                        !presenceChildContext.isPresent
+                    )
+                        return
+                    context.unregisterChild(presenceKey)
+                })
+        )
     }
 
     // Capture mid-animation computed styles via rAF so exit clones can start
@@ -848,7 +862,8 @@
         let wasAnimating = false
         const capture = () => {
             if (element && element.isConnected) {
-                const isAnimating = element.getAnimations().length > 0
+                const animations = element.getAnimations()
+                const isAnimating = animations.length > 0
                 // ResizeObserver doesn't fire for transform-only animations.
                 // Capture their visual rect while they run, plus one final
                 // settled frame, so a later clone exit never reuses the tiny
@@ -860,7 +875,14 @@
                     // the full style snapshot the exit clone freezes; the
                     // animating frames before it only copy layout fields.
                     context.updateChildState(presenceKey, rect, cs, !isAnimating)
-                    context.updateChildAnimatedStyle(presenceKey, cs.opacity, cs.transform)
+                    // The running animations too: a held exit clone takes them
+                    // over (plan 012 A2), and a detached element reports none.
+                    context.updateChildAnimatedStyle(
+                        presenceKey,
+                        cs.opacity,
+                        cs.transform,
+                        animations
+                    )
                 }
                 wasAnimating = isAnimating
             }
@@ -938,6 +960,51 @@
         }
     })
 
+    /** Layout keys a `style` motion value can drive (plan 012, placement). */
+    const LAYOUT_STYLE_KEYS = [
+        'top',
+        'right',
+        'bottom',
+        'left',
+        'width',
+        'height',
+        'margin',
+        'marginTop',
+        'marginRight',
+        'marginBottom',
+        'marginLeft',
+        'padding',
+        'paddingTop',
+        'paddingRight',
+        'paddingBottom',
+        'paddingLeft'
+    ]
+    /**
+     * Plan 012 (P3): how this element's projection node moves to its exit
+     * clone. Every element whose `MeasureLayout` upstream renders (`layout`,
+     * `layoutId`, `drag`) is held. `canHandOff` runs in the teardown, where
+     * the destroyed `measureLayoutMounted` recomputes from its dependencies'
+     * pre-flush values, as upstream's `MeasureLayout` keeps its last props.
+     */
+    const layoutHandOff: PresenceLayoutHandOff = {
+        canHandOff: () =>
+            !!motionDomProjection?.isMounted &&
+            !motionDomProjection.isHandedOff &&
+            measureLayoutMounted,
+        ownedLayoutKeys: () => {
+            const style = untrack(() => styleProp)
+            const keys =
+                style && typeof style === 'object'
+                    ? LAYOUT_STYLE_KEYS.filter((key) =>
+                          isMotionValue((style as Record<string, unknown>)[key])
+                      )
+                    : []
+            // trunk-ignore(eslint/svelte/prefer-svelte-reactivity): a read-only snapshot for the exit clone, never mutated or tracked
+            return new Set(keys)
+        },
+        handOff: (clone, release) => motionDomProjection?.handOffToExitClone(clone, release)
+    }
+
     // Reactively update registration when element/exit/transition props change.
     //
     // Only with a node. Upstream registers a child with its `PresenceChild`
@@ -946,8 +1013,17 @@
     // removed nothing holds it (`PresenceChild.tsx:104-113`): it leaves at once,
     // with no clone, and never blocks a `mode="wait"` sibling. The node is
     // `$state.raw`, so a late node registers as soon as it exists.
+    // Plan 012 (P5): also a child without an `exit` whose `MeasureLayout`
+    // would be rendered upstream (`layout`, `layoutId`, `drag`): its
+    // projection node holds the exit (`MeasureLayout.tsx:136-143, 188-217`
+    // @ v14.7.1), so it must be found when it unregisters.
     $effect(() => {
-        if (element && visualElement && shouldRegisterPresenceExit && exitProp !== undefined) {
+        if (
+            element &&
+            visualElement &&
+            shouldRegisterPresenceExit &&
+            (exitProp !== undefined || measureLayoutMounted)
+        ) {
             const resolvePresenceExit = (custom: unknown) => {
                 const resolved = resolveExit(
                     exitProp,
@@ -965,8 +1041,10 @@
                 presenceKey,
                 element,
                 filteredExit,
-                // The clone-based exit animates a DETACHED copy with no
-                // VisualElement, so `shouldSkipAnimations` cannot reach it.
+                // A clone that isn't held animates a copy with no
+                // VisualElement, so `shouldSkipAnimations` cannot reach it; a
+                // held clone animates through the re-homed VisualElement (plan
+                // 012), whose `animate(clone, …)` copies the transition too.
                 // motion-dom's `animateTarget` copies `transition.skipAnimations`
                 // onto every per-value transition, so threading it here is what
                 // makes exits instant under `<MotionConfig skipAnimations>`.
@@ -976,7 +1054,9 @@
                 skipAnimations ? { ...mergedTransition, skipAnimations: true } : mergedTransition,
                 resolvePresenceExit,
                 // Plan 015b (R6): the clone's completion re-renders this group.
-                layoutGroupContext?.group
+                layoutGroupContext?.group,
+                // Plan 012 (P3): hand the projection node to the exit clone.
+                layoutHandOff
             )
         }
     })

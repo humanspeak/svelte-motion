@@ -6,7 +6,6 @@ import {
     readScrollBasis,
     scrollDelta,
     scrollShift,
-    seenScrollBasis,
     type ScrollBasis
 } from './scrollBasis.js'
 
@@ -175,28 +174,6 @@ describe('scrollBasis (plan 015a)', () => {
             expect(scrollShift(basis, isFoldedIn)).toEqual({ x: 0, y: -500 })
             folded = true
             expect(scrollShift(basis, isFoldedIn)).toEqual({ x: 0, y: 0 })
-        })
-
-        it('2i: `seen` updates on a scroll event', () => {
-            const scroller = make('overflow: auto')
-            const element = make('', scroller)
-            readScrollBasis(element)
-
-            scrollWithEvent(scroller, 500, 20)
-
-            expect(seenScrollBasis(element).values).toEqual([[20, 500]])
-        })
-
-        it('2j: `seen` updates on a document click with no scroll event', () => {
-            const scroller = make('overflow: auto')
-            const element = make('', scroller)
-            readScrollBasis(element)
-
-            scroller.scrollTop = 500
-            expect(seenScrollBasis(element).values).toEqual([[0, 0]])
-            document.dispatchEvent(new MouseEvent('click'))
-
-            expect(seenScrollBasis(element).values).toEqual([[0, 500]])
         })
 
         it('2k: scrollDelta from 0 to 500 is 500', () => {

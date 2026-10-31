@@ -7,6 +7,7 @@ import { MotionDomProjectionAdapter } from './motionDomProjection'
 import {
     containsStatefulCloneContent,
     createAnimatePresenceContext,
+    createPopLayoutPointCache,
     getPresenceDepth,
     measurePopLayoutSnapshot,
     observeStyleChanges,
@@ -1188,10 +1189,10 @@ describe('exit placeholder slot preservation', () => {
         expect(wrapper.firstElementChild).toBe(clone)
     })
 
-    it("falls back to the element's own document body, not the global one", () => {
+    it("clones into the element's own document, never onto a <body>", () => {
         // Rendering into another window or iframe (e.g. via window.open()):
-        // once the slot parent is gone too, the clone must land in the
-        // element's own document, as upstream's PopChild does (motion cc77f7878).
+        // the clone must land in the element's own document, as upstream's
+        // PopChild does (motion cc77f7878).
         const iframe = document.createElement('iframe')
         document.body.appendChild(iframe)
         const doc = iframe.contentDocument!
@@ -1202,11 +1203,22 @@ describe('exit placeholder slot preservation', () => {
 
         const ctx = createAnimatePresenceContext({ mode: 'popLayout' })
         ctx.registerChild('card', card, { opacity: 0 })
-        host.remove()
+        card.remove()
         ctx.unregisterChild('card')
 
         expect(doc.body.querySelector('[data-clone="true"]')).toBeTruthy()
         expect(document.querySelector('[data-clone="true"]')).toBeNull()
+        ctx.dispose()
+
+        // With the slot parent gone too there is no clone at all (plan 012,
+        // 10j): a clone on <body> would escape every clipping ancestor.
+        const other = doc.createElement('div')
+        host.appendChild(other)
+        const ctx2 = createAnimatePresenceContext({ mode: 'popLayout' })
+        ctx2.registerChild('other', other, { opacity: 0 })
+        host.remove()
+        ctx2.unregisterChild('other')
+        expect(doc.querySelector('[data-clone="true"]')).toBeNull()
     })
 
     it('positions the exit clone at the current slot, not the stale registration rect', () => {
@@ -1659,110 +1671,6 @@ describe('observeStyleChanges', () => {
  * the update scrolls the content (a clamp), the clone follows the move with
  * the element's layout transition, in the same `animate()` call as its exit.
  */
-describe('exit clone layout follow (plan 015a)', () => {
-    let scroller: HTMLElement
-    let list: HTMLElement
-    let el: HTMLElement
-    let frames: FrameRequestCallback[]
-
-    const drain = async () => {
-        for (let i = 0; i < 10; i++) await Promise.resolve()
-    }
-    const runFrames = () => {
-        for (const callback of frames.splice(0)) callback(0)
-    }
-
-    beforeEach(() => {
-        vi.useRealTimers()
-        vi.clearAllMocks()
-        // Earlier describes spy on getComputedStyle; this one needs the real
-        // computed overflow of the scroller.
-        vi.restoreAllMocks()
-        document.body.innerHTML = ''
-        scroller = document.createElement('div')
-        scroller.setAttribute('style', 'overflow: auto; height: 320px')
-        list = document.createElement('ul')
-        el = document.createElement('li')
-        list.appendChild(el)
-        scroller.appendChild(list)
-        document.body.appendChild(scroller)
-        // Drawn at its offset size: unscaled.
-        Object.defineProperty(scroller, 'offsetWidth', { configurable: true, value: 400 })
-        Object.defineProperty(scroller, 'offsetHeight', { configurable: true, value: 320 })
-        scroller.scrollTop = 500
-
-        // The element's viewport rect at 500; the clone is drawn 70px lower
-        // once the scroll position has clamped to 430.
-        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
-            this: HTMLElement
-        ) {
-            if (this === el) return makeRect(10, 100, 150, 60)
-            if (this.dataset.clone) return makeRect(10, 170, 150, 60)
-            return makeRect(0, 0, 400, 320)
-        })
-        frames = []
-        // Assigned rather than spied: fake-timer installs swap these globals.
-        vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-            frames.push(callback)
-            return frames.length
-        })
-        vi.stubGlobal('cancelAnimationFrame', (handle: number) => {
-            frames[handle - 1] = () => {}
-        })
-    })
-    afterEach(() => {
-        vi.unstubAllGlobals()
-    })
-
-    const exitAfterClamp = async (clamp: boolean) => {
-        const ctx = createAnimatePresenceContext({ mode: 'popLayout' })
-        ctx.registerChild('item', el, { opacity: 0 }, { type: 'spring' })
-        // Svelte detaches the keyed node before teardown reaches unregister.
-        el.remove()
-        ctx.unregisterChild('item')
-        // The content shrank: the scroll position clamps, no scroll event yet.
-        if (clamp) scroller.scrollTop = 430
-        await drain()
-        return ctx
-    }
-
-    it('6a: a data-layout clone follows the clamp in one animation, before any frame', async () => {
-        el.setAttribute('data-layout', 'true')
-        const ctx = await exitAfterClamp(true)
-
-        expect(animate).toHaveBeenCalledTimes(1)
-        expect(animate).toHaveBeenCalledWith(
-            expect.any(HTMLElement),
-            expect.objectContaining({ opacity: 0, y: [-70, 0] }),
-            expect.objectContaining({ y: expect.objectContaining({ type: 'spring' }) })
-        )
-        runFrames()
-        expect(animate).toHaveBeenCalledTimes(1)
-        ctx.dispose()
-    })
-
-    it('6b: a non-layout clone gets no follow; its exit still starts on the frame', async () => {
-        const ctx = await exitAfterClamp(true)
-
-        expect(animate).not.toHaveBeenCalled()
-        runFrames()
-        expect(animate).toHaveBeenCalledTimes(1)
-        expect(vi.mocked(animate).mock.calls[0][1]).not.toHaveProperty('y')
-        ctx.dispose()
-    })
-
-    it('6c: with no scroll change there is no follow', async () => {
-        el.setAttribute('data-layout', 'true')
-        const ctx = await exitAfterClamp(false)
-
-        expect(animate).not.toHaveBeenCalled()
-        runFrames()
-        expect(animate).toHaveBeenCalledTimes(1)
-        expect(vi.mocked(animate).mock.calls[0][1]).not.toHaveProperty('y')
-        ctx.dispose()
-    })
-})
-
 /**
  * Plan 012 (U10): a `layout` / `layoutId` child keeps its projection node on
  * its exit clone, and the clone is held until that node is released, as
@@ -2168,7 +2076,8 @@ describe('exit holds (plan 012)', () => {
         const visualElement = {
             current: innerEl as HTMLElement,
             animationState: { setActive: vi.fn(() => exit.promise) },
-            projection: undefined
+            projection: undefined,
+            unmount: vi.fn()
         }
         visualElementStore.set(innerEl, visualElement as never)
         return { boundary, innerEl, exit, visualElement }
@@ -2646,5 +2555,36 @@ describe('exit holds (plan 012)', () => {
         ctx.unregisterChild('f')
         expect(parent.querySelector('[data-clone]')).toBeNull()
         ctx.dispose()
+    })
+})
+
+/**
+ * Plan 012 A2: a viewport resize can move a popLayout element (a fixed,
+ * bottom-anchored list) without resizing any box the cache observes. Upstream
+ * measures fresh on every resize, so the cached point follows it.
+ */
+describe('createPopLayoutPointCache and window resizes (plan 012 A2)', () => {
+    it('re-samples the resting point after a window resize', async () => {
+        vi.useRealTimers()
+        vi.restoreAllMocks()
+        document.body.innerHTML = ''
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        let top = 100
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(
+            () => new DOMRect(10, top, 100, 60)
+        )
+        const cache = createPopLayoutPointCache()
+        cache.track(element)
+        const settle = () => new Promise((resolve) => setTimeout(resolve, 120))
+        await settle()
+        expect(cache.read(element)?.[1]).toBe(100)
+
+        // The viewport got 180px shorter: the bottom-anchored element rose.
+        top = -80
+        window.dispatchEvent(new Event('resize'))
+        await settle()
+        expect(cache.read(element)?.[1]).toBe(-80)
+        cache.dispose()
     })
 })

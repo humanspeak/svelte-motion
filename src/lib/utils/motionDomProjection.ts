@@ -3,7 +3,9 @@ import {
     HTMLVisualElement,
     copyBoxInto,
     createBox,
+    frame,
     hasTransform,
+    microtask,
     rootProjectionNode,
     transformPropOrder,
     translateAxis,
@@ -340,6 +342,38 @@ const sameBox = (a: Box, b: Box): boolean =>
     Math.abs(a.y.max - b.y.max) < 0.5
 
 /**
+ * The hold a departing node keeps on its exit clone (plan 012), returned by
+ * {@link MotionDomProjectionAdapter.handOffToExitClone}.
+ *
+ * Upstream the exiting element and its projection node stay mounted until
+ * `MeasureLayout` calls `safeToRemove` (`MeasureLayout.tsx:188-217`,
+ * `use-presence.ts:59-64` @ v14.7.1). Here the node is re-pointed at the
+ * clone instead, and the presence context removes the clone once every hold
+ * on it has released and its exit has finished.
+ *
+ * @example
+ * ```ts
+ * const hold = adapter.handOffToExitClone(clone, () => settle('layout'))
+ * // once every flag has settled, while the clone is still connected:
+ * hold?.finish()
+ * clone.remove()
+ * ```
+ */
+export type ExitLayoutHold = {
+    /**
+     * Release the node now (re-entry, boundary disposal): later release
+     * signals are no-ops, and a deferred `unmount()` runs at once.
+     */
+    cancel(): void
+    /**
+     * End the hold once the clone may go: a deferred `unmount()` runs now,
+     * while the clone is still connected (upstream unmounts the node with its
+     * element still attached, `use-motion-ref.ts:39`). Idempotent.
+     */
+    finish(): void
+}
+
+/**
  * Svelte lifecycle adapter for motion-dom's upstream projection node system.
  *
  * The public Svelte API stays unchanged (`layout`, `layoutId`, `transition`).
@@ -414,12 +448,13 @@ export class MotionDomProjectionAdapter {
     private lastLayoutBasis: ScrollBasis | undefined
     /**
      * How {@link latestLayoutBox} (and the `lastLayout` taken from the same
-     * read) was measured, for the departing-lead snapshot. The adapter's own
-     * reads (`seedLayout`, `refreshLayout`, `measurePageRect`) count as
-     * keeping the style transforms, so the box is where the element was
-     * drawn. A motion-dom update pass resets the transforms of the nodes it
-     * measures first (`resetTransformStyle`, create-projection-node.ts @
-     * v14.7.1), so its box is the transform-free layout.
+     * read) was measured, for the departing-lead snapshot. Only
+     * `seedLayout`'s unstripped read keeps the style transforms, so its box
+     * is where the element was drawn. `refreshLayout` and `measurePageRect`
+     * strip the motion transforms first, and a motion-dom update pass resets
+     * the transforms of the nodes it measures (`resetTransformStyle`,
+     * create-projection-node.ts @ v14.7.1), so their box is the
+     * transform-free layout (plan 012).
      */
     private latestLayoutKeepsTransforms = true
     /**
@@ -522,6 +557,22 @@ export class MotionDomProjectionAdapter {
             if (adapter?.element) return adapter.isFoldedInWithSelf
         }
         return Object.assign(() => false, { wasRoot: false })
+    }
+
+    /**
+     * The adapter driving a projection node, for walks that start from a
+     * VisualElement (plan 012: an exit clone's nested nodes).
+     *
+     * @param projection A VisualElement's `projection`.
+     * @returns Its adapter, or `undefined` when none drives it.
+     *
+     * @example
+     * ```ts
+     * const adapter = MotionDomProjectionAdapter.adapterFor(visualElement.projection)
+     * ```
+     */
+    static adapterFor(projection: object | undefined): MotionDomProjectionAdapter | undefined {
+        return projection ? MotionDomProjectionAdapter.adapters.get(projection) : undefined
     }
 
     /**
@@ -733,7 +784,12 @@ export class MotionDomProjectionAdapter {
             this.rememberLayoutBox(
                 box,
                 this.layoutBasis,
-                this.readingOwnLayout,
+                // Only `seedLayout`'s unstripped read keeps the motion
+                // transforms; `refreshLayout` strips them like an update pass
+                // (plan 012: a refresh between two handoffs, e.g. part D's
+                // exit-complete one, left a translated ancestor's offset out
+                // of the departing-lead snapshot).
+                this.readingOwnLayout && this.readingUnstripped,
                 this.readingUnstripped && this.hasPathTransforms()
             )
         })
@@ -797,7 +853,207 @@ export class MotionDomProjectionAdapter {
                 for (const listener of this.commitListeners) listener(rect)
             }
         )
+        // Upstream `MeasureLayout.componentDidMount` (136-143 @ v14.7.1): the
+        // node's shared animation ending, or its stack's exit animation
+        // completing, may release an exiting node. Both go through the
+        // per-cycle latch ({@link releasePresence}).
+        this.offAnimationComplete = this.projection.addEventListener('animationComplete', () =>
+            this.releasePresence()
+        )
+        this.projection.setOptions({
+            ...this.projection.options,
+            onExitComplete: () => this.releasePresence()
+        })
         this.syncGroupMembership()
+    }
+
+    /** Removes the `animationComplete` release listener installed in `mount`. */
+    private offAnimationComplete: (() => void) | null = null
+
+    /**
+     * The release armed for the current exit cycle (plan 012), or `null`. Set
+     * when the node starts exiting, cleared by the first release signal, by
+     * re-entry and by unmount, so a cycle releases at most once however many
+     * signals fire (`NodeStack.exitAnimationComplete` notifies every member,
+     * stack.ts:76-81, and `animationComplete` and the lead check can fire too).
+     */
+    private pendingRelease: (() => void) | null = null
+
+    /**
+     * Upstream `safeToRemove` (`use-presence.ts:59-64`): fire the armed
+     * release once.
+     *
+     * Deferred to a microtask of its own, as upstream's is (it sets React
+     * state, which re-renders later). The signals arrive inside motion-dom's
+     * `microtask` batch, which never wakes again once something schedules on
+     * it while it processes (`createRenderBatcher(queueMicrotask, false)`:
+     * `wake()` skips scheduling mid-batch and the batch doesn't keep alive),
+     * and the release's teardown runs an update pass.
+     */
+    private releasePresence(): void {
+        const release = this.pendingRelease
+        if (!release) return
+        this.pendingRelease = null
+        queueMicrotask(release)
+    }
+
+    /**
+     * Set while this node is re-pointed at an exit clone (plan 012):
+     * the element it was mounted on, and whether `unmount()` was asked for.
+     */
+    private handOff: { original: HTMLElement; unmountRequested: boolean } | null = null
+
+    /** Whether this node has been handed off to an exit clone and not yet released. */
+    get isHandedOff(): boolean {
+        return this.handOff !== null
+    }
+
+    /**
+     * Upstream `MeasureLayout`'s exit sequence, after `isPresent` flipped to
+     * `false` (`getSnapshotBeforeUpdate` 188-201, `componentDidUpdate`
+     * 206-217 @ v14.7.1): relegate in the shared-layout stack, or release
+     * after this frame when nobody takes over; run the root update; and
+     * release from the microtask lead check when nothing animates it.
+     */
+    private relegateAndCommit(): void {
+        this.relegate()
+        this.commitExitUpdate()
+    }
+
+    /**
+     * `MeasureLayout.getSnapshotBeforeUpdate`'s exit half (188-201 @
+     * v14.7.1): relegate in the shared-layout stack, or, when nobody takes
+     * over, release after this frame unless the stack still has members.
+     */
+    private relegate(): void {
+        const projection = this.projection
+        if (!projection.relegate()) {
+            // "If there's another stack member taking over from this one, it's
+            // in charge of the exit animation and therefore should be in
+            // charge of the safe to remove. Otherwise we call it here."
+            frame.postRender(() => {
+                projection.getStack()?.members.length || this.releasePresence()
+            })
+        }
+    }
+
+    /**
+     * `MeasureLayout.componentDidUpdate` (206-217 @ v14.7.1): the root
+     * update, then the lead check that releases a node nothing animates.
+     */
+    private commitExitUpdate(): void {
+        const projection = this.projection
+        projection.root?.didUpdate()
+        this.visualElement.scheduleRenderMicrotask()
+        microtask.postRender(() => {
+            if (!projection.currentAnimation && projection.isLead()) this.releasePresence()
+        })
+    }
+
+    /**
+     * Keep this departing node alive on its exit clone (plan 012).
+     *
+     * Svelte detaches the element before any teardown runs, so it can't stay
+     * mounted as upstream's does. Instead the same VisualElement and
+     * projection node move to the clone, which sits in the element's slot:
+     * the node keeps its stack position, `resumeFrom` links, values and
+     * options, relegates as upstream's exiting `MeasureLayout` does
+     * (`MeasureLayout.tsx:188-217` @ v14.7.1), and the clone is held until it
+     * is released. `animate(clone, …)` then drives this VisualElement
+     * (`animation/animate/subject.ts:144-159`), so the exit and the
+     * projection share one renderer.
+     *
+     * Steps: seed the departing snapshot from cache (`seedDepartingLeadSnapshot`
+     * for a `layoutId` node, `seedOwnOnScreenSnapshot` otherwise); mark the
+     * node not present; re-point `projection.instance`,
+     * `visualElement.current`, `visualElementStore` and this adapter's
+     * element at the clone; run the relegate / update / lead-check sequence.
+     * A later `unmount()` is deferred until the hold finishes or is
+     * cancelled.
+     *
+     * @param clone The exit clone, already connected in the element's slot.
+     * @param release Called once when upstream would call `safeToRemove`.
+     * @param options `exiting: false` only re-points the node (a nested node
+     *     that doesn't exit with its ancestor): no snapshot, no relegate, no
+     *     release; its unmount still waits for the hold.
+     * @returns The hold, or `undefined` when the node isn't mounted or is
+     *     already handed off.
+     *
+     * @example
+     * ```ts
+     * const hold = adapter.handOffToExitClone(clone, () => settle())
+     * ```
+     */
+    handOffToExitClone(
+        clone: HTMLElement,
+        release: () => void,
+        options: { exiting?: boolean } = {}
+    ): ExitLayoutHold | undefined {
+        const original = this.element
+        if (!original || this.handOff) return undefined
+        const projection = this.projection
+        const exiting = options.exiting !== false
+        if (!exiting) {
+            // A nested node that doesn't exit with its ancestor (below a
+            // nested `AnimatePresence`, or one that measures no layout): it
+            // only moves with its element, as upstream keeps rendering it.
+            this.rehome(original, clone)
+            return this.holdFor()
+        }
+        hasTakenAnySnapshot = true
+        // 1. The snapshot `willUpdate()` takes upstream while the element is
+        // still attached (`unmount` → `willUpdate`, create-projection-node.ts
+        // 668-678), from cache: Svelte has already detached it.
+        if (projection.options.layoutId) {
+            this.seedDepartingLeadSnapshot(original)
+        } else {
+            const root = projection.root
+            if (root && !root.isUpdating) root.startUpdate()
+            this.seedOwnOnScreenSnapshot()
+        }
+        // 2. `projection.isPresent = isPresent` (MeasureLayout.tsx:163).
+        projection.isPresent = false
+        // 3. Re-point the node and its renderer at the clone.
+        this.rehome(original, clone)
+        this.pendingRelease = release
+        // 4. Relegate, update, lead check.
+        this.relegateAndCommit()
+        return this.holdFor()
+    }
+
+    /**
+     * Whether upstream renders this node's `MeasureLayout` (`layout`,
+     * `layoutId`, or `drag`'s `alwaysMeasureLayout`), so it holds an exit.
+     */
+    get measuresLayout(): boolean {
+        return !!(this.layout || this.layoutId || this.projection.options.alwaysMeasureLayout)
+    }
+
+    /** Re-point the node, its renderer and this adapter at `clone`; defer `unmount()`. */
+    private rehome(original: HTMLElement, clone: HTMLElement): void {
+        this.projection.instance = clone
+        this.visualElement.current = clone
+        visualElementStore.delete(original)
+        visualElementStore.set(clone, this.visualElement)
+        const self = MotionDomProjectionAdapter
+        if (self.byElement.get(original) === this) self.byElement.delete(original)
+        self.byElement.set(clone, this)
+        this.element = clone
+        this.handOff = { original, unmountRequested: false }
+    }
+
+    /** The hold ending a hand-off: disarms the release and runs a deferred unmount. */
+    private holdFor(): ExitLayoutHold {
+        let ended = false
+        const end = () => {
+            if (ended) return
+            ended = true
+            this.pendingRelease = null
+            const handOff = this.handOff
+            this.handOff = null
+            if (handOff?.unmountRequested) this.unmount()
+        }
+        return { cancel: end, finish: end }
     }
 
     /**
@@ -812,7 +1068,16 @@ export class MotionDomProjectionAdapter {
      */
     unmount(): void {
         if (!this.element) return
+        // Handed off to an exit clone (plan 012): unmounted when the hold
+        // ends, as upstream unmounts only after `safeToRemove`.
+        if (this.handOff) {
+            this.handOff.unmountRequested = true
+            return
+        }
         const element = this.element
+        this.pendingRelease = null
+        this.offAnimationComplete?.()
+        this.offAnimationComplete = null
         // MeasureLayout.componentWillUnmount (148), which only exists for
         // nodes that measure layout.
         if (this.layout || this.layoutId) hasTakenAnySnapshot = true
@@ -1257,7 +1522,8 @@ export class MotionDomProjectionAdapter {
             // slot.
             const { layoutBox } = this.projection.measure(false)
             rect = rectFromBox(layoutBox)
-            this.rememberLayoutBox(layoutBox, this.readBasis(), true, false)
+            // Read with the motion transforms stripped (see `refreshLayout`).
+            this.rememberLayoutBox(layoutBox, this.readBasis(), false, false)
         } finally {
             restore()
         }

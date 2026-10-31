@@ -133,7 +133,10 @@ for (const [suffix, query] of [
 
         // The crossfade is frozen (`ease: () => 0.25`), so the compositor may
         // paint only once after the click: the rAF hits cover the rest.
-        const frames = recording.frames.filter((frame) => frame.t >= 100)
+        const after = recording.frames.filter((frame) => frame.t >= 100)
+        // With nothing repainted after 100ms, the last frame painted before
+        // it is what is on screen.
+        const frames = after.length ? after : recording.frames.slice(-1)
         expect(frames.length).toBeGreaterThanOrEqual(1)
         const regions = await regionsIn(
             page,
@@ -178,3 +181,84 @@ for (const [suffix, query] of [
         await expectReleased(page, clickedAt)
     })
 }
+
+/**
+ * Plan 012, Step 3d (placement, M1): a held exit clone is drawn exactly where
+ * its element was. Its re-homed VisualElement renders the element's
+ * transforms and `style` motion values onto it, so the clone takes the
+ * untransformed box, from the recorded computed style and the placeholder
+ * slot (in flow) or its own resolved insets (out of flow). Judged on every
+ * rAF frame until the clone is gone.
+ */
+test.describe('held clone placement (plan 012, 3d)', () => {
+    type Box = { left: number; top: number; width: number; height: number }
+    const near = (a: Box, b: Box, tolerance = 1) =>
+        Math.abs(a.left - b.left) <= tolerance &&
+        Math.abs(a.top - b.top) <= tolerance &&
+        Math.abs(a.width - b.width) <= tolerance &&
+        Math.abs(a.height - b.height) <= tolerance
+
+    /** Remove the probe after `delay` ms; frames split at the clone's appearance. */
+    async function removeProbe(page: Page, probe: string, delay: number, scrollY = 0) {
+        await page.setViewportSize({ width: 1000, height: 660 })
+        await page.goto(`${URL}&probe=${probe}`)
+        await expect(page.locator('[data-hydrated]')).toBeAttached()
+        if (scrollY) await page.evaluate((y) => window.scrollTo(0, y), scrollY)
+        const { hits } = await recordPainted(
+            page,
+            async () => {
+                await page.waitForTimeout(delay)
+                await page.locator('#remove-probe').click()
+            },
+            1400,
+            [],
+            ['#probe', '#control', '[data-clone]']
+        )
+        const firstClone = hits.findIndex((hit) => hit.counts[2] > 0)
+        expect(firstClone, 'a clone appeared').toBeGreaterThan(0)
+        const before = hits[firstClone - 1]
+        const held = hits.slice(firstClone).filter((hit) => hit.counts[2] > 0)
+        expect(held.length).toBeGreaterThan(20)
+        return { before, held }
+    }
+
+    test('3d-i: an exit interrupting its enter keeps tracking the enter, no jump', async ({
+        page
+    }) => {
+        const { before, held } = await removeProbe(page, 'enter', 300)
+        const distance = before.rects[1]!.left - before.rects[0]!.left
+        // From the first frame after the removal on (no jump, no doubled
+        // `x` or `scale`), the clone moves exactly with the control.
+        for (const hit of held) {
+            const clone = hit.rects[0]!
+            const control = hit.rects[1]!
+            expect(
+                near(clone, { ...control, left: control.left - distance }, 0.5),
+                `at ${hit.t.toFixed(0)}ms: clone ${JSON.stringify(clone)} control ${JSON.stringify(control)}`
+            ).toBe(true)
+        }
+    })
+
+    for (const [name, probe, scrollY] of [
+        ['3d-ii: out of flow, with style layout keys', 'styles', 0],
+        [
+            '3d-iii: in flow with a margin, initial containing block, page scrolled 200px',
+            'margin',
+            200
+        ],
+        ['3d-iv: in flow, style motion values and content-box', 'values', 0],
+        ['3d-v: absolute inside a transform containing block', 'transform', 0],
+        ['3d-v: fixed inside a filter containing block', 'filter', 0],
+        ['3d-v: fixed inside a backdrop-filter containing block', 'backdrop', 0]
+    ] as const) {
+        test(`${name}: the clone stays on the element's last painted box`, async ({ page }) => {
+            const { before, held } = await removeProbe(page, probe, 200, scrollY)
+            for (const hit of held) {
+                expect(
+                    near(hit.rects[0]!, before.rects[0]!),
+                    `at ${hit.t.toFixed(0)}ms: ${JSON.stringify(hit.rects[0])} vs ${JSON.stringify(before.rects[0])}`
+                ).toBe(true)
+            }
+        })
+    }
+})

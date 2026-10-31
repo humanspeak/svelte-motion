@@ -28,7 +28,7 @@
     // The nested boundary's `onExitComplete` counts into `#inner-done`.
     //
     // Every rAF, `window.nestedLog` records the clone copy of `#fade` (its
-    // inline `opacity` and the scale in its inline `transform`), whether the
+    // computed `opacity` and the scale of its computed `transform`), whether the
     // lightbox clone is connected, and `#inner-done`'s count.
 
     const params = page.url.searchParams
@@ -64,11 +64,14 @@
         let raf = 0
         const record = () => {
             const fade = document.querySelector<HTMLElement>('[data-clone] .fade')
-            const scale = fade?.style.transform.match(/scale\(([-\d.e]+)/)
+            // Computed, not inline: Motion runs `opacity` and the transform
+            // group on WAAPI, which the inline style doesn't show.
+            const style = fade ? getComputedStyle(fade) : null
+            const matrix = style?.transform.match(/^matrix\(([-\d.e]+)/)
             w.nestedLog.push({
                 t: performance.timeOrigin + performance.now(),
-                fadeOpacity: fade && fade.style.opacity !== '' ? Number(fade.style.opacity) : null,
-                fadeScale: fade ? (scale ? Number(scale[1]) : 1) : null,
+                fadeOpacity: style ? Number(style.opacity) : null,
+                fadeScale: style ? (matrix ? Number(matrix[1]) : 1) : null,
                 cloneConnected: !!document.querySelector('[data-clone].lightbox'),
                 innerDone
             })

@@ -2694,6 +2694,40 @@ describe('presence in shared layout (plan 012)', () => {
         clone.remove()
     })
 
+    it('A2: a departing lead refreshed under a translated ancestor still hands over where it was drawn', () => {
+        // The ancestor is drawn 50px right by its own `x`; the lead sits in it.
+        const parentElement = document.createElement('div')
+        document.body.appendChild(parentElement)
+        vi.spyOn(parentElement, 'getBoundingClientRect').mockReturnValue(
+            new DOMRect(0, 0, 400, 100)
+        )
+        const parentAdapter = new MotionDomProjectionAdapter()
+        parentAdapter.updateOptions({ layout: true })
+        parentAdapter.mount(parentElement)
+        mounted.push(parentAdapter)
+        parentAdapter.projection.latestValues.x = 50
+        parentElement.style.transform = 'translateX(50px)'
+        const element = document.createElement('div')
+        parentElement.appendChild(element)
+        // Drawn with the ancestor's translate unless it is stripped.
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() =>
+            !element.isConnected
+                ? new DOMRect()
+                : new DOMRect(parentElement.style.transform === 'none' ? 100 : 150, 0, 100, 50)
+        )
+        const lead = new MotionDomProjectionAdapter({ parent: parentAdapter })
+        lead.updateOptions({ layoutId: 'a2-refresh' })
+        lead.mount(element)
+        mounted.push(lead)
+        // An own, stripped read (part D's exit-complete refresh does one).
+        lead.refreshLayout({ silent: true })
+        element.remove()
+        lead.unmount()
+
+        expect(lead.projection.snapshot?.measuredBox.x.min).toBe(150)
+        expect(lead.projection.snapshot?.layoutBox.x.min).toBe(100)
+    })
+
     it('9f: an adapter never given a presence unmounts as before', () => {
         const { adapter: a, element } = mount('p9f', new DOMRect(10, 0, 100, 50))
         const unmountVisualElement = vi.spyOn(a.visualElement, 'unmount')
