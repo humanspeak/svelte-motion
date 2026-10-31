@@ -262,3 +262,66 @@ test.describe('held clone placement (plan 012, 3d)', () => {
         })
     }
 })
+
+/**
+ * Plan 012 A3: a `layoutId` shape interrupted mid transform-enter
+ * (`scaleX` 0 → 1 over 1 s, linear) by a switch to another slot. In the
+ * framer-motion 14.7.1 repro the held shape follows the new one on every
+ * frame (the projection owns its transform: `willUpdate` demotes the
+ * compositor enter, create-projection-node.ts:129-131, 744-750), the new one
+ * starts from where the old one was drawn, and the old one fades out and is
+ * removed when the 1 s shared animation ends.
+ */
+for (const [suffix, query] of [
+    ['', ''],
+    [' (owned)', '&owned=true']
+] as const) {
+    test(`a crossfade interrupting a transform enter: the held shape follows the new one${suffix}`, async ({
+        page
+    }) => {
+        await page.setViewportSize({ width: 1000, height: 660 })
+        await page.goto(`${URL}&probe=switch${query}`)
+        await expect(page.locator('[data-hydrated]')).toBeAttached()
+        await page.waitForTimeout(100)
+        await page.locator('#start').click()
+        // ~40% into the 1 s enter.
+        await page.waitForTimeout(400)
+        const { frames, hits } = await recordPainted(
+            page,
+            () => page.locator('#switch').click(),
+            1500,
+            [],
+            ['#shape-a', '#shape-b']
+        )
+        expect(frames.length).toBeGreaterThan(0)
+        const before = hits.filter((hit) => hit.rects[0] && !hit.rects[1])
+        const both = hits.filter((hit) => hit.rects[0] && hit.rects[1])
+        expect(before.length).toBeGreaterThan(0)
+        expect(both.length).toBeGreaterThan(30)
+        // The old shape sits on the new one in every frame.
+        for (const hit of both) {
+            const [a, b] = [hit.rects[0]!, hit.rects[1]!]
+            expect(
+                Math.abs(a.left - b.left) <= 1 &&
+                    Math.abs(a.top - b.top) <= 1 &&
+                    Math.abs(a.width - b.width) <= 1,
+                `at ${hit.t.toFixed(0)}ms: ${JSON.stringify([a, b])}`
+            ).toBe(true)
+        }
+        // The new one starts where the old one was drawn, mid-enter.
+        const last = before[before.length - 1].rects[0]!
+        const first = both[0].rects[1]!
+        expect(last.width).toBeGreaterThan(40)
+        expect(first.width).toBeGreaterThanOrEqual(last.width - 2)
+        expect(first.width).toBeLessThanOrEqual(last.width + 20)
+        // The old one fades out and goes when the shared animation ends.
+        const opacities = both.map((hit) => hit.opacities[0]!)
+        for (let i = 1; i < opacities.length; i++) {
+            expect(opacities[i]).toBeLessThanOrEqual(opacities[i - 1] + 0.02)
+        }
+        expect(hits.filter((hit) => hit.t > 1300).every((hit) => !hit.rects[0])).toBe(true)
+        const end = hits[hits.length - 1].rects[1]!
+        expect(Math.abs(end.left - 500)).toBeLessThanOrEqual(1)
+        expect(Math.abs(end.width - 200)).toBeLessThanOrEqual(1)
+    })
+}

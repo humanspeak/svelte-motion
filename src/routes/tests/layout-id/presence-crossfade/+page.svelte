@@ -32,6 +32,11 @@
     // (3d-i), `?probe=styles` (3d-ii), `?probe=margin` (3d-iii),
     // `?probe=values` (3d-iv), `?probe=transform`, `?probe=filter` and
     // `?probe=backdrop` (3d-v).
+    //
+    // `?probe=switch` (plan 012 A3): a `layoutId` shape interrupted mid
+    // transform-enter (`scaleX` 0 → 1 over 1 s) by a switch to another slot;
+    // the held shape must follow the new one on every frame, as in the
+    // framer-motion 14.7.1 repro. `&owned=true` uses `present` + `child`.
 
     const params = page.url.searchParams
     const owned = params.get('owned') === 'true'
@@ -74,6 +79,7 @@
     const removeProbe = () => (probeShown = false)
     const probeExit = { opacity: 0, transition: { duration: 1 } }
     const enterTransition = { duration: 1, ease: 'linear' as const }
+    let switchSlot = $state<'none' | 'a' | 'b'>('none')
 
     // ---- Live verdict (tester only) ----
     //
@@ -164,7 +170,40 @@
 {#if probe}
     <!-- Outside the fixed fixture: 3d-iii needs no positioned ancestor. -->
     <div class="probes" data-probe={probe} data-hydrated={hydrated || undefined}>
-        {#if probe === 'enter'}
+        {#snippet switchShape(s: 'a' | 'b')}
+            <motion.div
+                key={s}
+                id="shape-{s}"
+                layoutId="switch-shape"
+                initial={s === 'a' ? { scaleX: 0 } : false}
+                animate={{ scaleX: 1 }}
+                transition={enterTransition}
+                style="width: 200px; height: 40px; background: {s === 'a' ? '#09f' : '#f09'};"
+            />
+        {/snippet}
+        {#if probe === 'switch'}
+            <div class="switch-stage">
+                {#each ['a', 'b'] as const as s (s)}
+                    <div class="switch-slot switch-{s}">
+                        {#if owned}
+                            <AnimatePresence present={switchSlot === s}>
+                                {#snippet child()}
+                                    {@render switchShape(s)}
+                                {/snippet}
+                            </AnimatePresence>
+                        {:else}
+                            <AnimatePresence>
+                                {#if switchSlot === s}
+                                    {@render switchShape(s)}
+                                {/if}
+                            </AnimatePresence>
+                        {/if}
+                    </div>
+                {/each}
+                <button id="start" type="button" onclick={() => (switchSlot = 'a')}>start</button>
+                <button id="switch" type="button" onclick={() => (switchSlot = 'b')}>switch</button>
+            </div>
+        {:else if probe === 'enter'}
             <div class="probe-row">
                 <AnimatePresence>
                     {#if probeShown}
@@ -358,6 +397,32 @@
     .probes {
         width: 100%;
         align-self: flex-start;
+    }
+    .switch-stage {
+        position: fixed;
+        inset: 0;
+        background: white;
+    }
+    .switch-slot {
+        position: absolute;
+        width: 200px;
+        height: 40px;
+    }
+    .switch-a {
+        left: 100px;
+        top: 100px;
+    }
+    .switch-b {
+        left: 500px;
+        top: 300px;
+    }
+    .switch-stage #start,
+    .switch-stage #switch {
+        position: absolute;
+        top: 500px;
+    }
+    .switch-stage #switch {
+        left: 100px;
     }
     .probe-row {
         display: flex;

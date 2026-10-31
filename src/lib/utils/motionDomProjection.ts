@@ -1064,6 +1064,15 @@ export class MotionDomProjectionAdapter {
         // still attached (`unmount` → `willUpdate`, create-projection-node.ts
         // 668-678), from cache: Svelte has already detached it.
         if (projection.options.layoutId) {
+            // Mid transform animation (an interrupted enter), the cached box
+            // no longer shows its transforms: upstream measures the node live
+            // (`unmount` → `willUpdate`, create-projection-node.ts 668-678 @
+            // v14.7.1). The clone stands in its slot, so read it there, and
+            // the snapshot applies the current transforms (plan 012 A3).
+            if (this.isAnimatingTransform()) {
+                this.rehome(original, clone)
+                this.refreshLayout({ silent: true })
+            }
             this.seedDepartingLeadSnapshot(original)
         } else {
             const root = projection.root
@@ -1073,7 +1082,7 @@ export class MotionDomProjectionAdapter {
         // 2. `projection.isPresent = isPresent` (MeasureLayout.tsx:163).
         projection.isPresent = false
         // 3. Re-point the node and its renderer at the clone.
-        this.rehome(original, clone)
+        if (!this.handOff) this.rehome(original, clone)
         this.pendingRelease = release
         // 4. Relegate, update, lead check.
         this.relegateAndCommit()
@@ -1086,6 +1095,14 @@ export class MotionDomProjectionAdapter {
      */
     get measuresLayout(): boolean {
         return !!(this.layout || this.layoutId || this.projection.options.alwaysMeasureLayout)
+    }
+
+    /** Whether any of the VisualElement's transform values is animating. */
+    private isAnimatingTransform(): boolean {
+        for (const key of transformPropOrder) {
+            if (this.visualElement.getValue(key)?.isAnimating()) return true
+        }
+        return false
     }
 
     /** Re-point the node, its renderer and this adapter at `clone`; defer `unmount()`. */

@@ -1000,6 +1000,12 @@ const isExitArtifact = (element: Element) =>
 
 type ExitAnimationState = { setActive(type: 'exit', isActive: boolean): Promise<unknown> }
 
+/** Whether a WAAPI animation animates `transform`. */
+const hasTransformKeyframes = (animation: Animation): boolean =>
+    !!(animation.effect as KeyframeEffect | null)
+        ?.getKeyframes()
+        .some((keyframe) => 'transform' in keyframe)
+
 /**
  * Keep an exiting element's running animations going on its held clone (plan
  * 012 A2), as upstream keeps animating the exiting element itself.
@@ -1025,11 +1031,14 @@ type ExitAnimationState = { setActive(type: 'exit', isActive: boolean): Promise<
  * @param element The detached element, still the VisualElement's `current`.
  * @param clone Its exit clone, connected.
  * @param animations The element's animations at its last animating frame.
+ * @param sharedLayout The element has a `layoutId`: its node relegates, so
+ *     its accelerated transforms move to the main thread instead (plan 012 A3).
  */
 const continueAnimationsOnClone = (
     element: HTMLElement,
     clone: HTMLElement,
-    animations: Animation[]
+    animations: Animation[],
+    sharedLayout = false
 ): void => {
     const running = animations.filter(
         (animation) =>
@@ -1037,6 +1046,35 @@ const continueAnimationsOnClone = (
             (animation.effect as KeyframeEffect | null)?.target === element
     )
     if (!running.length) return
+    if (sharedLayout && running.some(hasTransformKeyframes)) {
+        // A `layoutId` node relegates and follows the new lead, so the
+        // projection owns its transform: upstream's `willUpdate` moves the
+        // node's accelerated transforms to the main thread before it is
+        // measured (`demoteTransforms`, create-projection-node.ts:129-131,
+        // 744-750 @ v14.7.1), and they then render through the node. A new
+        // `onUpdate` does that here (`VisualElement.update`), while the
+        // VisualElement's `current` is still the element its group is keyed
+        // by; their motion values are synced from the compositor first.
+        const visualElement = visualElementStore.get(element) as
+            | {
+                  getProps(): Record<string, unknown>
+                  presenceContext: unknown
+                  update(props: unknown, presenceContext: unknown): void
+              }
+            | undefined
+        if (visualElement && !visualElement.getProps().onUpdate) {
+            const props = visualElement.getProps()
+            const context = visualElement.presenceContext
+            visualElement.update({ ...props, onUpdate: () => {} }, context)
+            visualElement.update(props, context)
+        }
+        for (const animation of running) {
+            if (hasTransformKeyframes(animation)) continue
+            const effect = animation.effect as KeyframeEffect
+            if (effect.target === element) effect.target = clone
+        }
+        return
+    }
     const transforms: KeyframeEffect[] = []
     for (const animation of running) {
         const effect = animation.effect as KeyframeEffect
@@ -2646,7 +2684,12 @@ export const createAnimatePresenceContext = (context: {
             // enter) move to the clone with their timing, as upstream keeps
             // animating the exiting element itself. A Motion `stop()` still
             // reaches them: it holds the same Animation objects.
-            continueAnimationsOnClone(exitingElement, clone, child.lastAnimations ?? [])
+            continueAnimationsOnClone(
+                exitingElement,
+                clone,
+                child.lastAnimations ?? [],
+                exitingElement.hasAttribute('data-layout-id')
+            )
             // Plan 012: hand the node to the clone, after the #2348
             // correction was queued, so the node's update pass measures the
             // corrected clone (its root update queues after the correction).
