@@ -28,11 +28,13 @@
     // - Upstream's `AnimatePresence` child is `SingleImage`, a plain component
     //   holding the overlay and the nested motion nodes. Only the owned syntax
     //   (`present` + `child`) can express that in Svelte, so this port uses it.
-    // - Upstream keys `SingleImage` by the open colour; it can't change while
-    //   the lightbox is open in this fixture, so the key is dropped.
-    // - A snippet reads live state, where upstream re-renders an exiting
-    //   child with its last props: `open` goes `false` while the lightbox is
-    //   held, so `SingleImage` reads `shownColor`, latched while open.
+    // - Upstream keys `SingleImage` by the open colour, so opening another
+    //   colour while one is still closing exits the old lightbox and enters a
+    //   new one (both on screen). An owned boundary can't be keyed, so there
+    //   is one boundary per colour, each present while its colour is open:
+    //   the same keyed semantics. Each passes its own colour, so the held
+    //   lightbox keeps the colour it was shown with (upstream re-renders an
+    //   exiting child with its last props).
     // - Tailwind's preflight makes every box `border-box`; the fixture resets
     //   it to the browser default upstream's dev harness has.
     // - `?partial-ease` and `?type` (only used by upstream's commented-out
@@ -89,6 +91,13 @@
                 verdict = 'watching'
                 readout = null
             }
+            if (!wasOpen && isOpen && closedAt !== null) {
+                // Another colour opened while one was closing: the verdict
+                // only judges a plain close.
+                closedAt = null
+                verdict = 'waiting'
+                readout = 'opened again while closing (not judged)'
+            }
             wasOpen = isOpen
             if (closedAt === null) return
             const elapsed = (now - closedAt) / 1000
@@ -113,10 +122,6 @@
         raf = requestAnimationFrame(sample)
         return () => cancelAnimationFrame(raf)
     })
-    let shownColor = $state(colors[0])
-    $effect.pre(() => {
-        if (open !== false) shownColor = open
-    })
 
     const steps: TesterStep[] = [
         {
@@ -134,6 +139,11 @@
             text: 'Try the green and blue items too, then click "instant" next to the chip and repeat.',
             expected:
                 'The same for each colour. With instant there is no animation: the card appears and disappears at once, and the item is back straight away.'
+        },
+        {
+            text: 'Open red, close it, and click green straight away while the red card is still shrinking.',
+            expected:
+                'Two cards at once, as upstream: the red card keeps shrinking into the red item and fades, while a new card grows out of the green item. Nothing snaps.'
         }
     ]
 </script>
@@ -183,11 +193,13 @@
             </motion.li>
         {/each}
     </ul>
-    <AnimatePresence present={open !== false}>
-        {#snippet child()}
-            <SingleImage color={shownColor} {transition} close={() => (open = false)} />
-        {/snippet}
-    </AnimatePresence>
+    {#each colors as color (color)}
+        <AnimatePresence present={open === color}>
+            {#snippet child()}
+                <SingleImage {color} {transition} close={() => (open = false)} />
+            {/snippet}
+        </AnimatePresence>
+    {/each}
 </div>
 
 <TesterPanel
