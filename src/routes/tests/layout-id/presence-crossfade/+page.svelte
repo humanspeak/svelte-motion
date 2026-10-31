@@ -2,6 +2,7 @@
     import { page } from '$app/state'
     import { AnimatePresence, motion } from '$lib'
     import { onMount } from 'svelte'
+    import { SvelteURLSearchParams } from 'svelte/reactivity'
     import TesterPanel, { type TesterStep } from '../../layout/_parity/TesterPanel.svelte'
 
     // Port of upstream motion `dev/react/src/tests/layout-shared-animate-presence.tsx`
@@ -26,7 +27,12 @@
     //   (its id, style and `animate` entry).
     // - `?solo=<n>` renders only shape n, at rest, for the spec's colour
     //   calibration.
-    // - `?duration=<s>` (default 10, as upstream) sets the transition length.
+    // - Only the specs (`@isPlaywright=true`) run upstream's frozen 10 s
+    //   transition. A human tester gets a 6 s linear one to watch, and the
+    //   probes run 6 times slower (`?slow=<n>`); `?ease=frozen` restores
+    //   upstream's. `?duration=<s>` sets the length either way.
+    // - The third shape stops 360px short of the right edge for a human
+    //   tester, so the TesterPanel doesn't cover it.
     //
     // Plan 012 placement probes (3d), each a separate fixture: `?probe=enter`
     // (3d-i), `?probe=styles` (3d-ii), `?probe=margin` (3d-iii),
@@ -39,7 +45,19 @@
     // framer-motion 14.7.1 repro. `&owned=true` uses `present` + `child`.
 
     const params = page.url.searchParams
+    const isPlaywright = params.get('@isPlaywright') === 'true'
     const owned = params.get('owned') === 'true'
+    // A URL for this page with some params changed, keeping the tester's
+    // others (`null` removes one).
+    const hrefWith = (changes: Record<string, string | null>) => {
+        const next = new SvelteURLSearchParams(params)
+        for (const [key, value] of Object.entries(changes)) {
+            if (value === null) next.delete(key)
+            else next.set(key, value)
+        }
+        const query = next.toString()
+        return query ? `?${query}` : '?'
+    }
     const solo = params.get('solo')
     const probe = params.get('probe')
 
@@ -56,9 +74,15 @@
         else shownB = count
     })
 
-    // `?duration=<s>` changes only the shared transition's length (plan 012
-    // A1), so the specs can check the release without waiting 10 s.
-    const transition = { duration: Number(params.get('duration') ?? 10), ease: () => 0.25 }
+    // The specs (`@isPlaywright=true`) run upstream's transition: 10 s, frozen
+    // a quarter of the way in by `ease: () => 0.25`. A human tester gets a
+    // watchable 6 s linear crossfade instead; `?ease=frozen` restores
+    // upstream's. `?duration=<s>` sets the length either way (plan 012 A1:
+    // the specs check the release with a short one).
+    const frozen =
+        params.get('ease') === 'frozen' || (isPlaywright && params.get('ease') !== 'linear')
+    const duration = Number(params.get('duration') ?? (isPlaywright ? 10 : 6))
+    const transition = { duration, ease: frozen ? () => 0.25 : ('linear' as const) }
 
     const animate = [
         { backgroundColor: '#09f', borderRadius: 10, opacity: 1 },
@@ -67,88 +91,131 @@
         { backgroundColor: '#9f0', borderRadius: 50, opacity: 0.5 }
     ]
 
+    // Upstream puts shape 2 at the window's right edge. For a human tester that
+    // is under the 360px TesterPanel, so it stops short of the panel; the specs
+    // (`@isPlaywright=true`, panel hidden) keep upstream's value.
+    const rightEdge = isPlaywright ? 'calc(100vw - 100px)' : 'calc(100vw - 460px)'
+
     const styles: Record<string, string | number>[] = [
         { width: 100, height: 100, top: 100 },
         { width: 200, height: 200, left: 100 },
-        { width: 100, height: 100, left: 'calc(100vw - 100px)' },
+        { width: 100, height: 100, left: rightEdge },
         { width: 200, height: 200 }
     ]
 
     // ---- Placement probes (plan 012, 3d) ----
     let probeShown = $state(true)
     const removeProbe = () => (probeShown = false)
-    const probeExit = { opacity: 0, transition: { duration: 1 } }
-    const enterTransition = { duration: 1, ease: 'linear' as const }
+    // `?slow=<n>` stretches the probes' timings n times so they can be
+    // watched. A human tester gets 6 by default; the specs run at 1.
+    const slow = Number(params.get('slow') ?? (isPlaywright ? 1 : 6))
+    const probeExit = { opacity: 0, transition: { duration: slow } }
+    const enterTransition = { duration: slow, ease: 'linear' as const }
     let switchSlot = $state<'none' | 'a' | 'b'>('none')
 
     // ---- Live verdict (tester only) ----
     //
-    // After a click, sample the frame for 600 ms: both shapes must stay
-    // mounted (the old one is held without an `exit`), and the point at the
-    // new shape's centre must hit the new shape (the old one paints under
-    // it, as upstream renders the exiting child first).
-    type Verdict = 'waiting' | 'sampling' | 'held' | 'removed' | 'on-top'
+    // After a click, watch every frame until the old shape is released (or
+    // the shared animation plus 2 s has passed):
+    // - both shapes stay mounted while the shared animation runs (the old
+    //   one is held without an `exit`);
+    // - the point at the new shape's centre hits the new shape (the old one
+    //   paints under it, as upstream renders the exiting child first);
+    // - the old shape is released once the animation ends.
+    // With the frozen ease the animation never visibly ends, so the verdict
+    // is given after 600 ms.
+    type Verdict = 'waiting' | 'watching' | 'ok' | 'removed' | 'on-top' | 'stuck'
     let verdict = $state<Verdict>('waiting')
     let readout = $state<string | null>(null)
 
     onMount(() => {
         hydrated = true
-        if (window.location.search.includes('@isPlaywright=true')) return
+        if (isPlaywright || probe) return
         let last = count
         let raf = 0
         let watching: { from: number; to: number; start: number } | null = null
-        let bothFrames = 0
-        let frames = 0
         let onTop = false
+        const finish = (next: Verdict, text: string) => {
+            verdict = next
+            readout = text
+            watching = null
+        }
         const sample = () => {
             raf = requestAnimationFrame(sample)
             const now = performance.now()
             if (count !== last) {
                 watching = { from: last, to: count, start: now }
                 last = count
-                bothFrames = 0
-                frames = 0
                 onTop = false
-                verdict = 'sampling'
+                verdict = 'watching'
+                readout = null
             }
             if (!watching) return
-            frames++
+            const elapsed = (now - watching.start) / 1000
             const old = document.getElementById(`shape-${watching.from}`)
             const next = document.getElementById(`shape-${watching.to}`)
-            if (old && next) bothFrames++
             if (next) {
                 const r = next.getBoundingClientRect()
                 const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
                 if (hit && hit.closest('[id]')?.id === `shape-${watching.from}`) onTop = true
             }
-            if (now - watching.start > 600) {
-                verdict = onTop ? 'on-top' : bothFrames === frames ? 'held' : 'removed'
-                readout = `both mounted in ${bothFrames}/${frames} frames`
-                watching = null
+            if (onTop) return finish('on-top', 'the old shape painted over the new one')
+            if (frozen) {
+                if (elapsed > 0.6)
+                    finish(old ? 'ok' : 'removed', old ? 'held (frozen ease)' : 'removed at once')
+                return
+            }
+            if (!old) {
+                if (elapsed < duration * 0.95)
+                    finish('removed', `removed after ${elapsed.toFixed(1)} s, before the end`)
+                else finish('ok', `held ${elapsed.toFixed(1)} s, then released`)
+            } else if (elapsed > duration + 2) {
+                finish('stuck', `still mounted ${elapsed.toFixed(1)} s later`)
+            } else {
+                readout = `held ${elapsed.toFixed(1)} s…`
             }
         }
         raf = requestAnimationFrame(sample)
         return () => cancelAnimationFrame(raf)
     })
 
-    const steps: TesterStep[] = [
+    const watchSteps: TesterStep[] = [
         {
-            text: 'Click the blue square.',
-            expected:
-                'A purple 200px square appears and the blue square stays mounted, sitting on it with the two colours blended (the animation is frozen a quarter of the way in). The chip reads HELD ✓.',
+            text: 'Click the blue square (or the button), then watch for the whole animation.',
+            expected: `Over ${duration} s the shape grows into a pale purple circle. The blue square travels with it, sitting exactly on top, and fades out by the end. The chip reads HELD ✓ "held ${duration}.0 s, then released".`,
             action: { label: 'Click the shape', run: cycle }
         },
         {
-            text: 'Click again, and twice more.',
+            text: 'Click three more times, letting each animation finish.',
             expected:
-                'Each click leaves the previous shape mounted under the new one, blended with it. HELD ✓ every time, never REMOVED or ON TOP.',
+                'A small pink square near the panel, then a pale green circle, then back to blue. Each time the previous shape rides on top of the new one and fades out at the end. Never REMOVED, ON TOP or STUCK.',
             action: { label: 'Click the shape', run: cycle }
         },
         {
-            text: 'Open the owned variant (link below) and repeat.',
-            expected: 'The same: HELD ✓ for every click.'
+            text: 'Click "switch to owned" next to the chip, and repeat steps 1–2.',
+            expected: 'The same as the default (clone) syntax.'
+        },
+        {
+            text: 'Click "mid-enter case" next to the chip.',
+            expected: 'That page has its own steps.'
         }
     ]
+    const switchSteps: TesterStep[] = [
+        {
+            text: 'Click "start" on the left.',
+            expected: `A blue bar grows from nothing to full width over ${slow} s.`
+        },
+        {
+            text: 'While it is still growing (about halfway), click "switch".',
+            expected:
+                "A pink bar takes over. It starts at the blue bar's size and place, never from zero width, and moves to its slot. The blue bar travels with it, on top, and fades out by the end."
+        },
+        {
+            text: 'Reload, click "switch to owned", and repeat.',
+            expected: 'The same.'
+        }
+    ]
+    const steps = probe === 'switch' ? switchSteps : watchSteps
 </script>
 
 <svelte:head>
@@ -354,24 +421,41 @@
     {steps}
 >
     {#snippet summary()}
-        <span
-            class="verdict {verdict === 'held'
-                ? 'ok'
-                : verdict === 'waiting' || verdict === 'sampling'
-                  ? 'na'
-                  : 'bad'}"
-        >
-            {verdict === 'held'
-                ? 'HELD ✓'
-                : verdict === 'removed'
-                  ? 'REMOVED ✗'
-                  : verdict === 'on-top'
-                    ? 'ON TOP ✗'
-                    : verdict === 'sampling'
-                      ? 'SAMPLING'
-                      : 'WAITING'}
+        {#if !probe}
+            <span
+                class="verdict {verdict === 'ok'
+                    ? 'ok'
+                    : verdict === 'waiting' || verdict === 'watching'
+                      ? 'na'
+                      : 'bad'}"
+            >
+                {verdict === 'ok'
+                    ? 'HELD ✓'
+                    : verdict === 'removed'
+                      ? 'REMOVED ✗'
+                      : verdict === 'on-top'
+                        ? 'ON TOP ✗'
+                        : verdict === 'stuck'
+                          ? 'STUCK ✗'
+                          : verdict === 'watching'
+                            ? 'WATCHING'
+                            : 'WAITING'}
+            </span>
+            {#if readout}<span class="readout">{readout}</span>{/if}
+        {/if}
+        <span class="variants">
+            {#if owned}
+                Owned · <a href={hrefWith({ owned: null })}>switch to clone</a>
+            {:else}
+                Clone · <a href={hrefWith({ owned: 'true' })}>switch to owned</a>
+            {/if}
+            ·
+            {#if probe === 'switch'}
+                <a href={hrefWith({ probe: null })}>back to the crossfade</a>
+            {:else}
+                <a href={hrefWith({ probe: 'switch' })}>mid-enter case</a>
+            {/if}
         </span>
-        {#if readout}<span class="readout">{readout}</span>{/if}
     {/snippet}
     {#snippet checks()}
         <p>
@@ -379,13 +463,18 @@
             shared animation completes, even without an <code>exit</code> prop: it is relegated in its
             stack, follows the new element and fades out while the new one fades in.
         </p>
-        <p>
-            Variants: <a href="?owned=true">owned</a> · <a href="?">clone (default)</a>
-        </p>
     {/snippet}
 </TesterPanel>
 
 <style>
+    .variants {
+        margin-left: 0.75rem;
+        font-size: 0.8rem;
+    }
+    .variants a {
+        color: #2563eb;
+        text-decoration: underline;
+    }
     .fixture {
         position: fixed;
         inset: 0;
