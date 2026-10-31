@@ -2627,6 +2627,8 @@ describe('presence in shared layout (plan 012)', () => {
         await flush()
         await frames(3)
         a.projection.getStack()!.exitAnimationComplete()
+        // The release runs in a microtask of its own (plan 012 A2).
+        await flush()
         expect(release).toHaveBeenCalledTimes(2)
     })
 

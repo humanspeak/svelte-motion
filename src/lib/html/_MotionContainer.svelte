@@ -2863,6 +2863,64 @@
         measuredBeforeLayoutIdChange = measured
     })
 
+    // ── Presence in shared layout (plan 012, P1/P2) ─────────────────────────
+    //
+    // Upstream `MeasureLayout` uses `usePresence()` (MeasureLayout.tsx:246-260
+    // @ v14.7.1): it registers with its `PresenceChild` (use-presence.ts:52-57)
+    // so an exiting element is held until `safeToRemove`, and on a presence
+    // flip it relegates or promotes the node (getSnapshotBeforeUpdate 163,
+    // 177-201) and runs the root update (componentDidUpdate 206-217). This is
+    // the owned path (`present` + `child`), where the element stays mounted;
+    // direct children hand their node to the exit clone instead (P3).
+    const measureParticipantId = `measure-${componentHydrationId}`
+
+    // P2: one participant while `MeasureLayout` would be rendered. A
+    // featureless `m` has no node, so it registers nothing (plan 016).
+    $effect(() => {
+        const presence = presenceChildContext
+        if (!presence || !measureLayoutMounted || !visualElement || !motionDomProjection) return
+        if (!motionDomProjection.isMounted) return
+        return untrack(() => presence.register(measureParticipantId))
+    })
+
+    // P1: the flip, pre-update then post-update, after the `layoutId` switch
+    // pair above (and after 015c's R2 once it lands, so its snapshot wins:
+    // `willUpdate()` returns for a node that is already dirty).
+    let lastSeenPresence: boolean | undefined
+    let presenceFlipPending = false
+    $effect.pre(() => {
+        const isPresent = presenceChildContext?.isPresent
+        const adapter = motionDomProjection
+        if (!presenceChildContext || isPresent === undefined || !visualElement || !adapter) return
+        if (!adapter.isMounted) return
+        untrack(() => {
+            // The first run with a mounted adapter is the mount, not a flip
+            // (`getSnapshotBeforeUpdate` only compares with `prevProps`).
+            const previous = lastSeenPresence
+            lastSeenPresence = isPresent
+            if (previous === undefined || previous === isPresent || !measureLayoutMounted) return
+            // This cycle's versioned completion, captured now.
+            const onExitComplete = presenceChildContext.onExitComplete
+            adapter.setPresence(isPresent, () => {
+                if (!isPresent) onExitComplete(measureParticipantId)
+            })
+            presenceFlipPending = true
+        })
+    })
+    $effect(() => {
+        const isPresent = presenceChildContext?.isPresent
+        const adapter = motionDomProjection
+        if (!adapter) return
+        untrack(() => {
+            // The adapter mounts in a user effect, after the pre effect's
+            // first run: the first presence seen with it mounted is here.
+            if (lastSeenPresence === undefined && adapter.isMounted) lastSeenPresence = isPresent
+            if (!presenceFlipPending) return
+            presenceFlipPending = false
+            adapter.commitPresence()
+        })
+    })
+
     // Cancel a pending reactive commit when the component tears down.
     $effect(() => {
         return () => {

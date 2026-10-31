@@ -950,6 +950,65 @@ export class MotionDomProjectionAdapter {
         })
     }
 
+    /** Set by {@link setPresence}, consumed by {@link commitPresence}. */
+    private presenceFlipPending = false
+
+    /**
+     * The pre-update half of a presence flip, for an element that stays
+     * mounted while it exits (the owned `present` + `child` path).
+     *
+     * Port of upstream `MeasureLayout.getSnapshotBeforeUpdate` (163, 177-201
+     * @ v14.7.1): `projection.isPresent = isPresent`, `willUpdate()`, then
+     * `promote()` on re-entry, or `relegate()` on exit (an earlier present
+     * member takes the lead), with the empty-stack release after this frame.
+     * Call {@link commitPresence} after the DOM update.
+     *
+     * @param isPresent The element's new presence.
+     * @param safeToRemove Called once when the exiting node may be removed
+     *     (upstream `usePresence`'s `safeToRemove`); ignored while present.
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * adapter.setPresence(false, () => onExitComplete(id))
+     * // ...after Svelte patched the DOM:
+     * adapter.commitPresence()
+     * ```
+     */
+    setPresence(isPresent: boolean, safeToRemove: () => void): void {
+        if (!this.element) return
+        const projection = this.projection
+        hasTakenAnySnapshot = true
+        projection.isPresent = isPresent
+        // A new cycle: arm the release on exit, disarm it on re-entry.
+        this.pendingRelease = isPresent ? null : safeToRemove
+        // Returns at once for a node that is already layout-dirty (737).
+        if (this.measuresLayout) projection.willUpdate()
+        if (isPresent) projection.promote()
+        else this.relegate()
+        this.presenceFlipPending = true
+    }
+
+    /**
+     * The post-update half of a presence flip (upstream
+     * `MeasureLayout.componentDidUpdate`, 206-217 @ v14.7.1): the root
+     * update, a render, and the lead check that releases an exiting node
+     * nothing animates.
+     *
+     * @returns Nothing.
+     *
+     * @example
+     * ```ts
+     * adapter.commitPresence()
+     * ```
+     */
+    commitPresence(): void {
+        if (!this.element || !this.presenceFlipPending) return
+        this.presenceFlipPending = false
+        this.commitExitUpdate()
+        this.refreshCachedLayout()
+    }
+
     /**
      * Keep this departing node alive on its exit clone (plan 012).
      *
