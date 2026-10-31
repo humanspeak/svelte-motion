@@ -2,6 +2,7 @@
     import { page } from '$app/state'
     import { AnimatePresence, motion } from '$lib'
     import { onMount } from 'svelte'
+    import { SvelteURLSearchParams } from 'svelte/reactivity'
     import type { MotionTransition } from '$lib/types'
     import TesterPanel, { type TesterStep } from '../../layout/_parity/TesterPanel.svelte'
     import SingleImage from './SingleImage.svelte'
@@ -18,8 +19,10 @@
     // and its dot are promoted again and the lightbox is held until they have
     // animated home.
     //
-    // ?instant=true uses `{ type: false }`; the default is `{ duration: 0.01 }`.
-    // ?duration=<s> sets another duration (plan 012 A1, for the painted close).
+    // ?instant=true uses `{ type: false }`. The specs (`@isPlaywright=true`)
+    // default to upstream's `{ duration: 0.01 }`; a human tester gets 1.5 s so
+    // the crossfade can be watched. ?duration=<s> sets another duration
+    // either way (plan 012 A1, for the painted close).
     //
     // Deviations:
     // - Upstream's `AnimatePresence` child is `SingleImage`, a plain component
@@ -35,13 +38,23 @@
     // - `?partial-ease` and `?type` (only used by upstream's commented-out
     //   switch spec) are not ported.
 
-    const instant = page.url.searchParams.get('instant') === 'true'
+    const params = page.url.searchParams
+    const isPlaywright = params.get('@isPlaywright') === 'true'
+    const instant = params.get('instant') === 'true'
     // `?duration=<s>` slows the shared transition so a spec can judge the
     // close from painted frames (plan 012 A1); not in upstream.
-    const duration = page.url.searchParams.get('duration')
-    const transition = (
-        instant ? { type: false } : { duration: duration ? Number(duration) : 0.01 }
-    ) as MotionTransition
+    const duration = Number(params.get('duration') ?? (isPlaywright ? 0.01 : 1.5))
+    const transition = (instant ? { type: false } : { duration }) as MotionTransition
+    // A URL for this page with some params changed (`null` removes one).
+    const hrefWith = (changes: Record<string, string | null>) => {
+        const next = new SvelteURLSearchParams(params)
+        for (const [key, value] of Object.entries(changes)) {
+            if (value === null) next.delete(key)
+            else next.set(key, value)
+        }
+        const query = next.toString()
+        return query ? `?${query}` : '?'
+    }
 
     const numColors = 3
     const makeColor = (hue: number) => `hsl(${hue}, 100%, 50%)`
@@ -52,7 +65,54 @@
     let open = $state<false | string>(false)
     // Set on mount, so the specs don't click before hydration.
     let hydrated = $state(false)
-    onMount(() => (hydrated = true))
+
+    // ---- Live verdict (tester only) ----
+    //
+    // After a close, watch every frame until the card is removed: the card
+    // must stay mounted while the red item grows back (it is held for the
+    // shared animation), and the red item must end fully visible.
+    type Verdict = 'waiting' | 'watching' | 'ok' | 'early' | 'hidden'
+    let verdict = $state<Verdict>('waiting')
+    let readout = $state<string | null>(null)
+    onMount(() => {
+        hydrated = true
+        if (isPlaywright) return
+        let wasOpen = open !== false
+        let closedAt: number | null = null
+        let raf = 0
+        const sample = () => {
+            raf = requestAnimationFrame(sample)
+            const now = performance.now()
+            const isOpen = open !== false
+            if (wasOpen && !isOpen) {
+                closedAt = now
+                verdict = 'watching'
+                readout = null
+            }
+            wasOpen = isOpen
+            if (closedAt === null) return
+            const elapsed = (now - closedAt) / 1000
+            if (document.getElementById('parent')) {
+                readout = `card held ${elapsed.toFixed(2)} s…`
+                return
+            }
+            const item = document.getElementById('item-parent')
+            const itemOpacity = item ? Number(getComputedStyle(item).opacity) : 0
+            if (!instant && elapsed < duration * 0.9) {
+                verdict = 'early'
+                readout = `card removed after ${elapsed.toFixed(2)} s, before the animation ended`
+            } else if (itemOpacity < 1) {
+                verdict = 'hidden'
+                readout = `red item left at opacity ${itemOpacity}`
+            } else {
+                verdict = 'ok'
+                readout = `card held ${elapsed.toFixed(2)} s, red item back`
+            }
+            closedAt = null
+        }
+        raf = requestAnimationFrame(sample)
+        return () => cancelAnimationFrame(raf)
+    })
     let shownColor = $state(colors[0])
     $effect.pre(() => {
         if (open !== false) shownColor = open
@@ -61,15 +121,19 @@
     const steps: TesterStep[] = [
         {
             text: 'Click the red gallery item.',
-            expected:
-                'A white rounded card with a black dot opens in the middle over a dark overlay. The red item underneath is hidden while the card leads its layoutId.',
+            expected: `Over ${instant ? 'no time' : `${duration} s`}, a white rounded card grows out of the red item into the middle, over a dark overlay, and the red item's dot grows into the card's black dot. The red item underneath is hidden while the card is open.`,
             action: { label: 'Open red', run: () => (open = colors[0]) }
         },
         {
             text: 'Click the dark overlay.',
             expected:
-                'The card closes back into the red item: the red item is visible again, square-cornered, with its translucent dot in the centre.',
+                "The card shrinks back into the red item while crossfading into it, and the dot shrinks back into the item's dot. Corners stay round (no stretched or squashed radius) all the way. At the end the red item is back, square-cornered, with its translucent dot. The chip reads HELD ✓.",
             action: { label: 'Close', run: () => (open = false) }
+        },
+        {
+            text: 'Try the green and blue items too, then click "instant" next to the chip and repeat.',
+            expected:
+                'The same for each colour. With instant there is no animation: the card appears and disappears at once, and the item is back straight away.'
         }
     ]
 </script>
@@ -132,6 +196,33 @@
     status="Plan 012: closing relegates the card and its dot back to the gallery item."
     {steps}
 >
+    {#snippet summary()}
+        <span
+            class="verdict {verdict === 'ok'
+                ? 'ok'
+                : verdict === 'waiting' || verdict === 'watching'
+                  ? 'na'
+                  : 'bad'}"
+        >
+            {verdict === 'ok'
+                ? 'HELD ✓'
+                : verdict === 'early'
+                  ? 'REMOVED EARLY ✗'
+                  : verdict === 'hidden'
+                    ? 'ITEM HIDDEN ✗'
+                    : verdict === 'watching'
+                      ? 'WATCHING'
+                      : 'WAITING'}
+        </span>
+        {#if readout}<span class="readout">{readout}</span>{/if}
+        <span class="variants">
+            {#if instant}
+                Instant · <a href={hrefWith({ instant: null })}>animated</a>
+            {:else}
+                {duration} s · <a href={hrefWith({ instant: 'true' })}>instant</a>
+            {/if}
+        </span>
+    {/snippet}
     {#snippet checks()}
         <p>
             Both the card and its dot have their own <code>layoutId</code>, as do the gallery item
@@ -139,11 +230,42 @@
             <code>MeasureLayout</code> does upstream. While the card is scaled, motion-dom's scale correctors
             keep the radii right.
         </p>
-        <p>Variants: <a href="?instant=true">instant</a> · <a href="?">0.01s (default)</a></p>
     {/snippet}
 </TesterPanel>
 
 <style>
+    .verdict {
+        display: inline-block;
+        margin-right: 0.25rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+    .verdict.ok {
+        background: #dcfce7;
+        color: #166534;
+    }
+    .verdict.bad {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    .verdict.na {
+        background: #f1f5f9;
+        color: #475569;
+    }
+    .readout {
+        font-size: 0.75rem;
+        color: #475569;
+    }
+    .variants {
+        margin-left: 0.75rem;
+        font-size: 0.8rem;
+    }
+    .variants a {
+        color: #2563eb;
+        text-decoration: underline;
+    }
     .lightbox-fixture,
     .lightbox-fixture :global(*) {
         box-sizing: content-box;
