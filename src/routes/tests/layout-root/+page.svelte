@@ -146,7 +146,10 @@
     let readout = $state<string | null>(null)
 
     const measureBefore = (): Before | null => {
-        const old = document.querySelector('.fixture-1935 .underline')
+        // The lead underline: the last one in document order. A held exiting
+        // underline (plan 012) can still be mounted before it.
+        const all = document.querySelectorAll('.fixture-1935 .underline')
+        const old = all[all.length - 1]
         const list = document.querySelector('.fixture-1935 ul')
         if (!old || !list) return null
         const box = old.getBoundingClientRect()
@@ -258,6 +261,11 @@
             expected:
                 'The sidebar goes, the bar jumps back right, and the underline slides one tab back (x 100 → 0 relative). MATCHES ✓.',
             action: { label: 'Select Tomato', run: () => testerSelect(tabs[0]) }
+        },
+        {
+            text: 'Open the exit=true variant, then exit=true&owned=true, and click Lettuce, then Tomato.',
+            expected:
+                'The old underline stays mounted and fades out sitting exactly on the new one as it slides (they read as one bar), then is removed when the slide ends. Every click reads MATCHES ✓. The owned variant (present + child) looks the same.'
         },
         {
             text: 'Open each variant link in the panel and click Lettuce, then Tomato, there.',
@@ -383,7 +391,7 @@
 <TesterPanel
     eyebrow="Motion 14.7.1 · #1935"
     title="Shared layoutId inside a layoutRoot"
-    status="Passes on this build (Motion 14.7.1). The exit=true crossfades wait for plan 012."
+    status="Passes on this build (Motion 14.7.1), the exit=true crossfades and the owned variants included (plan 012)."
     {steps}
 >
     {#snippet summary()}
@@ -424,6 +432,9 @@
             <a href="?layoutRoot=false&layout=position">layoutRoot=false&amp;layout=position</a> ·
             <a href="?layoutRoot=false&layout=size">layoutRoot=false&amp;layout=size</a> ·
             <a href="?innerX=80">innerX=80</a> ·
+            <a href="?exit=true">exit=true</a> ·
+            <a href="?exit=true&owned=true">exit=true&amp;owned=true</a> ·
+            <a href="?owned=true">owned</a> ·
             <a href="?">default</a>
         </p>
     {/snippet}

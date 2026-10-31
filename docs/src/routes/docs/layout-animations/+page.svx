@@ -80,9 +80,13 @@ The most common use case is a tab indicator that slides between tabs:
 ### How it works
 
 1. One element leads each `layoutId` at a time. A `layoutId` can change after mount: the element leaves its old id and joins the new one, as if it had unmounted and mounted again. Moving an id between mounted elements (`layoutId={selected ? 'highlight' : undefined}`) animates the new holder from the old one. An element that takes an id from one that is still on screen takes over instantly, and the other is hidden.
-2. When the old element unmounts, its bounding rect is captured.
+2. When the old element unmounts, its bounding rect is captured. Inside `AnimatePresence` it is held instead, and crossfades into the new one.
 3. When the new element mounts, it reads the stored rect and performs a FLIP animation from the old position to its own natural position.
 4. The animation uses the element's `transition` prop, or falls back to the previous element's transition.
+
+### Crossfading with `AnimatePresence`
+
+Inside `AnimatePresence`, the element that leaves a `layoutId` is held until the shared animation ends: it follows the new element and fades out while the new one fades in, as in Motion, even without an `exit` prop. See [AnimatePresence: Shared layout](/docs/animate-presence#shared-layout).
 
 ### Tabs without conditional rendering
 
@@ -187,6 +191,13 @@ Nested groups chain by default (`inherit={true}`), so a `<LayoutGroup id="inner"
 | `layoutId` | `string` | Shared identifier. Elements with matching `layoutId` animate between each other's positions. It can change after mount: the element moves to the new id's shared layout, animating from the previous holder, or taking over instantly from one still on screen. |
 
 `layoutId` works best inside `AnimatePresence`, which provides the registry that coordinates the snapshot/consume handoff.
+
+### Layout animation callbacks
+
+| Prop | Type | Description |
+|---|---|---|
+| `onLayoutAnimationStart` | `() => void` | Called when this element's layout animation starts, as in Motion. |
+| `onLayoutAnimationComplete` | `() => void` | Called when this element's layout animation completes, as in Motion. |
 
 ### `layoutRoot` and `layoutAnchor`
 
