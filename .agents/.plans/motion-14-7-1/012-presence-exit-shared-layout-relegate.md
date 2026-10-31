@@ -1852,3 +1852,44 @@ wins.
 - The test fixes in NC3–NC6: the `&` URLs, NC3's dot reading (the repro's `src/nested012.tsx` paints the dot fixed
   until release), the logged computed values, and timing from the removal frame.
 - Exit-complete-once `(owned)` failing in Step 2 is recorded. Step 4 must make it pass.
+
+### A3 (2026-10-31, operator-approved)
+
+Answers the guard's PASS-with-nits on `6c6ff86d`. The operator checked `tests/layout/group` live: both strips
+slide and crossfade within their own strip, and no underline crosses strips. Where this amendment and the body
+disagree, this amendment wins.
+
+**1. `e2e/layout/group.spec.ts` is in scope for one stale-test edit.**
+- "sibling LayoutGroups do not bridge a shared layoutId across the page" fails with a strict-mode error, because
+  during the crossfade the held old underline and the new one share `data-testid`. Upstream holds both too.
+- Read the newest underline in document order (`.last()`) for both `strip-a-underline` (`:55`) and
+  `strip-b-underline` (the sampling loop), as the #1935 cases do. Add a comment citing this amendment. Don't
+  change the thresholds or the sampling.
+
+**2. New case: crossfade interrupted mid transform-enter (guard nit 3). Red first.**
+- Risk: upstream's `willUpdate` demotes the exiting node's compositor transforms to the main thread, looking
+  them up by `node.instance` (`create-projection-node.ts:129-131, 744-750 @ v14.7.1`). After the re-home the
+  instance is the clone, and `presence.ts` re-attaches the moved transform animation after the read. So a held
+  `layoutId` clone interrupted mid transform-enter may keep its compositor transform over the crossfade.
+- Add a fixture to an existing in-scope page (preferably `presence-crossfade` or `layout-root`, behind a page
+  param): a `layoutId` underline or shape with `initial={{ scaleX: 0 }}` (or a scale enter), switched mid-enter.
+  Measure the same case in the repro at 4224 frame by frame first, and assert what upstream paints, on every
+  painted frame (`recordPainted`), on both syntaxes. Record whether it's RED on `6c6ff86d`.
+- If it's RED, fix it within 012's design. The likely fix is to demote or stop the moved transform animation
+  when the projection node takes over. More than one new mechanism is a STOP.
+
+**3. Root-cause the load-dependent drift (guard nit 1).**
+- `e2e/animate-presence/pop-layout-container-move.spec.ts:290`, the "(owned) … transform-centred container"
+  case, drifted 38.86 px (limit < 1 px) in the full guard set, and passed 12/12 alone.
+- Find out why. Run it under load (the full guard set, or `--workers` high with `--repeat-each`). If the drift
+  comes from 012's owned flip, its queued commit or the release microtask, fix it. If it reproduces on
+  `a22c7332` (before 012), report it with evidence and leave it. Don't loosen the limit or add retries.
+
+**4. Accepted guard notes.**
+- The `rememberLayoutBox` keeps-transforms flag change in 015a's `refreshLayout` and `measurePageRect`
+  (`motionDomProjection.ts:792, :1585`) is accepted as A2.3's fix.
+- Moved animations run to their natural end on a released clone, as upstream's detached element does.
+- The removed per-frame `card painted` check in `open-change.spec.ts` is accepted: the new lead paints over the
+  held card, as upstream does. Held count, the fall in opacity and the removal timing still enforce A1.1.
+
+**5. Then re-run the plan's guard set with its exact command and report its totals.**
