@@ -1893,3 +1893,23 @@ disagree, this amendment wins.
   held card, as upstream does. Held count, the fall in opacity and the removal timing still enforce A1.1.
 
 **5. Then re-run the plan's guard set with its exact command and report its totals.**
+
+### A4 (2026-10-31, operator-reported at sign-off)
+
+The operator found a bug while signing off `tests/layout-id/lightbox-crossfade` (lane `77a43596`): **open red → close
+→ open red → close breaks on the second close.** The first cycle is right, and so is the second open. Measured per rAF
+on the dev server (human mode, 1.5 s, owned syntax):
+- At the second close the held card (`#parent`) jumps on the first frame to `160,402 2000×276` and animates from
+  there to its own open box (`600×400` at `660,340`), instead of following `#item-parent` (which correctly grows back
+  from `600×400` to `180×580`). The held dot (`#child`) is `167×34` instead of following `#item-child`.
+- The first close of the same page load follows the item exactly on every frame.
+
+This is a 012 defect: the owned held/relegate state from the first exit cycle leaks into the second. Red first:
+1. Add to `e2e/layout-id/lightbox-crossfade.spec.ts` a painted case (`?duration=1`): open, close, open, close. On
+   every frame of the **second** close, the held card's rect matches `#item-parent`'s within 1 px (as on the first
+   close), and the held dot follows `#item-child`. It must be RED on `77a43596`.
+2. Add the same two-cycle check on the clone syntax (`nested-crossfade`, and `presence-crossfade`'s cycle if
+   relevant) and on `open-change` (owned and clone), and record whether each is RED.
+3. Find the root cause (state not reset between exit cycles: the release latch, the relegate/promote record, the
+   cached snapshot, the moved-animation record or the presence flip) and fix it inside 012's design. More than one
+   new mechanism is a STOP.
