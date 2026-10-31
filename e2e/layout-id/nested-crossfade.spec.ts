@@ -225,3 +225,36 @@ test('NC6: a propagating boundary inside a non-layout exit runs its child’s ex
     }
     await expect(page.locator('#inner-done')).toHaveText('1')
 })
+
+/**
+ * Plan 012 A4: a second open and close on the same page load. The second
+ * close must look like the first: the held clone follows `#item-parent` and
+ * its nested dot follows `#item-child` on every frame.
+ */
+test('two cycles: the second close follows the gallery item like the first', async ({ page }) => {
+    await openLightbox(page, '', 1300)
+    for (const cycle of [1, 2]) {
+        if (cycle === 2) {
+            await page.locator('#item-parent').click()
+            await page.waitForTimeout(1300)
+        }
+        const { hits } = await close(page, 1400)
+        const outer = both(hits, ITEM_PARENT, CLONE)
+        const inner = both(hits, ITEM_CHILD, CLONE_CHILD)
+        expect(outer.length, `cycle ${cycle}: outer frames`).toBeGreaterThanOrEqual(20)
+        expect(inner.length, `cycle ${cycle}: inner frames`).toBeGreaterThanOrEqual(20)
+        for (const hit of outer) {
+            expect(
+                centresNear(hit.rects[CLONE]!, hit.rects[ITEM_PARENT]!),
+                `cycle ${cycle} at ${hit.t.toFixed(0)}ms: ${JSON.stringify(hit.rects)}`
+            ).toBe(true)
+        }
+        for (const hit of inner) {
+            expect(
+                centresNear(hit.rects[CLONE_CHILD]!, hit.rects[ITEM_CHILD]!),
+                `cycle ${cycle} at ${hit.t.toFixed(0)}ms: ${JSON.stringify(hit.rects)}`
+            ).toBe(true)
+        }
+        await expect.poll(() => page.locator('[data-clone]').count(), { timeout: 1500 }).toBe(0)
+    }
+})

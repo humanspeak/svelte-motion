@@ -325,3 +325,44 @@ for (const [suffix, query] of [
         expect(Math.abs(end.width - 200)).toBeLessThanOrEqual(1)
     })
 }
+
+/**
+ * Plan 012 A4: a second shared crossfade on the same page load. After the
+ * first one has landed, the next click must hold the previous shape on the
+ * new one exactly as the first click did, and release it.
+ */
+for (const [suffix, query] of [
+    ['', ''],
+    [' (owned)', '&owned=true']
+] as const) {
+    test(`a second crossfade holds the previous shape on the new one${suffix}`, async ({
+        page
+    }) => {
+        await open(page, `${query}&duration=1`)
+        await page.waitForTimeout(100)
+        await page.locator('#shape-0').click()
+        await page.waitForTimeout(1300)
+        await expect(page.locator('#shape-0')).toHaveCount(0)
+        const { hits } = await recordPainted(
+            page,
+            () => page.locator('#shape-1').click(),
+            1300,
+            [{ selector: '#shape-2' }],
+            ['#shape-1', '#shape-2']
+        )
+        const both = hits.filter((hit) => hit.rects[0] && hit.rects[1] && hit.t >= 50)
+        expect(both.length).toBeGreaterThan(20)
+        for (const hit of both) {
+            const [a, b] = [hit.rects[0]!, hit.rects[1]!]
+            expect(
+                Math.abs(a.left - b.left) <= 1 &&
+                    Math.abs(a.top - b.top) <= 1 &&
+                    Math.abs(a.width - b.width) <= 1 &&
+                    Math.abs(a.height - b.height) <= 1,
+                `at ${hit.t.toFixed(0)}ms: ${JSON.stringify([a, b])}`
+            ).toBe(true)
+            expect(hit.hits[0], `hit at ${hit.t.toFixed(0)}ms`).toBe('shape-2')
+        }
+        await expect.poll(() => page.locator('#shape-1').count(), { timeout: 2000 }).toBe(0)
+    })
+}

@@ -192,3 +192,51 @@ test("changing the card's layoutId mid-open lets it finish opening", async ({ pa
             { width: 0, height: 0 }
         ])
 })
+
+/**
+ * Plan 012 A4: a second open and close on the same page load. The second
+ * close must hold the card while thumbnail one grows out of it, as the
+ * first does, and then remove it.
+ */
+for (const [suffix, query] of [
+    ['', ''],
+    [' (owned)', '&owned=true']
+] as const) {
+    test(`a second close holds the card like the first${suffix}`, async ({ page }) => {
+        await page.goto(URL + query)
+        await expect(page.locator('#one')).toBeVisible()
+        await page.waitForTimeout(200)
+        for (const cycle of [1, 2]) {
+            await page.click('#one')
+            await page.waitForTimeout(2500)
+            const { hits } = await recordPainted(
+                page,
+                () => page.click('#close'),
+                2400,
+                [],
+                ['#card', '#one']
+            )
+            const judged = hits.filter((hit) => hit.t >= 50 && hit.t <= 1900)
+            expect(judged.length, `cycle ${cycle}`).toBeGreaterThan(60)
+            const opacities: number[] = []
+            for (const hit of judged) {
+                expect(hit.counts[0], `cycle ${cycle}: card held at ${hit.t.toFixed(0)}ms`).toBe(1)
+                expect(hit.visible[1], `cycle ${cycle}: one painted at ${hit.t.toFixed(0)}ms`).toBe(
+                    true
+                )
+                opacities.push(hit.opacities[0]!)
+            }
+            expect(opacities[0]).toBeGreaterThan(0.8)
+            expect(opacities.some((o) => o > 0.1 && o < 0.9)).toBe(true)
+            // Thumbnail one grows out of the card: about the card's width at
+            // first, back to its own 160px by the end.
+            const widths = judged.map((hit) => hit.rects[1]!.width)
+            expect(widths[0], `cycle ${cycle}`).toBeGreaterThan(360)
+            expect(hits[hits.length - 1].rects[1]!.width).toBeCloseTo(160, 0)
+            expect(hits.filter((hit) => hit.t > 2300).every((hit) => hit.counts[0] === 0)).toBe(
+                true
+            )
+            await page.waitForTimeout(200)
+        }
+    })
+}

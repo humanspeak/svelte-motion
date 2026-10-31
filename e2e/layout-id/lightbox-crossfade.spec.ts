@@ -175,3 +175,58 @@ test('Closing: the lightbox is held while the gallery item animates home, then r
         bbox: { top: 40, left: 210, width: 180, height: 580 }
     })
 })
+
+/**
+ * Plan 012 A4: a second open and close on the same page load. Each close
+ * must look like the first: the held card follows `#item-parent` and the
+ * held dot follows `#item-child`, on every frame, until they are removed.
+ * State from the first exit cycle mustn't leak into the second.
+ */
+test('Closing twice: the second close follows the gallery item like the first', async ({
+    page
+}) => {
+    await page.setViewportSize({ width: 1000, height: 660 })
+    await page.goto('/tests/layout-id/lightbox-crossfade?@isPlaywright=true&duration=1')
+    await expect(page.locator('[data-hydrated]')).toBeAttached()
+    await page.waitForTimeout(50)
+
+    const near = (a: { left: number; top: number; width: number; height: number }, b: typeof a) =>
+        Math.abs(a.left - b.left) <= 1 &&
+        Math.abs(a.top - b.top) <= 1 &&
+        Math.abs(a.width - b.width) <= 1 &&
+        Math.abs(a.height - b.height) <= 1
+    const closeAndJudge = async (cycle: number) => {
+        const { frames, hits } = await recordPainted(
+            page,
+            () => page.locator('#overlay').click(),
+            1300,
+            [],
+            ['#parent', '#item-parent', '#child', '#item-child']
+        )
+        expect(frames.length).toBeGreaterThan(0)
+        const held = hits.filter((hit) => hit.rects[0] && hit.t >= 30)
+        expect(held.length, `cycle ${cycle}: frames with the card held`).toBeGreaterThan(20)
+        for (const hit of held) {
+            const at = `cycle ${cycle} at ${hit.t.toFixed(0)}ms`
+            expect(
+                near(hit.rects[0]!, hit.rects[1]!),
+                `${at}: card ${JSON.stringify(hit.rects[0])} vs item ${JSON.stringify(hit.rects[1])}`
+            ).toBe(true)
+            const dot = hit.rects[2]
+            if (dot) {
+                expect(
+                    near(dot, hit.rects[3]!),
+                    `${at}: dot ${JSON.stringify(hit.rects[2])} vs item dot ${JSON.stringify(hit.rects[3])}`
+                ).toBe(true)
+            }
+        }
+        await expect.poll(() => page.locator('#parent').count(), { timeout: 1500 }).toBe(0)
+    }
+
+    for (const cycle of [1, 2]) {
+        await page.locator('#item-child').click()
+        await page.waitForTimeout(1300)
+        await closeAndJudge(cycle)
+        await page.waitForTimeout(300)
+    }
+})

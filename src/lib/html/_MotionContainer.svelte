@@ -2919,12 +2919,22 @@
             if (lastSeenPresence === undefined && adapter.isMounted) lastSeenPresence = isPresent
             if (!presenceFlipPending) return
             presenceFlipPending = false
-            // After this flush's other effects: a popLayout exit's pop and
-            // its #2348 correction are queued by `PresenceChild`'s effects,
-            // which run after this child's, and the root update must queue
-            // behind the correction (upstream's pop is in place before
-            // `componentDidUpdate`). Not from inside motion-dom's batch.
-            queueMicrotask(() => adapter.commitPresence())
+            // Upstream's root update is queued in the commit itself
+            // (`componentDidUpdate`), ahead of the motion component's own
+            // `scheduleRenderMicrotask`: a render in between would project
+            // the relegated node onto the new lead's stale target from its
+            // previous animation, and the update pass would then measure
+            // that transform as its layout (plan 012 A4: a second close).
+            // Except for a popLayout exit: its pop and the #2348 correction
+            // are queued by `PresenceChild`'s effects, which run after this
+            // child's, and the update must queue behind the correction
+            // (upstream's pop is in place before `componentDidUpdate`). Not
+            // from inside motion-dom's batch.
+            if (isPresent === false && context?.mode === 'popLayout') {
+                queueMicrotask(() => adapter.commitPresence())
+            } else {
+                adapter.commitPresence()
+            }
         })
     })
 
