@@ -1,3 +1,4 @@
+import type { MotionExit, MotionTransition } from '$lib/types'
 import { animate } from 'motion'
 import { nodeGroup, visualElementStore } from 'motion-dom'
 import { getContext, setContext, tick } from 'svelte'
@@ -15,7 +16,9 @@ import {
     readAnimatedValues,
     resolvePopLayoutStyles,
     setPresenceDepth,
-    snapshotComputedStyle
+    snapshotComputedStyle,
+    type PresenceExitResolver,
+    type PresenceLayoutHandOff
 } from './presence'
 
 // Shared context store for mock - exposed for clearing between tests
@@ -1678,40 +1681,21 @@ describe('observeStyleChanges', () => {
  * `PresenceChild.tsx:67-75` @ v14.7.1).
  */
 describe('exit holds (plan 012)', () => {
-    type ExitHold = { cancel(): void; finish(): void }
-    type LayoutHandOff = {
-        canHandOff(): boolean
-        ownedLayoutKeys(): ReadonlySet<string>
-        handOff(clone: HTMLElement, release: () => void): ExitHold | undefined
-    }
-    type RegisterChild = (
-        key: string,
-        element: HTMLElement,
-        exit?: Record<string, unknown>,
-        mergedTransition?: Record<string, unknown>,
-        resolveExit?: (custom: unknown) => Record<string, unknown> | undefined,
-        layoutGroup?: object,
-        layoutHandOff?: LayoutHandOff
-    ) => void
     type Ctx = ReturnType<typeof createAnimatePresenceContext>
-    type PresenceApi = {
-        handOffToExitClone(clone: HTMLElement, release: () => void): ExitHold | undefined
-        readonly isHandedOff: boolean
-    }
 
     const register = (
         ctx: Ctx,
         key: string,
         element: HTMLElement,
         options: {
-            exit?: Record<string, unknown>
-            transition?: Record<string, unknown>
-            resolveExit?: (custom: unknown) => Record<string, unknown> | undefined
+            exit?: MotionExit
+            transition?: MotionTransition
+            resolveExit?: PresenceExitResolver
             group?: object
-            handOff?: LayoutHandOff
+            handOff?: PresenceLayoutHandOff
         } = {}
     ) =>
-        (ctx.registerChild as unknown as RegisterChild)(
+        ctx.registerChild(
             key,
             element,
             options.exit,
@@ -1737,16 +1721,15 @@ describe('exit holds (plan 012)', () => {
                 canHandOff: vi.fn(() => true),
                 ownedLayoutKeys: () => new Set(owned),
                 handOff
-            } satisfies LayoutHandOff
+            } satisfies PresenceLayoutHandOff
         }
     }
 
     /** The container's hand-off for a real adapter (P3). */
-    const adapterHandOff = (adapter: MotionDomProjectionAdapter): LayoutHandOff => ({
-        canHandOff: () => adapter.isMounted && !(adapter as unknown as PresenceApi).isHandedOff,
+    const adapterHandOff = (adapter: MotionDomProjectionAdapter): PresenceLayoutHandOff => ({
+        canHandOff: () => adapter.isMounted && !adapter.isHandedOff,
         ownedLayoutKeys: () => new Set(),
-        handOff: (clone, release) =>
-            (adapter as unknown as PresenceApi).handOffToExitClone(clone, release)
+        handOff: (clone, release) => adapter.handOffToExitClone(clone, release)
     })
 
     const rects = new Map<string, DOMRect>()
@@ -2253,7 +2236,7 @@ describe('exit holds (plan 012)', () => {
 
         const exitAfterClamp = async (clamp: boolean, mode: 'popLayout' | 'sync' = 'popLayout') => {
             const adapter = mountAdapter(item, { layout: true })
-            const handOff = vi.spyOn(adapter as unknown as PresenceApi, 'handOffToExitClone')
+            const handOff = vi.spyOn(adapter, 'handOffToExitClone')
             const ctx = createAnimatePresenceContext({ mode })
             register(ctx, 'item', item, {
                 exit: { opacity: 0 },
@@ -2347,7 +2330,7 @@ describe('exit holds (plan 012)', () => {
 
     it('10i: a node is handed off once', () => {
         const adapter = mountAdapter(el, { layoutId: 'i-once' })
-        const handOff = vi.spyOn(adapter as unknown as PresenceApi, 'handOffToExitClone')
+        const handOff = vi.spyOn(adapter, 'handOffToExitClone')
         const ctx = createAnimatePresenceContext({})
         register(ctx, 'i', el, { handOff: adapterHandOff(adapter) })
         el.remove()
@@ -2441,7 +2424,7 @@ describe('exit holds (plan 012)', () => {
         ctx.unregisterChild('nb')
         expect(innerAdapter.projection.isPresent).toBe(false)
         expect(relegate).toHaveBeenCalled()
-        expect((innerAdapter as unknown as PresenceApi).isHandedOff).toBe(true)
+        expect(innerAdapter.isHandedOff).toBe(true)
         ctx.dispose()
     })
 
@@ -2459,7 +2442,7 @@ describe('exit holds (plan 012)', () => {
         const copy = parent.querySelector<HTMLElement>('[data-clone] .inner')!
         expect(innerAdapter.visualElement.current).toBe(copy)
         expect(visualElementStore.get(copy)).toBe(innerAdapter.visualElement)
-        expect((innerAdapter as unknown as PresenceApi).isHandedOff).toBe(true)
+        expect(innerAdapter.isHandedOff).toBe(true)
         innerAdapter.unmount()
         expect(unmountInner).not.toHaveBeenCalled()
         outerAdapter.unmount()

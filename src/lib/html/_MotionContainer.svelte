@@ -438,9 +438,11 @@
      * the feature would never see a flip.
      *
      * Only the `PresenceChild` path is wired: direct `AnimatePresence` children
-     * exit through the CLONE path in `presence.ts`, which is a deliberate
-     * architectural deviation this plan keeps (the clone is detached and has no
-     * VisualElement, so it cannot fight the original's).
+     * exit through the CLONE path in `presence.ts`, a deliberate architectural
+     * deviation. Since plan 012 a direct child's VisualElement and projection
+     * node move to its exit clone when it measures layout (`layout`,
+     * `layoutId`, `drag`), so the clone animates through the same renderer;
+     * any other clone is a copy with no VisualElement.
      *
      * @returns The presence context, or `null` outside a `PresenceChild`.
      */
@@ -2917,7 +2919,12 @@
             if (lastSeenPresence === undefined && adapter.isMounted) lastSeenPresence = isPresent
             if (!presenceFlipPending) return
             presenceFlipPending = false
-            adapter.commitPresence()
+            // After this flush's other effects: a popLayout exit's pop and
+            // its #2348 correction are queued by `PresenceChild`'s effects,
+            // which run after this child's, and the root update must queue
+            // behind the correction (upstream's pop is in place before
+            // `componentDidUpdate`). Not from inside motion-dom's batch.
+            queueMicrotask(() => adapter.commitPresence())
         })
     })
 

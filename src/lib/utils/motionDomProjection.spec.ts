@@ -8,7 +8,11 @@ import {
     visualElementStore
 } from 'motion-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MotionDomProjectionAdapter, layoutMeasureStats } from './motionDomProjection.js'
+import {
+    MotionDomProjectionAdapter,
+    layoutMeasureStats,
+    type ExitLayoutHold
+} from './motionDomProjection.js'
 import { readScrollBasis } from './scrollBasis.js'
 import { createMotionVisualElement } from './visualElementCore.js'
 
@@ -2529,14 +2533,8 @@ describe('MotionDomProjectionAdapter.commitGroup and size-animating members (pla
  * `handOffToExitClone` re-points a departing node at its exit clone.
  */
 describe('presence in shared layout (plan 012)', () => {
-    type ExitHold = { cancel(): void; finish(): void }
-    type PresenceApi = {
-        setPresence(isPresent: boolean, safeToRemove: () => void): void
-        commitPresence(): void
-        handOffToExitClone(clone: HTMLElement, release: () => void): ExitHold | undefined
-        readonly isHandedOff: boolean
-    }
-    const api = (adapter: MotionDomProjectionAdapter) => adapter as unknown as PresenceApi
+    type ExitHold = ExitLayoutHold
+    const api = (adapter: MotionDomProjectionAdapter) => adapter
     const rects = new Map<HTMLElement, DOMRect>()
     const mounted: MotionDomProjectionAdapter[] = []
     const mount = (layoutId: string | undefined, rect: DOMRect, layout?: boolean) => {
