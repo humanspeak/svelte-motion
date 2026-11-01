@@ -249,6 +249,11 @@
             text: 'Switch to the next variant with the links next to the chip, and repeat steps 1 and 2.',
             expected:
                 'Each variant has its own expected close in step 2. Do all five: default, inner=boundary, inner=propagate (looks like default), propagate + fade, plain outer + fade.'
+        },
+        {
+            text: 'Known upstream bug, motiondivision/motion#4042 (default variant): open red, click blue while the card is open, then close.',
+            expected:
+                'As in framer-motion 14.7.1: the card takes over blue at once (blue and its dot hide, red flies home, the card stays put). On close, blue comes back at once and the card never leaves: the chip stays on WATCHING. Click "Reset page" to recover.'
         }
     ]
 </script>
