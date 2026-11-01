@@ -19,9 +19,17 @@
     // Deviations: upstream's `Boxes` component resets its index from its
     // `startIndex` prop while rendering; here the click does both. `?owned=true`
     // renders each box's measurer through `present` + `child`.
+    //
+    // The spec (`@isPlaywright=true`) keeps upstream's default layout
+    // transition. A human tester gets a one-second slide per box so each hop
+    // can be followed, and a verdict that expects one exit per "start 1" click
+    // made while the measurer sits in the last box.
 
-    const owned = page.url.searchParams.get('owned') === 'true'
+    const params = page.url.searchParams
+    const isPlaywright = params.get('@isPlaywright') === 'true'
+    const owned = params.get('owned') === 'true'
     const maxNum = 4
+    const transition = isPlaywright ? undefined : { duration: 1 }
 
     let currentIndex = $state(0)
     let doneCount = $state(0)
@@ -30,9 +38,30 @@
     const advance = () => {
         if (currentIndex < maxNum - 1) currentIndex += 1
     }
+    // Exits the last box should have reported: one per click made while the
+    // measurer is in it. A click mid-journey makes no exit from the last box.
+    let expected = $state(0)
     const start1 = () => {
+        if (currentIndex === maxNum - 1) expected += 1
         currentIndex = 1
     }
+    const verdict = $derived(
+        doneCount > expected
+            ? 'extra'
+            : expected === 0
+              ? 'waiting'
+              : doneCount === expected
+                ? 'ok'
+                : 'watching'
+    )
+
+    const variants = [
+        { label: 'clone (default)', query: '' },
+        { label: 'owned', query: 'owned=true' }
+    ]
+    const keep = isPlaywright ? '@isPlaywright=true' : ''
+    const variantHref = (query: string) => `?${[keep, query].filter(Boolean).join('&')}`
+    const current = owned ? 'owned' : 'clone (default)'
 
     // Upstream's mount effect: move on from the start box.
     let hydrated = $state(false)
@@ -55,15 +84,24 @@
 
     const steps: TesterStep[] = [
         {
-            text: 'Wait two seconds after the page loads.',
+            text: 'Load the page and watch the outlined square (the measurer) in the aqua boxes.',
             expected:
-                'The outlined measurer slides down from box 1 to the last box and stops there. The count reads 0.'
+                'It slides down one box per second, from box 1 to box 4, and stops in box 4. The count under the boxes reads 0 and the chip reads WAITING.'
         },
         {
-            text: 'Click "start 1".',
+            text: 'Once it rests in box 4, click "start 1".',
             expected:
-                'The measurer jumps back up to box 2 and slides down again to the last box. The count reads 1, and never 2.',
+                'It slides from box 4 up to box 2, then down box by box to box 4 again. The count goes to 1 as it leaves box 4, and the chip reads ONCE ✓. The count never jumps by 2.',
             action: { label: 'start 1', run: start1 }
+        },
+        {
+            text: 'Click "start 1" again after each return to box 4, a few times.',
+            expected:
+                'The count goes up by exactly one per click and the chip stays ONCE ✓. A click before it reaches box 4 sends it back without counting.'
+        },
+        {
+            text: 'Switch to the other variant with the links next to the chip and repeat.',
+            expected: 'Both variants behave the same.'
         }
     ]
 </script>
@@ -85,6 +123,7 @@
                             layout
                             layoutId="measurer"
                             style={measurerStyle}
+                            {transition}
                             onLayoutAnimationComplete={advance}
                         />
                     {/snippet}
@@ -97,6 +136,7 @@
                             layout
                             layoutId="measurer"
                             style={measurerStyle}
+                            {transition}
                             onLayoutAnimationComplete={advance}
                         />
                     {/if}
@@ -111,12 +151,28 @@
 <TesterPanel
     eyebrow="Motion 14.7.1 · #3233"
     title="onExitComplete fires once per exit"
-    status="Plan 012: the count reads 1 after start 1 on both syntaxes."
+    status="Plan 012: each start 1 from box 4 counts exactly one exit, on both syntaxes."
     {steps}
 >
     {#snippet summary()}
-        <span class="verdict {doneCount === 1 ? 'ok' : doneCount > 1 ? 'bad' : 'na'}">
-            {doneCount === 1 ? 'ONCE ✓' : doneCount > 1 ? `${doneCount}× ✗` : 'WAITING'}
+        <span class="verdict {verdict === 'ok' ? 'ok' : verdict === 'extra' ? 'bad' : 'na'}">
+            {verdict === 'ok'
+                ? 'ONCE ✓'
+                : verdict === 'extra'
+                  ? `${doneCount - expected} EXTRA ✗`
+                  : verdict === 'watching'
+                    ? 'WATCHING'
+                    : 'WAITING'}
+        </span>
+        <span class="readout">box {currentIndex + 1} · exits {doneCount}/{expected}</span>
+        <span class="variants">
+            {#each variants as v (v.label)}
+                {#if v.label === current}
+                    <strong>{v.label}</strong>
+                {:else}
+                    <a href={variantHref(v.query)}>{v.label}</a>
+                {/if}
+            {/each}
         </span>
     {/snippet}
     {#snippet checks()}
@@ -125,7 +181,6 @@
             box's <code>AnimatePresence onExitComplete</code> must fire exactly once when the measurer
             leaves it.
         </p>
-        <p>Variants: <a href="?owned=true">owned</a> · <a href="?">clone (default)</a></p>
     {/snippet}
 </TesterPanel>
 
@@ -144,6 +199,23 @@
     .verdict.bad {
         background: #fee2e2;
         color: #991b1b;
+    }
+    .readout {
+        margin-left: 0.5rem;
+        font-size: 0.75rem;
+        font-variant-numeric: tabular-nums;
+        color: #475569;
+    }
+    .variants {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem 0.75rem;
+        margin-top: 0.5rem;
+        font-size: 0.8rem;
+    }
+    .variants a {
+        color: #2563eb;
+        text-decoration: underline;
     }
     .verdict.na {
         background: #f1f5f9;
