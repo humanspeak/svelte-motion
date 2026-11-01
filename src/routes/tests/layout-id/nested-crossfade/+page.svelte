@@ -2,6 +2,7 @@
     import { page } from '$app/state'
     import { AnimatePresence, motion } from '$lib'
     import { onMount } from 'svelte'
+    import { SvelteURLSearchParams } from 'svelte/reactivity'
     import TesterPanel, { type TesterStep } from '../../layout/_parity/TesterPanel.svelte'
 
     // Not a port: the nested `layoutId` pairs of upstream's
@@ -25,6 +26,9 @@
     // - `&fast=true` makes the shared-layout transition 0.3 s.
     // - `?outer=plain` makes the lightbox a non-layout `motion.div` with
     //   `exit={{ opacity: 0 }}` (0.3 s).
+    // The specs (`@isPlaywright=true`) use these durations. A human tester
+    // gets every duration doubled, so each close can be watched, and a live
+    // verdict for the current variant.
     // The nested boundary's `onExitComplete` counts into `#inner-done`.
     //
     // Every rAF, `window.nestedLog` records the clone copy of `#fade` (its
@@ -32,13 +36,18 @@
     // lightbox clone is connected, and `#inner-done`'s count.
 
     const params = page.url.searchParams
+    const isPlaywright = params.get('@isPlaywright') === 'true'
     const inner = params.get('inner')
     const innerExit = params.get('innerExit') === 'true'
     const fast = params.get('fast') === 'true'
     const plainOuter = params.get('outer') === 'plain'
 
-    const transition = { duration: fast ? 0.3 : 1, ease: 'linear' as const }
-    const fadeTransition = { duration: 1, ease: 'linear' as const }
+    const slow = isPlaywright ? 1 : 2
+    const layoutDuration = (fast ? 0.3 : 1) * slow
+    const fadeDuration = 1 * slow
+    const plainDuration = 0.3 * slow
+    const transition = { duration: layoutDuration, ease: 'linear' as const }
+    const fadeTransition = { duration: fadeDuration, ease: 'linear' as const }
     const colors = ['tomato', 'royalblue', 'seagreen']
 
     let open = $state<string | false>(false)
@@ -81,23 +90,165 @@
         return () => cancelAnimationFrame(raf)
     })
 
+    // ---- Live verdict (tester only) ----
+    //
+    // The variant decides what a correct close looks like:
+    // - relegate (default, inner=propagate): the card is held for the shared
+    //   animation and its black dot stays centred on the gallery's white dot
+    //   on every frame.
+    // - boundary (inner=boundary): the dot isn't relegated, so it stays put
+    //   at its own box while the card is held.
+    // - fade (innerExit): the clone waits for the pink square's own exit,
+    //   which fades it out, and the nested boundary's `onExitComplete` fires
+    //   once.
+    const mode: 'relegate' | 'boundary' | 'fade' = innerExit
+        ? 'fade'
+        : inner === 'boundary'
+          ? 'boundary'
+          : 'relegate'
+    const holdFor = mode === 'fade' ? fadeDuration : layoutDuration
+    type Verdict = 'waiting' | 'watching' | 'ok' | 'early' | 'off' | 'moved' | 'nofade' | 'done'
+    let verdict = $state<Verdict>('waiting')
+    let readout = $state<string | null>(null)
+    onMount(() => {
+        if (isPlaywright) return
+        let wasOpen = open !== false
+        let closedAt: number | null = null
+        let worst = 0
+        let firstDot: DOMRect | null = null
+        let minOpacity = 1
+        let doneAtClose = 0
+        let raf = 0
+        const centreGap = (a: DOMRect, b: DOMRect) =>
+            Math.hypot(
+                a.left + a.width / 2 - (b.left + b.width / 2),
+                a.top + a.height / 2 - (b.top + b.height / 2)
+            )
+        const sample = () => {
+            raf = requestAnimationFrame(sample)
+            const now = performance.now()
+            const isOpen = open !== false
+            if (wasOpen && !isOpen) {
+                closedAt = now
+                worst = 0
+                firstDot = null
+                minOpacity = 1
+                doneAtClose = innerDone
+                verdict = 'watching'
+                readout = null
+            }
+            if (!wasOpen && isOpen && closedAt !== null) {
+                closedAt = null
+                verdict = 'waiting'
+                readout = 'opened again while closing (not judged)'
+            }
+            wasOpen = isOpen
+            if (closedAt === null) return
+            const elapsed = (now - closedAt) / 1000
+            const clone = document.querySelector('[data-clone].lightbox')
+            if (clone) {
+                const dot = document.querySelector('[data-clone] #child')?.getBoundingClientRect()
+                const itemDot = document.getElementById('item-child')?.getBoundingClientRect()
+                if (mode === 'relegate' && dot && itemDot)
+                    worst = Math.max(worst, centreGap(dot, itemDot))
+                if (mode === 'boundary' && dot) {
+                    firstDot ??= dot
+                    worst = Math.max(
+                        worst,
+                        Math.abs(dot.left - firstDot.left),
+                        Math.abs(dot.top - firstDot.top),
+                        Math.abs(dot.width - firstDot.width)
+                    )
+                }
+                const fade = document.querySelector<HTMLElement>('[data-clone] .fade')
+                if (fade) minOpacity = Math.min(minOpacity, Number(getComputedStyle(fade).opacity))
+                readout = `card held ${elapsed.toFixed(2)} s…`
+                return
+            }
+            // Wait a frame after the clone goes, before reading the count.
+            if (document.querySelector('.lightbox')) return
+            const held = `held ${elapsed.toFixed(2)} s`
+            if (elapsed < holdFor * 0.9) {
+                verdict = 'early'
+                readout = `card removed after ${elapsed.toFixed(2)} s, before ${holdFor} s`
+            } else if (mode === 'relegate' && worst > 2) {
+                verdict = 'off'
+                readout = `${held}, dot up to ${worst.toFixed(1)} px off the white dot`
+            } else if (mode === 'boundary' && worst > 1) {
+                verdict = 'moved'
+                readout = `${held}, dot moved ${worst.toFixed(1)} px`
+            } else if (mode === 'fade' && minOpacity > 0.2) {
+                verdict = 'nofade'
+                readout = `${held}, square only faded to ${minOpacity.toFixed(2)}`
+            } else if (mode === 'fade' && innerDone - doneAtClose !== 1) {
+                verdict = 'done'
+                readout = `${held}, onExitComplete fired ${innerDone - doneAtClose}×`
+            } else {
+                verdict = 'ok'
+                readout =
+                    mode === 'relegate'
+                        ? `${held}, dot within ${worst.toFixed(1)} px`
+                        : mode === 'boundary'
+                          ? `${held}, dot stayed put`
+                          : `${held}, square faded out`
+            }
+            closedAt = null
+        }
+        raf = requestAnimationFrame(sample)
+        return () => cancelAnimationFrame(raf)
+    })
+
+    const variants = [
+        { label: 'default', query: '' },
+        { label: 'inner=boundary', query: 'inner=boundary' },
+        { label: 'inner=propagate', query: 'inner=propagate' },
+        { label: 'propagate + fade', query: 'inner=propagate&innerExit=true&fast=true' },
+        { label: 'plain outer + fade', query: 'outer=plain&inner=propagate&innerExit=true' }
+    ]
+    const keep = isPlaywright ? '@isPlaywright=true' : ''
+    const variantHref = (query: string) => `?${[keep, query].filter(Boolean).join('&')}`
+    // The variant this URL shows, whatever the order of its params.
+    const canonical = (search: SvelteURLSearchParams) => {
+        search.delete('@isPlaywright')
+        return [...search]
+            .map(([k, v]) => `${k}=${v}`)
+            .sort()
+            .join('&')
+    }
+    const current = variants.find(
+        (v) =>
+            canonical(new SvelteURLSearchParams(v.query)) ===
+            canonical(new SvelteURLSearchParams(params))
+    )?.label
+
+    const closeExpected = plainOuter
+        ? `The white card has no layoutId, so it just fades out, with the pink square inside it, in ${plainDuration} s. The invisible card stays mounted until the square's own ${fadeDuration} s exit ends. You can't see that part: the chip reads WAITED ✓ after about ${fadeDuration} s.`
+        : mode === 'fade'
+          ? `The card shrinks back into the red item and fades out in ${layoutDuration} s, with the pink square inside it. The invisible card stays mounted until the square's own ${fadeDuration} s exit ends. You can't see that part: the chip reads WAITED ✓ after about ${fadeDuration} s.`
+          : mode === 'boundary'
+            ? `The card shrinks back into the red item while it fades, but the black dot stays where it was, at full size: a nested AnimatePresence keeps it out of the exit. The item's white dot is hidden meanwhile. When the card is gone, the white dot grows back out of the black dot's last box. The chip reads DOT STAYED ✓.`
+            : `The card shrinks back into the red item while it fades, and its black dot shrinks into the item's white dot, centred on it the whole way. The chip reads HELD ✓.`
+
     const steps: TesterStep[] = [
         {
-            text: 'Click the red gallery item.',
+            text: 'Click the red (tomato) gallery item.',
             expected:
-                'The white card grows out of the red item and its black dot grows out of the item’s white dot.',
+                mode === 'fade'
+                    ? `The white card grows out of the red item over ${layoutDuration} s, with a pink square in its middle.`
+                    : plainOuter
+                      ? 'The white card appears at once, with a pink square in its middle.'
+                      : `Over ${layoutDuration} s the white card grows out of the red item, and its black dot grows out of the item's white dot.`,
             action: { label: 'Open red', run: () => (open = colors[0]) }
         },
         {
-            text: 'Click "close".',
-            expected:
-                'The card shrinks back into the red item while it fades, and its black dot shrinks into the item’s white dot: both stay mounted until they land.',
+            text: 'Click "close" (bottom left), or the button here.',
+            expected: closeExpected,
             action: { label: 'Close', run: () => (open = false) }
         },
         {
-            text: 'Open the variants below and repeat.',
+            text: 'Switch to the next variant with the links next to the chip, and repeat steps 1 and 2.',
             expected:
-                'inner=boundary: the dot rides the card and is not relegated; inner=propagate: the dot relegates like the default; innerExit: the inner square fades and shrinks over one second and the card waits for it.'
+                'Each variant has its own expected close in step 2. Do all five: default, inner=boundary, inner=propagate (looks like default), propagate + fade, plain outer + fade.'
         }
     ]
 </script>
@@ -154,7 +305,7 @@
                     id="parent"
                     class="lightbox"
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3 }}
+                    transition={{ duration: plainDuration }}
                 >
                     {#if inner}
                         <AnimatePresence
@@ -204,24 +355,90 @@
     status="Plan 012: nested nodes of a direct AnimatePresence child relegate and hold, as upstream."
     {steps}
 >
+    {#snippet summary()}
+        <span
+            class="verdict {verdict === 'ok'
+                ? 'ok'
+                : verdict === 'waiting' || verdict === 'watching'
+                  ? 'na'
+                  : 'bad'}"
+        >
+            {verdict === 'ok'
+                ? mode === 'fade'
+                    ? 'WAITED ✓'
+                    : mode === 'boundary'
+                      ? 'DOT STAYED ✓'
+                      : 'HELD ✓'
+                : verdict === 'early'
+                  ? 'REMOVED EARLY ✗'
+                  : verdict === 'off'
+                    ? 'DOT OFF ✗'
+                    : verdict === 'moved'
+                      ? 'DOT MOVED ✗'
+                      : verdict === 'nofade'
+                        ? 'NO FADE ✗'
+                        : verdict === 'done'
+                          ? 'EXIT COUNT ✗'
+                          : verdict === 'watching'
+                            ? 'WATCHING'
+                            : 'WAITING'}
+        </span>
+        {#if readout}<span class="readout">{readout}</span>{/if}
+        <span class="variants">
+            {#each variants as v (v.label)}
+                {#if v.label === current}
+                    <strong>{v.label}</strong>
+                {:else}
+                    <a href={variantHref(v.query)}>{v.label}</a>
+                {/if}
+            {/each}
+        </span>
+    {/snippet}
     {#snippet checks()}
         <p>
             The lightbox is a direct <code>motion.div</code> child of <code>AnimatePresence</code>,
             so it exits as a clone. Its nested <code>layoutId</code> dot moves to the clone with its projection
             node, relegates and crossfades into the gallery dot.
         </p>
-        <p>
-            Variants:
-            <a href="?inner=boundary">inner=boundary</a> ·
-            <a href="?inner=propagate">inner=propagate</a> ·
-            <a href="?inner=propagate&innerExit=true&fast=true">propagate + innerExit</a> ·
-            <a href="?outer=plain&inner=propagate&innerExit=true">outer=plain</a> ·
-            <a href="?">default</a>
-        </p>
     {/snippet}
 </TesterPanel>
 
 <style>
+    .verdict {
+        display: inline-block;
+        margin-right: 0.25rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+    .verdict.ok {
+        background: #dcfce7;
+        color: #166534;
+    }
+    .verdict.bad {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    .verdict.na {
+        background: #f1f5f9;
+        color: #475569;
+    }
+    .readout {
+        font-size: 0.75rem;
+        color: #475569;
+    }
+    .variants {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem 0.75rem;
+        margin-top: 0.5rem;
+        font-size: 0.8rem;
+    }
+    .variants a {
+        color: #2563eb;
+        text-decoration: underline;
+    }
     .stage {
         position: fixed;
         inset: 0;
