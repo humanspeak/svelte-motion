@@ -2006,7 +2006,8 @@ export class MotionDomProjectionAdapter {
      * projection while the Svelte component controls the snapshot timing.
      *
      * @param previousRect Optional pre-update rect used to seed the root
-     * projection snapshot.
+     * projection snapshot. Ignored mid a shared `layoutId` animation, when
+     * the node's on-screen projection target is the snapshot.
      * @param options.ownSubtreeChanged This node's own props or DOM subtree
      * changed (not just its position). Descendants in a separate LayoutGroup
      * node group are then snapshotted too, as upstream's re-render would.
@@ -2032,12 +2033,26 @@ export class MotionDomProjectionAdapter {
         // shared-layout effect hand a departing element's rect to the projection
         // instead of hand-writing a FLIP (drag-single-writer 005).
         if (!this.element || !(this.layout || this.layoutId)) return
-        const snapshot = previousRect
-            ? measurementsFromRect(
-                  this.rebaseRect(previousRect, options?.previousBasis)!,
-                  this.lastLayout ?? this.projection.layout
-              )
-            : this.rebasedMeasurements(this.lastLayout, this.lastLayoutBasis)
+        // Mid a shared `layoutId` animation the node is drawn at its
+        // projection target, out of the previous lead's box, and upstream's
+        // `willUpdate()` snapshot measures that on-screen box
+        // (`updateSnapshot` → `measure`, create-projection-node.ts 967-979,
+        // 1080-1101 @ v14.7.1). Its cached layout rect is its own new slot,
+        // where it has never been drawn: seeding that restarted the
+        // animation from there, so an arriving node nudged by an unrelated
+        // reflow (plan 012 A5, a completed exit's `onExitComplete`
+        // re-rendering a counter) held at its new box for the whole
+        // animation instead of sliding from the old lead.
+        const projection = this.projection
+        const onScreen = projection.resumingFrom && projection.currentAnimation && projection.target
+        const snapshot = onScreen
+            ? this.onScreenSnapshot()
+            : previousRect
+              ? measurementsFromRect(
+                    this.rebaseRect(previousRect, options?.previousBasis)!,
+                    this.lastLayout ?? this.projection.layout
+                )
+              : this.rebasedMeasurements(this.lastLayout, this.lastLayoutBasis)
         if (!snapshot) {
             this.seedLayout()
             return
