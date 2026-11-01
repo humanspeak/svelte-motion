@@ -122,6 +122,7 @@
                         <motion.div
                             layout
                             layoutId="measurer"
+                            data-measurer
                             style={measurerStyle}
                             {transition}
                             onLayoutAnimationComplete={advance}
@@ -135,6 +136,7 @@
                             key="measurer"
                             layout
                             layoutId="measurer"
+                            data-measurer
                             style={measurerStyle}
                             {transition}
                             onLayoutAnimationComplete={advance}
