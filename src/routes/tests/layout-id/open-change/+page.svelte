@@ -45,7 +45,9 @@
     const items = ['one', 'two']
 
     let open = $state<string | null>(null)
-    const owned = page.url.searchParams.get('owned') === 'true'
+    const params = page.url.searchParams
+    const isPlaywright = params.get('@isPlaywright') === 'true'
+    const owned = params.get('owned') === 'true'
     // The id the owned card was last shown with (see the header).
     let shown = $state<string | null>(null)
     $effect.pre(() => {
@@ -86,62 +88,154 @@
 
     // ---- Live verdict (tester only) ----
     //
-    // On Close, judge the recorded frames for 2.2 s: thumbnail two must
-    // start at (about) the card's width and shrink home to 160px, and the
-    // card must stay mounted for most of it (held, crossfading out).
-    type Verdict = 'waiting' | 'recording' | 'grows-out' | 'snapped'
+    // Each action is judged from the recorded frames over the 2 s animation
+    // that follows it (the specs judge their own frames, so the verdict is
+    // off under `@isPlaywright`).
+    //
+    // - Next (card at rest): the card stays put and opaque, thumbnail one
+    //   starts at the card's box and ends home, thumbnail two is hidden.
+    //   Next mid-open: the card finishes opening, one ends home, two hidden.
+    // - Close: the thumbnail the card was showing starts at about the card's
+    //   size and shrinks home to 160px, while the card stays mounted for most
+    //   of it (held, crossfading out).
+    type Verdict = 'waiting' | 'recording' | 'ok' | 'bad'
     let verdict = $state<Verdict>('waiting')
+    let judged = $state<string | null>(null)
     let readout = $state<string | null>(null)
-    type Box = { width: number }
-    const judgeClose = () => {
+    type Box = {
+        x: number
+        y: number
+        width: number
+        height: number
+        opacity: number
+        visibility: string
+    }
+    type Frame = Partial<Record<'one' | 'two' | 'card', Box>>
+    const hidden = (box?: Box) => !box || box.visibility === 'hidden' || box.opacity < 0.01
+    const near = (a: Box, b: Box, tolerance: number) =>
+        Math.abs(a.x - b.x) < tolerance &&
+        Math.abs(a.y - b.y) < tolerance &&
+        Math.abs(a.width - b.width) < tolerance &&
+        Math.abs(a.height - b.height) < tolerance
+
+    let judging = 0
+    const judge = (label: string, test: (frames: Frame[]) => [boolean, string]) => {
+        if (isPlaywright) return
         const w = window as unknown as RecordingWindow
-        const start = w.closedAt ?? 0
+        const start = w.frames.length - 1
+        const run = ++judging
         verdict = 'recording'
+        judged = label
+        readout = null
         setTimeout(() => {
-            const frames = w.frames.slice(start) as Record<string, Box | undefined>[]
-            const widths = frames.flatMap((f) => (f.two ? [f.two.width] : []))
+            if (run !== judging) return
+            const [ok, text] = test(w.frames.slice(start) as Frame[])
+            verdict = ok ? 'ok' : 'bad'
+            readout = text
+        }, 2300)
+    }
+
+    const judgeNext = () =>
+        judge('next', ([before, ...after]) => {
+            const card = before.card
+            if (!card) return [false, 'no card was open']
+            const atRest = Math.abs(card.width - 400) < 1
+            const last = after.at(-1)!
+            const oneHome = !!last.one && Math.abs(last.one.width - 160) < 2
+            const twoHidden = after.slice(2).every((f) => hidden(f.two))
+            if (!atRest) {
+                const opened = !!last.card && Math.abs(last.card.width - 400) < 2
+                return [
+                    opened && oneHome && twoHidden,
+                    `mid-open: card ends ${last.card?.width.toFixed(0)}px wide, one ends ${last.one?.width.toFixed(0)}px, two ${twoHidden ? 'hidden' : 'SHOWN'}`
+                ]
+            }
+            const moved = after.filter(
+                (f) => !f.card || !near(f.card, card, 2) || f.card.opacity < 0.99
+            )
+            const first = after.find((f) => !hidden(f.one) && !near(f.one!, card, 1))
+            const fromCard = !!first && Math.abs(first.one!.width - card.width) < 40
+            return [
+                !moved.length && fromCard && oneHome && twoHidden,
+                `card ${moved.length ? `moved in ${moved.length} frames` : 'stayed put'}; one ${first?.one?.width.toFixed(0)} → ${last.one?.width.toFixed(0)}px; two ${twoHidden ? 'hidden' : 'SHOWN'}`
+            ]
+        })
+
+    const judgeClose = (id: string) =>
+        judge(`close into ${id}`, (frames) => {
+            const key = id as 'one' | 'two'
+            const widths = frames.flatMap((f) => (f[key] && !hidden(f[key]) ? [f[key]!.width] : []))
             const held = frames.filter((f) => f.card).length
             const ok =
                 widths.length > 10 &&
                 widths[1] > 300 &&
                 Math.abs(widths[widths.length - 1] - 160) < 2 &&
                 held > frames.length / 2
-            readout = `two ${widths[1]?.toFixed(0)} → ${widths.at(-1)?.toFixed(0)}px; card held ${held}/${frames.length} frames`
-            verdict = ok ? 'grows-out' : 'snapped'
-        }, 2200)
+            return [
+                ok,
+                `${id} ${widths[1]?.toFixed(0)} → ${widths.at(-1)?.toFixed(0)}px; card held ${held}/${frames.length} frames`
+            ]
+        })
+
+    // The page buttons, the thumbnails and the tester steps share these.
+    const openThumb = (id: string) => {
+        if (open && open !== id) {
+            mark('changedAt')
+            judgeNext()
+        }
+        open = id
+    }
+    const next = () => {
+        mark('changedAt')
+        if (open) judgeNext()
+        open = 'two'
+    }
+    const close = () => {
+        mark('closedAt')
+        if (open) judgeClose(open)
+        open = null
     }
 
-    const isPlaywright = () => window.location.search.includes('@isPlaywright=true')
+    const variants = [
+        { label: 'clone (default)', query: '' },
+        { label: 'owned', query: 'owned=true' }
+    ]
+    const keep = isPlaywright ? '@isPlaywright=true' : ''
+    const variantHref = (query: string) => `?${[keep, query].filter(Boolean).join('&')}`
+    const current = owned ? 'owned' : 'clone (default)'
+
     const steps: TesterStep[] = [
         {
             text: 'Click the red thumbnail ("one").',
-            expected: 'A grey card grows out of thumbnail one over two seconds.',
-            action: { label: 'Open one', run: () => (open = 'one') }
+            expected:
+                'A grey card grows out of thumbnail one over two seconds, and thumbnail one fades out.',
+            action: { label: 'Open one', run: () => openThumb('one') }
         },
         {
-            text: 'Click "next".',
+            text: 'When the card is fully open, click "next".',
             expected:
-                'The card stays where it is (no re-grow, no crossfade). Thumbnail one reappears and animates home from the card; thumbnail two disappears.',
-            action: {
-                label: 'Next',
-                run: () => {
-                    mark('changedAt')
-                    open = 'two'
-                }
-            }
+                "The card stays exactly where it is (no re-grow, no flash). Thumbnail one reappears at the card's size and shrinks home over two seconds; thumbnail two disappears. The chip reads NEXT ✓.",
+            action: { label: 'Next', run: next }
         },
         {
             text: 'Click "close".',
             expected:
-                'The card shrinks back into thumbnail two: thumbnail two grows out of the card while the card stays mounted and fades out, gone when the two seconds end. The chip reads GROWS OUT ✓.',
-            action: {
-                label: 'Close',
-                run: () => {
-                    mark('closedAt')
-                    open = null
-                    judgeClose()
-                }
-            }
+                'Thumbnail two grows back out of the card and shrinks home over two seconds, while the card stays and fades out, gone when it lands. The chip reads CLOSE INTO TWO ✓.',
+            action: { label: 'Close', run: close }
+        },
+        {
+            text: 'Open one again, close, and click thumbnail one again while it is still shrinking home.',
+            expected:
+                'The card grows back out from wherever thumbnail one had got to, with no jump. Close again: it shrinks into thumbnail one and the chip reads CLOSE INTO ONE ✓.'
+        },
+        {
+            text: 'Click "next" about half a second after opening one, while the card is still growing.',
+            expected:
+                'The card keeps growing to its full size, thumbnail one heads home, two disappears. The chip reads NEXT ✓.'
+        },
+        {
+            text: 'Switch to the other variant with the links next to the chip and repeat.',
+            expected: 'Both variants look the same.'
         }
     ]
 </script>
@@ -156,7 +250,7 @@
             {id}
             layoutId={id}
             {transition}
-            onclick={() => (open = id)}
+            onclick={() => openThumb(id)}
             style="position: absolute; top: 50px; left: {20 +
                 i * 180}px; width: 160px; height: 100px; background: {i ? 'royalblue' : 'tomato'};"
         />
@@ -185,26 +279,14 @@
             {/if}
         </AnimatePresence>
     {/if}
-    <button
-        id="next"
-        type="button"
-        style="position: absolute; top: 550px;"
-        onclick={() => {
-            mark('changedAt')
-            open = 'two'
-        }}
-    >
+    <button id="next" type="button" style="position: absolute; top: 550px;" onclick={next}>
         next
     </button>
     <button
         id="close"
         type="button"
         style="position: absolute; top: 550px; left: 100px;"
-        onclick={() => {
-            mark('closedAt')
-            open = null
-            if (!isPlaywright()) judgeClose()
-        }}
+        onclick={close}
     >
         close
     </button>
@@ -213,29 +295,35 @@
 <TesterPanel
     eyebrow="Motion 14.7.1 · #1411"
     title="Change an open card's layoutId, then close it"
-    status="Plan 012: closing holds the card while it crossfades into thumbnail two, on both syntaxes."
+    status="Plan 012: next switches the card in place; closing holds it while it crossfades into its thumbnail, on both syntaxes."
     {steps}
 >
     {#snippet summary()}
-        <span
-            class="verdict {verdict === 'grows-out' ? 'ok' : verdict === 'snapped' ? 'bad' : 'na'}"
-        >
-            {verdict === 'grows-out'
-                ? 'GROWS OUT ✓'
-                : verdict === 'snapped'
-                  ? 'SNAPPED ✗'
+        <span class="verdict {verdict === 'ok' ? 'ok' : verdict === 'bad' ? 'bad' : 'na'}">
+            {verdict === 'ok'
+                ? `${judged?.toUpperCase()} ✓`
+                : verdict === 'bad'
+                  ? `${judged?.toUpperCase()} ✗`
                   : verdict === 'recording'
-                    ? 'RECORDING'
+                    ? `RECORDING ${judged?.toUpperCase()}`
                     : 'WAITING'}
         </span>
         {#if readout}<span class="readout">{readout}</span>{/if}
+        <span class="variants">
+            {#each variants as v (v.label)}
+                {#if v.label === current}
+                    <strong>{v.label}</strong>
+                {:else}
+                    <a href={variantHref(v.query)}>{v.label}</a>
+                {/if}
+            {/each}
+        </span>
     {/snippet}
     {#snippet checks()}
         <p>
             Upstream the closing card is relegated: thumbnail two takes the lead again and grows out
             of the card, while the card stays mounted and fades out until that animation ends.
         </p>
-        <p>Variants: <a href="?owned=true">owned</a> · <a href="?">clone (default)</a></p>
     {/snippet}
 </TesterPanel>
 
@@ -259,6 +347,17 @@
     .verdict.na {
         background: #f1f5f9;
         color: #475569;
+    }
+    .variants {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem 0.75rem;
+        margin-top: 0.5rem;
+        font-size: 0.8rem;
+    }
+    .variants a {
+        color: #2563eb;
+        text-decoration: underline;
     }
     .readout {
         font-size: 0.75rem;
