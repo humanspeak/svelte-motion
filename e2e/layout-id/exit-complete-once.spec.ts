@@ -80,12 +80,15 @@ for (const [suffix, query] of [
             afterBox2.some((tops) => tops.some((top) => top > 125 && top < 235)),
             `painted between box 2 and box 3 (first in-between frame ${leftBox2})`
         ).toBe(true)
-        // No frame-to-frame jump of a box or more anywhere after the click.
+        // No frame-to-frame jump of half a box or more anywhere after the
+        // click: every measurer painted this frame sits near one painted in
+        // the previous frame, so a held box standing still can't hide a jump
+        // by the one moving in.
         for (let i = 1; i < frames.length; i++) {
             const prev = frames[i - 1]
             const cur = frames[i]
             if (!prev.length || !cur.length) continue
-            const step = Math.min(
+            const step = Math.max(
                 ...cur.map((top) => Math.min(...prev.map((p) => Math.abs(top - p))))
             )
             expect(
