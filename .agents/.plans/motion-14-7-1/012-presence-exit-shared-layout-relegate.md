@@ -1913,3 +1913,139 @@ This is a 012 defect: the owned held/relegate state from the first exit cycle le
 3. Find the root cause (state not reset between exit cycles: the release latch, the relegate/promote record, the
    cached snapshot, the moved-animation record or the presence flip) and fix it inside 012's design. More than one
    new mechanism is a STOP.
+
+### A5 (2026-11-01, operator-reported at sign-off; written 2026-11-03, operator-approved)
+
+The operator found a bug while signing off `tests/layout-id/exit-complete-once` under StrictMode, frame by frame
+against the framer-motion 14.7.1 repro: after "start 1", **the 2 → 3 hop jumps.** Upstream slides every hop
+(4 → 2 → 3 → 4, each frame a few px from the last). Ours paints the box 3 measurer at box 3 on its first frame and
+holds it there for the whole transition. Where this amendment and the body disagree, this amendment wins.
+
+**1. Red first: lane `7164b6df`.** `e2e/layout-id/exit-complete-once.spec.ts`, "Every hop after start 1 slides from
+the previous box", on both syntaxes (clone, and `(owned)` with `&owned=true`). It records the painted top of every
+`[data-measurer]` per rAF and asserts that the measurer is painted between box 2 and box 3 after it reaches box 2.
+The page gains a `data-measurer` attribute only. RED before the fix.
+
+**2. Fix: lane `3d86198c`. Two causes, both on the 2 → 3 hop.**
+- **Cause 1 (both syntaxes): a reflow restarted the shared animation from the cached layout.**
+  - Box 4's held exit completes in the frame the box 3 measurer mounts. Its `onExitComplete` bumps `#done-count`,
+    and the narrower glyph shifts the content by 1.33 px.
+  - The box 3 node's ResizeObserver commit (`commitObservedLayoutChange`) seeded its snapshot from its cached layout
+    rect (box 3), while the node was drawn at its projection target (box 2). The shared animation restarted with a
+    zero delta.
+  - Upstream's re-render snapshots live: `willUpdate` → `updateSnapshot` → `measure`
+    (`create-projection-node.ts:967-979, 1080-1101 @ v14.7.1`), which is the on-screen box.
+  - Fix: when `resumingFrom && currentAnimation && target`, `commitObservedLayoutChange` seeds from
+    `onScreenSnapshot()` instead (`src/lib/utils/motionDomProjection.ts` ~2046-2055, with an upstream citation in
+    the comment).
+- **Cause 2 (owned path only): `PresenceChild` re-created a child that was already not present.**
+  - The hydration-time `onMount` flip of box 1's `present` re-ran `PresenceChild`'s `{#if}` before its
+    `$effect.pre` moved the phase to `holding`. The child was destroyed and re-created already not present.
+  - That node never relegated or released. It stayed the measurer stack's present lead, every later hop resumed
+    from its box 1 snapshot, and its element stayed in the DOM.
+  - Upstream's `PresenceChild` renders its children through the flip (`PresenceChild.tsx:115-125 @ v14.7.1`).
+  - Fix: `rendersChildren()` (`src/lib/components/PresenceChild.svelte` ~308-311, used at ~393). It also renders
+    the children while an exit is about to start: the last seen `present` was `true` and the phase is still
+    `idle`.
+
+**3. Scope extensions (approved, for this change only).**
+- `src/lib/components/PresenceChild.svelte` is lifted from **Out of scope**, and from the out-of-scope-file STOP
+  condition, for the `rendersChildren()` change only. The rest of the file stays out of scope.
+- `MotionDomProjectionAdapter.commitObservedLayoutChange` (`motionDomProjection.ts`) is added to the in-scope
+  members, for the on-screen seed only.
+
+**4. Known gap, recorded.**
+- The cause 1 fix is narrowed to a shared animation in progress (`resumingFrom` set). Upstream's `willUpdate`
+  always snapshots the on-screen box, so a node mid any layout animation measures where it is drawn. The general
+  mid-animation case under `layoutScroll` is tuned by plan 015a (the `pop-layout-scroll-siblings` clamp test), and
+  `3d86198c` leaves it as it was.
+- **Follow-up A6 (pending):** a red test for the general mid-animation case (a reflow during a non-shared layout
+  animation). If it shows a visible divergence from upstream, A6 adopts upstream (on-screen seed in every
+  mid-animation commit). Otherwise the gap stays recorded here.
+
+**5. Test-only work under A5 (done).**
+- The per-box no-jump check landed in lane `02a3596f`. Each box is followed separately, so a held old box sitting
+  still can't hide a jump by the new one. The "painted between box 2 and box 3" assertion is unchanged.
+- Unit tests for both A5 changes landed in lane `e42d7a1b`. Both are RED on `3d86198c^`:
+  - `src/lib/utils/motionDomProjection.spec.ts`: mid a shared (`resumingFrom`) animation,
+    `commitObservedLayoutChange` seeds from the on-screen target box, ignoring the cached layout and the passed
+    rect. Idle, it seeds from the cached layout. RED: "expected 100 to be 40".
+  - `src/lib/utils/usePresence.spec.ts` with the new harness `src/lib/components/__tests__/MountFlipPresenceHarness.svelte`
+    (both in scope under A5): `PresenceChild` keeps its children through a present → not-present flip made from
+    an `onMount` before its phase effect runs. RED: "expected 2 to be 1" (the child mounted twice).
+
+### A6 (2026-11-03, operator-approved under A5.4)
+
+A5.4's follow-up probe is RED and shows a visible divergence from upstream. Under A5.4's approved clause, A6 adopts
+upstream. Where this amendment and the body or A5 disagree, this amendment wins.
+
+**1. Red first: lane `a938fd80`.**
+- New page `src/routes/tests/layout/reflow-mid-animation/+page.svelte` (linked from `src/routes/+page.svelte`) and
+  spec `e2e/layout/reflow-mid-animation.spec.ts`. All three files are in scope under A6.
+- A plain `layout` box (no `layoutId`) slides 400 px over 1 s, linear. 400 ms in, its content grows from 50 to
+  60 px, and its ResizeObserver commits the change through `commitObservedLayoutChange`.
+- Ours: the container passes the cached rect (`rebasedLastRect()`, `_MotionContainer.svelte` ~2503, used ~3169),
+  and the restart is seeded from it. The painted box jumps from 154 px to 399.6 px between frames 24 and 25 (a
+  245.6 px step) and holds at the end slot.
+- Upstream (repro mirror `/tmp/fm1471-repro-012`, `?test=reflowmid`, framer-motion 14.7.1) snapshots the painted
+  box in `willUpdate` (`updateSnapshot` → `measure`, `create-projection-node.ts:967-979, 1080-1101 @ v14.7.1`). It
+  slides on from 156 to 400 px with a max step of 7.2 px.
+
+**2. Fix: widen A5's on-screen seed to any in-flight layout animation, as upstream.**
+- In `commitObservedLayoutChange`, seed from `onScreenSnapshot()` whenever the node has a layout animation in flight
+  (`currentAnimation` with a projection `target`), not only when `resumingFrom` is set. With no animation in flight,
+  keep today's seed (the passed rect, else the cached layout).
+- This closes A5.4's recorded gap. A5's comment at the seed must be updated to match, keeping its upstream citation.
+- **In scope:** `src/lib/utils/motionDomProjection.ts`, `commitObservedLayoutChange` and what it calls for the seed
+  (`onScreenSnapshot` and its rebase helpers). `motionDomProjection.spec.ts`: extend A5's
+  `commitObservedLayoutChange` cases with a non-shared in-flight case, RED before the fix. No container change.
+  Everything else stays out of scope.
+
+**3. Done criteria.**
+- `e2e/layout/reflow-mid-animation.spec.ts` passes.
+- A5's specs and unit tests pass (`e2e/layout-id/exit-complete-once.spec.ts`, the `e42d7a1b` cases).
+- The 015a GUARDs pass unchanged: `e2e/animate-presence/pop-layout-scroll-siblings.spec.ts` and
+  `e2e/animate-presence/pop-layout-container-move.spec.ts` (baseline 69 passed, 1 skipped).
+- The full 012 set passes unchanged: `e2e/layout/layout-root.spec.ts e2e/layout-id e2e/animate-presence` (baseline
+  302 passed, 1 skipped).
+- `e2e/layout` passes as a whole.
+- `pnpm exec vitest run` passes.
+
+**4. STOP.**
+- A 015a `layoutScroll` case changes (fails, or drifts past its value from before A6). Report it with the measured
+  values; don't retune it.
+- The fix needs more than the widened gate in `commitObservedLayoutChange` and its seed helpers.
+
+**5. Scope extension: the clone hand-off's scroll anchoring (2026-11-03, operator-approved under A5.4's "A6 adopts
+upstream").** This answers the A6.4 STOP that the widened gate hit. The red unit case for A6.2 is lane `54e4b084`
+("expected 100 to be 40"). The fix itself is uncommitted in `motionDomProjection.ts`.
+- **What failed.** With the widened gate, `e2e/animate-presence/pop-layout-scroll-siblings.spec.ts:453` (clone,
+  `?layoutScroll`, "the clamp is a one-frame content jump") fails: blue never takes the 70 px clamp step. Upstream
+  takes it at about 100 ms (React mirror `/tmp/fm1471-repro-012`, `?test=scrollsib&layoutScroll`).
+- **Root cause: not the seed.**
+  - The clone path's hand-off in `src/lib/utils/presence.ts` inserts the absolute clone and drops the original.
+    The frame after the pop, that triggers a browser scroll-anchoring adjustment of +70 px (`#scroller`
+    `scrollTop` 550 → 620).
+  - Upstream keeps the real element, so the browser makes no adjustment.
+  - A trailing observer commit then sees a phantom 70 px change on `sib-4`.
+  - On the old gate, that phantom commit made orange (`sib-4`) snap instead of slide. This was an upstream
+    divergence before A6, and no spec checked it: upstream's orange slides 330 → 254. The phantom commit also
+    happened to produce the clamp jump that `:453` expects.
+  - With `#scroller { overflow-anchor: none }` on the page, both gates match upstream frame for frame (`scrollTop`
+    550; blue 120; green 260 → 183 → 191 → 190; orange 330 → 253 → 260). That confirms the cause.
+- **In scope (added):**
+  - The clone hand-off in `src/lib/utils/presence.ts`, only to stop the swap from producing a scroll-anchoring
+    adjustment that upstream doesn't get (for example, suppress or compensate anchoring around the clone insert
+    and the original's removal). It must be a library fix. A page-level CSS workaround (`overflow-anchor: none` on
+    the test page) is not acceptable, because users' pages won't have it.
+  - In `e2e/animate-presence/pop-layout-scroll-siblings.spec.ts`, on the **clone** `?layoutScroll` path only: a new
+    or tightened assertion, judged from painted frames, that the item after green (`sib-4`, orange) slides rather
+    than snaps (upstream 330 → 253 → 260, no one-frame step to its end slot), and that the scroller's `scrollTop`
+    stays at upstream's 550 (no anchoring adjustment). It must be **RED on current code** before the fix.
+- **Unchanged:** `:453` itself stays exactly as written. It is upstream-correct, and the fix must make it pass
+  without editing it. The owned branches of the spec stay out of scope (GUARDs).
+- **Done criteria (added to A6.3):** the new `sib-4` / `scrollTop` assertion passes, `:453` passes unedited, and the
+  rest of A6.3 holds, including the 015a GUARD and 012 set baselines.
+- **STOP (added to A6.4):** the anchoring fix changes any owned-path case or any case without a scroller (in
+  `pop-layout-scroll-siblings.spec.ts`, `pop-layout-container-move.spec.ts`, the 012 set or `e2e/layout`). Report
+  it with the measured values; don't retune. A6.4's `layoutScroll` STOP still applies to every other case.
