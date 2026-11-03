@@ -2006,8 +2006,8 @@ export class MotionDomProjectionAdapter {
      * projection while the Svelte component controls the snapshot timing.
      *
      * @param previousRect Optional pre-update rect used to seed the root
-     * projection snapshot. Ignored mid a shared `layoutId` animation, when
-     * the node's on-screen projection target is the snapshot.
+     * projection snapshot. Ignored mid a layout animation, when the node's
+     * on-screen projection target is the snapshot.
      * @param options.ownSubtreeChanged This node's own props or DOM subtree
      * changed (not just its position). Descendants in a separate LayoutGroup
      * node group are then snapshotted too, as upstream's re-render would.
@@ -2033,18 +2033,20 @@ export class MotionDomProjectionAdapter {
         // shared-layout effect hand a departing element's rect to the projection
         // instead of hand-writing a FLIP (drag-single-writer 005).
         if (!this.element || !(this.layout || this.layoutId)) return
-        // Mid a shared `layoutId` animation the node is drawn at its
-        // projection target, out of the previous lead's box, and upstream's
-        // `willUpdate()` snapshot measures that on-screen box
+        // Mid any layout animation (shared `layoutId` or plain `layout`) the
+        // node is drawn at its projection target, not its layout slot, and
+        // upstream's `willUpdate()` snapshot measures that on-screen box
         // (`updateSnapshot` → `measure`, create-projection-node.ts 967-979,
-        // 1080-1101 @ v14.7.1). Its cached layout rect is its own new slot,
-        // where it has never been drawn: seeding that restarted the
-        // animation from there, so an arriving node nudged by an unrelated
-        // reflow (plan 012 A5, a completed exit's `onExitComplete`
-        // re-rendering a counter) held at its new box for the whole
-        // animation instead of sliding from the old lead.
+        // 1080-1101 @ v14.7.1). Its cached layout rect (and the caller's
+        // `previousRect`, read from the same cache) is its slot: seeding that
+        // restarted the animation from there, so a node nudged by an
+        // unrelated reflow jumped to its new slot and held there. An arriving
+        // shared node held at its new box instead of sliding from the old
+        // lead (plan 012 A5, a completed exit's `onExitComplete` re-rendering
+        // a counter); a plain `layout` slide jumped to its end (plan 012 A6,
+        // its content growing mid slide).
         const projection = this.projection
-        const onScreen = projection.resumingFrom && projection.currentAnimation && projection.target
+        const onScreen = projection.currentAnimation && projection.target
         const snapshot = onScreen
             ? this.onScreenSnapshot()
             : previousRect
