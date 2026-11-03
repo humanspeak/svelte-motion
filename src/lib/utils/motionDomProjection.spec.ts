@@ -1257,6 +1257,73 @@ describe('MotionDomProjectionAdapter node-group gaps (plan 007 Step 4b)', () => 
 })
 
 /**
+ * An observed reflow mid a shared `layoutId` animation (plan 012 A5). The
+ * arriving node is drawn at its projection target, out of the previous
+ * lead's box; upstream's re-render snapshots that on-screen box
+ * (`willUpdate` → `updateSnapshot` → `measure`, create-projection-node.ts
+ * 967-979, 1080-1101 @ v14.7.1), so the restart continues from where it is
+ * painted instead of from its own (never drawn) slot.
+ */
+describe('MotionDomProjectionAdapter.commitObservedLayoutChange mid a shared animation (plan 012 A5)', () => {
+    const rects = new Map<HTMLElement, DOMRect>()
+    const place = (element: HTMLElement, top: number) =>
+        rects.set(element, new DOMRect(10, top, 100, 50))
+    const mount = (adapter: MotionDomProjectionAdapter, top: number) => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        place(element, top)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => rects.get(element)!)
+        adapter.updateOptions({ layoutId: 'measurer' })
+        adapter.mount(element)
+        return element
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+    /** Drawn 60px above its 100px slot, at the previous lead's box. */
+    const onScreenTarget = () => ({ x: { min: 10, max: 110 }, y: { min: 40, max: 90 } })
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+    })
+
+    it('seeds the committer from its on-screen target box, not its cached layout or the passed rect', async () => {
+        const previousLead = new MotionDomProjectionAdapter()
+        const arriving = new MotionDomProjectionAdapter()
+        mount(previousLead, 40)
+        const element = mount(arriving, 100)
+        const projection = arriving.projection
+        projection.resumingFrom = previousLead.projection as typeof projection.resumingFrom
+        projection.currentAnimation = {} as never
+        projection.target = onScreenTarget()
+
+        // An unrelated reflow nudges the slot by 1px.
+        place(element, 101)
+        arriving.commitObservedLayoutChange({ left: 10, top: 100, width: 100, height: 50 })
+
+        expect(projection.snapshot?.layoutBox.y.min).toBe(40)
+        projection.resumingFrom = undefined
+        projection.currentAnimation = undefined
+        await flush()
+        arriving.unmount()
+        previousLead.unmount()
+    })
+
+    it('seeds from the cached layout with no shared animation running', async () => {
+        const arriving = new MotionDomProjectionAdapter()
+        const element = mount(arriving, 100)
+        arriving.projection.target = onScreenTarget()
+
+        place(element, 101)
+        arriving.commitObservedLayoutChange()
+
+        expect(arriving.projection.snapshot?.layoutBox.y.min).toBe(100)
+        await flush()
+        arriving.unmount()
+    })
+})
+
+/**
  * LayoutGroup `forceRender` (plan 007 D7): `commitGroup` re-commits every
  * member of a node group from cached / on-screen snapshots.
  */
