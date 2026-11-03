@@ -1309,6 +1309,30 @@ describe('MotionDomProjectionAdapter.commitObservedLayoutChange mid a shared ani
         previousLead.unmount()
     })
 
+    it('seeds a non-shared in-flight layout animation from its on-screen target box (plan 012 A6)', async () => {
+        // A plain `layout` node mid its own animation: upstream's
+        // `willUpdate()` measures where it is painted whatever the animation
+        // (create-projection-node.ts 967-979, 1080-1101 @ v14.7.1).
+        const sliding = new MotionDomProjectionAdapter()
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        place(element, 100)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => rects.get(element)!)
+        sliding.updateOptions({ layout: true })
+        sliding.mount(element)
+        const projection = sliding.projection
+        projection.currentAnimation = {} as never
+        projection.target = onScreenTarget()
+
+        place(element, 101)
+        sliding.commitObservedLayoutChange({ left: 10, top: 100, width: 100, height: 50 })
+
+        expect(projection.snapshot?.layoutBox.y.min).toBe(40)
+        projection.currentAnimation = undefined
+        await flush()
+        sliding.unmount()
+    })
+
     it('seeds from the cached layout with no shared animation running', async () => {
         const arriving = new MotionDomProjectionAdapter()
         const element = mount(arriving, 100)
