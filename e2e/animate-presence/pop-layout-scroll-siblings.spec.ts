@@ -568,13 +568,13 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         for (const { scrollTop } of after.slice(clamped)) expect(scrollTop).toBe(550)
         // In content coordinates the item starts in its old slot (880) and
         // slides to its new one (810), never stepping to it in one frame.
+        // Drawn from its old slot it sits below the clamped scroller's
+        // bottom edge (upstream's 330 of 320), so it is first hit-tested a
+        // few frames in, still well short of the new slot.
         const fourth = after.flatMap(({ fourth }) => (fourth === undefined ? [] : [fourth]))
         expect(fourth.length).toBeGreaterThanOrEqual(20)
         expect(Math.abs(before.at(-1)!.fourth! - 880), 'sib-4 old slot').toBeLessThanOrEqual(2)
-        expect(
-            Math.max(...fourth.slice(0, 3)),
-            'sib-4 starts in its old slot'
-        ).toBeGreaterThanOrEqual(870)
+        expect(fourth[0], 'sib-4 first seen short of its new slot').toBeGreaterThanOrEqual(850)
         expect(Math.abs(fourth.at(-1)! - 810), 'sib-4 new slot').toBeLessThanOrEqual(3)
         expect(maxHitStep(hits, 'fourth'), 'sib-4 hit-tested step').toBeLessThanOrEqual(35)
         // …along its own layout spring, which overshoots the new slot

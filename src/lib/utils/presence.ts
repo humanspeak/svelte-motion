@@ -489,6 +489,56 @@ const readNumericStyle = (value: string, fallback: () => number): number => {
     return Number.isFinite(parsed) ? parsed : fallback()
 }
 
+/** Elements {@link suppressScrollAnchoring} holds, with their own inline value. */
+const anchoringSuppressions = new WeakMap<HTMLElement, { count: number; inline: string }>()
+
+/**
+ * Keep the browser from scroll-anchoring around an exit clone hand-off
+ * (plan 012 A6): `overflow-anchor: none` on `element` until the second
+ * animation frame, so the first frame's layout after the swap makes no
+ * adjustment. Overlapping calls share one hold; the element's own inline
+ * value comes back when the last one ends.
+ *
+ * Upstream keeps the real element in place, so its clamp of a scrolled
+ * container is the only scroll change an exit makes. The clone path removes
+ * the element and inserts its clone, and the frame after a `popLayout` pop
+ * the browser re-anchors the container to where its content sat before the
+ * clamp, once the siblings' layout transforms extend the overflow again
+ * (550 → 620 in `tests/animate-presence/pop-layout-scroll-siblings`
+ * `?layoutScroll`). Suppressing anchoring on the clone's layout parent for
+ * that frame leaves the clamp as upstream's; a compensating scroll write
+ * would fight the browser and any scroll in progress.
+ *
+ * @param element The clone's layout parent (it generates a box).
+ * @returns Nothing.
+ *
+ * @example
+ * ```ts
+ * parent.insertBefore(clone, slot)
+ * suppressScrollAnchoring(layoutParentOf(parent, true))
+ * ```
+ */
+export const suppressScrollAnchoring = (element: HTMLElement): void => {
+    const held = anchoringSuppressions.get(element)
+    if (held) {
+        held.count += 1
+    } else {
+        anchoringSuppressions.set(element, { count: 1, inline: element.style.overflowAnchor })
+        element.style.overflowAnchor = 'none'
+    }
+    const release = () => {
+        const hold = anchoringSuppressions.get(element)
+        if (!hold || --hold.count > 0) return
+        anchoringSuppressions.delete(element)
+        element.style.overflowAnchor = hold.inline
+    }
+    if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => requestAnimationFrame(release))
+    } else {
+        setTimeout(release, 32)
+    }
+}
+
 /**
  * Remove what a nested `AnimatePresence` had in flight from a fresh exit
  * clone (plan 012, N3): copies of its own exit clones and placeholders, which
@@ -2514,6 +2564,9 @@ export const createAnimatePresenceContext = (context: {
             held && !placeholder ? removalNextSibling(child.element, slotParent) : null
         const slotAnchor = placeholder ?? removedBefore ?? resolvePlaceholderAnchor(child)
         slotParent.insertBefore(clone, slotAnchor?.parentNode === slotParent ? slotAnchor : null)
+        // No scroll-anchoring adjustment from the swap, as upstream keeps
+        // the element (plan 012 A6).
+        if (followParent instanceof HTMLElement) suppressScrollAnchoring(followParent)
         const activeExit: ActiveExit = { clone, child, placeholder, cancelled: false, holds: [] }
         activeExits.set(key, activeExit)
         if (popLayoutSnapshot) {

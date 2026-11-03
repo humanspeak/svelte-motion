@@ -17,6 +17,7 @@ import {
     resolvePopLayoutStyles,
     setPresenceDepth,
     snapshotComputedStyle,
+    suppressScrollAnchoring,
     type PresenceExitResolver,
     type PresenceLayoutHandOff
 } from './presence'
@@ -79,6 +80,50 @@ function mockComputedStyle(overrides: Partial<CSSStyleDeclaration> = {}): CSSSty
     } as unknown as CSSStyleDeclaration
     return style
 }
+
+describe('suppressScrollAnchoring (plan 012 A6)', () => {
+    afterEach(() => vi.useRealTimers())
+
+    const frames = () => {
+        const queue: FrameRequestCallback[] = []
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            queue.push(callback)
+            return queue.length
+        })
+        return () => {
+            for (const callback of queue.splice(0)) callback(performance.now())
+        }
+    }
+
+    it('turns anchoring off until the second frame, then restores the inline value', () => {
+        const nextFrame = frames()
+        const list = document.createElement('ul')
+        list.style.overflowAnchor = 'auto'
+
+        suppressScrollAnchoring(list)
+        expect(list.style.overflowAnchor).toBe('none')
+        nextFrame()
+        expect(list.style.overflowAnchor).toBe('none')
+        nextFrame()
+        expect(list.style.overflowAnchor).toBe('auto')
+        vi.restoreAllMocks()
+    })
+
+    it('holds overlapping hand-offs until the last one ends', () => {
+        const nextFrame = frames()
+        const list = document.createElement('ul')
+
+        suppressScrollAnchoring(list)
+        nextFrame()
+        suppressScrollAnchoring(list)
+        nextFrame()
+        // The first hold ended; the second still covers its first frame.
+        expect(list.style.overflowAnchor).toBe('none')
+        nextFrame()
+        expect(list.style.overflowAnchor).toBe('')
+        vi.restoreAllMocks()
+    })
+})
 
 describe('presence context', () => {
     let parent: HTMLElement
