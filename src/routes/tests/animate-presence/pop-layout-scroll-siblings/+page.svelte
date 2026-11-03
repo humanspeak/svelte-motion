@@ -277,6 +277,30 @@
         sampleFrames(sample)
     }
 
+    const variants = [
+        { label: 'clone (default)', query: '' },
+        { label: 'owned', query: 'path=owned' },
+        { label: 'layoutScroll', query: 'layoutScroll' },
+        { label: 'owned · layoutScroll', query: 'path=owned&layoutScroll' },
+        { label: 'sticky', query: 'sticky' },
+        { label: 'owned · sticky', query: 'path=owned&sticky' },
+        { label: 'fixed', query: 'fixed' },
+        { label: 'owned · fixed', query: 'path=owned&fixed' },
+        { label: 'nolayout', query: 'nolayout' },
+        { label: 'sync', query: 'mode=sync' },
+        { label: 'owned · sync', query: 'mode=sync&path=owned' },
+        { label: 'owned · sync · layoutGroup', query: 'mode=sync&path=owned&layoutGroup' },
+        { label: 'footer', query: 'footer' },
+        { label: 'footer · sync', query: 'footer&mode=sync' }
+    ]
+    /** The query in canonical form, to mark the open variant. */
+    const canonical = (query: string) =>
+        [...new URLSearchParams(query).entries()]
+            .map(([k, v]) => (v ? `${k}=${v}` : k))
+            .sort()
+            .join('&')
+    const currentQuery = canonical(page.url.search)
+
     const steps: TesterStep[] = [
         {
             text: 'Scroll the list to the bottom (on ?fixed, scroll the page by 300px).',
@@ -397,6 +421,17 @@
                     : verdict.clamp
                       ? '70px one-frame step (expected)'
                       : 'NO JUMP'} · max step {verdict.jump}px
+            </span>
+        {/if}
+        {#if isTester}
+            <span class="variants">
+                {#each variants as v (v.label)}
+                    {#if canonical(v.query) === currentQuery}
+                        <strong>{v.label}</strong>
+                    {:else}
+                        <a href="?{v.query}">{v.label}</a>
+                    {/if}
+                {/each}
             </span>
         {/if}
         {#if isTester && movement}
@@ -596,5 +631,18 @@
 
     .chip.bad {
         background: #b00020;
+    }
+
+    .variants {
+        display: flex;
+        flex-basis: 100%;
+        flex-wrap: wrap;
+        gap: 0.25rem 0.75rem;
+        font-size: 0.8rem;
+    }
+
+    .variants a {
+        color: #2563eb;
+        text-decoration: underline;
     }
 </style>
