@@ -197,6 +197,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Rotate',
         description: 'Interactive Rotate animation example using Svelte Motion.'
     },
+    'presence-crossfade': {
+        title: 'Presence Crossfade',
+        description:
+            'A card that closes back into its thumbnail: exiting layoutId elements crossfade with AnimatePresence.'
+    },
     'scroll-progress': {
         title: 'Scroll Progress',
         description: 'Interactive scroll progress animation example using Svelte Motion.'

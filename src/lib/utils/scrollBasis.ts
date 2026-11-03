@@ -95,8 +95,17 @@ const styleMemo = new WeakMap<Element, NodeStyle>()
  * containment (`strict` and `content` include both). Read live, never
  * memoized: a motion ancestor's transform changes at any time. Only read on
  * a walk past a fixed node, which runs for a commit, never per frame.
+ * Also the "containing block of a fixed box" test of plan 012's exit-clone
+ * placement and of `popLayoutPointFollowsScroll`.
+ *
+ * @param element The element to test.
+ * @returns `true` when it contains its fixed descendants.
+ * @example
+ * ```ts
+ * if (holdsFixedDescendants(ancestor)) containingBlock = ancestor
+ * ```
  */
-const holdsFixedDescendants = (element: Element): boolean => {
+export const holdsFixedDescendants = (element: Element): boolean => {
     const view = element.ownerDocument.defaultView ?? window
     const computed = view.getComputedStyle(element)
     const set = (value: string | undefined) => !!value && value !== 'none'
@@ -300,41 +309,6 @@ export const readScrollBasis = (element: Element): ScrollBasis => {
     if (fixed) {
         fixedRoot = readRootScroll(element.ownerDocument)
         remember(element.ownerDocument, fixedRoot)
-    }
-    return { scrollers, values, epoch, resizeEpoch, fixedRoot, unreliable: sticky }
-}
-
-/**
- * `element`'s scroll basis from the tracker, as of the last resample:
- * normally the scroll from before the current DOM change. Reads no scroll
- * offset of a known container; a container the tracker hasn't seen yet is
- * read live.
- *
- * @param element The element to describe.
- * @returns The basis the tracker holds for it.
- *
- * @example
- * ```ts
- * const before = seenScrollBasis(parent)
- * // ...the DOM changes, a scroll position clamps...
- * const move = scrollDelta(before, readScrollBasis(parent), isFoldedIn)
- * ```
- */
-export const seenScrollBasis = (element: Element): ScrollBasis => {
-    install()
-    const { scrollers, fixed, sticky } = getScrollAncestors(element)
-    const values = scrollers.map((container) => {
-        const value = seen.get(container)
-        if (value) return value
-        const live = readScroll(container)
-        remember(container, live)
-        return live
-    })
-    let fixedRoot: [number, number] | null = null
-    if (fixed) {
-        const doc = element.ownerDocument
-        fixedRoot = seen.get(doc) ?? readRootScroll(doc)
-        remember(doc, fixedRoot)
     }
     return { scrollers, values, epoch, resizeEpoch, fixedRoot, unreliable: sticky }
 }
