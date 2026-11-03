@@ -1377,6 +1377,14 @@
                         Slow overdamped spring layout animation (#1207)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/reflow-mid-animation') + searchParams}
+                    >
+                        layout — a reflow mid animation keeps sliding from the painted box
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
