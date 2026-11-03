@@ -83,6 +83,14 @@ interface Hit {
      * only its bottom edge shows where its box is.
      */
     orange?: number
+    /**
+     * The item after green (`sib-4`, grey): its top in the scroller's
+     * content (viewport top minus the scroller's top plus its `scrollTop`),
+     * so a scroll clamp doesn't read as a move (plan 012 A6).
+     */
+    fourth?: number
+    /** `#scroller`'s `scrollTop`, when the page has one (plan 012 A6). */
+    scrollTop?: number
 }
 interface Recording {
     frames: Frame[]
@@ -159,6 +167,13 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
         const greenX = column('sib-3')
         const zeroX = column('sib-0')
         const orangeX = column('footer')
+        const fourthX = column('sib-4')
+        const scroller = document.getElementById('scroller')
+        const fourthTop = () => {
+            const top = scan(fourthX, 'sib-4', false)
+            if (top === undefined || !scroller) return undefined
+            return top - scroller.getBoundingClientRect().top + scroller.scrollTop
+        }
         const greenRect = document.getElementById('sib-3')?.getBoundingClientRect()
         const greenY = greenRect ? greenRect.top + greenRect.height / 2 : undefined
         const scanRow = (y: number | undefined, id: string) => {
@@ -210,7 +225,9 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
                 greenLeft: scanRow(greenY, 'sib-3'),
                 zero: scan(zeroX, 'sib-0', false),
                 ...pinkCentre(),
-                orange: scan(orangeX, 'footer', true)
+                orange: scan(orangeX, 'footer', true),
+                fourth: fourthTop(),
+                scrollTop: scroller?.scrollTop
             })
             requestAnimationFrame(sample)
         }
@@ -333,7 +350,7 @@ function maxStep(frames: Frame[], colour: Colour): number {
     return step
 }
 
-type HitEdge = 'blue' | 'green' | 'zero' | 'orange'
+type HitEdge = 'blue' | 'green' | 'zero' | 'orange' | 'fourth'
 
 /** The largest move of a hit-tested edge between two rendered frames. */
 function maxHitStep(hits: Hit[], colour: HitEdge): number {
@@ -501,6 +518,69 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
             () => getComputedStyle(document.getElementById('sib-1')!).transform
         )
         expect(transform).toBe('none')
+    })
+
+    /**
+     * Plan 012 A6: the clone hand-off makes no scroll-anchoring adjustment.
+     * Upstream keeps the real element, so the clamp leaves the scroller at
+     * 550 and the item after green slides up from its old slot (framer-motion
+     * 14.7.1, relative to the scroller: 330 → 253 → 260 with the clamp). Ours
+     * swapped in the clone and the browser re-anchored the scroller by +70px
+     * (550 → 620); a phantom commit then snapped that item to its new slot.
+     */
+    test('?layoutScroll, popLayout: no scroll re-anchor, the item after green slides', async ({
+        page
+    }) => {
+        await open(page, '&layoutScroll')
+        await scrollBottom(page)
+        await page.waitForTimeout(200)
+        let poppedAt = 0
+        const recording = await record(
+            page,
+            async () => {
+                poppedAt = await page.evaluate(() => {
+                    document.querySelector<HTMLElement>('[data-testid="remove"]')!.click()
+                    return performance.now()
+                })
+            },
+            600
+        )
+        annotate(recording)
+        const { hits } = recording
+        test.info().annotations.push({
+            type: 'hit-tested frames (ms: scrollTop/sib-4 content top)',
+            description: hits
+                .map(
+                    ({ t, scrollTop, fourth }) =>
+                        `${(t - poppedAt).toFixed(0)}: ${scrollTop ?? '-'}/${fourth?.toFixed(0) ?? '-'}`
+                )
+                .join(' ')
+        })
+        const before = hits.filter(({ t }) => t < poppedAt)
+        const after = hits.filter(({ t }) => t > poppedAt)
+        expect(before.at(-1)?.scrollTop).toBe(620)
+        expect(after.length).toBeGreaterThanOrEqual(20)
+        // The clamp lands on the first frame after the click and stays: the
+        // scroller is never re-anchored back to 620.
+        const clamped = after.findIndex(({ scrollTop }) => scrollTop === 550)
+        expect(clamped, 'clamped to 550').toBeGreaterThanOrEqual(0)
+        expect(after[clamped].t - poppedAt, 'clamp frame').toBeLessThanOrEqual(50)
+        for (const { scrollTop } of after.slice(clamped)) expect(scrollTop).toBe(550)
+        // In content coordinates the item starts in its old slot (880) and
+        // slides to its new one (810), never stepping to it in one frame.
+        const fourth = after.flatMap(({ fourth }) => (fourth === undefined ? [] : [fourth]))
+        expect(fourth.length).toBeGreaterThanOrEqual(20)
+        expect(Math.abs(before.at(-1)!.fourth! - 880), 'sib-4 old slot').toBeLessThanOrEqual(2)
+        expect(
+            Math.max(...fourth.slice(0, 3)),
+            'sib-4 starts in its old slot'
+        ).toBeGreaterThanOrEqual(870)
+        expect(Math.abs(fourth.at(-1)! - 810), 'sib-4 new slot').toBeLessThanOrEqual(3)
+        expect(maxHitStep(hits, 'fourth'), 'sib-4 hit-tested step').toBeLessThanOrEqual(35)
+        // …along its own layout spring, which overshoots the new slot
+        // (upstream's 253 against 260, content 803), not a restart from
+        // where a phantom commit left it.
+        expect(Math.min(...fourth), 'sib-4 overshoots its new slot').toBeLessThanOrEqual(806)
     })
 
     test('sync completion in the scrolled container: no jump', async ({ page }) => {
