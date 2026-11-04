@@ -620,4 +620,3 @@ Implement it in `presence.ts`.
   case failed by 12.8 px with the division). Guard-confirmed.
 - Maintenance: the follow axes run on the main thread through a no-op `onUpdate`, which relies on motion-dom's
   `canAccelerateTransform` checking `!options.hasOnUpdate` (`motion-value.ts:62`). Re-check this on every Motion bump.
-

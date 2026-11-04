@@ -628,4 +628,3 @@ only in-scope files.
   reads), with a red unit test in `layout.spec.ts` first (same declarations, different serialisation → not a
   layout change; a real geometric property change → still a layout change).
 - Done: the 3 `relative-child-measurements.spec.ts` tests pass with no assertion weakened, and the full gate passes.
-
