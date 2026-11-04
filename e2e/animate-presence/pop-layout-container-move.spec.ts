@@ -120,9 +120,9 @@ for (const path of PATHS) {
             page
         }) => {
             // Plan 015: the motion element's projection snapshot is taken after
-            // `{#each}` inserts the new item (`_MotionContainer.svelte:2187-2209`),
-            // so the owned item's layout animation starts ~69px off. The #2348
-            // correction itself is right here (its pop rule stays at 0px).
+            // `{#each}` inserts the new item, so the owned item's layout
+            // animation starts ~70px off. The #2348 correction itself is right
+            // here (its pop rule stays at 0px). Removed in plan 015c Step 2.
             test.fixme(
                 path === 'owned',
                 'Plan 015: the projection snapshot is taken after {#each} inserts the new item'
@@ -321,6 +321,13 @@ for (const path of PATHS) {
 }
 
 test.describe('popLayout playground (#2348)', () => {
+    /** The largest centre drift a `drift-<id>` readout reports, in px. */
+    const readDrift = async (page: Page, id: number) => {
+        const readout = page.locator(`[data-testid="drift-${id}"]`)
+        await expect(readout).toBeVisible()
+        return Number(/max centre drift ([\d.]+)px/.exec((await readout.textContent()) ?? '')?.[1])
+    }
+
     test('loads, renders the default preset and reads a held removal', async ({ page }) => {
         await page.goto('/tests/animate-presence/pop-layout-playground?@isPlaywright=true')
         await page.waitForFunction(() => window.MotionIsMounted === true)
@@ -345,5 +352,42 @@ test.describe('popLayout playground (#2348)', () => {
         expect(
             Number(/max centre drift ([\d.]+)px/.exec((await later.textContent()) ?? '')?.[1])
         ).toBeLessThanOrEqual(1)
+    })
+
+    /**
+     * Toast queue on the owned path: the oldest item exits while `{#each}`
+     * inserts a new one in the same update. The exiting item's own layout
+     * snapshot must be its box from before the insert (upstream snapshots
+     * in `getSnapshotBeforeUpdate`, `MeasureLayout.tsx:149-204` @ v14.7.1).
+     */
+    test('toast queue, owned path: the oldest item holds when one is added in the same update', async ({
+        page
+    }) => {
+        await page.goto(
+            '/tests/animate-presence/pop-layout-playground?@isPlaywright=true&preset=toast&path=owned'
+        )
+        await page.waitForFunction(() => window.MotionIsMounted === true)
+        await expect(page.locator('[data-testid="pg-item-0"]')).toBeVisible()
+
+        await click(page, '[data-testid="pg-cycle"]')
+
+        expect(await readDrift(page, 0)).toBeLessThanOrEqual(1)
+    })
+
+    /**
+     * Scrolled page that shrinks, owned path, left unscrolled: removing an
+     * item also removes a mirror row, a sibling of the list, in the same
+     * update. The exiting item's own layout snapshot must not see it.
+     */
+    test('scroll-mirror, owned path, unscrolled: the removed item holds', async ({ page }) => {
+        await page.goto(
+            '/tests/animate-presence/pop-layout-playground?@isPlaywright=true&preset=scroll-mirror&path=owned'
+        )
+        await page.waitForFunction(() => window.MotionIsMounted === true)
+        await expect(page.locator('[data-testid="pg-item-1"]')).toBeAttached()
+
+        await click(page, '[data-testid="pg-item-1"]')
+
+        expect(await readDrift(page, 1)).toBeLessThanOrEqual(1)
     })
 })

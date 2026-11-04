@@ -198,6 +198,22 @@ describe('layout siblings around AnimatePresence changes (plan 015b)', () => {
         expect(updates.footer).toEqual([{ snapshot: TOP + 3 * SLOT, layout: TOP + 4 * SLOT }])
     })
 
+    // 4. RED (plan 015c): the exiting element's own snapshot. Item 1 exits
+    // while `{#each}` prepends item 0 in the same update, which pushes item 1
+    // down a slot before item 1's pre-update effect runs. Upstream snapshots
+    // before React commits anything (`MeasureLayout.tsx:149-204` @ v14.7.1),
+    // so item 1's snapshot is its pre-insert box.
+    it('4: owned popLayout, item 1 exits as item 0 is prepended: item 1 snapshots its pre-insert box', async () => {
+        const { update } = await mount({ mode: 'popLayout', slow: true })
+        const updates = listen(['item-1'])
+
+        await update({ remove: [1], addFirst: true })
+        await settle()
+
+        expect(updates['item-1'].length).toBeGreaterThan(0)
+        expect(updates['item-1'][0].snapshot).toBe(TOP)
+    })
+
     // 5. Owned sync completion.
     it('5: owned sync completion, no LayoutGroup: item 2 snaps (GUARD)', async () => {
         const { update } = await mount({ mode: 'sync' })
