@@ -156,8 +156,8 @@
             action: { label: 'Remove second', run: removeSecond }
         },
         {
-            text: 'Switch to the centred list (translate(-50%, -50%)).',
-            expected: 'Four items centred in the window.',
+            text: 'Switch to the centred list (translate(-50%, -50%)). This also adds items until there are four again, so the next removal runs on the same list.',
+            expected: 'Four items centred in the window, one of them new.',
             action: { label: 'Centred', run: () => setScenario('center') }
         },
         {
@@ -330,6 +330,12 @@
         position: fixed;
         bottom: 20px;
         right: 20px;
+    }
+
+    /* Keep the bottom-right list clear of the wide tester column (360px).
+       The panel never renders under Playwright, so specs see upstream's 20px. */
+    :global(body:has(.tester-panel:not(.narrow))) .example :global(ul.fixed.anchor-bottom) {
+        right: 380px;
     }
 
     .example :global(ul.fixed.anchor-center) {

@@ -25,6 +25,8 @@
      * - `remove`: the ids that are leaving.
      * - `addLast`: appends item `items + 1`, in the same update as the props
      *   change.
+     * - `addFirst`: prepends item 0, in the same update as the props change
+     *   (plan 015c).
      * - `layoutGroup`: wraps everything in one `LayoutGroup`.
      * - `footerInList`: the footer sits directly in the list's parent.
      * - `nested`: item 2 holds an inner `AnimatePresence` with
@@ -36,6 +38,7 @@
         items = 3,
         remove = [],
         addLast = false,
+        addFirst = false,
         mode = 'popLayout',
         clone = false,
         layoutGroup = false,
@@ -47,6 +50,7 @@
         items?: number
         remove?: number[]
         addLast?: boolean
+        addFirst?: boolean
         mode?: 'popLayout' | 'sync'
         clone?: boolean
         layoutGroup?: boolean
@@ -57,6 +61,7 @@
     } = $props()
 
     const ids = $derived([
+        ...(addFirst ? [0] : []),
         ...Array.from({ length: items }, (_, index) => index + 1),
         ...(addLast ? [items + 1] : [])
     ])

@@ -8,6 +8,7 @@ import {
     visualElementStore
 } from 'motion-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { observeLayoutChanges } from './layout.js'
 import {
     MotionDomProjectionAdapter,
     layoutMeasureStats,
@@ -2831,5 +2832,134 @@ describe('presence in shared layout (plan 012)', () => {
         expect(visualElementStore.get(element)).toBeUndefined()
         // The departing-lead snapshot is still handed over (#1935 A1).
         expect(a.projection.snapshot).toBeDefined()
+    })
+})
+
+/**
+ * Plan 015c: an owned exiting element's own snapshot, seeded from its
+ * rebased cache when an earlier block in the same flush already moved it
+ * (upstream snapshots before React commits, `MeasureLayout.tsx:149-204` @
+ * v14.7.1).
+ */
+describe('MotionDomProjectionAdapter.seedOwnSnapshotFromCache (plan 015c)', () => {
+    const mounted: MotionDomProjectionAdapter[] = []
+    const tops = new Map<HTMLElement, number>()
+
+    const create = (top: number, parent: HTMLElement = document.body, style = '') => {
+        const element = document.createElement('div')
+        if (style) element.setAttribute('style', style)
+        parent.appendChild(element)
+        tops.set(element, top)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(
+            () => new DOMRect(10, tops.get(element) ?? 0, 100, 50)
+        )
+        return element
+    }
+    const mount = (
+        element: HTMLElement,
+        options: { layout?: boolean; layoutId?: string } = { layout: true },
+        extra: ConstructorParameters<typeof MotionDomProjectionAdapter>[0] = {}
+    ) => {
+        const adapter = new MotionDomProjectionAdapter(extra)
+        adapter.updateOptions(options)
+        adapter.mount(element)
+        mounted.push(adapter)
+        return adapter
+    }
+    const settle = async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+    }
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        tops.clear()
+        vi.stubGlobal(
+            'ResizeObserver',
+            class {
+                observe() {}
+                unobserve() {}
+                disconnect() {}
+            }
+        )
+    })
+    afterEach(async () => {
+        await settle()
+        for (const adapter of mounted.splice(0)) adapter.unmount()
+        vi.unstubAllGlobals()
+        vi.restoreAllMocks()
+        document.body.innerHTML = ''
+    })
+
+    it('seeds the pre-change box from cache with no DOM read, and returns its rect', () => {
+        const element = create(100)
+        const adapter = mount(element)
+        // An earlier block in the flush pushed it down a row.
+        tops.set(element, 170)
+        const reads = vi.spyOn(element, 'getBoundingClientRect')
+        reads.mockClear()
+
+        expect(adapter.ownCacheIsCurrent()).toBe(true)
+        const rect = adapter.seedOwnSnapshotFromCache()
+
+        expect(reads).not.toHaveBeenCalled()
+        expect(rect?.top).toBe(100)
+        expect(adapter.projection.snapshot?.layoutBox.y.min).toBe(100)
+        expect(adapter.projection.isLayoutDirty).toBe(true)
+        // The live `willUpdate()` that follows (plan 012's presence pair) is
+        // then a no-op: the cached snapshot wins.
+        adapter.willUpdate()
+        expect(adapter.projection.snapshot?.layoutBox.y.min).toBe(100)
+    })
+
+    it("seeds the group's other members from their caches too", () => {
+        const group = nodeGroup()
+        const a = mount(create(100), { layout: true }, { group })
+        const bElement = create(170)
+        const b = mount(bElement, { layout: true }, { group })
+        tops.set(bElement, 240)
+
+        a.seedOwnSnapshotFromCache()
+
+        expect(b.projection.snapshot?.layoutBox.y.min).toBe(170)
+    })
+
+    it('returns null when the node is already layout-dirty', () => {
+        const adapter = mount(create(100))
+        adapter.willUpdate()
+
+        expect(adapter.seedOwnSnapshotFromCache()).toBeNull()
+    })
+
+    it('is not current on a sticky path', () => {
+        const adapter = mount(create(100, document.body, 'position: sticky; top: 0'))
+
+        expect(adapter.ownCacheIsCurrent()).toBe(false)
+    })
+
+    it('is not current without layout or layoutId', () => {
+        const adapter = mount(create(100), {})
+
+        expect(adapter.ownCacheIsCurrent()).toBe(false)
+    })
+
+    it('is not current after a layout-affecting ancestor change, until the cache is rewritten', async () => {
+        const parent = document.createElement('div')
+        document.body.appendChild(parent)
+        const element = create(100, parent)
+        const adapter = mount(element)
+        const stop = observeLayoutChanges(element, () => {})
+        // Let any update pass still queued from earlier cases run first: its
+        // cache write would clear the stamp.
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        expect(adapter.ownCacheIsCurrent()).toBe(true)
+
+        parent.setAttribute('style', 'padding-top: 70px')
+        await settle()
+        expect(adapter.ownCacheIsCurrent()).toBe(false)
+
+        adapter.refreshLayout({ silent: true })
+        expect(adapter.ownCacheIsCurrent()).toBe(true)
+        stop()
     })
 })

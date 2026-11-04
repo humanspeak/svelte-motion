@@ -70,6 +70,8 @@
         computeFlipTransforms,
         runLayoutSizeAnimation,
         finishFlipAnimations,
+        hasPendingStructuralChange,
+        installStructuralProbe,
         isLayoutMeasurementGated,
         isObservedLayoutParent,
         layoutParentOf,
@@ -2550,11 +2552,27 @@
         )
     }
 
+    // Plan 015c: the structural-change probe for an owned `layout` element,
+    // so R2 below can tell when an earlier block in this flush has already
+    // changed the DOM around it. Installed only with an owned presence
+    // context: that is the only case R2 consults it.
+    $effect(() => {
+        const target = element
+        if (!target || !layoutProp || !presenceChildContext) return
+        return untrack(() => installStructuralProbe(target))
+    })
+
+    // This element's own presence as R2 last saw it (plan 015c).
+    let snapshotSeenPresence: boolean | undefined
+
+    // R2: the pre-update snapshot.
     $effect.pre(() => {
         const mountedOn = element && measureLayoutMounted ? element : null
         // Track common layout-affecting props so Svelte-owned updates can
         // snapshot before the DOM patch, matching upstream MeasureLayout.
         const deps = trackLayoutProjectionDependencies()
+        const previousPresence = snapshotSeenPresence
+        snapshotSeenPresence = presenceChildContext?.isPresent
 
         // Mount pass: not an update (MeasureLayout.tsx componentDidMount).
         // This effect owns the mount's root update for both trackers (the
@@ -2571,9 +2589,31 @@
             return
         }
 
-        // 'snapshot' phase: the pre-patch side of the update boundary.
-        explicitLayoutSnapshot = measureLayoutRect('snapshot')
-        motionDomProjection?.willUpdate()
+        // Upstream snapshots in `getSnapshotBeforeUpdate`, before React
+        // commits anything (`MeasureLayout.tsx:149-204` @ v14.7.1). This
+        // effect runs after earlier blocks in the same flush have patched the
+        // DOM: a keyed `{#each}` inserting a toast, or removing rows beside
+        // the list, has already moved this element, so a live read is a row
+        // off and its exit's layout animation starts ~70px away. On this
+        // element's own presence flip, with a childList change pending in
+        // this flush and a current cache, seed the snapshot (and its group's)
+        // from the rebased cache instead (plan 015c). Otherwise read live:
+        // a style or class change earlier in the flush still reads live.
+        const ownPresenceFlipped =
+            previousPresence !== undefined && previousPresence !== snapshotSeenPresence
+        const cached =
+            ownPresenceFlipped &&
+            hasPendingStructuralChange(mountedOn) &&
+            motionDomProjection?.ownCacheIsCurrent()
+                ? motionDomProjection.seedOwnSnapshotFromCache()
+                : null
+        if (cached) {
+            explicitLayoutSnapshot = cached
+        } else {
+            // 'snapshot' phase: the pre-patch side of the update boundary.
+            explicitLayoutSnapshot = measureLayoutRect('snapshot')
+            motionDomProjection?.willUpdate()
+        }
         motionDomProjectionUpdatePending = true
     })
 

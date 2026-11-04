@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as layoutModule from './layout.js'
 import {
+    clearAncestorChanged,
     computeFlipTransforms,
+    hasAncestorChangedSinceCache,
+    hasPendingStructuralChange,
+    installStructuralProbe,
     isLayoutMeasurementGated,
     measureRect,
     observeLayoutChanges,
@@ -1275,6 +1279,164 @@ describe('observeLayoutChanges reach and causes (plan 015b)', () => {
         await deliver()
 
         expect(onChange).not.toHaveBeenCalled()
+    })
+})
+
+/**
+ * Plan 015c: the probe behind an exiting element's own cached snapshot. It
+ * says whether a childList change is pending in this flush under the
+ * element's outermost observed ancestor (four levels up), and the
+ * ancestor-attribute stamp says whether its cache may be stale.
+ */
+describe('hasPendingStructuralChange and the ancestor stamp (plan 015c)', () => {
+    class NoopResizeObserver {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+    }
+    /** Let queued microtasks run (jsdom delivers mutation records on one). */
+    const settle = async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+    }
+
+    let stops: Array<() => void> = []
+    beforeEach(() => {
+        vi.stubGlobal('ResizeObserver', NoopResizeObserver)
+        stops = []
+    })
+    afterEach(() => {
+        for (const stop of stops) stop()
+        vi.unstubAllGlobals()
+        document.body.innerHTML = ''
+    })
+
+    /** `body > #a > #b > ul#c > div#d > li#el`, with `#a` the outermost observed ancestor. */
+    const tree = () => {
+        const chain = ['a', 'b', 'c', 'd'].map((id) => {
+            const node = document.createElement(id === 'c' ? 'ul' : 'div')
+            node.id = id
+            return node
+        })
+        chain.reduce<HTMLElement>((parent, node) => parent.appendChild(node), document.body)
+        const el = document.createElement('li')
+        chain[3].appendChild(el)
+        const [a, b, c, d] = chain
+        return { a, b, c, d, el }
+    }
+
+    it('is false without a probe', () => {
+        const { c, el } = tree()
+        c.appendChild(document.createElement('li'))
+        expect(hasPendingStructuralChange(el)).toBe(false)
+    })
+
+    it('is true for a childList change in this flush, for the rest of the microtask', async () => {
+        const { c, el } = tree()
+        stops.push(installStructuralProbe(el))
+
+        c.prepend(document.createElement('li'))
+
+        expect(hasPendingStructuralChange(el)).toBe(true)
+        // `takeRecords()` drained the queue; the answer is cached.
+        expect(hasPendingStructuralChange(el)).toBe(true)
+        await settle()
+        expect(hasPendingStructuralChange(el)).toBe(false)
+    })
+
+    it('is false once the change was delivered (a previous flush)', async () => {
+        const { c, el } = tree()
+        stops.push(installStructuralProbe(el))
+
+        c.appendChild(document.createElement('li'))
+        await settle()
+
+        expect(hasPendingStructuralChange(el)).toBe(false)
+    })
+
+    it('ignores attribute changes: no `attributes` option', () => {
+        const { a, c, el } = tree()
+        stops.push(installStructuralProbe(el))
+
+        c.setAttribute('style', 'padding-top: 70px')
+        a.className = 'moved'
+        el.setAttribute('class', 'exiting')
+
+        expect(hasPendingStructuralChange(el)).toBe(false)
+    })
+
+    it('sees a sibling of the layout parent (rows beside the list), not just the layout parent', () => {
+        const { b, el } = tree()
+        stops.push(installStructuralProbe(el))
+
+        b.appendChild(document.createElement('div'))
+
+        expect(hasPendingStructuralChange(el)).toBe(true)
+    })
+
+    it('does not see changes outside the outermost observed ancestor', () => {
+        const { el } = tree()
+        stops.push(installStructuralProbe(el))
+
+        document.body.appendChild(document.createElement('div'))
+
+        expect(hasPendingStructuralChange(el)).toBe(false)
+    })
+
+    it('shares one observer per target and disconnects with its last element', () => {
+        const { c, d, el } = tree()
+        const other = document.createElement('li')
+        d.appendChild(other)
+        const observe = vi.spyOn(MutationObserver.prototype, 'observe')
+        const release = installStructuralProbe(el)
+        const releaseOther = installStructuralProbe(other)
+        expect(observe).toHaveBeenCalledTimes(1)
+
+        release()
+        c.appendChild(document.createElement('li'))
+        expect(hasPendingStructuralChange(other)).toBe(true)
+        expect(hasPendingStructuralChange(el)).toBe(false)
+
+        releaseOther()
+        c.appendChild(document.createElement('li'))
+        expect(hasPendingStructuralChange(other)).toBe(false)
+    })
+
+    it("does not drain the layout observers' records", async () => {
+        const { d, el } = tree()
+        const onChange = vi.fn()
+        stops.push(observeLayoutChanges(el, onChange))
+        stops.push(installStructuralProbe(el))
+
+        // A sibling inserted in the layout parent (`#d`).
+        d.prepend(document.createElement('li'))
+        expect(hasPendingStructuralChange(el)).toBe(true)
+        await settle()
+
+        expect(onChange).toHaveBeenCalled()
+    })
+
+    it('stamps a layout-affecting ancestor change until the cache is written', async () => {
+        const { b, el } = tree()
+        stops.push(observeLayoutChanges(el, () => {}))
+        expect(hasAncestorChangedSinceCache(el)).toBe(false)
+
+        b.setAttribute('style', 'padding-top: 70px')
+        await settle()
+        expect(hasAncestorChangedSinceCache(el)).toBe(true)
+
+        clearAncestorChanged(el)
+        expect(hasAncestorChangedSinceCache(el)).toBe(false)
+    })
+
+    it('does not stamp a transform-only ancestor change', async () => {
+        const { b, el } = tree()
+        stops.push(observeLayoutChanges(el, () => {}))
+
+        b.style.transform = 'translateX(10px)'
+        await settle()
+
+        expect(hasAncestorChangedSinceCache(el)).toBe(false)
     })
 })
 
