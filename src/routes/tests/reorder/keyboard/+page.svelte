@@ -1,6 +1,7 @@
 <script lang="ts">
     /**
-     * Keyboard reordering (Motion 14.6.0, #2658): port of upstream's
+     * Keyboard reordering (Motion 14.6.0, #2658; one tab stop and arrow
+     * focus from Motion 14.9): port of upstream's
      * `dev/react/src/tests/issue-2658.tsx`.
      *
      * Query params (read on mount):
@@ -84,15 +85,16 @@
 
     const steps: TesterStep[] = [
         {
-            text: 'Click the "before" button, then press Tab.',
-            expected: 'Item "a" gets the focus ring. Focused reads "a".'
+            text: 'Click the "before" button, then press Tab a few times.',
+            expected:
+                'The first Tab focuses item "a" (Focused reads "a"). Later Tabs visit the inputs only: items b, c and d are skipped, as the group is one tab stop.'
         },
         {
-            text: 'Press ArrowDown without grabbing.',
-            expected: 'The page scrolls; the order stays a,b,c,d. Scroll back up.'
+            text: 'Shift+Tab back to "a", then press ArrowDown and ArrowUp without grabbing.',
+            expected: 'Focus moves a → b → a; the order stays a,b,c,d and the page does not scroll.'
         },
         {
-            text: 'With "a" focused, press Space.',
+            text: 'With "a" focused, press Space (Space grabs).',
             expected: 'Item "a" turns half transparent (whileDrag). Grabbed reads "a".'
         },
         {
@@ -112,7 +114,7 @@
         {
             text: 'Try again with ?axis=x, ?axis=x&rtl, ?layout and ?deferred added to the URL.',
             expected:
-                'x axis: Left/Right move (swapped in RTL), Up/Down are ignored. layout: moves animate. deferred: the order updates ~120ms later and focus stays.'
+                'x axis: Left/Right move focus, or the grabbed item (swapped in RTL); Up/Down are ignored. layout: moves animate. deferred: the order updates ~120ms later and focus stays.'
         }
     ]
 </script>
@@ -137,15 +139,17 @@
 <div style="height: 3000px"></div>
 
 <TesterPanel
-    eyebrow="Motion 14.6.0 · issue-2658.tsx"
+    eyebrow="Motion 14.9.1 · issue-2658.tsx"
     title="Reorder: keyboard"
     {steps}
     status="Covered by e2e/reorder/keyboard.spec.ts."
 >
     {#snippet checks()}
         <p>
-            Every <code>Reorder.Item</code> is keyboard reorderable: Tab focuses it, Space grabs and drops
-            it, arrows along the axis move it, Escape restores the order from the grab.
+            Every <code>Reorder.Item</code> is keyboard reorderable. The group is one tab stop: Tab reaches
+            the item focused last (or the first), and arrows move focus between items. Space grabs and
+            drops, arrows along the axis then move the grabbed item, Escape restores the order from the
+            grab.
         </p>
         <p>
             Svelte's keyed each moves DOM nodes, which can drop focus. The grabbed item must keep
