@@ -3,6 +3,7 @@ import {
     PanSession,
     SVGVisualElement,
     VisualElementDragControls,
+    createAnimationState,
     getFeatureDefinitions,
     motionValue,
     scrapeHTMLMotionValuesFromProps,
@@ -287,6 +288,86 @@ describe('ExitAnimationFeature', () => {
         expect(onExitComplete).toHaveBeenCalledTimes(1)
         ve.updateFeatures()
         expect(setActive).toHaveBeenCalledTimes(1)
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    /**
+     * A VE whose animationState is spied BEFORE the first `updateFeatures()`,
+     * so the exit feature's `mount()` is observable. `AnimationFeature` keeps
+     * a pre-existing animationState (`node.animationState ||= …`).
+     */
+    const createWithSpiedExit = (presence: Record<string, unknown>) => {
+        const element = document.createElement('div')
+        const ve = createMotionVisualElement({
+            props: { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } },
+            presenceContext: presence as never
+        })
+        ve.animationState = createAnimationState(ve)
+        const setActive = vi
+            .spyOn(ve.animationState, 'setActive')
+            .mockImplementation(() => Promise.resolve())
+        vi.spyOn(ve.animationState, 'animateChanges').mockImplementation(() => Promise.resolve())
+        ve.mount(element)
+        return { element, ve, setActive }
+    }
+
+    // framer-motion exit.ts @ v14.9.1 (#4049): `mount()` registers and then
+    // calls `update()`; it no longer reports completion straight away.
+    it("doesn't report completion when it mounts", () => {
+        const onExitComplete = vi.fn()
+        const register = vi.fn(() => () => {})
+        const { ve, element } = createWithSpiedExit({
+            id: 'p1',
+            isPresent: true,
+            register,
+            onExitComplete
+        })
+        ve.updateFeatures()
+
+        expect(onExitComplete).not.toHaveBeenCalled()
+        expect(register).toHaveBeenCalledTimes(1)
+
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    it('starts the exit when it mounts already exiting, without a further update', async () => {
+        const onExitComplete = vi.fn()
+        // The feature registers under its own id; capture it from `register`.
+        const register = vi.fn<(id: number) => () => void>(() => () => {})
+        const { ve, element, setActive } = createWithSpiedExit({
+            id: 'p1',
+            isPresent: false,
+            register,
+            onExitComplete
+        })
+        // The feature's mount runs inside this single call.
+        ve.updateFeatures()
+
+        expect(setActive).toHaveBeenCalledExactlyOnceWith('exit', true)
+        await Promise.resolve()
+        await Promise.resolve()
+        expect(onExitComplete).toHaveBeenCalledExactlyOnceWith(register.mock.calls[0][0])
+
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    it('starts the exit once when presence stays false across updates', () => {
+        const absent = {
+            id: 'p1',
+            isPresent: false,
+            register: () => () => {},
+            onExitComplete: vi.fn()
+        }
+        const { ve, element, setActive } = createWithSpiedExit(absent)
+        ve.updateFeatures()
+        ve.update(ve.getProps(), absent)
+        ve.updateFeatures()
+
+        expect(setActive).toHaveBeenCalledExactlyOnceWith('exit', true)
+
         ve.unmount()
         visualElementStore.delete(element)
     })
