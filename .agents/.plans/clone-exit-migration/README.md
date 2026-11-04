@@ -14,7 +14,7 @@ genuine open design question. This batch therefore starts with a spike.
 | Plan | Title                                                         | Priority | Effort | Risk | Depends on                  | Status                                                                                                        |
 | ---- | ------------------------------------------------------------- | -------- | ------ | ---- | --------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | 001  | Spike: choose the real-node exit mechanism                    | P3       | M      | LOW  | visual-element-core 002+004 | DONE — see `spike-report.md`: recommend Candidate B (data-driven children); Candidate A refuted by experiment |
-| 002  | (written after 001's decision) Implement the chosen mechanism | —        | L      | HIGH | 001                         | NOT YET WRITTEN                                                                                               |
+| 002  | (written after 001's decision) Implement the chosen mechanism | —        | L      | HIGH | 001                         | NOT YET WRITTEN — spike steps 1–3 shipped via 2.7.0 (see note)                                                                                               |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale)
@@ -62,3 +62,13 @@ Blocking prerequisite the spike uncovered: a `motion.*` child of the shipped
 `visualElement.updateFeatures()` only at mount and builds the presence context
 inside `untrack()`), so plan 002's first step is that two-line fix plus a
 red-first e2e — worth landing on its own regardless of the mechanism decision.
+
+## Status note — 2026-11-04 (after 2.7.0, main `60444e57`)
+
+Checked against the spike's 7-step outline for 002:
+
+- **Done:** 1. a `motion.*` child of an owned wrapper now exits. `PresenceChild` registers every participant (`owned-child.spec.ts`). 2. per-wrapper `onExitComplete` through the owned `present` + `child` form. 3. owned `popLayout` (`owned-pop-layout.spec.ts`).
+- **Partly done:** 5. clones are `inert` + `aria-hidden` (`presence.ts` ~2488). Held real nodes are not.
+- **Not done:** 4. the `items` + `getKey` list API on `AnimatePresence`. 6. migrating the repo's pages to that API. 7. deprecating and deleting the clone path. The clone path is still the default for keyed children.
+
+002 still needs to be written. Its scope is now steps 4–7.
