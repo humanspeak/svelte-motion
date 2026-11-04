@@ -69,6 +69,46 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/reorder-m') + searchParams}
+                    >
+                        LazyMotion — Reorder from the m entry (#2232)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/reorder-strict') + searchParams}
+                    >
+                        LazyMotion — main Reorder in strict mode (#2094)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/featureless-m') + searchParams}
+                    >
+                        LazyMotion — m without features
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/featureless-m-presence') + searchParams}
+                    >
+                        LazyMotion — featureless m in AnimatePresence
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/featureless-m-props') + searchParams}
+                    >
+                        LazyMotion — featureless m tabindex, style and pathLength
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/enter-animation') + searchParams}
                     >
                         Enter Animation
@@ -197,6 +237,31 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/use-scroll/scroll-length') + searchParams}
+                    >
+                        useScroll scrollXLength / scrollYLength (distance from the end)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/use-scroll/horizontal-target') + searchParams}
+                    >
+                        useScroll horizontal container + target (#2546)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/use-scroll/horizontal-target/reporter') +
+                            searchParams}
+                    >
+                        useScroll horizontal container + target (#2546) reporter page
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout-dependency') + searchParams}
                     >
                         layoutDependency
@@ -309,9 +374,41 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/waapi-color-interrupt') + searchParams}
+                    >
+                        Interrupted backgroundColor animation
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/optimized-appear') + searchParams}
                     >
                         Optimized appear animations
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/transition-out/mount') + searchParams}
+                    >
+                        transition.out — mount (#1725)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/transition-out/gestures') + searchParams}
+                    >
+                        transition.out — gestures (#1725)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/optimized-appear/initial-out') + searchParams}
+                    >
+                        Optimized appear — initial transition.out (#1725)
                     </a>
                 </li>
                 <li>
@@ -506,6 +603,32 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-sibling-rotating-3d') +
+                            searchParams}
+                    >
+                        Looping rotation vs a sibling's layout update (#4022)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/layout-ancestor-rotating-3d') +
+                            searchParams}
+                    >
+                        Rotating ancestor vs a child's layout update (#4022)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/independent-transforms/speed-change') + searchParams}
+                    >
+                        Changing an accelerated animation's speed
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/on-update') + searchParams}
                     >
                         onUpdate prop (main thread + latest values)
@@ -618,6 +741,14 @@
                         href={resolve('/tests/reorder/keyboard') + searchParams}
                     >
                         Reorder keyboard (Space / arrows / Escape, #2658)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/ref-constraints-scroll') + searchParams}
+                    >
+                        Reorder: ref dragConstraints in a scrolled layoutScroll group (#2024)
                     </a>
                 </li>
             </ul>
@@ -788,6 +919,30 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/flick-from-standstill') + searchParams}
+                    >
+                        Drag: fast flick from a standstill keeps its velocity (#1747)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/ref-constraints-shift') + searchParams}
+                    >
+                        Drag: ref constraints hold when the page moves both boxes
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/release-animate-variants') + searchParams}
+                    >
+                        Drag: release doesn't fire onAnimationComplete per animate label (#1831)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/mobile-drawer') + searchParams}
                     >
                         Drag Close Drawer (mobile drawer)
@@ -876,6 +1031,33 @@
                         href={resolve('/tests/animate-presence/owned-pop-layout') + searchParams}
                     >
                         popLayout with an owned child (siblings reflow immediately)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/pop-layout-container-move') +
+                            searchParams}
+                    >
+                        popLayout when popping moves the container (#2348)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/pop-layout-scroll-siblings') +
+                            searchParams}
+                    >
+                        Layout siblings around exits in scroll containers (plan 015a/b)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/pop-layout-playground') +
+                            searchParams}
+                    >
+                        popLayout playground (#2348)
                     </a>
                 </li>
                 <li>
@@ -1020,6 +1202,79 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/change-after-mount') + searchParams}
+                    >
+                        layoutId — changed after mount is honoured (#1411)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/move-to-sibling') + searchParams}
+                    >
+                        layoutId — moved to a sibling keeps it visible (#1411)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/tabs') + searchParams}
+                    >
+                        layoutId — tabs highlight moves between mounted elements (#1411)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/takeover') + searchParams}
+                    >
+                        layoutId — taking an on-screen element's id takes over instantly (#1411)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/open-change') + searchParams}
+                    >
+                        layoutId — changing an open card's id switches it instantly (#1411)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/presence-crossfade') + searchParams}
+                    >
+                        layoutId + AnimatePresence — an exiting element crossfades into the new one
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/exit-complete-once') + searchParams}
+                    >
+                        layoutId + AnimatePresence — onExitComplete fires once per exit (#3233)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/lightbox-crossfade') + searchParams}
+                    >
+                        layoutId + AnimatePresence — lightbox closes back into its gallery item
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/nested-crossfade') + searchParams}
+                    >
+                        layoutId + AnimatePresence — nested shared children of an exiting direct
+                        child
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout/scroll') + searchParams}
                     >
                         layoutScroll — single container
@@ -1090,6 +1345,46 @@
                         LayoutGroup — relative children follow a re-laid-out parent
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/transform-origin-at-rest') + searchParams}
+                    >
+                        layout — transform-origin stays at the centre at rest
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-root') + searchParams}
+                    >
+                        layoutRoot — shared layoutId animates relative to its layout root (#1935)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-root/anchor') + searchParams}
+                    >
+                        layoutAnchor — a centered child stays centered while its parent resizes
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/overdamped-spring') + searchParams}
+                    >
+                        Slow overdamped spring layout animation (#1207)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/reflow-mid-animation') + searchParams}
+                    >
+                        layout — a reflow mid animation keeps sliding from the painted box
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
@@ -1130,6 +1425,23 @@
                         href={resolve('/tests/useAnimate') + searchParams}
                     >
                         useAnimate
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/useAnimate/timeline') + searchParams}
+                    >
+                        useAnimate — timelines (Motion 14.7)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion-reexports') + searchParams}
+                    >
+                        Motion re-exports — createScopedAnimate, inertia, animateMini,
+                        resolveElements
                     </a>
                 </li>
                 <li>

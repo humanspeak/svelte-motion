@@ -13,8 +13,10 @@ type LayoutIdEntry = {
 /**
  * Registry that stores last-known rect + transition for each layoutId.
  *
- * - `snapshot(id, rect, transition, owner)` — called when an element with a layoutId unmounts
- *   (or its `layoutId` turns off). `owner` is the element writing the entry.
+ * - `snapshot(id, rect, transition, owner)` — called when an element with a layoutId is removed
+ *   from the DOM. `owner` is the element writing the entry. A `layoutId` that changes (or turns
+ *   off) on an element that stays mounted is not a handoff: it moves the element's projection
+ *   node between motion-dom's shared-layout stacks instead (#1411, Motion 14.7.1).
  * - `consume(id, consumer)` — called by a newly mounted element. Returns and **deletes** the
  *   entry (one-shot). An element never consumes its own entry: when its `layoutId` turns back
  *   on it is still the lead of its own shared-layout stack upstream, so nothing animates

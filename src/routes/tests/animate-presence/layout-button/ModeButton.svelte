@@ -1,16 +1,24 @@
 <script lang="ts">
-    import { AnimatePresence, motion } from '$lib'
+    import { AnimatePresence, LayoutGroup, motion } from '$lib'
     import { onDestroy, onMount } from 'svelte'
     import type { AnimatePresenceMode } from '$lib/types'
 
     let {
         mode,
         title,
-        testIdPrefix
+        testIdPrefix,
+        layoutGroup = false
     }: {
         mode: AnimatePresenceMode
         title: string
         testIdPrefix: string
+        /**
+         * Wrap the shell in a `LayoutGroup` (plan 015b A1.2): the exit's
+         * completion then re-renders the shell through `forceRender`, so its
+         * width animates (`AnimatePresence/index.tsx:206`). Without it the
+         * shell snaps, as in Motion (`index.tsx:244`).
+         */
+        layoutGroup?: boolean
     } = $props()
 
     let copied = $state(false)
@@ -166,73 +174,83 @@
     })
 </script>
 
+{#snippet shell()}
+    <motion.button
+        type="button"
+        class="copy-button"
+        data-testid="{testIdPrefix}-button"
+        data-mode={mode}
+        aria-label="Copy snippet"
+        bind:ref={buttonElement}
+        layout
+        transition={layoutTransition}
+        onclick={showCopied}
+    >
+        <motion.span
+            class="state {copied ? 'copied-state' : 'copy-state'}"
+            data-testid="{testIdPrefix}-{copied ? 'copied' : 'copy'}-state"
+            data-svelte-motion-layout
+            layout={mode === 'sync' ? undefined : 'position'}
+        >
+            <AnimatePresence initial={false} {mode}>
+                {#if copied}
+                    <motion.span
+                        key="copied"
+                        class="state-content copied-state"
+                        data-testid="{testIdPrefix}-copied-presence-state"
+                        initial={{ opacity: 1 }}
+                        animate={{ opacity: 1 }}
+                        exit={visibleExit}
+                        transition={labelTransition}
+                    >
+                        <svg
+                            aria-hidden="true"
+                            data-testid="{testIdPrefix}-copied-icon"
+                            viewBox="0 0 24 24"
+                        >
+                            <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                        <span>copied</span>
+                    </motion.span>
+                {:else}
+                    <motion.span
+                        key="copy"
+                        class="state-content copy-state"
+                        data-testid="{testIdPrefix}-copy-presence-state"
+                        initial={{ opacity: 1 }}
+                        animate={{ opacity: 1 }}
+                        exit={mode === 'sync' ? copyExit : visibleExit}
+                        transition={labelTransition}
+                    >
+                        <svg
+                            aria-hidden="true"
+                            data-testid="{testIdPrefix}-copy-icon"
+                            viewBox="0 0 24 24"
+                        >
+                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                        </svg>
+                        <span>copy</span>
+                    </motion.span>
+                {/if}
+            </AnimatePresence>
+        </motion.span>
+    </motion.button>
+{/snippet}
+
 <article class="demo" data-testid="{testIdPrefix}-demo">
     <div class="demo-head">
         <div>
             <h2>{title}</h2>
             <p>{mode}</p>
         </div>
-        <motion.button
-            type="button"
-            class="copy-button"
-            data-testid="{testIdPrefix}-button"
-            data-mode={mode}
-            aria-label="Copy snippet"
-            bind:ref={buttonElement}
-            layout
-            transition={layoutTransition}
-            onclick={showCopied}
-        >
-            <motion.span
-                class="state {copied ? 'copied-state' : 'copy-state'}"
-                data-testid="{testIdPrefix}-{copied ? 'copied' : 'copy'}-state"
-                data-svelte-motion-layout
-                layout={mode === 'sync' ? undefined : 'position'}
-            >
-                <AnimatePresence initial={false} {mode}>
-                    {#if copied}
-                        <motion.span
-                            key="copied"
-                            class="state-content copied-state"
-                            data-testid="{testIdPrefix}-copied-presence-state"
-                            initial={{ opacity: 1 }}
-                            animate={{ opacity: 1 }}
-                            exit={visibleExit}
-                            transition={labelTransition}
-                        >
-                            <svg
-                                aria-hidden="true"
-                                data-testid="{testIdPrefix}-copied-icon"
-                                viewBox="0 0 24 24"
-                            >
-                                <path d="M20 6 9 17l-5-5" />
-                            </svg>
-                            <span>copied</span>
-                        </motion.span>
-                    {:else}
-                        <motion.span
-                            key="copy"
-                            class="state-content copy-state"
-                            data-testid="{testIdPrefix}-copy-presence-state"
-                            initial={{ opacity: 1 }}
-                            animate={{ opacity: 1 }}
-                            exit={mode === 'sync' ? copyExit : visibleExit}
-                            transition={labelTransition}
-                        >
-                            <svg
-                                aria-hidden="true"
-                                data-testid="{testIdPrefix}-copy-icon"
-                                viewBox="0 0 24 24"
-                            >
-                                <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                            </svg>
-                            <span>copy</span>
-                        </motion.span>
-                    {/if}
-                </AnimatePresence>
-            </motion.span>
-        </motion.button>
+        {#if layoutGroup}
+            <LayoutGroup>
+                {@render shell()}
+            </LayoutGroup>
+        {:else}
+            {@render shell()}
+        {/if}
     </div>
 
     <div class="debug-log" data-testid="{testIdPrefix}-observer-log">

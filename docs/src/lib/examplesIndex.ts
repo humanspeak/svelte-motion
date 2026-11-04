@@ -68,6 +68,15 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'Curved motion paths with transition.path — keyframes, rotation, and shared layout.'
     },
+    'create-scoped-animate': {
+        title: 'createScopedAnimate',
+        description: 'An animate function bound to one element: selectors only resolve inside it.'
+    },
+    inertia: {
+        title: 'inertia',
+        description:
+            'Fling a value with inertia: it coasts, bounces off a boundary, and can snap to a grid.'
+    },
     'ai-gradient-card': {
         title: 'AI Gradient Card',
         description:
@@ -136,6 +145,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'Keep FLIP layout animations anchored when the parent container scrolls mid-animation.'
     },
+    'layout-root': {
+        title: 'layoutRoot & layoutAnchor',
+        description:
+            'A tab underline glides one tab while the whole tab bar jumps, and a centred child stays centred while its parent resizes.'
+    },
     'lazy-motion': {
         title: 'LazyMotion',
         description: 'Load Svelte Motion feature bundles with LazyMotion and the m namespace.'
@@ -192,6 +206,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Rotate',
         description: 'Interactive Rotate animation example using Svelte Motion.'
     },
+    'presence-crossfade': {
+        title: 'Presence Crossfade',
+        description:
+            'A card that closes back into its thumbnail: exiting layoutId elements crossfade with AnimatePresence.'
+    },
     'scroll-progress': {
         title: 'Scroll Progress',
         description: 'Interactive scroll progress animation example using Svelte Motion.'
@@ -233,6 +252,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
     'transform-page-point': {
         title: 'Scaled Drag Board',
         description: 'A zoomable constrained board whose draggable tile stays under the pointer.'
+    },
+    'transition-out': {
+        title: 'transition.out',
+        description:
+            'Choose the transition a value uses when it leaves a state, with a mount-only delay from initial.'
     },
     'use-animate': {
         title: 'useAnimate',

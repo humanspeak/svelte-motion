@@ -51,6 +51,40 @@ export type { DragOptions } from 'motion-dom'
 export { animate } from '$lib/utils/animateValue'
 export { attrEffect, propEffect, styleEffect, svgEffect } from '$lib/utils/effects'
 export type { EffectValues } from '$lib/utils/effects'
+// Motion 14.7: animate() returns a mutable Timeline. Type-only upstream too.
+export type {
+    AnimationSequence,
+    NestedSequence,
+    ObjectTarget,
+    Segment,
+    SequenceInfo,
+    SequenceOptions,
+    Timeline,
+    TimelineCallback,
+    TimelineItem,
+    TimelineOptions
+} from 'motion'
+
+// Upstream public, framework-agnostic API (plan 014): the scoped animate
+// factory useAnimate is built on, the WAAPI-only `motion/mini` animate, the
+// inertia/keyframes generators (siblings of `spring`) and resolveElements.
+// Identical bindings to motion's; JSDoc lives at the definitions.
+export { createScopedAnimate } from '$lib/utils/animateValue'
+export { animateMini, inertia, keyframes, resolveElements } from '$lib/utils/motionReexports'
+// Types in the signatures of the re-exports above, plus SpringOptions for `spring`.
+export type {
+    AnimationOptions,
+    AnimationPlaybackControlsWithThen,
+    DOMKeyframesDefinition,
+    ElementOrSelector,
+    GeneratorFactory,
+    InertiaOptions,
+    KeyframeGenerator,
+    KeyframeOptions,
+    SelectorCache,
+    SpringOptions,
+    ValueAnimationOptions
+} from 'motion'
 
 // Motion 13.2 effect registry: build effects for non-DOM subjects with
 // `createEffect` and register them via `animate.addEffect`. `createEffect`
@@ -192,8 +226,8 @@ export type { UseScrollOptions, UseScrollReturn } from '$lib/utils/scroll.svelte
 export { useSpring } from '$lib/utils/spring.svelte'
 export type { SpringMotionValue, UseSpringOptions } from '$lib/utils/spring.svelte'
 export type { TransformTemplate } from '$lib/utils/style'
-export { useIsPresent, usePresence, usePresenceData } from '$lib/utils/usePresence'
-export type { UsePresenceState } from '$lib/utils/usePresence'
+export { useIsPresent, usePresence, usePresenceData } from '$lib/utils/usePresence.svelte'
+export type { UsePresenceState } from '$lib/utils/usePresence.svelte'
 export { useVelocity } from '$lib/utils/velocity.svelte'
 export type { VelocitySource } from '$lib/utils/velocity.svelte'
 export { useWillChange } from '$lib/utils/willChange.svelte'

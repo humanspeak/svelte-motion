@@ -19,7 +19,9 @@ description: Load only the motion feature bundle your page needs
 
 # LazyMotion
 
-`LazyMotion` pairs with the `m` namespace to choose which runtime features are active for a subtree. It mirrors Framer Motion's bundle split while keeping the default `motion` export unchanged.
+`LazyMotion` pairs with the `m` namespace to choose which runtime features are active for a subtree, like Motion's `LazyMotion`. `m` components get the features of the nearest `LazyMotion` bundle. `motion` components always have every feature and ignore `LazyMotion`. An `m` outside `LazyMotion` renders its `style` and `initial` and does nothing else.
+
+In svelte-motion, `LazyMotion` selects behaviour but does not yet reduce bundle size: every feature's code is bundled either way.
 
 ```svelte
 <script>
@@ -47,7 +49,7 @@ Use `domAnimation` for most interface motion. Use `domMin` for pages that only n
 
 ## Async loading
 
-`features` can also be a function returning a promise. The subtree renders with `domMin` first, then upgrades when the bundle resolves.
+`features` can also be a function returning a promise. Until the bundle resolves, the subtree's `m` components render their `initial` state and do nothing else. When it resolves they animate in. If the loader rejects, `m` components stay as they were rendered.
 
 ```svelte
 <script>
@@ -61,8 +63,53 @@ Use `domAnimation` for most interface motion. Use `domMin` for pages that only n
 </LazyMotion>
 ```
 
+## Without LazyMotion
+
+An `m` with no `LazyMotion` above it has no animation runtime, as in Motion. It renders its `style`, `initial`, `tabindex` and drag styles, and runs no animation, gesture, drag, layout or exit animation. Inside `AnimatePresence` it is removed at once.
+
+```svelte
+<!-- Renders at opacity 0.5 and stays there. -->
+<m.div initial={{ opacity: 0.5 }} animate={{ opacity: 1 }} />
+```
+
+## Strict mode
+
+Pass `strict` to make sure a subtree only uses `m` components. In development, rendering a `motion` component inside `<LazyMotion strict>` throws:
+
+```text
+You have rendered a `motion` component within a `LazyMotion` component. This will break tree shaking. Import and render a `m` component instead.
+```
+
+Production builds skip the check.
+
+The main `Reorder` renders `motion` components too, but you render `Reorder`, not `motion`. Inside `<LazyMotion strict>` it warns once in development instead of throwing, and the warning names the fix: import `Reorder` from `@humanspeak/svelte-motion/m`.
+
+## Reorder with LazyMotion
+
+`Reorder` from the `@humanspeak/svelte-motion/m` entry renders `m` components, so it gets its features from `LazyMotion`. Reordering needs drag and layout, so give it `domMax`. Without a `LazyMotion` that provides `domMax`, this `Reorder` does nothing.
+
+```svelte
+<script>
+    import { LazyMotion, domMax } from '@humanspeak/svelte-motion'
+    import { Reorder } from '@humanspeak/svelte-motion/m'
+
+    let items = $state([0, 1, 2, 3])
+</script>
+
+<LazyMotion features={domMax} strict>
+    <Reorder.Group axis="y" values={items} onReorder={(next) => (items = next)}>
+        {#each items as item (item)}
+            <Reorder.Item value={item}>{item}</Reorder.Item>
+        {/each}
+    </Reorder.Group>
+</LazyMotion>
+```
+
+The `@humanspeak/svelte-motion/m` entry also exports `m`.
+
 ## Related
 
 - [Tree Shaking](/docs/tree-shaking) — Import only the components you use
 - [Gestures](/docs/gestures) — Hover, tap, focus, pan, and in-view states
 - [Drag](/docs/drag) — Drag requires `domMax`
+- [Reorder](/docs/reorder) — Drag-to-reorder lists

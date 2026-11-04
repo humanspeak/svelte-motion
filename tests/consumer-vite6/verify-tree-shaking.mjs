@@ -140,7 +140,17 @@ const NON_COMPONENT_MOTION = new Set(['MotionGlobalConfig', 'MotionValueState'])
 const isComponent = (name) =>
     COMPONENT_NAMES.has(name) || (/^Motion[A-Z]/.test(name) && !NON_COMPONENT_MOTION.has(name))
 const nonComponent = all.exports.filter((name) => !isComponent(name))
-for (const name of ['animate', 'frame', 'useTransform', 'useScroll']) {
+for (const name of [
+    'animate',
+    'frame',
+    'useTransform',
+    'useScroll',
+    'createScopedAnimate',
+    'animateMini',
+    'inertia',
+    'keyframes',
+    'resolveElements'
+]) {
     assert.ok(nonComponent.includes(name), `export derivation broke: ${name} not found`)
 }
 assert.ok(
@@ -161,5 +171,30 @@ if (surface.code.includes(CONTAINER_MARKER) || hasTag(surface.code, 'div')) {
         `these exports pull in the motion component layer: ${offenders.join(', ') || '(only in combination)'}`
     )
 }
+
+// 6. Light re-exports don't drag in the Timeline / animate() engine.
+const TIMELINE_MARKER = /class Timeline\b/
+const heavy = await bundle(`export { createScopedAnimate } from '${PKG}'`)
+assert.ok(
+    TIMELINE_MARKER.test(heavy.code),
+    'positive control: createScopedAnimate should bundle the Timeline class'
+)
+for (const name of ['inertia', 'keyframes', 'resolveElements', 'animateMini']) {
+    const light = await bundle(`export { ${name} } from '${PKG}'`)
+    assert.ok(!TIMELINE_MARKER.test(light.code), `${name} pulls in the Timeline/animate() engine`)
+}
+
+// 7. The `./m` entry (#2232) bundles through the exports map and exports
+// exactly `m` and its LazyMotion-aware `Reorder`. Upstream's
+// `Reorder/__tests__/tree-shaking.test.ts` also asserts the `m` Reorder bundle
+// has none of the domMax canaries; that is not ported: svelte-motion's
+// feature bundles are boolean flags over code `_MotionContainer.svelte` always
+// imports (projection, drag and pan), so every feature is bundled regardless.
+const mEntry = await bundle(`export { m, Reorder } from '${PKG}/m'`)
+assert.deepEqual(
+    [...mEntry.exports].sort(),
+    ['Reorder', 'm'],
+    `the ./m entry should export exactly Reorder and m, got: ${mEntry.exports.join(', ')}`
+)
 
 console.log('Tree-shaking consumer checks passed.')

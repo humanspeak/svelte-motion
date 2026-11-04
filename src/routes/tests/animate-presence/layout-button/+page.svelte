@@ -24,6 +24,12 @@
             <DocsKitCopyButton />
             <RollingCopyButton />
             <ModeButton mode="wait" title="Wait" testIdPrefix="wait" />
+            <ModeButton
+                mode="wait"
+                title="Wait (LayoutGroup)"
+                testIdPrefix="wait-group"
+                layoutGroup
+            />
             <ModeButton mode="sync" title="Sync" testIdPrefix="sync" />
             <ModeButton mode="popLayout" title="Pop layout" testIdPrefix="pop-layout" />
         </div>

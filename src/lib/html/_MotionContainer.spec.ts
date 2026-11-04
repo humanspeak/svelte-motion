@@ -49,9 +49,9 @@ const animateValueMock = vi.hoisted(() =>
 )
 
 // Mock 'motion' before importing the Svelte component (hoisted)
-vi.mock('motion', () => {
+vi.mock('motion', async (importOriginal) => {
     const animateMock = vi.fn(() => ({ finished: Promise.resolve() }))
-    return { animate: animateMock }
+    return { ...(await importOriginal<typeof import('motion')>()), animate: animateMock }
 })
 const { animate: animateMock } = (await import('motion')) as unknown as {
     animate: ReturnType<typeof vi.fn> & {
@@ -109,7 +109,9 @@ afterEach(() => {
 })
 
 describe('_MotionContainer', () => {
-    it('does not add tabindex when element is natively focusable', async () => {
+    // Upstream `render/html/use-props.ts:76-81` has no tag check, so a link
+    // with `whileTap` gets `tabIndex=0` too (plan 016).
+    it('adds tabindex=0 to a natively focusable element with whileTap (upstream use-props)', async () => {
         const { container } = render(MotionContainer as unknown as any, {
             props: {
                 tag: 'a',
@@ -119,7 +121,7 @@ describe('_MotionContainer', () => {
         })
         await flushTimers()
         const el = container.firstElementChild as HTMLElement
-        expect(el.hasAttribute('tabindex')).toBe(false)
+        expect(el.getAttribute('tabindex')).toBe('0')
     })
 
     it('adds tabindex=0 for non-focusable elements with whileTap', async () => {
@@ -524,9 +526,10 @@ describe('_MotionContainer', () => {
 
         const el = container.firstElementChild as HTMLElement
         expect(el).toBeTruthy()
-        // Compositor hints applied on ready
-        expect(el.style.willChange).toBe('transform')
-        expect(el.style.transformOrigin).toBe('0 0')
+        // Upstream writes no layout hints at rest (create-projection-node.ts:2119 is the only
+        // transform-origin writer, and only while projecting).
+        expect(el.style.willChange).toBe('')
+        expect(el.style.transformOrigin).toBe('')
 
         // Trigger size change
         currentRect = {
@@ -539,13 +542,71 @@ describe('_MotionContainer', () => {
         roInstances.at(-1)?.fire()
 
         // In JSDOM, style/animation timing can be inconsistent; assert that
-        // a ResizeObserver was created and compositor hints are applied.
+        // a ResizeObserver was created.
         expect(roInstances.length).toBeGreaterThan(0)
 
-        // Teardown cleans compositor hints
         unmount()
-        expect(el.style.willChange).toBe('')
-        expect(el.style.transformOrigin).toBe('')
+        expect(el.style.transform).toBe('')
+
+        rectSpy.mockRestore()
+    })
+
+    it('leaves no top-left transform-origin on a layout element at rest, before or after a layout change', async () => {
+        const roInstances: Array<{ fire: () => void }> = []
+        class FakeResizeObserver {
+            private _cb: ResizeObserverCallback
+            constructor(cb: ResizeObserverCallback) {
+                this._cb = cb
+                roInstances.push({ fire: () => this._cb([], this as unknown as ResizeObserver) })
+            }
+            observe() {}
+            disconnect() {}
+        }
+        vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+
+        let currentRect = {
+            left: 0,
+            top: 0,
+            width: 100,
+            height: 100
+        } as unknown as DOMRect
+        const rectSpy = vi
+            .spyOn(
+                HTMLElement.prototype as unknown as { getBoundingClientRect: () => DOMRect },
+                'getBoundingClientRect'
+            )
+            .mockImplementation(() => currentRect)
+
+        const { container, unmount } = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', layout: true }
+        })
+
+        await flushTimers()
+
+        const el = container.firstElementChild as HTMLElement
+        expect(el).toBeTruthy()
+        // At rest, before any layout animation: upstream leaves the browser's
+        // default centre origin and writes no will-change for layout.
+        expect(el.style.transformOrigin).not.toMatch(/^0(px)? 0(px)?/)
+        expect(el.style.willChange).not.toBe('transform')
+
+        // A layout change, then let it settle.
+        currentRect = {
+            left: 10,
+            top: 5,
+            width: 200,
+            height: 120
+        } as unknown as DOMRect
+        roInstances.at(-1)?.fire()
+        await flushTimers()
+        await flushTimers()
+        await flushTimers()
+
+        expect(el.style.transformOrigin).not.toMatch(/^0(px)? 0(px)?/)
+
+        // Unmount still clears a projected transform.
+        unmount()
+        expect(el.style.transform).toBe('')
 
         rectSpy.mockRestore()
     })
@@ -799,10 +860,10 @@ describe('_MotionContainer', () => {
         }
     )
 
-    it('manual wrapper release may finish owned descendant exits early without double notification', async () => {
-        const group = await controlledOwnedGroup({ manual: true })
+    it('legacy manual release may finish owned descendant exits early without double notification', async () => {
+        const group = await controlledOwnedGroup({ manual: true, legacy: true })
         await group.update({ present: false })
-        group.result.getByTestId('probe').click()
+        group.result.getByTestId('legacy-probe').click()
         await flushTimers()
         expect(group.result.queryByTestId('owned-group')).toBeNull()
         expect(group.onExitComplete).toHaveBeenCalledTimes(1)
@@ -811,12 +872,61 @@ describe('_MotionContainer', () => {
         expect(group.onExitComplete).toHaveBeenCalledTimes(1)
     })
 
-    it('reading usePresence does not add a barrier to owned descendant exits', async () => {
+    it('a legacy usePresence read does not add a barrier to owned descendant exits', async () => {
+        const group = await controlledOwnedGroup({ manual: true, legacy: true })
+        await group.update({ present: false })
+        await group.complete('owned-fast')
+        expect(group.result.queryByTestId('legacy-probe')).toBeTruthy()
+        await group.complete('owned-slow')
+        expect(group.result.queryByTestId('owned-group')).toBeNull()
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+    })
+
+    // Plan 017. A `usePresence()` consumer is one participant
+    // (use-presence.ts:52-62 @ v14.7.1): the wrapper leaves once it and every
+    // motion exit are done (PresenceChild.tsx:67-75).
+    it('a usePresence consumer holds owned descendant exits until its own safeToRemove', async () => {
         const group = await controlledOwnedGroup({ manual: true })
         await group.update({ present: false })
         await group.complete('owned-fast')
-        expect(group.result.queryByTestId('probe')).toBeTruthy()
         await group.complete('owned-slow')
+        expect(group.result.queryByTestId('owned-group')).toBeTruthy()
+        expect(group.onExitComplete).not.toHaveBeenCalled()
+        group.result.getByTestId('probe').click()
+        await flushTimers()
+        expect(group.result.queryByTestId('owned-group')).toBeNull()
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+    })
+
+    it('a usePresence safeToRemove does not cut owned descendant exits short', async () => {
+        const group = await controlledOwnedGroup({ manual: true })
+        await group.update({ present: false })
+        // The consumer must have its callback, or the click proves nothing.
+        expect(group.result.getByTestId('probe').dataset.tupleHasCallback).toBe('true')
+        group.result.getByTestId('probe').click()
+        await flushTimers()
+        expect(group.result.queryByTestId('owned-fast')).toBeTruthy()
+        expect(group.result.queryByTestId('owned-slow')).toBeTruthy()
+        expect(group.onExitComplete).not.toHaveBeenCalled()
+        await group.complete('owned-fast')
+        await group.complete('owned-slow')
+        expect(group.result.queryByTestId('owned-group')).toBeNull()
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+    })
+
+    it('a featureless m beside a usePresence consumer waits for the consumer', async () => {
+        const group = await controlledOwnedGroup({
+            manual: true,
+            featureless: true,
+            fastPresent: false,
+            slowPresent: false
+        })
+        await group.update({ present: false })
+        await flushTimers()
+        await flushTimers()
+        expect(group.result.queryByTestId('owned-group')).toBeTruthy()
+        group.result.getByTestId('probe').click()
+        await flushTimers()
         expect(group.result.queryByTestId('owned-group')).toBeNull()
         expect(group.onExitComplete).toHaveBeenCalledTimes(1)
     })

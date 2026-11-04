@@ -2,11 +2,30 @@ import { frameData, frameSteps, motionValue } from 'motion-dom'
 import { describe, expect, it, vi } from 'vitest'
 import {
     applyMotionStyleEffect,
+    captureMotionStyleValues,
     collectMotionStyleValues,
     extractTransform,
+    freezeMotionStyle,
     mergeInlineStyles,
     serializeMotionStyle
 } from './style.js'
+
+// Records whether code runs inside Svelte's `untrack` (pass-through otherwise).
+const untrackState = vi.hoisted(() => ({ depth: 0 }))
+vi.mock('svelte', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('svelte')>()
+    return {
+        ...actual,
+        untrack: <T>(fn: () => T): T => {
+            untrackState.depth++
+            try {
+                return actual.untrack(fn)
+            } finally {
+                untrackState.depth--
+            }
+        }
+    }
+})
 
 const flushRenderFrame = () => frameSteps.render.process(frameData)
 
@@ -470,6 +489,104 @@ describe('collectMotionStyleValues', () => {
     it('returns undefined when no MotionValues are present', () => {
         expect(collectMotionStyleValues({ opacity: 0.5 })).toBeUndefined()
         expect(collectMotionStyleValues('opacity: 0.5')).toBeUndefined()
+    })
+})
+
+describe('captureMotionStyleValues', () => {
+    it('returns undefined when there is nothing to capture', () => {
+        expect(captureMotionStyleValues({ width: '5px', color: 'red' })).toBeUndefined()
+        expect(captureMotionStyleValues('transform: translateX(4px)')).toBeUndefined()
+        expect(captureMotionStyleValues(undefined)).toBeUndefined()
+    })
+
+    it("captures each MotionValue's current value", () => {
+        const x = motionValue(24)
+        const glow = motionValue('40%')
+
+        expect(captureMotionStyleValues({ x, '--glow': glow, width: '5px' })).toEqual({
+            x: 24,
+            '--glow': '40%'
+        })
+    })
+
+    it('captures forced raw keys too', () => {
+        expect(captureMotionStyleValues({ x: 10, width: '5px' })).toEqual({ x: 10 })
+        expect(captureMotionStyleValues({ originX: 0.2, scale: 2, color: 'red' })).toEqual({
+            originX: 0.2,
+            scale: 2
+        })
+    })
+
+    it('captures opacity only with layout or layoutId', () => {
+        expect(captureMotionStyleValues({ opacity: 0.5 })).toBeUndefined()
+        expect(captureMotionStyleValues({ opacity: 0.5 }, { layout: true })).toEqual({
+            opacity: 0.5
+        })
+        expect(captureMotionStyleValues({ opacity: 0.5 }, { layoutId: 'card' })).toEqual({
+            opacity: 0.5
+        })
+    })
+
+    it('reads MotionValues untracked, so the caller does not subscribe', () => {
+        const x = motionValue(3)
+        const readsInsideUntrack: boolean[] = []
+        const get = x.get.bind(x)
+        x.get = () => {
+            readsInsideUntrack.push(untrackState.depth > 0)
+            return get()
+        }
+
+        captureMotionStyleValues({ x })
+
+        expect(readsInsideUntrack).toEqual([true])
+    })
+})
+
+describe('freezeMotionStyle', () => {
+    it('replaces MotionValues and forced keys with the captured values', () => {
+        const x = motionValue(10)
+        const captured = captureMotionStyleValues({ x, originX: 0.5 })
+        x.set(50)
+
+        expect(freezeMotionStyle({ x, originX: 1, width: '20px' }, captured)).toEqual({
+            x: 10,
+            originX: 0.5,
+            width: '20px'
+        })
+    })
+
+    it('freezes opacity only with layout or layoutId', () => {
+        const captured = { opacity: 0.5 }
+
+        expect(freezeMotionStyle({ opacity: 0.9 }, captured)).toEqual({ opacity: 0.9 })
+        expect(freezeMotionStyle({ opacity: 0.9 }, captured, { layout: true })).toEqual({
+            opacity: 0.5
+        })
+    })
+
+    it('drops MotionValues and forced keys that were not captured', () => {
+        const y = motionValue(4)
+
+        expect(freezeMotionStyle({ y, scale: 2, color: 'red' }, { x: 1 })).toEqual({
+            color: 'red'
+        })
+        expect(freezeMotionStyle({ y, color: 'red' }, undefined)).toEqual({ color: 'red' })
+    })
+
+    it('leaves non-forced raw values reactive', () => {
+        const captured = captureMotionStyleValues({ x: 10, width: '5px' })
+
+        expect(freezeMotionStyle({ x: 20, width: '30px' }, captured)).toEqual({
+            x: 10,
+            width: '30px'
+        })
+    })
+
+    it('returns string and missing styles unchanged', () => {
+        expect(freezeMotionStyle('transform: translateX(4px)', { x: 1 })).toBe(
+            'transform: translateX(4px)'
+        )
+        expect(freezeMotionStyle(undefined, { x: 1 })).toBeUndefined()
     })
 })
 

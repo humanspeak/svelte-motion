@@ -217,6 +217,25 @@ To turn keyboard reordering off for an item, call `preventDefault()` in its `onk
 - `values` can hold any type — strings, numbers, or objects (compared by reference). Keep the `{#each}` key and the item `value` in sync.
 - Wrapped `axis="xy"` layouts choose the closest visual row and horizontal slot from complete item measurements.
 
+## With LazyMotion
+
+The `Reorder` from `@humanspeak/svelte-motion` renders `motion` components, which always have every feature. To take drag and layout from a `<LazyMotion>` instead (for example in a `strict` subtree), import `Reorder` from the `m` entry and give it `domMax`:
+
+```svelte
+<script>
+    import { LazyMotion, domMax } from '@humanspeak/svelte-motion'
+    import { Reorder } from '@humanspeak/svelte-motion/m'
+</script>
+
+<LazyMotion features={domMax} strict>
+    <Reorder.Group axis="y" values={items} onReorder={(next) => (items = next)}>
+        <!-- Reorder.Item as usual -->
+    </Reorder.Group>
+</LazyMotion>
+```
+
+See [LazyMotion](/docs/lazy-motion) for strict mode and feature bundles.
+
 ## Props
 
 ### Reorder.Group
@@ -248,6 +267,7 @@ All other motion props — including every drag prop and callback — are forwar
 - [Drag](/docs/drag) — The gesture system Reorder builds on
 - [Layout Animations](/docs/layout-animations) — How siblings FLIP between slots
 - [Motion values](/docs/motion-values) — Observe the live drag offset
+- [LazyMotion](/docs/lazy-motion) — Reorder from the `m` entry
 
 ---
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { usePresenceData } from '$lib/utils/usePresence'
+    import { usePresenceData } from '$lib/utils/usePresence.svelte'
 
     const data = $derived(usePresenceData<number>())
 </script>

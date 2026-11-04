@@ -79,10 +79,40 @@ The most common use case is a tab indicator that slides between tabs:
 
 ### How it works
 
-1. Only one element with a given `layoutId` should be mounted at a time (use conditional rendering).
-2. When the old element unmounts, its bounding rect is captured.
+1. One element leads each `layoutId` at a time. A `layoutId` can change after mount: the element leaves its old id and joins the new one, as if it had unmounted and mounted again. Moving an id between mounted elements (`layoutId={selected ? 'highlight' : undefined}`) animates the new holder from the old one. An element that takes an id from one that is still on screen takes over instantly, and the other is hidden.
+2. When the old element unmounts, its bounding rect is captured. Inside `AnimatePresence` it is held instead, and crossfades into the new one.
 3. When the new element mounts, it reads the stored rect and performs a FLIP animation from the old position to its own natural position.
 4. The animation uses the element's `transition` prop, or falls back to the previous element's transition.
+
+### Crossfading with `AnimatePresence`
+
+Inside `AnimatePresence`, the element that leaves a `layoutId` is held until the shared animation ends: it follows the new element and fades out while the new one fades in, as in Motion, even without an `exit` prop. See [AnimatePresence: Shared layout](/docs/animate-presence#shared-layout).
+
+### Tabs without conditional rendering
+
+Every tab can render its own highlight. Give `layoutId` only to the selected one, and the highlight slides to the new tab when the selection changes (Motion 14.7.1, #1411):
+
+```svelte
+<script>
+    import { motion } from '@humanspeak/svelte-motion'
+
+    const tabs = ['Home', 'Search', 'Profile']
+    let selected = $state('Home')
+</script>
+
+{#each tabs as tab (tab)}
+    <button onclick={() => (selected = tab)} style="position: relative;">
+        {tab}
+        <motion.div
+            layoutId={selected === tab ? 'highlight' : undefined}
+            style="position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: {selected ===
+            tab
+                ? 'royalblue'
+                : 'transparent'};"
+        />
+    </button>
+{/each}
+```
 
 Layout animations can travel along a curve instead of a straight FLIP interpolation. See [`arc()`](/docs/arc) for `transition.layout.path` and shared `layoutId` examples.
 
@@ -158,12 +188,27 @@ Nested groups chain by default (`inherit={true}`), so a `<LayoutGroup id="inner"
 
 | Prop | Type | Description |
 |---|---|---|
-| `layoutId` | `string` | Shared identifier. Elements with matching `layoutId` animate between each other's positions. |
+| `layoutId` | `string` | Shared identifier. Elements with matching `layoutId` animate between each other's positions. It can change after mount: the element moves to the new id's shared layout, animating from the previous holder, or taking over instantly from one still on screen. |
 
 `layoutId` works best inside `AnimatePresence`, which provides the registry that coordinates the snapshot/consume handoff.
+
+### Layout animation callbacks
+
+| Prop | Type | Description |
+|---|---|---|
+| `onLayoutAnimationStart` | `() => void` | Called when this element's layout animation starts, as in Motion. |
+| `onLayoutAnimationComplete` | `() => void` | Called when this element's layout animation completes, as in Motion. |
+
+### `layoutRoot` and `layoutAnchor`
+
+| Prop | Type | Description |
+|---|---|---|
+| `layoutRoot` | `boolean` | Make this element a layout root: descendants' layout animations, including shared `layoutId` ones whose previous element was inside it too, resolve relative to it. Its own layout change is instant. Read at mount. See [layoutRoot & layoutAnchor](/docs/layout-root). |
+| `layoutAnchor` | `{ x: number; y: number } \| false` | The point on the parent that relative layout projection is anchored to (default top-left; `{ x: 0.5, y: 0.5 }` for a centred child), or `false` to turn relative projection off. |
 
 ## Related
 
 - [AnimatePresence](/docs/animate-presence) — Coordinate enter/exit animations
 - [Shared Layout Animation example](/examples/shared-layout-animation) — Full interactive demo
 - [LayoutGroup example](/examples/layout-group) — Two sibling tab strips reusing the same `layoutId` without crossing over
+- [layoutRoot & layoutAnchor](/docs/layout-root) — Animate shared layout relative to a layout root, and anchor relative projection

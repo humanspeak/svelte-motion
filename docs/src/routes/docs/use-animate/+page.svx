@@ -6,6 +6,7 @@ description: 'Imperative animation with a scoped CSS-selector API.'
 <script>
   import Example from '#lib/components/general/Example.svelte';
   import UseAnimateExample from '#lib/examples/use-animate/demos/Default.svelte';
+  import UseAnimateTimelineExample from '#lib/examples/use-animate/demos/Timeline.svelte';
   import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
@@ -45,6 +46,11 @@ against `scope.current`.
 
 <button onclick={run}>Animate</button>
 ```
+
+Selector strings resolve against `scope.current`, so calling `animate('li', …)`
+before the attachment fires throws, as in Motion. Element and motion-value
+subjects work at any time. Trigger selector animations from user events or
+`$effect` after mount.
 
 <Example isSmall exampleUrl="/examples/use-animate">
   <UseAnimateExample />
@@ -105,6 +111,72 @@ finishes:
 </script>
 ```
 
+## Timelines
+
+Since Motion 14.7, `animate` returns a mutable `Timeline`. You can change it
+while it plays: changes are batched per microtask, and the timeline rebuilds
+from its current time without a jump.
+
+```svelte
+<script lang="ts">
+    import { useAnimate } from '@humanspeak/svelte-motion'
+    import { onMount } from 'svelte'
+
+    const [scope, animate] = useAnimate()
+    let tl: ReturnType<typeof animate>
+
+    onMount(() => {
+        tl = animate(
+            [['.a', { x: 200 }, { duration: 1 }], 'mid', ['.b', { x: 200 }, { duration: 1 }]],
+            { autoplay: false, onUpdate: (time) => console.log(time) }
+        )
+    })
+
+    // Half a second after the `mid` label.
+    const addC = () => tl.add(['.c', { x: 200 }, { duration: 1 }], 'mid+0.5')
+</script>
+```
+
+- **`add(item, at?)`** &mdash; add a segment, a label, or a nested item. A
+  nested item is another timeline or `{ sequence, at }`.
+- **`call(callback, at?)`** &mdash; run `callback(direction)` when the playhead
+  crosses `at`. `direction` is `1` playing forwards and `-1` in reverse.
+- **`addPause(at?)`** &mdash; pause when the playhead reaches `at`.
+- **`move(item, at)`**, **`remove(item)`**, **`clear()`** &mdash; reposition,
+  drop, or empty the timeline's items.
+- **Labels** &mdash; a string in the sequence marks a time. `at` accepts a label
+  or a label with an offset, such as `'mid+0.5'` or `'mid-0.2'`.
+  `getLabelTime(label)` returns a label's time.
+- **`seek(time | label)`**, **`playTo(time | label)`**, **`reverse()`** &mdash;
+  jump to a time, play to a time or label and pause there, or play backwards.
+- **`progress`**, **`time`**, **`speed`**, **`duration`**, **`state`** &mdash;
+  read or set playback. Setting `progress` or `time` scrubs the timeline.
+
+Options, in addition to `SequenceOptions`:
+
+- **`autoplay`** &mdash; `false` builds the timeline paused.
+- **`onUpdate(time)`** &mdash; called every frame with the timeline's time.
+- **`onRepeat`** &mdash; called each time a repeat starts.
+- **`onReverseComplete`** &mdash; called when reverse playback reaches the
+  start. Without it, `onComplete` fires there instead.
+
+<Example isSmall exampleUrl="/examples/use-animate">
+  <UseAnimateTimelineExample />
+</Example>
+
+## MotionConfig
+
+Inside a `<MotionConfig>`, `reducedMotion` and `skipAnimations` apply to
+everything started through the scoped `animate`, including segments added to a
+timeline later. Both are read on every call, so changing them after mount
+affects later animations. They are also exposed live as `scope.reduceMotion`
+and `scope.skipAnimations`, which is what timelines read when they rebuild.
+Options you pass to a call explicitly still win.
+
+As in Motion, `useAnimate` with no `MotionConfig` animates transforms even when
+the OS asks for reduced motion. Wrap it in `<MotionConfig reducedMotion="user">`
+to follow the OS setting.
+
 ## Cleanup
 
 The attachment cleanup runs when the parent element detaches. Every animation
@@ -132,17 +204,24 @@ For state-driven animations on a single element, the declarative
   properties:
   - `scope.current: HTMLElement | undefined` &mdash; the attached element,
     populated once `{@attach scope}` fires.
-  - `scope.animations: AnimationPlaybackControlsWithThen[]` &mdash; in-flight
-    animations started through the scoped `animate`. Cleared automatically when
-    the parent detaches.
+  - `scope.animations` &mdash; the timelines started through the scoped
+    `animate`. Stopped and cleared automatically when the parent detaches.
+  - `scope.reduceMotion: boolean | undefined` and
+    `scope.skipAnimations: boolean | undefined` &mdash; the nearest
+    `MotionConfig`'s settings, read live. Timelines started through the scope
+    follow them when they rebuild.
 - **`animate(target, keyframes, options?)`** &mdash; same overloads as
   motion's standalone `animate`. Strings are resolved against
   `scope.current`. Also accepts `[ [target, keyframes, options], ... ]`
-  sequences with optional `SequenceOptions` (see motion docs).
+  sequences with the timeline options above (everything but `scope`).
 
-`animate` returns an `AnimationPlaybackControlsWithThen`. It's `await`-able
-and exposes `play`, `pause`, `stop`, `cancel`, `complete`, `time`, `speed`,
-and a `finished` promise.
+`animate` returns a `Timeline` (Motion 14.7). It's `await`-able, exposes
+`play`, `pause`, `stop`, `cancel`, `complete`, `time`, `speed` and a `finished`
+promise, and adds the timeline methods in [Timelines](#timelines). The
+`Timeline`, `TimelineItem`, `TimelineCallback`, `TimelineOptions`,
+`AnimationSequence`, `NestedSequence`, `Segment`, `SequenceOptions`,
+`SequenceInfo` and `ObjectTarget` types are exported from
+`@humanspeak/svelte-motion`.
 
 ## See also
 

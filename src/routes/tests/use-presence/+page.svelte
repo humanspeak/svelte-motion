@@ -1,7 +1,9 @@
 <script lang="ts">
     import { AnimatePresence, PresenceChild, motion, useMotionValue, useReducedMotion } from '$lib'
     import { onDestroy, onMount } from 'svelte'
+    import TesterPanel, { type TesterStep } from '../layout/_parity/TesterPanel.svelte'
     import CustomExit from './CustomExit.svelte'
+    import MixedExit from './MixedExit.svelte'
     import WaitChild from './WaitChild.svelte'
 
     let visible = $state(true)
@@ -65,6 +67,63 @@
     }
 
     onDestroy(clearSequence)
+
+    // ---- Each participant holds its own (plan 017) ----
+    let mixedPresent = $state(true)
+    let mixedCompletions = $state(0)
+    type Verdict = { ok: boolean; text: string }
+    // Tester only; never under `@isPlaywright=true`.
+    let isTester = $state(false)
+    let mixedVerdict = $state<Verdict | null>(null)
+    onMount(() => {
+        isTester = !window.location.search.includes('@isPlaywright=true')
+    })
+
+    function toggleMixed() {
+        const leaving = mixedPresent
+        mixedPresent = !mixedPresent
+        if (!isTester || !leaving) return
+        const start = performance.now()
+        const frames: { t: number; css: boolean; motion: boolean; opacity: number }[] = []
+        const step = () => {
+            const css = document.querySelector('[data-testid="mixed-css"]')
+            const motionCard = document.querySelector<HTMLElement>('[data-testid="mixed-motion"]')
+            frames.push({
+                t: performance.now() - start,
+                css: !!css,
+                motion: !!motionCard,
+                opacity: motionCard ? Number(getComputedStyle(motionCard).opacity) : -1
+            })
+            if ((css || motionCard) && performance.now() - start < 2500) {
+                requestAnimationFrame(step)
+                return
+            }
+            const lastMotion = frames.findLast((frame) => frame.motion)
+            const cssGone = frames.findIndex((frame) => !frame.css)
+            const motionGone = frames.findIndex((frame) => !frame.motion)
+            const heldLate = frames.some((frame) => frame.t >= 400 && frame.css && frame.motion)
+            const ok =
+                !!lastMotion &&
+                lastMotion.opacity <= 0.1 &&
+                cssGone >= 0 &&
+                cssGone === motionGone &&
+                heldLate
+            mixedVerdict = {
+                ok,
+                text: `last motion opacity ${lastMotion ? lastMotion.opacity.toFixed(2) : '—'} (want ≤ 0.10) · ${cssGone === motionGone ? 'left together' : 'left apart'} · ${heldLate ? 'both held past 0.4 s' : 'released early'}`
+            }
+        }
+        requestAnimationFrame(step)
+    }
+
+    const steps: TesterStep[] = [
+        {
+            text: 'Each participant holds its own: press "Toggle mixed" once.',
+            expected:
+                'The CSS card fades in 0.3 s but both cards stay until the motion card has faded out (1.2 s); then both leave together and completions reads 1.',
+            action: { label: 'Toggle mixed', run: toggleMixed }
+        }
+    ]
 
     const reduced = useReducedMotion()
     let mounted = $state(false)
@@ -326,6 +385,40 @@
     </section>
 
     <section class="block">
+        <h2>
+            Each participant holds its own
+            {#if isTester && mixedVerdict}
+                <span class="verdict" class:ok={mixedVerdict.ok}>
+                    {mixedVerdict.ok ? 'OK' : 'WRONG'} · {mixedVerdict.text}
+                </span>
+            {/if}
+        </h2>
+        <p class="hint">
+            A <code>usePresence()</code> consumer and a <code>motion.div</code> exit share one owned
+            wrapper. The consumer's <code>safeToRemove</code> completes only itself, so the wrapper leaves
+            when the slower motion exit is done too.
+        </p>
+        <button type="button" data-testid="toggle-mixed" onclick={toggleMixed} class="primary">
+            {mixedPresent ? 'Hide' : 'Show'} mixed
+        </button>
+        <span data-testid="mixed-completions">{mixedCompletions}</span>
+        <div class="stage">
+            {#if mounted}
+                <AnimatePresence
+                    present={mixedPresent}
+                    onExitComplete={() => {
+                        if (!mixedPresent) mixedCompletions += 1
+                    }}
+                >
+                    {#snippet child()}
+                        <MixedExit />
+                    {/snippet}
+                </AnimatePresence>
+            {/if}
+        </div>
+    </section>
+
+    <section class="block">
         <h2>mode='wait' integration with motion.* enter</h2>
         <p class="hint">
             Click <code>swap</code> — the new motion element waits for the old PresenceChild's
@@ -353,7 +446,35 @@
     </section>
 </div>
 
+<TesterPanel
+    eyebrow="AnimatePresence/use-presence.ts (Motion 14.7.1)"
+    title="usePresence registers its own participant"
+    status="Expected on this build: the chip reads OK."
+    {steps}
+>
+    {#snippet checks()}
+        <p>
+            Upstream each <code>usePresence()</code> consumer is one participant of its presence
+            child, and its <code>safeToRemove</code> completes only that participant. The wrapper leaves
+            once every participant, including motion exits, is done.
+        </p>
+    {/snippet}
+</TesterPanel>
+
 <style>
+    .verdict {
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #7f1d1d;
+        color: white;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .verdict.ok {
+        background: #14532d;
+    }
+
     .page {
         padding: 24px;
         max-width: 640px;

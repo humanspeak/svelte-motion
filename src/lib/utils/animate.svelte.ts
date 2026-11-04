@@ -1,11 +1,7 @@
 import { getMotionConfig } from '$lib/components/motionConfig.context.js'
 import type { MotionConfigProps } from '$lib/types.js'
-import { createScopedAnimate } from 'motion'
-import type {
-    AnimationPlaybackControlsWithThen,
-    AnimationScope as MotionAnimationScope
-} from 'motion-dom'
-import type { SvelteMotionAnimate } from './animateValue.js'
+import type { AnimationPlaybackControlsWithThen } from 'motion-dom'
+import { createScopedAnimate, type SvelteMotionAnimate } from './animateValue.js'
 
 /**
  * The scope returned by {@link useAnimate}. Functions as a Svelte 5
@@ -22,6 +18,43 @@ export type AnimationScope<T extends Element = HTMLElement> = ((node: T) => () =
     current: T | undefined
     /** Animations currently scoped to this element. */
     animations: AnimationPlaybackControlsWithThen[]
+    /**
+     * MotionConfig's resolved `reducedMotion`, read live from the nearest
+     * `MotionConfig`. Timelines created with this scope follow it when they
+     * rebuild.
+     */
+    readonly reduceMotion?: boolean
+    /**
+     * MotionConfig's `skipAnimations`, read live from the nearest
+     * `MotionConfig`. Timelines created with this scope follow it when they
+     * rebuild.
+     */
+    readonly skipAnimations?: boolean
+}
+
+/**
+ * Resolves MotionConfig's `reducedMotion` policy to the boolean Motion's
+ * `reduceMotion` option expects, mirroring `useReducedMotionConfig` without
+ * hooks so it also works when `useAnimate()` runs at module scope.
+ *
+ * Upstream `use-animate.ts:17` is `useReducedMotionConfig() ?? undefined`, and
+ * React's MotionConfig context defaults to `"never"`, hence `false` with no
+ * config.
+ *
+ * @param config The nearest MotionConfig, if any.
+ * @returns `true`/`false` for a resolved policy, or `undefined` when the OS
+ *   preference can't be read.
+ */
+const resolveReduceMotion = (config: MotionConfigProps | undefined): boolean | undefined => {
+    const policy = config?.reducedMotion ?? 'never'
+    if (policy === 'always') return true
+    if (policy === 'never') return false
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined
+    try {
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    } catch {
+        return undefined
+    }
 }
 
 /**
@@ -38,14 +71,19 @@ export type AnimationScope<T extends Element = HTMLElement> = ((node: T) => () =
  * When the attached element detaches, every animation started through the
  * scoped `animate` is stopped and `scope.animations` is cleared.
  *
- * `animate` ignores calls before the attachment fires — `scope.current` is
- * still `undefined`, and motion throws when asked to query selectors against
- * a missing root. Trigger animations from user events or `$effect` after
- * mount.
+ * Selector strings resolve against `scope.current`, so calling
+ * `animate('li', …)` before the attachment fires throws, as in Motion. Element
+ * and motion-value subjects work at any time. Trigger selector animations from
+ * user events or `$effect` after mount.
  *
- * Inside a `<MotionConfig skipAnimations>` subtree, animations started through
- * the returned `animate` complete instantly. The current config value is read
- * per call, so toggling it after mount affects subsequent animations.
+ * Inside a `<MotionConfig>`, `reducedMotion` and `skipAnimations` are both read
+ * per call and passed to every animation started through the returned
+ * `animate` (with `skipAnimations` they complete instantly), so toggling them
+ * after mount affects subsequent animations. Both are also exposed live on
+ * `scope`, so timelines rebuilt later (`tl.add(…)`) follow them.
+ *
+ * `animate` returns a mutable `Timeline` (Motion 14.7); see
+ * https://motion.dev/docs/animate.
  *
  * @template T The parent element type. Defaults to `HTMLElement`.
  * @returns A `[scope, animate]` tuple.
@@ -109,23 +147,35 @@ export const useAnimate = <T extends Element = HTMLElement>(): [
         motionConfig = undefined
     }
 
+    // Upstream use-animate.ts:23-24 writes these every render; getters keep
+    // them current without one. Read by Timeline rebuilds (timeline index.ts:470-478).
+    Object.defineProperties(scope, {
+        reduceMotion: { get: () => resolveReduceMotion(motionConfig), enumerable: true },
+        skipAnimations: { get: () => motionConfig?.skipAnimations, enumerable: true }
+    })
+
     // Memoised on the resolved value so repeated calls under an unchanged
     // config reuse one scoped animate. Every instance is handed the SAME
     // `scope` object, so `scope.animations` tracking stays correct across
     // rebuilds.
     let cachedScoped: SvelteMotionAnimate | undefined
     let cachedSkip: boolean | undefined
+    let cachedReduce: boolean | undefined
     let hasCached = false
 
     const resolveScopedAnimate = (): SvelteMotionAnimate => {
         const skipAnimations = motionConfig?.skipAnimations
-        if (!hasCached || cachedSkip !== skipAnimations) {
+        const reduceMotion = resolveReduceMotion(motionConfig)
+        if (!hasCached || cachedSkip !== skipAnimations || cachedReduce !== reduceMotion) {
             hasCached = true
             cachedSkip = skipAnimations
+            cachedReduce = reduceMotion
+            // Upstream passes both keys even when `undefined`; createScopedAnimate ignores it.
             cachedScoped = createScopedAnimate({
-                scope: scope as MotionAnimationScope<T>,
-                ...(skipAnimations === undefined ? {} : { skipAnimations })
-            }) as SvelteMotionAnimate
+                scope,
+                reduceMotion,
+                skipAnimations
+            })
         }
         return cachedScoped!
     }

@@ -1,12 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as layoutModule from './layout.js'
 import {
+    clearAncestorChanged,
     computeFlipTransforms,
+    hasAncestorChangedSinceCache,
+    hasPendingStructuralChange,
+    installStructuralProbe,
     isLayoutMeasurementGated,
     measureRect,
     observeLayoutChanges,
     runLayoutSizeAnimation,
     selectLayoutDependencies,
-    setCompositorHints,
     stripNonChildLayoutStyle
 } from './layout.js'
 
@@ -295,14 +299,6 @@ describe('utils/layout', () => {
 
         await Promise.resolve()
         expect(el.hasAttribute('data-layout-size-animation')).toBe(false)
-    })
-
-    it('setCompositorHints: toggles styles', () => {
-        const el = document.createElement('div')
-        setCompositorHints(el, true)
-        expect(el.style.willChange).toBe('transform')
-        setCompositorHints(el, false)
-        expect(el.style.willChange).toBe('')
     })
 
     it('observeLayoutChanges: calls callback and cleans up (with parent branch)', () => {
@@ -723,6 +719,51 @@ describe('utils/layout', () => {
             cleanup()
         })
 
+        it('ignores an ancestor style rewrite that only re-serializes the authored text', async () => {
+            const parent = document.createElement('div')
+            const el = document.createElement('div')
+            // Authored text, never touched by the CSSOM yet: `#ddd`, not the
+            // browser's `rgb(221, 221, 221)` serialization.
+            parent.setAttribute('style', 'position: relative; width: 400px; background: #ddd')
+            parent.appendChild(el)
+            document.body.appendChild(parent)
+
+            const cb = vi.fn()
+            const cleanup = observeLayoutChanges(el, cb)
+            await flush()
+            cb.mockClear()
+
+            // The projection's first transform write re-serializes every
+            // declaration. Only an animation channel changed.
+            parent.style.transform = 'translate3d(0px, -74px, 0px)'
+            await flush()
+
+            expect(
+                cb,
+                'a serialization-only difference must not count as a layout change'
+            ).not.toHaveBeenCalled()
+            cleanup()
+        })
+
+        it('still re-slots on a geometric change to an ancestor with authored style text', async () => {
+            const parent = document.createElement('div')
+            const el = document.createElement('div')
+            parent.setAttribute('style', 'position: relative; width: 400px; background: #ddd')
+            parent.appendChild(el)
+            document.body.appendChild(parent)
+
+            const cb = vi.fn()
+            const cleanup = observeLayoutChanges(el, cb)
+            await flush()
+            cb.mockClear()
+
+            parent.style.width = '300px'
+            await flush()
+
+            expect(cb, 'a real geometric change must still be observed').toHaveBeenCalled()
+            cleanup()
+        })
+
         it('does not observe beyond MAX_OBSERVED_ANCESTORS (4) levels', async () => {
             // Chain above el: a1 (1st) … a5 (5th). Only 4 levels are watched.
             const a5 = document.createElement('div')
@@ -962,5 +1003,483 @@ describe('stripNonChildLayoutStyle', () => {
         expect(stripNonChildLayoutStyle('width: 1px; height: 2px')).not.toBe(
             stripNonChildLayoutStyle('height: 2px; width: 1px')
         )
+    })
+})
+
+/**
+ * Plan 015b: which DOM changes reach a `layout` element, and why it ran.
+ *
+ * Upstream re-renders every `motion.*` in the render that changed state, so
+ * siblings in other `AnimatePresence` boundaries snapshot too; and when an
+ * exit completes it re-renders only that `AnimatePresence`
+ * (`components/AnimatePresence/index.tsx:244` @ v14.7.1), so nodes outside it
+ * snap. These cases use jsdom's real `MutationObserver` and inject no CSS:
+ * the `display: contents` rule of `.animate-presence-container` is component
+ * CSS that Vitest blanks, so the layout parent must be found by its class.
+ *
+ * The new API is read off the module namespace so a missing export fails
+ * only the cases that use it.
+ */
+describe('observeLayoutChanges reach and causes (plan 015b)', () => {
+    type Cause = { kind: string; markers?: Array<{ boundary: Element | null }> }
+    type Api = {
+        markExiting?: (
+            element: Element,
+            marker: { boundary: Element | null; group?: object }
+        ) => void
+    }
+    const api = layoutModule as unknown as Api
+    type Options = {
+        onLayoutParentChange?: (
+            parent: Element,
+            records: MutationRecord[] | null,
+            cause: Cause
+        ) => void
+    }
+    const observe = (
+        el: HTMLElement,
+        onChange: (cause?: Cause) => void,
+        options?: Options
+    ): (() => void) =>
+        Reflect.apply(observeLayoutChanges, undefined, [el, onChange, options]) as () => void
+
+    class NoopResizeObserver {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+    }
+    /** Let jsdom deliver queued mutation records (a microtask). */
+    const deliver = async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+    }
+    /** One animation frame: every rAF callback queued so far, no newer ones. */
+    const nextFrame = () => vi.runOnlyPendingTimers()
+    const lastCause = (onChange: ReturnType<typeof vi.fn>) =>
+        onChange.mock.calls.at(-1)?.[0] as Cause | undefined
+
+    let stops: Array<() => void> = []
+    beforeEach(() => {
+        vi.stubGlobal('ResizeObserver', NoopResizeObserver)
+        stops = []
+    })
+    afterEach(() => {
+        for (const stop of stops) stop()
+        vi.unstubAllGlobals()
+        document.body.innerHTML = ''
+    })
+
+    /**
+     * `ul > .animate-presence-container > li#el` beside a second boundary
+     * holding `li#sib`: the owned path, one `AnimatePresence` per item.
+     */
+    const ownedList = () => {
+        const ul = document.createElement('ul')
+        const boundary = document.createElement('div')
+        boundary.className = 'animate-presence-container'
+        const sibBoundary = document.createElement('div')
+        sibBoundary.className = 'animate-presence-container'
+        const el = document.createElement('li')
+        el.id = 'el'
+        const sib = document.createElement('li')
+        sib.id = 'sib'
+        boundary.append(el)
+        sibBoundary.append(sib)
+        ul.append(sibBoundary, boundary)
+        const grandparent = document.createElement('div')
+        grandparent.append(ul)
+        document.body.append(grandparent)
+        return { grandparent, ul, boundary, sibBoundary, el, sib }
+    }
+
+    const watch = (el: HTMLElement, options?: Options) => {
+        const onChange = vi.fn()
+        stops.push(observe(el, onChange, options))
+        return onChange
+    }
+
+    it('4a: a change in the layout parent reaches an element under an AnimatePresence container', async () => {
+        const { ul, el } = ownedList()
+        const onChange = watch(el)
+        await deliver()
+        onChange.mockClear()
+
+        ul.append(document.createElement('li'))
+        await deliver()
+
+        expect(onChange).toHaveBeenCalled()
+    })
+
+    it("4b: a sibling's data-motion-pop-id reaches the element", async () => {
+        const { el, sib } = ownedList()
+        const onChange = watch(el)
+        await deliver()
+        onChange.mockClear()
+
+        sib.setAttribute('data-motion-pop-id', 'pop-1')
+        await deliver()
+
+        expect(onChange).toHaveBeenCalled()
+    })
+
+    it('4c: removing a marked element is exit-complete, through the self-subtree and layout-parent observers', async () => {
+        // Layout-parent observer: a marked sibling in another boundary.
+        const { el, sib, sibBoundary } = ownedList()
+        const onChange = watch(el)
+        await deliver()
+        onChange.mockClear()
+
+        api.markExiting!(sib, { boundary: sibBoundary })
+        sib.remove()
+        await deliver()
+
+        expect(onChange).toHaveBeenCalledTimes(1)
+        expect(lastCause(onChange)?.kind).toBe('exit-complete')
+        expect(lastCause(onChange)?.markers?.[0]?.boundary).toBe(sibBoundary)
+
+        // Self-subtree observer: a marked child of the element itself.
+        const host = document.createElement('div')
+        const inner = document.createElement('div')
+        inner.className = 'animate-presence-container'
+        const child = document.createElement('div')
+        inner.append(child)
+        host.append(inner)
+        const wrap = document.createElement('section')
+        wrap.append(host)
+        document.body.append(wrap)
+        const onHost = watch(host)
+        await deliver()
+        onHost.mockClear()
+
+        api.markExiting!(child, { boundary: inner })
+        child.remove()
+        await deliver()
+
+        expect(onHost).toHaveBeenCalledTimes(1)
+        expect(lastCause(onHost)?.kind).toBe('exit-complete')
+    })
+
+    it('4d: an add and a removal in one batch are not exit-complete', async () => {
+        // In the element's own boundary, which it observes today too.
+        const { el, boundary } = ownedList()
+        const leaving = document.createElement('li')
+        boundary.append(leaving)
+        const onChange = watch(el)
+        await deliver()
+        onChange.mockClear()
+
+        api.markExiting?.(leaving, { boundary })
+        leaving.remove()
+        boundary.append(document.createElement('li'))
+        await deliver()
+
+        expect(onChange).toHaveBeenCalled()
+        for (const [cause] of onChange.mock.calls) {
+            expect((cause as Cause | undefined)?.kind).not.toBe('exit-complete')
+        }
+    })
+
+    it('4e: coalesced causes merge, and a trailing cause-less call inherits exit-complete for a double rAF', async () => {
+        // An exit-complete batch, then an add before the trailing frame: the
+        // merged (trailing) cause is not exit-complete.
+        const first = ownedList()
+        const onFirst = watch(first.el)
+        await deliver()
+        nextFrame()
+        onFirst.mockClear()
+
+        api.markExiting!(first.sib, { boundary: first.sibBoundary })
+        first.sib.remove()
+        await deliver()
+        expect(lastCause(onFirst)?.kind).toBe('exit-complete')
+        first.ul.append(document.createElement('li'))
+        await deliver()
+        nextFrame()
+        expect(lastCause(onFirst)?.kind).not.toBe('exit-complete')
+        stops.forEach((stop) => stop())
+        stops = []
+        document.body.innerHTML = ''
+
+        // An exit-complete batch alone: the trailing call, then a cause-less
+        // one (here a class change) inside the window, inherit it.
+        const second = ownedList()
+        const onSecond = watch(second.el)
+        await deliver()
+        nextFrame()
+        nextFrame()
+        onSecond.mockClear()
+
+        api.markExiting!(second.sib, { boundary: second.sibBoundary })
+        second.sib.remove()
+        await deliver()
+        expect(lastCause(onSecond)?.kind).toBe('exit-complete')
+        nextFrame()
+        expect(onSecond).toHaveBeenCalledTimes(2)
+        expect(lastCause(onSecond)?.kind).toBe('exit-complete')
+        second.el.className = 'resized'
+        await deliver()
+        expect(onSecond).toHaveBeenCalledTimes(3)
+        expect(lastCause(onSecond)?.kind).toBe('exit-complete')
+
+        // Past the double rAF, a cause-less call is just a change.
+        nextFrame()
+        nextFrame()
+        nextFrame()
+        onSecond.mockClear()
+        second.el.className = 'resized again'
+        await deliver()
+        expect(onSecond).toHaveBeenCalled()
+        expect(lastCause(onSecond)?.kind).not.toBe('exit-complete')
+    })
+
+    it('4f: onLayoutParentChange fires once per batch, only for records targeting the layout parent', async () => {
+        const { ul, el, sib } = ownedList()
+        const onLayoutParentChange = vi.fn()
+        watch(el, { onLayoutParentChange })
+        await deliver()
+
+        // Deep inside a sibling: not a change of the layout parent's children.
+        sib.append(document.createElement('span'))
+        await deliver()
+        expect(onLayoutParentChange).not.toHaveBeenCalled()
+
+        // Two appends in one batch: one call, with the layout parent.
+        ul.append(document.createElement('li'))
+        ul.append(document.createElement('li'))
+        await deliver()
+        expect(onLayoutParentChange).toHaveBeenCalledTimes(1)
+        expect(onLayoutParentChange.mock.calls[0][0]).toBe(ul)
+        expect(Array.isArray(onLayoutParentChange.mock.calls[0][1])).toBe(true)
+    })
+
+    it("4g: a sibling's style change doesn't reach the element", async () => {
+        const { el, sib } = ownedList()
+        const onChange = watch(el)
+        await deliver()
+        onChange.mockClear()
+
+        sib.style.color = 'red'
+        sib.setAttribute('data-unrelated', '1')
+        await deliver()
+
+        expect(onChange).not.toHaveBeenCalled()
+    })
+
+    it('A1.3a: a popped element does not re-commit for its own pop or its list changing', async () => {
+        // Upstream never re-snapshots a popped exiting element for its own
+        // pop (PresenceChild's pop is a style rule, not a render of it).
+        const { ul, el } = ownedList()
+        const onChange = watch(el)
+        await deliver()
+        onChange.mockClear()
+
+        el.setAttribute('data-motion-pop-id', 'pop-self')
+        await deliver()
+        ul.append(document.createElement('li'))
+        await deliver()
+
+        expect(onChange).not.toHaveBeenCalled()
+    })
+})
+
+/**
+ * Plan 015c: the probe behind an exiting element's own cached snapshot. It
+ * says whether a childList change is pending in this flush under the
+ * element's outermost observed ancestor (four levels up), and the
+ * ancestor-attribute stamp says whether its cache may be stale.
+ */
+describe('hasPendingStructuralChange and the ancestor stamp (plan 015c)', () => {
+    class NoopResizeObserver {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+    }
+    /** Let queued microtasks run (jsdom delivers mutation records on one). */
+    const settle = async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+    }
+
+    let stops: Array<() => void> = []
+    beforeEach(() => {
+        vi.stubGlobal('ResizeObserver', NoopResizeObserver)
+        stops = []
+    })
+    afterEach(() => {
+        for (const stop of stops) stop()
+        vi.unstubAllGlobals()
+        document.body.innerHTML = ''
+    })
+
+    /** `body > #a > #b > ul#c > div#d > li#el`, with `#a` the outermost observed ancestor. */
+    const tree = () => {
+        const chain = ['a', 'b', 'c', 'd'].map((id) => {
+            const node = document.createElement(id === 'c' ? 'ul' : 'div')
+            node.id = id
+            return node
+        })
+        chain.reduce<HTMLElement>((parent, node) => parent.appendChild(node), document.body)
+        const el = document.createElement('li')
+        chain[3].appendChild(el)
+        const [a, b, c, d] = chain
+        return { a, b, c, d, el }
+    }
+
+    it('is false without a probe', () => {
+        const { c, el } = tree()
+        c.appendChild(document.createElement('li'))
+        expect(hasPendingStructuralChange(el)).toBe(false)
+    })
+
+    it('is true for a childList change in this flush, for the rest of the microtask', async () => {
+        const { c, el } = tree()
+        stops.push(installStructuralProbe(el))
+
+        c.prepend(document.createElement('li'))
+
+        expect(hasPendingStructuralChange(el)).toBe(true)
+        // `takeRecords()` drained the queue; the answer is cached.
+        expect(hasPendingStructuralChange(el)).toBe(true)
+        await settle()
+        expect(hasPendingStructuralChange(el)).toBe(false)
+    })
+
+    it('is false once the change was delivered (a previous flush)', async () => {
+        const { c, el } = tree()
+        stops.push(installStructuralProbe(el))
+
+        c.appendChild(document.createElement('li'))
+        await settle()
+
+        expect(hasPendingStructuralChange(el)).toBe(false)
+    })
+
+    it('ignores attribute changes: no `attributes` option', () => {
+        const { a, c, el } = tree()
+        stops.push(installStructuralProbe(el))
+
+        c.setAttribute('style', 'padding-top: 70px')
+        a.className = 'moved'
+        el.setAttribute('class', 'exiting')
+
+        expect(hasPendingStructuralChange(el)).toBe(false)
+    })
+
+    it('sees a sibling of the layout parent (rows beside the list), not just the layout parent', () => {
+        const { b, el } = tree()
+        stops.push(installStructuralProbe(el))
+
+        b.appendChild(document.createElement('div'))
+
+        expect(hasPendingStructuralChange(el)).toBe(true)
+    })
+
+    it('does not see changes outside the outermost observed ancestor', () => {
+        const { el } = tree()
+        stops.push(installStructuralProbe(el))
+
+        document.body.appendChild(document.createElement('div'))
+
+        expect(hasPendingStructuralChange(el)).toBe(false)
+    })
+
+    it('shares one observer per target and disconnects with its last element', () => {
+        const { c, d, el } = tree()
+        const other = document.createElement('li')
+        d.appendChild(other)
+        const observe = vi.spyOn(MutationObserver.prototype, 'observe')
+        const release = installStructuralProbe(el)
+        const releaseOther = installStructuralProbe(other)
+        expect(observe).toHaveBeenCalledTimes(1)
+
+        release()
+        c.appendChild(document.createElement('li'))
+        expect(hasPendingStructuralChange(other)).toBe(true)
+        expect(hasPendingStructuralChange(el)).toBe(false)
+
+        releaseOther()
+        c.appendChild(document.createElement('li'))
+        expect(hasPendingStructuralChange(other)).toBe(false)
+    })
+
+    it("does not drain the layout observers' records", async () => {
+        const { d, el } = tree()
+        const onChange = vi.fn()
+        stops.push(observeLayoutChanges(el, onChange))
+        stops.push(installStructuralProbe(el))
+
+        // A sibling inserted in the layout parent (`#d`).
+        d.prepend(document.createElement('li'))
+        expect(hasPendingStructuralChange(el)).toBe(true)
+        await settle()
+
+        expect(onChange).toHaveBeenCalled()
+    })
+
+    it('stamps a layout-affecting ancestor change until the cache is written', async () => {
+        const { b, el } = tree()
+        stops.push(observeLayoutChanges(el, () => {}))
+        expect(hasAncestorChangedSinceCache(el)).toBe(false)
+
+        b.setAttribute('style', 'padding-top: 70px')
+        await settle()
+        expect(hasAncestorChangedSinceCache(el)).toBe(true)
+
+        clearAncestorChanged(el)
+        expect(hasAncestorChangedSinceCache(el)).toBe(false)
+    })
+
+    it('does not stamp a transform-only ancestor change', async () => {
+        const { b, el } = tree()
+        stops.push(observeLayoutChanges(el, () => {}))
+
+        b.style.transform = 'translateX(10px)'
+        await settle()
+
+        expect(hasAncestorChangedSinceCache(el)).toBe(false)
+    })
+})
+
+/**
+ * Plan 015b A2.2: an offscreen box-size animation completes at once, but its
+ * animation's final `onUpdate` arrives after the cleanup, which rewrote the
+ * final inline width and left it set at rest (the layout-button wait-group
+ * shell kept `width: 93px` below the fold).
+ */
+describe('runLayoutSizeAnimation offscreen completion (plan 015b A2.2)', () => {
+    it('leaves no inline size behind when a late final update lands after the cleanup', async () => {
+        const el = document.createElement('button')
+        const child = document.createElement('span')
+        child.setAttribute('data-svelte-motion-layout', '')
+        el.appendChild(child)
+        document.body.appendChild(el)
+        // Below the fold.
+        vi.spyOn(el, 'getBoundingClientRect').mockImplementation(
+            () => new DOMRect(100, window.innerHeight + 200, 93, 32)
+        )
+        animateMock.mockImplementationOnce(((
+            _from: number,
+            _to: number,
+            options: { onUpdate?: (progress: number) => void }
+        ) => ({
+            finished: Promise.resolve(),
+            // Like motion's, the final value is written on a later tick.
+            complete: () => queueMicrotask(() => options.onUpdate?.(1)),
+            stop() {},
+            cancel() {}
+        })) as never)
+
+        runLayoutSizeAnimation(
+            el,
+            { dx: 0, dy: 0, sx: 0.83, sy: 1, shouldTranslate: false, shouldScale: true },
+            {}
+        )
+        await Promise.resolve()
+        await Promise.resolve()
+
+        expect(el.hasAttribute('data-layout-size-animation')).toBe(false)
+        expect(el.style.width).toBe('')
+        expect(el.style.height).toBe('')
+        el.remove()
     })
 })

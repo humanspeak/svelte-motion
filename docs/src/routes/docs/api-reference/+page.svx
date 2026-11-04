@@ -125,15 +125,18 @@ To keep your dependency graph small, Svelte Motion re-exports the low-level impe
 
 ```ts
 import {
-    animate,    // animate elements or motion values to keyframes / values
-    delay,      // schedule a callback after N seconds (frame-aware)
-    hover,      // attach true-hover-gated hover listeners to an element
-    inView,     // attach an IntersectionObserver-driven in-view listener
-    press,      // attach pointer-press listeners
-    resize,     // observe ResizeObserver resize events
-    scroll,     // attach a scroll-progress callback (or accelerate a MotionValue)
-    stagger,    // build a staggered delay function for animate()
-    transform   // build a curried mapper for a numeric input → output range
+    animate,             // animate elements or motion values to keyframes / values
+    animateMini,         // Web Animations-only animate (motion/mini)
+    createScopedAnimate, // animate bound to a scope element (what useAnimate uses)
+    delay,               // schedule a callback after N seconds (frame-aware)
+    hover,               // attach true-hover-gated hover listeners to an element
+    inView,              // attach an IntersectionObserver-driven in-view listener
+    press,               // attach pointer-press listeners
+    resize,              // observe ResizeObserver resize events
+    resolveElements,     // selector / element / list → Element[]
+    scroll,              // attach a scroll-progress callback (or accelerate a MotionValue)
+    stagger,             // build a staggered delay function for animate()
+    transform            // build a curried mapper for a numeric input → output range
 } from '@humanspeak/svelte-motion'
 ```
 
@@ -146,6 +149,14 @@ import { arc } from '@humanspeak/svelte-motion'
 ```
 
 `arc()` is re-exported from Motion and creates curved `transition.path` animations. See the [`arc()` guide](/docs/arc) for keyframes, layout animations, springs, and tangent-following rotation.
+
+### Generators
+
+```ts
+import { inertia, keyframes, spring } from '@humanspeak/svelte-motion'
+```
+
+The animation generators behind `transition.type`. Pass one as `type`, or call it with options and sample `next(ms)` by hand. See [inertia & keyframes](/docs/inertia).
 
 ### Easing functions
 

@@ -47,13 +47,15 @@ CSS classes, or coordinating an exit with non-DOM work.
 </AnimatePresence>
 ```
 
-Inside `<Card>`:
+Inside `<Card>`, call `usePresence()` once in the component's `<script>`, then read
+`presence` in `$effect` or the template. Destructuring it at the top level of
+`<script>` reads it only once.
 
 ```svelte
 <script lang="ts">
     import { usePresence } from '@humanspeak/svelte-motion'
 
-    const presence = $derived(usePresence())
+    const presence = usePresence()
     const isPresent = $derived(presence[0])
     let node: HTMLElement | undefined = $state()
 
@@ -119,7 +121,8 @@ different content during exit, no `safeToRemove` needed:
 ```
 
 When called outside any `PresenceChild`, `useIsPresent()` returns `true` and
-`usePresence()` returns `[true, null]`.
+`usePresence()` returns `[true, null]`. `useIsPresent()` never registers with
+the wrapper, so it never holds an exit.
 
 ## How `safeToRemove` behaves
 
@@ -128,9 +131,9 @@ When called outside any `PresenceChild`, `useIsPresent()` returns `true` and
   `safeToRemove` fires cancels the exit; the previously-handed-out callback
   becomes a no-op so a stale `transitionend` handler can't tear down a
   now-present component.
-- **Manual holds.** A wrapper with no motion exit participants stays mounted
-  until you call `safeToRemove`. Reading `usePresence()` does not add an
-  independent hold when motion descendants already coordinate automatic removal.
+- **Per participant.** Each `usePresence()` consumer is one participant of its
+  wrapper, and its `safeToRemove` completes only that participant. The wrapper
+  (or owned `child` snippet) leaves when every participant is done.
 
 ## Mixing with `motion.*` `exit`
 
@@ -140,11 +143,12 @@ registered motion exits finish, then removes the whole subtree and reports one
 completion to `<AnimatePresence>`. The same coordination applies to an owned
 `child()` snippet containing a plain wrapper with multiple motion descendants.
 
-`safeToRemove()` remains an explicit release of the **whole wrapper**. Calling
-it may remove motion descendants before their animations finish. Merely reading
-`usePresence()` does not register a second completion barrier. For custom exit
-work that must hold independently, use a separate manual `<PresenceChild>`
-boundary rather than combining it with automatic motion exits in one wrapper.
+As in Motion, every `usePresence()` consumer is a participant too. Its
+`safeToRemove()` completes only that consumer, so it never cuts a slower motion
+exit short: the wrapper leaves when every participant (motion exits, layout
+measurement, other `usePresence()` consumers) is done. A wrapper with nothing
+registered (plain elements, or an `m` without `LazyMotion` features) leaves as
+soon as its exit starts.
 
 Re-entering cancels the current automatic exit cycle. Stale animation
 completions cannot finish a newer exit. Removing an exiting motion descendant
@@ -153,17 +157,35 @@ also removes its pending participation, so it cannot leave the wrapper stuck.
 See [the owned group example](/examples/use-presence) for fast and slow exits
 that retain their common wrapper until both finish.
 
+## Migrating from `$derived(usePresence())`
+
+Earlier versions asked you to re-call `usePresence()` inside `$derived`. That
+pattern still works but is deprecated: a reactive call can't register with the
+wrapper, so the wrapper keeps the old rules. It doesn't leave on its own when
+nothing else is registered, and that call's `safeToRemove` releases the whole
+wrapper, motion descendants included. Development builds warn once per wrapper.
+
+```svelte
+<!-- Before (deprecated) -->
+<script lang="ts">
+    const presence = $derived(usePresence())
+</script>
+
+<!-- After -->
+<script lang="ts">
+    const presence = usePresence()
+</script>
+```
+
+The rest of the component (`$derived(presence[0])`, destructuring inside
+`$effect`) stays the same.
+
 ## Known limitations
 
-- **`mode='popLayout'`**: the wrapper holds the child in document flow during
-  exit, so `popLayout` semantics (sibling reflow as the exiting element
-  leaves layout immediately) are not implemented for `<PresenceChild>`.
-  `mode='sync'` (default) and `mode='wait'` work as expected — the wrapper
-  participates in the same `inFlightExits` accounting as the clone path.
 - **Nested `<AnimatePresence>` inside a held `<PresenceChild>`**: while
   the wrapper is holding, descendants don't see exit signals because the
-  Svelte tree is still mounted. Once you call `safeToRemove`, normal
-  unmount fires, and any nested motion children's `exit` runs at that point.
+  Svelte tree is still mounted. Once the wrapper leaves, normal unmount
+  fires, and any nested motion children's `exit` runs at that point.
 
 ## API Reference
 
@@ -171,7 +193,7 @@ that retain their common wrapper until both finish.
 
 | Prop | Type | Default | Description |
 | ---- | ---- | ------- | ----------- |
-| `present` | `boolean` | `true` | When this flips `true → false`, the wrapper holds children rendered with `isPresent=false` until all motion exits finish or `safeToRemove` fires. |
+| `present` | `boolean` | `true` | When this flips `true → false`, the wrapper holds children rendered with `isPresent=false` until every registered participant is done (with nothing registered, at once). |
 | `children` | `Snippet` | — | Snippet rendered while `present` is true or while the wrapper is holding. |
 
 ### `useIsPresent(): boolean`
@@ -181,9 +203,10 @@ of any `<PresenceChild>`.
 
 ### `usePresence(): [true, null] | [false, () => void]`
 
-Returns the framer-motion-style tuple. `[true, null]` while present (or
-outside any `<PresenceChild>`); `[false, () => void]` once the wrapper
-enters its exit hold.
+Registers the calling component with its wrapper at init and returns a
+reactive two-item array in the framer-motion tuple shape: `[true, null]` while
+present (or outside any `<PresenceChild>`); `[false, () => void]` once the
+wrapper enters its exit hold. The callback completes only this consumer.
 
 ## See also
 
