@@ -17,12 +17,50 @@ describe('presence exit registry', () => {
         expect(done).toHaveBeenCalledTimes(1)
     })
 
-    it('holds an empty manual wrapper, including unknown mount completions', () => {
+    // Plan 017. Upstream completes a PresenceChild that nothing registered
+    // with from its post-commit effect (PresenceChild.tsx:104-113 @ v14.7.1);
+    // the owner calls `completeIfEmpty()` at that point.
+    it('completes an empty cycle once completeIfEmpty is called, ignoring unknown completions', () => {
         const registry = createPresenceExitRegistry()
         const done = vi.fn()
         const complete = registry.begin(done)
         complete(1)
         expect(done).not.toHaveBeenCalled()
+        registry.completeIfEmpty()
+        registry.completeIfEmpty()
+        expect(done).toHaveBeenCalledTimes(1)
+    })
+
+    it('completeIfEmpty does nothing with a pending participant, after cancel, or outside a cycle', () => {
+        const pending = createPresenceExitRegistry()
+        pending.register(1)
+        const pendingDone = vi.fn()
+        pending.begin(pendingDone)
+        pending.completeIfEmpty()
+        expect(pendingDone).not.toHaveBeenCalled()
+
+        const cancelled = createPresenceExitRegistry()
+        const cancelledDone = vi.fn()
+        cancelled.begin(cancelledDone)
+        cancelled.cancel()
+        cancelled.completeIfEmpty()
+        expect(cancelledDone).not.toHaveBeenCalled()
+
+        const idle = createPresenceExitRegistry()
+        expect(() => idle.completeIfEmpty()).not.toThrow()
+        const idleDone = vi.fn()
+        idle.register(1)()
+        idle.completeIfEmpty()
+        idle.begin(idleDone)
+        idle.register(2)
+        idle.completeIfEmpty()
+        expect(idleDone).not.toHaveBeenCalled()
+    })
+
+    it('a participant that registers and leaves during an empty cycle completes it', () => {
+        const registry = createPresenceExitRegistry()
+        const done = vi.fn()
+        registry.begin(done)
         const dispose = registry.register(1)
         expect(done).not.toHaveBeenCalled()
         dispose()

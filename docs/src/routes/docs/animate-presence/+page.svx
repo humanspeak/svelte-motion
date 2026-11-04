@@ -120,6 +120,8 @@ Use the owned form for stateful elements, focus-sensitive interfaces, reversible
 | Focus, canvas, media, live state | Not retained by the clone | Retained while exit is in progress |
 | VisualElement during exit | Disconnected | Live |
 
+An owned child with nothing that exits (plain elements, or an `m` without `LazyMotion` features) leaves at once, as in Motion.
+
 `PresenceChild` remains available as the lower-level primitive for custom CSS, GSAP, canvas, or other manually completed exit work.
 
 ## Usage

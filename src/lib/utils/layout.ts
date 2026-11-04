@@ -953,6 +953,158 @@ const classifyMutations = (records: MutationRecord[]): LayoutChangeCause | null 
     return { kind: 'exit-complete', markers: [...new Set(markers)] }
 }
 
+// ---- Pending structural change (plan 015c) ---------------------------------
+//
+// Upstream snapshots an exiting element in `getSnapshotBeforeUpdate`, before
+// React commits anything (`MeasureLayout.tsx:149-204` @ v14.7.1). Here the
+// element's pre-update effect runs after earlier blocks in the same flush
+// have already patched the DOM (a keyed `{#each}` inserting a sibling), so a
+// live read is a row off. The probe tells the effect whether such a
+// structural change is pending in this flush, so it can trust the cached
+// layout instead.
+
+interface StructuralProbe {
+    ctor: typeof MutationObserver
+    observer: MutationObserver
+    /** Elements probing this target. */
+    refs: number
+    /** `takeRecords()` drained records in this microtask: the answer stays yes. */
+    pending: boolean
+}
+
+/**
+ * One probe per target. Never shared with the {@link acquireMutationObserver}
+ * registry: `takeRecords()` drains the observer's queue, which would steal a
+ * shared observer's records from its other handlers.
+ */
+const structuralProbes = new WeakMap<Node, StructuralProbe>()
+/** The target each probed element installed its probe on. */
+const probeTargets = new WeakMap<Element, Node>()
+
+/**
+ * The outermost observed ancestor of `el`: `MAX_OBSERVED_ANCESTORS` levels up,
+ * or the highest one there is. Not the layout parent: siblings of the list
+ * (the playground's mirror rows) re-slot it without touching the list.
+ */
+const outermostObservedAncestor = (el: Element): Element | null => {
+    let outermost: Element | null = null
+    let current = el.parentElement
+    for (let depth = 0; current && depth < MAX_OBSERVED_ANCESTORS; depth++) {
+        outermost = current
+        current = current.parentElement
+    }
+    return outermost
+}
+
+/**
+ * Install the structural-change probe for `el` (plan 015c): one shared
+ * `MutationObserver` per target, on `el`'s outermost observed ancestor, with
+ * `{ childList: true, subtree: true }` and a no-op callback. No `attributes`:
+ * childList records are the only DOM changes that can move the element
+ * earlier in the same flush. Install it only for `layout` elements with an
+ * owned presence context; per microtask it allocates one record per childList
+ * mutation under its target, which the no-op callback drains. It reads no
+ * layout.
+ *
+ * @param el The `layout` element whose own snapshot may come from cache.
+ * @returns Releases the probe.
+ *
+ * @example
+ * ```ts
+ * const release = installStructuralProbe(element)
+ * // … later
+ * release()
+ * ```
+ */
+export const installStructuralProbe = (el: Element): (() => void) => {
+    const Ctor = globalThis.MutationObserver
+    const target = outermostObservedAncestor(el)
+    if (!Ctor || !target) return () => {}
+    let probe = structuralProbes.get(target)
+    if (!probe || probe.ctor !== Ctor) {
+        const observer = new Ctor(() => {})
+        observer.observe(target, { childList: true, subtree: true })
+        probe = { ctor: Ctor, observer, refs: 0, pending: false }
+        structuralProbes.set(target, probe)
+    }
+    const owned = probe
+    owned.refs++
+    probeTargets.set(el, target)
+    let released = false
+    return () => {
+        if (released) return
+        released = true
+        if (probeTargets.get(el) === target) probeTargets.delete(el)
+        owned.refs--
+        if (owned.refs > 0) return
+        owned.observer.disconnect()
+        if (structuralProbes.get(target) === owned) structuralProbes.delete(target)
+    }
+}
+
+/**
+ * Whether a childList change under `el`'s probe target is pending in this
+ * flush (plan 015c), i.e. the DOM changed structurally since the last
+ * microtask checkpoint. `takeRecords()` drains the queue, so a yes is cached
+ * for the rest of the microtask. `false` without a probe, or when `el` has
+ * moved out of the probed subtree.
+ *
+ * @param el An element passed to {@link installStructuralProbe}.
+ * @returns Whether a structural change is pending.
+ *
+ * @example
+ * ```ts
+ * if (hasPendingStructuralChange(element)) adapter.seedOwnSnapshotFromCache()
+ * ```
+ */
+export const hasPendingStructuralChange = (el: Element): boolean => {
+    const target = probeTargets.get(el)
+    const probe = target && structuralProbes.get(target)
+    if (!target || !probe || !target.contains(el)) return false
+    if (probe.pending) return true
+    if (!probe.observer.takeRecords().length) return false
+    probe.pending = true
+    queueMicrotask(() => (probe.pending = false))
+    return true
+}
+
+/**
+ * Elements a layout-affecting ancestor style or class change reached since
+ * their cached layout was written (plan 015c): the cache may be stale, so the
+ * exiting element's own snapshot is read live.
+ */
+const ancestorChangedSinceCache = new WeakSet<Element>()
+
+/**
+ * Whether a layout-affecting ancestor attribute change reached `el` since
+ * its cache was last written ({@link clearAncestorChanged}).
+ *
+ * @param el An observed `layout` element.
+ * @returns Whether its cached layout may be stale.
+ *
+ * @example
+ * ```ts
+ * if (!hasAncestorChangedSinceCache(element)) trustCache()
+ * ```
+ */
+export const hasAncestorChangedSinceCache = (el: Element): boolean =>
+    ancestorChangedSinceCache.has(el)
+
+/**
+ * Clear `el`'s ancestor-changed stamp: its cached layout was just written.
+ *
+ * @param el An observed `layout` element.
+ * @returns Nothing.
+ *
+ * @example
+ * ```ts
+ * clearAncestorChanged(element)
+ * ```
+ */
+export const clearAncestorChanged = (el: Element): void => {
+    ancestorChangedSinceCache.delete(el)
+}
+
 /**
  * Observe size/attribute changes that commonly trigger layout changes.
  *
@@ -1084,7 +1236,10 @@ export const observeLayoutChanges = (
     // `observe()`, so in production this is simply the initial chain.
     let observedAncestors: HTMLElement[] = collectAncestors()
     const onAncestorAttributes: MutationHandler = (mutations) => {
-        if (ancestorMutationsAffectLayout(mutations)) schedule()
+        if (!ancestorMutationsAffectLayout(mutations)) return
+        // Plan 015c: the cache may be stale until the commit rewrites it.
+        ancestorChangedSinceCache.add(el)
+        schedule()
     }
     const wireAncestors = () => {
         // Only the LAYOUT PARENT gets childList (plan 015b): `subtree: true`

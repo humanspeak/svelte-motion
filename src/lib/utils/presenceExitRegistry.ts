@@ -5,8 +5,10 @@ type ParticipantId = Parameters<PresenceContextProps['register']>[0]
 /**
  * Coordinates the independent motion exits owned by one PresenceChild.
  *
- * Like upstream PresenceChild, registered IDs track completion. Empty manual
- * wrappers intentionally keep their hold until explicitly released.
+ * Like upstream PresenceChild, registered IDs track completion, and a cycle
+ * completes once every participant is done. A cycle with nothing registered
+ * completes when its owner calls `completeIfEmpty()`, as upstream's
+ * post-commit effect does (PresenceChild.tsx:104-113 @ v14.7.1).
  *
  * It also remembers the outermost registered motion node, the element
  * `mode="popLayout"` pops out of flow (framer-motion
@@ -19,12 +21,11 @@ export function createPresenceExitRegistry() {
     const participants = new Map<ParticipantId, { complete: boolean }>()
     let cycle = 0
     let active = false
-    let participated = false
     let finish: (() => void) | undefined
     let popNode: VisualElement | undefined
 
     function checkComplete() {
-        if (!active || !participated) return
+        if (!active) return
         for (const participant of participants.values()) {
             if (!participant.complete) return
         }
@@ -49,7 +50,6 @@ export function createPresenceExitRegistry() {
     function register(id: ParticipantId, node?: VisualElement) {
         const participant = { complete: false }
         participants.set(id, participant)
-        if (active) participated = true
         // Upstream keeps `node` when `node.parent?.presenceContext?.id !== id`,
         // i.e. its parent motion component belongs to another presence child.
         // svelte-motion's presence context ids are per element, so compare the
@@ -78,7 +78,6 @@ export function createPresenceExitRegistry() {
         begin(onComplete: () => void) {
             cancel()
             active = true
-            participated = participants.size > 0
             finish = onComplete
             for (const participant of participants.values()) participant.complete = false
             const version = cycle
@@ -89,6 +88,15 @@ export function createPresenceExitRegistry() {
                 participant.complete = true
                 checkComplete()
             }
+        },
+        /**
+         * Complete the active cycle if nothing is registered with it, as
+         * upstream's post-commit effect does (PresenceChild.tsx:104-113 @
+         * v14.7.1). A no-op outside a cycle or while any participant is
+         * registered.
+         */
+        completeIfEmpty() {
+            if (active && participants.size === 0) checkComplete()
         },
         cancel
     }

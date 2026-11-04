@@ -860,10 +860,10 @@ describe('_MotionContainer', () => {
         }
     )
 
-    it('manual wrapper release may finish owned descendant exits early without double notification', async () => {
-        const group = await controlledOwnedGroup({ manual: true })
+    it('legacy manual release may finish owned descendant exits early without double notification', async () => {
+        const group = await controlledOwnedGroup({ manual: true, legacy: true })
         await group.update({ present: false })
-        group.result.getByTestId('probe').click()
+        group.result.getByTestId('legacy-probe').click()
         await flushTimers()
         expect(group.result.queryByTestId('owned-group')).toBeNull()
         expect(group.onExitComplete).toHaveBeenCalledTimes(1)
@@ -872,12 +872,61 @@ describe('_MotionContainer', () => {
         expect(group.onExitComplete).toHaveBeenCalledTimes(1)
     })
 
-    it('reading usePresence does not add a barrier to owned descendant exits', async () => {
+    it('a legacy usePresence read does not add a barrier to owned descendant exits', async () => {
+        const group = await controlledOwnedGroup({ manual: true, legacy: true })
+        await group.update({ present: false })
+        await group.complete('owned-fast')
+        expect(group.result.queryByTestId('legacy-probe')).toBeTruthy()
+        await group.complete('owned-slow')
+        expect(group.result.queryByTestId('owned-group')).toBeNull()
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+    })
+
+    // Plan 017. A `usePresence()` consumer is one participant
+    // (use-presence.ts:52-62 @ v14.7.1): the wrapper leaves once it and every
+    // motion exit are done (PresenceChild.tsx:67-75).
+    it('a usePresence consumer holds owned descendant exits until its own safeToRemove', async () => {
         const group = await controlledOwnedGroup({ manual: true })
         await group.update({ present: false })
         await group.complete('owned-fast')
-        expect(group.result.queryByTestId('probe')).toBeTruthy()
         await group.complete('owned-slow')
+        expect(group.result.queryByTestId('owned-group')).toBeTruthy()
+        expect(group.onExitComplete).not.toHaveBeenCalled()
+        group.result.getByTestId('probe').click()
+        await flushTimers()
+        expect(group.result.queryByTestId('owned-group')).toBeNull()
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+    })
+
+    it('a usePresence safeToRemove does not cut owned descendant exits short', async () => {
+        const group = await controlledOwnedGroup({ manual: true })
+        await group.update({ present: false })
+        // The consumer must have its callback, or the click proves nothing.
+        expect(group.result.getByTestId('probe').dataset.tupleHasCallback).toBe('true')
+        group.result.getByTestId('probe').click()
+        await flushTimers()
+        expect(group.result.queryByTestId('owned-fast')).toBeTruthy()
+        expect(group.result.queryByTestId('owned-slow')).toBeTruthy()
+        expect(group.onExitComplete).not.toHaveBeenCalled()
+        await group.complete('owned-fast')
+        await group.complete('owned-slow')
+        expect(group.result.queryByTestId('owned-group')).toBeNull()
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+    })
+
+    it('a featureless m beside a usePresence consumer waits for the consumer', async () => {
+        const group = await controlledOwnedGroup({
+            manual: true,
+            featureless: true,
+            fastPresent: false,
+            slowPresent: false
+        })
+        await group.update({ present: false })
+        await flushTimers()
+        await flushTimers()
+        expect(group.result.queryByTestId('owned-group')).toBeTruthy()
+        group.result.getByTestId('probe').click()
+        await flushTimers()
         expect(group.result.queryByTestId('owned-group')).toBeNull()
         expect(group.onExitComplete).toHaveBeenCalledTimes(1)
     })

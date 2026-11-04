@@ -1,7 +1,7 @@
 <script lang="ts">
     import { usePresence } from '$lib'
 
-    const presence = $derived(usePresence())
+    const presence = usePresence()
     const isPresent = $derived(presence[0])
     let node: HTMLElement | undefined = $state()
 
