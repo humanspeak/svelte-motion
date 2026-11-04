@@ -23,15 +23,20 @@ describe('MotionValue.jump', () => {
      * into the motion value. That must not override the value jumped to.
      */
     it('ends at the jumped value when stopping a running animation', () => {
-        Element.prototype.animate = vi.fn().mockImplementation(() => ({
-            cancel: vi.fn(),
-            onfinish: null,
-            playbackRate: 1,
-            currentTime: 300,
-            startTime: time.now() - 300,
-            playState: 'running',
-            effect: { getComputedTiming: () => ({ duration: 300 }) }
-        }))
+        const running = () =>
+            ({
+                cancel: vi.fn(),
+                onfinish: null,
+                playbackRate: 1,
+                currentTime: 300,
+                startTime: time.now() - 300,
+                playState: 'running',
+                effect: { getComputedTiming: () => ({ duration: 300 }) }
+            }) as unknown as Animation
+        Element.prototype.animate = vi.fn().mockImplementation(running)
+        // The shared vitest setup stubs `HTMLElement.prototype.animate` with an
+        // already-finished animation, which shadows the Element mock for a div
+        vi.spyOn(HTMLElement.prototype, 'animate').mockImplementation(running)
 
         const element = document.createElement('div')
         const value = motionValue(0)
