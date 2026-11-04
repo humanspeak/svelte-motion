@@ -6,11 +6,11 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { ArrowUpToLine, Gauge, Layers, ListOrdered, Zap } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import LayoutDependencyDefault from '$lib/examples/layout-dependency/demos/Default.svelte'
-    import LayoutDependencyKeyedList from '$lib/examples/layout-dependency/demos/KeyedList.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import LayoutDependencyDefault from '#lib/examples/layout-dependency/demos/Default.svelte'
+    import LayoutDependencyKeyedList from '#lib/examples/layout-dependency/demos/KeyedList.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

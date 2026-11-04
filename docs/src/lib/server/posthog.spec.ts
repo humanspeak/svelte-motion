@@ -12,7 +12,14 @@ const { env, posthogConstructor, shutdown } = vi.hoisted(() => {
     }
 })
 
-vi.mock('$env/dynamic/public', () => ({ env }))
+vi.mock('$app/env/public', () => ({
+    get PUBLIC_POSTHOG_PROJECT_TOKEN() {
+        return env.PUBLIC_POSTHOG_PROJECT_TOKEN
+    },
+    get PUBLIC_POSTHOG_HOST() {
+        return env.PUBLIC_POSTHOG_HOST
+    }
+}))
 vi.mock('posthog-node', () => ({ PostHog: posthogConstructor }))
 
 beforeEach(() => {

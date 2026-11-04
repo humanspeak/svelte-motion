@@ -4,9 +4,9 @@ description: Drive any object with animate() — createEffect, animate.addEffect
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte'
-  import Default from '$lib/examples/custom-effects/demos/Default.svelte'
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte'
+  import Default from '#lib/examples/custom-effects/demos/Default.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

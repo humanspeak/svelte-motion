@@ -6,12 +6,12 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Archive, ShieldCheck, Sparkles, TimerReset, Trash2 } from '@lucide/svelte'
-    import { demoCodeSamples } from '$lib/demo-code-samples'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import ArchiveArmedDemo from '$lib/examples/armed-buttons/demos/Archive.svelte'
-    import ArmedButtonsDefault from '$lib/examples/armed-buttons/demos/Default.svelte'
-    import DeleteArmedWaitDemo from '$lib/examples/armed-buttons/demos/DeleteWait.svelte'
+    import { demoCodeSamples } from '#lib/demo-code-samples.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import ArchiveArmedDemo from '#lib/examples/armed-buttons/demos/Archive.svelte'
+    import ArmedButtonsDefault from '#lib/examples/armed-buttons/demos/Default.svelte'
+    import DeleteArmedWaitDemo from '#lib/examples/armed-buttons/demos/DeleteWait.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

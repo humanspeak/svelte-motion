@@ -4,9 +4,9 @@ description: Component-free motion values — motionValue, springValue, transfor
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte'
-  import VanillaValuesDemo from '$lib/examples/vanilla-values/demos/Default.svelte'
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte'
+  import VanillaValuesDemo from '#lib/examples/vanilla-values/demos/Default.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

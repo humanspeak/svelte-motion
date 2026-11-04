@@ -9,7 +9,7 @@
   tab switch — the panel container (and any styling on it) stays stable.
 -->
 <script lang="ts">
-    import { cn, type WithoutChildrenOrChild } from '$lib/shadcn/utils'
+    import { cn, type WithoutChildrenOrChild } from '#lib/shadcn/utils.js'
     import {
         MotionDiv,
         type MotionAnimate,

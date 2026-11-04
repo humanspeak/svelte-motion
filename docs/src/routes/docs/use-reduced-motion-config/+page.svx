@@ -4,9 +4,9 @@ description: 'Resolve the active reduced-motion policy from <MotionConfig> and t
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import UseReducedMotionConfigExample from '$lib/examples/use-reduced-motion-config/demos/Default.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import UseReducedMotionConfigExample from '#lib/examples/use-reduced-motion-config/demos/Default.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

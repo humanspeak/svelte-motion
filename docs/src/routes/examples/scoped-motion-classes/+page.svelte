@@ -5,11 +5,11 @@
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { exampleSourceUrl } from '$lib/docs-config'
-    import ScopedMotionClassesDefault from '$lib/examples/scoped-motion-classes/demos/Default.svelte'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { exampleSourceUrl } from '#lib/docs-config.js'
+    import ScopedMotionClassesDefault from '#lib/examples/scoped-motion-classes/demos/Default.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

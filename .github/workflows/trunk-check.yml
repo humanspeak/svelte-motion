@@ -38,6 +38,9 @@ jobs:
             - name: Generate SvelteKit tsconfigs for type-aware lint
               run: |
                   pnpm exec svelte-kit sync
+                  # Kit 3's sync evaluates docs/vite.config.ts, which imports the
+                  # library's built `@humanspeak/svelte-motion/vite` entry.
+                  pnpm run package
                   pnpm --filter docs exec svelte-kit sync
 
             - name: Trunk Code Quality

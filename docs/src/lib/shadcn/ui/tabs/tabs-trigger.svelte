@@ -8,7 +8,7 @@
   (background swap for `default`, underline for `line`).
 -->
 <script lang="ts">
-    import { cn, type WithoutChildrenOrChild } from '$lib/shadcn/utils'
+    import { cn, type WithoutChildrenOrChild } from '#lib/shadcn/utils.js'
     import { AnimatePresence, MotionDiv } from '@humanspeak/svelte-motion'
     import { Tabs as TabsPrimitive, type TabsTriggerProps as BitsTabsTriggerProps } from 'bits-ui'
     import { getContext } from 'svelte'

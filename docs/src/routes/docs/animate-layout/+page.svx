@@ -4,9 +4,9 @@ description: Animate layout changes on plain HTML elements with animateLayout â€
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte'
-  import AnimateLayoutExample from '$lib/examples/AnimateLayoutExample.svelte'
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte'
+  import AnimateLayoutExample from '#lib/examples/AnimateLayoutExample.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

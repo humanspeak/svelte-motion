@@ -4,9 +4,9 @@ description: 'Pass MotionValues directly to object-form style props.'
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import ObjectStyleMotionValuesExample from '$lib/examples/object-style-motion-values/demos/Default.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import ObjectStyleMotionValuesExample from '#lib/examples/object-style-motion-values/demos/Default.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { OG } from '@humanspeak/docs-kit'
-    import { docsConfig } from '$lib/docs-config'
+    import { docsConfig } from '#lib/docs-config.js'
 
     const {
         type = 'og',

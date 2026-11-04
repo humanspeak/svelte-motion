@@ -6,11 +6,11 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Crosshair, Layers, MoveHorizontal, PanelLeft, Target, Unlink } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import CenteredAnchor from '$lib/examples/layout-root/demos/CenteredAnchor.svelte'
-    import SidebarTabs from '$lib/examples/layout-root/demos/SidebarTabs.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import CenteredAnchor from '#lib/examples/layout-root/demos/CenteredAnchor.svelte'
+    import SidebarTabs from '#lib/examples/layout-root/demos/SidebarTabs.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

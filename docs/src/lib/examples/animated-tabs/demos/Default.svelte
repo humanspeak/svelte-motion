@@ -1,5 +1,5 @@
 <script lang="ts">
-    import * as Tabs from '$lib/shadcn/ui/tabs'
+    import * as Tabs from '#lib/shadcn/ui/tabs/index.js'
 </script>
 
 <!-- dk-strip: positioning shell — centers the tabs inside `.dk-ex-body`

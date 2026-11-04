@@ -4,9 +4,9 @@ description: Drop-in animated replacement for shadcn Tabs with a spring-based sl
 ---
 
 <script>
-  import * as Tabs from '$lib/shadcn/ui/tabs'
-  import ComponentSource from '$lib/components/general/ComponentSource.svelte'
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import * as Tabs from '#lib/shadcn/ui/tabs/index.js'
+  import ComponentSource from '#lib/components/general/ComponentSource.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
   import { Download } from '@lucide/svelte'
 
   const { data } = $props()

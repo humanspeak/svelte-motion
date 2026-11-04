@@ -6,11 +6,11 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Axis3d, Box, Hand, Layers, MousePointer2, RotateCw } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import DragTransformsAngled from '$lib/examples/drag-transforms/demos/Angled.svelte'
-    import DragTransformsPerspective from '$lib/examples/drag-transforms/demos/Perspective.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import DragTransformsAngled from '#lib/examples/drag-transforms/demos/Angled.svelte'
+    import DragTransformsPerspective from '#lib/examples/drag-transforms/demos/Perspective.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

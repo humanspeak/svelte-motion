@@ -4,9 +4,9 @@ description: 'Customize the generated CSS transform string for motion components
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import TransformTemplateExample from '$lib/examples/transform-template/demos/Default.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import TransformTemplateExample from '#lib/examples/transform-template/demos/Default.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

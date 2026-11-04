@@ -4,9 +4,9 @@ description: 'Choose the transition a value uses when it leaves a state, includi
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import TransitionOutExample from '$lib/examples/transition-out/demos/Default.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import TransitionOutExample from '#lib/examples/transition-out/demos/Default.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

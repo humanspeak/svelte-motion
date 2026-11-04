@@ -81,8 +81,9 @@ const COMPONENT_MAP = {
 function rewriteImports(content, sourceFilename, fileRenames, pascalName) {
     let result = content
 
-    // Rewrite $lib/shadcn/utils → $UTILS$ (CLI resolves this to consumer's utils path)
-    result = result.replace(/\$lib\/shadcn\/utils/g, '$UTILS$')
+    // Rewrite #lib/shadcn/utils.js (or legacy $lib/shadcn/utils) → $UTILS$
+    // (CLI resolves this to consumer's utils path)
+    result = result.replace(/[$#]lib\/shadcn\/utils(?:\.js)?/g, '$UTILS$')
 
     // Rewrite relative imports to match renamed files
     // e.g. ./button.svelte → ./animated-button.svelte

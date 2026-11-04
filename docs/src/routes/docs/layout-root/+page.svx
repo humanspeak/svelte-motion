@@ -4,10 +4,10 @@ description: 'Animate shared layoutId elements relative to a layout root, and ch
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import SidebarTabs from '$lib/examples/layout-root/demos/SidebarTabs.svelte';
-  import CenteredAnchor from '$lib/examples/layout-root/demos/CenteredAnchor.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import SidebarTabs from '#lib/examples/layout-root/demos/SidebarTabs.svelte';
+  import CenteredAnchor from '#lib/examples/layout-root/demos/CenteredAnchor.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

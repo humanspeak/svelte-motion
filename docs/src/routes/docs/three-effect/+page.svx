@@ -4,9 +4,9 @@ description: Animate Three.js objects, materials and shader uniforms with threeE
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte'
-  import Default from '$lib/examples/three-effect/demos/Default.svelte'
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte'
+  import Default from '#lib/examples/three-effect/demos/Default.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

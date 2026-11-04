@@ -1,4 +1,4 @@
-import { EXAMPLES } from '$lib/examplesIndex'
+import { EXAMPLES } from '#lib/examplesIndex.js'
 import type { PageLoad } from './$types'
 
 export const load: PageLoad = () => ({

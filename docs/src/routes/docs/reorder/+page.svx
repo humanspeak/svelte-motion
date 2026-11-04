@@ -4,9 +4,9 @@ description: Drag-to-reorder lists and wrapped grids with automatic axis detecti
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte'
-  import ReorderExample from '$lib/examples/ReorderExample.svelte'
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte'
+  import ReorderExample from '#lib/examples/ReorderExample.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

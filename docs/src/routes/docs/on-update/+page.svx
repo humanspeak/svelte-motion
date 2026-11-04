@@ -4,9 +4,9 @@ description: 'Read every latest motion value once per frame with the onUpdate pr
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import OnUpdateExample from '$lib/examples/on-update/demos/Default.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import OnUpdateExample from '#lib/examples/on-update/demos/Default.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

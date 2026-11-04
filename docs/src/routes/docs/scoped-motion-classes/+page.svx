@@ -4,9 +4,9 @@ description: Use @humanspeak/svelte-scoped-props when component-scoped CSS class
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte'
-  import ScopedMotionClasses from '$lib/examples/scoped-motion-classes/demos/Default.svelte'
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte'
+  import ScopedMotionClasses from '#lib/examples/scoped-motion-classes/demos/Default.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

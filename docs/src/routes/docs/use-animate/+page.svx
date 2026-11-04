@@ -4,10 +4,10 @@ description: 'Imperative animation with a scoped CSS-selector API.'
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import UseAnimateExample from '$lib/examples/use-animate/demos/Default.svelte';
-  import UseAnimateTimelineExample from '$lib/examples/use-animate/demos/Timeline.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import UseAnimateExample from '#lib/examples/use-animate/demos/Default.svelte';
+  import UseAnimateTimelineExample from '#lib/examples/use-animate/demos/Timeline.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

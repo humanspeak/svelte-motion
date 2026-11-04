@@ -4,9 +4,9 @@ description: 'Custom exit animations driven from the child component.'
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte';
-  import UsePresenceExample from '$lib/examples/use-presence/demos/Default.svelte';
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte';
+  import UsePresenceExample from '#lib/examples/use-presence/demos/Default.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

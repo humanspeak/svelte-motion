@@ -24,7 +24,7 @@
 </script>
 
 <script lang="ts">
-    import { cn, type WithoutChildrenOrChild } from '$lib/shadcn/utils'
+    import { cn, type WithoutChildrenOrChild } from '#lib/shadcn/utils.js'
     import { Tabs as TabsPrimitive, type TabsRootProps as BitsTabsRootProps } from 'bits-ui'
     import { setContext } from 'svelte'
 

@@ -9,7 +9,7 @@
   Set `animated={false}` to disable motion and get vanilla shadcn behavior.
 -->
 <script lang="ts" module>
-    import { cn, type WithElementRef } from '$lib/shadcn/utils'
+    import { cn, type WithElementRef } from '#lib/shadcn/utils.js'
     import type { HTMLAnchorAttributes, HTMLButtonAttributes } from 'svelte/elements'
     import { type VariantProps, tv } from 'tailwind-variants'
 

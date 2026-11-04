@@ -1,8 +1,8 @@
 <script lang="ts">
     import { CompareIndexV2 } from '@humanspeak/docs-kit'
-    import { competitors, ours } from '$lib/compare-data'
+    import { competitors, ours } from '#lib/compare-data.js'
     import posthog from 'posthog-js'
-    import { browser } from '$app/environment'
+    import { browser } from '$app/env'
 
     $effect(() => {
         if (browser) {

@@ -2,7 +2,7 @@
     import { Dialog } from 'bits-ui'
     import { AnimatePresence, motion } from '@humanspeak/svelte-motion'
     import posthog from 'posthog-js'
-    import { registryItems } from '$lib/generated/registry-data'
+    import { registryItems } from '#lib/generated/registry-data.js'
     import {
         Code,
         ChevronRight,

@@ -4,9 +4,9 @@ description: 'Create an animate function bound to a scope element — the factor
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte'
-  import Default from '$lib/examples/create-scoped-animate/demos/Default.svelte'
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte'
+  import Default from '#lib/examples/create-scoped-animate/demos/Default.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

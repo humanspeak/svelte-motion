@@ -1,4 +1,4 @@
-import { demoCodeSample, type DemoCodeLoaderKey, type DemoCodeSample } from '$lib/demo-loaders'
+import { demoCodeSample, type DemoCodeLoaderKey, type DemoCodeSample } from '#lib/demo-loaders.js'
 
 const demoCodeDependencies: Partial<Record<DemoCodeLoaderKey, DemoCodeLoaderKey[]>> = {
     'armed-buttons/demos/Archive.svelte': ['armed-buttons/ArchiveArmedButton.svelte'],

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { page } from '$app/state'
     import { afterNavigate } from '$app/navigation'
-    import { browser } from '$app/environment'
+    import { browser } from '$app/env'
     import posthog from 'posthog-js'
     import {
         HeaderV2,
@@ -14,10 +14,10 @@
         extractHeadings,
         type TocHeading
     } from '@humanspeak/docs-kit'
-    import { docsConfig } from '$lib/docs-config'
-    import favicon from '$lib/assets/logo.svg'
-    import { docsSections, headerNav, motionLoveAndRespect } from '$lib/docsNav'
-    import sitemapManifest from '$lib/sitemap-manifest.json'
+    import { docsConfig } from '#lib/docs-config.js'
+    import favicon from '#lib/assets/logo.svg'
+    import { docsSections, headerNav, motionLoveAndRespect } from '#lib/docsNav.js'
+    import sitemapManifest from '#lib/sitemap-manifest.json'
     import rootPkg from '../../../../package.json'
     import '@fontsource-variable/inter/index.css'
     import '@fontsource-variable/jetbrains-mono/index.css'
@@ -130,7 +130,9 @@
         if (contentElement) refreshHeadings()
     })
 
-    afterNavigate(() => {
+    afterNavigate(({ shallow, type }) => {
+        if (shallow && type === 'goto') return
+
         requestAnimationFrame(refreshHeadings)
         if (browser) {
             posthog.capture('doc_page_viewed', {

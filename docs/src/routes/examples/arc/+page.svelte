@@ -6,12 +6,12 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Compass, MoveRight, RotateCw, Share2, Spline, Waypoints } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import ArcDefault from '$lib/examples/arc/demos/Default.svelte'
-    import ArcLayout from '$lib/examples/arc/demos/Layout.svelte'
-    import ArcRotate from '$lib/examples/arc/demos/Rotate.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import ArcDefault from '#lib/examples/arc/demos/Default.svelte'
+    import ArcLayout from '#lib/examples/arc/demos/Layout.svelte'
+    import ArcRotate from '#lib/examples/arc/demos/Rotate.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()

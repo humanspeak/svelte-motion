@@ -4,9 +4,9 @@ description: 'Motion generators for decelerating inertia and eased tweens — pa
 ---
 
 <script>
-  import Example from '$lib/components/general/Example.svelte'
-  import Default from '$lib/examples/inertia/demos/Default.svelte'
-  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+  import Example from '#lib/components/general/Example.svelte'
+  import Default from '#lib/examples/inertia/demos/Default.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
 
   const seo = getSeoContext()
   if (seo) {

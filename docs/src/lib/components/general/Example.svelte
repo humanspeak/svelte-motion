@@ -10,7 +10,7 @@
 -->
 <script lang="ts">
     import { EmbeddedExampleV2 } from '@humanspeak/docs-kit'
-    import { exampleSourceUrl } from '$lib/docs-config'
+    import { exampleSourceUrl } from '#lib/docs-config.js'
     import type { Snippet } from 'svelte'
 
     type ExampleProps = {

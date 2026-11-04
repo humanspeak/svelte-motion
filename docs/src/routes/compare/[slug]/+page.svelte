@@ -1,8 +1,8 @@
 <script lang="ts">
     import { ComparisonPageV2, type CompareSlugLoadData } from '@humanspeak/docs-kit'
-    import { competitors, ours } from '$lib/compare-data'
+    import { competitors, ours } from '#lib/compare-data.js'
     import posthog from 'posthog-js'
-    import { browser } from '$app/environment'
+    import { browser } from '$app/env'
 
     const { data }: { data: CompareSlugLoadData } = $props()
     const others = $derived(competitors.filter((c) => c.slug !== data.competitor.slug))

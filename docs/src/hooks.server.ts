@@ -1,7 +1,6 @@
-import { getPostHogClient } from '$lib/server/posthog'
+import { getPostHogClient } from '#lib/server/posthog.js'
 import { createSecurityHeadersHandle } from '@humanspeak/docs-kit/hooks'
-import type { Handle, HandleServerError } from '@sveltejs/kit'
-import { sequence } from '@sveltejs/kit/hooks'
+import { sequence, type Handle, type HandleServerError } from '@sveltejs/kit/hooks'
 
 const handlePostHogProxy: Handle = async ({ event, resolve }) => {
     const { pathname } = event.url
@@ -43,26 +42,24 @@ const handlePostHogProxy: Handle = async ({ event, resolve }) => {
 export const handle: Handle = sequence(handlePostHogProxy, createSecurityHeadersHandle())
 
 /**
- * Reports server errors when analytics is configured and preserves the error response.
+ * Reports unexpected server errors when analytics is configured.
  *
- * @param input - The SvelteKit server error and response details.
- * @returns The original public error message and status.
+ * Kit 3 routes expected errors (404s, `error()` calls) through this hook too;
+ * only report genuinely unexpected ones. Returning nothing keeps SvelteKit's
+ * default status and message (500 / "Internal Error" for unknown errors).
+ *
+ * @param input - The SvelteKit caught error and its kind.
  */
-export const handleError: HandleServerError = async ({ error, status, message }) => {
-    const posthog = getPostHogClient()
+export const handleError: HandleServerError = ({ kind, error }) => {
+    if (kind !== 'unknown') return
 
-    posthog?.capture({
+    getPostHogClient()?.capture({
         distinctId: 'server',
         event: 'server_error',
         properties: {
             error: error instanceof Error ? error.message : String(error),
-            status,
-            message
+            status: 500,
+            message: 'Internal Error'
         }
     })
-
-    return {
-        message,
-        status
-    }
 }

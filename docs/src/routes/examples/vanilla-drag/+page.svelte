@@ -6,10 +6,10 @@
         formatSheetLabel
     } from '@humanspeak/docs-kit'
     import { Hand, MoveHorizontal, RotateCcw } from '@lucide/svelte'
-    import { demoCodeSample } from '$lib/demo-loaders'
-    import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
-    import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
-    import VanillaDragSliderKnob from '$lib/examples/vanilla-drag/demos/SliderKnob.svelte'
+    import { demoCodeSample } from '#lib/demo-loaders.js'
+    import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
+    import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import VanillaDragSliderKnob from '#lib/examples/vanilla-drag/demos/SliderKnob.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
     const seo = getSeoContext()
