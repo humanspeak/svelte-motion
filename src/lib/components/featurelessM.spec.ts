@@ -6,6 +6,7 @@ import { visualElementStore } from 'motion-dom'
 import { tick } from 'svelte'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import FeaturelessMProbe from './__tests__/FeaturelessMProbe.svelte'
+import FeaturelessOwnedPresenceProbe from './__tests__/FeaturelessOwnedPresenceProbe.svelte'
 import FeaturelessParentProbe from './__tests__/FeaturelessParentProbe.svelte'
 import FeaturelessPresenceProbe from './__tests__/FeaturelessPresenceProbe.svelte'
 import FeaturelessStyleProbe from './__tests__/FeaturelessStyleProbe.svelte'
@@ -300,6 +301,57 @@ describe('m without LazyMotion features', () => {
 
             expect(document.querySelectorAll('[data-clone="true"]').length).toBe(0)
             expect(screen.queryByTestId('leaver')).toBeNull()
+        } finally {
+            proto.getAnimations = originalGetAnimations
+        }
+    })
+
+    // U13 (plan 017). The owned form (`present` + `child`): nothing registers
+    // for a featureless `m`, so its PresenceChild completes at once
+    // (`PresenceChild.tsx:104-113` @ v14.7.1).
+    it('a featureless m in an owned presence leaves at once and onExitComplete fires once', async () => {
+        const proto = Element.prototype as unknown as { getAnimations?: () => Animation[] }
+        const originalGetAnimations = proto.getAnimations
+        proto.getAnimations = () => []
+        try {
+            const onExitComplete = vi.fn()
+            const result = render(FeaturelessOwnedPresenceProbe, {
+                props: { show: true, onExitComplete }
+            })
+            await vi.advanceTimersByTimeAsync(50)
+            await tick()
+            expect(screen.queryByTestId('owned-leaver')).not.toBeNull()
+            await result.rerender({ show: false, onExitComplete })
+            await tick()
+            await tick()
+
+            expect(screen.queryByTestId('owned-leaver')).toBeNull()
+            expect(onExitComplete).toHaveBeenCalledTimes(1)
+            await vi.advanceTimersByTimeAsync(2000)
+            expect(onExitComplete).toHaveBeenCalledTimes(1)
+        } finally {
+            proto.getAnimations = originalGetAnimations
+        }
+    })
+
+    // U14 (guard). With LazyMotion features the node's exit feature registers,
+    // so the wrapper holds for its exit.
+    it('an m with LazyMotion features in an owned presence still runs its exit', async () => {
+        const proto = Element.prototype as unknown as { getAnimations?: () => Animation[] }
+        const originalGetAnimations = proto.getAnimations
+        proto.getAnimations = () => []
+        try {
+            const onExitComplete = vi.fn()
+            const result = render(FeaturelessOwnedPresenceProbe, {
+                props: { show: true, lazy: true, onExitComplete }
+            })
+            await vi.advanceTimersByTimeAsync(50)
+            await tick()
+            await result.rerender({ show: false, lazy: true, onExitComplete })
+            await flushTimers()
+
+            expect(screen.queryByTestId('owned-leaver')).not.toBeNull()
+            expect(onExitComplete).not.toHaveBeenCalled()
         } finally {
             proto.getAnimations = originalGetAnimations
         }

@@ -2,8 +2,9 @@
     import { useIsPresent, usePresence } from '$lib/utils/usePresence'
 
     const isPresent = $derived(useIsPresent())
-    const presence = $derived(usePresence())
-    const [tupleIsPresent, safeToRemove] = $derived(presence)
+    const presence = usePresence()
+    const tupleIsPresent = $derived(presence[0])
+    const safeToRemove = $derived(presence[1])
 </script>
 
 <div

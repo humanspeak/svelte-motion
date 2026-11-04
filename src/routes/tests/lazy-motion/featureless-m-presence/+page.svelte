@@ -20,6 +20,9 @@
      *   `<LazyMotion features={domAnimation}>` (the control).
      * - wait-enter: `mode="wait"`; a `motion.div` swaps to a bare `m.div`.
      * - wait-leave: `mode="wait"`; a bare `m.div` swaps to a `motion.div`.
+     * - owned exit: the same pair in the owned `present` + `child` form;
+     *   nothing registers for the bare `m`, so its wrapper leaves at once,
+     *   `PresenceChild.tsx:104-113` (plan 017).
      *
      * Every card has a featured element so `window.MotionIsMounted` is set (a
      * featureless `m` never sets it). The `data-testid`s are what
@@ -30,10 +33,13 @@
     let showExit = $state(true)
     let enterSwapped = $state(false)
     let leaveSwapped = $state(false)
+    let showOwned = $state(true)
+    let ownedBareCompletions = $state(0)
 
     const toggleExit = () => (showExit = !showExit)
     const swapEnter = () => (enterSwapped = !enterSwapped)
     const swapLeave = () => (leaveSwapped = !leaveSwapped)
+    const toggleOwned = () => (showOwned = !showOwned)
 
     // ---- Live verdicts (tester only; never under `@isPlaywright=true`) ----
     type Verdict = { ok: boolean; text: string }
@@ -41,6 +47,7 @@
     let exitVerdict = $state<Verdict | null>(null)
     let enterVerdict = $state<Verdict | null>(null)
     let leaveVerdict = $state<Verdict | null>(null)
+    let ownedVerdict = $state<Verdict | null>(null)
 
     onMount(() => {
         isTester = !window.location.search.includes('@isPlaywright=true')
@@ -115,6 +122,30 @@
         })
     }
 
+    const runOwned = () => {
+        const leaving = showOwned
+        toggleOwned()
+        if (!isTester || !leaving) return
+        let bareSeen = 0
+        let controlFrames = 0
+        everyFrame(60, (index) => {
+            if (byTestId('owned-bare')) bareSeen++
+            const control = byTestId('owned-control')
+            if (
+                control &&
+                getComputedStyle(control).visibility !== 'hidden' &&
+                Number(getComputedStyle(control).opacity) > 0
+            )
+                controlFrames++
+            if (index === 59) {
+                ownedVerdict = {
+                    ok: bareSeen === 0 && controlFrames >= 3,
+                    text: `bare painted on ${bareSeen} frames (want 0) · control on ${controlFrames} (want ≥ 3)`
+                }
+            }
+        })
+    }
+
     const steps: TesterStep[] = [
         {
             text: 'Exit card: press "Toggle exit" once.',
@@ -133,6 +164,12 @@
             expected:
                 'The old bare box is gone at once and the new box starts fading in right away, without waiting 0.6 s. The chip reads OK.',
             action: { label: 'Swap (leave)', run: runLeave }
+        },
+        {
+            text: 'Owned exit card: press "Toggle owned" once.',
+            expected:
+                'The bare box disappears at once, with no fade, and completions reads 1. The control box fades and shrinks for about 0.6 s. The chip reads OK.',
+            action: { label: 'Toggle owned', run: runOwned }
         }
     ]
 </script>
@@ -263,12 +300,54 @@
             {@render ready()}
         </div>
     </section>
+
+    <section class="card">
+        <h2>Owned exit {@render chip(ownedVerdict)}</h2>
+        <button type="button" data-testid="toggle-owned" onclick={runOwned}>Toggle owned</button>
+        <div class="row">
+            <div class="slot">
+                <AnimatePresence present={showOwned} onExitComplete={() => ownedBareCompletions++}>
+                    {#snippet child()}
+                        <m.div
+                            data-testid="owned-bare"
+                            class="box"
+                            initial={{ opacity: 0.4 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0, scale: 0.5 }}
+                            {transition}>bare</m.div
+                        >
+                    {/snippet}
+                </AnimatePresence>
+            </div>
+            <div class="slot">
+                <LazyMotion features={domAnimation}>
+                    <AnimatePresence present={showOwned}>
+                        {#snippet child()}
+                            <m.div
+                                data-testid="owned-control"
+                                class="box control"
+                                initial={{ opacity: 0.4 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0, scale: 0.5 }}
+                                {transition}>control</m.div
+                            >
+                        {/snippet}
+                    </AnimatePresence>
+                </LazyMotion>
+            </div>
+            <span
+                >completions: <span data-testid="owned-bare-completions"
+                    >{ownedBareCompletions}</span
+                ></span
+            >
+        </div>
+    </section>
 </main>
 
 <TesterPanel
     eyebrow="motion/features/animation/exit.ts (Motion 14.7.1)"
     title="A featureless m leaves AnimatePresence at once"
-    status="Expected on this build: all three chips read OK."
+    status="Expected on this build: all four chips read OK."
     {steps}
 >
     {#snippet checks()}

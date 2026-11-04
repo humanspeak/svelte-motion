@@ -223,4 +223,71 @@ test.describe('usePresence', () => {
         await expect(page.getByTestId('wait-b')).toHaveCount(0, { timeout: 5000 })
         await expect(page.getByTestId('wait-a')).toHaveAttribute('data-is-present', 'true')
     })
+
+    // Plan 017. Each `usePresence()` consumer is one participant and its
+    // `safeToRemove` completes only that participant (use-presence.ts:59-62 @
+    // v14.7.1), so a CSS consumer can't cut a slower motion exit short.
+    test('a usePresence consumer and a motion exit each hold the owned wrapper', async ({
+        page
+    }) => {
+        await page.goto('/tests/use-presence?@isPlaywright=true')
+        await expect(page.getByTestId('mixed-motion')).toBeVisible()
+        const frames = await page.evaluate(
+            () =>
+                new Promise<
+                    {
+                        t: number
+                        css: boolean
+                        released: boolean
+                        motion: boolean
+                        opacity: number
+                    }[]
+                >((resolve) => {
+                    const out: {
+                        t: number
+                        css: boolean
+                        released: boolean
+                        motion: boolean
+                        opacity: number
+                    }[] = []
+                    const start = performance.now()
+                    const step = () => {
+                        const css = document.querySelector<HTMLElement>('[data-testid="mixed-css"]')
+                        const motion = document.querySelector<HTMLElement>(
+                            '[data-testid="mixed-motion"]'
+                        )
+                        out.push({
+                            t: performance.now() - start,
+                            css: !!css,
+                            released: css?.dataset.released === 'true',
+                            motion: !!motion,
+                            opacity: motion ? Number(getComputedStyle(motion).opacity) : -1
+                        })
+                        if ((css || motion) && performance.now() - start < 2500)
+                            requestAnimationFrame(step)
+                        else resolve(out)
+                    }
+                    document.querySelector<HTMLElement>('[data-testid="toggle-mixed"]')!.click()
+                    requestAnimationFrame(step)
+                })
+        )
+        const show = JSON.stringify(frames)
+        const withMotion = frames.filter((frame) => frame.motion)
+        expect(withMotion.length, show).toBeGreaterThan(0)
+        expect(withMotion[withMotion.length - 1].opacity, show).toBeLessThanOrEqual(0.1)
+        const cssGone = frames.findIndex((frame) => !frame.css)
+        const motionGone = frames.findIndex((frame) => !frame.motion)
+        expect(cssGone, show).toBeGreaterThanOrEqual(0)
+        expect(cssGone, show).toBe(motionGone)
+        expect(
+            frames.some((frame) => frame.t >= 400 && frame.css && frame.motion),
+            show
+        ).toBe(true)
+        // (d) The CSS consumer got and used its callback before the removal frame.
+        expect(
+            frames.slice(0, cssGone).some((frame) => frame.css && frame.released),
+            show
+        ).toBe(true)
+        await expect(page.getByTestId('mixed-completions')).toHaveText('1')
+    })
 })

@@ -12,7 +12,7 @@
 <script lang="ts">
     import { usePresence } from '$lib/utils/usePresence'
 
-    const presence = $derived(usePresence())
+    const presence = usePresence()
 
     $effect(() => {
         const [, safeToRemove] = presence
